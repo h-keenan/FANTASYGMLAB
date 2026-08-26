@@ -302,6 +302,25 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     text-transform: uppercase;
     white-space: nowrap;
 }
+@media (min-width: 520px) {
+    .trade-summary-title { color: var(--color-text-muted); font-size: var(--font-size-body); font-weight: var(--font-weight-body); }
+    .trade-summary-category { opacity: 0.78; }
+    .trade-summary-assets .dg-compact-asset--compact,
+    .trade-summary-assets .dg-compact-asset--standard {
+        --size-asset-compact: 2.75rem;
+        --size-asset-standard: 2.75rem;
+        column-gap: var(--space-sm);
+        grid-template-columns: 2.75rem minmax(0, 1fr) max-content;
+        width: 100%;
+    }
+    .trade-summary-assets .dg-compact-asset-avatar,
+    .trade-summary-assets .dg-compact-pick-plate {
+        flex-basis: 2.75rem;
+        height: 2.75rem;
+        width: 2.75rem;
+    }
+    .trade-summary-assets .dg-compact-asset-name { font: var(--font-card-title); }
+}
 @media (min-width: 360px) {
     .trade-summary-package { align-items: start; column-gap: var(--space-sm); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); justify-content: stretch; max-width: 100%; width: 100%; }
     .trade-summary-for { align-self: center; display: flex; }
@@ -430,6 +449,66 @@ def _safe_text(value, default: str = "") -> str:
     except Exception:
         pass
     return str(value)
+
+
+def _team_name_from_summary(summary: pd.DataFrame, roster_id: str) -> str:
+    if summary is None or getattr(summary, "empty", True) or "roster_id" not in summary.columns:
+        return ""
+    rid = str(roster_id or "").strip()
+    if not rid:
+        return ""
+    matched = summary.loc[summary["roster_id"].astype(str) == rid]
+    if matched.empty:
+        return ""
+    for column in ("team_name", "display_name", "owner_name"):
+        if column not in matched.columns:
+            continue
+        name = str(matched.iloc[0].get(column) or "").strip()
+        if name:
+            return name
+    return ""
+
+
+def authenticated_team_display_name(
+    session: MutableMapping | None = None,
+    *,
+    idea: Mapping | None = None,
+    roster_id: str = "",
+) -> str:
+    """Resolve the signed-in roster's public team name. Not League Teams browse state."""
+
+    payload = idea or {}
+    named = str(payload.get("my_team_name") or "").strip()
+    if named:
+        return named
+    state = session if session is not None else getattr(st, "session_state", {})
+    rid = str(roster_id or "").strip() or str(state.get("my_roster_id") or "").strip()
+    if not rid:
+        return ""
+    try:
+        from modules import prepared_player_frame
+
+        store = state.get(prepared_player_frame.SHARED_CONTEXT_KEY)
+    except Exception:
+        store = None
+    frames: list[pd.DataFrame] = []
+    if isinstance(store, dict):
+        league_id = str(state.get("selected_league_id") or "").strip()
+        for memo_key, item in store.items():
+            if not isinstance(item, dict):
+                continue
+            summary = item.get("team_direction_summary")
+            if not isinstance(summary, pd.DataFrame) or summary.empty:
+                continue
+            if not league_id or league_id in str(memo_key):
+                frames.insert(0, summary)
+            else:
+                frames.append(summary)
+    for summary in frames:
+        found = _team_name_from_summary(summary, rid)
+        if found:
+            return found
+    return ""
 
 
 def _compact_copy(value: object, *, limit: int = 180, default: str = "") -> str:
@@ -1301,7 +1380,7 @@ def _trade_summary_assets_html(assets: list[dict]) -> str:
         return "<div class='trade-summary-assets'><span class='trade-summary-asset-name'>No assets</span></div>"
     return (
         "<div class='trade-summary-assets'>"
-        + compact_asset_stack_html(assets, size="compact", show_value=False, show_role=False)
+        + compact_asset_stack_html(assets, size="standard", show_value=False, show_role=False)
         + "</div>"
     )
 
@@ -1924,9 +2003,11 @@ def render_trade_idea_card(
             on_dismiss=_dismiss_trade_detail,
         )
         def _trade_detail_dialog() -> None:
-            from modules.share_recommendation_cards import trade_share_side_labels as _side_labels
+            from modules.share_recommendation_cards import in_app_trade_side_labels as _side_labels
+
+            mine = authenticated_team_display_name(st.session_state, idea=idea)
             send_label, receive_label = _side_labels(
-                my_team_name=_safe_text(st.session_state.get("selected_team_name")),
+                my_team_name=mine,
                 partner_name=_safe_text(idea.get("partner_team_name")),
             )
             package_html = compact_assets_html or assets_html
@@ -2009,7 +2090,9 @@ def render_trade_idea_card(
                     share_card = share_cards.build_trade_share_card(
                         idea,
                         source_surface="trade_review",
-                        my_team_name=_safe_text(st.session_state.get("selected_team_name")),
+                        my_team_name=authenticated_team_display_name(
+                            st.session_state, idea=idea
+                        ),
                     )
                     share_recommendation_ui.render_share_controls(
                         share_card,

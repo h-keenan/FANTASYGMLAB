@@ -100,7 +100,7 @@ def test_standard_trade_idea_portrait_meets_identity_row_contract():
     assert "Tyrone Tracy" in html
     assert "RB · NYG" in html
     css = (COMPACT_FANTASY_ASSET_CSS + TRADE_SUMMARY_COMPONENT_CSS).replace(" ", "")
-    assert "dg-compact-asset--standard{--size-asset-standard:3.25rem" in css
+    assert "--size-asset-standard:2.75rem" in css
     assert ".dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard)" in css
     compact = compact_asset_html(
         {

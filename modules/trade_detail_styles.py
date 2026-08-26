@@ -209,9 +209,9 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     }
 
     .trade-detail-modal .trade-matchup-compact {
-        gap: var(--space-lg);
+        gap: var(--space-sm);
         grid-template-columns: minmax(0, 1fr) 3rem minmax(0, 1fr);
-        padding: var(--space-md) var(--space-lg);
+        padding: var(--space-sm);
     }
 }
 
@@ -222,9 +222,26 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
     }
 
     .trade-detail-modal .trade-matchup-compact {
-        gap: var(--space-xl);
-        padding: var(--space-lg) var(--space-xl);
+        gap: var(--space-md);
+        padding: var(--space-sm) var(--space-md);
     }
+}
+
+.trade-detail-modal.trade-detail-modal--decision {
+    border-color: var(--color-border);
+}
+.trade-detail-modal .trade-card-partner {
+    padding: var(--space-2xs) 0 var(--space-xs);
+}
+.trade-detail-modal .trade-matchup-compact .trade-side {
+    padding: var(--space-xs) 0 !important;
+}
+.trade-detail-modal .trade-asset-row,
+.trade-detail-modal .trade-asset-row-compact {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: var(--space-2xs) 0 !important;
 }
 
 /* Canonical share PNG displayed compact; source is full-resolution, content-tall. */

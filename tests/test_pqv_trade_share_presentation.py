@@ -97,6 +97,12 @@ def test_share_labels_are_perspective_safe_with_and_without_team_names():
     )
     assert named.send_side_label == "Tongue Punchers receives"
     assert named.receive_side_label == "Harbor Club receives"
+    rewritten = share.rewrite_share_reason_sides(
+        "You add future flexibility.",
+        my_team_name="Harbor Club",
+    )
+    assert rewritten == "Harbor Club adds future flexibility."
+    assert "You " not in rewritten
     payload = share.build_share_text_payload(named)
     assert "YOU GIVE" not in payload
     assert "YOU GET" not in payload
@@ -109,12 +115,48 @@ def test_share_labels_are_perspective_safe_with_and_without_team_names():
             "trade_gain": 0,
             "send_assets": [{"name": "Send", "player_id": "1"}],
             "receive_assets": [{"name": "Get", "player_id": "2"}],
-            "reasoning_summary": "Even swap.",
+            "reasoning_summary": "You add future flexibility.",
         }
     )
     assert unnamed.send_side_label == "Trade partner receives"
-    assert unnamed.receive_side_label == "Proposing roster receives"
+    assert unnamed.receive_side_label == "This roster receives"
     assert "YOU GIVE" not in share.build_share_text_payload(unnamed)
+    assert "Proposing roster" not in share.build_share_text_payload(unnamed)
+    assert "You add" not in unnamed.reason
+    assert "This roster adds future flexibility" in unnamed.reason
+    assert unnamed.verdict == "Fair"
+    payload = share.build_share_text_payload(unnamed)
+    assert payload.index("Fair") < payload.index("Balance:")
+
+
+def test_authenticated_team_name_ignores_league_browse_selection():
+    import pandas as pd
+
+    from modules import prepared_player_frame
+
+    session = {
+        "selected_team_name": "Wrong Browse Team",
+        "my_roster_id": "7",
+        "selected_league_id": "L1",
+        prepared_player_frame.SHARED_CONTEXT_KEY: {
+            "L1-memo": {
+                "team_direction_summary": pd.DataFrame(
+                    [{"roster_id": "7", "team_name": "Harbor Club"}]
+                )
+            }
+        },
+    }
+    assert trade_hub_ui.authenticated_team_display_name(session) == "Harbor Club"
+    assert trade_hub_ui.authenticated_team_display_name(
+        {"selected_team_name": "Wrong"}, idea={"my_team_name": "From Idea"}
+    ) == "From Idea"
+
+
+def test_pqv_actions_sit_under_decision_without_dead_space_label():
+    assert "player-quick-view-actions-label" not in PQV
+    assert "pqv_actions_tertiary_" in PQV
+    assert PQV.index("pqv_actions_strip_") < PQV.index("pqv_detail_nav_")
+    assert "type=\"tertiary\"" in PQV[PQV.index("pqv_actions_tertiary_") :]
 
 
 def test_share_generation_stays_behind_explicit_share_open():

@@ -68,7 +68,7 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     why = source.index("player_quick_view.why_this_recommendation_html")
     workspace = source.index("player_quick_view.pqv_primary_workspace_html", context)
     first_useful = source.index("pqv_first_useful", workspace)
-    actions = source.index("player-quick-view-actions-label", first_useful)
+    actions = source.index('st.container(key=f"pqv_actions_{player_id}")', first_useful)
     nav = source.index("pqv_detail_nav_", actions)
     season_summary = source.index("player_quick_view.current_season_summary_html", nav)
     season = source.index("player_quick_view.render_current_season", season_summary)

@@ -41,7 +41,7 @@ SHARE_HEIGHT_MAX = 2880
 SHARE_HEIGHT = 1200 * SHARE_SCALE  # historical 9:10 poster; not a forced canvas
 SHARE_SQUARE = 1080 * SHARE_SCALE
 PREVIEW_DISPLAY_WIDTH = 400  # desktop CSS display; mobile CSS uses 300. Source stays SHARE_WIDTH.
-RENDER_VERSION = "share-r12-perspective"
+RENDER_VERSION = "share-r13-named-sides"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}
@@ -102,15 +102,69 @@ def trade_share_side_labels(
     my_team_name: str = "",
     partner_name: str = "",
 ) -> tuple[str, str]:
-    """Perspective-safe column titles for a shareable trade.
+    """Perspective-neutral column titles for a shareable trade.
 
     Send assets are what the partner receives. Receive assets are what the
-    proposing roster receives. Never use bare YOU GIVE / YOU GET.
+    authenticated roster receives. Never use YOU GIVE / YOU GET / proposing roster.
     """
 
     partner = _safe_text(partner_name) or "Trade partner"
-    mine = _safe_text(my_team_name) or "Proposing roster"
+    mine = _safe_text(my_team_name) or "This roster"
     return (f"{partner} receives", f"{mine} receives")
+
+
+def in_app_trade_side_labels(
+    *,
+    my_team_name: str = "",
+    partner_name: str = "",
+) -> tuple[str, str]:
+    """Authenticated in-app exchange labels. Perspective is known here."""
+
+    partner = _safe_text(partner_name) or "Trade partner"
+    mine = _safe_text(my_team_name) or "Your roster"
+    return (f"{partner} receives", f"{mine} receives")
+
+
+_SHARE_YOU_CLAUSE = re.compile(
+    r"\bYou (give up|add|get|send|receive|spend|move|use|keep|gain|give|trade)\b",
+    re.IGNORECASE,
+)
+_SHARE_YOU_VERBS = {
+    "add": "adds",
+    "get": "gets",
+    "send": "sends",
+    "receive": "receives",
+    "spend": "spends",
+    "move": "moves",
+    "use": "uses",
+    "keep": "keeps",
+    "gain": "gains",
+    "give": "gives",
+    "give up": "gives up",
+    "trade": "trades",
+}
+
+
+def rewrite_share_reason_sides(
+    reason: str,
+    *,
+    my_team_name: str = "",
+    partner_name: str = "",
+) -> str:
+    """Rewrite first-person share copy onto explicit roster names. Presentation only."""
+
+    team = _safe_text(my_team_name) or "This roster"
+    del partner_name  # partner names stay as already written in the source sentence.
+
+    def _replace(match: re.Match[str]) -> str:
+        verb = match.group(1).casefold()
+        mapped = _SHARE_YOU_VERBS.get(verb, verb if verb.endswith("s") else f"{verb}s")
+        return f"{team} {mapped}"
+
+    text = _SHARE_YOU_CLAUSE.sub(_replace, _safe_text(reason))
+    text = re.sub(r"\byour roster\b", team, text, flags=re.IGNORECASE)
+    text = re.sub(r"\byour team\b", team, text, flags=re.IGNORECASE)
+    return text
 
 
 def _compact(text: str, limit: int = 140) -> str:
@@ -151,6 +205,7 @@ class ShareRecommendationCard:
     partner_name: str = ""
     send_side_label: str = ""
     receive_side_label: str = ""
+    verdict: str = ""
     fit: str = ""
     recommendation_id: str = ""
     source_surface: str = ""
@@ -254,6 +309,10 @@ def build_share_text_payload(card: ShareRecommendationCard) -> str:
     if receive:
         blocks.append(receive_title + "\n" + "\n".join(receive))
 
+    verdict = _share_line(getattr(card, "verdict", "") or card.action)
+    if verdict:
+        blocks.append(verdict)
+
     balance = _share_line(card.value_change)
     if balance:
         if balance not in {"Even"}:
@@ -317,6 +376,17 @@ def build_trade_share_card(
         recommendation_id = ""
         action = _safe_text(idea.get("tag"), "Trade")
 
+    partner = _safe_text(idea.get("partner_team_name"))
+    mine = _safe_text(my_team_name) or _safe_text(idea.get("my_team_name"))
+    reason = rewrite_share_reason_sides(
+        reason,
+        my_team_name=mine,
+        partner_name=partner,
+    )
+    from modules.trade_visual_language import trade_value_band
+
+    verdict = trade_value_band(trade_gain)
+
     if not receive_assets and not send_assets:
         return ShareRecommendationCard(
             card_type=CARD_TYPE_TRADE,
@@ -341,11 +411,11 @@ def build_trade_share_card(
             sorted(str(a.get("player_id") or a.get("label") or "") for a in send_assets),
             sorted(str(a.get("player_id") or a.get("label") or "") for a in receive_assets),
             scoring_format,
-            _safe_text(idea.get("partner_team_name")),
+            partner,
+            mine,
+            verdict,
         )
     )
-    partner = _safe_text(idea.get("partner_team_name"))
-    mine = _safe_text(my_team_name) or _safe_text(idea.get("my_team_name"))
     send_side_label, receive_side_label = trade_share_side_labels(
         my_team_name=mine,
         partner_name=partner,
@@ -369,6 +439,7 @@ def build_trade_share_card(
         partner_name=partner,
         send_side_label=send_side_label,
         receive_side_label=receive_side_label,
+        verdict=verdict,
         fit=fit,
         recommendation_id=recommendation_id,
         source_surface=source_surface,

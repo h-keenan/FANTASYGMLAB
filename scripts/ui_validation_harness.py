@@ -2150,21 +2150,16 @@ def _player_dossier() -> None:
         )
     )
     with st.container(key="pqv_actions_fixture"):
-        st.markdown(
-            "<div class='player-quick-view-actions-label'>Actions</div>",
-            unsafe_allow_html=True,
-        )
         with st.container(key="pqv_actions_strip_fixture"):
-            a, b, c, d = st.columns(4, gap="small")
+            a, b, c = st.columns((1.6, 1.1, 0.9), gap="small")
             with a:
-                st.button("Open in Trade Hub", key="pqv_open_trade_fixture", use_container_width=True, type="primary")
+                st.button("Open in Trade Hub", key="pqv_open_trade_fixture", use_container_width=False, type="primary")
             with b:
-                st.button("GM Targets", use_container_width=True)
+                st.button("GM Targets", use_container_width=False)
             with c:
-                st.button("Untouchable", use_container_width=True)
-            with d:
-                st.button("Share", use_container_width=True)
-    st.button("Feedback", use_container_width=True)
+                st.button("Share", use_container_width=False)
+        with st.container(key="pqv_actions_tertiary_fixture"):
+            st.button("Untouchable", use_container_width=False, type="tertiary")
 
     detail = str(st.session_state.get("ui_dossier_detail") or "")
 
