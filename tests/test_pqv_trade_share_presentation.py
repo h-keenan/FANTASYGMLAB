@@ -18,6 +18,16 @@ PQV = APP[
 ]
 
 
+def test_collapsed_trade_card_stacks_below_700px_iframe_width():
+    css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
+    first_package = css.split(".trade-summary-package {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns: minmax(0, 1fr);" in first_package
+    assert "container-type: inline-size;" in css
+    assert "@container trade-summary (min-width: 700px)" in css
+    assert "@media (min-width: 360px)" not in css
+    assert "max-width: 8rem" not in css
+
+
 def test_pqv_trade_hub_remains_one_script_path_app_rerun():
     assert "trade_hub_clicked = st.button(" in PQV
     assert 'st.rerun(scope="app")' in PQV

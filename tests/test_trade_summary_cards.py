@@ -170,16 +170,16 @@ def test_detail_content_remains_lazy_until_summary_is_tapped():
 
 def test_mobile_contract_is_compact_from_320_through_430_pixels():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
-    mobile = css[css.index("@media (max-width: 430px)") :]
+    mobile = css[css.index("@container trade-summary (max-width: 430px)") :]
     assert "min-height: 0;" in mobile
     assert "grid-template-columns: minmax(0, 1fr);" in mobile
     assert "var(--size-asset-standard)" in css or "var(--size-asset-compact)" in mobile
     assert ".trade-summary-signals { display: none; }" in mobile
-    assert ".trade-summary-category," in mobile
+    assert ".trade-summary-category { display: block;" in mobile
     assert ".trade-summary-rationale { display: none; }" in mobile
     assert ".trade-summary-side-label," not in mobile
     assert ".trade-summary-why," not in mobile
-    narrow = mobile[mobile.index("@media (max-width: 340px)") :]
+    narrow = mobile[mobile.index("@container trade-summary (max-width: 340px)") :]
     assert "grid-template-columns: minmax(0, 1fr);" in narrow
     assert ".trade-summary-title { font-size: var(--font-size-body); }" in narrow
     assert "white-space: normal;" in css
@@ -196,8 +196,12 @@ def test_mobile_contract_is_compact_from_320_through_430_pixels():
 def test_mobile_target_widths_share_the_same_full_width_card_contract():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     assert all(width <= 430 for width in (320, 390, 430))
-    assert "@media (max-width: 430px)" in css
-    assert ".trade-summary-card { gap: 0.22rem; max-width: 100%; min-height: 0; padding: 0.45rem 0.65rem; width: 100%; }" in css
+    assert "@container trade-summary (max-width: 430px)" in css
+    assert "gap: 0.22rem" in css
+    assert "padding: 0.45rem 0.65rem" in css
+    mobile_card = css.split("@container trade-summary (max-width: 430px)", 1)[1].split(".trade-summary-card", 1)[1][:180]
+    assert "overflow-x: clip" in mobile_card
+    assert "max-width: 100%" in mobile_card
 
 
 def test_isolated_trade_component_receives_design_token_styles():
@@ -206,7 +210,7 @@ def test_isolated_trade_component_receives_design_token_styles():
     assert ".trade-summary-card" in css
     assert "border-left: var(--border-width-semantic) solid var(--color-information);" in css
     assert "font-size: var(--font-size-display);" in css
-    assert "@media (max-width: 430px)" in css
+    assert "@container trade-summary (max-width: 430px)" in css
     assert "flex: 0 0 3.25rem;" in css or "var(--size-asset-compact)" in css
     assert "max-width: 100%;" in css
     assert "width: 100%;" in css

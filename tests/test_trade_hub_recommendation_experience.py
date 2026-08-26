@@ -92,9 +92,12 @@ def test_summary_card_is_a_compact_decision_object():
     assert "width: 100%;" in css
     assert "max-width: 100%;" in css
     assert "width: max-content;" not in css.split(".trade-summary-card {", 1)[1][:500]
+    first_package = css.split(".trade-summary-package {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns: minmax(0, 1fr);" in first_package
     assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in css
     assert "grid-template-columns: max-content auto max-content;" not in css
-    desktop = css.split("@media (min-width: 360px)", 1)[1]
+    desktop = css.split("@container trade-summary (min-width: 700px)", 1)[1]
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);" in desktop.split(".trade-summary-package", 1)[1][:280]
     assert "width: 100%;" in desktop.split(".trade-summary-package", 1)[1][:280]
     assert "width: max-content;" not in desktop.split(".trade-summary-package", 1)[1][:280]
     assert ".trade-summary-for" in css

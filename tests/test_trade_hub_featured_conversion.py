@@ -300,7 +300,7 @@ def test_low_confidence_note_is_on_cards_and_kept_on_mobile():
     assert "trade-summary-confidence-note" in source
     assert "LOW_CONFIDENCE_USER_NOTE" in source
     assert "More dependent on partner preference and market fit." in source
-    mobile = source.split("@media (max-width: 430px)", 1)[1].split("@media", 1)[0]
+    mobile = source.split("@container trade-summary (max-width: 430px)", 1)[1].split("@container", 1)[0]
     assert "trade-summary-confidence-note" in mobile
     assert "display: none" not in mobile.split("trade-summary-confidence-note", 1)[1][:180]
 

@@ -7893,8 +7893,10 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
     border-block: var(--border-width-default) solid var(--color-border);
     display: grid;
     gap: var(--space-sm);
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     margin-top: var(--space-sm);
+    max-width: 100%;
+    overflow-x: clip;
     padding: var(--space-sm) 0;
 }
 .trade-summary-side {
@@ -7955,7 +7957,8 @@ div[class*="st-key-trade_summary_"][class*="_open"] button {
         margin-top: var(--space-xs);
     }
     .trade-summary-package {
-        display: block;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
     }
     .trade-summary-side + .trade-summary-side {
         margin-top: var(--space-xs);

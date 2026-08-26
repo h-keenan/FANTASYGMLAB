@@ -28,7 +28,7 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .pqv-signal-badge-group{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin:var(--space-xs) 0 0}
 .pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio{margin:0 0 var(--space-sm);max-width:none}
-.player-quick-view-shell{max-width:none}
+.player-quick-view-shell{max-width:100%;min-width:0;overflow-x:clip}
 .player-quick-view-shell .dg-tier-legend{margin:var(--space-2xs) 0 0;max-width:22rem}
 .player-quick-view-shell .dg-tier-legend>summary{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min);text-transform:uppercase}
 .pqv-bio-row{display:grid;gap:var(--space-sm);grid-template-columns:repeat(auto-fit,minmax(7rem,1fr))}
@@ -179,6 +179,7 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-why-recommendation .player-dossier-section-heading,.pqv-fantasy-evidence .player-dossier-section-heading,.pqv-accolades .player-dossier-section-heading,.pqv-career-glance .player-dossier-section-heading,.pqv-career-dossier .player-dossier-section-heading,.pqv-bio .player-dossier-section-heading,.player-dossier-rank-cell,.pqv-why-factor,.pqv-signal-badge{padding-left:0;padding-right:0}
 }
 @media (max-width:430px){
+.player-quick-view-shell,.pqv-workspace,.pqv-workspace-top{max-width:100%;min-width:0;overflow-x:clip}
 .pqv-hero-portrait{--pqv-portrait-size:clamp(2.75rem,14vw,3.5rem)}
 .player-quick-view-name{font-size:var(--font-size-card-title)}
 .pqv-decision-summary .player-dossier-section-heading{padding:var(--space-xs) var(--space-sm)}

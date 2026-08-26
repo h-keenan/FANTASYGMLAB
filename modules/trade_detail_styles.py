@@ -200,6 +200,24 @@ div[class*="st-key-trade_detail_nav_"] button:focus-visible {
         width: 100%;
         height: 6px;
     }
+
+    div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) .trade-asset-name,
+    div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) .trade-side-header > span {
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
+}
+
+@media (max-width: 430px) {
+    div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: var(--space-xs) !important;
+        max-width: 100%;
+    }
+    div[data-testid="stDialog"] div[role="dialog"]:has(.trade-detail-modal) [data-testid="stHorizontalBlock"] > div {
+        min-width: 0 !important;
+        width: 100% !important;
+    }
 }
 
 @media (min-width: 1280px) {

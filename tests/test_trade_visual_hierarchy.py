@@ -228,9 +228,9 @@ def test_share_card_v2_keeps_canonical_renderer_and_confidence_text():
 def test_hub_and_dashboard_css_stay_compact_on_phone_and_desktop():
     hub = TRADE_SUMMARY_COMPONENT_CSS
     compact_css = compact.COMPACT_FANTASY_ASSET_CSS
-    assert "@media (max-width: 430px)" in hub
+    assert "@container trade-summary (max-width: 430px)" in hub
     assert "max-width: 100%" in hub
-    assert "width: 100%;" in hub.split("@media (max-width: 430px)")[1]
+    assert "width: 100%;" in hub.split("@container trade-summary (max-width: 430px)")[1]
     assert "max-width:40rem" in compact_css.replace(" ", "")
     assert "@media (min-width:1024px)" in compact_css
     dashboard = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")

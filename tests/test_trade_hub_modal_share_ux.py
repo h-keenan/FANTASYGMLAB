@@ -146,15 +146,15 @@ def test_modal_css_keeps_phone_matchup_and_desktop_width():
     assert ".tvl-edge-mark" in TRADE_DETAIL_CSS and "width: 100%" in TRADE_DETAIL_CSS
 
 
-def test_mobile_summary_uses_two_column_asset_grid_only_for_two_assets():
+def test_mobile_summary_stacks_package_instead_of_two_column_assets():
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
-    exact_two = (
-        ":has(> .dg-compact-asset:nth-child(3)):not(:has(> "
-        ".dg-compact-asset:nth-child(5)))"
-    )
-    assert exact_two in css
-    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)" in css
-    assert "--size-asset-standard: var(--size-asset-compact)" in css
+    assert ":has(> .dg-compact-asset:nth-child(3)):not(:has(> " not in css
+    mobile = css[css.index("@container trade-summary (max-width: 430px)") :]
+    assert "grid-template-columns: minmax(0, 1fr);" in mobile.split(".trade-summary-package", 1)[1][:220]
+    assert ".trade-summary-assets .dg-compact-asset-stack { display: flex; flex-direction: column;" in mobile
+    compare = css.split("@container trade-summary (min-width: 700px)", 1)[1]
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)" in compare.split(".trade-summary-package", 1)[1][:280]
+    assert "--size-asset-standard:var(--size-asset-compact)" in css.replace(" ", "")
 
 
 @pytest.mark.parametrize("delta", ("-991", "-160", "Even", "+160", "+991"))
