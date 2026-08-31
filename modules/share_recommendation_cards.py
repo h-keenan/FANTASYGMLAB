@@ -41,7 +41,7 @@ SHARE_HEIGHT_MAX = 2880
 SHARE_HEIGHT = 1200 * SHARE_SCALE  # historical 9:10 poster; not a forced canvas
 SHARE_SQUARE = 1080 * SHARE_SCALE
 PREVIEW_DISPLAY_WIDTH = 400  # desktop CSS display; mobile CSS uses 300. Source stays SHARE_WIDTH.
-RENDER_VERSION = "share-r13-named-sides"
+RENDER_VERSION = "share-r14-edge-owner"
 
 CACHE_TTL_SECONDS = 15 * 60
 _CACHE: dict[str, tuple[float, bytes]] = {}
@@ -75,6 +75,104 @@ def experiment_enabled(*, environ: Mapping[str, str] | None = None) -> bool:
         default=experimental_graduation.GRADUATED_DEFAULT_ON,
     )
 
+def format_share_value(value: int | None) -> str:
+    if value is None:
+        return ""
+    return f"{int(value):,}"
+
+
+def _side_display_name(side_label: str, *, fallback: str = "") -> str:
+    """Strip ' receives' suffixes from column titles for edge-owner copy."""
+
+    text = _safe_text(side_label) or _safe_text(fallback)
+    if not text:
+        return ""
+    lowered = text.casefold()
+    for suffix in (" receives", " receive", " gets", " get"):
+        if lowered.endswith(suffix):
+            return text[: -len(suffix)].strip() or text
+    return text
+
+
+def resolve_trade_share_edge(
+    *,
+    acquire_total: int | None,
+    send_total: int | None,
+    trade_gain: int | None = None,
+    receive_side_label: str = "",
+    send_side_label: str = "",
+    receive_team_name: str = "",
+    send_team_name: str = "",
+) -> dict[str, Any]:
+    """Canonical trade-edge interpretation for share cards.
+
+    Positive delta means the receive side (authenticated roster perspective)
+    gets more value. Edge ownership is always named — never a bare "+412".
+    """
+
+    if acquire_total is not None and send_total is not None:
+        delta = int(acquire_total) - int(send_total)
+    elif trade_gain is not None:
+        delta = int(trade_gain)
+    else:
+        delta = 0
+
+    receive_name = _side_display_name(
+        receive_side_label, fallback=receive_team_name or "This roster"
+    )
+    send_name = _side_display_name(
+        send_side_label, fallback=send_team_name or "Trade partner"
+    )
+
+    if delta > 0:
+        return {
+            "delta": delta,
+            "polarity": "pos",
+            "value_change": f"+{delta}",
+            "edge_owner_label": receive_name,
+            "edge_summary": f"Edge: {receive_name} +{delta:,}",
+            "acquire_total": acquire_total,
+            "send_total": send_total,
+        }
+    if delta < 0:
+        magnitude = abs(delta)
+        return {
+            "delta": delta,
+            "polarity": "neg",
+            "value_change": f"-{magnitude}",
+            "edge_owner_label": send_name,
+            "edge_summary": f"Edge: {send_name} +{magnitude:,}",
+            "acquire_total": acquire_total,
+            "send_total": send_total,
+        }
+    return {
+        "delta": 0,
+        "polarity": "even",
+        "value_change": "Even",
+        "edge_owner_label": "",
+        "edge_summary": "Edge: Even",
+        "acquire_total": acquire_total,
+        "send_total": send_total,
+    }
+
+
+def sum_share_asset_scores(assets: Sequence[Mapping[str, Any]]) -> int | None:
+    """Sum already-computed asset scores. Returns None when no scores exist."""
+
+    total = 0
+    saw_score = False
+    for asset in assets or ():
+        if not isinstance(asset, Mapping):
+            continue
+        raw = asset.get("score", asset.get("value_score", asset.get("value")))
+        parsed = _optional_int(raw)
+        if parsed is None:
+            continue
+        saw_score = True
+        total += int(parsed)
+    return int(total) if saw_score else None
+
+
 def _optional_int(value: object) -> int | None:
     if value in (None, ""):
         return None
@@ -82,12 +180,6 @@ def _optional_int(value: object) -> int | None:
         return int(round(float(value)))
     except (TypeError, ValueError):
         return None
-
-
-def format_share_value(value: int | None) -> str:
-    if value is None:
-        return ""
-    return f"{int(value):,}"
 
 
 def _safe_text(value: object, default: str = "") -> str:
@@ -198,6 +290,8 @@ class ShareRecommendationCard:
     scoring_format: str = ""
     acquire_total: int | None = None
     send_total: int | None = None
+    edge_owner_label: str = ""
+    edge_summary: str = ""
     acquire_lines: tuple[ShareAssetLine, ...] = ()
     send_lines: tuple[ShareAssetLine, ...] = ()
     metrics: tuple[str, ...] = ()
@@ -205,6 +299,7 @@ class ShareRecommendationCard:
     partner_name: str = ""
     send_side_label: str = ""
     receive_side_label: str = ""
+    my_team_name: str = ""
     verdict: str = ""
     fit: str = ""
     recommendation_id: str = ""
@@ -299,30 +394,46 @@ def build_share_text_payload(card: ShareRecommendationCard) -> str:
     send = _ordered_asset_labels(card.send_lines)
     receive = _ordered_asset_labels(card.acquire_lines)
     send_title, receive_title = trade_share_side_labels(
-        my_team_name="",
+        my_team_name=getattr(card, "my_team_name", "") or "",
         partner_name=card.partner_name,
     )
     send_title = _share_line(card.send_side_label) or send_title
     receive_title = _share_line(card.receive_side_label) or receive_title
     if send:
-        blocks.append(send_title + "\n" + "\n".join(send))
+        send_block = send_title
+        if card.send_total is not None:
+            send_block += f"\nValue: {format_share_value(card.send_total)}"
+        send_block += "\n" + "\n".join(send)
+        blocks.append(send_block)
     if receive:
-        blocks.append(receive_title + "\n" + "\n".join(receive))
+        receive_block = receive_title
+        if card.acquire_total is not None:
+            receive_block += f"\nValue: {format_share_value(card.acquire_total)}"
+        receive_block += "\n" + "\n".join(receive)
+        blocks.append(receive_block)
 
     verdict = _share_line(getattr(card, "verdict", "") or card.action)
     if verdict:
         blocks.append(verdict)
 
-    balance = _share_line(card.value_change)
-    if balance:
-        if balance not in {"Even"}:
-            sign = balance[0] if balance[:1] in {"+", "-"} else ""
-            digits = balance[1:] if sign else balance
-            try:
-                balance = f"{sign}{int(digits.replace(',', '')):,}"
-            except ValueError:
-                pass
-        blocks.append(f"Balance: {balance}")
+    edge_summary = _share_line(getattr(card, "edge_summary", "") or "")
+    if edge_summary:
+        blocks.append(edge_summary)
+    else:
+        balance = _share_line(card.value_change)
+        edge_owner = _share_line(getattr(card, "edge_owner_label", "") or "")
+        if balance:
+            if balance not in {"Even"}:
+                sign = balance[0] if balance[:1] in {"+", "-"} else ""
+                digits = balance[1:] if sign else balance
+                try:
+                    balance = f"{sign}{int(digits.replace(',', '')):,}"
+                except ValueError:
+                    pass
+            if edge_owner and balance not in {"Even"}:
+                blocks.append(f"Edge: {edge_owner} {balance.lstrip('+') if balance.startswith('-') else balance}")
+            else:
+                blocks.append(f"Edge: {balance}" if balance == "Even" else f"Balance: {balance}")
 
     signals = []
     fit = _share_line(card.fit)
@@ -354,12 +465,16 @@ def build_trade_share_card(
     trade_gain = int(idea.get("trade_gain") or 0)
     acquire_total = _optional_int(idea.get("their_score"))
     send_total = _optional_int(idea.get("my_score"))
-    if trade_gain > 0:
-        value_change = f"+{trade_gain}"
-    elif trade_gain < 0:
-        value_change = f"-{abs(trade_gain)}"
-    else:
-        value_change = "Even"
+    if acquire_total is None:
+        acquire_total = sum_share_asset_scores(receive_assets)
+    if send_total is None:
+        send_total = sum_share_asset_scores(send_assets)
+    if (
+        acquire_total is not None
+        and send_total is not None
+        and not trade_gain
+    ):
+        trade_gain = int(acquire_total) - int(send_total)
 
     try:
         narrative = narrative_mod.build_trade_narrative(dict(idea))
@@ -399,6 +514,19 @@ def build_trade_share_card(
             generated_at=_windows_safe_date(),
         )
 
+    send_side_label, receive_side_label = trade_share_side_labels(
+        my_team_name=mine,
+        partner_name=partner,
+    )
+    edge = resolve_trade_share_edge(
+        acquire_total=acquire_total,
+        send_total=send_total,
+        trade_gain=trade_gain,
+        receive_side_label=receive_side_label,
+        send_side_label=send_side_label,
+        receive_team_name=mine,
+        send_team_name=partner,
+    )
     fingerprint = _fingerprint(
         (
             CARD_TYPE_TRADE,
@@ -406,6 +534,7 @@ def build_trade_share_card(
             trade_gain,
             acquire_total,
             send_total,
+            edge["edge_owner_label"],
             confidence,
             reason,
             sorted(str(a.get("player_id") or a.get("label") or "") for a in send_assets),
@@ -416,10 +545,6 @@ def build_trade_share_card(
             verdict,
         )
     )
-    send_side_label, receive_side_label = trade_share_side_labels(
-        my_team_name=mine,
-        partner_name=partner,
-    )
     fit = _safe_text(idea.get("fit_grade"))
     return ShareRecommendationCard(
         card_type=CARD_TYPE_TRADE,
@@ -427,16 +552,19 @@ def build_trade_share_card(
         action=action or "Trade",
         reason=reason,
         confidence=confidence,
-        value_change=value_change,
+        value_change=str(edge["value_change"]),
         scoring_format=_safe_text(scoring_format),
         acquire_total=acquire_total,
         send_total=send_total,
+        edge_owner_label=str(edge["edge_owner_label"]),
+        edge_summary=str(edge["edge_summary"]),
         acquire_lines=tuple(_asset_line(asset) for asset in receive_assets),
         send_lines=tuple(_asset_line(asset) for asset in send_assets),
         context_line=(
             f"{mine} ⇄ {partner}" if mine and partner else (f"vs {partner}" if partner else "")
         ),
         partner_name=partner,
+        my_team_name=mine,
         send_side_label=send_side_label,
         receive_side_label=receive_side_label,
         verdict=verdict,

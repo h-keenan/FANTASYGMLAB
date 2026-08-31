@@ -1466,6 +1466,22 @@ def season_stats_history_html(resume: CareerResume) -> str:
     )
 
 
+SYNTHETIC_PRIMARY_ACTIONS = frozenset(
+    {
+        "shop",
+        "hold",
+        "drop",
+        "acquire",
+        "trade candidate",
+        "drop candidate",
+        "hold candidate",
+        "monitor",
+        "stash",
+        "add",
+    }
+)
+
+
 def recommendation_context_html(
     summary: str,
     context: str = "",
@@ -1479,17 +1495,23 @@ def recommendation_context_html(
     """Render PQV recommendation or neutral player context.
 
     When ``active_recommendation`` is false, this is general player analysis —
-    not a synthesized recommendation.
+    not a synthesized recommendation. Shop/Hold/Drop/Acquire/Monitor verbs are
+    suppressed unless an active canonical recommendation is bound.
     """
 
-    title = "Decision"
+    title = "Decision" if active_recommendation else "Player Context"
     heading = dossier_section_heading_html(title).replace(
         "<h3>",
         "<h3 id='player-dossier-context-title'>",
         1,
     )
-    confidence_text = _text(confidence)
+    confidence_text = _text(confidence) if active_recommendation else ""
     action_text = _text(action)
+    if not active_recommendation:
+        # Refuse primary-move verbs invented by neutral fallbacks.
+        if action_text.casefold() in SYNTHETIC_PRIMARY_ACTIONS:
+            action_text = "No active recommendation"
+        confidence_text = ""
     topline = ""
     if action_text or confidence_text:
         topline = (

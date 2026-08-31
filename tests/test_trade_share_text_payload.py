@@ -48,7 +48,8 @@ def test_canonical_trade_share_payload_handles_package_shapes(send, receive):
     assert payload.index("Tongue Punchers receives") < payload.index("This roster receives")
     for asset in send + receive:
         assert payload.count(asset["name"]) == 1
-    assert "Balance: -991" in payload
+    assert "Balance: -991" not in payload
+    assert "Edge: Tongue Punchers +991" in payload
     assert "Fit: Strong Fit · Confidence: Medium" in payload
     assert "Why it works:" in payload
     assert payload.endswith("FantasyGM Lab")

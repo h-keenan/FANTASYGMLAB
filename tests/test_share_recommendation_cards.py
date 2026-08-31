@@ -479,3 +479,139 @@ def test_recommendation_share_keeps_full_why_and_footer_reserve():
     assert "def _why_lines" in renderer
     assert "max_lines=4" not in renderer.split("def _why_lines")[1].split("def render_share_card_png")[0]
     assert "footer_h = 80 * s + 24 * s" in renderer
+
+
+def test_trade_share_edge_owner_positive_named_sides():
+    idea = {
+        "tag": "Fair swap",
+        "trade_gain": 224,
+        "my_score": 8125,
+        "their_score": 8349,
+        "partner_team_name": "Charmmanderr",
+        "my_team_name": "Revivalry",
+        "trade_confidence_label": "High",
+        "reasoning_summary": "Revivalry improves at WR without gutting the roster.",
+        "send_assets": [
+            {"asset_type": "player", "name": "Aging WR", "position": "WR", "team": "KC", "player_id": "s1", "score": 4000},
+            {"asset_type": "pick", "label": "2027 2nd", "score": 4125},
+        ],
+        "receive_assets": [
+            {"asset_type": "player", "name": "Young WR", "position": "WR", "team": "MIA", "player_id": "r1", "score": 8349},
+        ],
+    }
+    card = share.build_trade_share_card(idea, my_team_name="Revivalry")
+    assert card.acquire_total == 8349
+    assert card.send_total == 8125
+    assert card.edge_owner_label == "Revivalry"
+    assert card.edge_summary == "Edge: Revivalry +224"
+    assert "Charmmanderr receives" in card.send_side_label
+    assert "Revivalry receives" in card.receive_side_label
+    text = share.build_share_text_payload(card)
+    assert "Value: 8,349" in text or "8,349" in text
+    assert "Value: 8,125" in text or "8,125" in text
+    assert "Edge: Revivalry +224" in text
+    assert "Balance: +224" not in text
+
+
+def test_trade_share_edge_owner_negative_reverses_owner():
+    idea = {
+        "tag": "Overpay watch",
+        "trade_gain": -412,
+        "my_score": 9000,
+        "their_score": 8588,
+        "partner_team_name": "Partner FC",
+        "my_team_name": "Home Squad",
+        "send_assets": [{"asset_type": "player", "name": "Star", "player_id": "1", "score": 9000}],
+        "receive_assets": [{"asset_type": "player", "name": "Depth", "player_id": "2", "score": 8588}],
+    }
+    card = share.build_trade_share_card(idea, my_team_name="Home Squad")
+    assert card.edge_owner_label == "Partner FC"
+    assert card.edge_summary == "Edge: Partner FC +412"
+    assert card.value_change == "-412"
+
+
+def test_trade_share_even_is_unambiguous():
+    idea = {
+        "trade_gain": 0,
+        "my_score": 5000,
+        "their_score": 5000,
+        "partner_team_name": "Away",
+        "my_team_name": "Home",
+        "send_assets": [{"asset_type": "player", "name": "A", "player_id": "1", "score": 5000}],
+        "receive_assets": [{"asset_type": "player", "name": "B", "player_id": "2", "score": 5000}],
+    }
+    card = share.build_trade_share_card(idea, my_team_name="Home")
+    assert card.edge_summary == "Edge: Even"
+    assert card.edge_owner_label == ""
+    assert "Even" in share.build_share_text_payload(card)
+
+
+def test_trade_share_fallback_roster_labels():
+    idea = {
+        "trade_gain": 50,
+        "my_score": 100,
+        "their_score": 150,
+        "send_assets": [{"asset_type": "player", "name": "A", "player_id": "1"}],
+        "receive_assets": [{"asset_type": "player", "name": "B", "player_id": "2"}],
+    }
+    card = share.build_trade_share_card(idea)
+    assert card.receive_side_label == "This roster receives"
+    assert card.send_side_label == "Trade partner receives"
+    assert card.edge_owner_label == "This roster"
+    assert "Edge: This roster +50" in card.edge_summary
+
+
+def test_resolve_trade_share_edge_is_single_canonical_interpretation():
+    edge = share.resolve_trade_share_edge(
+        acquire_total=8349,
+        send_total=8125,
+        receive_side_label="Revivalry receives",
+        send_side_label="Charmmanderr receives",
+    )
+    assert edge["delta"] == 224
+    assert edge["edge_owner_label"] == "Revivalry"
+    assert edge["edge_summary"] == "Edge: Revivalry +224"
+
+
+def test_analyzer_share_includes_side_totals_and_named_edge():
+    from modules import trade_offer_analyzer as toa
+
+    verdict = toa.decide_offer_verdict(
+        {
+            "available": True,
+            "value_delta": 300,
+            "explanation": "Acceptable package.",
+            "lineup_summary": "Lineup stable.",
+            "strategy_summary": "Retool-friendly.",
+            "injury_summary": "",
+            "roster_fit_verdict": "Positive Fit",
+            "component_scores": {
+                "value": 1,
+                "lineup": 1,
+                "needs": 0,
+                "age": 0,
+                "draft": 0,
+                "strategy": 0,
+                "injury": 0,
+            },
+        }
+    )
+    card = toa.build_offer_eval_share_card(
+        verdict,
+        send_assets=[
+            {"asset_type": "player", "name": "Send A", "player_id": "1", "score": 4000},
+            {"asset_type": "pick", "label": "2028 1st", "score": 3500},
+        ],
+        receive_assets=[
+            {"asset_type": "player", "name": "Get B", "player_id": "2", "score": 7800},
+        ],
+        league_name="Dynasty League",
+        my_team_name="Home GM",
+        partner_name="Away GM",
+        format_label="PPR",
+    )
+    assert card.send_total == 7500
+    assert card.acquire_total == 7800
+    assert card.edge_owner_label == "Home GM"
+    assert "Edge: Home GM +300" in card.edge_summary
+    assert card.acquire_total is not None and card.send_total is not None

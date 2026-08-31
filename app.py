@@ -4605,6 +4605,8 @@ def _build_structured_decision_candidate(
         "need_flag": bool(item.get("need_flag")),
         "surplus_flag": bool(item.get("surplus_flag")),
         "untouchable_flag": bool(item.get("untouchable_flag")),
+        "young_upside_flag": bool(item.get("young_upside_flag")),
+        "protected_low_value_flag": bool(item.get("protected_low_value_flag")),
         "score": float(pd.to_numeric(pd.Series([item.get("score_num", item.get("value_score", 0))]), errors="coerce").fillna(0).iloc[0]),
         "market_score": _safe_float(item.get("market_score_num", item.get("market_score", item.get("value", 0))), 0.0),
         "opportunity_score": _safe_float(item.get("opportunity_score_num", item.get("opportunity_score", 0)), 0.0),
@@ -5653,7 +5655,9 @@ def render_player_quick_view_content(
         show_action_tile = True
         concise_rationale = bound_narrative.reason
     else:
-        recommendation_action = primary_status
+        # Neutral path: role/context only — never invent Shop/Hold/Drop.
+        recommendation_action = ""
+        action_value = ""
         show_action_tile = False
         concise_rationale = _safe_text(summary_text)
 
@@ -5747,8 +5751,16 @@ def render_player_quick_view_content(
     decision_action = (
         pqv_story.get("action")
         if bound_narrative.is_active_recommendation and pqv_story.get("action")
-        else (action_value or primary_status)
+        else ""
     )
+    if not bound_narrative.is_active_recommendation:
+        # Neutral authority: never synthesize Shop/Hold/Drop/Acquire as Decision.
+        # Prefer roster role context, else an explicit no-move label.
+        role_context = _safe_text(role_label) if on_roster and role_label else ""
+        if role_context:
+            decision_action = role_context
+        else:
+            decision_action = "No active recommendation"
     recommendation_html = player_quick_view.recommendation_context_html(
         "",
         "",
@@ -11641,9 +11653,15 @@ def prioritize_trade_candidates_with_headline(
             continue
         updated = dict(item)
         if player_id in headline_id_set:
-            updated["reason"] = headline_reason
-            updated["note"] = headline_reason
-            updated["source"] = "headline_trade"
+            # Preserve independent sell evidence (source). Package membership is
+            # contextual — do not rewrite source to headline_trade.
+            updated["headline_package_member"] = True
+            package_note = _safe_text(updated.get("reason") or updated.get("note"))
+            if package_note and "headline trade path" not in package_note.casefold():
+                updated["package_context"] = headline_reason
+            else:
+                updated["reason"] = _safe_text(updated.get("reason")) or headline_reason
+                updated["note"] = _safe_text(updated.get("note")) or headline_reason
             prioritized.append(updated)
             seen.add(player_id)
     if len(prioritized) < 3:
@@ -11659,15 +11677,21 @@ def prioritize_trade_candidates_with_headline(
             tier_label = _safe_text(row.get("player_tier"))
             if role_label == "Core" or tier_label in {"Elite", "Star", "Core Starter"}:
                 continue
-            prioritized.append(
-                _build_structured_decision_candidate(
-                    row,
-                    bucket="trade",
-                    reason=headline_reason,
-                    priority=len(prioritized) + 1,
-                    source="headline_trade",
-                )
+            # Incidental package membership alone is not a sell signal for
+            # developmental / protected dynasty assets.
+            if bool(row.get("protected_low_value_flag")) or bool(row.get("young_upside_flag")):
+                continue
+            if tier_label in {"Development", "Developmental"}:
+                continue
+            candidate = _build_structured_decision_candidate(
+                row,
+                bucket="trade",
+                reason=headline_reason,
+                priority=len(prioritized) + 1,
+                source="headline_trade",
             )
+            candidate["headline_package_member"] = True
+            prioritized.append(candidate)
             seen.add(player_id)
             if len(prioritized) >= 3:
                 break

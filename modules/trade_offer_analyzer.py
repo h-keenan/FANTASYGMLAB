@@ -474,6 +474,8 @@ def build_offer_eval_share_card(
     league_name: str = "",
     format_label: str = "",
     strategy_label: str = "",
+    my_team_name: str = "",
+    partner_name: str = "",
 ):
     """Map an offer verdict into the existing Share Recommendation card model."""
 
@@ -491,14 +493,26 @@ def build_offer_eval_share_card(
         )
 
     value_delta = int(verdict.value_delta)
-    acquire_total = None
-    send_total = None
-    if value_delta > 0:
-        value_change = f"+{value_delta}"
-    elif value_delta < 0:
-        value_change = f"-{abs(value_delta)}"
-    else:
-        value_change = "Even"
+    acquire_total = share.sum_share_asset_scores(receive_assets)
+    send_total = share.sum_share_asset_scores(send_assets)
+    mine = str(my_team_name or "").strip() or (
+        f"{league_name} roster" if str(league_name or "").strip() else ""
+    )
+    partner = str(partner_name or "").strip()
+
+    send_side_label, receive_side_label = share.trade_share_side_labels(
+        my_team_name=mine,
+        partner_name=partner,
+    )
+    edge = share.resolve_trade_share_edge(
+        acquire_total=acquire_total,
+        send_total=send_total,
+        trade_gain=value_delta,
+        receive_side_label=receive_side_label,
+        send_side_label=send_side_label,
+        receive_team_name=mine,
+        send_team_name=partner,
+    )
 
     metrics = tuple(
         part
@@ -518,14 +532,11 @@ def build_offer_eval_share_card(
             value_delta,
             acquire_total,
             send_total,
+            edge["edge_owner_label"],
             verdict.rationale,
             sorted(str(a.get("player_id") or a.get("label") or "") for a in send_assets),
             sorted(str(a.get("player_id") or a.get("label") or "") for a in receive_assets),
         )
-    )
-    send_side_label, receive_side_label = share.trade_share_side_labels(
-        my_team_name=league_name and f"{league_name} roster" or "",
-        partner_name="",
     )
     return share.ShareRecommendationCard(
         card_type=share.CARD_TYPE_TRADE,
@@ -533,15 +544,20 @@ def build_offer_eval_share_card(
         action=verdict.ui_verdict,
         reason=verdict.rationale,
         confidence=verdict.confidence.replace(" confidence", "").replace("Close call", "Close"),
-        value_change=value_change,
+        value_change=str(edge["value_change"]),
         scoring_format=format_label,
         acquire_total=acquire_total,
         send_total=send_total,
+        edge_owner_label=str(edge["edge_owner_label"]),
+        edge_summary=str(edge["edge_summary"]),
         acquire_lines=tuple(share._asset_line(asset) for asset in receive_assets),
         send_lines=tuple(share._asset_line(asset) for asset in send_assets),
         metrics=metrics,
         send_side_label=send_side_label,
         receive_side_label=receive_side_label,
+        my_team_name=mine,
+        partner_name=partner,
+        verdict=verdict.band,
         source_surface="trade_analyzer",
         fingerprint=fingerprint,
         generated_at=share._windows_safe_date(),
