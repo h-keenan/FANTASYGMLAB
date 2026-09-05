@@ -139,17 +139,18 @@ VIEWPORT_PRESERVE_JS = """
       const record = (target) => {
         const root = pageScroller()
         if (!root || !target) return
-        const widget = target.closest('[data-testid="stElementContainer"]') || target
+        const action = target.closest("button, a, summary, [role='button'], input, textarea, select") || target
+        const widget = action.closest('[data-testid="stElementContainer"]') || action
         const rect = widget.getBoundingClientRect()
         const srect = root.getBoundingClientRect()
         hostWindow.__dgInPlaceAnchor = {
           t: Date.now(),
-          key: keyFrom(target),
+          key: keyFrom(action),
           offset: rect.top - srect.top,
           scrollTop: Number(root.scrollTop || 0),
-          nav: isIntentionalNav(target),
-          lockScroll: isFixedOrb(target),
-          label: (target.innerText || target.getAttribute("aria-label") || "").trim().slice(0, 120),
+          nav: isIntentionalNav(action),
+          lockScroll: isFixedOrb(action),
+          label: actionLabel(action),
           navToken: Number(hostWindow.__dynastyGmScrollResetToken || 0)
         }
       }
@@ -185,6 +186,16 @@ VIEWPORT_PRESERVE_JS = """
             const root = pageScroller()
             if (root && Math.abs(Number(root.scrollTop || 0) - last.scrollTop) > 24) {
               root.scrollTop = last.scrollTop
+            }
+            return
+          }
+          if (last.label && actionLabel(focused) === last.label) {
+            const root = pageScroller()
+            if (root) {
+              const rect = focused.getBoundingClientRect()
+              const srect = root.getBoundingClientRect()
+              const delta = (rect.top - srect.top) - last.offset
+              if (Math.abs(delta) >= 12) root.scrollTop += delta
             }
             return
           }
