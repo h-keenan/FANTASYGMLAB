@@ -2863,6 +2863,7 @@ def main() -> None:
     }[surface]()
     _render_fixture_ack_markers()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
+    viewport_preservation.render_viewport_restore_kick()
 
 
 if __name__ == "__main__":

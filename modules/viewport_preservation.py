@@ -136,6 +136,8 @@ VIEWPORT_PRESERVE_JS = """
         }
       }
 
+      hostWindow.__dgRestoreInPlaceAnchor = restore
+
       const record = (target) => {
         const root = pageScroller()
         if (!root || !target) return
@@ -249,3 +251,29 @@ def render_viewport_preservation() -> None:
         width=1,
         height=1,
     )
+
+
+VIEWPORT_RESTORE_KICK_JS = """
+    export default function(component) {
+      const hostWindow = window.parent || window
+      hostWindow.requestAnimationFrame(() => {
+        hostWindow.requestAnimationFrame(() => {
+          if (typeof hostWindow.__dgRestoreInPlaceAnchor === "function") {
+            hostWindow.__dgRestoreInPlaceAnchor()
+          }
+        })
+      })
+    }
+"""
+
+
+def render_viewport_restore_kick() -> None:
+    """Invoke the early binder's restore after the route tree is emitted."""
+
+    kick = st.components.v2.component(
+        "viewport_restore_kick",
+        html="<span aria-hidden='true'></span>",
+        js=VIEWPORT_RESTORE_KICK_JS,
+        isolate_styles=False,
+    )
+    kick(key="dg_viewport_restore_kick", data={"v": 1}, width=1, height=1)

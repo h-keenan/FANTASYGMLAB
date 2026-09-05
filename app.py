@@ -24693,6 +24693,7 @@ def main():
 
     _lifecycle.mark(st.session_state, "T7_page_tree_complete")
     _route_body.exit_route_body(route_body_container, st.session_state)
+    viewport_preservation.render_viewport_restore_kick()
 
     performance.finish_rerun(
         perf_rerun,

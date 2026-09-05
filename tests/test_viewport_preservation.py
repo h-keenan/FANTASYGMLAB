@@ -14,7 +14,7 @@ import pytest
 
 from modules.app_styles import APP_CSS
 from modules.mobile_interaction_overlay_styles import MOBILE_INTERACTION_OVERLAY_CSS
-from modules.viewport_preservation import VIEWPORT_PRESERVE_JS
+from modules.viewport_preservation import VIEWPORT_PRESERVE_JS, VIEWPORT_RESTORE_KICK_JS
 from scripts.measure_interaction_rerun_architecture import count_explicit_reruns
 
 
@@ -50,6 +50,17 @@ def test_app_and_harness_mount_shared_helper():
     assert "viewport_preservation.render_viewport_preservation()" in HARNESS
     assert 'st.components.v2.component(\n    "viewport_preserve"' not in APP
     assert APP.count("_render_navigation_scroll_reset(current_page, league_id=") == 1
+    assert "render_viewport_restore_kick()" in APP
+    assert "render_viewport_restore_kick()" in HARNESS
+
+
+def test_late_kick_only_calls_existing_restore_after_two_frames():
+    assert "__dgRestoreInPlaceAnchor" in VIEWPORT_PRESERVE_JS
+    assert "requestAnimationFrame" in VIEWPORT_RESTORE_KICK_JS
+    assert "__dgRestoreInPlaceAnchor()" in VIEWPORT_RESTORE_KICK_JS
+    assert "addEventListener" not in VIEWPORT_RESTORE_KICK_JS
+    assert "setInterval" not in VIEWPORT_RESTORE_KICK_JS
+    assert "MutationObserver" not in VIEWPORT_RESTORE_KICK_JS
 
 
 def test_navigation_tracker_reads_stmain_scroller():
