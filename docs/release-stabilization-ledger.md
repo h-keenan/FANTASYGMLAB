@@ -92,3 +92,11 @@ The focused 390 failure was intermittent: runs sometimes passed and sometimes le
 Current focused validation after the two-phase change: **10 passed** in the successful run. The authoritative prior full suite remains **3,755 passed, 1 failed, 0 collection errors**, with the same 390/844 viewport failure. Actual-app 390 cold smoke passed helper binding, hidden artifact, overflow, and console/page-error checks; the full actual-app interaction matrix and 10 fresh-context repetitions remain incomplete due Windows runner stalls.
 
 Recommendation remains **Revise** until the intermittent 390px case is proven stable and the requested 10/10 repetitions plus actual-app 1440 validation complete.
+
+## Lifecycle synchronization closure attempt (`cf50c7d`)
+
+The late-kick component now exposes `__dgViewportRestoreKickSeq`, increments it when its JavaScript executes, records `__dgViewportRestoreKickAt`, then invokes the existing restore resolver after two animation frames. Its component data uses a per-script lifecycle token so components.v2 receives changed data on reruns. The hidden kick host shares the binder's 1x1 offscreen fixed CSS.
+
+`click_in_place` now waits for the kick sequence to increment after each action, then waits two animation frames before measuring geometry; the fixed 2800ms success delay was removed. Timeout diagnostics include old/current sequence, helper binding, target presence, and main scroll geometry.
+
+Manual harness smoke confirmed the initial kick component appears and sequence reaches 1. However, the Playwright regression suite in this Windows runner timed out waiting for the sequence during the matrix run (2 failures, 9 passed), so the component-v2 rerun increment contract is not yet proven under the test fixture. No additional product viewport resolver change was made. Recommendation remains **Revise**.
