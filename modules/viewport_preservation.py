@@ -106,11 +106,22 @@ VIEWPORT_PRESERVE_JS = """
           }
           return
         }
-        let el = last.key ? doc.querySelector("." + CSS.escape(last.key)) : null
+        const actionLabel = (node) => (node.innerText || node.getAttribute("aria-label") || "")
+          .trim().slice(0, 120)
+        let el = actionLabel(doc.activeElement) === last.label ? doc.activeElement : null
+        if (!el) el = last.key ? doc.querySelector("." + CSS.escape(last.key)) : null
+        if (el && last.label && actionLabel(el) !== last.label
+            && ![...el.querySelectorAll("button, a, summary, [role='button']")]
+              .some((node) => actionLabel(node) === last.label)) {
+          el = null
+        }
         if (!el && last.label) {
-          el = [...doc.querySelectorAll("button, a, summary, [role='button']")]
-            .find((node) => (node.innerText || node.getAttribute("aria-label") || "")
-              .trim() === last.label) || null
+          const matches = [...doc.querySelectorAll("button, a, summary, [role='button']")]
+            .filter((node) => actionLabel(node) === last.label)
+          // A duplicate label has no safe identity once Streamlit keys change.
+          // Keep the keyed match above when it is verified; otherwise decline
+          // to re-anchor rather than selecting an unrelated control.
+          el = matches.length === 1 ? matches[0] : null
         }
         if (el) {
           const rect = el.getBoundingClientRect()
@@ -204,6 +215,8 @@ VIEWPORT_PRESERVE_JS = """
       })
       hostWindow.setTimeout(restore, 80)
       hostWindow.setTimeout(restore, 220)
+      hostWindow.setTimeout(restore, 600)
+      hostWindow.setTimeout(restore, 1200)
     }
 """
 

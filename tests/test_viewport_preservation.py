@@ -37,6 +37,14 @@ def test_viewport_helper_is_event_driven_and_not_scrollintoview():
     assert "scrollIntoView" not in APP
 
 
+def test_label_fallback_requires_unique_replacement_identity():
+    """The bounded label fallback handles key churn without arbitrary matches."""
+    assert "actionLabel = (node)" in VIEWPORT_PRESERVE_JS
+    assert "matches.length === 1 ? matches[0] : null" in VIEWPORT_PRESERVE_JS
+    assert "A duplicate label has no safe identity" in VIEWPORT_PRESERVE_JS
+    assert "last.key && last.label" not in VIEWPORT_PRESERVE_JS
+
+
 def test_app_and_harness_mount_shared_helper():
     assert "viewport_preservation.render_viewport_preservation()" in APP
     assert "viewport_preservation.render_viewport_preservation()" in HARNESS
