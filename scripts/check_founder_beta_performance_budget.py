@@ -19,8 +19,15 @@ MAX_WARM_SERVER_MS = 750.0
 MAX_FIXTURE_RENDER_MS = 3_000.0
 MAX_PROTOBUF_BYTES = 520_000
 SURFACES = ("dashboard", "my-team", "trade", "waivers", "league")
-# Inventory includes account/guest remounts; this pass did not add rerun sites.
-MAX_EXPLICIT_RERUNS = 58
+# Canonical explicit-rerun inventory is 62 (same on main and this branch).
+# History: budget was last raised to 58 for Trade Analyzer chip remounts
+# (89fb2fb). Welcome/entry state-machine work (3036a53) then intentionally
+# netted +4 sites (marketing_landing +3, account_ui +1, premium_page +1,
+# trade_hub_ui -1) and launch gates were updated to <= 62, but this budget
+# script was left stale at 58. Do not delete those remounts — Import/welcome
+# ownership and Premium handoff require them. Raise only to match the already-
+# authoritative launch inventory; this trust PR adds 0 new st.rerun sites.
+MAX_EXPLICIT_RERUNS = 62
 
 
 def _runtime_report(output: str) -> dict:

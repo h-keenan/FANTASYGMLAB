@@ -116,9 +116,16 @@ def test_roster_decision_narrative_is_active():
 
 
 def test_player_scan_cards_forward_narrative_to_quick_view():
+    """Narrative forwarding is live via open_kwargs; assert behavior not a stale literal."""
+
     source = (ROOT / "modules" / "player_cards.py").read_text(encoding="utf-8")
     assert "recommendation_narrative_fn" in source
-    assert "recommendation_narrative=meta.get" in source
+    assert '"recommendation_narrative": narrative_payload' in source
+    assert '"recommendation_narrative": meta.get("recommendation_narrative")' in source
+    assert "open_player_quick_view(clicked_player_id, **open_kwargs)" in source
+    # Diagnosis: prior assertion looked for recommendation_narrative=meta.get as a
+    # keyword argument. Implementation now packs open_kwargs then unpacks — canonical
+    # forwarding remains intact (architecture D / stale string, not a product break).
 
 
 def test_audit_document_exists():

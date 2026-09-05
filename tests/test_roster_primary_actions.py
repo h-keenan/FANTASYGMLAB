@@ -12,9 +12,20 @@ APP = (ROOT / "app.py").read_text(encoding="utf-8")
 TY = "ty-simpson-1"
 HOLD_REASON = "Young developmental stash with enough upside to protect instead of forcing a bad cut."
 SHOP_REASON = "Direct outgoing piece in the current headline trade path for a starter with this partner."
+SURPLUS_REASON = "Redundant depth at a surplus position."
 
 
-def _item(player_id: str, name: str, *, bucket: str, reason: str, source: str = "roster") -> dict:
+def _item(
+    player_id: str,
+    name: str,
+    *,
+    bucket: str,
+    reason: str,
+    source: str = "roster",
+    young_upside_flag: bool = False,
+    protected_low_value_flag: bool = False,
+    player_tier: str = "",
+) -> dict:
     return {
         "player_id": player_id,
         "player_name": name,
@@ -24,11 +35,28 @@ def _item(player_id: str, name: str, *, bucket: str, reason: str, source: str = 
         "note": reason,
         "source": source,
         "priority": 1,
+        "young_upside_flag": young_upside_flag,
+        "protected_low_value_flag": protected_low_value_flag,
+        "player_tier": player_tier,
+        "tier": player_tier,
     }
 
 
-def test_ty_simpson_style_headline_shop_is_not_also_hold():
-    hold = [_item(TY, "Ty Simpson", bucket="keep", reason=HOLD_REASON)]
+def test_developmental_hold_survives_incidental_headline_shop():
+    """Headline package membership alone is not a sell signal."""
+
+    hold = [
+        _item(
+            TY,
+            "Ty Simpson",
+            bucket="keep",
+            reason=HOLD_REASON,
+            source="roster_hold",
+            young_upside_flag=True,
+            protected_low_value_flag=True,
+            player_tier="Development",
+        )
+    ]
     shop = [
         _item(
             TY,
@@ -36,6 +64,9 @@ def test_ty_simpson_style_headline_shop_is_not_also_hold():
             bucket="trade",
             reason=SHOP_REASON,
             source="headline_trade",
+            young_upside_flag=True,
+            protected_low_value_flag=True,
+            player_tier="Development",
         )
     ]
     before = rpa.conflicting_primary_player_ids(
@@ -53,15 +84,75 @@ def test_ty_simpson_style_headline_shop_is_not_also_hold():
         drop_candidates=reconciled[rpa.ACTION_DROP],
     )
     assert after == set()
-    assert [item["player_id"] for item in reconciled[rpa.ACTION_SHOP]] == [TY]
-    assert reconciled[rpa.ACTION_HOLD] == []
+    assert [item["player_id"] for item in reconciled[rpa.ACTION_HOLD]] == [TY]
+    assert reconciled[rpa.ACTION_SHOP] == []
     assert rpa.primary_action_for_player(
         TY,
         trade_candidates=shop,
         keep_candidates=hold,
         drop_candidates=[],
         player_name="Ty Simpson",
-    ) == rpa.ACTION_SHOP
+    ) == rpa.ACTION_HOLD
+
+
+def test_developmental_with_independent_sell_and_headline_allows_shop():
+    hold = [
+        _item(
+            "dev-2",
+            "Young Stash",
+            bucket="keep",
+            reason=HOLD_REASON,
+            young_upside_flag=True,
+            player_tier="Development",
+        )
+    ]
+    shop = [
+        _item(
+            "dev-2",
+            "Young Stash",
+            bucket="trade",
+            reason=SURPLUS_REASON,
+            source="sell_candidate",
+            young_upside_flag=True,
+            player_tier="Development",
+        )
+    ]
+    reconciled = rpa.reconcile_primary_action_lists(
+        trade_candidates=shop,
+        keep_candidates=hold,
+        drop_candidates=[],
+    )
+    assert [item["player_id"] for item in reconciled[rpa.ACTION_SHOP]] == ["dev-2"]
+    assert reconciled[rpa.ACTION_HOLD] == []
+
+
+def test_ordinary_surplus_veteran_headline_shop_remains_valid():
+    shop = [
+        _item(
+            "vet-1",
+            "Aging Depth",
+            bucket="trade",
+            reason=SHOP_REASON,
+            source="headline_trade",
+            player_tier="Contributor",
+        )
+    ]
+    hold = [
+        _item(
+            "vet-1",
+            "Aging Depth",
+            bucket="keep",
+            reason="Depth piece with limited upside.",
+            player_tier="Contributor",
+        )
+    ]
+    reconciled = rpa.reconcile_primary_action_lists(
+        trade_candidates=shop,
+        keep_candidates=hold,
+        drop_candidates=[],
+    )
+    assert [item["player_id"] for item in reconciled[rpa.ACTION_SHOP]] == ["vet-1"]
+    assert reconciled[rpa.ACTION_HOLD] == []
 
 
 def test_manual_untouchable_is_not_shop_hold_or_drop():
@@ -85,6 +176,29 @@ def test_manual_untouchable_is_not_shop_hold_or_drop():
             keep_candidates=hold,
             drop_candidates=drop,
             untouchable_names=["Core Back"],
+            player_name="Core Back",
+        )
+        == rpa.ACTION_PROTECT
+    )
+
+
+def test_untouchable_beats_headline_outgoing():
+    shop = [
+        _item(
+            "p-core",
+            "Core Back",
+            bucket="trade",
+            reason=SHOP_REASON,
+            source="headline_trade",
+        )
+    ]
+    assert (
+        rpa.primary_action_for_player(
+            "p-core",
+            trade_candidates=shop,
+            keep_candidates=[],
+            drop_candidates=[],
+            untouchable_player_ids=["p-core"],
             player_name="Core Back",
         )
         == rpa.ACTION_PROTECT
@@ -128,26 +242,33 @@ def test_replacement_drop_beats_generic_surplus_shop():
     assert reconciled[rpa.ACTION_SHOP] == []
 
 
-def test_headline_shop_beats_drop():
+def test_replacement_drop_beats_incidental_headline_shop():
+    """Documented precedence: incidental package membership does not clear Drop."""
+
     shop = [
         _item(
-            TY,
-            "Ty Simpson",
+            "drop-h",
+            "Replaceable Vet",
             bucket="trade",
             reason=SHOP_REASON,
             source="headline_trade",
         )
     ]
-    drop = [_item(TY, "Ty Simpson", bucket="drop", reason="Replacement-level.")]
-    hold = [_item(TY, "Ty Simpson", bucket="keep", reason=HOLD_REASON)]
+    drop = [
+        _item(
+            "drop-h",
+            "Replaceable Vet",
+            bucket="drop",
+            reason="Replacement-level veteran with no roster utility.",
+        )
+    ]
     reconciled = rpa.reconcile_primary_action_lists(
         trade_candidates=shop,
-        keep_candidates=hold,
+        keep_candidates=[],
         drop_candidates=drop,
     )
-    assert [item["player_id"] for item in reconciled[rpa.ACTION_SHOP]] == [TY]
-    assert reconciled[rpa.ACTION_DROP] == []
-    assert reconciled[rpa.ACTION_HOLD] == []
+    assert [item["player_id"] for item in reconciled[rpa.ACTION_DROP]] == ["drop-h"]
+    assert reconciled[rpa.ACTION_SHOP] == []
 
 
 def test_trade_candidate_is_not_hold():
@@ -181,7 +302,7 @@ def test_different_players_can_occupy_different_sections():
     ) == set()
 
 
-def test_roster_actions_shop_agrees_with_canonical_shop():
+def test_roster_actions_hold_agrees_when_headline_only_developmental():
     from app import select_my_team_primary_recommendation
 
     shop = [
@@ -191,12 +312,27 @@ def test_roster_actions_shop_agrees_with_canonical_shop():
             bucket="trade",
             reason=SHOP_REASON,
             source="headline_trade",
+            young_upside_flag=True,
+            protected_low_value_flag=True,
+            player_tier="Development",
         )
     ]
-    hold = [_item(TY, "Ty Simpson", bucket="keep", reason=HOLD_REASON)]
+    hold = [
+        _item(
+            TY,
+            "Ty Simpson",
+            bucket="keep",
+            reason=HOLD_REASON,
+            young_upside_flag=True,
+            protected_low_value_flag=True,
+            player_tier="Development",
+        )
+    ]
     reconciled = rpa.reconcile_primary_action_lists(
         trade_candidates=shop, keep_candidates=hold, drop_candidates=[]
     )
+    assert reconciled[rpa.ACTION_SHOP] == []
+    assert [item["player_id"] for item in reconciled[rpa.ACTION_HOLD]] == [TY]
     rec = select_my_team_primary_recommendation(
         roster_limit_context={"over_limit": False},
         acute_injury_pressure=False,
@@ -220,9 +356,8 @@ def test_roster_actions_shop_agrees_with_canonical_shop():
         drop_candidates=[],
         move_candidates=[],
     )
-    assert rec["value"] == "Shop Ty Simpson"
-    assert rec["player_id"] == TY
-    assert TY not in {item["player_id"] for item in reconciled[rpa.ACTION_HOLD]}
+    # Without Shop candidates, Next Move should not invent Shop for the developmental piece.
+    assert "Shop Ty Simpson" not in str(rec.get("value") or "")
 
 
 def test_headline_prioritize_then_reconcile_matches_my_team_owner():
@@ -234,6 +369,11 @@ def test_headline_prioritize_then_reconcile_matches_my_team_owner():
     assert reconcile_block > prioritize_at
     assert "hold_candidates_structured" in APP[reconcile_block : reconcile_block + 1200]
     assert "roster_primary_actions.reconcile_primary_action_lists(" in APP
+    prioritize_body = APP[prioritize_at : reconcile_block]
+    assert "protected_low_value_flag" in prioritize_body
+    assert "young_upside_flag" in prioritize_body
+    assert 'source="headline_trade"' in prioritize_body
+    assert "headline_package_member" in prioritize_body
 
 
 def test_no_new_provider_or_trade_hub_construction_in_owner():

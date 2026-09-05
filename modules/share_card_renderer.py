@@ -890,6 +890,11 @@ def _render_trade(
     tokens = LayoutTokens(**{**tokens.__dict__, "portrait": portrait})
     give_h = _matchup_column_height(draw, card.send_lines, tokens, hero_font, meta_font, inner_w)
     get_h = _matchup_column_height(draw, card.acquire_lines, tokens, hero_font, meta_font, inner_w)
+    total_band = 36 * s
+    if card.send_total is not None:
+        give_h += total_band
+    if card.acquire_total is not None:
+        get_h += total_band
     col_h = max(give_h, get_h)
     draw.line((left_x, y, left_x + 10 * s, y + col_h), fill=NEGATIVE, width=max(4, 3 * s))
     draw.line((right_x, y, right_x + 10 * s, y + col_h), fill=POSITIVE, width=max(4, 3 * s))
@@ -976,6 +981,11 @@ def _render_matchup_column(
     accent,
 ):
     draw.text((x, y), _t(title), font=section_font, fill=accent)
+    cursor = y + 32 * s
+    if total is not None:
+        total_label = share.format_share_value(int(total))
+        draw.text((x, cursor), _t(total_label), font=value_font, fill=TEXT)
+        cursor += 36 * s
     _draw_matchup_assets(
         Image,
         draw,
@@ -983,7 +993,7 @@ def _render_matchup_column(
         lines,
         portraits,
         x,
-        y + 32 * s,
+        cursor,
         col_w,
         hero_font,
         meta_font,
@@ -993,14 +1003,25 @@ def _render_matchup_column(
 
 
 def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
-    """Human verdict first; signed model delta and confidence stay subordinate."""
+    """Human verdict first; named edge owner + side-aware delta stay subordinate."""
 
     verdict = _t(getattr(card, "verdict", "") or card.action or "Fair")
     draw.text((pad, y), verdict, font=edge_font, fill=TEXT)
     y += 48 * s
 
+    edge_summary = _t(getattr(card, "edge_summary", "") or "")
+    edge_owner = _t(getattr(card, "edge_owner_label", "") or "")
     vc = _t(card.value_change or "Even")
     label, polarity = parse_signed_edge(vc)
+    if edge_summary:
+        display = edge_summary
+    elif edge_owner and polarity != "even":
+        magnitude = label.lstrip("+-") if label else vc.lstrip("+-")
+        display = f"Edge: {edge_owner} +{magnitude}"
+    elif polarity == "even":
+        display = "Edge: Even"
+    else:
+        display = f"Edge: {label}" if label else vc
     color = POSITIVE if polarity == "pos" else NEGATIVE if polarity == "neg" else TEXT
     tip = pad + 6 * s
     if polarity == "pos":
@@ -1015,9 +1036,8 @@ def _render_value_edge(draw, card, y, pad, width, s, section_font, edge_font):
         )
     else:
         draw.rectangle((pad, y + 12 * s, pad + 12 * s, y + 16 * s), fill=color)
-    number = label if polarity != "even" else vc
-    draw.text((pad + 20 * s, y), number, font=section_font, fill=color)
-    num_w = _text_width(draw, number, section_font)
+    draw.text((pad + 20 * s, y), display, font=section_font, fill=color)
+    num_w = _text_width(draw, display, section_font)
     track_w = 56 * s
     bar_x = pad + 20 * s + num_w + 12 * s
     bar_y = y + 12 * s

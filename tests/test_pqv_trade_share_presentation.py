@@ -171,7 +171,9 @@ def test_share_labels_are_perspective_safe_with_and_without_team_names():
     assert "This roster adds future flexibility" in unnamed.reason
     assert unnamed.verdict == "Fair"
     payload = share.build_share_text_payload(unnamed)
-    assert payload.index("Fair") < payload.index("Balance:")
+    assert "Edge:" in payload
+    assert payload.index("Fair") < payload.index("Edge:")
+    assert "Balance:" not in payload
 
 
 def test_authenticated_team_name_ignores_league_browse_selection():

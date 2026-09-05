@@ -148,12 +148,26 @@ def test_player_without_recommendation_shows_neutral_context():
     html = player_quick_view.recommendation_context_html(
         presentation["summary"],
         presentation["context"],
-        action="Monitor",
+        action="No active recommendation",
         active_recommendation=False,
         recommendation_id=neutral.recommendation_id,
     )
-    assert "Decision" in html
-    assert "Monitor" in html
+    assert "Player Context" in html
+    assert "No active recommendation" in html
+    assert "Hold" not in html
+    assert "Monitor" not in html
+    assert "player-dossier-neutral-context" in html
+
+
+def test_pqv_neutral_refuses_synthetic_hold_action():
+    html = player_quick_view.recommendation_context_html(
+        "Depth chart context.",
+        "General player analysis — not an active recommendation.",
+        action="Hold",
+        active_recommendation=False,
+    )
+    assert "No active recommendation" in html
+    assert "player-dossier-context-action\">Hold<" not in html
     assert "player-dossier-neutral-context" in html
 
 
