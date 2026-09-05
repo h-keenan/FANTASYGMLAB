@@ -166,9 +166,7 @@ def avatar_html(image_url: str, fallback_text: str, css_class: str = "player-ava
     image_html = (
         f"<img class='dg-player-headshot-image' src='{safe_url}' alt='' "
         f"width='{box_px}' height='{box_px}' "
-        "decoding='async' "
-        "onload=\"this.classList.add('is-loaded');if(!this.naturalWidth)this.remove();\" "
-        "onerror=\"this.remove()\">"
+        "decoding='async'>"
         if safe_url
         else ""
     )

@@ -200,7 +200,7 @@ def test_avatar_hides_fallback_when_photo_element_exists():
     )
     assert "dg-player-headshot-image" in loaded
     assert ">EW<" in loaded
-    assert "this.remove()" in loaded
+    assert "onerror=" not in loaded
     missing = player_profile_ui.avatar_html("", "EW", "dg-compact-asset-avatar")
     assert "<img" not in missing
     assert ">EW<" in missing
@@ -231,5 +231,6 @@ def test_avatar_hides_fallback_when_photo_element_exists():
         "EW",
         "dg-compact-asset-avatar",
     )
-    assert "onerror=\"this.remove()\"" in broken_contract
-    assert "if(!this.naturalWidth)this.remove()" in broken_contract.replace(" ", "")
+    assert "onload=" not in broken_contract
+    assert "onerror=" not in broken_contract
+    assert "dg-player-headshot-fallback" in broken_contract

@@ -96,6 +96,7 @@ from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import viewport_preservation
+from modules import player_headshot_runtime
 
 
 SURFACES = {
@@ -2821,6 +2822,7 @@ def _alerts() -> None:
 def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     viewport_preservation.render_viewport_preservation()
+    player_headshot_runtime.render_player_headshot_runtime()
     # Match production inject order from app.py script start, then command header
     # (late, like render_top_league_identity_header). MOBILE_INTERACTION_OVERLAY_CSS
     # is already concatenated into APP_CSS — do not re-inject after the command owner.

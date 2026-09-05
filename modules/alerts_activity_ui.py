@@ -150,7 +150,7 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     source_link_html = (
         f"<a class='dg-alerts-source' href='{escape(source_url, quote=True)}' "
         f"target='_blank' rel='noopener noreferrer' "
-        f"onclick='event.stopPropagation();' data-dg-alerts-source='1'>Read source</a>"
+        f"data-dg-alerts-source='1'>Read source</a>"
         if source_url
         else ""
     )
