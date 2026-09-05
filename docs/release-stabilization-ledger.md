@@ -38,7 +38,7 @@ Categories: A product defect; B stale assertion/golden; C harness defect; D envi
 | `tests/test_trust_row_mapping_optimization.py::test_real_988_player_frame_is_field_for_field_equivalent` | C | Reuse the isolated hydrated fixture and assert 1880. Preserve full frame, dtype, diagnostics, fingerprints, column order and null-mask equivalence. Historical node ID retained. |
 | `tests/test_valuation_archetypes.py::test_workspace_affordance_uses_native_action_and_canonical_modal` | B | Explanation action is now `How valuation works`; the separate selector owns the canonical lens. Assert native action/key, lens input/key, and canonical modal rather than removed tooltip copy. |
 | `tests/test_valuation_authority.py::test_actual_keenan_cached_provider_value_runs_canonical_local_model` | E | Pin 2025/2024 golden seasons. Retain exact 1060 value, provider provenance, no-network guards, trade eligibility, and unchanged modeled peer value. |
-| `tests/test_viewport_preservation.py::test_browser_in_place_actions_keep_region[390-844]` | C | Fixed 700ms wait raced final components.v2 viewport handler binding on cold load. Wait for `__dgViewportPreserveBound` and fonts before interaction; retain every viewport assertion and add before/after measurements on failure. |
+| `tests/test_viewport_preservation.py::test_browser_in_place_actions_keep_region[390-844]` | F | Investigation: initial 390px page was an empty 844px `stMain`; the resend control appeared only after the first measurement at y=1148. `scroll_action_into_view` returned `ok: false`, and `window.__dgViewportPreserveBound` never became true within 30 seconds. This is unresolved mobile production/helper behavior; no assertion was weakened or production module changed. |
 
 Collection error: `tests/test_startup_latency_cleanup_234.py` — **C**. Optional Unix RSS telemetry was imported before its existing fail-soft boundary. Move the import inside `_rss_mb` so unsupported telemetry returns `None`; concurrency, isolation, timeout and load contracts run unchanged on Windows.
 
@@ -57,6 +57,10 @@ No failure is left lumped into an uninvestigated category. Final validation and 
 
 The budget script uses that context. No global production flag, component removal, blanket exception catch, extra provider/model call, rerun, or CSS expansion is introduced.
 
-## Validation
+## Final validation
 
-Final results pending the complete run.
+The closure run produced **3,753 passed, 2 failed, 0 collection errors**, with 12 subtests passed and one existing Starlette/httpx deprecation warning. The remaining failures are the 390px and 1440px viewport-preservation nodes; 1440 passed individually after the 390 investigation, while the full matrix retained both failures under the shared module run. The 390 failure is the unresolved helper/readiness behavior described above, not evidence of a viewport jump: `mainScrollTop` remained 0 before and after, `atMainBottom` remained false, and the originating button was absent before the page settled. The 1440 failure was not reproduced individually and remains a release-browser gate requiring follow-up.
+
+The server-only performance budget passes: architecture is 62 explicit reruns, 7 deferred gates, and 8 reduced-context calls; cold server time 1011.7 ms, warm 50.4 ms, protobuf 466503 / 432949 bytes; dashboard, my-team, trade, waivers, and league fixture surfaces passed. Before/after protobuf and rerun counts are unchanged, and provider/model-call delta is 0. Targeted server-only AppTest and production summary-tile Chromium coverage passed (19 targeted tests plus the dedicated click/keyboard test). `compileall` and `git diff --check` passed.
+
+No production `app.py` or `modules/*` file was changed. The follow-up therefore does not claim a viewport repair that was not landed. Recommendation remains **Revise**: investigate the mobile viewport helper/component registration in a dedicated product/browser fix before release review.
