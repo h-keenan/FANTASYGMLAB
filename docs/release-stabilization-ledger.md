@@ -82,3 +82,13 @@ After the repair, the viewport-preservation suite passed 9 tests in one run (the
 - `python -m compileall -q app.py modules services scripts tests` passed. `git diff --check` passed. Generated test data was restored/removed after validation.
 
 Recommendation: **Revise**. Keep PR #437 Draft until the intermittent 390px viewport case and actual-app matrix/repetition gates are completed.
+
+## Two-phase viewport lifecycle investigation
+
+At head `3ae44e3`, the early binder remains immediately after `st.set_page_config`. It now exposes the existing safe resolver as `window.__dgRestoreInPlaceAnchor`. A separate `render_viewport_restore_kick()` component is emitted after route output completes: it installs no listeners, creates no anchor, and invokes the existing resolver after two animation frames. The same lifecycle is mirrored in `scripts/ui_validation_harness.py`.
+
+The focused 390 failure was intermittent: runs sometimes passed and sometimes left the replacement at y=1005 with `stMain.scrollTop=143`. The late kick is now implemented to cover the post-route lifecycle, but a complete 10/10 repetition and a zero-failure full suite have not been achieved. No additional arbitrary timers, polling, MutationObserver, reruns, or provider calls were added.
+
+Current focused validation after the two-phase change: **10 passed** in the successful run. The authoritative prior full suite remains **3,755 passed, 1 failed, 0 collection errors**, with the same 390/844 viewport failure. Actual-app 390 cold smoke passed helper binding, hidden artifact, overflow, and console/page-error checks; the full actual-app interaction matrix and 10 fresh-context repetitions remain incomplete due Windows runner stalls.
+
+Recommendation remains **Revise** until the intermittent 390px case is proven stable and the requested 10/10 repetitions plus actual-app 1440 validation complete.
