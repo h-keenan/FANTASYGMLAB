@@ -100,3 +100,26 @@ The late-kick component now exposes `__dgViewportRestoreKickSeq`, increments it 
 `click_in_place` now waits for the kick sequence to increment after each action, then waits two animation frames before measuring geometry; the fixed 2800ms success delay was removed. Timeout diagnostics include old/current sequence, helper binding, target presence, and main scroll geometry.
 
 Manual harness smoke confirmed the initial kick component appears and sequence reaches 1. However, the Playwright regression suite in this Windows runner timed out waiting for the sequence during the matrix run (2 failures, 9 passed), so the component-v2 rerun increment contract is not yet proven under the test fixture. No additional product viewport resolver change was made. Recommendation remains **Revise**.
+
+## Authoritative final state — alternating-key pass (2026-09-05)
+
+Validated implementation SHA: `4da5f2353ffd33990a2414f528363546beaef476`. The following documentation-only commit records these results; older closure sections are historical and do not establish current green status.
+
+**Recommendation: Revise.** PR #437 remains Draft, human-approval-required, with no auto-merge. #435 was untouched.
+
+Only `modules/viewport_preservation.py` changed in this implementation pass: the late component now alternates between `dg_viewport_restore_kick_1` and `dg_viewport_restore_kick_0`. The existing prefix CSS covers both keys; a min-width override prevents Streamlit's 16px minimum from overriding the 1px width. The resolver, event listeners, two-frame invocation and sequence diagnostics were not changed.
+
+Smallest browser proof used one Streamlit process and one Chromium process. Python token and frontend sequence advanced exactly **1,2,3,4,5,6** across five clicks; emitted suffixes were **1,0,1,0,1,0**. Kick timestamps were **1788641493939, 1788641494128, 1788641494276, 1788641494453, 1788641494583, 1788641494735**. No remount timeout occurred. However, every click emitted the existing browser error **`actionLabel is not defined`**. `actionLabel` is declared inside `restore` but referenced by `record` and the focus handler outside that scope. This pass explicitly prohibited resolver changes, so this error remains unfixed and must not be concealed by the successful sequence proof.
+
+| Current focused node | Result | Cause |
+|---|---|---|
+| `tests/test_viewport_preservation.py::test_browser_in_place_actions_keep_region[390-844]` | Failed; 93.47 seconds | Initial kick wait timed out because the harness aborted before reaching the late component. |
+| `tests/test_viewport_preservation.py::test_browser_in_place_actions_keep_region[1440-900]` | Failed; 93.31 seconds | Same harness exception. |
+
+Captured server traceback: `_guest_landing` calls `marketing_landing.render_marketing_landing()` at line 2377, which already calls the deferred renderer. Its second deferred call at harness line 2442 raises **StreamlitDuplicateElementKey: landing_pricing_cta**. Thus the route never reaches `render_viewport_restore_kick()`. This is a concrete harness defect, not evidence that alternating remounts fail and not a Windows runner stall. There were no repeated matrix attempts after these failures.
+
+Actual `app.py` cold smoke at both 390x844 and 1440x900: binder true, sequence 1, no Streamlit exception, no page errors, no horizontal overflow; both hosts fixed and opacity 0. Their measured width was 16px before the final min-width override (height 1px). Final 1px computed-width verification and genuine in-place action validation are incomplete; neither actual-app release proof is claimed green.
+
+Full suite was deliberately **not run**: the user required both synchronized width tests to pass first. No old full-suite result is represented as current-head validation.
+
+Current implementation performance script **passes**: cold **848.6 ms / 469105 protobuf bytes**, warm **46.7 ms / 435551 bytes**. All dashboard, my-team, trade, waivers and league fixture surfaces pass. Explicit reruns **62**, deferred gates **7**, reduced-context calls **8**, all unchanged; provider/model-call delta **0**. APP_CSS unchanged. Compileall and git diff --check passed.
