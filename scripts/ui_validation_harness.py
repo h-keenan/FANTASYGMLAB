@@ -2439,7 +2439,6 @@ def _guest_landing() -> None:
     else:
         _render_import()
         _render_account()
-    marketing_landing.render_marketing_landing_deferred()
 
     st.markdown("<div data-fgl-guest-landing='1'></div>", unsafe_allow_html=True)
     if fixture_auth == "guest":

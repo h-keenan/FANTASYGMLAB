@@ -43,6 +43,8 @@ def test_label_fallback_requires_unique_replacement_identity():
     assert "matches.length === 1 ? matches[0] : null" in VIEWPORT_PRESERVE_JS
     assert "A duplicate label has no safe identity" in VIEWPORT_PRESERVE_JS
     assert "last.key && last.label" not in VIEWPORT_PRESERVE_JS
+    assert VIEWPORT_PRESERVE_JS.count("const actionLabel =") == 1
+    assert VIEWPORT_PRESERVE_JS.index("const actionLabel =") < VIEWPORT_PRESERVE_JS.index("const restore =")
 
 
 def test_app_and_harness_mount_shared_helper():
@@ -199,8 +201,12 @@ def test_browser_in_place_actions_keep_region(harness_url, width, height):
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
             )
         page = browser.new_page(**kwargs)
+        errors = []
+        page.on("pageerror", lambda error: errors.append(f"{page.url}: {error}"))
+        page.on("console", lambda message: errors.append(f"{page.url}: {message.text}") if message.type == "error" else None)
         try:
             report = run_viewport_matrix(page, base_url=harness_url)
+            assert not errors, errors
         finally:
             browser.close()
     assert "resend_confirmation" in report["cases"]
@@ -212,3 +218,29 @@ def test_browser_in_place_actions_keep_region(harness_url, width, height):
     assert "dashboard_refresh" in report["cases"]
     assert "strategy_toggle" in report["cases"]
     assert "pqv_more_details" in report["cases"]
+
+
+@pytest.mark.parametrize("auth", ["guest", "pending_definite"])
+def test_guest_landing_completes_once_without_js_errors(harness_url, auth):
+    from playwright.sync_api import sync_playwright
+    from scripts.validate_viewport_preservation import wait_app, click_in_place
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+        try:
+            page.goto(f"{harness_url}/?surface=guest-landing&fixture_auth={auth}")
+            wait_app(page)
+            assert page.locator('[data-testid="stException"]').count() == 0
+            assert page.locator('.st-key-landing_pricing_cta').count() == 1
+            assert page.evaluate("window.__dgViewportPreserveBound === true")
+            if auth == "pending_definite":
+                result = click_in_place(page, "Resend confirmation email")
+                assert page.evaluate("window.__dgViewportRestoreKickSeq") > result["before"]["kickSeq"]
+                page.evaluate("window.__dgRestoreInPlaceAnchor()")
+            assert not errors, errors
+        finally:
+            browser.close()

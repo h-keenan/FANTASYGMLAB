@@ -91,6 +91,9 @@ VIEWPORT_PRESERVE_JS = """
         )
       }
 
+      const actionLabel = (node) => (node.innerText || node.getAttribute("aria-label") || "")
+        .trim().slice(0, 120)
+
       const restore = () => {
         const last = hostWindow.__dgInPlaceAnchor
         if (!last || last.nav) return
@@ -108,8 +111,6 @@ VIEWPORT_PRESERVE_JS = """
           }
           return
         }
-        const actionLabel = (node) => (node.innerText || node.getAttribute("aria-label") || "")
-          .trim().slice(0, 120)
         let el = actionLabel(doc.activeElement) === last.label ? doc.activeElement : null
         if (!el) el = last.key ? doc.querySelector("." + CSS.escape(last.key)) : null
         if (el && last.label && actionLabel(el) !== last.label
