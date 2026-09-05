@@ -70,3 +70,15 @@ Production inspection showed `app.py` mounted `viewport_preservation.render_view
 The committed repair moves the helper immediately after `st.set_page_config` in `app.py` and `scripts/ui_validation_harness.py`, changes the hidden host to a 1px offscreen fixed host with opacity 0 and pointer-events disabled, and records a bounded action label so the helper can restore against the post-rerun control when its generated key changes. No extra rerun/provider/model call or visible layout is introduced. This is a real production helper defect, confirmed by the cold 390 browser reproduction; it is not an assertion relaxation.
 
 After the repair, the viewport-preservation suite passed 9 tests in one run (the WebKit availability branch remains conditional), and the 390 case passed individually. A 1440 individual run passed before the helper-label repair; repeated 10-run fresh-browser loops were attempted but could not complete reliably under this Windows process runner, so no unsupported 10/10 claim is made. The remaining full-suite/browser counts below are the actual completed runs.
+
+## Final closure pass on `0de2134`
+
+- Current-head initial full suite before this final helper hardening: **3,754 passed, 1 failed, 0 collection errors**. The failure was `tests/test_viewport_preservation.py::test_browser_in_place_actions_keep_region[390-844]`, a real/intermittent viewport-helper re-anchor defect (post-rerun control remained at y=1005 while `stMain.scrollTop` stayed 143).
+- Final helper hardening: records the actionable control (not a nested click child), verifies keyed matches against the bounded label, prefers an active matching replacement, and declines ambiguous duplicate labels. Added deterministic source-contract coverage for unique replacement and duplicate-label refusal.
+- Focused viewport suite after hardening: **10 passed**; the 390/844 and 1440/900 browser cases passed in the focused run.
+- Actual `app.py` Chromium smoke at 390x844: helper bound after settle, hidden marker not visible, document width equal to viewport, no console/page errors. A broader actual-app interaction matrix was attempted but the Windows runner stalled; it was stopped without claiming success. The same runner could not complete the requested 10 fresh-context repetitions.
+- Final authoritative full suite on `0de2134`: **3,755 passed, 1 failed, 0 collection errors**. The remaining failure is the same intermittent 390/844 viewport case above; it is not browser-unavailable infrastructure and remains unresolved for release closure.
+- Performance budget after `0de2134`: explicit reruns **62**, deferred gates **7**, reduced-context calls **8**, provider/model-call delta **0**; cold server **1001.3 ms**, warm **55.5 ms**, protobuf **467723 / 434169 bytes**; all fixture surfaces passed.
+- `python -m compileall -q app.py modules services scripts tests` passed. `git diff --check` passed. Generated test data was restored/removed after validation.
+
+Recommendation: **Revise**. Keep PR #437 Draft until the intermittent 390px viewport case and actual-app matrix/repetition gates are completed.
