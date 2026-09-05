@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from unittest.mock import patch
 
 import pytest
@@ -615,3 +616,154 @@ def test_analyzer_share_includes_side_totals_and_named_edge():
     assert card.edge_owner_label == "Home GM"
     assert "Edge: Home GM +300" in card.edge_summary
     assert card.acquire_total is not None and card.send_total is not None
+
+
+def test_analyzer_multi_asset_share_totals_match_edge_and_verdict():
+    """Production-shaped Analyzer package: side totals, named edge, verdict agree.
+
+    Reuses canonical owners only:
+    - modules.trade_offer_analyzer.build_offer_eval_share_card
+    - modules.share_recommendation_cards.sum_share_asset_scores /
+      resolve_trade_share_edge (via the Analyzer builder)
+    """
+
+    from modules import share_recommendation_cards as share_mod
+    from modules import trade_offer_analyzer as toa
+
+    send_assets = [
+        {"asset_type": "player", "name": "CMC", "player_id": "4017", "score": 9200},
+        {"asset_type": "player", "name": "Depth WR", "player_id": "5001", "score": 2100},
+        {"asset_type": "pick", "label": "2027 Mid 2nd", "score": 1800},
+    ]
+    receive_assets = [
+        {"asset_type": "player", "name": "Young QB", "player_id": "8110", "score": 7800},
+        {"asset_type": "player", "name": "Breakout TE", "player_id": "8220", "score": 4100},
+        {"asset_type": "pick", "label": "2026 Early 1st", "score": 5500},
+    ]
+    expected_send = share_mod.sum_share_asset_scores(send_assets)
+    expected_acquire = share_mod.sum_share_asset_scores(receive_assets)
+    assert expected_send == 9200 + 2100 + 1800
+    assert expected_acquire == 7800 + 4100 + 5500
+    side_delta = int(expected_acquire) - int(expected_send)
+    assert side_delta == 4300
+
+    # Analyzer value_delta matches scored package difference so share + verdict
+    # cannot tell contradictory stories on magnitude/direction.
+    verdict = toa.decide_offer_verdict(
+        {
+            "available": True,
+            "value_delta": side_delta,
+            "explanation": "Multi-asset smash package.",
+            "lineup_summary": "Starter upgrade at QB/TE.",
+            "strategy_summary": "Contender tilt.",
+            "injury_summary": "",
+            "roster_fit_verdict": "Positive Fit",
+            "component_scores": {
+                "value": 2,
+                "lineup": 2,
+                "needs": 1,
+                "age": 0,
+                "draft": 1,
+                "strategy": 1,
+                "injury": 0,
+            },
+        }
+    )
+    assert verdict.value_delta == side_delta
+    assert side_delta > 0
+    assert verdict.band == "SMASH ACCEPT"
+    assert verdict.ui_verdict == "ACCEPT"
+
+    card = toa.build_offer_eval_share_card(
+        verdict,
+        send_assets=send_assets,
+        receive_assets=receive_assets,
+        league_name="Founder Beta League",
+        my_team_name="Revivalry",
+        partner_name="Charmmanderr",
+        format_label="SF PPR",
+        strategy_label="Contend",
+    )
+
+    assert card.send_total == expected_send
+    assert card.acquire_total == expected_acquire
+    assert card.send_total == sum(int(a["score"]) for a in send_assets)
+    assert card.acquire_total == sum(int(a["score"]) for a in receive_assets)
+
+    edge = share_mod.resolve_trade_share_edge(
+        acquire_total=card.acquire_total,
+        send_total=card.send_total,
+        trade_gain=verdict.value_delta,
+        receive_side_label=card.receive_side_label,
+        send_side_label=card.send_side_label,
+        receive_team_name="Revivalry",
+        send_team_name="Charmmanderr",
+    )
+    assert edge["delta"] == side_delta == verdict.value_delta
+    assert edge["polarity"] == "pos"
+    assert card.edge_owner_label == "Revivalry"
+    assert card.edge_owner_label == edge["edge_owner_label"]
+    assert card.edge_summary == f"Edge: Revivalry +{side_delta:,}"
+    assert card.edge_summary == edge["edge_summary"]
+    assert "FAIR +" not in card.edge_summary
+    assert re.fullmatch(r"Edge: Revivalry \+4,300", card.edge_summary)
+    # Verdict action and share edge must agree on who is ahead.
+    assert int(card.acquire_total) - int(card.send_total) == verdict.value_delta
+    assert card.value_change == f"+{side_delta}"
+
+
+def test_analyzer_multi_asset_share_partner_edge_is_named_unambiguously():
+    """Partner-favored multi-asset package still names the edge owner."""
+
+    from modules import share_recommendation_cards as share_mod
+    from modules import trade_offer_analyzer as toa
+
+    send_assets = [
+        {"asset_type": "player", "name": "Elite RB", "player_id": "1", "score": 9500},
+        {"asset_type": "pick", "label": "2026 1st", "score": 5200},
+    ]
+    receive_assets = [
+        {"asset_type": "player", "name": "Aging WR", "player_id": "2", "score": 6100},
+        {"asset_type": "player", "name": "Handcuff", "player_id": "3", "score": 2400},
+        {"asset_type": "pick", "label": "2028 3rd", "score": 900},
+    ]
+    expected_send = share_mod.sum_share_asset_scores(send_assets)
+    expected_acquire = share_mod.sum_share_asset_scores(receive_assets)
+    side_delta = int(expected_acquire) - int(expected_send)
+    assert side_delta == -5300
+
+    verdict = toa.decide_offer_verdict(
+        {
+            "available": True,
+            "value_delta": side_delta,
+            "explanation": "Package is light.",
+            "lineup_summary": "Lose RB1 production.",
+            "strategy_summary": "Overpay risk.",
+            "injury_summary": "",
+            "roster_fit_verdict": "Negative Fit",
+            "component_scores": {
+                "value": -2,
+                "lineup": -2,
+                "needs": -1,
+                "age": 0,
+                "draft": -1,
+                "strategy": -1,
+                "injury": 0,
+            },
+        }
+    )
+    card = toa.build_offer_eval_share_card(
+        verdict,
+        send_assets=send_assets,
+        receive_assets=receive_assets,
+        my_team_name="Home GM",
+        partner_name="Away GM",
+    )
+    assert card.send_total == expected_send == 14700
+    assert card.acquire_total == expected_acquire == 9400
+    assert card.edge_owner_label == "Away GM"
+    assert card.edge_summary == "Edge: Away GM +5,300"
+    assert verdict.value_delta == side_delta
+    assert int(card.acquire_total) - int(card.send_total) == verdict.value_delta
+    assert "Balance:" not in card.edge_summary
+    assert not card.edge_summary.startswith("+")
