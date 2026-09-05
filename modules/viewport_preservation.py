@@ -281,4 +281,4 @@ def render_viewport_restore_kick() -> None:
         js=VIEWPORT_RESTORE_KICK_JS,
         isolate_styles=False,
     )
-    kick(key="dg_viewport_restore_kick", data={"v": token}, width=1, height=1)
+    kick(key=f"dg_viewport_restore_kick_{token % 2}", data={"v": token}, width=1, height=1)
