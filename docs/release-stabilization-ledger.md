@@ -123,3 +123,28 @@ Actual `app.py` cold smoke at both 390x844 and 1440x900: binder true, sequence 1
 Full suite was deliberately **not run**: the user required both synchronized width tests to pass first. No old full-suite result is represented as current-head validation.
 
 Current implementation performance script **passes**: cold **848.6 ms / 469105 protobuf bytes**, warm **46.7 ms / 435551 bytes**. All dashboard, my-team, trade, waivers and league fixture surfaces pass. Explicit reruns **62**, deferred gates **7**, reduced-context calls **8**, all unchanged; provider/model-call delta **0**. APP_CSS unchanged. Compileall and git diff --check passed.
+
+## Authoritative final state — confirmed blocker repairs (2026-09-05)
+
+Implementation HEAD: `248484ceaddaadd2d5f1e4559ee89d751bc6417f`; the subsequent documentation-only commit records this evidence. This section supersedes earlier release-status sections. **Recommendation: Revise.**
+
+Both requested blockers are repaired. In `modules/viewport_preservation.py`, the single unchanged `actionLabel` implementation moved from inside `restore` into shared component-function scope before restore, record and listener registration. In `scripts/ui_validation_harness.py`, the redundant deferred marketing render was removed: the normal marketing renderer already emits the pricing CTA and marks deferred content mounted. Production marketing code and viewport resolver behavior are unchanged. Tests now fail on browser console/page errors, verify the shared helper declaration, and exercise guest and pending-confirmation landing routes.
+
+Guest/pending regression proof: **2 passed**. Both routes emit exactly one pricing CTA, have no Streamlit exception and reach the kick. The pending resend click advances the sequence, preserves geometry and executes pointer/focus/restore paths without JavaScript errors. Alternating keys and the lifecycle wait remain intact.
+
+Latest viewport suite: **11 passed, 2 failed in 39.12 seconds**. Both complete geometry matrices returned successfully, but their browser-error assertions failed:
+
+- `tests/test_viewport_preservation.py::test_browser_in_place_actions_keep_region[390-844]`
+- `tests/test_viewport_preservation.py::test_browser_in_place_actions_keep_region[1440-900]`
+
+The captured error occurs on `?surface=dashboard`: **Minified React error #231, onLoad supplied as string**. The only inline `onload` found under modules is `modules/player_profile_ui.py::avatar_html`; its HTML contains string onload/onerror attributes. This is a newly exposed browser error, not a synchronization timeout, geometry failure, or Windows runner stall. It was not suppressed or altered in this two-blocker repair.
+
+Companion focused suites: **36 passed** (summary tiles, CSS DOM ownership, Orb collision/dismiss, mobile overlay, pending confirmation); navigation suites: **45 passed**. Combined with viewport: **92 passed, 2 failed** across these invocations.
+
+Actual `app.py` cold smoke at both 390x844 and 1440x900: binder active, kick sequence 1, no captured console/page errors, no horizontal overflow, both helper hosts measured **1x1**, fixed, opacity 0. No genuine in-place rerun was completed in this actual-app smoke: the attempted safe Feedback entry was unavailable on the signed-out page. Therefore actual-app release interaction proof remains incomplete.
+
+Full suite was not run: the requested prerequisite that both synchronized viewport tests pass remains unmet. No historical full-suite number is claimed for this implementation HEAD.
+
+Performance script **passes** on this implementation: cold **797.2 ms / 469102 protobuf bytes**, warm **49.4 ms / 435548 bytes**. All five fixture surfaces pass. Explicit reruns **62**, deferred gates **7**, reduced-context calls **8** (all unchanged); provider/model-call delta **0**. Protobuf is **3 bytes lower** than the preceding reference in each state. APP_CSS unchanged. Compileall and git diff --check pass; working tree clean before this documentation update.
+
+PR #437 remains Draft with human-approval-required; no auto-merge, no merge, and #435 untouched.
