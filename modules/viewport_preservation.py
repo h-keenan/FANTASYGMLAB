@@ -18,16 +18,19 @@ from modules.html_rendering import inject_global_styles
 
 VIEWPORT_PRESERVE_CSS = """
 [class*="st-key-dg_viewport_preserve"] {
-    clip: rect(0, 0, 0, 0) !important;
-    height: 0 !important;
+    clip: rect(0, 0, 1px, 1px) !important;
+    height: 1px !important;
     margin: 0 !important;
-    max-height: 0 !important;
-    max-width: 0 !important;
+    max-height: 1px !important;
+    max-width: 1px !important;
     overflow: hidden !important;
     padding: 0 !important;
     pointer-events: none !important;
-    position: absolute !important;
-    width: 0 !important;
+    position: fixed !important;
+    left: -10px !important;
+    top: -10px !important;
+    opacity: 0 !important;
+    width: 1px !important;
 }
 """
 
@@ -103,7 +106,12 @@ VIEWPORT_PRESERVE_JS = """
           }
           return
         }
-        const el = last.key ? doc.querySelector("." + CSS.escape(last.key)) : null
+        let el = last.key ? doc.querySelector("." + CSS.escape(last.key)) : null
+        if (!el && last.label) {
+          el = [...doc.querySelectorAll("button, a, summary, [role='button']")]
+            .find((node) => (node.innerText || node.getAttribute("aria-label") || "")
+              .trim() === last.label) || null
+        }
         if (el) {
           const rect = el.getBoundingClientRect()
           const srect = root.getBoundingClientRect()
@@ -130,6 +138,7 @@ VIEWPORT_PRESERVE_JS = """
           scrollTop: Number(root.scrollTop || 0),
           nav: isIntentionalNav(target),
           lockScroll: isFixedOrb(target),
+          label: (target.innerText || target.getAttribute("aria-label") || "").trim().slice(0, 120),
           navToken: Number(hostWindow.__dynastyGmScrollResetToken || 0)
         }
       }
@@ -158,7 +167,7 @@ VIEWPORT_PRESERVE_JS = """
         doc.addEventListener("focusin", (event) => {
           const last = hostWindow.__dgInPlaceAnchor
           if (!last || last.nav) return
-          if ((Date.now() - last.t) > 1600) return
+          if ((Date.now() - last.t) > 5000) return
           const focused = event.target
           if (!(focused instanceof hostWindow.Element)) return
           if (isOverlayChrome(focused)) {

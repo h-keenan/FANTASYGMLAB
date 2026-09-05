@@ -42,7 +42,8 @@ def measure(page: Page) -> dict[str, Any]:
 
 def wait_app(page: Page) -> None:
     page.wait_for_selector('[data-testid="stApp"]', timeout=90_000)
-    page.wait_for_timeout(700)
+    page.wait_for_selector('[data-testid="stMain"]', timeout=90_000)
+    page.wait_for_function("document.fonts && document.fonts.status === 'loaded'", timeout=90_000)
 
 
 def button_locator(page: Page, name: str):
@@ -62,7 +63,7 @@ def scroll_action_into_view(page: Page, name: str, *, target_y: int = 200) -> di
             return text.toLowerCase() === String(name).toLowerCase()
               || text.toLowerCase().indexOf(String(name).toLowerCase()) >= 0;
           });
-          if (!main || !btn) return { ok: false };
+          if (!main || !btn) throw new Error(`viewport target missing: ${name}`);
           const br = btn.getBoundingClientRect();
           const mr = main.getBoundingClientRect();
           main.scrollTop += (br.top - mr.top - targetY);
@@ -117,10 +118,13 @@ def assert_in_place_contract(
     if box_after is None:
         return
     if not box_after.get("onscreen"):
-        raise AssertionError(f"{action}: originating control left the viewport")
+        raise AssertionError(f"{action}: originating control left the viewport; before={before}; after={after}; box_after={box_after}")
 
 
 def click_in_place(page: Page, name: str, *, settle_ms: int = 2800) -> dict[str, Any]:
+    button_locator(page, name).wait_for(state="visible", timeout=90_000)
+    page.wait_for_function("window.__dgViewportPreserveBound === true", timeout=90_000)
+    page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
     scrolled = scroll_action_into_view(page, name)
     before = measure(page)
     before["box"] = action_box(page, name)

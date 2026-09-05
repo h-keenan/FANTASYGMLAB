@@ -2821,6 +2821,7 @@ def _alerts() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
+    viewport_preservation.render_viewport_preservation()
     # Match production inject order from app.py script start, then command header
     # (late, like render_top_league_identity_header). MOBILE_INTERACTION_OVERLAY_CSS
     # is already concatenated into APP_CSS — do not re-inject after the command owner.
@@ -2861,7 +2862,6 @@ def main() -> None:
         "alerts": _alerts,
     }[surface]()
     _render_fixture_ack_markers()
-    viewport_preservation.render_viewport_preservation()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
 
 

@@ -17458,6 +17458,7 @@ def main():
         layout="wide",
         initial_sidebar_state="collapsed",
     )
+    viewport_preservation.render_viewport_preservation()
     try:
         _runtime_secrets = st.secrets
     except Exception:
@@ -24635,7 +24636,6 @@ def main():
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
     )
-    viewport_preservation.render_viewport_preservation()
     performance.record_timing(
         f"page_route_total_{_safe_text(current_page, 'unknown')}",
         (time.perf_counter() - route_content_started) * 1000,
