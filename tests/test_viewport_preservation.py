@@ -58,6 +58,7 @@ def test_late_kick_only_calls_existing_restore_after_two_frames():
     assert "__dgRestoreInPlaceAnchor" in VIEWPORT_PRESERVE_JS
     assert "requestAnimationFrame" in VIEWPORT_RESTORE_KICK_JS
     assert "__dgRestoreInPlaceAnchor()" in VIEWPORT_RESTORE_KICK_JS
+    assert "__dgViewportRestoreKickSeq" in VIEWPORT_RESTORE_KICK_JS
     assert "addEventListener" not in VIEWPORT_RESTORE_KICK_JS
     assert "setInterval" not in VIEWPORT_RESTORE_KICK_JS
     assert "MutationObserver" not in VIEWPORT_RESTORE_KICK_JS

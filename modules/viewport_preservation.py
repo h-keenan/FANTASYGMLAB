@@ -17,7 +17,8 @@ import streamlit as st
 from modules.html_rendering import inject_global_styles
 
 VIEWPORT_PRESERVE_CSS = """
-[class*="st-key-dg_viewport_preserve"] {
+[class*="st-key-dg_viewport_preserve"],
+[class*="st-key-dg_viewport_restore_kick"] {
     clip: rect(0, 0, 1px, 1px) !important;
     height: 1px !important;
     margin: 0 !important;
@@ -256,6 +257,8 @@ def render_viewport_preservation() -> None:
 VIEWPORT_RESTORE_KICK_JS = """
     export default function(component) {
       const hostWindow = window.parent || window
+      hostWindow.__dgViewportRestoreKickSeq = Number(hostWindow.__dgViewportRestoreKickSeq || 0) + 1
+      hostWindow.__dgViewportRestoreKickAt = Date.now()
       hostWindow.requestAnimationFrame(() => {
         hostWindow.requestAnimationFrame(() => {
           if (typeof hostWindow.__dgRestoreInPlaceAnchor === "function") {
@@ -270,10 +273,12 @@ VIEWPORT_RESTORE_KICK_JS = """
 def render_viewport_restore_kick() -> None:
     """Invoke the early binder's restore after the route tree is emitted."""
 
+    token = int(st.session_state.get("_viewport_restore_kick_token", 0)) + 1
+    st.session_state["_viewport_restore_kick_token"] = token
     kick = st.components.v2.component(
         "viewport_restore_kick",
-        html="<span aria-hidden='true'></span>",
+        html="<span class='dg-viewport-restore-kick-marker' aria-hidden='true'></span>",
         js=VIEWPORT_RESTORE_KICK_JS,
         isolate_styles=False,
     )
-    kick(key="dg_viewport_restore_kick", data={"v": 1}, width=1, height=1)
+    kick(key="dg_viewport_restore_kick", data={"v": token}, width=1, height=1)
