@@ -519,5 +519,8 @@ def test_application_remains_unmodified_and_exposes_no_archetype_selector():
     app_source = Path("app.py").read_text(encoding="utf-8")
     ui_source = Path("modules/valuation_archetype_ui.py").read_text(encoding="utf-8")
     assert "experimental_archetype" not in app_source
-    assert "selectbox" not in ui_source
+    # The canonical format lens is public; experimental archetypes are not.
+    assert "experimental_archetype" not in ui_source
+    assert "SUPPORTED_VALUATION_LENSES," in ui_source
+    assert "key=CANONICAL_LENS_SESSION_KEY" in ui_source
     assert "radio(" not in ui_source

@@ -165,8 +165,9 @@ def test_email_confirm_callback_consumes_guest_resume():
     source = Path(__file__).resolve().parents[1].joinpath(
         "modules", "account_ui.py"
     ).read_text(encoding="utf-8")
-    region = source.split("email_confirm_callback", 1)[1].split(
-        "if isinstance(status, dict)", 1
+    # Match the Python success branch, not the component's JavaScript payload.
+    region = source.split('st.session_state["auth_restore_last_result"] = "email_confirm_callback"', 1)[1].split(
+        '\n    if ', 1
     )[0]
     assert "peek_guest_resume" in region
     assert "finish_auth_from_guest" in region

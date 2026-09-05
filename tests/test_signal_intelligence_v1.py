@@ -90,7 +90,9 @@ def test_header_max_3_to_6():
     assert len(header) == 6
 
 
-def test_see_all_timeline_includes_general_news():
+def test_see_all_timeline_includes_general_news(monkeypatch):
+    # Disk news is a separate input; it must not crowd this synthetic timeline.
+    monkeypatch.setattr(news, "load_cached_news_pool", lambda: [])
     session = {
         nc.ACTIVITY_INBOX_SNAPSHOT_KEY: {
             "league_id": "L1",

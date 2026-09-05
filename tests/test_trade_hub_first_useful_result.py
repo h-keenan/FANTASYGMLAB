@@ -269,10 +269,10 @@ def test_no_football_logic_modules_modified_for_this_pr():
         line.strip()
         for line in __import__("subprocess")
         .run(
-            ["git", "diff", "--name-only", "main"],
+            ["git", "diff", "--name-only", "origin/main"],
             capture_output=True,
             text=True,
-            check=False,
+            check=True,
         )
         .stdout.splitlines()
         if line.strip()

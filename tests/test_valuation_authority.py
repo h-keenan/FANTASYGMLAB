@@ -59,7 +59,7 @@ def test_canonical_model_result_without_provider_row_remains_authoritative():
     assert int(result["score"]) == 2200
 
 
-def test_actual_keenan_cached_provider_value_runs_canonical_local_model():
+def test_actual_keenan_cached_provider_value_runs_canonical_local_model(cached_2025_stats_season):
     with patch(
         "modules.fantasycalc.requests.get",
         side_effect=AssertionError("cached reconciliation must not call FantasyCalc"),

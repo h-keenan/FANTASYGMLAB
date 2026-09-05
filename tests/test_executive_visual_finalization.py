@@ -52,9 +52,7 @@ def test_dashboard_actions_precede_analysis_zones():
 
 def test_legacy_avatar_black_gradient_removed_from_shared_portrait_classes():
     styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
-    avatar_block = styles[
-        styles.index(".trade-avatar,") : styles.index(".trade-avatar,") + 900
-    ]
+    avatar_block = styles.split("\n.trade-avatar,\n.player-avatar,\n.free-agent-avatar {", 1)[1].split("}", 1)[0]
     assert "#020617" not in avatar_block
     assert "var(--color-surface-raised)" in avatar_block
     assert "border-radius: 50%" not in avatar_block

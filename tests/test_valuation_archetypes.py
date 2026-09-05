@@ -219,9 +219,11 @@ def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch
     )
 
     label, kwargs = calls["button"]
-    assert label == "Redraft · Valuation: Balanced"
+    assert label == "How valuation works"
     assert kwargs["type"] == "tertiary"
     assert kwargs["key"] == "fixture_explain"
-    assert "Valuation is how players are scored" in kwargs["help"]
-    assert "Redraft" in kwargs["help"]
+    args, selector_kwargs = calls["selectbox"]
+    assert args[0] == "Valuation lens"
+    assert tuple(args[1]) == tuple(valuation_archetype_ui.SUPPORTED_VALUATION_LENSES)
+    assert selector_kwargs["key"] == "league_type"
     assert calls["modal"][1] == valuation_archetype_ui.MODAL_SURFACE

@@ -48,8 +48,9 @@ def test_pqv_spacing_is_not_over_compressed():
     compression = (
         ROOT / "modules" / "executive_workflow_compression_styles.py"
     ).read_text(encoding="utf-8")
-    assert "margin: var(--space-md) 0" in styles
-    assert "padding: var(--space-md)" in styles
+    assert '.pqv-workspace{display:grid;gap:var(--space-sm);' in styles
+    assert '.pqv-decision-row,.pqv-evidence-row{align-items:start;display:grid;gap:var(--space-md);' in styles
+    assert 'min-height:var(--touch-target-min)' in styles
     compact = "".join(compression.split())
     assert "margin:var(--space-md)0!important" in compact
     assert "margin:var(--space-xs)0!important" not in compact

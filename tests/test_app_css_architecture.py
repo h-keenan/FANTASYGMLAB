@@ -33,12 +33,12 @@ def test_route_owned_css_is_not_in_app_css():
 
 def test_route_owned_css_is_injected_by_owners():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "inject_global_styles(PLAYER_QUICK_VIEW_CSS)" in app
+    assert "inject_global_styles(DECISION_SURFACE_DIALOG_CSS + PLAYER_QUICK_VIEW_CSS)" in app
     assert "inject_global_styles(WAIVERS_PRESENTATION_CSS)" in (
         ROOT / "modules" / "waivers_ui.py"
     ).read_text(encoding="utf-8")
     trade_hub = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
-    assert "inject_global_styles(TRADE_DETAIL_CSS)" in trade_hub
+    assert "inject_global_styles(DECISION_SURFACE_DIALOG_CSS + TRADE_DETAIL_CSS)" in trade_hub
     methodology = (ROOT / "modules" / "methodology_page.py").read_text(encoding="utf-8")
     assert "inject_global_styles(METHODOLOGY_PAGE_CSS)" in methodology
     live_draft = (ROOT / "modules" / "live_draft_ui.py").read_text(encoding="utf-8")

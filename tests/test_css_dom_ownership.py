@@ -244,7 +244,8 @@ def test_production_equivalent_computed_styles_chromium_390():
     frame_w = measured["frame"]["w"]
     frame_h = measured["frame"]["h"]
     assert abs(frame_w - frame_h) < 1.5
-    assert frame_w > 70
+    # Compact mobile dossier: clamp(2.75rem, 14vw, 3.5rem), 390px viewport.
+    assert abs(frame_w - 54.6) < 1
     inner_w = measured["inner"]["w"]
     assert abs(inner_w - frame_w) < 2, measured["inner"]
     assert abs(measured["inner"]["top"]) < 2
@@ -261,8 +262,8 @@ def test_production_equivalent_computed_styles_chromium_390():
     assert "data:image/svg+xml" in (orb["beforeMask"] or "")
     assert orb["gap"] is not None and 4 <= orb["gap"] <= 24
     assert "CURRENT" in orb["afterContent"]
-    assert abs(measured["trade"]["w"] - 52) <= 2
-    assert abs(measured["trade"]["h"] - 52) <= 2
+    assert abs(measured["trade"]["w"] - 36) <= 2
+    assert abs(measured["trade"]["h"] - 36) <= 2
     dash = measured["dashboard"]
     assert dash, measured
     assert dash["visibleTag"] == "IMG"
@@ -287,7 +288,7 @@ def test_real_player_computed_styles_cover_several_headshots():
         assert measured.get("error") is None, measured
         assert measured["imgNatural"]["w"] >= 300
         img_w = float(str(measured["imgComputed"]["width"]).replace("px", ""))
-        assert img_w > 70
+        assert abs(img_w - 54.6) < 1
         assert "1.65" in measured["imgComputed"]["transform"]
 
 
@@ -300,7 +301,7 @@ def test_webkit_390_if_available():
     assert measured["overlayGlyph"] is False
     assert "data:image/svg+xml" in (measured["orb"]["beforeMask"] or "")
     img_w = float(str(measured["imgComputed"]["width"]).replace("px", ""))
-    assert img_w > 70
+    assert abs(img_w - 54.6) < 1
     assert abs(measured["inner"]["w"] - measured["frame"]["w"]) < 2
     dash = measured.get("dashboard") or {}
     assert dash.get("objectFit") == "cover"
@@ -313,7 +314,8 @@ def test_chromium_1440_keeps_filled_hero_and_standard_trade_portrait():
     assert measured.get("error") is None, measured
     assert "1.65" in measured["imgComputed"]["transform"]
     assert abs(measured["inner"]["w"] - measured["frame"]["w"]) < 2
-    assert abs(measured["trade"]["w"] - 52) <= 2
+    # compact_asset_html defaults to the 2.25rem compact token.
+    assert abs(measured["trade"]["w"] - 36) <= 2
     dash = measured.get("dashboard") or {}
     assert abs(dash.get("w", 0) - 52) <= 4
     assert "18%" in (dash.get("objectPosition") or "")

@@ -65,12 +65,13 @@ def _assert_exact(frame: pd.DataFrame):
     return expected, actual
 
 
-def test_real_988_player_frame_is_field_for_field_equivalent():
-    frame, output_columns = _load_real_frame("data/players.db")
+def test_real_988_player_frame_is_field_for_field_equivalent(public_player_trust_fixture):
+    frame, output_columns = public_player_trust_fixture
 
     expected, actual = _assert_exact(frame)
 
-    assert len(frame) == 988
+    # Reconciliation expands the 988 persisted rows to the 1880-player universe.
+    assert len(frame) == 1880
     assert tuple(expected.columns) == tuple(actual.columns)
     assert tuple(output_columns) == tuple(
         column for column in output_columns if column in actual.columns
