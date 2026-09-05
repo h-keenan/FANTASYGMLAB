@@ -24,6 +24,7 @@ VIEWPORT_PRESERVE_CSS = """
     margin: 0 !important;
     max-height: 1px !important;
     max-width: 1px !important;
+    min-width: 1px !important;
     overflow: hidden !important;
     padding: 0 !important;
     pointer-events: none !important;
