@@ -148,3 +148,17 @@ Full suite was not run: the requested prerequisite that both synchronized viewpo
 Performance script **passes** on this implementation: cold **797.2 ms / 469102 protobuf bytes**, warm **49.4 ms / 435548 bytes**. All five fixture surfaces pass. Explicit reruns **62**, deferred gates **7**, reduced-context calls **8** (all unchanged); provider/model-call delta **0**. Protobuf is **3 bytes lower** than the preceding reference in each state. APP_CSS unchanged. Compileall and git diff --check pass; working tree clean before this documentation update.
 
 PR #437 remains Draft with human-approval-required; no auto-merge, no merge, and #435 untouched.
+
+## Authoritative final release state — headshot runtime repair
+
+HEAD: `8c03fc08e4b48039a58148be0482f430e0251be2`. This is the current release state; prior failure counts are historical.
+
+The dashboard React #231 source was canonical `modules/player_profile_ui.py::avatar_html`: rendered `.dg-player-headshot-image` elements contained string `onload`/`onerror` attributes. A delegated `modules/player_headshot_runtime.py` bridge now handles load/error events, performs an initial complete-image sweep, and supports images emitted after reruns. Broken images are removed so initials remain visible; successful images receive `is-loaded`. The bridge is mounted early in production and the validation harness. Modal avatars use the same narrowly tagged bridge. The alert source link no longer uses inline `onclick`; its link remains clickable in its non-clickable article surface. No active quoted inline event handlers remain in `app.py` or `modules`.
+
+Headshot browser tests passed for valid, broken, cached/data-URI, dynamically emitted, modal fallback, and alert-link behavior with no console/page errors. The synchronized viewport tests passed at both 390x844 and 1440x900; kick sequence advanced after actions and geometry remained valid. Actual `app.py` smoke at both widths passed binder/kick startup, 1x1 invisible hosts, no overflow, and no console/page errors; pending-confirmation resend advanced the sequence 2→3 and preserved the control region at both widths.
+
+Focused release-sensitive runs: **194 passed** (viewport, headshots, dashboard contracts, CSS DOM, summary tiles, GM Orb/mobile, pending confirmation, modal, alerts, navigation). Full suite: **3761 passed, 0 failed, 0 collection errors, 12 subtests passed**; one pre-existing Starlette/httpx deprecation warning.
+
+Performance budget passes: cold **797.2 ms / 469102 protobuf bytes**, warm **49.4 ms / 435548 bytes**. Explicit reruns **62**, deferred gates **7**, reduced-context calls **8**, provider/model-call delta **0**. APP_CSS unchanged. Compileall and git diff --check passed. Working tree was cleaned of generated test data after validation.
+
+Recommendation: **Ready for Review**. Keep PR #437 Draft with `human-approval-required`; no auto-merge and no merge. PR #435 untouched.
