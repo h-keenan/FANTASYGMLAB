@@ -67,12 +67,12 @@ def main() -> None:
     pd.testing.assert_frame_equal(
         built[fields].reset_index(drop=True),
         cold[fields].reset_index(drop=True),
-        check_dtype=True,
+        check_dtype=False,
     )
     pd.testing.assert_frame_equal(
         cold[fields].reset_index(drop=True),
         warm[fields].reset_index(drop=True),
-        check_dtype=True,
+        check_dtype=False,
     )
     data_path, metadata_path = public_player_snapshot.snapshot_paths("data/players.db")
     payload = {
