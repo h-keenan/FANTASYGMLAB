@@ -64,14 +64,19 @@ def main() -> None:
         timings.clear()
         warm, warm_ms = _elapsed_call()
     fields = [field for field in EQUIVALENCE_FIELDS if field in cold.columns]
+    def comparable(frame):
+        result = frame[fields].reset_index(drop=True).copy()
+        for column in result.columns:
+            result[column] = result[column].where(result[column].notna(), pd.NA)
+        return result
     pd.testing.assert_frame_equal(
-        built[fields].reset_index(drop=True),
-        cold[fields].reset_index(drop=True),
+        comparable(built),
+        comparable(cold),
         check_dtype=False,
     )
     pd.testing.assert_frame_equal(
-        cold[fields].reset_index(drop=True),
-        warm[fields].reset_index(drop=True),
+        comparable(cold),
+        comparable(warm),
         check_dtype=False,
     )
     data_path, metadata_path = public_player_snapshot.snapshot_paths("data/players.db")
