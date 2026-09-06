@@ -6,6 +6,7 @@ from typing import Callable
 
 import pandas as pd
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
 
 from modules import ui_modal
 from modules import canonical_recommendation_narrative
@@ -594,7 +595,7 @@ def render_summary_tiles(
             height="content",
             on_clicked_change=on_clicked_change,
         )
-    except ValueError as exc:
+    except (ValueError, StreamlitAPIException) as exc:
         if "is not registered" not in str(exc):
             raise
         st.markdown(html, unsafe_allow_html=True)

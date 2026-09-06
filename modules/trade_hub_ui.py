@@ -6,6 +6,7 @@ from typing import Callable, Mapping, MutableMapping
 
 import pandas as pd
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
 
 from modules import brand_identity
 from modules import (
@@ -2004,7 +2005,7 @@ def render_trade_idea_card(
                 recommendation_narrative=narrative_payload,
             )
             trade_detail_navigation.close(st.session_state, summary_key)
-    except ValueError as exc:
+    except (ValueError, StreamlitAPIException) as exc:
         if "is not registered" not in str(exc):
             raise
         render_trade_html(summary_html)
@@ -2037,7 +2038,6 @@ def render_trade_idea_card(
             )
         except Exception:
             pass
-
     navigation = trade_detail_navigation.current(st.session_state)
     if navigation.trade_key == summary_key:
         # Keep Trade Review / detail provenance aligned with this card's idea.
