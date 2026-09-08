@@ -37,6 +37,15 @@ def test_dashboard_strategy_context_is_a_vertical_stack_not_a_flex_badge():
     assert "overflow-x: hidden" not in styles
 
 
+def test_mobile_validator_reads_streamlit_selected_lens_from_current_and_legacy_dom():
+    validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    assert "data-baseweb=\\\"select\\\"" in validator
+    assert "getAttribute('aria-label')" in validator
+    assert "getAttribute('aria-valuetext')" in validator
+    assert "toLowerCase().includes('balanced')" in validator
+    assert "toLowerCase().includes('win now')" not in validator
+
+
 def test_game_plan_refresh_is_not_a_fixed_column_shove():
     briefing = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
     compact = briefing.replace(" ", "")

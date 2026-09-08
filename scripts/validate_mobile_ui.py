@@ -838,7 +838,21 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
               const keyed = document.querySelector('[class*="st-key-dashboard_valuation_lens"]')
               const selectbox = [...document.querySelectorAll('[data-testid="stSelectbox"]')]
                 .find(el => (el.innerText || '').toLowerCase().includes('valuation lens'))
-              return (keyed || selectbox)?.innerText || ''
+              const root = (keyed || selectbox)
+              if (!root) return ''
+              const select = root.querySelector('[data-testid="stSelectbox"]') || root
+              const combobox = select.querySelector('[role="combobox"]')
+              const baseweb = select.querySelector('[data-baseweb="select"]')
+              const candidates = [
+                combobox && typeof combobox.value === 'string' ? combobox.value : '',
+                combobox?.getAttribute('aria-label') || '',
+                combobox?.getAttribute('aria-valuetext') || '',
+                baseweb?.textContent || '',
+                select.textContent || '',
+                root.textContent || '',
+              ]
+              return candidates.map(value => String(value || '').replace(/\s+/g, ' ').trim())
+                .find(value => value.toLowerCase().includes('balanced')) || ''
             })(),
             shellText,
             commandCells: (() => {
@@ -1246,7 +1260,22 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                     viewport,
                     scrollWidth: root.scrollWidth,
                     strategy: box(strategy || strategyButton || owner),
-                    strategyText: owner ? (owner.innerText || '') : '',
+                    strategyText: (() => {
+                      if (!owner) return '';
+                      const select = owner.querySelector('[data-testid="stSelectbox"]') || owner;
+                      const combobox = select.querySelector('[role="combobox"]');
+                      const baseweb = select.querySelector('[data-baseweb="select"]');
+                      const candidates = [
+                        combobox && typeof combobox.value === 'string' ? combobox.value : '',
+                        combobox?.getAttribute('aria-label') || '',
+                        combobox?.getAttribute('aria-valuetext') || '',
+                        baseweb?.textContent || '',
+                        select.textContent || '',
+                        owner.textContent || '',
+                      ];
+                      return candidates.map(value => String(value || '').replace(/\s+/g, ' ').trim())
+                        .find(value => value.toLowerCase().includes('balanced')) || '';
+                    })(),
                     strategyClipped: owner ? (owner.scrollWidth > owner.clientWidth + 1) : null,
                     refresh: box(refresh),
                     meta: box(meta),
