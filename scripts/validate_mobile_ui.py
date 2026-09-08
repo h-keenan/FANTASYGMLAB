@@ -76,7 +76,7 @@ SURFACES = {
     ),
     "alerts": (
         "Alerts",
-        "Important",
+        "Priority",
         "My Players",
         "News",
         "League",
@@ -1486,7 +1486,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             )
         if "activity" not in alerts_blob:
             failures.append("Activity secondary label missing")
-        for label in ("important", "my players", "news", "league", "decisions"):
+        for label in ("priority", "my players", "news", "league", "decisions"):
             if label not in alerts_blob:
                 failures.append(f"Alerts timeline missing {label} control")
         radius = page.evaluate(

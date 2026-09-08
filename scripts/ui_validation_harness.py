@@ -2871,10 +2871,21 @@ def _alerts() -> None:
         league_id="fixture-league",
     )
     st.session_state.update(session)
+
+    def _alerts_section_header(_title: str, *, kicker: str = "", note: str = "", compact: bool = False) -> None:
+        # The fixture shell already owns the page title. Keep the route's
+        # Activity kicker/subtitle without introducing a second Alerts H2.
+        render_html_fragment(
+            "<header class='dg-ui-section-header dg-ui-section-header--secondary'>"
+            f"<div class='dg-ui-section-header-copy'><div class='dg-ui-eyebrow'>{kicker}</div>"
+            f"<p class='dg-ui-section-subtitle'>{note}</p></div></header>"
+        )
+
     alerts_activity_ui.render_alerts_page(
         league_id="fixture-league",
         session=st.session_state,
         entitlement="free",
+        render_section_header=_alerts_section_header,
         open_player_quick_view=lambda player_id, **_kwargs: st.session_state.__setitem__(
             "fixture_alert_player_id", str(player_id or "")
         ),
