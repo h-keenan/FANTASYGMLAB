@@ -12,7 +12,7 @@ def test_strategy_context_is_owned_by_dashboard_header_not_a_floating_pill():
     ui = (ROOT / "modules" / "valuation_archetype_ui.py").read_text(encoding="utf-8")
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     workflow = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
-    assert "Valuation:" in ui
+    assert "dashboard_valuation_lens" in ui
     assert "Lens ·" not in ui
     assert 'key="dashboard_page_context"' in ui
     assert "dg-dashboard-page-identity" in ui

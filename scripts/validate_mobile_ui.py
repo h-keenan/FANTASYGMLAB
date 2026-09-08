@@ -833,7 +833,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
               ? Math.max(0, routeCandidates[0].top - shellWrapper.bottom)
               : null,
             shellCount: document.querySelectorAll('.dg-executive-shell').length,
-            switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"]').length,
+            switcherCount: [...document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] button[data-testid="stPopoverButton"]')].filter(el => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden'; }).length,
             shellText,
             commandCells: (() => {
               const buttons = [...document.querySelectorAll(
@@ -1163,7 +1163,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("duplicate Today's Game Plan headers")
         if "Your Next Move" in body_text:
             failures.append("Your Next Move should not appear when Game Plan owns current actions")
-        if "Valuation:" not in body_text:
+        if "balanced" not in body_text.casefold() or "How valuation works" not in body_text:
             failures.append("missing Strategy context on Dashboard")
         if "Lens ·" in body_text:
             failures.append("legacy Lens pill must not appear on Dashboard")
@@ -1219,10 +1219,9 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 """() => {
                   const root = document.documentElement;
                   const viewport = root.clientWidth;
-                  const strategy = [...document.querySelectorAll('button')].find(el => {
-                    const r = el.getBoundingClientRect();
-                    return (el.innerText || '').includes('Valuation:') && r.width > 1 && r.height > 1;
-                  });
+                  const owner = document.querySelector('[class*="st-key-dashboard_valuation_lens"]');
+                  const strategy = owner?.querySelector('select, [role="combobox"], input');
+                  const strategyButton = owner?.querySelector('button');
                   const refresh = [...document.querySelectorAll('button')].find(el => {
                     const r = el.getBoundingClientRect();
                     const label = (el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase();
@@ -1237,9 +1236,9 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   return {
                     viewport,
                     scrollWidth: root.scrollWidth,
-                    strategy: box(strategy),
-                    strategyText: strategy ? (strategy.innerText || '') : '',
-                    strategyClipped: strategy ? (strategy.scrollWidth > strategy.clientWidth + 1) : null,
+                    strategy: box(strategy || strategyButton || owner),
+                    strategyText: owner ? (owner.innerText || '') : '',
+                    strategyClipped: owner ? (owner.scrollWidth > owner.clientWidth + 1) : null,
                     refresh: box(refresh),
                     meta: box(meta),
                   };
@@ -1259,7 +1258,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 if geometry.get("strategyClipped"):
                     failures.append("Strategy label is clipped")
                 strategy_text = str(geometry.get("strategyText") or "")
-                if "Valuation:" not in strategy_text or "Balanced" not in strategy_text:
+                if "balanced" not in strategy_text.casefold():
                     failures.append("Strategy label incomplete")
             meta = geometry.get("meta") or {}
             if strategy and meta:
