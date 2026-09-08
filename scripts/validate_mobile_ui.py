@@ -288,6 +288,7 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
     page.screenshot(path=str(output / complete_name), full_page=True)
     page.get_by_role("button", name="CAREER").click()
     page.get_by_text("Bio", exact=True).wait_for(state="visible", timeout=30_000)
+    page.locator(".pqv-accolades").wait_for(state="visible", timeout=30_000)
     page.get_by_text("2023", exact=True).first.wait_for(state="visible", timeout=30_000)
     expanded_name = f"player-dossier-history-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
@@ -1632,8 +1633,6 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         if surface == "league":
             if "dg-lh-item" in page.content():
                 failures.append("League History feed rendered on League Overview")
-        if surface == "player-dossier" and not desktop.get("accolades"):
-            failures.append("PQV Accolades missing from desktop dossier fixture")
         if surface == "recaps":
             recap = desktop.get("recap") or {}
             if not recap.get("width"):
