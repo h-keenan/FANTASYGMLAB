@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("committed_fantasycalc")
+
 from pathlib import Path
 
 import pandas as pd
@@ -79,7 +83,7 @@ def test_normalize_player_record_drops_college_and_nested_rookie_year():
 
 
 def test_sleeper_cache_has_college_and_rookie_year_but_no_draft_capital():
-    players = sleeper.get_players(refresh=False)
+    players, _ = sleeper.load_cached_players_disk()
     assert isinstance(players, dict) and players
 
     college = 0

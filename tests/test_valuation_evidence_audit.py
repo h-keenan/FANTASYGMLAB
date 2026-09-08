@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.usefixtures("committed_fantasycalc")
+
 import pandas as pd
 
 from modules import news_signal
