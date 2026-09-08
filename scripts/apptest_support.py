@@ -21,3 +21,16 @@ def server_only_summary_tiles():
         side_effect=ValueError("Component 'summary_tile_tap_grid' is not registered"),
     ):
         yield
+
+
+@contextmanager
+def server_only_player_quick_view():
+    """Exercise the bridge's no-browser/no-request fallback in AppTest."""
+    from modules import player_quick_view_bridge
+
+    with patch.object(
+        player_quick_view_bridge,
+        "PLAYER_QUICK_VIEW_BRIDGE_COMPONENT",
+        side_effect=ValueError("Component 'player_quick_view_parent_bridge' is not registered"),
+    ):
+        yield
