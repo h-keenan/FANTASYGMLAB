@@ -329,6 +329,38 @@ def _dialog_contract(page) -> dict:
     return metrics
 
 
+def _run_summary_transport_probe(browser, base_url: str) -> dict:
+    page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+    try:
+        page.goto(f"{base_url}/?surface=summary-probe", wait_until="networkidle", timeout=60_000)
+        marker = page.locator("[data-summary-probe-reruns]")
+        marker.wait_for(state="attached", timeout=30_000)
+        before = int(marker.get_attribute("data-summary-probe-reruns") or "0")
+        candidates = []
+        for candidate_frame in page.frames:
+            tiles = candidate_frame.locator(".summary-tile-tappable")
+            for tile_index in range(tiles.count()):
+                tile = tiles.nth(tile_index)
+                if "transport probe" in (tile.inner_text() or "").lower():
+                    candidates.append((candidate_frame, tile_index, tile))
+        if not candidates:
+            raise AssertionError("summary transport probe tile missing")
+        frame, tile_index, tile = ([item for item in candidates if item[0] is not page] or candidates)[0]
+        tile.click()
+        page.wait_for_function(
+            "([selector, before]) => Number(document.querySelector(selector)?.dataset.summaryProbeReruns || 0) > before",
+            arg=["[data-summary-probe-reruns]", before],
+            timeout=30_000,
+        )
+        reruns = int(marker.get_attribute("data-summary-probe-reruns") or "0")
+        received = page.locator('[data-summary-trigger-received="1"]').count() > 0
+        dialog = page.locator('[data-summary-probe-dialog="1"]')
+        dialog.wait_for(state="visible", timeout=30_000)
+        return {"beforeReruns": before, "afterReruns": reruns, "clickedIndex": tile_index, "pythonReceived": received, "dialog": dialog.count() > 0}
+    finally:
+        page.close()
+
+
 def _capture_navigation_flow(page, output: Path, width: int) -> dict:
     orb = page.get_by_role("button", name=re.compile(r"Open GM menu|^(GM|Menu)$", re.I))
     orb_box = orb.bounding_box()
@@ -1635,6 +1667,7 @@ def main() -> int:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         try:
+            report["summaryTransportProbe"] = _run_summary_transport_probe(browser, args.base_url)
             for surface in selected_surfaces:
                 expected = SURFACES[surface]
                 report["surfaces"][surface] = {}
