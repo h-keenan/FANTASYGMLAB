@@ -239,6 +239,10 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
         tile.scroll_into_view_if_needed()
         tile.click()
         dialog = page.locator('[data-testid="stDialog"]')
+        if dialog.count() == 0:
+            # Streamlit may present the dialog in the active component frame
+            # while the parent is settling the rerun.
+            dialog = _frame_with_selector(page, '[data-testid="stDialog"]')
         dialog.wait_for(state="visible", timeout=30_000)
         page.get_by_text("League Leaderboard", exact=True).wait_for(state="visible", timeout=30_000)
         captures[f"{slug}Contract"] = _dialog_contract(page)
