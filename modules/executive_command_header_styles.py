@@ -200,6 +200,7 @@ div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > div {
 
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"],
 div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] > button[data-testid="stPopoverButton"],
+div[class*="st-key-executive_command_actions"] [data-testid="stPopover"] button[data-testid="stPopoverButton"],
 div[class*="st-key-executive_command_actions"] [data-testid="stButton"] > button {
     align-items: center !important;
     background: transparent !important;
@@ -347,6 +348,7 @@ div[class*="st-key-executive_command_actions"] div[class*="_global_feedback_cont
 
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"],
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] > button[data-testid="stPopoverButton"],
+div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stPopover"] button[data-testid="stPopoverButton"],
 div[class*="st-key-executive_command_actions"] [data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:first-child [data-testid="stButton"] > button {
     border-inline-start: 0 !important;
     color: var(--color-text-primary) !important;

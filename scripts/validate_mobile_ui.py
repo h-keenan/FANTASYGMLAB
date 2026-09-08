@@ -834,6 +834,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
               : null,
             shellCount: document.querySelectorAll('.dg-executive-shell').length,
             switcherCount: [...document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] button[data-testid="stPopoverButton"]')].filter(el => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden'; }).length,
+            valuationLensText: document.querySelector('[class*="st-key-dashboard_valuation_lens"]')?.innerText || '',
             shellText,
             commandCells: (() => {
               const buttons = [...document.querySelectorAll(
@@ -1163,7 +1164,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("duplicate Today's Game Plan headers")
         if "Your Next Move" in body_text:
             failures.append("Your Next Move should not appear when Game Plan owns current actions")
-        if "balanced" not in body_text.casefold() or "How valuation works" not in body_text:
+        lens_text = str(metrics.get("valuationLensText") or "")
+        if "balanced" not in lens_text.casefold() or "How valuation works" not in body_text:
             failures.append("missing Strategy context on Dashboard")
         if "Lens ·" in body_text:
             failures.append("legacy Lens pill must not appear on Dashboard")
