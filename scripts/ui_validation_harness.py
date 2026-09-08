@@ -4,6 +4,7 @@ Standings board fixture coverage is exercised on the league surface."""
 from __future__ import annotations
 
 import sys
+from hashlib import sha256
 from pathlib import Path
 
 import streamlit as st
@@ -128,8 +129,7 @@ def _summary_component_probe() -> None:
         st.session_state.get("_summary_probe_reruns", 0)
     ) + 1
     reruns = st.session_state["_summary_probe_reruns"]
-    probe_html = workspace_ui.summary_tiles_html(
-        [
+    probe_items = [
             {
                 "label": "Transport Probe",
                 "value": "Tap",
@@ -137,15 +137,23 @@ def _summary_component_probe() -> None:
                 "comparison": {"current": "Tap", "leader": "Tap"},
                 "tappable": True,
             }
-        ],
+        ]
+    probe_html = workspace_ui.summary_tiles_html(
+        probe_items,
         compact=True,
     )
-    result = workspace_ui.SUMMARY_TILE_TAP_COMPONENT(
-        key="summary_component_transport_probe",
-        data={"html": probe_html},
-        width="stretch",
-        height="content",
-    )
+    probe_container = st.container()
+    probe_key = "summary_tile_tap_" + sha256(
+        ("ci_dashboard_snapshot\x1f" + probe_html).encode("utf-8")
+    ).hexdigest()[:20]
+    with probe_container:
+        result = workspace_ui.SUMMARY_TILE_TAP_COMPONENT(
+            key=probe_key,
+            data={"html": probe_html},
+            width="stretch",
+            height="content",
+            on_clicked_change=workspace_ui.on_clicked_change,
+        )
     clicked = getattr(result, "clicked", None)
     received = isinstance(clicked, dict) and str(clicked.get("index")) == "0"
     st.markdown(

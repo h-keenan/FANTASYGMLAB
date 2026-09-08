@@ -226,6 +226,7 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
         # page may also contain a fail-soft HTML copy. Prefer the active
         # component frame and identify the tile by its semantic label.
         candidates = []
+        page.locator(".summary-tile-tappable").first.wait_for(state="visible", timeout=30_000)
         for candidate_frame in page.frames:
             tiles = candidate_frame.locator(".summary-tile-tappable")
             for tile_index in range(tiles.count()):
@@ -234,12 +235,15 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
                     candidates.append((candidate_frame, tile_index, tile))
         if not candidates:
             raise AssertionError(f"missing semantic summary tile: {label}")
-        interactive = [item for item in candidates if item[0] is not page]
+        interactive = [item for item in candidates if item[0] != page.main_frame]
         frame, tile_index, tile = (interactive or candidates)[0]
         tile.scroll_into_view_if_needed()
-        tile.click()
+        # Streamlit may rebuild the component host during the scroll settlement;
+        # native element activation keeps the click on the selected component
+        # tile instead of landing on its grid parent.
+        tile.dispatch_event("click")
         dialog = page.locator('[data-testid="stDialog"]')
-        receipt = page.locator('[data-fixture-summary-dialog-received="Average Age"]')
+        receipt = page.locator(f'[data-fixture-summary-dialog-received="{label}"]')
         receipt.wait_for(state="attached", timeout=10_000)
         if dialog.count() == 0:
             # Streamlit may present the dialog in the active component frame
@@ -347,7 +351,7 @@ def _run_summary_transport_probe(browser, base_url: str) -> dict:
                     candidates.append((candidate_frame, tile_index, tile))
         if not candidates:
             raise AssertionError("summary transport probe tile missing")
-        frame, tile_index, tile = ([item for item in candidates if item[0] is not page] or candidates)[0]
+        frame, tile_index, tile = ([item for item in candidates if item[0] != page.main_frame] or candidates)[0]
         tile.click()
         page.wait_for_function(
             "([selector, before]) => Number(document.querySelector(selector)?.dataset.summaryProbeReruns || 0) > before",
