@@ -574,6 +574,17 @@ def _header_geometry() -> None:
     )
 
 
+def _render_fixture_summary_dialog(item: dict) -> None:
+    """Expose trigger receipt before invoking the canonical dialog renderer."""
+
+    label = str(item.get("label") or "").strip()
+    st.markdown(
+        f'<div data-fixture-summary-dialog-received="{label}"></div>',
+        unsafe_allow_html=True,
+    )
+    workspace_ui.render_canonical_summary_tile_detail_dialog(item)
+
+
 def _dashboard() -> None:
     briefing_mode = str(st.query_params.get("briefing") or "populated").strip().lower()
     from modules import game_plan_package
@@ -961,7 +972,7 @@ def _dashboard() -> None:
             snapshot,
             compact=True,
             key_prefix="ci_dashboard_snapshot",
-            detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
+            detail_dialog_renderer=_render_fixture_summary_dialog,
         ),
         render_orientation=lambda: dashboard_orientation.render_orientation_if_applicable(
             authenticated=True,

@@ -239,6 +239,8 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
         tile.scroll_into_view_if_needed()
         tile.click()
         dialog = page.locator('[data-testid="stDialog"]')
+        receipt = page.locator('[data-fixture-summary-dialog-received="Average Age"]')
+        receipt.wait_for(state="attached", timeout=10_000)
         if dialog.count() == 0:
             # Streamlit may present the dialog in the active component frame
             # while the parent is settling the rerun.
