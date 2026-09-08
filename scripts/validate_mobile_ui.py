@@ -841,6 +841,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             // Secondary command tiles may share a multi-column row under tablet
             // widths; they are not "primary content" for the near-zero check (#235).
             if (el.classList.contains('home-command-card-secondary')) return false;
+            // Team Snapshot is a compact comparison sub-surface inside a
+            // two-column desktop layout; its cards are intentionally narrower
+            // than full-width primary content.
+            if (el.classList.contains('summary-tile-compact') && el.closest('[class*="st-key-dashboard_team_snapshot"]')) return false;
             return true;
           });
           const badTargets = [...document.querySelectorAll('button, [role="button"], a')]
