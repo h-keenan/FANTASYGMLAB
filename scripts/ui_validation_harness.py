@@ -117,7 +117,50 @@ SURFACES = {
     "viewport-preserve",
     "recaps",
     "alerts",
+    "summary-probe",
 }
+
+
+def _summary_component_probe() -> None:
+    """Minimal real components.v2 transport probe for browser CI diagnosis."""
+
+    st.session_state["_summary_probe_reruns"] = int(
+        st.session_state.get("_summary_probe_reruns", 0)
+    ) + 1
+    reruns = st.session_state["_summary_probe_reruns"]
+    probe_html = workspace_ui.summary_tiles_html(
+        [
+            {
+                "label": "Transport Probe",
+                "value": "Tap",
+                "note": "Real summary tile component transport probe.",
+                "comparison": {"current": "Tap", "leader": "Tap"},
+                "tappable": True,
+            }
+        ],
+        compact=True,
+    )
+    result = workspace_ui.SUMMARY_TILE_TAP_COMPONENT(
+        key="summary_component_transport_probe",
+        data={"html": probe_html},
+        width="stretch",
+        height="content",
+    )
+    clicked = getattr(result, "clicked", None)
+    received = isinstance(clicked, dict) and str(clicked.get("index")) == "0"
+    st.markdown(
+        f'<div data-summary-probe-reruns="{reruns}" '
+        f'data-summary-trigger-received="{1 if received else 0}" '
+        f'data-summary-trigger-index="{str(clicked.get("index")) if isinstance(clicked, dict) else ""}"></div>',
+        unsafe_allow_html=True,
+    )
+
+    if received:
+        @st.dialog("Summary transport probe", width="small")
+        def _show_probe_dialog() -> None:
+            st.markdown('<div data-summary-probe-dialog="1">Transport received</div>', unsafe_allow_html=True)
+
+        _show_probe_dialog()
 
 HEADER_LEAGUE_FIXTURES = {
     "short": "A",
@@ -2861,6 +2904,7 @@ def main() -> None:
         "viewport-preserve": _viewport_preserve,
         "recaps": _recaps,
         "alerts": _alerts,
+        "summary-probe": _summary_component_probe,
     }[surface]()
     viewport_preservation.render_viewport_restore_kick()
     _render_fixture_ack_markers()

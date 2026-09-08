@@ -220,10 +220,23 @@ def _open_team_snapshot_expander(page) -> None:
 
 def _capture_metric_flow(page, output: Path, width: int) -> dict:
     _open_team_snapshot_expander(page)
-    frame = _frame_with_selector(page, ".summary-tile-tappable")
     captures = {}
-    for index, slug in ((1, "average-age"), (2, "starter-strength")):
-        tile = frame.locator(".summary-tile-tappable").nth(index)
+    for label, slug in (("Average Age", "average-age"), ("Starter Strength", "starter-strength")):
+        # components.v2 renders the interactive copy in its iframe while the
+        # page may also contain a fail-soft HTML copy. Prefer the active
+        # component frame and identify the tile by its semantic label.
+        candidates = []
+        for candidate_frame in page.frames:
+            tiles = candidate_frame.locator(".summary-tile-tappable")
+            for tile_index in range(tiles.count()):
+                tile = tiles.nth(tile_index)
+                if label.lower() in (tile.inner_text() or "").lower():
+                    candidates.append((candidate_frame, tile_index, tile))
+        if not candidates:
+            raise AssertionError(f"missing semantic summary tile: {label}")
+        interactive = [item for item in candidates if item[0] is not page]
+        frame, tile_index, tile = (interactive or candidates)[0]
+        tile.set_attribute("data-validator-selected", f"{label}:{tile_index}")
         tile.scroll_into_view_if_needed()
         tile.click()
         dialog = page.locator('[data-testid="stDialog"]')
@@ -242,7 +255,6 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
         dialog.wait_for(state="hidden", timeout=30_000)
         page.reload(wait_until="networkidle", timeout=60_000)
         _open_team_snapshot_expander(page)
-        frame = _frame_with_selector(page, ".summary-tile-tappable")
     return captures
 
 
@@ -851,7 +863,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 select.textContent || '',
                 root.textContent || '',
               ]
-              return candidates.map(value => String(value || '').replace(/\s+/g, ' ').trim())
+              return candidates.map(value => String(value || '').replace(/\\s+/g, ' ').trim())
                 .find(value => value.toLowerCase().includes('balanced')) || ''
             })(),
             shellText,
@@ -1273,7 +1285,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                         select.textContent || '',
                         owner.textContent || '',
                       ];
-                      return candidates.map(value => String(value || '').replace(/\s+/g, ' ').trim())
+                      return candidates.map(value => String(value || '').replace(/\\s+/g, ' ').trim())
                         .find(value => value.toLowerCase().includes('balanced')) || '';
                     })(),
                     strategyClipped: owner ? (owner.scrollWidth > owner.clientWidth + 1) : null,
