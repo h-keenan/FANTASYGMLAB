@@ -834,7 +834,12 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
               : null,
             shellCount: document.querySelectorAll('.dg-executive-shell').length,
             switcherCount: [...document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] button[data-testid="stPopoverButton"]')].filter(el => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden'; }).length,
-            valuationLensText: document.querySelector('[class*="st-key-dashboard_valuation_lens"]')?.innerText || '',
+            valuationLensText: (() => {
+              const keyed = document.querySelector('[class*="st-key-dashboard_valuation_lens"]')
+              const selectbox = [...document.querySelectorAll('[data-testid="stSelectbox"]')]
+                .find(el => (el.innerText || '').toLowerCase().includes('valuation lens'))
+              return (keyed || selectbox)?.innerText || ''
+            })(),
             shellText,
             commandCells: (() => {
               const buttons = [...document.querySelectorAll(
@@ -1221,7 +1226,9 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 """() => {
                   const root = document.documentElement;
                   const viewport = root.clientWidth;
-                  const owner = document.querySelector('[class*="st-key-dashboard_valuation_lens"]');
+                  const owner = document.querySelector('[class*="st-key-dashboard_valuation_lens"]')
+                    || [...document.querySelectorAll('[data-testid="stSelectbox"]')]
+                      .find(el => (el.innerText || '').toLowerCase().includes('valuation lens'));
                   const strategy = owner?.querySelector('select, [role="combobox"], input');
                   const strategyButton = owner?.querySelector('button');
                   const refresh = [...document.querySelectorAll('button')].find(el => {
