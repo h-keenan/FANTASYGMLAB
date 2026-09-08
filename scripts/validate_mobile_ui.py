@@ -236,7 +236,6 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
             raise AssertionError(f"missing semantic summary tile: {label}")
         interactive = [item for item in candidates if item[0] is not page]
         frame, tile_index, tile = (interactive or candidates)[0]
-        tile.set_attribute("data-validator-selected", f"{label}:{tile_index}")
         tile.scroll_into_view_if_needed()
         tile.click()
         dialog = page.locator('[data-testid="stDialog"]')
