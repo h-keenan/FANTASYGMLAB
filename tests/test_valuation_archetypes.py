@@ -227,3 +227,26 @@ def test_workspace_affordance_uses_native_action_and_canonical_modal(monkeypatch
     assert tuple(args[1]) == tuple(valuation_archetype_ui.SUPPORTED_VALUATION_LENSES)
     assert selector_kwargs["key"] == "league_type"
     assert calls["modal"][1] == valuation_archetype_ui.MODAL_SURFACE
+
+def test_dashboard_identity_belongs_to_shell_and_lens_keeps_single_owner(monkeypatch):
+    from contextlib import nullcontext
+    from modules import valuation_archetype_ui as ui
+    containers, widgets, html, buttons = [], [], [], []
+    monkeypatch.setattr(ui.st, 'session_state', {'league_type': 'Dynasty'})
+    def container(**kwargs):
+        containers.append(kwargs['key'])
+        return nullcontext()
+    monkeypatch.setattr(ui.st, 'container', container)
+    monkeypatch.setattr(ui.st, 'markdown', lambda text, **kwargs: html.append(text))
+    monkeypatch.setattr(ui.st, 'selectbox', lambda *args, **kwargs: widgets.append((args, kwargs)))
+    monkeypatch.setattr(ui.st, 'button', lambda label, **kwargs: buttons.append(label) or False)
+    ui.render_workspace_archetype_affordance(BALANCED_DYNASTY, key='fixture',
+        league_name='Unique League', team_name='Unique Team', season='2026')
+    assert containers == ['dashboard_page_context', 'dashboard_valuation_lens']
+    assert len(widgets) == 1
+    args, kwargs = widgets[0]
+    assert args[0] == 'Valuation lens'
+    assert kwargs['key'] == 'league_type'
+    assert kwargs['format_func']('Dynasty') == 'Dynasty — balanced long-term value'
+    assert buttons == ['How valuation works']
+    assert not html
