@@ -76,7 +76,7 @@ SURFACES = {
     ),
     "alerts": (
         "Alerts",
-        "Important",
+        "Priority",
         "My Players",
         "News",
         "League",
@@ -220,13 +220,35 @@ def _open_team_snapshot_expander(page) -> None:
 
 def _capture_metric_flow(page, output: Path, width: int) -> dict:
     _open_team_snapshot_expander(page)
-    frame = _frame_with_selector(page, ".summary-tile-tappable")
     captures = {}
-    for index, slug in ((1, "average-age"), (2, "starter-strength")):
-        tile = frame.locator(".summary-tile-tappable").nth(index)
+    for label, slug in (("Average Age", "average-age"), ("Starter Strength", "starter-strength")):
+        # components.v2 renders the interactive copy in its iframe while the
+        # page may also contain a fail-soft HTML copy. Prefer the active
+        # component frame and identify the tile by its semantic label.
+        candidates = []
+        page.locator(".summary-tile-tappable").first.wait_for(state="visible", timeout=30_000)
+        for candidate_frame in page.frames:
+            tiles = candidate_frame.locator(".summary-tile-tappable")
+            for tile_index in range(tiles.count()):
+                tile = tiles.nth(tile_index)
+                if label.lower() in (tile.inner_text() or "").lower():
+                    candidates.append((candidate_frame, tile_index, tile))
+        if not candidates:
+            raise AssertionError(f"missing semantic summary tile: {label}")
+        interactive = [item for item in candidates if item[0] != page.main_frame]
+        frame, tile_index, tile = (interactive or candidates)[0]
         tile.scroll_into_view_if_needed()
-        tile.click()
+        # Streamlit may rebuild the component host during the scroll settlement;
+        # native element activation keeps the click on the selected component
+        # tile instead of landing on its grid parent.
+        tile.dispatch_event("click")
         dialog = page.locator('[data-testid="stDialog"]')
+        receipt = page.locator(f'[data-fixture-summary-dialog-received="{label}"]')
+        receipt.wait_for(state="attached", timeout=10_000)
+        if dialog.count() == 0:
+            # Streamlit may present the dialog in the active component frame
+            # while the parent is settling the rerun.
+            dialog = _frame_with_selector(page, '[data-testid="stDialog"]')
         dialog.wait_for(state="visible", timeout=30_000)
         page.get_by_text("League Leaderboard", exact=True).wait_for(state="visible", timeout=30_000)
         captures[f"{slug}Contract"] = _dialog_contract(page)
@@ -242,7 +264,6 @@ def _capture_metric_flow(page, output: Path, width: int) -> dict:
         dialog.wait_for(state="hidden", timeout=30_000)
         page.reload(wait_until="networkidle", timeout=60_000)
         _open_team_snapshot_expander(page)
-        frame = _frame_with_selector(page, ".summary-tile-tappable")
     return captures
 
 
@@ -267,6 +288,7 @@ def _capture_player_dossier_flow(page, output: Path, width: int) -> dict:
     page.screenshot(path=str(output / complete_name), full_page=True)
     page.get_by_role("button", name="CAREER").click()
     page.get_by_text("Bio", exact=True).wait_for(state="visible", timeout=30_000)
+    page.locator(".pqv-accolades").wait_for(state="visible", timeout=30_000)
     page.get_by_text("2023", exact=True).first.wait_for(state="visible", timeout=30_000)
     expanded_name = f"player-dossier-history-expanded-{width}x844.png"
     page.screenshot(path=str(output / expanded_name), full_page=True)
@@ -312,6 +334,38 @@ def _dialog_contract(page) -> dict:
     if not close_box or min(close_box["width"], close_box["height"]) + 0.01 < 44:
         raise AssertionError(f"undersized modal close target: {close_box}")
     return metrics
+
+
+def _run_summary_transport_probe(browser, base_url: str) -> dict:
+    page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+    try:
+        page.goto(f"{base_url}/?surface=summary-probe", wait_until="networkidle", timeout=60_000)
+        marker = page.locator("[data-summary-probe-reruns]")
+        marker.wait_for(state="attached", timeout=30_000)
+        before = int(marker.get_attribute("data-summary-probe-reruns") or "0")
+        candidates = []
+        for candidate_frame in page.frames:
+            tiles = candidate_frame.locator(".summary-tile-tappable")
+            for tile_index in range(tiles.count()):
+                tile = tiles.nth(tile_index)
+                if "transport probe" in (tile.inner_text() or "").lower():
+                    candidates.append((candidate_frame, tile_index, tile))
+        if not candidates:
+            raise AssertionError("summary transport probe tile missing")
+        frame, tile_index, tile = ([item for item in candidates if item[0] != page.main_frame] or candidates)[0]
+        tile.click()
+        page.wait_for_function(
+            "([selector, before]) => Number(document.querySelector(selector)?.dataset.summaryProbeReruns || 0) > before",
+            arg=["[data-summary-probe-reruns]", before],
+            timeout=30_000,
+        )
+        reruns = int(marker.get_attribute("data-summary-probe-reruns") or "0")
+        received = page.locator('[data-summary-trigger-received="1"]').count() > 0
+        dialog = page.locator('[data-summary-probe-dialog="1"]')
+        dialog.wait_for(state="visible", timeout=30_000)
+        return {"beforeReruns": before, "afterReruns": reruns, "clickedIndex": tile_index, "pythonReceived": received, "dialog": dialog.count() > 0}
+    finally:
+        page.close()
 
 
 def _capture_navigation_flow(page, output: Path, width: int) -> dict:
@@ -788,6 +842,10 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             // Secondary command tiles may share a multi-column row under tablet
             // widths; they are not "primary content" for the near-zero check (#235).
             if (el.classList.contains('home-command-card-secondary')) return false;
+            // Team Snapshot is a compact comparison sub-surface inside a
+            // two-column desktop layout; its cards are intentionally narrower
+            // than full-width primary content.
+            if (el.classList.contains('summary-tile-compact') && el.closest('[class*="st-key-dashboard_team_snapshot"]')) return false;
             return true;
           });
           const badTargets = [...document.querySelectorAll('button, [role="button"], a')]
@@ -833,7 +891,27 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
               ? Math.max(0, routeCandidates[0].top - shellWrapper.bottom)
               : null,
             shellCount: document.querySelectorAll('.dg-executive-shell').length,
-            switcherCount: document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button[data-testid="stPopoverButton"]').length,
+            switcherCount: [...document.querySelectorAll('[class*="st-key-executive_workspace_shell"] [class*="st-key-top_league_actions"] button[data-testid="stPopoverButton"]')].filter(el => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden'; }).length,
+            valuationLensText: (() => {
+              const keyed = document.querySelector('[class*="st-key-dashboard_valuation_lens"]')
+              const selectbox = [...document.querySelectorAll('[data-testid="stSelectbox"]')]
+                .find(el => (el.innerText || '').toLowerCase().includes('valuation lens'))
+              const root = (keyed || selectbox)
+              if (!root) return ''
+              const select = root.querySelector('[data-testid="stSelectbox"]') || root
+              const combobox = select.querySelector('[role="combobox"]')
+              const baseweb = select.querySelector('[data-baseweb="select"]')
+              const candidates = [
+                combobox && typeof combobox.value === 'string' ? combobox.value : '',
+                combobox?.getAttribute('aria-label') || '',
+                combobox?.getAttribute('aria-valuetext') || '',
+                baseweb?.textContent || '',
+                select.textContent || '',
+                root.textContent || '',
+              ]
+              return candidates.map(value => String(value || '').replace(/\\s+/g, ' ').trim())
+                .find(value => value.toLowerCase().includes('balanced')) || ''
+            })(),
             shellText,
             commandCells: (() => {
               const buttons = [...document.querySelectorAll(
@@ -1163,7 +1241,8 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append("duplicate Today's Game Plan headers")
         if "Your Next Move" in body_text:
             failures.append("Your Next Move should not appear when Game Plan owns current actions")
-        if "Valuation:" not in body_text:
+        lens_text = str(metrics.get("valuationLensText") or "")
+        if "balanced" not in lens_text.casefold() or "How valuation works" not in body_text:
             failures.append("missing Strategy context on Dashboard")
         if "Lens ·" in body_text:
             failures.append("legacy Lens pill must not appear on Dashboard")
@@ -1219,10 +1298,11 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 """() => {
                   const root = document.documentElement;
                   const viewport = root.clientWidth;
-                  const strategy = [...document.querySelectorAll('button')].find(el => {
-                    const r = el.getBoundingClientRect();
-                    return (el.innerText || '').includes('Valuation:') && r.width > 1 && r.height > 1;
-                  });
+                  const owner = document.querySelector('[class*="st-key-dashboard_valuation_lens"]')
+                    || [...document.querySelectorAll('[data-testid="stSelectbox"]')]
+                      .find(el => (el.innerText || '').toLowerCase().includes('valuation lens'));
+                  const strategy = owner?.querySelector('select, [role="combobox"], input');
+                  const strategyButton = owner?.querySelector('button');
                   const refresh = [...document.querySelectorAll('button')].find(el => {
                     const r = el.getBoundingClientRect();
                     const label = (el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase();
@@ -1237,9 +1317,24 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                   return {
                     viewport,
                     scrollWidth: root.scrollWidth,
-                    strategy: box(strategy),
-                    strategyText: strategy ? (strategy.innerText || '') : '',
-                    strategyClipped: strategy ? (strategy.scrollWidth > strategy.clientWidth + 1) : null,
+                    strategy: box(strategy || strategyButton || owner),
+                    strategyText: (() => {
+                      if (!owner) return '';
+                      const select = owner.querySelector('[data-testid="stSelectbox"]') || owner;
+                      const combobox = select.querySelector('[role="combobox"]');
+                      const baseweb = select.querySelector('[data-baseweb="select"]');
+                      const candidates = [
+                        combobox && typeof combobox.value === 'string' ? combobox.value : '',
+                        combobox?.getAttribute('aria-label') || '',
+                        combobox?.getAttribute('aria-valuetext') || '',
+                        baseweb?.textContent || '',
+                        select.textContent || '',
+                        owner.textContent || '',
+                      ];
+                      return candidates.map(value => String(value || '').replace(/\\s+/g, ' ').trim())
+                        .find(value => value.toLowerCase().includes('balanced')) || '';
+                    })(),
+                    strategyClipped: owner ? (owner.scrollWidth > owner.clientWidth + 1) : null,
                     refresh: box(refresh),
                     meta: box(meta),
                   };
@@ -1259,7 +1354,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 if geometry.get("strategyClipped"):
                     failures.append("Strategy label is clipped")
                 strategy_text = str(geometry.get("strategyText") or "")
-                if "Valuation:" not in strategy_text or "Balanced" not in strategy_text:
+                if "balanced" not in strategy_text.casefold():
                     failures.append("Strategy label incomplete")
             meta = geometry.get("meta") or {}
             if strategy and meta:
@@ -1391,7 +1486,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             )
         if "activity" not in alerts_blob:
             failures.append("Activity secondary label missing")
-        for label in ("important", "my players", "news", "league", "decisions"):
+        for label in ("priority", "my players", "news", "league", "decisions"):
             if label not in alerts_blob:
                 failures.append(f"Alerts timeline missing {label} control")
         radius = page.evaluate(
@@ -1538,8 +1633,6 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
         if surface == "league":
             if "dg-lh-item" in page.content():
                 failures.append("League History feed rendered on League Overview")
-        if surface == "player-dossier" and not desktop.get("accolades"):
-            failures.append("PQV Accolades missing from desktop dossier fixture")
         if surface == "recaps":
             recap = desktop.get("recap") or {}
             if not recap.get("width"):
@@ -1583,6 +1676,7 @@ def main() -> int:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         try:
+            report["summaryTransportProbe"] = _run_summary_transport_probe(browser, args.base_url)
             for surface in selected_surfaces:
                 expected = SURFACES[surface]
                 report["surfaces"][surface] = {}

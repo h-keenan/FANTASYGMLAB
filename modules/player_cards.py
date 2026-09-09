@@ -4,6 +4,7 @@ from typing import Callable
 
 import pandas as pd
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
 
 from modules import football_assets
 from modules.interaction_contract import TAP_DELEGATION_JS, on_clicked_change
@@ -479,7 +480,7 @@ def render_player_interaction_grid(
             height="content",
             on_clicked_change=on_clicked_change,
         )
-    except ValueError as exc:
+    except (ValueError, StreamlitAPIException) as exc:
         if "is not registered" not in str(exc):
             raise
         st.markdown(html, unsafe_allow_html=True)

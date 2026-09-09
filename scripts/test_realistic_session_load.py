@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import resource
 import sys
 import threading
 import time
@@ -42,6 +41,9 @@ from modules import prepared_player_frame
 
 def _rss_mb() -> float | None:
     try:
+        # Optional Unix telemetry must not prevent the load harness on Windows.
+        import resource
+
         usage = resource.getrusage(resource.RUSAGE_SELF)
         # macOS returns bytes; Linux returns kilobytes.
         rss = float(usage.ru_maxrss)

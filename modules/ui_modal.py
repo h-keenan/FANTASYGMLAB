@@ -61,8 +61,7 @@ def _list_item_avatar_html(item: ModalListItem) -> str:
     initials = escape(_item_initials(item))
     url = _safe_http_url(item.avatar_url)
     image = (
-        f'<img src="{escape(url, quote=True)}" alt="" loading="lazy" '
-        'onerror="this.remove()">'
+        f'<img class="dg-modal-list-avatar-image" src="{escape(url, quote=True)}" alt="" loading="lazy">'
         if url
         else ""
     )

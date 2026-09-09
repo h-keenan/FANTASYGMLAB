@@ -216,4 +216,4 @@ def test_alert_injury_row_has_concise_non_repetitive_hierarchy():
     assert "Starter · Status not yet confirmed" in html
     assert "affects your starter" not in html
     assert "STATUS NOT YET CONFIRMED</span>" not in html
-    assert "aria-label='Urgent player alert'" in html
+    assert "aria-label='URGENT player alert'" in html

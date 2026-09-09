@@ -17,17 +17,22 @@ import streamlit as st
 from modules.html_rendering import inject_global_styles
 
 VIEWPORT_PRESERVE_CSS = """
-[class*="st-key-dg_viewport_preserve"] {
-    clip: rect(0, 0, 0, 0) !important;
-    height: 0 !important;
+[class*="st-key-dg_viewport_preserve"],
+[class*="st-key-dg_viewport_restore_kick"] {
+    clip: rect(0, 0, 1px, 1px) !important;
+    height: 1px !important;
     margin: 0 !important;
-    max-height: 0 !important;
-    max-width: 0 !important;
+    max-height: 1px !important;
+    max-width: 1px !important;
+    min-width: 1px !important;
     overflow: hidden !important;
     padding: 0 !important;
     pointer-events: none !important;
-    position: absolute !important;
-    width: 0 !important;
+    position: fixed !important;
+    left: -10px !important;
+    top: -10px !important;
+    opacity: 0 !important;
+    width: 1px !important;
 }
 """
 
@@ -86,6 +91,9 @@ VIEWPORT_PRESERVE_JS = """
         )
       }
 
+      const actionLabel = (node) => (node.innerText || node.getAttribute("aria-label") || "")
+        .trim().slice(0, 120)
+
       const restore = () => {
         const last = hostWindow.__dgInPlaceAnchor
         if (!last || last.nav) return
@@ -103,7 +111,21 @@ VIEWPORT_PRESERVE_JS = """
           }
           return
         }
-        const el = last.key ? doc.querySelector("." + CSS.escape(last.key)) : null
+        let el = actionLabel(doc.activeElement) === last.label ? doc.activeElement : null
+        if (!el) el = last.key ? doc.querySelector("." + CSS.escape(last.key)) : null
+        if (el && last.label && actionLabel(el) !== last.label
+            && ![...el.querySelectorAll("button, a, summary, [role='button']")]
+              .some((node) => actionLabel(node) === last.label)) {
+          el = null
+        }
+        if (!el && last.label) {
+          const matches = [...doc.querySelectorAll("button, a, summary, [role='button']")]
+            .filter((node) => actionLabel(node) === last.label)
+          // A duplicate label has no safe identity once Streamlit keys change.
+          // Keep the keyed match above when it is verified; otherwise decline
+          // to re-anchor rather than selecting an unrelated control.
+          el = matches.length === 1 ? matches[0] : null
+        }
         if (el) {
           const rect = el.getBoundingClientRect()
           const srect = root.getBoundingClientRect()
@@ -117,19 +139,23 @@ VIEWPORT_PRESERVE_JS = """
         }
       }
 
+      hostWindow.__dgRestoreInPlaceAnchor = restore
+
       const record = (target) => {
         const root = pageScroller()
         if (!root || !target) return
-        const widget = target.closest('[data-testid="stElementContainer"]') || target
+        const action = target.closest("button, a, summary, [role='button'], input, textarea, select") || target
+        const widget = action.closest('[data-testid="stElementContainer"]') || action
         const rect = widget.getBoundingClientRect()
         const srect = root.getBoundingClientRect()
         hostWindow.__dgInPlaceAnchor = {
           t: Date.now(),
-          key: keyFrom(target),
+          key: keyFrom(action),
           offset: rect.top - srect.top,
           scrollTop: Number(root.scrollTop || 0),
-          nav: isIntentionalNav(target),
-          lockScroll: isFixedOrb(target),
+          nav: isIntentionalNav(action),
+          lockScroll: isFixedOrb(action),
+          label: actionLabel(action),
           navToken: Number(hostWindow.__dynastyGmScrollResetToken || 0)
         }
       }
@@ -158,13 +184,23 @@ VIEWPORT_PRESERVE_JS = """
         doc.addEventListener("focusin", (event) => {
           const last = hostWindow.__dgInPlaceAnchor
           if (!last || last.nav) return
-          if ((Date.now() - last.t) > 1600) return
+          if ((Date.now() - last.t) > 5000) return
           const focused = event.target
           if (!(focused instanceof hostWindow.Element)) return
           if (isOverlayChrome(focused)) {
             const root = pageScroller()
             if (root && Math.abs(Number(root.scrollTop || 0) - last.scrollTop) > 24) {
               root.scrollTop = last.scrollTop
+            }
+            return
+          }
+          if (last.label && actionLabel(focused) === last.label) {
+            const root = pageScroller()
+            if (root) {
+              const rect = focused.getBoundingClientRect()
+              const srect = root.getBoundingClientRect()
+              const delta = (rect.top - srect.top) - last.offset
+              if (Math.abs(delta) >= 12) root.scrollTop += delta
             }
             return
           }
@@ -195,6 +231,8 @@ VIEWPORT_PRESERVE_JS = """
       })
       hostWindow.setTimeout(restore, 80)
       hostWindow.setTimeout(restore, 220)
+      hostWindow.setTimeout(restore, 600)
+      hostWindow.setTimeout(restore, 1200)
     }
 """
 
@@ -216,3 +254,33 @@ def render_viewport_preservation() -> None:
         width=1,
         height=1,
     )
+
+
+VIEWPORT_RESTORE_KICK_JS = """
+    export default function(component) {
+      const hostWindow = window.parent || window
+      hostWindow.__dgViewportRestoreKickSeq = Number(hostWindow.__dgViewportRestoreKickSeq || 0) + 1
+      hostWindow.__dgViewportRestoreKickAt = Date.now()
+      hostWindow.requestAnimationFrame(() => {
+        hostWindow.requestAnimationFrame(() => {
+          if (typeof hostWindow.__dgRestoreInPlaceAnchor === "function") {
+            hostWindow.__dgRestoreInPlaceAnchor()
+          }
+        })
+      })
+    }
+"""
+
+
+def render_viewport_restore_kick() -> None:
+    """Invoke the early binder's restore after the route tree is emitted."""
+
+    token = int(st.session_state.get("_viewport_restore_kick_token", 0)) + 1
+    st.session_state["_viewport_restore_kick_token"] = token
+    kick = st.components.v2.component(
+        "viewport_restore_kick",
+        html="<span class='dg-viewport-restore-kick-marker' aria-hidden='true'></span>",
+        js=VIEWPORT_RESTORE_KICK_JS,
+        isolate_styles=False,
+    )
+    kick(key=f"dg_viewport_restore_kick_{token % 2}", data={"v": token}, width=1, height=1)

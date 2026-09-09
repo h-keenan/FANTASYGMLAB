@@ -33,6 +33,7 @@ from modules.mobile_visual_polish_styles import MOBILE_VISUAL_POLISH_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import viewport_preservation
+from modules import player_headshot_runtime
 from modules.interaction_contract import on_clicked_change
 from modules import auth_supabase
 from modules import auth_restore_lifecycle
@@ -17458,6 +17459,8 @@ def main():
         layout="wide",
         initial_sidebar_state="collapsed",
     )
+    viewport_preservation.render_viewport_preservation()
+    player_headshot_runtime.render_player_headshot_runtime()
     try:
         _runtime_secrets = st.secrets
     except Exception:
@@ -24635,7 +24638,6 @@ def main():
         selected_league_name=selected_league_name,
         my_roster_id=my_roster_id,
     )
-    viewport_preservation.render_viewport_preservation()
     performance.record_timing(
         f"page_route_total_{_safe_text(current_page, 'unknown')}",
         (time.perf_counter() - route_content_started) * 1000,
@@ -24693,6 +24695,7 @@ def main():
 
     _lifecycle.mark(st.session_state, "T7_page_tree_complete")
     _route_body.exit_route_body(route_body_container, st.session_state)
+    viewport_preservation.render_viewport_restore_kick()
 
     performance.finish_rerun(
         perf_rerun,

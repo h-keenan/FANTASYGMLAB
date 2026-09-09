@@ -29,6 +29,8 @@ SURFACES = ("dashboard", "my-team", "trade", "waivers", "league")
 # authoritative launch inventory; this trust PR adds 0 new st.rerun sites.
 MAX_EXPLICIT_RERUNS = 62
 
+from scripts.apptest_support import server_only_summary_tiles, server_only_player_quick_view
+
 
 def _runtime_report(output: str) -> dict:
     reports = [
@@ -41,6 +43,8 @@ def _runtime_report(output: str) -> dict:
     return reports[-1]
 
 
+@server_only_summary_tiles()
+@server_only_player_quick_view()
 def main() -> int:
     os.environ["DYNASTYGM_RUNTIME_TRACE"] = "1"
     from streamlit.testing.v1 import AppTest

@@ -4,6 +4,7 @@ Standings board fixture coverage is exercised on the league surface."""
 from __future__ import annotations
 
 import sys
+from hashlib import sha256
 from pathlib import Path
 
 import streamlit as st
@@ -96,6 +97,7 @@ from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 from modules.ux_polish_styles import FOUNDER_BETA_UX_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules import viewport_preservation
+from modules import player_headshot_runtime
 
 
 SURFACES = {
@@ -116,7 +118,57 @@ SURFACES = {
     "viewport-preserve",
     "recaps",
     "alerts",
+    "summary-probe",
 }
+
+
+def _summary_component_probe() -> None:
+    """Minimal real components.v2 transport probe for browser CI diagnosis."""
+
+    st.session_state["_summary_probe_reruns"] = int(
+        st.session_state.get("_summary_probe_reruns", 0)
+    ) + 1
+    reruns = st.session_state["_summary_probe_reruns"]
+    probe_items = [
+            {
+                "label": "Transport Probe",
+                "value": "Tap",
+                "note": "Real summary tile component transport probe.",
+                "comparison": {"current": "Tap", "leader": "Tap"},
+                "tappable": True,
+            }
+        ]
+    probe_html = workspace_ui.summary_tiles_html(
+        probe_items,
+        compact=True,
+    )
+    probe_container = st.container()
+    probe_key = "summary_tile_tap_" + sha256(
+        ("ci_dashboard_snapshot\x1f" + probe_html).encode("utf-8")
+    ).hexdigest()[:20]
+    with probe_container:
+        result = workspace_ui.SUMMARY_TILE_TAP_COMPONENT(
+            key=probe_key,
+            data={"html": probe_html},
+            width="stretch",
+            height="content",
+            on_clicked_change=workspace_ui.on_clicked_change,
+        )
+    clicked = getattr(result, "clicked", None)
+    received = isinstance(clicked, dict) and str(clicked.get("index")) == "0"
+    st.markdown(
+        f'<div data-summary-probe-reruns="{reruns}" '
+        f'data-summary-trigger-received="{1 if received else 0}" '
+        f'data-summary-trigger-index="{str(clicked.get("index")) if isinstance(clicked, dict) else ""}"></div>',
+        unsafe_allow_html=True,
+    )
+
+    if received:
+        @st.dialog("Summary transport probe", width="small")
+        def _show_probe_dialog() -> None:
+            st.markdown('<div data-summary-probe-dialog="1">Transport received</div>', unsafe_allow_html=True)
+
+        _show_probe_dialog()
 
 HEADER_LEAGUE_FIXTURES = {
     "short": "A",
@@ -530,6 +582,17 @@ def _header_geometry() -> None:
     )
 
 
+def _render_fixture_summary_dialog(item: dict) -> None:
+    """Expose trigger receipt before invoking the canonical dialog renderer."""
+
+    label = str(item.get("label") or "").strip()
+    st.markdown(
+        f'<div data-fixture-summary-dialog-received="{label}"></div>',
+        unsafe_allow_html=True,
+    )
+    workspace_ui.render_canonical_summary_tile_detail_dialog(item)
+
+
 def _dashboard() -> None:
     briefing_mode = str(st.query_params.get("briefing") or "populated").strip().lower()
     from modules import game_plan_package
@@ -917,7 +980,7 @@ def _dashboard() -> None:
             snapshot,
             compact=True,
             key_prefix="ci_dashboard_snapshot",
-            detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
+            detail_dialog_renderer=_render_fixture_summary_dialog,
         ),
         render_orientation=lambda: dashboard_orientation.render_orientation_if_applicable(
             authenticated=True,
@@ -2439,7 +2502,6 @@ def _guest_landing() -> None:
     else:
         _render_import()
         _render_account()
-    marketing_landing.render_marketing_landing_deferred()
 
     st.markdown("<div data-fgl-guest-landing='1'></div>", unsafe_allow_html=True)
     if fixture_auth == "guest":
@@ -2809,10 +2871,21 @@ def _alerts() -> None:
         league_id="fixture-league",
     )
     st.session_state.update(session)
+
+    def _alerts_section_header(_title: str, *, kicker: str = "", note: str = "", compact: bool = False) -> None:
+        # The fixture shell already owns the page title. Keep the route's
+        # Activity kicker/subtitle without introducing a second Alerts H2.
+        render_html_fragment(
+            "<header class='dg-ui-section-header dg-ui-section-header--secondary'>"
+            f"<div class='dg-ui-section-header-copy'><div class='dg-ui-eyebrow'>{kicker}</div>"
+            f"<p class='dg-ui-section-subtitle'>{note}</p></div></header>"
+        )
+
     alerts_activity_ui.render_alerts_page(
         league_id="fixture-league",
         session=st.session_state,
         entitlement="free",
+        render_section_header=_alerts_section_header,
         open_player_quick_view=lambda player_id, **_kwargs: st.session_state.__setitem__(
             "fixture_alert_player_id", str(player_id or "")
         ),
@@ -2821,6 +2894,8 @@ def _alerts() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
+    viewport_preservation.render_viewport_preservation()
+    player_headshot_runtime.render_player_headshot_runtime()
     # Match production inject order from app.py script start, then command header
     # (late, like render_top_league_identity_header). MOBILE_INTERACTION_OVERLAY_CSS
     # is already concatenated into APP_CSS — do not re-inject after the command owner.
@@ -2859,9 +2934,10 @@ def main() -> None:
         "viewport-preserve": _viewport_preserve,
         "recaps": _recaps,
         "alerts": _alerts,
+        "summary-probe": _summary_component_probe,
     }[surface]()
+    viewport_preservation.render_viewport_restore_kick()
     _render_fixture_ack_markers()
-    viewport_preservation.render_viewport_preservation()
     st.caption("Synthetic fixture only — no credentials, personal identifiers, or production data.")
 
 

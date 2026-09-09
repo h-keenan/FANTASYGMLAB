@@ -150,7 +150,7 @@ def test_header_is_compact_document_flow_not_floating_badge():
     styles = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(encoding="utf-8")
     assert "dg-dashboard-page-identity" in ui
     assert "Dashboard</div>" not in ui
-    assert "Valuation:" in ui
+    assert "dashboard_valuation_lens" in ui
     assert "position:absolute" not in ui
     assert "position:absolute" not in styles
     assert "display: flex" in styles

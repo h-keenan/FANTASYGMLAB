@@ -93,7 +93,8 @@ def test_fallback_initials_hide_when_image_node_exists():
     loaded = avatar_html("https://example.com/ok.png", "JH", "player-avatar")
     assert "dg-player-headshot-fallback" in loaded
     assert "dg-player-headshot-image" in loaded
-    assert "onerror=\"this.remove()\"" in loaded
+    assert "onload=" not in loaded
+    assert "onerror=" not in loaded
     missing = avatar_html("", "JH", "player-avatar")
     assert "<img" not in missing
     assert ">JH<" in missing

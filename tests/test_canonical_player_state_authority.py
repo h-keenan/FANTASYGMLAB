@@ -78,7 +78,7 @@ def test_query_keenan_returns_actual_player_with_default_explorer_filters():
     assert "Keenan Allen" in visible["name"].tolist()
 
 
-def test_active_unsigned_cached_market_value_remains_globally_searchable():
+def test_active_unsigned_cached_market_value_remains_globally_searchable(cached_2025_stats_season):
     keenan = _actual_record("Keenan Allen")
     persisted = _persisted_frame()
     inventory = {str(keenan["player_id"]): keenan}

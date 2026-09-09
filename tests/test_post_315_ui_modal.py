@@ -31,14 +31,15 @@ def test_canonical_avatar_hides_fallback_only_after_image_loads():
     )
     assert "dg-player-headshot-fallback" in html
     assert ">JH<" in html
-    assert "onload=\"this.classList.add('is-loaded')" in html
-    assert "if(!this.naturalWidth)this.remove()" in html
-    assert "onerror=\"this.remove()\"" in html
+    assert "onload=" not in html
+    assert "onerror=" not in html
+    assert "dg-player-headshot-image" in html
     assert html.index("dg-player-headshot-fallback") < html.index("<img")
     failed = player_profile_ui.avatar_html("", "AJ", "compact-player-avatar")
     assert ">AJ<" in failed
     assert "<img" not in failed
-    assert "is-loaded" in AVATAR
+    from modules.player_headshot_runtime import HEADSHOT_RUNTIME_JS
+    assert "is-loaded" in HEADSHOT_RUNTIME_JS
     assert ":has(.dg-player-headshot-image.is-loaded)" in APP_CSS
     assert ":has(img.dg-player-headshot-image)" in APP_CSS
     assert ":has(img.dg-player-headshot-image)" in COMPACT_FANTASY_ASSET_CSS
@@ -50,7 +51,7 @@ def test_canonical_avatar_hides_fallback_only_after_image_loads():
     assert ":has(.dg-player-headshot-image.is-loaded)" in COMPACT_FANTASY_ASSET_CSS
     import app as production_app
 
-    assert production_app.avatar_html("https://example.com/x.png", "X").count("is-loaded") == 1
+    assert "onload=" not in production_app.avatar_html("https://example.com/x.png", "X")
 
 
 def test_compact_assets_reuse_canonical_avatar():
@@ -65,7 +66,8 @@ def test_compact_assets_reuse_canonical_avatar():
     )
     assert "dg-player-headshot" in html
     assert "is-loaded" in html or "dg-player-headshot-image" in html
-    assert "onload=" in html
+    assert "onload=" not in html
+    assert "onerror=" not in html
 
 
 def test_share_panel_is_centered_cluster_not_full_canvas():

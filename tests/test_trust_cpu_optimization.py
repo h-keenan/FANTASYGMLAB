@@ -92,12 +92,13 @@ def test_validation_reuses_one_stable_serialization_for_key_and_payload():
     assert dumps.call_count == 1
 
 
-def test_real_public_player_dataset_is_exactly_equivalent():
-    frame, output_columns = _load_real_frame("data/players.db")
+def test_real_public_player_dataset_is_exactly_equivalent(public_player_trust_fixture):
+    frame, output_columns = public_player_trust_fixture
 
     result = _diagnostic_and_schema_equivalence(frame, output_columns)
 
-    assert len(frame) == 988
+    # Reconciliation expands the 988 persisted rows to the 1880-player universe.
+    assert len(frame) == 1880
     assert all(
         result[key]
         for key in (

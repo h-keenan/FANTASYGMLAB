@@ -25,7 +25,7 @@ def test_dashboard_strategy_context_is_a_vertical_stack_not_a_flex_badge():
     ui = (ROOT / "modules" / "valuation_archetype_ui.py").read_text(encoding="utf-8")
     compact = styles.replace(" ", "")
     assert 'key="dashboard_page_context"' in ui
-    assert "Valuation:" in ui
+    assert "dashboard_valuation_lens" in ui
     assert "Lens ·" not in ui
     assert "flex-direction:column" in compact or "display:block!important" in compact
     assert "flex:1 1 12rem" not in compact
@@ -35,6 +35,15 @@ def test_dashboard_strategy_context_is_a_vertical_stack_not_a_flex_badge():
     assert "white-space:normal!important" in unify.replace(" ", "")
     assert "position:absolute" not in styles
     assert "overflow-x: hidden" not in styles
+
+
+def test_mobile_validator_reads_streamlit_selected_lens_from_current_and_legacy_dom():
+    validator = (ROOT / "scripts" / "validate_mobile_ui.py").read_text(encoding="utf-8")
+    assert 'data-baseweb="select"' in validator
+    assert "getAttribute('aria-label')" in validator
+    assert "getAttribute('aria-valuetext')" in validator
+    assert "toLowerCase().includes('balanced')" in validator
+    assert "toLowerCase().includes('win now')" not in validator
 
 
 def test_game_plan_refresh_is_not_a_fixed_column_shove():

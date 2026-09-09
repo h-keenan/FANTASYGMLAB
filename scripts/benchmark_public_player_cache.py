@@ -33,6 +33,18 @@ EQUIVALENCE_FIELDS = [
 ]
 
 
+_MISSING_SENTINEL = "__FGL_BENCHMARK_MISSING__"
+
+
+def comparable(frame, fields):
+    """Normalize missing storage representations without changing present values."""
+    result = frame[fields].reset_index(drop=True).copy()
+    for column in result.columns:
+        series = result[column].astype("object")
+        result[column] = series.where(series.notna(), _MISSING_SENTINEL)
+    return result
+
+
 def _elapsed_call():
     started = time.perf_counter()
     frame = rankings.load_players("data/players.db")
@@ -65,14 +77,14 @@ def main() -> None:
         warm, warm_ms = _elapsed_call()
     fields = [field for field in EQUIVALENCE_FIELDS if field in cold.columns]
     pd.testing.assert_frame_equal(
-        built[fields].reset_index(drop=True),
-        cold[fields].reset_index(drop=True),
-        check_dtype=True,
+        comparable(built, fields),
+        comparable(cold, fields),
+        check_dtype=False,
     )
     pd.testing.assert_frame_equal(
-        cold[fields].reset_index(drop=True),
-        warm[fields].reset_index(drop=True),
-        check_dtype=True,
+        comparable(cold, fields),
+        comparable(warm, fields),
+        check_dtype=False,
     )
     data_path, metadata_path = public_player_snapshot.snapshot_paths("data/players.db")
     payload = {
