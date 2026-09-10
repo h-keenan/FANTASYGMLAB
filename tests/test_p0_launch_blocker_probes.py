@@ -5,7 +5,8 @@ from __future__ import annotations
 from scripts import verify_p0_launch_blockers as p0
 
 
-def test_p0_evaluate_classifies_no_server_webhook(monkeypatch):
+def test_p0_evaluate_reports_missing_webhook_configuration(monkeypatch):
+    monkeypatch.delenv("DYNASTYGM_WEBHOOK_HEALTH_URL", raising=False)
     fake_domain = {
         "verdict": "NOT READY",
         "gates": {
@@ -40,7 +41,8 @@ def test_p0_evaluate_classifies_no_server_webhook(monkeypatch):
     assert report["verdict"] == "P0 NOT CLEARED"
     assert "P0_stripe_webhook" in report["remaining_p0"]
     assert "P0_app_subdomain" in report["remaining_p0"]
-    assert report["blockers"]["P0_stripe_webhook"]["classification"].startswith("B_")
+    assert report["blockers"]["P0_stripe_webhook"]["root_cause"] == "not_configured"
+    assert report["blockers"]["P0_stripe_webhook"]["evidence"]["ready"]["configuration"] == "not_configured"
     assert report["analytics_note"]["classification"].startswith("B_")
     assert report["blockers"]["P0_stripe_webhook"]["owner"] == "founder_control_plane"
 

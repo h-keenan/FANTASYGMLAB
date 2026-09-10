@@ -66,7 +66,8 @@ def test_smoke_script_is_pass_fail_ordered():
 
 def test_verifier_probes_webhook_and_robots():
     source = Path("scripts/verify_production_domain_cutover.py").read_text(encoding="utf-8")
-    assert "WEBHOOK_HEALTH" in source
+    assert "webhook_probe_urls" in source
+    assert "webhook_ready" in source
     assert "STATIC_ROBOTS" in source
     assert "webhook_health_ok" in source
 
