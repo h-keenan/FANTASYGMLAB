@@ -1,3 +1,5 @@
+> Current authority: [webhook operations](webhook-operational-authority.md). Historical guessed-host 404 observations below do not describe the current live service. Blueprint association must be verified before any sync; do not create a duplicate.
+
 # Render Deployment
 
 FantasyGM Lab currently runs on Render as **two** services (dashboard names):
@@ -12,23 +14,24 @@ The canonical production branch is `main`. Deployed services should track
 The application footer displays Render's runtime-provided short Git SHA and
 branch so a deployed build can be verified without a network request.
 
-## Create The Render Service
+## Verify Existing Render Services
 
 1. In Render, connect the private GitHub repository `h-keenan/FANTASYGMLAB`.
-2. Create a Blueprint from `render.yaml`, or create a Python web service manually with the same settings.
+2. Verify existing service association before any Blueprint sync. Do not recreate live services.
 3. Confirm the Streamlit service:
    - Build command: `pip install -r requirements.txt`
    - Start command: `streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true`
    - Health check path: `/_stcore/health`
    - Auto-deploy from `main`: enabled.
-4. Confirm the Stripe webhook service is **actually created** (Blueprint apply/sync):
-   - Dashboard name in production: `fantasygmlab-stripe-webhook` (Blueprint may still say `fantasygm-lab-stripe-webhook`)
+4. Confirm the existing live Stripe webhook service:
+   - Dashboard name in production: `fantasygmlab-stripe-webhook` (the historical Blueprint name differs; association is unverified)
    - Build command: `pip install -r requirements.txt`
    - Start command: `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT`
    - Health check path: `/health`
    - Auto-deploy from `main`: enabled.
+<!-- HISTORICAL EVIDENCE: old guessed host; not the current Render service. -->
    - If `https://fantasygm-lab-stripe-webhook.onrender.com/health` returns `x-render-routing: no-server`,
-     the service does not exist yet — create it from this Blueprint. See
+     that historical guessed target does not establish current service state. See
      `docs/stripe-webhook-service-contract.md`.
 
 ## Environment Variables

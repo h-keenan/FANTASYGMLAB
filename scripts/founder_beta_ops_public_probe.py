@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
 """Probe public production surfaces without secrets.
 
-Prints JSON evidence for HTTPS, health, favicon, and known webhook host guesses.
+Prints JSON evidence for HTTPS, health, favicon, and configured webhook liveness/readiness.
 Does not create accounts, call Stripe, or read Supabase.
 """
 
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from modules.webhook_probe_config import webhook_probe_urls, probe_webhook
 import ssl
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-PRODUCTION_BASELINE_SHA = "81b37ee7d18453d9ac2ecffed1988687f21188b7"
+PRODUCTION_BASELINE_SHA = "6d379dcd38f1a87f501dafa119dc58d0f0d6134a"
 
 TARGETS = (
     ("apex_https", "https://fantasygmlab.com/"),
@@ -23,10 +30,7 @@ TARGETS = (
     ("onrender_app", "https://fantasygmlab.onrender.com/"),
     ("favicon_png", "https://www.fantasygmlab.com/favicon.png"),
     ("favicon_ico", "https://www.fantasygmlab.com/favicon.ico"),
-    (
-        "webhook_guess_health",
-        "https://fantasygm-lab-stripe-webhook.onrender.com/health",
-    ),
+
 )
 
 
@@ -74,14 +78,21 @@ def _probe(name: str, url: str) -> dict:
         }
 
 
+def webhook_results(environ=None):
+    endpoints = webhook_probe_urls(environ)
+    return [dict(name="webhook_" + kind, **(probe_webhook(endpoints[kind])
+        if endpoints["status"] == "configured" else {"ok": False, "configuration": endpoints["status"]}))
+        for kind in ("health", "ready")]
+
+
 def main() -> int:
     report = {
         "probed_at_utc": datetime.now(timezone.utc).isoformat(),
         "expected_main_baseline": PRODUCTION_BASELINE_SHA,
-        "results": [_probe(name, url) for name, url in TARGETS],
+        "results": [_probe(name, url) for name, url in TARGETS] + webhook_results(),
         "notes": [
-            "Webhook host is the render.yaml service name. "
-            "x-render-routing=no-server means the web service was never created on Render.",
+            "Webhook URLs require DYNASTYGM_WEBHOOK_HEALTH_URL; health is liveness, ready is billing readiness. "
+            "Historical no-server results for guessed hosts are not current deployment evidence.",
             "Build SHA must be confirmed in the app footer (Render RENDER_GIT_COMMIT).",
             "Stripe/Supabase SQL and env vars require founder dashboard access.",
         ],

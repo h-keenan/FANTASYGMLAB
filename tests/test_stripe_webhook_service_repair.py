@@ -119,19 +119,17 @@ def test_harness_script_passes_in_process():
     assert results["duplicate_event"]["supabase_patch_calls"] == 1
 
 
-def test_founder_ops_defaults_webhook_health_url():
+def test_founder_ops_requires_webhook_health_url():
     from modules import founder_ops
 
-    assert "fantasygm-lab-stripe-webhook.onrender.com/health" in founder_ops.DEFAULT_WEBHOOK_HEALTH_URL
     with patch.object(founder_ops, "_probe_webhook_health", return_value="http_404") as probe:
         snap = founder_ops.collect_ops_snapshot(
             environ={"DYNASTYGM_FOUNDER_OPS": "1"},
             secrets={},
             session_state={},
         )
-    probe.assert_called_once()
-    assert "fantasygm-lab-stripe-webhook" in probe.call_args.args[0]
-    assert snap.stripe_webhook_health == "http_404"
+    probe.assert_not_called()
+    assert snap.stripe_webhook_health == "not_configured"
 
 
 def test_public_probe_documents_no_server_routing():

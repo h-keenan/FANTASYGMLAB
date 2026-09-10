@@ -1,24 +1,27 @@
+> Current authority: [webhook operations](webhook-operational-authority.md). Historical guessed-host 404 observations below do not describe the current live service. Blueprint association must be verified before any sync; do not create a duplicate.
+
 # Stripe Webhook Service Contract (PR #170)
 
 Repair and verification contract for the dedicated Stripe webhook service.
 Test mode is the safe default. Live processing requires an explicit
 `STRIPE_BILLING_MODE=live` setting and matching live credentials.
 
-## Final production probe status (pre-deploy)
+## Historical production probe status (not current authority)
 
 Re-confirmed **2026-08-18** during Founder Beta launch-ops closure (unchanged root cause):
 
 | Check | Result |
 | --- | --- |
+<!-- HISTORICAL EVIDENCE: old guessed host; not the current Render service. -->
 | `GET https://fantasygm-lab-stripe-webhook.onrender.com/health` | **404** `Not Found` |
 | Response header | `x-render-routing: no-server` |
 | Root cause | **No Render web service is deployed under this hostname.** This is not a missing FastAPI route. The Streamlit app exists; the webhook Blueprint service was never created/synced. |
 | Local code | `GET /health` → 200; unsigned `POST /stripe/webhook` → 400 (missing signature) |
 
-After this PR merges, founder must **create/apply** the webhook service from `render.yaml` (or manually with the same start command). Then re-run:
+Current verification: inspect the existing live service; do not create/apply the unresolved Blueprint. Run a fresh probe:
 
 ```bash
-python scripts/stripe_webhook_harness.py --base-url https://fantasygm-lab-stripe-webhook.onrender.com
+python scripts/stripe_webhook_harness.py --base-url https://fantasygmlab-stripe-webhook.onrender.com
 ```
 
 Success: `/health` → 200 `{"status":"ok"}`; unsigned `POST /stripe/webhook` → **4xx** (not 404).
@@ -30,11 +33,11 @@ Success: `/health` → 200 `{"status":"ok"}`; unsigned `POST /stripe/webhook` �
 | Framework | FastAPI |
 | Module | `services/stripe_webhook_service.py` |
 | ASGI app | `services.stripe_webhook_service:app` |
-| Render service name | `fantasygm-lab-stripe-webhook` |
+| Render service name | `fantasygmlab-stripe-webhook` |
 | Start command | `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT` |
 | Health check path | `/health` (not Streamlit `/`) |
-| Expected hostname | `https://fantasygm-lab-stripe-webhook.onrender.com` |
-| Webhook URL | `https://fantasygm-lab-stripe-webhook.onrender.com/stripe/webhook` |
+| Expected hostname | `https://fantasygmlab-stripe-webhook.onrender.com` |
+| Webhook URL | `https://fantasygmlab-stripe-webhook.onrender.com/stripe/webhook` |
 | Auto-deploy | `branch: main` in `render.yaml` |
 
 ### Routes
@@ -68,7 +71,7 @@ Success: `/health` → 200 `{"status":"ok"}`; unsigned `POST /stripe/webhook` �
 | `STRIPE_SECRET_KEY` | for checkout | Must match the configured mode |
 | `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL` | for checkout | Price ids from the configured Stripe mode |
 | Return URL vars | recommended | success/cancel/portal |
-| `DYNASTYGM_WEBHOOK_HEALTH_URL` | optional | defaults to expected `/health` URL in Founder Ops |
+| `DYNASTYGM_WEBHOOK_HEALTH_URL` | optional | requires explicit public `/health` URL; missing reports `not_configured` |
 
 ## Test / live safety
 
@@ -126,7 +129,7 @@ stripe trigger customer.subscription.updated
 
 ## Founder Ops
 
-Founder Ops probes `DYNASTYGM_WEBHOOK_HEALTH_URL` or the default expected `/health` URL and shows:
+Founder Ops probes `DYNASTYGM_WEBHOOK_HEALTH_URL` (required; no default hostname) and shows:
 
 - Stripe mode (`test` / missing)
 - webhook reachable / health probe string
@@ -136,10 +139,10 @@ No secrets are displayed.
 
 ## Manual steps after merge (founder)
 
-1. Render → Blueprint Sync / create web service `fantasygm-lab-stripe-webhook` from `render.yaml`.
+Verify the existing `fantasygmlab-stripe-webhook` service; do not create or sync a replacement from the unresolved Blueprint. See [current webhook operations](webhook-operational-authority.md).
 2. Set webhook env vars (test secrets + service role). Confirm Streamlit lacks service-role.
 3. Deploy; confirm logs show uvicorn listening.
-4. `python scripts/stripe_webhook_harness.py --base-url https://fantasygm-lab-stripe-webhook.onrender.com`
+4. `python scripts/stripe_webhook_harness.py --base-url https://fantasygmlab-stripe-webhook.onrender.com`
 5. Stripe Dashboard (Test Mode) → endpoint URL `/stripe/webhook` + events from `docs/STRIPE_TEST_MODE_SETUP.md`.
 6. Proceed to Test Mode lifecycle (monthly/annual/portal/cancel) — next ops gate, not this PR.
 

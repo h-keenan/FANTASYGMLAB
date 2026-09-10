@@ -58,10 +58,10 @@ services:
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
   - type: web
-    # Dedicated Stripe Test Mode webhook. If this hostname returns
-    # x-render-routing: no-server, the Blueprint service was never created —
-    # apply/sync render.yaml or create the web service manually (see
-    # docs/stripe-webhook-service-contract.md).
+    # HISTORICAL Blueprint identity: differs from the existing live service
+    # fantasygmlab-stripe-webhook. Association is unverified: DO NOT sync this
+    # entry or rename it to create/recreate a service. Verify Render association
+    # first; see docs/webhook-operational-authority.md. Name retained fail-safe.
     name: fantasygm-lab-stripe-webhook
     branch: main
     runtime: python

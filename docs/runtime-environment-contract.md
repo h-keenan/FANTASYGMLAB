@@ -55,7 +55,7 @@ disables checkout (fail-closed) and does **not** take down the app.
 | `DYNASTYGM_ANALYTICS_ENV` | local/ops | `launch_analytics` | No | No | No | auto production/development/test | Stamp only | Yes |
 | `DYNASTYGM_FOUNDER_OPS` | Render / local | Founder Ops dest | No | No | No | false | Hidden unless flag **and** `auth_user.app_metadata.founder_ops is True` | Yes |
 | `DYNASTYGM_DEV_REVIEW` | Render / local | Founder Labs dest | No | No | No | false | Hidden unless flag **and** live session **and** (`founder_ops` or `dev_review` app_metadata) | Yes |
-| `DYNASTYGM_WEBHOOK_HEALTH_URL` | Render / local | Founder Ops probe | No | No | No | default webhook `/health` | Fail-open probe | Yes |
+| `DYNASTYGM_WEBHOOK_HEALTH_URL` | Render / local | Founder Ops probe | No | No | No | no default; `not_configured` when absent | Fail-open probe | Yes |
 | `DYNASTYGM_ALLOW_PROD_DEBUG` | never on customer Render | debug lock | No | Must be unset | No | false | Debug/override flags ignored on managed hosts | Yes (escape hatch) |
 | `DYNASTYGM_PREMIUM_OVERRIDE` | local only | `premium` | No | Must be unset | No | false; managed-host locked | No fake Premium | Yes |
 | `DYNASTYGM_DEBUG_AUTH` | local only | premium diagnostics | No | Must be unset | No | false; managed-host locked | Hidden | Yes |

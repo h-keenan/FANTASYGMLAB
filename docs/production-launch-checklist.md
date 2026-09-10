@@ -1,3 +1,5 @@
+> Current authority: [webhook operations](webhook-operational-authority.md). Historical guessed-host 404 observations below do not describe the current live service. Blueprint association must be verified before any sync; do not create a duplicate.
+
 # Production Launch Checklist (#228)
 
 Single master gate. Status values: **DONE** | **MANUAL** | **BLOCKED** | **NOT REQUIRED**.
@@ -195,7 +197,7 @@ Treat as **BLOCKING** until cleared:
 5. **Supabase:** Site URL + redirect allowlist → `https://app.fantasygmlab.com` (+ `/**`); remove obsolete hosts after overlap.  
 6. **Render Streamlit secrets:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `APP_BASE_URL=https://app.fantasygmlab.com`; **no** service role key.  
 7. **Decide billing:** keep checkout OFF, or configure Stripe **Test** secrets + price ids + app-host return URLs.  
-8. **Render:** Create/sync `fantasygm-lab-stripe-webhook` with service role + webhook secret; confirm `/health` 200.  
+Verify the existing `fantasygmlab-stripe-webhook` service; do not create or sync a replacement from the unresolved Blueprint. See [current webhook operations](webhook-operational-authority.md).
 9. **Stripe Dashboard:** Webhook endpoint → `…/stripe/webhook`; enable required events; enable Customer Portal.  
 10. **Optional:** `DYNASTYGM_LAUNCH_ANALYTICS=1` on Streamlit for funnel.  
 11. **Legal:** Publish real support contact; confirm Terms/Privacy for paid beta.  

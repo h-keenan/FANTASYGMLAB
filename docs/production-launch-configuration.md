@@ -97,7 +97,7 @@ Legend — **Fail behavior:** fail-open = product continues without feature; fai
 | `DYNASTYGM_PREMIUM_OVERRIDE` | Force Premium locally | Dev only | bool | No | false; managed-host locked | Safe | Must be unset | app config |
 | `DYNASTYGM_SHOW_DEV_DESTINATIONS` | Dev nav | Dev only | bool | No | false; managed-host locked | Safe | Must be unset | app config |
 | `DYNASTYGM_DEV_RELOAD_MODULES` | Hot reload | Dev only | bool | No | false | Safe | Must be unset | app config |
-| `DYNASTYGM_WEBHOOK_HEALTH_URL` | Founder Ops probe | Optional | URL | No | default webhook `/health` | Fail-open | No | app config |
+| `DYNASTYGM_WEBHOOK_HEALTH_URL` | Founder Ops probe | Optional | URL | No | no default; `not_configured` when absent | Fail-open | No | app config |
 | `PYTHON_VERSION` | Runtime | Yes | `3.12.10` | No | Blueprint sets | — | YES | Render |
 | `RENDER` / `RENDER_SERVICE_ID` / `RENDER_EXTERNAL_URL` | Managed-host detection | Platform | set by Render | No | unset locally | — | Auto | Render |
 

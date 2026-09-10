@@ -1,3 +1,5 @@
+> Current authority: [webhook operations](webhook-operational-authority.md). Historical guessed-host 404 observations below do not describe the current live service. Blueprint association must be verified before any sync; do not create a duplicate.
+
 # Stripe Test-Mode Billing Setup
 
 DynastyGM supports a test-mode Stripe foundation for Founder Premium. Live billing is not enabled by this setup, and the app should keep working when Stripe configuration is missing.
@@ -55,10 +57,10 @@ The client does not grant Premium after checkout. Premium entitlement must still
 
 `render.yaml` defines a separate backend-only service:
 
-- Service name: `fantasygm-lab-stripe-webhook`
-- Expected host: `https://fantasygm-lab-stripe-webhook.onrender.com`
-- Health URL: `https://fantasygm-lab-stripe-webhook.onrender.com/health`
-- Stripe webhook URL: `https://fantasygm-lab-stripe-webhook.onrender.com/stripe/webhook`
+- Service name: `fantasygmlab-stripe-webhook`
+- Expected host: `https://fantasygmlab-stripe-webhook.onrender.com`
+- Health URL: `https://fantasygmlab-stripe-webhook.onrender.com/health`
+- Stripe webhook URL: `https://fantasygmlab-stripe-webhook.onrender.com/stripe/webhook`
 - Start command: `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT`
 
 If `/health` returns `x-render-routing: no-server`, the Render web service has not been created yet.

@@ -51,7 +51,7 @@ def server_issued_capability(session_state: Mapping[str, Any] | None, key: str) 
 
 FOUNDER_OPS_ENV = "DYNASTYGM_FOUNDER_OPS"
 FOUNDER_OPS_PAGE_KEY = "founder_ops"
-DEFAULT_WEBHOOK_HEALTH_URL = "https://fantasygm-lab-stripe-webhook.onrender.com/health"
+from modules.webhook_probe_config import webhook_probe_urls
 HEARTBEAT_PATH = Path(
     os.environ.get(
         "DYNASTYGM_FOUNDER_OPS_HEARTBEAT_PATH",
@@ -244,9 +244,8 @@ def _probe_webhook_health(url: str, *, timeout: float = 4.0) -> str:
             headers={"User-Agent": "FantasyGM-FounderOps/1.0"},
         )
         with urlopen(request, timeout=timeout) as response:
-            body = response.read(120).decode("utf-8", "replace")
             if response.status == 200:
-                return f"ok:{body[:60]}"
+                return "ok"
             return f"http_{response.status}"
     except HTTPError as exc:
         return f"http_{exc.code}"
@@ -297,10 +296,11 @@ def collect_ops_snapshot(
     heartbeat = _read_heartbeat()
     public_age = _age_hours(PUBLIC_PLAYER_DB)
     sleeper_age = _age_hours(SLEEPER_PLAYERS_CACHE)
-    webhook_health_url = str(env.get("DYNASTYGM_WEBHOOK_HEALTH_URL") or "").strip()
-    if not webhook_health_url:
-        webhook_health_url = DEFAULT_WEBHOOK_HEALTH_URL
-    webhook_health = _probe_webhook_health(webhook_health_url)
+    endpoints = webhook_probe_urls(env)
+    webhook_health = (
+        _probe_webhook_health(endpoints["health"])
+        if endpoints["status"] == "configured" else endpoints["status"]
+    )
 
     session = session_state if isinstance(session_state, Mapping) else {}
     profile_status = str(session.get("account_profile_status") or "").strip() or "unknown"

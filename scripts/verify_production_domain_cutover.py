@@ -29,7 +29,11 @@ WWW_URL = "https://www.fantasygmlab.com/"
 APP_URL = "https://app.fantasygmlab.com/"
 APP_HEALTH = "https://app.fantasygmlab.com/_stcore/health"
 ONRENDER_HEALTH = "https://fantasygmlab.onrender.com/_stcore/health"
-WEBHOOK_HEALTH = "https://fantasygm-lab-stripe-webhook.onrender.com/health"
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from modules.webhook_probe_config import webhook_probe_urls, probe_webhook
 STATIC_ROBOTS = "https://fantasygmlab.com/robots.txt"
 
 
@@ -115,7 +119,11 @@ def evaluate() -> dict[str, Any]:
     app = _get(APP_URL)
     health = _get(APP_HEALTH)
     onrender_health = _get(ONRENDER_HEALTH)
-    webhook_health = _get(WEBHOOK_HEALTH)
+    endpoints = webhook_probe_urls()
+    webhook_health = (probe_webhook(endpoints["health"]) if endpoints["status"] == "configured"
+                      else {"ok": False, "configuration": endpoints["status"]})
+    webhook_ready = (probe_webhook(endpoints["ready"]) if endpoints["status"] == "configured"
+                     else {"ok": False, "configuration": endpoints["status"]})
     robots = _get(STATIC_ROBOTS)
 
     gates = {
@@ -141,7 +149,6 @@ def evaluate() -> dict[str, Any]:
         "webhook_health_ok": bool(
             webhook_health.get("ok")
             and webhook_health.get("status") == 200
-            and "ok" in (webhook_health.get("sample") or "").casefold()
         ),
         # Render edge with no attached web service (Blueprint never applied).
         "webhook_no_server": (
@@ -197,6 +204,7 @@ def evaluate() -> dict[str, Any]:
             "app_health": health,
             "onrender_health": onrender_health,
             "webhook_health": webhook_health,
+            "webhook_ready": webhook_ready,
             "static_robots": robots,
             "dns": {
                 "apex": _dns("fantasygmlab.com"),

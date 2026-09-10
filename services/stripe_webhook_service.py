@@ -1,9 +1,9 @@
 """Backend-only Stripe webhook service for Founder Premium.
 
 Deployment topology (Render):
-  - Service name: fantasygm-lab-stripe-webhook
+  - Service name: fantasygmlab-stripe-webhook
   - Entrypoint: uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT
-  - Expected public host: https://fantasygm-lab-stripe-webhook.onrender.com
+  - Expected public host: https://fantasygmlab-stripe-webhook.onrender.com
   - GET  /health         — process liveness (no Stripe/Supabase dependency)
   - GET  /ready          — billing config readiness (no secret values)
   - POST /stripe/webhook — signed events matching the configured Stripe mode
@@ -21,7 +21,7 @@ from modules import stripe_billing, stripe_webhook
 
 
 SERVICE_NAME = "stripe-webhook"
-EXPECTED_PUBLIC_HOST = "https://fantasygm-lab-stripe-webhook.onrender.com"
+EXPECTED_PUBLIC_HOST = "https://fantasygmlab-stripe-webhook.onrender.com"
 
 app = FastAPI(
     title="FantasyGM Lab Stripe Webhook",
