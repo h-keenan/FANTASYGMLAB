@@ -63,7 +63,7 @@ The client does not grant Premium after checkout. Premium entitlement must still
 - Stripe webhook URL: `https://fantasygmlab-stripe-webhook.onrender.com/stripe/webhook`
 - Start command: `uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $PORT`
 
-If `/health` returns `x-render-routing: no-server`, the Render web service has not been created yet.
+If `/health` returns `x-render-routing: no-server`, verify the configured target and existing Render service association. Do not infer a missing service or create a duplicate from that response.
 See `docs/stripe-webhook-service-contract.md`.
 
 This service is the only place that receives `SUPABASE_SERVICE_ROLE_KEY`.
