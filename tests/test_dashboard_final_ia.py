@@ -15,7 +15,7 @@ def test_strategy_context_is_owned_by_dashboard_header_not_a_floating_pill():
     assert "dashboard_valuation_lens" in ui
     assert "Lens ·" not in ui
     assert 'key="dashboard_page_context"' in ui
-    assert "dg-dashboard-page-identity" in ui
+    assert "dg-dashboard-page-identity" not in ui
     assert "dg-dashboard-page-kicker" not in ui
     home = app.split("def render_home_dashboard(", 1)[1].split(
         "def render_platform_topbar(", 1

@@ -148,7 +148,7 @@ def test_quiet_day_copy_is_intentional_not_empty_boxes():
 def test_header_is_compact_document_flow_not_floating_badge():
     ui = (ROOT / "modules" / "valuation_archetype_ui.py").read_text(encoding="utf-8")
     styles = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(encoding="utf-8")
-    assert "dg-dashboard-page-identity" in ui
+    assert "dg-dashboard-page-identity" not in ui
     assert "Dashboard</div>" not in ui
     assert "dashboard_valuation_lens" in ui
     assert "position:absolute" not in ui

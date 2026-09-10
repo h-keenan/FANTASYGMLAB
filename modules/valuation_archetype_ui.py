@@ -135,21 +135,8 @@ def render_workspace_archetype_affordance(
     only widget that owns that field; the collapsed sidebar must not remount it.
     """
 
-    format_name = league_format_context.format_display_name(league_settings)
-    identity_bits = [
-        str(part).strip()
-        for part in (league_name, team_name, season)
-        if str(part or "").strip()
-    ]
-    meta = " · ".join(identity_bits)
+    # The executive shell owns league/team identity; this owns valuation only.
     with st.container(key="dashboard_page_context"):
-        if meta:
-            st.markdown(
-                "<div class='dg-dashboard-page-context'>"
-                f"<div class='dg-dashboard-page-identity'>{escape(meta)}</div>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
         render_evaluation_lens_control(
             key=key,
             label="Valuation lens",
