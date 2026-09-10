@@ -50,7 +50,7 @@ def test_public_probe_baseline_matches_post_168_main():
         encoding="utf-8"
     )
     # Probe baseline tracks latest paid-launch gate main (updated by subsequent ops PRs).
-    assert "81b37ee7d18453d9ac2ecffed1988687f21188b7" in source
+    assert "6d379dcd38f1a87f501dafa119dc58d0f0d6134a" in source
     assert "Does not create accounts" in source or "does not create accounts" in source.casefold()
 
 

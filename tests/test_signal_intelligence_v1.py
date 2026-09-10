@@ -450,7 +450,10 @@ def test_read_time_guard_ignores_other_league_timeline_before_refresh():
     assert not any(row.get("player_id") == "jeanty-a" for row in leaked)
 
 
-def test_alerts_timeline_a_to_b_to_a_and_rapid_switch():
+def test_alerts_timeline_a_to_b_to_a_and_rapid_switch(monkeypatch):
+    # This test owns its league-specific events. Unrelated current disk news
+    # can mention the same player in any league and is not session leakage.
+    monkeypatch.setattr(news, "load_cached_news_pool", lambda: [])
     from unittest.mock import patch
 
     import app

@@ -1,3 +1,5 @@
+> HISTORICAL EVIDENCE: this report records past probes of a guessed hostname and past topology assumptions. It is no longer deployment or runbook authority. Do not execute its service-creation instructions. See [current webhook operations](webhook-operational-authority.md).
+
 # Founder Beta Launch Go / No-Go Gate v2
 
 Final paid Founder Beta intake gate. Re-runs unresolved **P0** items from

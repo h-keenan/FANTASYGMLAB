@@ -1,3 +1,5 @@
+> HISTORICAL EVIDENCE: this report records past probes of a guessed hostname and past topology assumptions. It is no longer deployment or runbook authority. Do not execute its service-creation instructions. See [current webhook operations](webhook-operational-authority.md).
+
 # Pre-launch production release gate (post-#270)
 
 | Field | Value |

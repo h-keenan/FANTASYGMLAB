@@ -27,7 +27,7 @@ if str(ROOT) not in sys.path:
 from scripts.verify_production_domain_cutover import evaluate as evaluate_domain  # noqa: E402
 
 
-WEBHOOK_BASE = "https://fantasygm-lab-stripe-webhook.onrender.com"
+from modules.webhook_probe_config import webhook_probe_urls, probe_webhook
 APP_HOST = "app.fantasygmlab.com"
 
 
@@ -76,19 +76,19 @@ def _http(url: str, *, method: str = "GET", data: bytes | None = None) -> dict[s
 
 def evaluate() -> dict[str, Any]:
     domain = evaluate_domain()
-    health = _http(f"{WEBHOOK_BASE}/health")
-    root = _http(f"{WEBHOOK_BASE}/")
-    unsigned = _http(
-        f"{WEBHOOK_BASE}/stripe/webhook",
-        method="POST",
-        data=b"{}",
-    )
+    endpoints = webhook_probe_urls()
+    def check(kind, method="GET"):
+        return (probe_webhook(endpoints[kind], method=method)
+                if endpoints["status"] == "configured" else {"ok": False, "configuration": endpoints["status"]})
+    health = check("health")
+    ready = check("ready")
+    root = check("root")
+    unsigned = check("webhook", "POST")
     dns_app = _dns_cname(APP_HOST)
 
     webhook_live = bool(
         health.get("ok")
         and health.get("status") == 200
-        and "ok" in (health.get("sample") or "").casefold()
     )
     # After deploy: unsigned POST must be 4xx (signature), never 404 / no-server.
     webhook_rejects_unsigned = bool(
@@ -156,32 +156,17 @@ def evaluate() -> dict[str, Any]:
             ],
         },
         "P0_stripe_webhook": {
-            "cleared": webhook_live and webhook_rejects_unsigned,
-            "root_cause": (
-                "PASS"
-                if webhook_live and webhook_rejects_unsigned
-                else (
-                    "x-render-routing: no-server — Blueprint webhook web service never "
-                    "created under fantasygm-lab-stripe-webhook (code routes OK locally)"
-                    if webhook_no_server
-                    else "Webhook host responds but health/signature gates failed"
-                )
-            ),
-            "classification": "B_wrong_or_missing_Render_service"
-            if webhook_no_server
-            else ("OK" if webhook_live else "unknown"),
+            "cleared": webhook_live and webhook_rejects_unsigned and ready.get("ok", False),
+            "root_cause": (endpoints["status"] if endpoints["status"] != "configured"
+                           else "Check liveness, billing readiness and unsigned signature rejection separately"),
+            "classification": "configuration_or_probe_evidence",
             "owner": "founder_control_plane",
-            "evidence": {"health": health, "root": root, "unsigned_post": unsigned},
+            "evidence": {"health": health, "ready": ready, "root": root, "unsigned_post": unsigned},
             "founder_action": [
-                "Render Blueprint Apply → create fantasygm-lab-stripe-webhook",
-                "Or New Web Service: uvicorn services.stripe_webhook_service:app "
-                "--host 0.0.0.0 --port $PORT; healthCheckPath=/health",
-                "Set env: STRIPE_SECRET_KEY=sk_test_…, STRIPE_WEBHOOK_SECRET=whsec_…, "
-                "SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (webhook only)",
-                "Stripe Dashboard Test Mode webhook → "
-                "https://fantasygm-lab-stripe-webhook.onrender.com/stripe/webhook",
-                "Re-run: python scripts/stripe_webhook_harness.py --base-url "
-                "https://fantasygm-lab-stripe-webhook.onrender.com",
+                "Verify the existing fantasygmlab-stripe-webhook service; do not create a duplicate via Blueprint sync.",
+                "Set DYNASTYGM_WEBHOOK_HEALTH_URL to the verified public /health endpoint.",
+                "Verify /health process liveness and /ready billing readiness independently.",
+                "Complete Stripe Test Mode lifecycle verification; do not enable live billing.",
             ],
         },
         "P0_authenticated_restore": {

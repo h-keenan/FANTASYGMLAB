@@ -1,3 +1,5 @@
+> Current authority: [webhook operations](webhook-operational-authority.md). Historical guessed-host 404 observations below do not describe the current live service. Blueprint association must be verified before any sync; do not create a duplicate.
+
 # Production Domain Cutover
 
 Ops cutover for the topology established by PR #209:
@@ -30,6 +32,7 @@ Re-measured **2026-08-18** during Founder Beta launch-ops closure. Master Ops ga
 | `https://www.fantasygmlab.com/` | **HTTP 200** Streamlit HTML (same app as `app.`) |
 | `https://www.fantasygmlab.com/_stcore/health` | **200** `ok` |
 | `https://fantasygmlab.onrender.com/_stcore/health` | **200** `ok` |
+<!-- HISTORICAL EVIDENCE: old guessed host; not the current Render service. -->
 | `https://fantasygm-lab-stripe-webhook.onrender.com/health` | **404** `x-render-routing: no-server` |
 | Render API / CLI from agent | **Unavailable** (`RENDER_API_KEY` unset) |
 | Supabase Auth redirect API | **Not exposed** via MCP — dashboard-only |
@@ -59,7 +62,7 @@ Auth/session storage lives **only** on `app.fantasygmlab.com`. Static landing ne
 | --- | --- | --- | --- |
 | `fantasygm-lab` | Python web | `streamlit run app.py …` | `/_stcore/health` |
 | `fantasygm-lab-marketing` | Static web | `staticPublishPath: ./static/landing` | n/a (static) |
-| `fantasygm-lab-stripe-webhook` | Python web | uvicorn webhook | `/health` |
+| `fantasygmlab-stripe-webhook` | Python web | uvicorn webhook | `/health` |
 
 ### Always-on requirement
 
@@ -140,7 +143,7 @@ Point checkout/portal returns at the **app** host, e.g.:
 https://app.fantasygmlab.com/?page=premium
 ```
 
-Do not enable live billing in this cutover. Webhook service host remains `fantasygm-lab-stripe-webhook.onrender.com`.
+Do not enable live billing in this cutover. Webhook service host remains `fantasygmlab-stripe-webhook.onrender.com`.
 
 ---
 

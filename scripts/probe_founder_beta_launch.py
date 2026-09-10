@@ -22,7 +22,10 @@ def classify(report: dict) -> dict:
     gates = report.get("gates") or {}
     webhook_ok = bool(gates.get("webhook_health_ok"))
     webhook_missing = bool(gates.get("webhook_no_server"))
-    if webhook_ok:
+    configuration = (report.get("probes", {}).get("webhook_health", {}).get("configuration"))
+    if configuration:
+        webhook_state = configuration
+    elif webhook_ok:
         webhook_state = "deployed_healthy"
     elif webhook_missing:
         webhook_state = "blueprint_host_no_server"

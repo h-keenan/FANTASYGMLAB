@@ -1,3 +1,5 @@
+> Current authority: [webhook operations](webhook-operational-authority.md). Historical guessed-host 404 observations below do not describe the current live service. Blueprint association must be verified before any sync; do not create a duplicate.
+
 # P0 launch blocker clearance (post-#271)
 
 | Field | Value |
@@ -13,7 +15,7 @@
 
 **NO-GO**
 
-All four #271 P0 blockers remain **uncleared**. Root causes are **founder control-plane** (DNS / Render Blueprint / Supabase dashboard / credentials), not missing application routes.
+Historical assessment at the time: all four #271 P0 blockers remained **uncleared**. Root causes are **founder control-plane** (DNS / Render Blueprint / Supabase dashboard / credentials), not missing application routes.
 
 Guest/core product on `https://fantasygmlab.onrender.com` remains usable (reconfirmed this pass).
 
@@ -29,7 +31,7 @@ Re-probe: `python scripts/verify_p0_launch_blockers.py` → **P0 NOT CLEARED**.
 | `www.fantasygmlab.com` | same static **or** redirect → apex | Canonical marketing |
 | `app.fantasygmlab.com` | `fantasygm-lab` (Streamlit, always-on) | **Canonical product + auth + billing returns** |
 | `fantasygmlab.onrender.com` | `fantasygm-lab` default host | Internal; do not market |
-| `fantasygm-lab-stripe-webhook.onrender.com` | `fantasygm-lab-stripe-webhook` (uvicorn) | Test-mode Stripe webhook only |
+| `fantasygmlab-stripe-webhook.onrender.com` | `fantasygmlab-stripe-webhook` (uvicorn) | Test-mode Stripe webhook only |
 
 `APP_BASE_URL` Blueprint default: `https://app.fantasygmlab.com`.
 
@@ -57,7 +59,7 @@ Re-probe: `python scripts/verify_p0_launch_blockers.py` → **P0 NOT CLEARED**.
 
 ### Exact founder steps (domain)
 
-1. Render → **Blueprint** → Apply `render.yaml` (creates marketing + webhook if missing).
+1. Historical topology plan only: do not apply the unresolved Blueprint. Verify existing service association and approved domain ownership first.
 2. **fantasygm-lab** (Streamlit): Custom Domains → add **`app.fantasygmlab.com` only**; remove apex/www if present.
 3. **fantasygm-lab-marketing**: Custom Domains → add **`fantasygmlab.com`** + **`www.fantasygmlab.com`**.
 4. Porkbun: replace `app` CNAME `uixie.porkbun.com` with Render’s CNAME target for Streamlit.
@@ -108,11 +110,11 @@ Project: **DynastyGM** (`ejbwbnlelwvdyabyptqn`) — from cutover docs.
 
 ### Exact founder steps (webhook)
 
-1. Create/sync Render web service `fantasygm-lab-stripe-webhook` from Blueprint **or** manually with start command from `render.yaml`.
+Verify the existing `fantasygmlab-stripe-webhook` service; do not create or sync a replacement from the unresolved Blueprint. See [current webhook operations](webhook-operational-authority.md).
 2. Env (webhook only): `STRIPE_SECRET_KEY=sk_test_…`, `STRIPE_WEBHOOK_SECRET=whsec_…`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 3. Ensure Streamlit does **not** have `SUPABASE_SERVICE_ROLE_KEY`.
-4. Stripe Test Mode endpoint → `https://fantasygm-lab-stripe-webhook.onrender.com/stripe/webhook`.
-5. `python scripts/stripe_webhook_harness.py --base-url https://fantasygm-lab-stripe-webhook.onrender.com`  
+4. Stripe Test Mode endpoint → `https://fantasygmlab-stripe-webhook.onrender.com/stripe/webhook`.
+5. `python scripts/stripe_webhook_harness.py --base-url https://fantasygmlab-stripe-webhook.onrender.com`
    Success: `/health` 200; unsigned POST **4xx** (not 404).
 
 ---
@@ -197,22 +199,22 @@ See [`iphone-safari-manual-gate.md`](iphone-safari-manual-gate.md). **Not claime
 
 ### P0 (public launch blockers) — still open
 
-1. `app.fantasygmlab.com` Porkbun 404  
-2. Apex/www Streamlit (marketing cutover incomplete)  
-3. Stripe webhook `no-server` 404  
+1. `app.fantasygmlab.com` Porkbun 404
+2. Apex/www Streamlit (marketing cutover incomplete)
+3. Stripe webhook `no-server` 404
 4. Authenticated Free/Premium restore unproven (blocked on 1 + credentials)
 
 ### P1 (Founder Beta known risk)
 
-1. Analytics/Founder Ops host-local JSONL (class B)  
-2. iPhone Safari manual  
-3. League-switch auth matrix incomplete  
-4. News live pool partial / fixture-backed  
+1. Analytics/Founder Ops host-local JSONL (class B)
+2. iPhone Safari manual
+3. League-switch auth matrix incomplete
+4. News live pool partial / fixture-backed
 
 ### P2
 
-1. Hidden duplicate GM orb DOM node  
-2. GitHub Actions billing flake  
+1. Hidden duplicate GM orb DOM node
+2. GitHub Actions billing flake
 
 **Billing disabled** is **not** P0 for unpaid public launch.
 
@@ -220,25 +222,25 @@ See [`iphone-safari-manual-gate.md`](iphone-safari-manual-gate.md). **Not claime
 
 ## 18. Required answers
 
-1. Does `app.` resolve to product? **No** (Porkbun 404).  
-2. Apex/www serve? **Streamlit** (should be marketing).  
-3. HTTPS on intended hosts? **onrender/apex/www yes**; `app.` TLS to parking only.  
-4. Supabase auth URLs correct? **Unknown live; expected values documented — founder must confirm.**  
-5. Auth Free login? **Unproven.**  
-6. Auth session restore? **Unproven.**  
-7. Auth league restore? **Unproven.**  
-8. A→B→A no leakage? **Unproven** (auth).  
-9. Premium entitlement proven? **No** (billing off; no fixture).  
-10. `/health` 200? **No** (no-server).  
-11. `/stripe/webhook` reject bad sig? **Code yes locally; prod 404.**  
-12. Billing mode? **Disabled / not live.**  
-13. Launch safe with billing state? **Yes for unpaid**; not for paid checkout.  
-14. Prod analytics written? **Unproven.**  
-15. Founder Ops read them? **Unproven.**  
-16. JSONL enough for Founder Beta? **B — yes with single instance + explicit ephemeral limit.**  
-17. Sensitive fields excluded in prod proof? **Contract yes; prod unproven.**  
-18. iPhone Safari pass? **No — manual required.**  
-19. Remaining issues? See §17.  
+1. Does `app.` resolve to product? **No** (Porkbun 404).
+2. Apex/www serve? **Streamlit** (should be marketing).
+3. HTTPS on intended hosts? **onrender/apex/www yes**; `app.` TLS to parking only.
+4. Supabase auth URLs correct? **Unknown live; expected values documented — founder must confirm.**
+5. Auth Free login? **Unproven.**
+6. Auth session restore? **Unproven.**
+7. Auth league restore? **Unproven.**
+8. A→B→A no leakage? **Unproven** (auth).
+9. Premium entitlement proven? **No** (billing off; no fixture).
+10. `/health` 200? **No** (no-server).
+11. `/stripe/webhook` reject bad sig? **Code yes locally; prod 404.**
+12. Billing mode? **Disabled / not live.**
+13. Launch safe with billing state? **Yes for unpaid**; not for paid checkout.
+14. Prod analytics written? **Unproven.**
+15. Founder Ops read them? **Unproven.**
+16. JSONL enough for Founder Beta? **B — yes with single instance + explicit ephemeral limit.**
+17. Sensitive fields excluded in prod proof? **Contract yes; prod unproven.**
+18. iPhone Safari pass? **No — manual required.**
+19. Remaining issues? See §17.
 20. Exact founder action before launch? Complete domain cutover §2–3, webhook §5, Supabase §4, auth matrix §8, Founder Ops analytics confirm §10–12, iPhone checklist, re-run `verify_p0_launch_blockers.py` → **P0 CLEARED**, then re-gate for GO/CONDITIONAL GO.
 
 ### Code vs control-plane
@@ -247,6 +249,6 @@ See [`iphone-safari-manual-gate.md`](iphone-safari-manual-gate.md). **Not claime
 | --- | --- |
 | app 404 | Control-plane DNS + Render domain |
 | apex/www | Control-plane Blueprint + domains |
-| webhook 404 | Control-plane create webhook service |
+| historical guessed-host webhook 404 | Superseded; freshly verify the existing service |
 | auth unproven | Control-plane + founder manual test |
 | This PR | Docs + probe script surfacing `x-render-routing: no-server` / Porkbun parking |

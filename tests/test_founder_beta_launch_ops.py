@@ -69,12 +69,13 @@ def test_webhook_service_rejects_unsigned_and_live_events():
     assert "signature" in unsigned.json()["error"].casefold()
 
 
-def test_live_app_health_and_webhook_classification():
+def test_live_app_health_and_webhook_classification(monkeypatch):
+    monkeypatch.delenv("DYNASTYGM_WEBHOOK_HEALTH_URL", raising=False)
     report = evaluate()
     summary = classify(report)
     assert summary["app_health_ok"] is True
     assert summary["app_host"] == "streamlit"
-    assert summary["webhook_state"] in {"deployed_healthy", "blueprint_host_no_server"}
+    assert summary["webhook_state"] == "not_configured"
     # Marketing cutover is Ops, not a code gate. Record the live shape.
     assert "apex_serves_streamlit" in summary
     assert "www_serves_streamlit" in summary
