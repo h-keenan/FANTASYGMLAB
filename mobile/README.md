@@ -53,14 +53,15 @@ mobile/
       LoginScreen.tsx
       HomeScreen.tsx         entitlement + saved leagues (reads Supabase
                               saved_leagues directly, same RLS as the web app)
-      LeagueDetailScreen.tsx  teams/rosters for one league
+      LeagueDetailScreen.tsx  teams for one league (tap a team for its roster)
+      TeamRosterScreen.tsx    one team's players (name, position, status)
 ```
 
 ## What's not built yet
 
-- Player-level data (names, positions, values) — needs a `/v1/players`
-  endpoint added to the backend; current screens only show roster player
-  *counts*, not fabricated player details.
+- Player *values*/rankings — `/v1/players` returns Sleeper's own fields only
+  (name, position, team, status, injury). No valuation/ranking engine is
+  wired up yet; that needs its own endpoint wrapping `modules/rankings.py`.
 - Rankings, Trade Hub, Waivers, News — not started. These need real backend
   endpoints wrapping the existing `modules/` engines; nothing here invents
   placeholder football data ahead of that.
