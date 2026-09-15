@@ -1,13 +1,15 @@
 default_platform(:ios)
 
+require "json"
+
 # Both platforms use Expo's "Continuous Native Generation": `ios/` and
 # `android/` are never committed (see mobile/.gitignore) — every build
 # regenerates them fresh from app.json + package.json via `expo prebuild`.
 # That keeps signing config and native project state from drifting apart.
 
-def ensure_native_project(platform)
+def ensure_native_project(platform, force: false)
   dir = platform == :ios ? "../ios" : "../android"
-  unless Dir.exist?(dir)
+  if force || !Dir.exist?(dir)
     Dir.chdir("..") { sh("npx expo prebuild --platform #{platform} --clean --non-interactive") }
   end
 end
@@ -111,7 +113,7 @@ platform :ios do
 
   desc "Build and upload a TestFlight build"
   lane :beta do
-    ensure_native_project(:ios)
+    ensure_native_project(:ios, force: true)
     api_key = asc_api_key
     match(type: "appstore", api_key: api_key, readonly: true)
     # expo prebuild's generated Xcode project defaults to automatic signing,
@@ -138,10 +140,31 @@ platform :ios do
   end
 end
 
+# app.json has no versionCode (expo prebuild defaults to 1 every time,
+# since android/ is regenerated fresh and nothing here persists it) — Play
+# rejects re-uploading a version code it's already seen, so bump it past
+# whatever Play has on record before each build.
+def bump_android_version_code
+  existing_codes = google_play_track_version_codes(
+    package_name: ENV.fetch("FGL_BUNDLE_ID"),
+    track: "internal",
+    json_key: ENV.fetch("GOOGLE_PLAY_JSON_KEY_PATH"),
+  )
+  next_code = (existing_codes.max || 0) + 1
+
+  app_json_path = "../app.json"
+  config = JSON.parse(File.read(app_json_path))
+  config["expo"]["android"] ||= {}
+  config["expo"]["android"]["versionCode"] = next_code
+  File.write(app_json_path, JSON.pretty_generate(config) + "\n")
+  UI.success("Set android.versionCode to #{next_code} (Play's highest known: #{existing_codes.max || 'none'})")
+end
+
 platform :android do
   desc "Build and upload a Play internal-testing build"
   lane :beta do
-    ensure_native_project(:android)
+    bump_android_version_code
+    ensure_native_project(:android, force: true)
     configure_android_release_signing
     gradle(
       project_dir: "android",
