@@ -1,6 +1,12 @@
 source "https://rubygems.org"
 
 gem "fastlane"
+# expo prebuild shells out to `pod install`. Running under `bundle exec`
+# means Bundler intercepts that shell-out too — if cocoapods isn't in this
+# Gemfile, `pod` fails with "cocoapods is not currently included in the
+# bundle" even when expo's own auto-install step just installed it as a
+# bare gem moments earlier.
+gem "cocoapods", ">= 1.15"
 
 plugins_path = File.join(File.dirname(__FILE__), "fastlane", "Pluginfile")
 eval_gemfile(plugins_path) if File.exist?(plugins_path)
