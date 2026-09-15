@@ -144,3 +144,69 @@ def test_league_endpoints_wrap_sleeper_module(monkeypatch):
             rosters = client.get("/v1/leagues/abc/rosters", headers={"Authorization": "Bearer good-token"})
         assert rosters.status_code == 200
         assert rosters.json()["rosters"] == [{"roster_id": 1}]
+
+
+def _fake_players_dataset():
+    return {
+        "1001": {
+            "full_name": "Test Player",
+            "first_name": "Test",
+            "last_name": "Player",
+            "position": "WR",
+            "team": "KC",
+            "status": "Active",
+            "injury_status": None,
+            "age": 26,
+            "number": 10,
+            "years_exp": 4,
+            "espn_id": "should-not-leak",
+            "sportradar_id": "should-not-leak",
+        },
+    }
+
+
+def test_players_endpoint_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/players?ids=1001")
+    assert response.status_code == 401
+
+
+def test_players_endpoint_projects_minimal_fields(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_players", return_value=_fake_players_dataset()):
+            response = client.get(
+                "/v1/players?ids=1001,9999",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body["players"].keys()) == {"1001"}
+    player = body["players"]["1001"]
+    assert player["full_name"] == "Test Player"
+    assert player["position"] == "WR"
+    assert "espn_id" not in player
+    assert "sportradar_id" not in player
+
+
+def test_players_endpoint_rejects_empty_or_oversized_id_list(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        empty = client.get("/v1/players?ids=", headers={"Authorization": "Bearer good-token"})
+        assert empty.status_code == 422
+
+        too_many_ids = ",".join(str(i) for i in range(301))
+        oversized = client.get(
+            f"/v1/players?ids={too_many_ids}",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        assert oversized.status_code == 422

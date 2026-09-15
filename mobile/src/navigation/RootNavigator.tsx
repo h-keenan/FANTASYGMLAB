@@ -7,10 +7,12 @@ import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import LeagueDetailScreen from '../screens/LeagueDetailScreen';
+import TeamRosterScreen from '../screens/TeamRosterScreen';
 
 export type RootStackParamList = {
   Home: undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
+  TeamRoster: { ownerName: string; playerIds: string[] };
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -37,6 +39,7 @@ export default function RootNavigator() {
             options={{ title: 'FantasyGM Lab' }}
           />
           <AppStack.Screen name="LeagueDetail" component={LeagueDetailScreen} />
+          <AppStack.Screen name="TeamRoster" component={TeamRosterScreen} />
         </AppStack.Navigator>
       ) : (
         <AuthStack.Navigator screenOptions={{ headerShown: false }}>

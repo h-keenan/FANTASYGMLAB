@@ -71,6 +71,28 @@ export interface LeagueRostersResponse {
   rosters: Array<Record<string, unknown>>;
 }
 
+export interface PlayerSummary {
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  position: string | null;
+  team: string | null;
+  status: string | null;
+  injury_status: string | null;
+  age: number | null;
+  number: number | null;
+  years_exp: number | null;
+}
+
+export interface PlayersResponse {
+  ok: true;
+  players: Record<string, PlayerSummary>;
+}
+
+// Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
+// large roster/league fetch can't silently exceed it.
+const MAX_PLAYER_IDS_PER_REQUEST = 300;
+
 export const api = {
   getMe: () => authorizedFetch<MeResponse>('/v1/me'),
   getLeague: (leagueId: string) =>
@@ -83,4 +105,24 @@ export const api = {
     authorizedFetch<LeagueRostersResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rosters`,
     ),
+  getPlayers: async (playerIds: string[]): Promise<Record<string, PlayerSummary>> => {
+    const uniqueIds = [...new Set(playerIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return {};
+
+    const batches: string[][] = [];
+    for (let i = 0; i < uniqueIds.length; i += MAX_PLAYER_IDS_PER_REQUEST) {
+      batches.push(uniqueIds.slice(i, i + MAX_PLAYER_IDS_PER_REQUEST));
+    }
+
+    const results = await Promise.all(
+      batches.map((batch) =>
+        authorizedFetch<PlayersResponse>(`/v1/players?ids=${batch.join(',')}`),
+      ),
+    );
+
+    return results.reduce<Record<string, PlayerSummary>>((acc, result) => {
+      Object.assign(acc, result.players);
+      return acc;
+    }, {});
+  },
 };

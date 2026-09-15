@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { api } from '../lib/api';
@@ -10,7 +17,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'LeagueDetail'>;
 interface TeamRow {
   rosterId: number | string;
   ownerName: string;
-  playerCount: number;
+  playerIds: string[];
 }
 
 export default function LeagueDetailScreen({ route, navigation }: Props) {
@@ -49,7 +56,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           return {
             rosterId: String(roster.roster_id ?? ''),
             ownerName: usersById.get(ownerId) ?? 'Unclaimed team',
-            playerCount: players.length,
+            playerIds: players.map(String),
           };
         });
         setTeams(rows);
@@ -85,35 +92,29 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.note}>
-        Team rosters shown by player count only — full player-level detail
-        (names, positions, values) needs a players endpoint not built yet.
-      </Text>
-      <FlatList
-        data={teams}
-        keyExtractor={(item) => String(item.rosterId)}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={styles.owner}>{item.ownerName}</Text>
-            <Text style={styles.count}>{item.playerCount} players</Text>
-          </View>
-        )}
-      />
-    </View>
+    <FlatList
+      data={teams}
+      keyExtractor={(item) => String(item.rosterId)}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() =>
+            navigation.navigate('TeamRoster', {
+              ownerName: item.ownerName,
+              playerIds: item.playerIds,
+            })
+          }
+        >
+          <Text style={styles.owner}>{item.ownerName}</Text>
+          <Text style={styles.count}>{item.playerIds.length} players</Text>
+        </TouchableOpacity>
+      )}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  note: {
-    fontSize: 12,
-    color: '#6b7280',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#f9fafb',
-  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

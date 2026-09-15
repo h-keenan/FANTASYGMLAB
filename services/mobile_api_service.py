@@ -9,6 +9,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}                — Sleeper league metadata
   - GET  /v1/leagues/{id}/users          — Sleeper league members
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
+  - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -186,3 +187,49 @@ def get_league_users(league_id: str, _user: dict[str, Any] = Depends(require_use
 @app.get("/v1/leagues/{league_id}/rosters")
 def get_league_rosters(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     return {"ok": True, "rosters": sleeper.get_rosters(league_id)}
+
+
+MAX_PLAYER_IDS_PER_REQUEST = 300
+
+# Minimal, display-safe projection of Sleeper's player object — not the raw
+# record (which also carries a dozen third-party IDs, scouting metadata,
+# etc. nothing in this app needs).
+_PLAYER_FIELDS = (
+    "full_name",
+    "first_name",
+    "last_name",
+    "position",
+    "team",
+    "status",
+    "injury_status",
+    "age",
+    "number",
+    "years_exp",
+)
+
+
+def _project_player(player: dict[str, Any]) -> dict[str, Any]:
+    return {field: player.get(field) for field in _PLAYER_FIELDS}
+
+
+@app.get("/v1/players")
+def get_players(
+    ids: str = "",
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    requested_ids = [part.strip() for part in ids.split(",") if part.strip()]
+    if not requested_ids:
+        raise HTTPException(status_code=422, detail="Provide at least one id in ?ids=.")
+    if len(requested_ids) > MAX_PLAYER_IDS_PER_REQUEST:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Too many ids — max {MAX_PLAYER_IDS_PER_REQUEST} per request.",
+        )
+
+    all_players = sleeper.get_players()
+    players = {
+        player_id: _project_player(all_players[player_id])
+        for player_id in requested_ids
+        if player_id in all_players
+    }
+    return {"ok": True, "players": players}
