@@ -9,12 +9,14 @@ import HomeScreen from '../screens/HomeScreen';
 import LeagueDetailScreen from '../screens/LeagueDetailScreen';
 import TeamRosterScreen from '../screens/TeamRosterScreen';
 import PaywallScreen from '../screens/PaywallScreen';
+import TradeCalculatorScreen from '../screens/TradeCalculatorScreen';
 
 export type RootStackParamList = {
   Home: undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
   TeamRoster: { ownerName: string; playerIds: string[] };
   Paywall: undefined;
+  TradeCalculator: { leagueId: string; leagueName: string };
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -42,6 +44,11 @@ export default function RootNavigator() {
           />
           <AppStack.Screen name="LeagueDetail" component={LeagueDetailScreen} />
           <AppStack.Screen name="TeamRoster" component={TeamRosterScreen} />
+          <AppStack.Screen
+            name="TradeCalculator"
+            component={TradeCalculatorScreen}
+            options={{ title: 'Trade Calculator' }}
+          />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}
