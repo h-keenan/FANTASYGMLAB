@@ -22,26 +22,17 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    navigation.setOptions({
-      title: leagueName,
-      headerRight: () => (
-        <View style={{ flexDirection: 'row', gap: 16 }}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Players', { leagueId, leagueName })}
-            hitSlop={8}
-          >
-            <Text style={styles.headerAction}>Players</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('TradeCalculator', { leagueId, leagueName })}
-            hitSlop={8}
-          >
-            <Text style={styles.headerAction}>Trade Calc</Text>
-          </TouchableOpacity>
-        </View>
-      ),
-    });
-  }, [leagueId, leagueName, navigation]);
+    navigation.setOptions({ title: leagueName });
+  }, [leagueName, navigation]);
+
+  const tools: Array<{ label: string; onPress: () => void }> = [
+    { label: 'Players', onPress: () => navigation.navigate('Players', { leagueId, leagueName }) },
+    { label: 'Waivers', onPress: () => navigation.navigate('Waivers', { leagueId, leagueName }) },
+    {
+      label: 'Trade Calc',
+      onPress: () => navigation.navigate('TradeCalculator', { leagueId, leagueName }),
+    },
+  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +101,15 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       contentContainerStyle={styles.listContent}
       data={teams}
       keyExtractor={(item) => String(item.rosterId)}
+      ListHeaderComponent={
+        <View style={styles.toolRow}>
+          {tools.map((tool) => (
+            <TouchableOpacity key={tool.label} style={styles.toolChip} onPress={tool.onPress}>
+              <Text style={styles.toolChipText}>{tool.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      }
       renderItem={({ item }) => (
         <AnimatedCard
           style={styles.card}
@@ -161,5 +161,17 @@ const styles = StyleSheet.create({
   },
   count: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   error: { color: colors.danger, textAlign: 'center' },
-  headerAction: { color: colors.accent, fontSize: 15, fontWeight: '600' },
+  toolRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  toolChip: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  toolChipText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });
