@@ -29,6 +29,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const tools: Array<{ label: string; onPress: () => void }> = [
     { label: 'Alerts', onPress: () => navigation.navigate('Alerts', { leagueId, leagueName }) },
     { label: 'Players', onPress: () => navigation.navigate('Players', { leagueId, leagueName }) },
+    { label: 'GM Targets', onPress: () => navigation.navigate('GmTargets', { leagueId, leagueName }) },
     { label: 'Waivers', onPress: () => navigation.navigate('Waivers', { leagueId, leagueName }) },
     {
       label: 'Trade Calc',

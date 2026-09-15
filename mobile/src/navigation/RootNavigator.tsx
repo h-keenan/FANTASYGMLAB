@@ -22,6 +22,7 @@ import WaiversScreen from '../screens/WaiversScreen';
 import TradeAnalyzerScreen from '../screens/TradeAnalyzerScreen';
 import RecapScreen from '../screens/RecapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
+import GmTargetsScreen from '../screens/GmTargetsScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -33,7 +34,8 @@ export type RootStackParamList = {
   More: undefined;
   LegalPage: { pageKey: string };
   Players: { leagueId: string; leagueName: string };
-  PlayerDetail: { player: RankedPlayer };
+  PlayerDetail: { player: RankedPlayer; leagueId: string; leagueName: string };
+  GmTargets: { leagueId: string; leagueName: string };
   Waivers: { leagueId: string; leagueName: string };
   TradeAnalyzer: { leagueId: string; leagueName: string };
   Recap: { leagueId: string; leagueName: string };
@@ -91,6 +93,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="TradeAnalyzer" component={TradeAnalyzerScreen} />
           <AppStack.Screen name="Recap" component={RecapScreen} />
           <AppStack.Screen name="Alerts" component={AlertsScreen} />
+          <AppStack.Screen name="GmTargets" component={GmTargetsScreen} />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}

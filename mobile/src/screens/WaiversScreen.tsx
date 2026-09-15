@@ -108,7 +108,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
           renderItem={({ item, index }) => (
             <AnimatedCard
               style={styles.card}
-              onPress={() => navigation.navigate('PlayerDetail', { player: item })}
+              onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
             >
               <View style={styles.rankBadge}>
                 <Text style={styles.rankText}>{index + 1}</Text>
