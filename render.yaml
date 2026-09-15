@@ -107,3 +107,34 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+  # RevenueCat webhook -> Supabase entitlement sync (mobile IAP + RC Billing
+  # web). Not deployed until Founder Ops syncs this Blueprint entry and
+  # selects a paid always-on instance type. Run
+  # docs/supabase_revenuecat_billing.sql first, then point the RevenueCat
+  # project's webhook at https://fantasygm-lab-revenuecat-webhook.onrender.com/revenuecat/webhook
+  # with an Authorization header value matching REVENUECAT_WEBHOOK_AUTH_TOKEN.
+  # See services/revenuecat_webhook_service.py.
+  - type: web
+    name: fantasygm-lab-revenuecat-webhook
+    branch: main
+    runtime: python
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.revenuecat_webhook_service:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: REVENUECAT_SECRET_KEY
+        sync: false
+      - key: REVENUECAT_PROJECT_ID
+        sync: false
+      - key: REVENUECAT_WEBHOOK_AUTH_TOKEN
+        sync: false
+      - key: REVENUECAT_BILLING_MODE
+        sync: false
+        # test until live-billing review; must match SANDBOX vs PRODUCTION events
