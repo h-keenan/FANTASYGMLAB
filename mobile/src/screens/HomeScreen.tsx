@@ -10,11 +10,14 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 import AnimatedCard from '../components/AnimatedCard';
+import GlassPanel from '../components/GlassPanel';
 import { api, type MeResponse } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { colors, radii, spacing } from '../theme';
+import { colors, gradients, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -79,14 +82,15 @@ export default function HomeScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <LinearGradient colors={gradients.hero} style={styles.heroGradient} />
+      <GlassPanel style={styles.header}>
         <View>
           <Text style={styles.email}>{session?.user.email}</Text>
           {me ? (
@@ -112,7 +116,7 @@ export default function HomeScreen({ navigation }: Props) {
         <TouchableOpacity onPress={() => void signOut()} hitSlop={8}>
           <Text style={styles.signOut}>Sign out</Text>
         </TouchableOpacity>
-      </View>
+      </GlassPanel>
 
       {meError ? (
         <Text style={styles.error}>Couldn't load your account: {meError}</Text>
@@ -164,11 +168,14 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  heroGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 220 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.xl,
+    marginHorizontal: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     marginBottom: spacing.lg,
   },
   email: { fontSize: 17, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.xs },
@@ -177,13 +184,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radii.pill,
-    backgroundColor: colors.border,
+    backgroundColor: colors.accentMuted,
   },
   entitlementPillPremium: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(245,197,66,0.16)',
   },
   entitlementText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  entitlementTextPremium: { color: '#92400E' },
+  entitlementTextPremium: { color: '#F5C542' },
   signOut: { color: colors.danger, fontSize: 14, fontWeight: '500' },
   sectionTitle: {
     fontSize: 13,

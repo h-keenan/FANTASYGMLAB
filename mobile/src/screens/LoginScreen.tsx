@@ -9,8 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAuth } from '../context/AuthContext';
+import { colors, gradients, radii, spacing, typography } from '../theme';
 
 export default function LoginScreen() {
   const { signIn, signUp } = useAuth();
@@ -38,96 +40,106 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <Text style={styles.title}>FantasyGM Lab</Text>
-      <Text style={styles.subtitle}>
-        {mode === 'signIn' ? 'Sign in to your account' : 'Create an account'}
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={submit}
-        disabled={submitting || !email || !password}
+    <View style={styles.root}>
+      <LinearGradient colors={gradients.hero} style={styles.hero} />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {submitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>
-            {mode === 'signIn' ? 'Sign in' : 'Sign up'}
-          </Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
-      >
-        <Text style={styles.switchMode}>
-          {mode === 'signIn'
-            ? "Don't have an account? Sign up"
-            : 'Already have an account? Sign in'}
+        <Text style={styles.title}>FantasyGM Lab</Text>
+        <Text style={styles.subtitle}>
+          {mode === 'signIn' ? 'Sign in to your account' : 'Create an account'}
         </Text>
-      </TouchableOpacity>
-    </KeyboardAvoidingView>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor={colors.textTertiary}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor={colors.textTertiary}
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+        <TouchableOpacity
+          style={[styles.button, (submitting || !email || !password) && styles.buttonDisabled]}
+          onPress={submit}
+          disabled={submitting || !email || !password}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {mode === 'signIn' ? 'Sign in' : 'Sign up'}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
+        >
+          <Text style={styles.switchMode}>
+            {mode === 'signIn'
+              ? "Don't have an account? Sign up"
+              : 'Already have an account? Sign in'}
+          </Text>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+  hero: { position: 'absolute', top: 0, left: 0, right: 0, height: '55%' },
   container: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    backgroundColor: '#fff',
+    paddingHorizontal: spacing.xl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    ...typography.title,
+    fontSize: 30,
+    color: colors.textPrimary,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   subtitle: {
     fontSize: 15,
-    color: '#555',
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     fontSize: 16,
-    marginBottom: 12,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surfaceSolid,
+    color: colors.textPrimary,
   },
   button: {
-    backgroundColor: '#111827',
-    borderRadius: 8,
-    paddingVertical: 14,
+    backgroundColor: colors.accent,
+    borderRadius: radii.sm,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.xs,
   },
+  buttonDisabled: { opacity: 0.5 },
   buttonText: {
     color: '#fff',
     fontSize: 16,
@@ -135,15 +147,15 @@ const styles = StyleSheet.create({
   },
   switchMode: {
     textAlign: 'center',
-    marginTop: 16,
-    color: '#2563eb',
+    marginTop: spacing.lg,
+    color: colors.accent,
   },
   error: {
-    color: '#dc2626',
-    marginBottom: 8,
+    color: colors.danger,
+    marginBottom: spacing.sm,
   },
   notice: {
-    color: '#16a34a',
-    marginBottom: 8,
+    color: colors.success,
+    marginBottom: spacing.sm,
   },
 });

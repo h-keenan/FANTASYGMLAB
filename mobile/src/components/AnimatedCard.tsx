@@ -48,7 +48,9 @@ export default function AnimatedCard({ style, children, onPressIn, onPressOut, .
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     padding: spacing.lg,
     ...cardShadow,
   },
