@@ -25,12 +25,20 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
     navigation.setOptions({
       title: leagueName,
       headerRight: () => (
-        <TouchableOpacity
-          onPress={() => navigation.navigate('TradeCalculator', { leagueId, leagueName })}
-          hitSlop={8}
-        >
-          <Text style={styles.headerAction}>Trade Calc</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 16 }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Players', { leagueId, leagueName })}
+            hitSlop={8}
+          >
+            <Text style={styles.headerAction}>Players</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('TradeCalculator', { leagueId, leagueName })}
+            hitSlop={8}
+          >
+            <Text style={styles.headerAction}>Trade Calc</Text>
+          </TouchableOpacity>
+        </View>
       ),
     });
   }, [leagueId, leagueName, navigation]);
