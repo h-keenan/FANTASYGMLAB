@@ -126,7 +126,7 @@ export default function PaywallScreen({ navigation }: Props) {
       </View>
 
       {loading ? (
-        <ActivityIndicator style={styles.loadingIndicator} />
+        <ActivityIndicator style={styles.loadingIndicator} color={colors.accent} />
       ) : loadError ? (
         <Text style={styles.error}>{loadError}</Text>
       ) : packages.length === 0 ? (

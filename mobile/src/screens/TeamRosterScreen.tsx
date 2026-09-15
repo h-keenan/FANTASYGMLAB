@@ -55,7 +55,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   injuryPill: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.dangerMuted,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,

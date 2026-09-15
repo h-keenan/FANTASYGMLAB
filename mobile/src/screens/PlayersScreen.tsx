@@ -67,6 +67,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
         value={search}
         onChangeText={setSearch}
         autoCapitalize="none"
+        placeholderTextColor={colors.textTertiary}
       />
 
       <View style={styles.filterRow}>
@@ -95,7 +96,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading ? (
-        <ActivityIndicator style={styles.loading} />
+        <ActivityIndicator style={styles.loading} color={colors.accent} />
       ) : (
         <FlatList
           data={filtered}
@@ -138,6 +139,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     backgroundColor: colors.surface,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   filterRow: {

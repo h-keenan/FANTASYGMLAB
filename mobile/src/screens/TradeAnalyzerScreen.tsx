@@ -195,7 +195,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
@@ -309,6 +309,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         value={search}
         onChangeText={setSearch}
         autoCapitalize="none"
+        placeholderTextColor={colors.textTertiary}
       />
 
       <FlatList
@@ -486,6 +487,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
     backgroundColor: colors.surface,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   resultsList: { paddingBottom: spacing.xl },
