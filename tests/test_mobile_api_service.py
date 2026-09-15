@@ -869,7 +869,10 @@ def test_alerts_returns_real_roster_relevant_news(monkeypatch):
         },
     ]
 
-    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+    read_keys_response = Mock(status_code=200)
+    read_keys_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, read_keys_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
                 "modules.sleeper.get_rosters",
@@ -893,3 +896,110 @@ def test_alerts_returns_real_roster_relevant_news(monkeypatch):
     assert len(items) == 1
     assert items[0]["matched_player"] == "Star Wideout"
     assert "ankle" in items[0]["title"].casefold()
+    assert items[0]["read"] is False
+    assert items[0]["alert_key"]
+
+
+def test_alerts_marks_items_already_read(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    fake_pool = [
+        {
+            "title": "Star Wideout (ankle) limited in practice",
+            "summary": "The receiver was limited with an ankle issue.",
+            "link": "https://example.com/star-wideout-injury",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 1000.0,
+        },
+    ]
+    from services.mobile_api_service import _alert_key_for_link
+
+    already_read_key = _alert_key_for_link("https://example.com/star-wideout-injury")
+    read_keys_response = Mock(status_code=200)
+    read_keys_response.json.return_value = [{"alert_key": already_read_key}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, read_keys_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["9001"]}],
+            ):
+                with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                    with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+                        with patch("modules.news.load_cached_news_pool", return_value=fake_pool):
+                            response = client.get(
+                                "/v1/leagues/abc/alerts",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    assert items[0]["read"] is True
+
+
+def test_mark_alert_read_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.post("/v1/leagues/abc/alerts/read", json={"alert_key": "abc123"})
+    assert response.status_code == 401
+
+
+def test_mark_alert_read_rejects_empty_key(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/leagues/abc/alerts/read",
+            json={"alert_key": ""},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_mark_alert_read_writes_with_callers_own_token(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    post_response = Mock(status_code=201)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=post_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/abc/alerts/read",
+                json={"alert_key": "abc123"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    call_kwargs = mock_post.call_args.kwargs
+    assert call_kwargs["headers"]["Authorization"] == "Bearer good-token"
+    assert call_kwargs["json"] == {"user_id": "user-123", "league_id": "abc", "alert_key": "abc123"}
+
+
+def test_mark_alert_read_fails_closed_when_table_missing(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    post_response = Mock(status_code=404)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=post_response):
+            response = client.post(
+                "/v1/leagues/abc/alerts/read",
+                json={"alert_key": "abc123"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "reason": "not_available"}

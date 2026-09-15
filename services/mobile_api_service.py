@@ -16,6 +16,7 @@ Deployment topology (Render):
   - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
   - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
+  - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -33,6 +34,7 @@ so the web app and mobile app share one engine.
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -623,8 +625,50 @@ def get_league_recap(league_id: str, _user: dict[str, Any] = Depends(require_use
     return {"ok": True, "recap": recap, "reason": ""}
 
 
-def _project_alert_item(item: dict[str, Any]) -> dict[str, Any]:
+def _alert_key_for_link(link: str) -> str:
+    """Stable, opaque identity for one alert item — a hash of its article
+    link, never the raw URL or any football output (see
+    docs/supabase_mobile_alert_reads.sql)."""
+
+    return hashlib.sha256(str(link or "").encode("utf-8")).hexdigest()[:32]
+
+
+def _fetch_read_alert_keys(
+    config: dict, user_id: str, access_token: str, league_id: str
+) -> set[str]:
+    """Which alert_keys this user has already marked read in this league.
+
+    Fails closed to "none read" (never crashes the alerts feed) — covers
+    the pre-migration state where mobile_alert_reads doesn't exist yet.
+    """
+
+    if not user_id:
+        return set()
+    url = auth_supabase.rest_api_url(
+        config,
+        "mobile_alert_reads",
+        f"select=alert_key&user_id=eq.{user_id}&league_id=eq.{league_id}",
+    )
+    try:
+        response = requests.get(url, headers=auth_supabase.auth_headers(config, access_token), timeout=15)
+    except Exception:
+        return set()
+    if response.status_code >= 400:
+        return set()
+    try:
+        rows = response.json()
+    except Exception:
+        return set()
+    if not isinstance(rows, list):
+        return set()
+    return {str(row.get("alert_key")) for row in rows if isinstance(row, dict) and row.get("alert_key")}
+
+
+def _project_alert_item(item: dict[str, Any], *, read_keys: set[str]) -> dict[str, Any]:
     payload = _project_news_item(item)
+    alert_key = _alert_key_for_link(str(item.get("link") or ""))
+    payload["alert_key"] = alert_key
+    payload["read"] = alert_key in read_keys
     payload["matched_player"] = _clean_json_value(item.get("matched_player"))
     payload["relevance_reason"] = _clean_json_value(item.get("relevance_reason"))
     return payload
@@ -641,9 +685,9 @@ def get_league_alerts(
     roster-news filtering and curation the web app uses
     (modules.my_news.filter_news_for_players / curate_player_news), scoped
     to the signed-in user's actual roster via the same my-roster resolution
-    `/trade-analyzer` uses. Read/unread state and cross-league aggregation
-    are not implemented — this is a stateless "recent relevant news" feed,
-    not the web app's full Alerts notification system.
+    `/trade-analyzer` uses. Cross-league aggregation is not implemented —
+    this is one league's feed, not the web app's full Alerts notification
+    system, but read state is real (see POST .../alerts/read).
     """
 
     if not 1 <= limit <= MAX_NEWS_LIMIT:
@@ -674,5 +718,52 @@ def get_league_alerts(
     filtered = my_news.filter_news_for_players(pool, player_names, roster_teams)
     curated = my_news.curate_player_news(filtered, max_items=limit)
 
-    items = [_project_alert_item(item) for item in curated]
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    read_keys = _fetch_read_alert_keys(config, user_id, str(user.get("_access_token") or ""), league_id)
+
+    items = [_project_alert_item(item, read_keys=read_keys) for item in curated]
     return {"ok": True, "items": items, "reason": ""}
+
+
+class MarkAlertReadRequest(BaseModel):
+    alert_key: str
+
+
+@app.post("/v1/leagues/{league_id}/alerts/read")
+def mark_league_alert_read(
+    league_id: str,
+    body: MarkAlertReadRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Durably mark one alert read (see docs/supabase_mobile_alert_reads.sql).
+    Writes with the caller's own token — RLS (auth.uid() = user_id), not the
+    service-role key, decides what's allowed. Fails closed (200, ok: False)
+    rather than 500 when the table isn't migrated yet, so an older backend
+    state never breaks the alerts feed itself.
+    """
+
+    alert_key = str(body.alert_key or "").strip()
+    if not alert_key:
+        raise HTTPException(status_code=422, detail="alert_key is required.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    url = auth_supabase.rest_api_url(config, "mobile_alert_reads")
+    headers = auth_supabase.auth_headers(config, str(user.get("_access_token") or ""))
+    headers["Prefer"] = "resolution=ignore-duplicates,return=minimal"
+    try:
+        response = requests.post(
+            url,
+            headers=headers,
+            json={"user_id": user_id, "league_id": league_id, "alert_key": alert_key},
+            timeout=15,
+        )
+    except Exception:
+        return {"ok": False, "reason": "not_available"}
+    if response.status_code >= 400:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}

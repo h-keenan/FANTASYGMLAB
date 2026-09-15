@@ -69,6 +69,16 @@ export default function AlertsScreen({ route, navigation }: Props) {
     void load();
   }, [load]);
 
+  const openAndMarkRead = (item: AlertItem) => {
+    if (!item.read) {
+      setItems((prev) => prev.map((row) => (row.alert_key === item.alert_key ? { ...row, read: true } : row)));
+      // Fire-and-forget: read state is a soft-fail nicety (see the backend's
+      // "fails closed" design), never worth blocking or erroring the tap on.
+      api.markAlertRead(leagueId, item.alert_key).catch(() => {});
+    }
+    if (item.link) void Linking.openURL(item.link);
+  };
+
   if (notReadyReason) {
     return (
       <View style={styles.center}>
@@ -98,17 +108,18 @@ export default function AlertsScreen({ route, navigation }: Props) {
         }
         renderItem={({ item }) => (
           <AnimatedCard
-            style={styles.card}
-            onPress={() => {
-              if (item.link) void Linking.openURL(item.link);
-            }}
+            style={StyleSheet.flatten([styles.card, item.read && styles.cardRead])}
+            onPress={() => openAndMarkRead(item)}
           >
             <View style={styles.headerRow}>
-              {item.matched_player ? (
-                <View style={styles.playerBadge}>
-                  <Text style={styles.playerBadgeText}>{item.matched_player}</Text>
-                </View>
-              ) : null}
+              <View style={styles.headerLeft}>
+                {!item.read ? <View style={styles.unreadDot} /> : null}
+                {item.matched_player ? (
+                  <View style={styles.playerBadge}>
+                    <Text style={styles.playerBadgeText}>{item.matched_player}</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.time}>{relativeTime(item.published_ts)}</Text>
             </View>
             {item.event_type ? (
@@ -121,7 +132,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
                 <Text style={styles.badgeText}>{item.event_type}</Text>
               </View>
             ) : null}
-            <Text style={styles.title} numberOfLines={2}>
+            <Text style={[styles.title, item.read && styles.titleRead]} numberOfLines={2}>
               {item.title}
             </Text>
             {item.summary ? (
@@ -156,11 +167,19 @@ const styles = StyleSheet.create({
   },
   listContent: { padding: spacing.lg, paddingTop: 0, gap: spacing.sm },
   card: { padding: spacing.lg },
+  cardRead: { opacity: 0.6 },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.xs,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
   },
   playerBadge: {
     backgroundColor: colors.badgeBackground,
@@ -179,6 +198,7 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   time: { fontSize: 12, color: colors.textSecondary },
   title: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.xs },
+  titleRead: { fontWeight: '500' },
   summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   speculative: {
     fontSize: 11,
