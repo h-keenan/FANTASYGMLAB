@@ -68,6 +68,35 @@ mobile/
 - RevenueCat paywall UI — the SDK is configured and entitlement can be read
   (`hasPremiumEntitlement()` in `revenuecat.ts`), but there's no purchase
   screen yet.
-- Native builds / code signing — this is the Expo-managed JS layer only.
-  `expo prebuild` (to generate `ios/`/`android/`) and Fastlane (build, sign,
-  submit to TestFlight/Play) are a separate, later step.
+- A real build. Fastlane config exists (`fastlane/Fastfile`, `Appfile`,
+  `Matchfile` — see below) and parses correctly, but no lane has actually
+  been run yet, so nothing has produced an installable build so far.
+
+## Native builds (Fastlane)
+
+`ios/` and `android/` are never committed — every build regenerates them
+fresh via `expo prebuild` (Expo's "Continuous Native Generation"), which the
+Fastlane lanes below do automatically. This keeps native project state from
+drifting out of sync with `app.json`.
+
+```sh
+cd mobile
+PATH="/opt/homebrew/opt/ruby@3.4/bin:$PATH" bundle install   # first time only
+cp fastlane/.env.example fastlane/.env   # fill in real values
+PATH="/opt/homebrew/opt/ruby@3.4/bin:$PATH" bundle exec fastlane ios beta
+PATH="/opt/homebrew/opt/ruby@3.4/bin:$PATH" bundle exec fastlane android beta
+```
+
+(The system Ruby on macOS is too old for current Fastlane — use a modern
+Ruby, e.g. `brew install ruby@3.4`.)
+
+- **iOS**: `match` (git-based cert/profile storage, see `Matchfile`) syncs
+  signing, then `build_app` + `upload_to_testflight`. Needs Xcode ≥ 26.4
+  (Expo SDK 57's minimum) — check `xcodebuild -version` before running this
+  locally.
+- **Android**: Gradle release bundle + `upload_to_play_store` (`internal`
+  track). Needs the app already created in Play Console and the service
+  account granted access there (Play Console → Setup → API access) — that
+  grant is a manual step Google doesn't expose via any API.
+- Confirm `FGL_IOS_WORKSPACE`/`FGL_IOS_SCHEME` in `fastlane/.env` after the
+  *first* `expo prebuild` run — see the comment in `Fastfile`.

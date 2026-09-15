@@ -1,0 +1,10 @@
+app_identifier(ENV["FGL_BUNDLE_ID"] || "com.fantasygmlab.app")
+
+# iOS / App Store Connect — API-key auth (no Apple ID password / 2FA prompts).
+# apple_id/team_id aren't needed when app_store_connect_api_key is supplied
+# in the Fastfile, but team_id here also covers plain `match`/`gym` calls.
+team_id(ENV["APPLE_TEAM_ID"])
+
+# Android / Play Console — service account JSON (see Fastfile `supply` calls).
+json_key_file(ENV["GOOGLE_PLAY_JSON_KEY_PATH"]) if ENV["GOOGLE_PLAY_JSON_KEY_PATH"]
+package_name(ENV["FGL_BUNDLE_ID"] || "com.fantasygmlab.app")
