@@ -14317,15 +14317,7 @@ def _classify_manager_tendencies(enriched: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _league_history_window(league: dict) -> tuple[int, int, int]:
-    settings = league.get("settings", {}) if isinstance(league.get("settings"), dict) else {}
-    current_leg = _safe_positive_int(settings.get("leg"), 0)
-    playoff_week_start = _safe_positive_int(settings.get("playoff_week_start"), 15)
-    regular_season_end = max(1, playoff_week_start - 1) if playoff_week_start > 1 else max(1, current_leg)
-    # Sleeper has no useful transaction or matchup data for future weeks.
-    # Offseason leagues use round 1; active leagues stop at the current leg.
-    max_history_week = max(1, min(18, current_leg if current_leg > 0 else 1))
-    return current_leg, regular_season_end, max_history_week
+_league_history_window = league_recaps.league_history_window
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)

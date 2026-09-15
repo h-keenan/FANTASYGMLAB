@@ -37,6 +37,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       label: 'Trade Analyzer',
       onPress: () => navigation.navigate('TradeAnalyzer', { leagueId, leagueName }),
     },
+    { label: 'Recap', onPress: () => navigation.navigate('Recap', { leagueId, leagueName }) },
   ];
 
   useEffect(() => {
