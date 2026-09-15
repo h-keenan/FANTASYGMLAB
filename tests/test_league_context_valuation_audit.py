@@ -334,7 +334,7 @@ def test_pass_td_detected_but_unused_metadata():
     detected = app.detect_league_value_settings_from_payload(payload)
     assert detected["_detected_scoring"]["pass_td"] == 6.0
     # Multiplier path must not key off pass_td.
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    source = (ROOT / "modules" / "league_value_settings.py").read_text(encoding="utf-8")
     multiplier = source.split("def _league_settings_multiplier", 1)[1].split("\ndef apply_valuation_lens", 1)[0]
     assert "pass_td" not in multiplier
 
