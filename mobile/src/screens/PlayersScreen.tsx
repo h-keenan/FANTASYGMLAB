@@ -104,7 +104,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
           renderItem={({ item }) => (
             <AnimatedCard
               style={styles.card}
-              onPress={() => navigation.navigate('PlayerDetail', { player: item })}
+              onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
             >
               <View style={styles.rankBadge}>
                 <Text style={styles.rankText}>{item.overall_rank ?? '—'}</Text>

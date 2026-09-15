@@ -19,7 +19,7 @@ export class ApiError extends Error {
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: 'GET' | 'POST'; jsonBody?: unknown },
+  init?: { method?: 'GET' | 'POST' | 'DELETE'; jsonBody?: unknown },
 ): Promise<T> {
   const { data, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !data.session) {
@@ -59,6 +59,10 @@ function authorizedFetch<T>(path: string): Promise<T> {
 
 function authorizedPost<T>(path: string, jsonBody: unknown): Promise<T> {
   return authorizedRequest<T>(path, { method: 'POST', jsonBody });
+}
+
+function authorizedDelete<T>(path: string): Promise<T> {
+  return authorizedRequest<T>(path, { method: 'DELETE' });
 }
 
 export interface MeResponse {
@@ -281,6 +285,25 @@ export interface QuickViewResponse {
   reason: '' | 'not_found';
 }
 
+export interface GmTarget {
+  player_id: string;
+  source_surface: string;
+  created_at: string | null;
+}
+
+export interface GmTargetsResponse {
+  ok: true;
+  targets: GmTarget[];
+}
+
+export type GmTargetMutationReason = '' | 'at_cap' | 'not_available';
+
+export interface GmTargetMutationResponse {
+  ok: boolean;
+  reason: GmTargetMutationReason;
+  cap?: number;
+}
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -314,6 +337,17 @@ export const api = {
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
   getPlayerQuickView: (playerId: string) =>
     authorizedFetch<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
+  getGmTargets: (leagueId: string) =>
+    authorizedFetch<GmTargetsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`),
+  addGmTarget: (leagueId: string, playerId: string, sourceSurface = 'gm_targets') =>
+    authorizedPost<GmTargetMutationResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`, {
+      player_id: playerId,
+      source_surface: sourceSurface,
+    }),
+  removeGmTarget: (leagueId: string, playerId: string) =>
+    authorizedDelete<GmTargetMutationResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}`,
+    ),
   markAlertRead: (leagueId: string, alertKey: string) =>
     authorizedPost<{ ok: boolean; reason: string }>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,

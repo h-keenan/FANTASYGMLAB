@@ -18,6 +18,9 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
+  - GET  /v1/leagues/{id}/gm-targets           — the caller's watchlist in this league
+  - POST /v1/leagues/{id}/gm-targets           — add a player to the watchlist (cap-enforced)
+  - DELETE /v1/leagues/{id}/gm-targets/{pid}   — remove a player from the watchlist
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -48,8 +51,10 @@ import pandas as pd
 import requests
 
 from modules import (
+    account_store,
     auth_supabase,
     canonical_player_ranking,
+    gm_targets,
     league_history,
     league_recaps,
     league_value_settings,
@@ -829,3 +834,126 @@ def get_player_quick_view(
         "bio": dataclasses.asdict(bio),
         "reason": "",
     }
+
+
+class AddGmTargetRequest(BaseModel):
+    player_id: str
+    source_surface: str = ""
+
+
+def _project_gm_target(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "player_id": gm_targets.normalize_player_id(row.get("player_id")),
+        "source_surface": str(row.get("source_surface") or ""),
+        "created_at": row.get("created_at"),
+    }
+
+
+def _fetch_gm_target_rows(
+    config: dict[str, Any], user_id: str, access_token: str, league_id: str, *, select: str
+) -> tuple[list[dict[str, Any]], str]:
+    return account_store.fetch_rows(
+        config,
+        access_token,
+        gm_targets.TARGETS_TABLE,
+        user_id=user_id,
+        extra_query=f"league_id=eq.{league_id}&select={select}&order=created_at.desc",
+    )
+
+
+@app.get("/v1/leagues/{league_id}/gm-targets")
+def get_gm_targets(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """The caller's durable watchlist for this league (GM Targets).
+
+    Preference rows only, per modules.gm_targets' own contract (see
+    docs/experimental-gm-targets-contract.md) — never stores name, rank, or
+    valuation here; the mobile client enriches display info client-side via
+    /v1/players and /v1/leagues/{id}/rankings, same separation the web app
+    keeps. Fails soft to an empty list if the table isn't reachable rather
+    than erroring the whole screen.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": True, "targets": []}
+
+    rows, error = _fetch_gm_target_rows(
+        config, user_id, access_token, league_id, select="player_id,source_surface,created_at"
+    )
+    if error:
+        return {"ok": True, "targets": []}
+    return {"ok": True, "targets": [_project_gm_target(row) for row in rows]}
+
+
+@app.post("/v1/leagues/{league_id}/gm-targets")
+def add_gm_target(
+    league_id: str,
+    payload: AddGmTargetRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Add a player to the caller's watchlist for this league.
+
+    Idempotent (upsert on the same primary key modules.gm_targets uses) and
+    cap-enforced server-side — Free up to MAX_TARGETS_FREE, Premium up to
+    MAX_TARGETS_PREMIUM, matching the web app's entitlement.
+    """
+
+    player_id = gm_targets.normalize_player_id(payload.player_id)
+    if not player_id:
+        raise HTTPException(status_code=422, detail="player_id is required.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {"entitlement": "free"}
+    cap = (
+        gm_targets.MAX_TARGETS_PREMIUM
+        if profile.get("entitlement") == "premium"
+        else gm_targets.MAX_TARGETS_FREE
+    )
+
+    existing, error = _fetch_gm_target_rows(config, user_id, access_token, league_id, select="player_id")
+    if error:
+        return {"ok": False, "reason": "not_available"}
+    existing_ids = {gm_targets.normalize_player_id(row.get("player_id")) for row in existing}
+    if player_id not in existing_ids and len(existing_ids) >= cap:
+        return {"ok": False, "reason": "at_cap", "cap": cap}
+
+    ok, error = account_store.upsert_row(
+        config,
+        access_token,
+        gm_targets.TARGETS_TABLE,
+        {
+            "user_id": user_id,
+            "league_id": league_id,
+            "player_id": player_id,
+            "source_surface": payload.source_surface[:64],
+        },
+        on_conflict="user_id,league_id,player_id",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+@app.delete("/v1/leagues/{league_id}/gm-targets/{player_id}")
+def remove_gm_target(
+    league_id: str,
+    player_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    pid = gm_targets.normalize_player_id(player_id)
+    ok, error = account_store.delete_rows(
+        config,
+        access_token,
+        gm_targets.TARGETS_TABLE,
+        query=f"user_id=eq.{user_id}&league_id=eq.{league_id}&player_id=eq.{pid}",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}

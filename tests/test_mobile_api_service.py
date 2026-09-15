@@ -1113,3 +1113,139 @@ def test_quick_view_reports_no_seasons_when_stats_unavailable(monkeypatch):
     assert body["ok"] is True
     assert body["stats"]["seasons"] == []
     assert body["bio"]["years_in_league"] == "Rookie"
+
+
+def test_gm_targets_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/leagues/abc/gm-targets").status_code == 401
+    assert client.post("/v1/leagues/abc/gm-targets", json={"player_id": "1"}).status_code == 401
+    assert client.delete("/v1/leagues/abc/gm-targets/1").status_code == 401
+
+
+def test_get_gm_targets_returns_watchlist(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    targets_response = Mock(status_code=200)
+    targets_response.json.return_value = [
+        {"player_id": "9001", "source_surface": "player_quick_view", "created_at": "2026-09-01T00:00:00Z"},
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, targets_response]):
+        response = client.get("/v1/leagues/abc/gm-targets", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["targets"] == [
+        {"player_id": "9001", "source_surface": "player_quick_view", "created_at": "2026-09-01T00:00:00Z"},
+    ]
+
+
+def test_get_gm_targets_fails_soft_when_table_unreachable(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    error_response = Mock(status_code=404)
+    error_response.json.return_value = {"message": "relation does not exist"}
+
+    with patch("requests.get", side_effect=[auth_user_response, error_response]):
+        response = client.get("/v1/leagues/abc/gm-targets", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "targets": []}
+
+
+def test_add_gm_target_rejects_empty_player_id(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/leagues/abc/gm-targets",
+            json={"player_id": ""},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_add_gm_target_enforces_free_tier_cap(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = [
+        {"player_id": "1"}, {"player_id": "2"}, {"player_id": "3"},
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, existing_response]):
+        response = client.post(
+            "/v1/leagues/abc/gm-targets",
+            json={"player_id": "9999"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert body["reason"] == "at_cap"
+    assert body["cap"] == 3
+
+
+def test_add_gm_target_upserts_when_under_cap(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": ""}]
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = []
+    upsert_response = Mock(status_code=201)
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, existing_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/abc/gm-targets",
+                json={"player_id": "9001", "source_surface": "player_quick_view"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    call_kwargs = mock_post.call_args.kwargs
+    assert call_kwargs["json"] == {
+        "user_id": "user-123",
+        "league_id": "abc",
+        "player_id": "9001",
+        "source_surface": "player_quick_view",
+    }
+
+
+def test_remove_gm_target_deletes_row(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    delete_response = Mock(status_code=200)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.delete", return_value=delete_response) as mock_delete:
+            response = client.delete(
+                "/v1/leagues/abc/gm-targets/9001",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    requested_url = mock_delete.call_args.args[0]
+    assert "user_id=eq.user-123" in requested_url
+    assert "league_id=eq.abc" in requested_url
+    assert "player_id=eq.9001" in requested_url
