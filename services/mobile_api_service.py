@@ -17,6 +17,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
+  - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -34,6 +35,7 @@ so the web app and mobile app share one engine.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 from typing import Any
 
@@ -55,6 +57,7 @@ from modules import (
     news as news_cache,
     news_signal,
     player_eligibility,
+    player_quick_view,
     rankings,
     sleeper,
     sleeper_leagues,
@@ -767,3 +770,62 @@ def mark_league_alert_read(
     if response.status_code >= 400:
         return {"ok": False, "reason": "not_available"}
     return {"ok": True, "reason": ""}
+
+
+def _stat_item_dict(item: player_quick_view.StatItem) -> dict[str, Any]:
+    return {"label": item.label, "value": item.value, "note": item.note, "tone": item.tone}
+
+
+def _season_stat_view_dict(season: player_quick_view.SeasonStatView) -> dict[str, Any]:
+    return {
+        "season": season.season,
+        "season_type": season.season_type,
+        "games": season.games,
+        "complete": season.complete,
+        "label": season.label,
+        "key_stats": [_stat_item_dict(item) for item in season.key_stats],
+        "fantasy": [_stat_item_dict(item) for item in season.fantasy],
+        "usage": [_stat_item_dict(item) for item in season.usage],
+    }
+
+
+def _quick_view_stats_dict(stats: player_quick_view.PlayerQuickViewStats) -> dict[str, Any]:
+    return {
+        "seasons": [_season_stat_view_dict(season) for season in stats.seasons],
+        "college": [_stat_item_dict(item) for item in stats.college],
+        "college_available": stats.college_available,
+        "career_totals_available": stats.career_totals_available,
+        "position": stats.position,
+    }
+
+
+@app.get("/v1/players/{player_id}/quick-view")
+def get_player_quick_view(
+    player_id: str,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Player Quick View: season stats + bio for the player detail pop-up.
+
+    Reuses modules.player_quick_view.build_stats_view/build_executive_snapshot
+    verbatim — the same engine that renders the web app's player dossier
+    pop-up (see that module's docstring). League-independent: the client
+    already has valuation/rank context from /v1/leagues/{id}/rankings and
+    combines both client-side.
+    """
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    matches = players_df[players_df["player_id"] == player_id]
+    if matches.empty:
+        return {"ok": True, "stats": None, "bio": None, "reason": "not_found"}
+
+    row = matches.iloc[0]
+    stats = player_quick_view.build_stats_view(row)
+    bio = player_quick_view.build_executive_snapshot(row)
+    return {
+        "ok": True,
+        "stats": _quick_view_stats_dict(stats),
+        "bio": dataclasses.asdict(bio),
+        "reason": "",
+    }

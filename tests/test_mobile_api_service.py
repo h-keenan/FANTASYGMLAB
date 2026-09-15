@@ -1003,3 +1003,113 @@ def test_mark_alert_read_fails_closed_when_table_missing(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"ok": False, "reason": "not_available"}
+
+
+def _fake_quick_view_frame():
+    return pd.DataFrame(
+        [
+            {
+                "player_id": "9001",
+                "name": "Star Wideout",
+                "position": "WR",
+                "years_exp": 3,
+                "games_played": 10,
+                "stats_season": 2026,
+                "targets": 80,
+                "receptions": 60,
+                "receiving_yards": 900,
+                "receiving_tds": 7,
+                "fantasy_points_ppr": 210.5,
+                "fantasy_points_half_ppr": 180.0,
+                "fantasy_points_std": 150.0,
+                "ppg": 21.0,
+                "snap_share": 0.72,
+                "target_share": 0.28,
+            },
+            {
+                "player_id": "9002",
+                "name": "No Stats Rookie",
+                "position": "WR",
+                "years_exp": 0,
+            },
+        ]
+    )
+
+
+def test_quick_view_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/players/9001/quick-view")
+    assert response.status_code == 401
+
+
+def test_quick_view_reports_not_found_for_unknown_player(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_fake_quick_view_frame()):
+            response = client.get(
+                "/v1/players/does-not-exist/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["stats"] is None
+    assert body["bio"] is None
+    assert body["reason"] == "not_found"
+
+
+def test_quick_view_returns_real_season_stats_and_bio(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_fake_quick_view_frame()):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    stats = body["stats"]
+    # Real modules.player_quick_view engine, not a mocked result — this
+    # exercises the same code path the web app's player dossier pop-up uses.
+    assert stats["position"] == "WR"
+    assert len(stats["seasons"]) == 1
+    season = stats["seasons"][0]
+    assert season["season"] == 2026
+    assert season["games"] == 10
+    key_stat_labels = {item["label"] for item in season["key_stats"]}
+    assert "Rec Yards" in key_stat_labels
+    usage_labels = {item["label"] for item in season["usage"]}
+    assert "Snap %" in usage_labels
+    assert body["bio"]["years_in_league"] == "3 seasons"
+
+
+def test_quick_view_reports_no_seasons_when_stats_unavailable(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_fake_quick_view_frame()):
+            response = client.get(
+                "/v1/players/9002/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["stats"]["seasons"] == []
+    assert body["bio"]["years_in_league"] == "Rookie"
