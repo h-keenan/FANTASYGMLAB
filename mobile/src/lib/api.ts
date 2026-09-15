@@ -238,6 +238,49 @@ export interface RecapResponse {
   reason: '' | 'no_completed_week';
 }
 
+export interface QuickViewStatItem {
+  label: string;
+  value: string;
+  note: string;
+  tone: string;
+}
+
+export interface QuickViewSeason {
+  season: number | null;
+  season_type: string;
+  games: number | null;
+  complete: boolean | null;
+  label: string;
+  key_stats: QuickViewStatItem[];
+  fantasy: QuickViewStatItem[];
+  usage: QuickViewStatItem[];
+}
+
+export interface QuickViewStats {
+  seasons: QuickViewSeason[];
+  college: QuickViewStatItem[];
+  college_available: boolean;
+  career_totals_available: boolean;
+  position: string;
+}
+
+export interface QuickViewBio {
+  years_in_league: string;
+  draft_capital: string;
+  college: string;
+  height: string;
+  weight: string;
+  bye_week: string;
+  contract_status: string;
+}
+
+export interface QuickViewResponse {
+  ok: true;
+  stats: QuickViewStats | null;
+  bio: QuickViewBio | null;
+  reason: '' | 'not_found';
+}
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -269,6 +312,8 @@ export const api = {
     authorizedFetch<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap`),
   getLeagueAlerts: (leagueId: string, limit = 12) =>
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
+  getPlayerQuickView: (playerId: string) =>
+    authorizedFetch<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
   markAlertRead: (leagueId: string, alertKey: string) =>
     authorizedPost<{ ok: boolean; reason: string }>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,
