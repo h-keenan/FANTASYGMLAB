@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ui_changed: ${{ steps.classify.outputs.ui_changed }}
+      mobile_app_changed: ${{ steps.classify.outputs.mobile_app_changed }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -54,6 +55,27 @@ jobs:
         run: python scripts/check_founder_beta_performance_budget.py
       - name: Verify deferred secondary payload reduction
         run: python scripts/benchmark_deferred_payload.py
+
+  mobile-app:
+    needs: [classify]
+    if: needs.classify.outputs.mobile_app_changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Expo doctor
+        run: npx expo-doctor
 
   mobile-ui:
     needs: [classify, test]
