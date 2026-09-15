@@ -352,3 +352,92 @@ def test_rankings_endpoint_rejects_bad_limit(monkeypatch):
             headers={"Authorization": "Bearer good-token"},
         )
         assert response.status_code == 422
+
+
+def test_news_endpoint_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/news")
+    assert response.status_code == 401
+
+
+def test_news_endpoint_rejects_bad_limit(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/news?limit=0",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        assert response.status_code == 422
+
+        response = client.get(
+            "/v1/news?limit=9999",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        assert response.status_code == 422
+
+
+def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_pool = [
+        {
+            "title": "Star RB (knee) questionable for Sunday",
+            "summary": "The team's RB1 was limited in practice with a knee issue.",
+            "link": "https://example.com/injury-1",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 1000.0,
+        },
+        # Off-topic — no injury/role/transaction/off-field signal, should be dropped.
+        {
+            "title": "Celebrity attends game, wears fun hat",
+            "summary": "A celebrity wore a hat at the game.",
+            "link": "https://example.com/celebrity",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 2000.0,
+        },
+        # Duplicate link of the injury item above (different casing) — deduped.
+        {
+            "title": "Star RB (knee) questionable for Sunday",
+            "summary": "The team's RB1 was limited in practice with a knee issue.",
+            "link": "HTTPS://EXAMPLE.COM/injury-1",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 1000.0,
+        },
+        {
+            "title": "Team trades WR to division rival",
+            "summary": "A trade sends a wide receiver across the division.",
+            "link": "https://example.com/trade-1",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 3000.0,
+        },
+    ]
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+            with patch("modules.news.load_cached_news_pool", return_value=fake_pool):
+                response = client.get(
+                    "/v1/news",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    items = body["items"]
+    # Celebrity item dropped (no actionable signal); injury duplicate deduped;
+    # most-recent-first ordering (trade at 3000 before injury at 1000).
+    assert len(items) == 2
+    assert items[0]["title"] == "Team trades WR to division rival"
+    assert items[0]["event_type"] == "transaction"
+    assert items[1]["title"] == "Star RB (knee) questionable for Sunday"
+    assert items[1]["event_type"] == "injury/status"
+    for item in items:
+        assert "summary" in item
+        assert "speculative" in item

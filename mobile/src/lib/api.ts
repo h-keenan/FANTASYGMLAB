@@ -112,6 +112,21 @@ export interface LeagueRankingsResponse {
 // Matches modules/league_value_settings.py's VALUATION_LENS_TO_SCORE_FIELD keys.
 export type ValuationLens = 'Dynasty' | 'Rebuild' | 'Non-Dynasty';
 
+export interface NewsItem {
+  title: string | null;
+  link: string | null;
+  source: string | null;
+  summary: string | null;
+  published_ts: number | null;
+  event_type: string | null;
+  speculative: boolean;
+}
+
+export interface NewsResponse {
+  ok: true;
+  items: NewsItem[];
+}
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -136,6 +151,7 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?${params.toString()}`,
     );
   },
+  getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
   getPlayers: async (playerIds: string[]): Promise<Record<string, PlayerSummary>> => {
     const uniqueIds = [...new Set(playerIds.filter(Boolean))];
     if (uniqueIds.length === 0) return {};
