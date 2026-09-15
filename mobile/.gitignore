@@ -48,3 +48,7 @@ fastlane/screenshots/**/*.png
 fastlane/screenshots/**/*.PNG
 fastlane/test_output
 vendor/bundle
+
+# build outputs (gym/fastlane)
+*.ipa
+*.app.dSYM.zip
