@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -210,3 +211,144 @@ def test_players_endpoint_rejects_empty_or_oversized_id_list(monkeypatch):
             headers={"Authorization": "Bearer good-token"},
         )
         assert oversized.status_code == 422
+
+
+def _fake_players_frame():
+    return pd.DataFrame(
+        [
+            {
+                "player_id": "9001",
+                "name": "Star Wideout",
+                "position": "WR",
+                "team": "KC",
+                "age": 24,
+                "years_exp": 3,
+                "status": "Active",
+                "injury_status": None,
+                "search_rank": 10,
+                "score": 8000,
+                "dynasty_score": 8000,
+                "value_score": 7000,
+                "market_score": 8000,
+                "role_score": 7500,
+                "opportunity_score": 7500,
+                "scarcity_score": 7000,
+                "risk_multiplier": 1.0,
+            },
+            {
+                "player_id": "9002",
+                "name": "Backup Runner",
+                "position": "RB",
+                "team": "NYJ",
+                "age": 29,
+                "years_exp": 7,
+                "status": "Active",
+                "injury_status": None,
+                "search_rank": 400,
+                "score": 1200,
+                "dynasty_score": 1200,
+                "value_score": 1500,
+                "market_score": 1200,
+                "role_score": 1000,
+                "opportunity_score": 900,
+                "scarcity_score": 800,
+                "risk_multiplier": 1.0,
+            },
+        ]
+    )
+
+
+def test_rankings_endpoint_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/rankings")
+    assert response.status_code == 401
+
+
+def test_rankings_endpoint_rejects_unknown_lens(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/rankings?lens=Nonsense",
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_rankings_endpoint_returns_ranked_players_for_real_league_settings(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    response = client.get(
+                        "/v1/leagues/abc/rankings?lens=Dynasty",
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    players = body["players"]
+    assert len(players) == 2
+    # The genuinely more valuable player ranks first — this exercises the
+    # real valuation/ranking engine (modules.league_value_settings), not a
+    # mocked result, so a wiring mistake would actually change this order.
+    assert players[0]["name"] == "Star Wideout"
+    assert players[0]["overall_rank"] == 1
+    assert players[1]["name"] == "Backup Runner"
+    assert players[1]["overall_rank"] == 2
+    for player in players:
+        assert "score" in player
+        assert "tier" in player
+
+
+def test_rankings_endpoint_returns_404_for_missing_league(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={}):
+            response = client.get(
+                "/v1/leagues/missing/rankings",
+                headers={"Authorization": "Bearer good-token"},
+            )
+    assert response.status_code == 404
+
+
+def test_rankings_endpoint_rejects_bad_limit(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/rankings?limit=0",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        assert response.status_code == 422
+
+        response = client.get(
+            "/v1/leagues/abc/rankings?limit=9999",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        assert response.status_code == 422

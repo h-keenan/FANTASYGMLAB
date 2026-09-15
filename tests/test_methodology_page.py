@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / "app.py").read_text(encoding="utf-8")
 METHODOLOGY = (ROOT / "modules" / "methodology_page.py").read_text(encoding="utf-8")
 RANKINGS = (ROOT / "modules" / "rankings.py").read_text(encoding="utf-8")
-VALUATION = (ROOT / "app.py").read_text(encoding="utf-8")
+VALUATION = (ROOT / "modules" / "league_value_settings.py").read_text(encoding="utf-8")
 
 
 def test_methodology_is_support_not_primary_nav():

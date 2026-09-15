@@ -10,6 +10,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/users          — Sleeper league members
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
+  - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -33,9 +34,17 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+import pandas as pd
 import requests
 
-from modules import auth_supabase, sleeper
+from modules import (
+    auth_supabase,
+    canonical_player_ranking,
+    league_value_settings,
+    player_eligibility,
+    rankings,
+    sleeper,
+)
 
 
 SERVICE_NAME = "mobile-api"
@@ -232,4 +241,100 @@ def get_players(
         for player_id in requested_ids
         if player_id in all_players
     }
+    return {"ok": True, "players": players}
+
+
+PLAYERS_DB_PATH = "data/players.db"
+MAX_RANKINGS_LIMIT = 300
+
+
+def _clean_json_value(value: Any) -> Any:
+    """Convert a pandas/numpy scalar to a plain JSON-safe value (NaN -> None)."""
+
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, (int, float, str, bool)):
+        return value
+    if hasattr(value, "item"):
+        return value.item()
+    return value
+
+
+def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
+    overall_rank = row.get("canonical_overall_rank")
+    if pd.isna(overall_rank):
+        overall_rank = row.get("overall_rank")
+    position_rank = row.get("canonical_position_rank")
+    if pd.isna(position_rank):
+        position_rank = row.get("position_rank")
+    return {
+        "player_id": _clean_json_value(row.get("player_id")),
+        "name": _clean_json_value(row.get("name")),
+        "position": _clean_json_value(row.get("position")),
+        "team": _clean_json_value(row.get("team")),
+        "age": _clean_json_value(row.get("age")),
+        "status": _clean_json_value(row.get("status")),
+        "injury_status": _clean_json_value(row.get("injury_status")),
+        "tier": _clean_json_value(row.get("player_tier")),
+        "score": _clean_json_value(row.get(score_field)),
+        "overall_rank": _clean_json_value(overall_rank),
+        "position_rank": _clean_json_value(position_rank),
+        "rank_unavailable_reason": _clean_json_value(row.get("rank_unavailable_reason")),
+    }
+
+
+@app.get("/v1/leagues/{league_id}/rankings")
+def get_league_rankings(
+    league_id: str,
+    lens: str = "Dynasty",
+    limit: int = 100,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """League-adjusted player rankings — shares the exact same valuation
+    engine as the web app (modules.league_value_settings, extracted from
+    app.py so both apps use one copy; see that module's docstring). Does
+    not invent a new ranking formula or retune anything for mobile.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    if not 1 <= limit <= MAX_RANKINGS_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_RANKINGS_LIMIT}.")
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_rankings"
+    )
+    if players_df.empty:
+        return {"ok": True, "players": []}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+
+    score_field = league_value_settings.valuation_score_field(lens)
+    scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
+    ranked = canonical_player_ranking.attach_canonical_ranks(
+        valued,
+        scoring_format=scoring_context.scoring_format,
+        score_field=score_field,
+        context=scoring_context,
+    )
+
+    ranked = ranked.sort_values(score_field, ascending=False).head(limit)
+    players = [_project_ranking_row(row, score_field) for _, row in ranked.iterrows()]
     return {"ok": True, "players": players}
