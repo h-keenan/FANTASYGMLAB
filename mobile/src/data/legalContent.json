@@ -1,0 +1,147 @@
+{
+  "lastUpdated": "June 22, 2026",
+  "pages": {
+    "about_disclaimer": {
+      "title": "About / Disclaimer",
+      "kicker": "Launch Information",
+      "note": "What FantasyGM Lab is, what its recommendations mean, and where its limits are.",
+      "sections": [
+        {
+          "title": "About FantasyGM Lab",
+          "paragraphs": [
+            "FantasyGM Lab is an independent fantasy football analysis and roster-management tool. It organizes league, roster, player, trade, waiver, draft, injury, and news context to help users make their own decisions.",
+            "For a plain-language explanation of what evaluations consider \u2014 without changing any values \u2014 see How We Evaluate."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Informational use only",
+          "paragraphs": [
+            "Fantasy advice in FantasyGM Lab is provided for informational and entertainment purposes only. Users remain responsible for every lineup, roster, trade, waiver, and draft decision, and FantasyGM Lab does not guarantee results.",
+            "Projections, rankings, player values, injury notes, trade ideas, waiver suggestions, draft recommendations, and other analysis may be incomplete, delayed, outdated, or wrong. Injury and news information may lag or remain uncertain. Verify important information with current primary sources before acting."
+          ],
+          "bullets": [
+            "FantasyGM Lab does not provide gambling or betting advice.",
+            "FantasyGM Lab does not provide financial, legal, medical, or other professional advice."
+          ]
+        },
+        {
+          "title": "Independent product",
+          "paragraphs": [
+            "FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
+          ],
+          "bullets": []
+        }
+      ]
+    },
+    "terms": {
+      "title": "Terms of Use",
+      "kicker": "Founder Beta Terms",
+      "note": "Plain-language conditions for using FantasyGM Lab.",
+      "sections": [
+        {
+          "title": "Using the app",
+          "paragraphs": [
+            "By using FantasyGM Lab, you agree to use it lawfully and responsibly. The app is intended for personal fantasy football research and decision support."
+          ],
+          "bullets": [
+            "Do not disrupt, overload, abuse, or attempt to gain unauthorized access to the app or its data.",
+            "Do not use automated scraping, bulk extraction, or reverse engineering to copy or republish the service, except where applicable law expressly permits it.",
+            "Do not use FantasyGM Lab to impersonate others, violate third-party rights, or interfere with another user's access."
+          ]
+        },
+        {
+          "title": "Advice and responsibility",
+          "paragraphs": [
+            "All analysis is informational and for entertainment. You are responsible for checking league rules, player status, injuries, news, scoring settings, and transaction details before making a decision.",
+            "FantasyGM Lab does not guarantee the accuracy, completeness, availability, or outcome of projections, rankings, values, trades, waivers, draft recommendations, injury information, or news."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Availability and changes",
+          "paragraphs": [
+            "FantasyGM Lab is an evolving Founder Beta product. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
+            "These terms may be updated as the product changes. Continued use after an update means you accept the revised terms."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "No affiliation",
+          "paragraphs": [
+            "FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
+          ],
+          "bullets": []
+        }
+      ]
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "kicker": "Founder Beta Privacy",
+      "note": "A practical summary of the data FantasyGM Lab may handle.",
+      "sections": [
+        {
+          "title": "Data the app may handle",
+          "paragraphs": [
+            "FantasyGM Lab may handle or store basic information needed to run the app, including a Sleeper username, selected league and roster identifiers, league or team names, user preferences, roster roles, untouchable-player choices, feedback reports, and app or session state.",
+            "Feedback reports may include the page or recommendation being reported, related player or team identifiers, league context, confidence or reason fields, and an optional user comment."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "How data is used",
+          "paragraphs": [
+            "This information is used to load the requested league, personalize analysis, preserve expected app context, diagnose problems, and improve the product.",
+            "Some information may be stored in the browser session, local application files, caches, or other project storage used by the current Founder Beta. FantasyGM Lab does not claim that these systems provide perfect security or permanent retention."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Third-party services and data",
+          "paragraphs": [
+            "FantasyGM Lab relies on third-party platforms, APIs, hosting, and data sources to provide league, player, injury, news, and related information. Requests to those services may expose standard technical information such as network address, browser details, or request metadata under the provider's own policies.",
+            "Third-party data may be incomplete, delayed, unavailable, or subject to separate terms. FantasyGM Lab does not control those services."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Retention and security",
+          "paragraphs": [
+            "Data may be retained while the Founder Beta is operated, tested, or improved. Users can clear local browser or session state where supported, but some operational or feedback records may remain in application storage.",
+            "Reasonable care is taken with application data, but no internet service or local storage method can be guaranteed completely secure."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "No affiliation",
+          "paragraphs": [
+            "FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
+          ],
+          "bullets": []
+        }
+      ]
+    },
+    "no_affiliation": {
+      "title": "No-Affiliation Disclaimer",
+      "kicker": "Independent Product",
+      "note": "FantasyGM Lab is not an official product of any league, team, player, or fantasy platform.",
+      "sections": [
+        {
+          "title": "No endorsement or sponsorship",
+          "paragraphs": [
+            "FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Third-party names and data",
+          "paragraphs": [
+            "References to leagues, teams, players, platforms, logos, statistics, and other third-party material are used only to identify and analyze fantasy football information. Ownership remains with the applicable rights holders.",
+            "Availability of third-party data does not imply a partnership, endorsement, sponsorship, or official relationship."
+          ],
+          "bullets": []
+        }
+      ]
+    }
+  }
+}

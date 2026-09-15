@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { colors } from '../theme';
+import type { RankedPlayer } from '../lib/api';
 
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
@@ -13,6 +14,10 @@ import TeamRosterScreen from '../screens/TeamRosterScreen';
 import PaywallScreen from '../screens/PaywallScreen';
 import TradeCalculatorScreen from '../screens/TradeCalculatorScreen';
 import NewsScreen from '../screens/NewsScreen';
+import MoreScreen from '../screens/MoreScreen';
+import LegalPageScreen from '../screens/LegalPageScreen';
+import PlayersScreen from '../screens/PlayersScreen';
+import PlayerDetailScreen from '../screens/PlayerDetailScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -21,6 +26,10 @@ export type RootStackParamList = {
   Paywall: undefined;
   TradeCalculator: { leagueId: string; leagueName: string };
   News: undefined;
+  More: undefined;
+  LegalPage: { pageKey: string };
+  Players: { leagueId: string; leagueName: string };
+  PlayerDetail: { player: RankedPlayer };
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -47,9 +56,14 @@ export default function RootNavigator() {
             options={({ navigation }) => ({
               title: 'FantasyGM Lab',
               headerRight: () => (
-                <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8}>
-                  <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '600' }}>News</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8}>
+                    <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '600' }}>News</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8}>
+                    <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '600' }}>More</Text>
+                  </TouchableOpacity>
+                </View>
               ),
             })}
           />
@@ -61,6 +75,10 @@ export default function RootNavigator() {
             options={{ title: 'Trade Calculator' }}
           />
           <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
+          <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
+          <AppStack.Screen name="LegalPage" component={LegalPageScreen} />
+          <AppStack.Screen name="Players" component={PlayersScreen} />
+          <AppStack.Screen name="PlayerDetail" component={PlayerDetailScreen} />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}
