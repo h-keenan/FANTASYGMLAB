@@ -39,7 +39,7 @@ jobs:
       - name: Compile
         run: python -m compileall -q app.py modules services scripts tests
       - name: Import app and webhook service
-        run: python -c "import app; import services.stripe_webhook_service"
+        run: python -c "import app; import services.stripe_webhook_service; import services.mobile_api_service"
       - name: Install pinned Chromium runtime
         run: python -m playwright install --with-deps chromium
       - name: Diff whitespace safety

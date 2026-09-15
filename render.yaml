@@ -87,3 +87,23 @@ services:
         sync: false
       - key: STRIPE_PRICE_ANNUAL
         sync: false
+  # Mobile app (Expo/React Native, iOS + Android) JSON API. Not deployed until
+  # Founder Ops syncs this Blueprint entry and selects a paid always-on
+  # instance type (free/sleeping plans cause a cold first request). Verifies
+  # each request's Supabase access token against GoTrue directly — no
+  # service-role key on this process. See services/mobile_api_service.py.
+  - type: web
+    name: fantasygm-lab-mobile-api
+    branch: main
+    runtime: python
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn services.mobile_api_service:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
