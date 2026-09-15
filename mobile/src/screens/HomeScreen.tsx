@@ -27,28 +27,47 @@ interface SavedLeague {
 export default function HomeScreen({ navigation }: Props) {
   const { session, signOut } = useAuth();
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
-  const [leagues, setLeagues] = useState<SavedLeague[]>([]);
+  const [leagues, setLeagues] = useState<SavedLeague[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [meError, setMeError] = useState<string | null>(null);
+  const [leaguesError, setLeaguesError] = useState<string | null>(null);
 
+  // Independent requests: the backend API and Supabase are separate
+  // services, so one failing (e.g. the API isn't reachable) shouldn't also
+  // blank out the other or get misread as "you have no saved leagues".
   const load = useCallback(async () => {
-    setError(null);
-    try {
-      const [meResult, leaguesResult] = await Promise.all([
-        api.getMe(),
-        supabase
-          .from('saved_leagues')
-          .select('id, league_id, league_name, is_default')
-          .order('is_default', { ascending: false }),
-      ]);
-      setMe(meResult.user);
-      if (leaguesResult.error) throw new Error(leaguesResult.error.message);
-      setLeagues((leaguesResult.data as SavedLeague[]) ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load your account.');
-    } finally {
-      setLoading(false);
+    setMeError(null);
+    setLeaguesError(null);
+
+    const [meResult, leaguesResult] = await Promise.allSettled([
+      api.getMe(),
+      supabase
+        .from('saved_leagues')
+        .select('id, league_id, league_name, is_default')
+        .order('is_default', { ascending: false }),
+    ]);
+
+    if (meResult.status === 'fulfilled') {
+      setMe(meResult.value.user);
+    } else {
+      setMeError(
+        meResult.reason instanceof Error
+          ? meResult.reason.message
+          : 'Could not reach the FantasyGM Lab API.',
+      );
     }
+
+    if (leaguesResult.status === 'fulfilled') {
+      if (leaguesResult.value.error) {
+        setLeaguesError(leaguesResult.value.error.message);
+      } else {
+        setLeagues((leaguesResult.value.data as SavedLeague[]) ?? []);
+      }
+    } else {
+      setLeaguesError('Could not load your saved leagues.');
+    }
+
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -79,17 +98,23 @@ export default function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {meError ? (
+        <Text style={styles.error}>Couldn't load your account: {meError}</Text>
+      ) : null}
+      {leaguesError ? (
+        <Text style={styles.error}>Couldn't load your leagues: {leaguesError}</Text>
+      ) : null}
 
       <Text style={styles.sectionTitle}>Your leagues</Text>
       <FlatList
-        data={leagues}
+        data={leagues ?? []}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            No leagues saved yet. Add one from the web app first — this app
-            reads the same saved leagues as your FantasyGM Lab account.
+            {leaguesError
+              ? 'Could not check your saved leagues — pull to retry.'
+              : "No leagues saved yet. Add one from the web app first — this app reads the same saved leagues as your FantasyGM Lab account."}
           </Text>
         }
         renderItem={({ item }) => (
