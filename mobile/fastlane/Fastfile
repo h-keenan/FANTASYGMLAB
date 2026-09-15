@@ -12,6 +12,38 @@ def ensure_native_project(platform)
   end
 end
 
+# expo prebuild's generated Android project signs *every* build type,
+# release included, with the debug keystore (see the generated
+# app/build.gradle's own comment telling you to fix this for production).
+# Since android/ is regenerated fresh each run, patch in a real release
+# signingConfig here rather than committing a modified build.gradle that
+# would just get overwritten by the next prebuild anyway.
+def configure_android_release_signing
+  gradle_path = "../android/app/build.gradle"
+  contents = File.read(gradle_path)
+
+  unless contents.include?("signingConfigs.release")
+    contents.sub!(
+      /signingConfigs\s*\{/,
+      <<~GRADLE.chomp
+        signingConfigs {
+                release {
+                    storeFile file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                    storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                    keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                    keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                }
+      GRADLE
+    )
+    contents.sub!(
+      /(release\s*\{\s*\n\s*\/\/.*\n\s*\/\/.*\n)\s*signingConfig signingConfigs\.debug/,
+      '\1            signingConfig signingConfigs.release',
+    )
+    File.write(gradle_path, contents)
+    UI.success("Patched android/app/build.gradle with a release signingConfig")
+  end
+end
+
 def asc_api_key
   app_store_connect_api_key(
     key_id: ENV.fetch("ASC_KEY_ID"),
@@ -110,7 +142,15 @@ platform :android do
   desc "Build and upload a Play internal-testing build"
   lane :beta do
     ensure_native_project(:android)
-    gradle(project_dir: "android", task: "bundle", build_type: "Release")
+    configure_android_release_signing
+    gradle(
+      project_dir: "android",
+      task: "bundle",
+      build_type: "Release",
+      # ANDROID_KEYSTORE_* are read directly from the environment by the
+      # signingConfig injected above (System.getenv), not passed as -P
+      # properties, so they never end up in Gradle's build cache/logs.
+    )
     upload_to_play_store(
       track: "internal",
       aab: "android/app/build/outputs/bundle/release/app-release.aab",
