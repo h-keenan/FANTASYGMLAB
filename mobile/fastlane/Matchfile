@@ -1,0 +1,7 @@
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/yawcompanyx-hue/fantasygmlab-certificates.git")
+storage_mode("git")
+type("appstore") # overridden per-lane in the Fastfile where needed
+app_identifier([ENV["FGL_BUNDLE_ID"] || "com.fantasygmlab.app"])
+username(ENV["APPLE_ID"])
+team_id(ENV["APPLE_TEAM_ID"])
+readonly(true) # CI/local builds only consume certs; `fastlane match` (run by hand) creates/rotates them

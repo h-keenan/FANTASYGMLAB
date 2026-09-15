@@ -1,0 +1,59 @@
+default_platform(:ios)
+
+# Both platforms use Expo's "Continuous Native Generation": `ios/` and
+# `android/` are never committed (see mobile/.gitignore) — every build
+# regenerates them fresh from app.json + package.json via `expo prebuild`.
+# That keeps signing config and native project state from drifting apart.
+
+def ensure_native_project(platform)
+  dir = platform == :ios ? "../ios" : "../android"
+  unless Dir.exist?(dir)
+    Dir.chdir("..") { sh("npx expo prebuild --platform #{platform} --clean --non-interactive") }
+  end
+end
+
+def asc_api_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_filepath: ENV.fetch("ASC_KEY_PATH"),
+  )
+end
+
+platform :ios do
+  desc "Sync (or, run by a human, rotate) signing certs/profiles via match. Read-only in CI."
+  lane :certs do
+    match(type: "appstore", api_key: asc_api_key, readonly: ENV["MATCH_READONLY"] != "false")
+  end
+
+  desc "Build and upload a TestFlight build"
+  lane :beta do
+    ensure_native_project(:ios)
+    api_key = asc_api_key
+    match(type: "appstore", api_key: api_key, readonly: true)
+    build_app(
+      # Confirm these two names after the first `expo prebuild` run — Expo
+      # derives them from app.json's `name`/`slug` and may not match exactly.
+      workspace: ENV["FGL_IOS_WORKSPACE"] || "ios/FantasyGMLab.xcworkspace",
+      scheme: ENV["FGL_IOS_SCHEME"] || "FantasyGMLab",
+      export_method: "app-store",
+    )
+    upload_to_testflight(api_key: api_key, skip_waiting_for_build_processing: true)
+  end
+end
+
+platform :android do
+  desc "Build and upload a Play internal-testing build"
+  lane :beta do
+    ensure_native_project(:android)
+    gradle(project_dir: "android", task: "bundle", build_type: "Release")
+    upload_to_play_store(
+      track: "internal",
+      aab: "android/app/build/outputs/bundle/release/app-release.aab",
+      json_key: ENV.fetch("GOOGLE_PLAY_JSON_KEY_PATH"),
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+end
