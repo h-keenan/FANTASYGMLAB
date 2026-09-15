@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, Touchabl
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -102,6 +103,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
                 : undefined
             }
           >
+            <PlayerAvatar playerId={item.target.player_id} size={40} style={styles.avatar} />
             <View style={styles.nameColumn}>
               <Text style={styles.name} numberOfLines={1}>
                 {item.player?.name ?? `Player ${item.target.player_id}`}
@@ -139,8 +141,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     lineHeight: 16,
   },
-  listContent: { padding: spacing.lg, paddingTop: 0, gap: spacing.sm },
+  listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
   card: { flexDirection: 'row', alignItems: 'center', padding: spacing.md },
+  avatar: { marginRight: spacing.sm },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },

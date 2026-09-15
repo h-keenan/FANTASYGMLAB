@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type QuickViewBio, type QuickViewStatItem, type QuickViewStats } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -143,6 +144,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
+        <PlayerAvatar playerId={player.player_id} size={88} style={styles.heroAvatar} />
         <Text style={styles.name}>{player.name ?? 'Unknown player'}</Text>
         <Text style={styles.meta}>
           {[player.position, player.team].filter(Boolean).join(' · ')}
@@ -205,6 +207,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl },
   header: { alignItems: 'center', marginBottom: spacing.xl },
+  heroAvatar: { marginBottom: spacing.md },
   name: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   meta: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
   tierBadge: {

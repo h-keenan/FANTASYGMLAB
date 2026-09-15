@@ -212,12 +212,12 @@ const styles = StyleSheet.create({
   packageTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
   packagePrice: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   bestValueBadge: {
-    backgroundColor: colors.badgeBackground,
+    backgroundColor: colors.premiumMuted,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radii.pill,
   },
-  bestValueBadgeText: { color: colors.badgeText, fontSize: 10, fontWeight: '700' },
+  bestValueBadgeText: { color: colors.premium, fontSize: 10, fontWeight: '700' },
   primaryButton: {
     backgroundColor: colors.accent,
     borderRadius: radii.md,

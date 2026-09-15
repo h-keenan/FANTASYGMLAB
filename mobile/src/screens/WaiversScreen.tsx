@@ -11,6 +11,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type RankedPlayer } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -111,6 +112,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               style={styles.card}
               onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
             >
+              <PlayerAvatar playerId={item.player_id} size={40} style={styles.avatar} />
               <View style={styles.rankBadge}>
                 <Text style={styles.rankText}>{index + 1}</Text>
               </View>
@@ -171,11 +173,12 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   pillTextActive: { color: '#fff' },
   loading: { marginTop: spacing.xl },
-  listContent: { padding: spacing.lg, paddingTop: 0, gap: spacing.sm },
+  listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
   card: { flexDirection: 'row', alignItems: 'center', padding: spacing.md },
+  avatar: { marginRight: spacing.sm },
   rankBadge: {
-    width: 36,
-    height: 32,
+    width: 30,
+    height: 26,
     borderRadius: radii.sm,
     backgroundColor: colors.badgeBackground,
     alignItems: 'center',
