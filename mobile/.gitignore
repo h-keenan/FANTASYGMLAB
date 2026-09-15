@@ -37,9 +37,24 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
+# Generated native folders. android/ is still fully regenerated per-build
+# (Continuous Native Generation) and never committed — Android has no
+# Xcode-Cloud-style requirement to see a checked-in project.
+#
+# ios/ IS committed, but only as a bootstrap snapshot: Xcode Cloud reads
+# the project structure straight from the repo to detect a project/scheme
+# and let you create a workflow, so something has to exist there. Every
+# real Xcode Cloud build (and every Fastlane build, via
+# ensure_native_project) regenerates it fresh via `expo prebuild --clean`
+# before compiling, so the committed copy never has to be kept up to date
+# by hand — see mobile/ios/ci_scripts/ci_post_clone.sh.
 /android
+/ios/Pods/
+/ios/build/
+/ios/*.xcworkspace/xcuserdata/
+/ios/*.xcodeproj/xcuserdata/
+/ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
 
 # fastlane
 fastlane/report.xml

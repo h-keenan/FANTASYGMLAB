@@ -75,7 +75,27 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Expo doctor
-        run: npx expo-doctor
+        run: |
+          set +e
+          output="$(npx expo-doctor 2>&1)"
+          status=$?
+          echo "$output"
+          set -e
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+          # ios/ is intentionally committed (as a bootstrap snapshot for Xcode
+          # Cloud to detect a project/scheme) but is always regenerated fresh
+          # via `expo prebuild --clean` before every real build — Fastlane's
+          # ensure_native_project and mobile/ios/ci_scripts/ci_post_clone.sh
+          # both do this. expo-doctor can't see that CI step, so it always
+          # flags the committed folder; accept only this one known check.
+          failed_checks="$(echo "$output" | grep -c '^✖')"
+          if [ "$failed_checks" -eq 1 ] && echo "$output" | grep -q "Check for app config fields that may not be synced in a non-CNG project"; then
+            echo "Accepting the known non-CNG-sync warning: ios/ is a bootstrap snapshot for Xcode Cloud, regenerated fresh before every real build."
+            exit 0
+          fi
+          exit "$status"
 
   mobile-ui:
     needs: [classify, test]
