@@ -19,6 +19,7 @@ import LegalPageScreen from '../screens/LegalPageScreen';
 import PlayersScreen from '../screens/PlayersScreen';
 import PlayerDetailScreen from '../screens/PlayerDetailScreen';
 import WaiversScreen from '../screens/WaiversScreen';
+import TradeAnalyzerScreen from '../screens/TradeAnalyzerScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -32,6 +33,7 @@ export type RootStackParamList = {
   Players: { leagueId: string; leagueName: string };
   PlayerDetail: { player: RankedPlayer };
   Waivers: { leagueId: string; leagueName: string };
+  TradeAnalyzer: { leagueId: string; leagueName: string };
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -82,6 +84,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Players" component={PlayersScreen} />
           <AppStack.Screen name="PlayerDetail" component={PlayerDetailScreen} />
           <AppStack.Screen name="Waivers" component={WaiversScreen} />
+          <AppStack.Screen name="TradeAnalyzer" component={TradeAnalyzerScreen} />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}

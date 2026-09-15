@@ -33,6 +33,10 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       label: 'Trade Calc',
       onPress: () => navigation.navigate('TradeCalculator', { leagueId, leagueName }),
     },
+    {
+      label: 'Trade Analyzer',
+      onPress: () => navigation.navigate('TradeAnalyzer', { leagueId, leagueName }),
+    },
   ];
 
   useEffect(() => {
