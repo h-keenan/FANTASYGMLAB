@@ -53,7 +53,14 @@ export interface MeResponse {
     id: string;
     email: string;
     entitlement: 'free' | 'premium';
+    sleeper_username: string;
   };
+}
+
+export interface MyRosterResponse {
+  ok: true;
+  roster: Record<string, unknown> | null;
+  reason: '' | 'no_sleeper_username_linked' | 'sleeper_user_not_found' | 'not_a_member_of_league';
 }
 
 export interface LeagueResponse {
@@ -143,6 +150,8 @@ export const api = {
     authorizedFetch<LeagueRostersResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rosters`,
     ),
+  getMyRoster: (leagueId: string) =>
+    authorizedFetch<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),
   getLeagueRankings: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

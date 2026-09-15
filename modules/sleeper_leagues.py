@@ -78,6 +78,13 @@ def _resolve_user_id(username: str) -> tuple[Optional[str], bool]:
     return None, transport_error
 
 
+def resolve_sleeper_user_id(username: str) -> Optional[str]:
+    """Public entry point: Sleeper user_id for a username, or None if not found."""
+
+    user_id, _transport_error = _resolve_user_id(username)
+    return user_id
+
+
 def lookup_user_leagues(username: str, season: Optional[int] = None) -> LeagueLookupResult:
     """
     Return Sleeper leagues for a username with a customer-safe lookup status.
