@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -22,8 +22,18 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    navigation.setOptions({ title: leagueName });
-  }, [leagueName, navigation]);
+    navigation.setOptions({
+      title: leagueName,
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('TradeCalculator', { leagueId, leagueName })}
+          hitSlop={8}
+        >
+          <Text style={styles.headerAction}>Trade Calc</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [leagueId, leagueName, navigation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,4 +153,5 @@ const styles = StyleSheet.create({
   },
   count: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   error: { color: colors.danger, textAlign: 'center' },
+  headerAction: { color: colors.accent, fontSize: 15, fontWeight: '600' },
 });

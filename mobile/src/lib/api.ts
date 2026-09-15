@@ -89,6 +89,29 @@ export interface PlayersResponse {
   players: Record<string, PlayerSummary>;
 }
 
+export interface RankedPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  status: string | null;
+  injury_status: string | null;
+  tier: string | null;
+  score: number | null;
+  overall_rank: number | null;
+  position_rank: number | null;
+  rank_unavailable_reason: string | null;
+}
+
+export interface LeagueRankingsResponse {
+  ok: true;
+  players: RankedPlayer[];
+}
+
+// Matches modules/league_value_settings.py's VALUATION_LENS_TO_SCORE_FIELD keys.
+export type ValuationLens = 'Dynasty' | 'Rebuild' | 'Non-Dynasty';
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -105,6 +128,14 @@ export const api = {
     authorizedFetch<LeagueRostersResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rosters`,
     ),
+  getLeagueRankings: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    params.set('limit', String(options?.limit ?? 300));
+    return authorizedFetch<LeagueRankingsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?${params.toString()}`,
+    );
+  },
   getPlayers: async (playerIds: string[]): Promise<Record<string, PlayerSummary>> => {
     const uniqueIds = [...new Set(playerIds.filter(Boolean))];
     if (uniqueIds.length === 0) return {};
