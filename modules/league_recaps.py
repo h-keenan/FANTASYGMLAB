@@ -14,6 +14,7 @@ from hashlib import sha256
 from typing import Any, Mapping, MutableMapping, Sequence
 
 from modules import league_history as history
+from modules.league_value_settings import _safe_positive_int
 
 
 SESSION_CACHE_KEY = "_league_recap_cache"
@@ -59,6 +60,54 @@ def _float(value: object, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def league_history_window(league: Mapping[str, Any] | None) -> tuple[int, int, int]:
+    """(current_leg, regular_season_end, max_history_week) from league settings.
+
+    Extracted from app.py's `_league_history_window` — pure code move, no
+    behavior change. app.py re-exports this name unchanged.
+    """
+
+    settings = league.get("settings", {}) if isinstance(league, Mapping) and isinstance(league.get("settings"), dict) else {}
+    current_leg = _safe_positive_int(settings.get("leg"), 0)
+    playoff_week_start = _safe_positive_int(settings.get("playoff_week_start"), 15)
+    regular_season_end = max(1, playoff_week_start - 1) if playoff_week_start > 1 else max(1, current_leg)
+    # Sleeper has no useful transaction or matchup data for future weeks.
+    # Offseason leagues use round 1; active leagues stop at the current leg.
+    max_history_week = max(1, min(18, current_leg if current_leg > 0 else 1))
+    return current_leg, regular_season_end, max_history_week
+
+
+def build_matchup_history_rows(
+    league_id: str,
+    max_week: int,
+    *,
+    fetch_matchups,
+) -> list[dict[str, Any]]:
+    """Flatten per-week Sleeper matchup rows into one week-tagged list.
+
+    `fetch_matchups` is injected (matches modules.sleeper.get_matchups'
+    signature: `(league_id, round_num) -> list[dict]`) so this stays testable
+    without mocking modules.sleeper directly — same dependency-injection
+    pattern as `collect_season_transactions` in modules/league_history.py.
+    """
+
+    rows: list[dict[str, Any]] = []
+    for week in range(1, max(1, _int(max_week, 1)) + 1):
+        for matchup in fetch_matchups(league_id, week) or []:
+            roster_id = _safe_positive_int(matchup.get("roster_id"), 0)
+            if roster_id <= 0:
+                continue
+            rows.append(
+                {
+                    "week": week,
+                    "roster_id": roster_id,
+                    "matchup_id": _safe_positive_int(matchup.get("matchup_id"), 0),
+                    "points": _float(matchup.get("points"), _float(matchup.get("custom_points"), 0.0)),
+                }
+            )
+    return rows
 
 
 def last_scored_week(league: Mapping[str, Any] | None) -> int:

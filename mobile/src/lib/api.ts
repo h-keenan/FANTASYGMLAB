@@ -186,6 +186,37 @@ export interface TradeAnalyzerResponse {
   reason: TradeAnalyzerReason;
 }
 
+export interface RecapStory {
+  story_type: string;
+  title: string;
+  summary: string;
+  glyph: string;
+  primary_team: string;
+  secondary_team: string;
+  players: string[];
+  metric_label: string;
+  metric_value: string;
+  history_week: number;
+  confidence: string;
+}
+
+export interface WeeklyRecap {
+  recap_id: string;
+  league_id: string;
+  season: string;
+  week: number;
+  headline: string;
+  stories: RecapStory[];
+  incomplete: boolean;
+  empty_reason: string;
+}
+
+export interface RecapResponse {
+  ok: true;
+  recap: WeeklyRecap | null;
+  reason: '' | 'no_completed_week';
+}
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -213,6 +244,8 @@ export const api = {
     );
   },
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
+  getLeagueRecap: (leagueId: string) =>
+    authorizedFetch<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap`),
   postTradeAnalyzer: (
     leagueId: string,
     body: {

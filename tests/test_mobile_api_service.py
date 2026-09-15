@@ -697,3 +697,111 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
     for item in items:
         assert "summary" in item
         assert "speculative" in item
+
+
+_RECAP_LEAGUE = {
+    "season": "2026",
+    "settings": {"leg": 3, "last_scored_leg": 3, "playoff_week_start": 15},
+}
+
+
+def _recap_matchups(league_id: str, week: int):
+    if week not in (1, 2, 3):
+        return []
+    return [
+        {"roster_id": 1, "matchup_id": 1, "points": 130.5},
+        {"roster_id": 2, "matchup_id": 1, "points": 98.2},
+    ]
+
+
+def _recap_transactions(league_id: str, week: int):
+    if week != 3:
+        return []
+    return [
+        {
+            "type": "waiver",
+            "status": "complete",
+            "adds": {"9001": 1},
+            "drops": None,
+            "roster_ids": [1],
+            "status_updated": 1700000000000,
+            "transaction_id": "tx1",
+            "settings": {"waiver_bid": 12},
+        }
+    ]
+
+
+def test_recap_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/recap")
+    assert response.status_code == 401
+
+
+def test_recap_returns_404_for_missing_league(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={}):
+            response = client.get("/v1/leagues/missing/recap", headers={"Authorization": "Bearer good-token"})
+    assert response.status_code == 404
+
+
+def test_recap_reports_no_completed_week(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_RECAP_LEAGUE):
+            with patch("modules.sleeper.get_matchups", return_value=[]):
+                response = client.get("/v1/leagues/abc/recap", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["recap"] is None
+    assert body["reason"] == "no_completed_week"
+
+
+def test_recap_returns_real_weekly_recap(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_profiles = {
+        "1": {"team_name": "Home Team", "owner_name": "Alice", "username": "alice"},
+        "2": {"team_name": "Away Team", "owner_name": "Bob", "username": "bob"},
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_RECAP_LEAGUE):
+            with patch("modules.sleeper.get_matchups", side_effect=_recap_matchups):
+                with patch("modules.sleeper.get_transactions", side_effect=_recap_transactions):
+                    with patch("modules.sleeper.get_league_roster_profiles", return_value=fake_profiles):
+                        with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/recap",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    recap = body["recap"]
+    assert recap is not None
+    assert recap["week"] == 3
+    assert recap["season"] == "2026"
+    # Real story generation (modules.league_recaps.build_weekly_recap), not a
+    # mocked result — a wiring mistake (e.g. bad profiles/player_lookup shape)
+    # would leave this empty.
+    assert recap["stories"]
+    assert recap["incomplete"] is False

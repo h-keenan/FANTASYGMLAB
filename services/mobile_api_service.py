@@ -14,6 +14,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
   - GET  /v1/news                        — curated NFL fantasy news (injury/role/transaction/off-field)
   - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
+  - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -44,6 +45,8 @@ import requests
 from modules import (
     auth_supabase,
     canonical_player_ranking,
+    league_history,
+    league_recaps,
     league_value_settings,
     my_news,
     news as news_cache,
@@ -552,3 +555,68 @@ def post_trade_analyzer(
         receive_assets=receive_assets,
     )
     return {"ok": True, "verdict": verdict.to_public_dict(), "reason": ""}
+
+
+@app.get("/v1/leagues/{league_id}/recap")
+def get_league_recap(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Latest completed-week recap — shares the exact same builder as the web
+    app's League Recaps page (modules.league_recaps.build_weekly_recap). Does
+    not invent new stories, headline templates, or narrative logic. Movement
+    (power-rank trend) and power_ranks are omitted, same as the web app's own
+    call site when a league is first opened — build_weekly_recap simply
+    skips the story categories that need them.
+    """
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    _, _, max_history_week = league_recaps.league_history_window(league)
+    matchup_rows = league_recaps.build_matchup_history_rows(
+        league_id, max_history_week, fetch_matchups=sleeper.get_matchups
+    )
+    week = league_recaps.completed_recap_week(league, matchup_rows)
+    if week <= 0:
+        return {"ok": True, "recap": None, "reason": "no_completed_week"}
+
+    profiles = sleeper.get_league_roster_profiles(league_id) or {}
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_recap")
+    lookup_rows: list[dict[str, Any]] = []
+    if not players_df.empty:
+        settings = league_value_settings.detect_league_value_settings_from_payload(league)
+        valued = league_value_settings.apply_valuation_lens(players_df, "Dynasty", settings)
+        cols = [c for c in ("player_id", "name", "position", "team", "value_score") if c in valued.columns]
+        if cols:
+            lookup_rows = valued[cols].to_dict("records")
+    player_lookup = league_history.player_lookup_from_rows(lookup_rows)
+
+    season = str(league.get("season") or "")
+    raw_transactions = sleeper.get_transactions(league_id, week) or []
+    transactions: list[dict[str, Any]] = []
+    for raw in raw_transactions:
+        normalized = league_history.normalize_transaction(
+            raw,
+            league_id=league_id,
+            season=season,
+            week=week,
+            profiles=profiles,
+            player_lookup=player_lookup,
+        )
+        if normalized:
+            transactions.append(normalized)
+
+    recap = league_recaps.build_weekly_recap(
+        league_id=league_id,
+        season=season,
+        week=week,
+        transactions=transactions,
+        matchups=matchup_rows,
+        profiles=profiles,
+        movement=None,
+        power_ranks=None,
+    )
+    return {"ok": True, "recap": recap, "reason": ""}
