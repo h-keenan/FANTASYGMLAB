@@ -90,7 +90,9 @@ export default function HomeScreen({ navigation }: Props) {
         <View>
           <Text style={styles.email}>{session?.user.email}</Text>
           {me ? (
-            <View
+            <TouchableOpacity
+              disabled={me.entitlement === 'premium'}
+              onPress={() => navigation.navigate('Paywall')}
               style={[
                 styles.entitlementPill,
                 me.entitlement === 'premium' && styles.entitlementPillPremium,
@@ -102,9 +104,9 @@ export default function HomeScreen({ navigation }: Props) {
                   me.entitlement === 'premium' && styles.entitlementTextPremium,
                 ]}
               >
-                {me.entitlement === 'premium' ? 'Premium' : 'Free'}
+                {me.entitlement === 'premium' ? 'Premium' : 'Free — Upgrade'}
               </Text>
-            </View>
+            </TouchableOpacity>
           ) : null}
         </View>
         <TouchableOpacity onPress={() => void signOut()} hitSlop={8}>
