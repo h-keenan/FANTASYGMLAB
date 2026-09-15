@@ -149,6 +149,8 @@ export interface NewsResponse {
 }
 
 export interface AlertItem extends NewsItem {
+  alert_key: string;
+  read: boolean;
   matched_player: string | null;
   relevance_reason: string | null;
 }
@@ -267,6 +269,11 @@ export const api = {
     authorizedFetch<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap`),
   getLeagueAlerts: (leagueId: string, limit = 12) =>
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
+  markAlertRead: (leagueId: string, alertKey: string) =>
+    authorizedPost<{ ok: boolean; reason: string }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,
+      { alert_key: alertKey },
+    ),
   postTradeAnalyzer: (
     leagueId: string,
     body: {

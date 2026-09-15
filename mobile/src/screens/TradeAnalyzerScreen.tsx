@@ -45,12 +45,22 @@ const NOT_READY_MESSAGES: Record<string, string> = {
   not_a_member_of_league: "You don't appear to own a team in this league.",
 };
 
+interface OtherTeam {
+  rosterId: string;
+  ownerName: string;
+  playerIds: Set<string>;
+}
+
+const ALL_TEAMS_ID = '__all__';
+
 export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const { leagueId, leagueName } = route.params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [myRosterIds, setMyRosterIds] = useState<Set<string>>(new Set());
+  const [otherTeams, setOtherTeams] = useState<OtherTeam[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(ALL_TEAMS_ID);
   const [rankings, setRankings] = useState<RankedPlayer[]>([]);
   const [sendIds, setSendIds] = useState<RankedPlayer[]>([]);
   const [receiveIds, setReceiveIds] = useState<RankedPlayer[]>([]);
@@ -69,17 +79,42 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [myRoster, rankingsResult] = await Promise.all([
+        const [myRoster, rankingsResult, usersResult, rostersResult] = await Promise.all([
           api.getMyRoster(leagueId),
           api.getLeagueRankings(leagueId, { lens: 'Dynasty', limit: 300 }),
+          api.getLeagueUsers(leagueId),
+          api.getLeagueRosters(leagueId),
         ]);
         if (cancelled) return;
+
+        let myId = '';
         if (myRoster.reason) {
           setNotReadyReason(myRoster.reason);
         } else {
           const players = Array.isArray(myRoster.roster?.players) ? (myRoster.roster!.players as unknown[]) : [];
           setMyRosterIds(new Set(players.map(String)));
+          myId = String(myRoster.roster?.roster_id ?? '');
         }
+
+        const usersById = new Map<string, string>();
+        for (const user of usersResult.users) {
+          const id = String(user.user_id ?? '');
+          if (id) usersById.set(id, String(user.display_name ?? user.username ?? 'Unknown owner'));
+        }
+        const teams: OtherTeam[] = rostersResult.rosters
+          .map((roster) => {
+            const rosterId = String(roster.roster_id ?? '');
+            const ownerId = String(roster.owner_id ?? '');
+            const players = Array.isArray(roster.players) ? roster.players : [];
+            return {
+              rosterId,
+              ownerName: usersById.get(ownerId) ?? 'Unclaimed team',
+              playerIds: new Set(players.map(String)),
+            };
+          })
+          .filter((team) => team.rosterId && team.rosterId !== myId);
+        setOtherTeams(teams);
+
         setRankings(rankingsResult.players);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load trade data.');
@@ -101,8 +136,13 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     if (activeSide === 'send') {
       return rankings.filter((p) => myRosterIds.has(p.player_id));
     }
-    return rankings.filter((p) => !myRosterIds.has(p.player_id));
-  }, [rankings, myRosterIds, activeSide]);
+    if (selectedTeamId === ALL_TEAMS_ID) {
+      return rankings.filter((p) => !myRosterIds.has(p.player_id));
+    }
+    const team = otherTeams.find((t) => t.rosterId === selectedTeamId);
+    if (!team) return [];
+    return rankings.filter((p) => team.playerIds.has(p.player_id));
+  }, [rankings, myRosterIds, otherTeams, selectedTeamId, activeSide]);
 
   const searchResults = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -202,6 +242,33 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         />
       </View>
 
+      {activeSide === 'receive' && otherTeams.length > 0 ? (
+        <View style={styles.teamRow}>
+          <TouchableOpacity
+            style={[styles.pill, selectedTeamId === ALL_TEAMS_ID && styles.pillActive]}
+            onPress={() => setSelectedTeamId(ALL_TEAMS_ID)}
+          >
+            <Text style={[styles.pillText, selectedTeamId === ALL_TEAMS_ID && styles.pillTextActive]}>
+              All Teams
+            </Text>
+          </TouchableOpacity>
+          {otherTeams.map((team) => (
+            <TouchableOpacity
+              key={team.rosterId}
+              style={[styles.pill, selectedTeamId === team.rosterId && styles.pillActive]}
+              onPress={() => setSelectedTeamId(team.rosterId)}
+            >
+              <Text
+                style={[styles.pillText, selectedTeamId === team.rosterId && styles.pillTextActive]}
+                numberOfLines={1}
+              >
+                {team.ownerName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.strategyRow}>
         {STRATEGIES.map((option) => (
           <TouchableOpacity
@@ -233,7 +300,11 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       <TextInput
         style={styles.searchInput}
         placeholder={
-          activeSide === 'send' ? 'Search your roster' : 'Search players to receive'
+          activeSide === 'send'
+            ? 'Search your roster'
+            : selectedTeamId === ALL_TEAMS_ID
+              ? 'Search players to receive'
+              : `Search ${otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? 'team'}'s roster`
         }
         value={search}
         onChangeText={setSearch}
@@ -368,6 +439,7 @@ const styles = StyleSheet.create({
   },
   chipText: { flex: 1, fontSize: 13, color: colors.textPrimary, marginRight: spacing.xs },
   chipRemove: { fontSize: 14, color: colors.textSecondary, fontWeight: '700' },
+  teamRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   strategyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   pill: {
     paddingHorizontal: spacing.sm,
