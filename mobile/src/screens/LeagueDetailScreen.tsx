@@ -1,15 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import AnimatedCard from '../components/AnimatedCard';
 import { api } from '../lib/api';
+import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LeagueDetail'>;
@@ -93,11 +88,13 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
   return (
     <FlatList
+      style={styles.list}
+      contentContainerStyle={styles.listContent}
       data={teams}
       keyExtractor={(item) => String(item.rosterId)}
       renderItem={({ item }) => (
-        <TouchableOpacity
-          style={styles.row}
+        <AnimatedCard
+          style={styles.card}
           onPress={() =>
             navigation.navigate('TeamRoster', {
               ownerName: item.ownerName,
@@ -105,25 +102,45 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
             })
           }
         >
-          <Text style={styles.owner}>{item.ownerName}</Text>
-          <Text style={styles.count}>{item.playerIds.length} players</Text>
-        </TouchableOpacity>
+          <View style={styles.row}>
+            <Text style={styles.owner} numberOfLines={1}>
+              {item.ownerName}
+            </Text>
+            <View style={styles.countPill}>
+              <Text style={styles.count}>{item.playerIds.length}</Text>
+            </View>
+          </View>
+        </AnimatedCard>
       )}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  list: { backgroundColor: colors.background },
+  listContent: { padding: spacing.lg, gap: spacing.sm },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.background,
+  },
+  card: { padding: spacing.lg },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e7eb',
+    alignItems: 'center',
   },
-  owner: { fontSize: 16 },
-  count: { fontSize: 14, color: '#6b7280' },
-  error: { color: '#dc2626', textAlign: 'center' },
+  owner: { flex: 1, fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm },
+  countPill: {
+    backgroundColor: colors.background,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    minWidth: 28,
+    alignItems: 'center',
+  },
+  count: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  error: { color: colors.danger, textAlign: 'center' },
 });

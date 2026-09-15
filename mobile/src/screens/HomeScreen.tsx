@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import AnimatedCard from '../components/AnimatedCard';
 import { api, type MeResponse } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -88,12 +90,24 @@ export default function HomeScreen({ navigation }: Props) {
         <View>
           <Text style={styles.email}>{session?.user.email}</Text>
           {me ? (
-            <Text style={styles.entitlement}>
-              {me.entitlement === 'premium' ? 'Premium' : 'Free'} account
-            </Text>
+            <View
+              style={[
+                styles.entitlementPill,
+                me.entitlement === 'premium' && styles.entitlementPillPremium,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.entitlementText,
+                  me.entitlement === 'premium' && styles.entitlementTextPremium,
+                ]}
+              >
+                {me.entitlement === 'premium' ? 'Premium' : 'Free'}
+              </Text>
+            </View>
           ) : null}
         </View>
-        <TouchableOpacity onPress={() => void signOut()}>
+        <TouchableOpacity onPress={() => void signOut()} hitSlop={8}>
           <Text style={styles.signOut}>Sign out</Text>
         </TouchableOpacity>
       </View>
@@ -109,6 +123,7 @@ export default function HomeScreen({ navigation }: Props) {
       <FlatList
         data={leagues ?? []}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListEmptyComponent={
           <Text style={styles.empty}>
@@ -118,8 +133,8 @@ export default function HomeScreen({ navigation }: Props) {
           </Text>
         }
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.leagueRow}
+          <AnimatedCard
+            style={styles.leagueCard}
             onPress={() =>
               navigation.navigate('LeagueDetail', {
                 leagueId: item.league_id,
@@ -127,9 +142,17 @@ export default function HomeScreen({ navigation }: Props) {
               })
             }
           >
-            <Text style={styles.leagueName}>{item.league_name || item.league_id}</Text>
-            {item.is_default ? <Text style={styles.defaultBadge}>Default</Text> : null}
-          </TouchableOpacity>
+            <View style={styles.leagueRow}>
+              <Text style={styles.leagueName} numberOfLines={1}>
+                {item.league_name || item.league_id}
+              </Text>
+              {item.is_default ? (
+                <View style={styles.defaultBadge}>
+                  <Text style={styles.defaultBadgeText}>Default</Text>
+                </View>
+              ) : null}
+            </View>
+          </AnimatedCard>
         )}
       />
     </View>
@@ -137,49 +160,68 @@ export default function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingTop: 16 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.lg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.lg,
   },
-  email: { fontSize: 16, fontWeight: '600' },
-  entitlement: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  signOut: { color: '#dc2626', fontSize: 14 },
+  email: { fontSize: 17, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.xs },
+  entitlementPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.border,
+  },
+  entitlementPillPremium: {
+    backgroundColor: '#FEF3C7',
+  },
+  entitlementText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  entitlementTextPremium: { color: '#92400E' },
+  signOut: { color: colors.danger, fontSize: 14, fontWeight: '500' },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#6b7280',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    letterSpacing: 0.5,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
+  },
+  listContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.sm,
+  },
+  leagueCard: {
+    padding: spacing.lg,
   },
   leagueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e7eb',
   },
-  leagueName: { fontSize: 16 },
+  leagueName: { flex: 1, fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm },
   defaultBadge: {
-    fontSize: 12,
-    color: '#2563eb',
-    fontWeight: '600',
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
   },
+  defaultBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   empty: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    color: '#6b7280',
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.md,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   error: {
-    color: '#dc2626',
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    color: colors.danger,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
   },
 });

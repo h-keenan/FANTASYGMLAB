@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { api, type PlayerSummary } from '../lib/api';
+import { cardShadow, colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeamRoster'>;
@@ -69,9 +70,12 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 
   return (
     <FlatList
+      style={styles.list}
       data={players}
       keyExtractor={(item) => item.playerId}
-      contentContainerStyle={players.length === 0 ? styles.emptyContainer : undefined}
+      contentContainerStyle={
+        players.length === 0 ? styles.emptyContainer : styles.listContent
+      }
       ListEmptyComponent={
         <Text style={styles.empty}>
           No player data available for this roster (Sleeper doesn't have
@@ -79,18 +83,22 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
         </Text>
       }
       renderItem={({ item }) => (
-        <View style={styles.row}>
+        <View style={styles.card}>
           <View style={styles.positionBadge}>
             <Text style={styles.positionText}>{item.position ?? '—'}</Text>
           </View>
           <View style={styles.nameColumn}>
-            <Text style={styles.name}>{item.full_name ?? 'Unknown player'}</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.full_name ?? 'Unknown player'}
+            </Text>
             <Text style={styles.meta}>
               {[item.team, item.status].filter(Boolean).join(' · ') || '—'}
             </Text>
           </View>
           {item.injury_status ? (
-            <Text style={styles.injury}>{item.injury_status}</Text>
+            <View style={styles.injuryPill}>
+              <Text style={styles.injuryText}>{item.injury_status}</Text>
+            </View>
           ) : null}
         </View>
       )}
@@ -99,34 +107,49 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  list: { backgroundColor: colors.background },
+  listContent: { padding: spacing.lg, gap: spacing.sm },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.background,
+  },
   emptyContainer: { flex: 1, justifyContent: 'center' },
   empty: {
     textAlign: 'center',
-    color: '#6b7280',
-    paddingHorizontal: 24,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.xl,
+    lineHeight: 20,
   },
-  row: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e7eb',
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    ...cardShadow,
   },
   positionBadge: {
     width: 40,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: '#111827',
+    height: 32,
+    borderRadius: radii.sm,
+    backgroundColor: colors.badgeBackground,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
   },
-  positionText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  nameColumn: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '600' },
-  meta: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  injury: { fontSize: 12, color: '#dc2626', fontWeight: '600' },
-  error: { color: '#dc2626', textAlign: 'center' },
+  positionText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
+  nameColumn: { flex: 1, marginRight: spacing.sm },
+  name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  injuryPill: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  injuryText: { fontSize: 11, fontWeight: '700', color: colors.danger },
+  error: { color: colors.danger, textAlign: 'center' },
 });
