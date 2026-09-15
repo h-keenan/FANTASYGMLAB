@@ -103,6 +103,23 @@ def test_me_returns_user_and_entitlement(monkeypatch):
     assert body["user"]["id"] == "user-123"
     assert body["user"]["email"] == "gm@example.com"
     assert body["user"]["entitlement"] == "premium"
+    assert body["user"]["sleeper_username"] == ""
+
+
+def test_me_returns_linked_sleeper_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json()["user"]["sleeper_username"] == "gm_dynasty"
 
 
 def test_me_defaults_to_free_when_profile_lookup_fails(monkeypatch):
@@ -145,6 +162,92 @@ def test_league_endpoints_wrap_sleeper_module(monkeypatch):
             rosters = client.get("/v1/leagues/abc/rosters", headers={"Authorization": "Bearer good-token"})
         assert rosters.status_code == 200
         assert rosters.json()["rosters"] == [{"roster_id": 1}]
+
+
+def test_my_roster_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/my-roster")
+    assert response.status_code == 401
+
+
+def test_my_roster_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get("/v1/leagues/abc/my-roster", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["roster"] is None
+    assert body["reason"] == "no_sleeper_username_linked"
+
+
+def test_my_roster_reports_sleeper_user_not_found(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "ghost_gm"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value=None):
+            response = client.get("/v1/leagues/abc/my-roster", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["roster"] is None
+    assert body["reason"] == "sleeper_user_not_found"
+
+
+def test_my_roster_reports_not_a_member(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch("modules.sleeper.get_rosters", return_value=[{"roster_id": 1, "owner_id": "someone-else"}]):
+                response = client.get("/v1/leagues/abc/my-roster", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["roster"] is None
+    assert body["reason"] == "not_a_member_of_league"
+
+
+def test_my_roster_returns_matching_roster(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "someone-else"},
+                    {"roster_id": 2, "owner_id": "sleeper-user-1", "players": ["p1", "p2"]},
+                ],
+            ):
+                response = client.get("/v1/leagues/abc/my-roster", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reason"] == ""
+    assert body["roster"]["roster_id"] == 2
+    assert body["roster"]["players"] == ["p1", "p2"]
 
 
 def _fake_players_dataset():

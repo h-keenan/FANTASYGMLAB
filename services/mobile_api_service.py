@@ -9,6 +9,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}                — Sleeper league metadata
   - GET  /v1/leagues/{id}/users          — Sleeper league members
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
+  - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
   - GET  /v1/news                        — curated NFL fantasy news (injury/role/transaction/off-field)
@@ -48,6 +49,7 @@ from modules import (
     player_eligibility,
     rankings,
     sleeper,
+    sleeper_leagues,
 )
 
 
@@ -139,13 +141,14 @@ def require_user(authorization: str | None = Header(default=None)) -> dict[str, 
     return normalized
 
 
-def _fetch_profile_entitlement(config: dict, user_id: str, access_token: str) -> str:
-    """Read `profiles.entitlement` using the caller's own token (RLS-scoped)."""
+def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict[str, str]:
+    """Read select `profiles` columns using the caller's own token (RLS-scoped)."""
 
+    defaults = {"entitlement": "free", "sleeper_username": ""}
     url = auth_supabase.rest_api_url(
         config,
         "profiles",
-        f"select=entitlement&user_id=eq.{user_id}",
+        f"select=entitlement,sleeper_username&user_id=eq.{user_id}",
     )
     try:
         response = requests.get(
@@ -154,32 +157,37 @@ def _fetch_profile_entitlement(config: dict, user_id: str, access_token: str) ->
             timeout=15,
         )
     except Exception:
-        return "free"
+        return defaults
     if response.status_code >= 400:
-        return "free"
+        return defaults
     try:
         rows = response.json()
     except Exception:
-        return "free"
+        return defaults
     if isinstance(rows, list) and rows and isinstance(rows[0], dict):
-        entitlement = str(rows[0].get("entitlement") or "free").strip().lower()
-        return entitlement if entitlement in {"free", "premium"} else "free"
-    return "free"
+        row = rows[0]
+        entitlement = str(row.get("entitlement") or "free").strip().lower()
+        return {
+            "entitlement": entitlement if entitlement in {"free", "premium"} else "free",
+            "sleeper_username": str(row.get("sleeper_username") or "").strip(),
+        }
+    return defaults
 
 
 @app.get("/v1/me")
 def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
-    entitlement = "free"
+    profile = {"entitlement": "free", "sleeper_username": ""}
     if user_id:
-        entitlement = _fetch_profile_entitlement(config, user_id, str(user.get("_access_token") or ""))
+        profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
     return {
         "ok": True,
         "user": {
             "id": user_id,
             "email": user.get("email") or "",
-            "entitlement": entitlement,
+            "entitlement": profile["entitlement"],
+            "sleeper_username": profile["sleeper_username"],
         },
     }
 
@@ -200,6 +208,35 @@ def get_league_users(league_id: str, _user: dict[str, Any] = Depends(require_use
 @app.get("/v1/leagues/{league_id}/rosters")
 def get_league_rosters(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     return {"ok": True, "rosters": sleeper.get_rosters(league_id)}
+
+
+@app.get("/v1/leagues/{league_id}/my-roster")
+def get_my_roster(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Identify which of this league's rosters belongs to the signed-in user.
+
+    Resolves via the Sleeper username linked on their profile (same
+    profiles.sleeper_username the web app sets) -> Sleeper user_id -> the
+    roster whose owner_id matches. All non-matches are expected, everyday
+    states (not errors), so this always returns 200 with a `reason` the
+    client can act on instead of parsing HTTP status semantics.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    sleeper_username = str(profile.get("sleeper_username") or "")
+    if not sleeper_username:
+        return {"ok": True, "roster": None, "reason": "no_sleeper_username_linked"}
+
+    sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
+    if not sleeper_user_id:
+        return {"ok": True, "roster": None, "reason": "sleeper_user_not_found"}
+
+    for roster in sleeper.get_rosters(league_id):
+        if str(roster.get("owner_id") or "") == sleeper_user_id:
+            return {"ok": True, "roster": roster, "reason": ""}
+
+    return {"ok": True, "roster": None, "reason": "not_a_member_of_league"}
 
 
 MAX_PLAYER_IDS_PER_REQUEST = 300

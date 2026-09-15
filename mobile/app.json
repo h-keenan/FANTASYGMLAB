@@ -9,7 +9,10 @@
     "scheme": "fantasygmlab",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fantasygmlab.app"
+      "bundleIdentifier": "com.fantasygmlab.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.fantasygmlab.app",

@@ -13,6 +13,7 @@ interface TeamRow {
   rosterId: number | string;
   ownerName: string;
   playerIds: string[];
+  isMine: boolean;
 }
 
 export default function LeagueDetailScreen({ route, navigation }: Props) {
@@ -39,9 +40,10 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
     async function load() {
       try {
-        const [usersResult, rostersResult] = await Promise.all([
+        const [usersResult, rostersResult, myRosterResult] = await Promise.all([
           api.getLeagueUsers(leagueId),
           api.getLeagueRosters(leagueId),
+          api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
         ]);
         if (cancelled) return;
 
@@ -54,15 +56,22 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           if (id) usersById.set(id, name);
         }
 
+        const myRosterId = myRosterResult.roster
+          ? String(myRosterResult.roster.roster_id ?? '')
+          : '';
+
         const rows: TeamRow[] = rostersResult.rosters.map((roster) => {
           const ownerId = String(roster.owner_id ?? '');
           const players = Array.isArray(roster.players) ? roster.players : [];
+          const rosterId = String(roster.roster_id ?? '');
           return {
-            rosterId: String(roster.roster_id ?? ''),
+            rosterId,
             ownerName: usersById.get(ownerId) ?? 'Unclaimed team',
             playerIds: players.map(String),
+            isMine: Boolean(myRosterId) && rosterId === myRosterId,
           };
         });
+        rows.sort((a, b) => Number(b.isMine) - Number(a.isMine));
         setTeams(rows);
       } catch (err) {
         if (!cancelled) {
@@ -112,7 +121,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       }
       renderItem={({ item }) => (
         <AnimatedCard
-          style={styles.card}
+          style={StyleSheet.flatten([styles.card, item.isMine && styles.cardMine])}
           onPress={() =>
             navigation.navigate('TeamRoster', {
               ownerName: item.ownerName,
@@ -121,9 +130,16 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           }
         >
           <View style={styles.row}>
-            <Text style={styles.owner} numberOfLines={1}>
-              {item.ownerName}
-            </Text>
+            <View style={styles.ownerGroup}>
+              <Text style={styles.owner} numberOfLines={1}>
+                {item.ownerName}
+              </Text>
+              {item.isMine ? (
+                <View style={styles.mineBadge}>
+                  <Text style={styles.mineBadgeText}>You</Text>
+                </View>
+              ) : null}
+            </View>
             <View style={styles.countPill}>
               <Text style={styles.count}>{item.playerIds.length}</Text>
             </View>
@@ -145,12 +161,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   card: { padding: spacing.lg },
+  cardMine: { borderWidth: 2, borderColor: colors.accent },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  owner: { flex: 1, fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm },
+  ownerGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: spacing.sm },
+  owner: { fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm, flexShrink: 1 },
+  mineBadge: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  mineBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   countPill: {
     backgroundColor: colors.background,
     borderRadius: radii.pill,
