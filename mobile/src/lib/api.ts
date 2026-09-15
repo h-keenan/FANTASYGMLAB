@@ -148,6 +148,25 @@ export interface NewsResponse {
   items: NewsItem[];
 }
 
+export interface AlertItem extends NewsItem {
+  matched_player: string | null;
+  relevance_reason: string | null;
+}
+
+export type AlertsReason =
+  | ''
+  | 'no_sleeper_username_linked'
+  | 'sleeper_user_not_found'
+  | 'not_a_member_of_league'
+  | 'empty_roster'
+  | 'no_player_data';
+
+export interface AlertsResponse {
+  ok: true;
+  items: AlertItem[];
+  reason: AlertsReason;
+}
+
 export type TeamStrategy =
   | 'contender'
   | 'fringe_contender'
@@ -246,6 +265,8 @@ export const api = {
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
   getLeagueRecap: (leagueId: string) =>
     authorizedFetch<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap`),
+  getLeagueAlerts: (leagueId: string, limit = 12) =>
+    authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
   postTradeAnalyzer: (
     leagueId: string,
     body: {

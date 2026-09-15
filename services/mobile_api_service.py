@@ -15,6 +15,7 @@ Deployment topology (Render):
   - GET  /v1/news                        — curated NFL fantasy news (injury/role/transaction/off-field)
   - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
   - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
+  - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -620,3 +621,58 @@ def get_league_recap(league_id: str, _user: dict[str, Any] = Depends(require_use
         power_ranks=None,
     )
     return {"ok": True, "recap": recap, "reason": ""}
+
+
+def _project_alert_item(item: dict[str, Any]) -> dict[str, Any]:
+    payload = _project_news_item(item)
+    payload["matched_player"] = _clean_json_value(item.get("matched_player"))
+    payload["relevance_reason"] = _clean_json_value(item.get("relevance_reason"))
+    return payload
+
+
+@app.get("/v1/leagues/{league_id}/alerts")
+def get_league_alerts(
+    league_id: str,
+    limit: int = 12,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Roster-relevant news alerts — "what happened that matters to me,"
+    not a general feed (see GET /v1/news for that). Shares the exact same
+    roster-news filtering and curation the web app uses
+    (modules.my_news.filter_news_for_players / curate_player_news), scoped
+    to the signed-in user's actual roster via the same my-roster resolution
+    `/trade-analyzer` uses. Read/unread state and cross-league aggregation
+    are not implemented — this is a stateless "recent relevant news" feed,
+    not the web app's full Alerts notification system.
+    """
+
+    if not 1 <= limit <= MAX_NEWS_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_NEWS_LIMIT}.")
+
+    my_roster, reason = _resolve_my_roster(user, league_id)
+    if my_roster is None:
+        return {"ok": True, "items": [], "reason": reason}
+
+    roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    if not roster_ids:
+        return {"ok": True, "items": [], "reason": "empty_roster"}
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    if players_df.empty:
+        return {"ok": True, "items": [], "reason": "no_player_data"}
+
+    mine = players_df[players_df["player_id"].astype(str).isin(roster_ids)]
+    player_names = [str(name) for name in mine.get("name", []) if str(name).strip()]
+    roster_teams = sorted({str(team) for team in mine.get("team", []) if str(team).strip()})
+    if not player_names:
+        return {"ok": True, "items": [], "reason": "no_player_data"}
+
+    news_cache.schedule_news_cache_refresh()
+    pool = news_cache.load_cached_news_pool()
+    filtered = my_news.filter_news_for_players(pool, player_names, roster_teams)
+    curated = my_news.curate_player_news(filtered, max_items=limit)
+
+    items = [_project_alert_item(item) for item in curated]
+    return {"ok": True, "items": items, "reason": ""}

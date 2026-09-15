@@ -805,3 +805,91 @@ def test_recap_returns_real_weekly_recap(monkeypatch):
     # would leave this empty.
     assert recap["stories"]
     assert recap["incomplete"] is False
+
+
+def test_alerts_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/alerts")
+    assert response.status_code == 401
+
+
+def test_alerts_rejects_bad_limit(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/alerts?limit=0",
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_alerts_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get("/v1/leagues/abc/alerts", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"] == []
+    assert body["reason"] == "no_sleeper_username_linked"
+
+
+def test_alerts_returns_real_roster_relevant_news(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    fake_pool = [
+        {
+            "title": "Star Wideout (ankle) limited in practice",
+            "summary": "The receiver was limited with an ankle issue heading into Sunday.",
+            "link": "https://example.com/star-wideout-injury",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 1000.0,
+        },
+        {
+            "title": "Unrelated player signs endorsement deal",
+            "summary": "A player not on this roster signed a new deal.",
+            "link": "https://example.com/unrelated",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 2000.0,
+        },
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["9001"]}],
+            ):
+                with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                    with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+                        with patch("modules.news.load_cached_news_pool", return_value=fake_pool):
+                            response = client.get(
+                                "/v1/leagues/abc/alerts",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    items = body["items"]
+    # Only the roster-relevant item survives — this exercises the real
+    # modules.my_news filtering/curation, not a mocked result.
+    assert len(items) == 1
+    assert items[0]["matched_player"] == "Star Wideout"
+    assert "ankle" in items[0]["title"].casefold()
