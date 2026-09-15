@@ -1,7 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+import { colors } from '../theme';
 
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
@@ -10,6 +12,7 @@ import LeagueDetailScreen from '../screens/LeagueDetailScreen';
 import TeamRosterScreen from '../screens/TeamRosterScreen';
 import PaywallScreen from '../screens/PaywallScreen';
 import TradeCalculatorScreen from '../screens/TradeCalculatorScreen';
+import NewsScreen from '../screens/NewsScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -17,6 +20,7 @@ export type RootStackParamList = {
   TeamRoster: { ownerName: string; playerIds: string[] };
   Paywall: undefined;
   TradeCalculator: { leagueId: string; leagueName: string };
+  News: undefined;
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -40,7 +44,14 @@ export default function RootNavigator() {
           <AppStack.Screen
             name="Home"
             component={HomeScreen}
-            options={{ title: 'FantasyGM Lab' }}
+            options={({ navigation }) => ({
+              title: 'FantasyGM Lab',
+              headerRight: () => (
+                <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8}>
+                  <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '600' }}>News</Text>
+                </TouchableOpacity>
+              ),
+            })}
           />
           <AppStack.Screen name="LeagueDetail" component={LeagueDetailScreen} />
           <AppStack.Screen name="TeamRoster" component={TeamRosterScreen} />
@@ -49,6 +60,7 @@ export default function RootNavigator() {
             component={TradeCalculatorScreen}
             options={{ title: 'Trade Calculator' }}
           />
+          <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}

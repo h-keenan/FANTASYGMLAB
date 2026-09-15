@@ -11,6 +11,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
+  - GET  /v1/news                        — curated NFL fantasy news (injury/role/transaction/off-field)
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -41,6 +42,9 @@ from modules import (
     auth_supabase,
     canonical_player_ranking,
     league_value_settings,
+    my_news,
+    news as news_cache,
+    news_signal,
     player_eligibility,
     rankings,
     sleeper,
@@ -246,6 +250,17 @@ def get_players(
 
 PLAYERS_DB_PATH = "data/players.db"
 MAX_RANKINGS_LIMIT = 300
+MAX_NEWS_LIMIT = 50
+
+# Only actionable signal — a generic/off-topic headline (the RSS cache is a
+# broad NFL feed, not fantasy-specific) classifies as EVENT_HEADLINE and is
+# dropped, same taxonomy the web app's roster news feed uses.
+_ACTIONABLE_NEWS_EVENTS = {
+    news_signal.EVENT_INJURY,
+    news_signal.EVENT_ROLE,
+    news_signal.EVENT_TRANSACTION,
+    news_signal.EVENT_OFF_FIELD,
+}
 
 
 def _clean_json_value(value: Any) -> Any:
@@ -338,3 +353,55 @@ def get_league_rankings(
     ranked = ranked.sort_values(score_field, ascending=False).head(limit)
     players = [_project_ranking_row(row, score_field) for _, row in ranked.iterrows()]
     return {"ok": True, "players": players}
+
+
+def _project_news_item(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "title": _clean_json_value(item.get("title")),
+        "link": _clean_json_value(item.get("link")),
+        "source": _clean_json_value(item.get("source")),
+        "summary": _clean_json_value(my_news.build_quick_news_summary(item)),
+        "published_ts": _clean_json_value(item.get("published_ts")),
+        "event_type": _clean_json_value(item.get("signal_primary_event")),
+        "speculative": bool(item.get("signal_speculative")),
+    }
+
+
+@app.get("/v1/news")
+def get_news(
+    limit: int = 30,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Curated general NFL fantasy news (injury/role/transaction/off-field
+    signal only — a generic headline is dropped). Not roster-scoped: this is
+    a league-wide feed for anyone, not "your team's" news.
+
+    Shares the same disk-cached pool and classification the web app uses
+    (modules.news, modules.news_signal) and never triggers a live RSS fetch
+    on this request path — schedule_news_cache_refresh only starts a
+    background refresh when the on-disk cache is already stale.
+    """
+
+    if not 1 <= limit <= MAX_NEWS_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_NEWS_LIMIT}.")
+
+    news_cache.schedule_news_cache_refresh()
+    pool = news_cache.load_cached_news_pool()
+
+    enriched = (news_signal.enrich_news_item(item) for item in pool if isinstance(item, dict))
+    actionable = [item for item in enriched if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS]
+    actionable.sort(key=my_news.news_timestamp, reverse=True)
+
+    seen_links: set[str] = set()
+    items: list[dict[str, Any]] = []
+    for item in actionable:
+        link = str(item.get("link") or "").strip().lower()
+        if link and link in seen_links:
+            continue
+        if link:
+            seen_links.add(link)
+        items.append(_project_news_item(item))
+        if len(items) >= limit:
+            break
+
+    return {"ok": True, "items": items}
