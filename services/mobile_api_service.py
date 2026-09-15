@@ -13,6 +13,7 @@ Deployment topology (Render):
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
   - GET  /v1/news                        — curated NFL fantasy news (injury/role/transaction/off-field)
+  - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -35,6 +36,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 import pandas as pd
 import requests
@@ -50,7 +52,10 @@ from modules import (
     rankings,
     sleeper,
     sleeper_leagues,
+    trade_analyzer_fit,
+    trade_offer_analyzer,
 )
+from modules.trade_analyzer_assembly import player_asset_from_mapping
 
 
 SERVICE_NAME = "mobile-api"
@@ -210,15 +215,14 @@ def get_league_rosters(league_id: str, _user: dict[str, Any] = Depends(require_u
     return {"ok": True, "rosters": sleeper.get_rosters(league_id)}
 
 
-@app.get("/v1/leagues/{league_id}/my-roster")
-def get_my_roster(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+def _resolve_my_roster(user: dict[str, Any], league_id: str) -> tuple[dict[str, Any] | None, str]:
     """Identify which of this league's rosters belongs to the signed-in user.
 
     Resolves via the Sleeper username linked on their profile (same
     profiles.sleeper_username the web app sets) -> Sleeper user_id -> the
     roster whose owner_id matches. All non-matches are expected, everyday
-    states (not errors), so this always returns 200 with a `reason` the
-    client can act on instead of parsing HTTP status semantics.
+    states (not errors) — callers return 200 with the `reason` rather than
+    an HTTP error status for any of them.
     """
 
     config = auth_supabase.get_supabase_config()
@@ -226,17 +230,29 @@ def get_my_roster(league_id: str, user: dict[str, Any] = Depends(require_user)) 
     profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
     sleeper_username = str(profile.get("sleeper_username") or "")
     if not sleeper_username:
-        return {"ok": True, "roster": None, "reason": "no_sleeper_username_linked"}
+        return None, "no_sleeper_username_linked"
 
     sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
     if not sleeper_user_id:
-        return {"ok": True, "roster": None, "reason": "sleeper_user_not_found"}
+        return None, "sleeper_user_not_found"
 
     for roster in sleeper.get_rosters(league_id):
         if str(roster.get("owner_id") or "") == sleeper_user_id:
-            return {"ok": True, "roster": roster, "reason": ""}
+            return roster, ""
 
-    return {"ok": True, "roster": None, "reason": "not_a_member_of_league"}
+    return None, "not_a_member_of_league"
+
+
+@app.get("/v1/leagues/{league_id}/my-roster")
+def get_my_roster(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Identify which of this league's rosters belongs to the signed-in user.
+
+    Always returns 200 with a `reason` the client can act on instead of
+    parsing HTTP status semantics — see `_resolve_my_roster`.
+    """
+
+    roster, reason = _resolve_my_roster(user, league_id)
+    return {"ok": True, "roster": roster, "reason": reason}
 
 
 MAX_PLAYER_IDS_PER_REQUEST = 300
@@ -442,3 +458,97 @@ def get_news(
             break
 
     return {"ok": True, "items": items}
+
+
+class TradeAnalyzerRequest(BaseModel):
+    send_player_ids: list[str] = Field(default_factory=list)
+    receive_player_ids: list[str] = Field(default_factory=list)
+    # Any unrecognized value falls back to "retool" — see
+    # modules.team_eval.normalize_team_strategy — so this is never rejected.
+    strategy: str = "retool"
+    lens: str = "Dynasty"
+
+
+@app.post("/v1/leagues/{league_id}/trade-analyzer")
+def post_trade_analyzer(
+    league_id: str,
+    body: TradeAnalyzerRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Real accept/decline/counter verdict for a proposed trade package.
+
+    Shares the exact same fit engine as the web app's Trade Analyzer
+    (modules.trade_analyzer_fit, extracted from app.py) and the same
+    verdict logic (modules.trade_offer_analyzer) — this does not invent a
+    new scoring model. Roster-specific, so it needs the signed-in user's
+    own roster in this league (see `_resolve_my_roster`); any of that
+    resolution's non-match states, or an empty/invalid package, return 200
+    with a `reason` rather than an HTTP error, since they're everyday
+    states a client should handle gracefully (e.g. prompt to link Sleeper).
+    """
+
+    if body.lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    if not body.send_player_ids and not body.receive_player_ids:
+        raise HTTPException(status_code=422, detail="Provide at least one player on either side of the trade.")
+
+    my_roster, reason = _resolve_my_roster(user, league_id)
+    if my_roster is None:
+        return {"ok": True, "verdict": None, "reason": reason}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_trade_analyzer"
+    )
+    if players_df.empty:
+        return {"ok": True, "verdict": None, "reason": "no_player_data"}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, body.lens, settings)
+    score_field = league_value_settings.valuation_score_field(body.lens)
+
+    my_roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    my_team_df = valued[valued["player_id"].astype(str).isin(my_roster_ids)].copy()
+    if my_team_df.empty:
+        return {"ok": True, "verdict": None, "reason": "empty_roster"}
+
+    def build_assets(player_ids: list[str]) -> list[dict[str, Any]]:
+        wanted = {str(pid) for pid in player_ids if pid}
+        if not wanted:
+            return []
+        rows = valued[valued["player_id"].astype(str).isin(wanted)]
+        return [player_asset_from_mapping(row, score_field=score_field) for _, row in rows.iterrows()]
+
+    send_assets = build_assets(body.send_player_ids)
+    receive_assets = build_assets(body.receive_player_ids)
+    if not send_assets and not receive_assets:
+        return {"ok": True, "verdict": None, "reason": "assets_not_found"}
+
+    fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
+        my_team_df=my_team_df,
+        all_players_df=valued,
+        send_assets=send_assets,
+        receive_assets=receive_assets,
+        metrics=None,
+        strategy=body.strategy,
+        lineup_settings=settings,
+        score_field=score_field,
+    )
+    if not fit or not fit.get("available"):
+        return {"ok": True, "verdict": None, "reason": "fit_unavailable"}
+
+    verdict = trade_offer_analyzer.decide_offer_verdict(
+        fit,
+        send_assets=send_assets,
+        receive_assets=receive_assets,
+    )
+    return {"ok": True, "verdict": verdict.to_public_dict(), "reason": ""}

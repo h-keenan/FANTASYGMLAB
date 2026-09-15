@@ -250,6 +250,159 @@ def test_my_roster_returns_matching_roster(monkeypatch):
     assert body["roster"]["players"] == ["p1", "p2"]
 
 
+def _fake_roster_frame():
+    positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "RB", "WR"]
+    rows = []
+    for i, position in enumerate(positions, start=1):
+        rows.append(
+            {
+                "player_id": f"my{i}",
+                "name": f"My Player {i}",
+                "position": position,
+                "team": "KC",
+                "age": 26,
+                "years_exp": 4,
+                "status": "Active",
+                "injury_status": None,
+                "score": 2000,
+                "dynasty_score": 2000,
+                "value_score": 2000,
+                "rebuild_score": 2000,
+            }
+        )
+    # A clearly-weaker bench RB to trade away.
+    rows.append(
+        {
+            "player_id": "my_bench_rb",
+            "name": "Bench Runner",
+            "position": "RB",
+            "team": "KC",
+            "age": 30,
+            "years_exp": 8,
+            "status": "Active",
+            "injury_status": None,
+            "score": 300,
+            "dynasty_score": 300,
+            "value_score": 300,
+            "rebuild_score": 300,
+        }
+    )
+    # A clearly-better available RB to trade for.
+    rows.append(
+        {
+            "player_id": "target_rb",
+            "name": "Target Runner",
+            "position": "RB",
+            "team": "SF",
+            "age": 25,
+            "years_exp": 3,
+            "status": "Active",
+            "injury_status": None,
+            "score": 6000,
+            "dynasty_score": 6000,
+            "value_score": 6000,
+            "rebuild_score": 6000,
+        }
+    )
+    return pd.DataFrame(rows)
+
+
+_TRADE_ANALYZER_LEAGUE = {
+    "scoring_settings": {"rec": 1.0},
+    "settings": {"type": 2},
+    "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN", "BN"],
+    "total_rosters": 12,
+}
+
+
+def test_trade_analyzer_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.post("/v1/leagues/abc/trade-analyzer", json={"send_player_ids": ["p1"]})
+    assert response.status_code == 401
+
+
+def test_trade_analyzer_rejects_empty_package(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/leagues/abc/trade-analyzer",
+            json={},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_trade_analyzer_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.post(
+            "/v1/leagues/abc/trade-analyzer",
+            json={"send_player_ids": ["my_bench_rb"], "receive_player_ids": ["target_rb"]},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["verdict"] is None
+    assert body["reason"] == "no_sleeper_username_linked"
+
+
+def test_trade_analyzer_returns_real_verdict_for_lopsided_upgrade(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids}],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            response = client.post(
+                                "/v1/leagues/abc/trade-analyzer",
+                                json={
+                                    "send_player_ids": ["my_bench_rb"],
+                                    "receive_player_ids": ["target_rb"],
+                                    "strategy": "contender",
+                                },
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    verdict = body["verdict"]
+    # A clearly better RB (6000) for a clearly worse one (300) on a
+    # contender roster should land as a real accept, not a mocked stub —
+    # this exercises the actual fit engine + verdict logic end to end.
+    assert verdict["tone"] == "accept"
+    assert verdict["value_delta"] > 0
+    for key in ("band", "ui_verdict", "confidence", "rationale", "value_summary", "roster_summary"):
+        assert key in verdict
+
+
 def _fake_players_dataset():
     return {
         "1001": {

@@ -17,16 +17,22 @@ export class ApiError extends Error {
   }
 }
 
-async function authorizedFetch<T>(path: string): Promise<T> {
+async function authorizedRequest<T>(
+  path: string,
+  init?: { method?: 'GET' | 'POST'; jsonBody?: unknown },
+): Promise<T> {
   const { data, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !data.session) {
     throw new ApiError(401, 'Not signed in.');
   }
 
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
+    method: init?.method ?? 'GET',
     headers: {
       Authorization: `Bearer ${data.session.access_token}`,
+      ...(init?.jsonBody !== undefined ? { 'Content-Type': 'application/json' } : {}),
     },
+    ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
   });
 
   let body: unknown = null;
@@ -45,6 +51,14 @@ async function authorizedFetch<T>(path: string): Promise<T> {
   }
 
   return body as T;
+}
+
+function authorizedFetch<T>(path: string): Promise<T> {
+  return authorizedRequest<T>(path);
+}
+
+function authorizedPost<T>(path: string, jsonBody: unknown): Promise<T> {
+  return authorizedRequest<T>(path, { method: 'POST', jsonBody });
 }
 
 export interface MeResponse {
@@ -134,6 +148,44 @@ export interface NewsResponse {
   items: NewsItem[];
 }
 
+export type TeamStrategy =
+  | 'contender'
+  | 'fringe_contender'
+  | 'retool'
+  | 'rebuild'
+  | 'tank';
+
+export interface TradeVerdict {
+  band: string;
+  ui_verdict: 'ACCEPT' | 'DECLINE' | 'COUNTER' | 'FAIR';
+  confidence: string;
+  rationale: string;
+  value_summary: string;
+  roster_summary: string;
+  strategy_summary: string;
+  risk_summary: string;
+  counter_guidance: string;
+  fit_total: number;
+  value_delta: number;
+  tone: 'accept' | 'counter' | 'decline' | 'fair';
+}
+
+export type TradeAnalyzerReason =
+  | ''
+  | 'no_sleeper_username_linked'
+  | 'sleeper_user_not_found'
+  | 'not_a_member_of_league'
+  | 'no_player_data'
+  | 'empty_roster'
+  | 'assets_not_found'
+  | 'fit_unavailable';
+
+export interface TradeAnalyzerResponse {
+  ok: true;
+  verdict: TradeVerdict | null;
+  reason: TradeAnalyzerReason;
+}
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -161,6 +213,21 @@ export const api = {
     );
   },
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
+  postTradeAnalyzer: (
+    leagueId: string,
+    body: {
+      sendPlayerIds: string[];
+      receivePlayerIds: string[];
+      strategy?: TeamStrategy;
+      lens?: ValuationLens;
+    },
+  ) =>
+    authorizedPost<TradeAnalyzerResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/trade-analyzer`, {
+      send_player_ids: body.sendPlayerIds,
+      receive_player_ids: body.receivePlayerIds,
+      strategy: body.strategy ?? 'retool',
+      lens: body.lens ?? 'Dynasty',
+    }),
   getPlayers: async (playerIds: string[]): Promise<Record<string, PlayerSummary>> => {
     const uniqueIds = [...new Set(playerIds.filter(Boolean))];
     if (uniqueIds.length === 0) return {};
