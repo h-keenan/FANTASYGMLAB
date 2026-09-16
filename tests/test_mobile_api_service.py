@@ -1650,9 +1650,9 @@ def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monke
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
     fake_cards = [_fake_idea_record(f"Rival {i}", gain=10 - i) for i in range(4)]
 
-    # Two full requests, each: require_user's auth check + _resolve_my_roster's
-    # profile fetch + this endpoint's own entitlement profile fetch.
-    responses = [auth_user_response, profile_response, profile_response] * 2
+    # Two full requests, each: require_user's auth check + one profile fetch
+    # shared between entitlement and _resolve_my_roster (no double-fetch).
+    responses = [auth_user_response, profile_response] * 2
     with patch("requests.get", side_effect=responses):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
@@ -1711,7 +1711,7 @@ def test_trade_hub_premium_entitlement_sees_full_board_ignoring_ad_unlocks(monke
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
     fake_cards = [_fake_idea_record(f"Rival {i}", gain=10 - i) for i in range(3)]
 
-    with patch("requests.get", side_effect=[auth_user_response, profile_response, profile_response]):
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
                 "modules.sleeper.get_rosters",
