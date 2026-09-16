@@ -339,6 +339,12 @@ export interface GmTargetMutationResponse {
   cap?: number;
 }
 
+export interface PushMutationResponse {
+  ok: boolean;
+  reason: string;
+  sent?: number;
+}
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -389,6 +395,17 @@ export const api = {
     authorizedDelete<GmTargetMutationResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}`,
     ),
+  registerPushToken: (expoPushToken: string, platform: string, deviceName = '') =>
+    authorizedPost<PushMutationResponse>('/v1/push/register', {
+      expo_push_token: expoPushToken,
+      platform,
+      device_name: deviceName,
+    }),
+  unregisterPushToken: (expoPushToken: string) =>
+    authorizedPost<PushMutationResponse>('/v1/push/unregister', {
+      expo_push_token: expoPushToken,
+    }),
+  sendTestPush: () => authorizedPost<PushMutationResponse>('/v1/push/test', {}),
   markAlertRead: (leagueId: string, alertKey: string) =>
     authorizedPost<{ ok: boolean; reason: string }>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,

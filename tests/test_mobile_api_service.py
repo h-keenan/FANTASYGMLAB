@@ -1336,3 +1336,131 @@ def test_player_awards_returns_real_badges_for_a_qualifying_season(monkeypatch):
     assert any(award["short_label"] == "1,500+ Rec Yds" for award in body["awards"])
     for award in body["awards"]:
         assert award["tier"] in {"gold", "silver", "bronze", None}
+
+
+def test_register_push_token_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.post("/v1/push/register", json={"expo_push_token": "ExponentPushToken[abc]"})
+    assert response.status_code == 401
+
+
+def test_register_push_token_rejects_malformed_token(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/push/register",
+            json={"expo_push_token": "not-a-real-token"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "reason": "not_available"}
+
+
+def test_register_push_token_upserts_with_callers_own_token(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    upsert_response = Mock(status_code=201)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/push/register",
+                json={
+                    "expo_push_token": "ExponentPushToken[abc123]",
+                    "platform": "ios",
+                    "device_name": "Test iPhone",
+                },
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    call_kwargs = mock_post.call_args.kwargs
+    assert call_kwargs["headers"]["Authorization"] == "Bearer good-token"
+    assert call_kwargs["json"] == {
+        "expo_push_token": "ExponentPushToken[abc123]",
+        "user_id": "user-123",
+        "platform": "ios",
+        "device_name": "Test iPhone",
+    }
+    assert "on_conflict=expo_push_token" in mock_post.call_args.args[0]
+
+
+def test_unregister_push_token_deletes_callers_own_row(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    delete_response = Mock(status_code=204)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.delete", return_value=delete_response) as mock_delete:
+            response = client.post(
+                "/v1/push/unregister",
+                json={"expo_push_token": "ExponentPushToken[abc123]"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    assert "user_id=eq.user-123" in mock_delete.call_args.args[0]
+    assert "expo_push_token=eq.ExponentPushToken[abc123]" in mock_delete.call_args.args[0]
+
+
+def test_send_test_push_reports_no_registered_tokens(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    empty_tokens_response = Mock(status_code=200)
+    empty_tokens_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, empty_tokens_response]):
+        response = client.post(
+            "/v1/push/test",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "reason": "no_registered_tokens"}
+
+
+def test_send_test_push_delivers_via_expo_for_registered_tokens(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    tokens_response = Mock(status_code=200)
+    tokens_response.json.return_value = [{"expo_push_token": "ExponentPushToken[abc123]"}]
+    expo_response = Mock(status_code=200)
+    expo_response.json.return_value = {"data": [{"status": "ok"}]}
+
+    with patch("requests.get", side_effect=[auth_user_response, tokens_response]):
+        with patch("requests.post", return_value=expo_response) as mock_post:
+            response = client.post(
+                "/v1/push/test",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {"ok": True, "reason": "", "sent": 1}
+    # Real modules.push_tokens.send_expo_push_notifications engine, not a
+    # mocked result — verifies it actually posts to Expo's push API.
+    assert mock_post.call_args.args[0] == "https://exp.host/--/api/v2/push/send"
+    sent_messages = mock_post.call_args.kwargs["json"]
+    assert sent_messages == [
+        {
+            "to": "ExponentPushToken[abc123]",
+            "title": "FantasyGM Lab",
+            "body": mock_post.call_args.kwargs["json"][0]["body"],
+            "data": {"kind": "test"},
+        }
+    ]

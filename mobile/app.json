@@ -37,7 +37,13 @@
           }
         }
       ],
-      "./plugins/withIosMinDeploymentTarget.js"
+      "./plugins/withIosMinDeploymentTarget.js",
+      [
+        "expo-notifications",
+        {
+          "color": "#22D3EE"
+        }
+      ]
     ]
   }
 }
