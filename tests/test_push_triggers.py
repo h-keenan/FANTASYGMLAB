@@ -1,0 +1,180 @@
+"""modules.push_triggers — the basic automated push-trigger sweep.
+
+Mocks requests (the Supabase service-role + Sleeper I/O boundary) and the
+dashboard_engine composition call, matching the mocking convention used
+across the mobile API tests.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import Mock, patch
+
+import pandas as pd
+
+from modules import push_tokens, push_triggers
+
+
+def _config() -> push_triggers.PushTriggerConfig:
+    return push_triggers.PushTriggerConfig(url="https://example.supabase.co", service_role_key="service-role-key")
+
+
+def test_load_push_trigger_config_reads_expected_env_vars():
+    config = push_triggers.load_push_trigger_config(
+        environ={"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    )
+    assert config.configured
+    assert config.url == "https://x.supabase.co"
+    assert config.service_role_key == "srk"
+
+
+def test_load_push_trigger_config_not_configured_without_service_role_key():
+    config = push_triggers.load_push_trigger_config(environ={"SUPABASE_URL": "https://x.supabase.co"})
+    assert not config.configured
+
+
+def test_run_push_trigger_sweep_fails_soft_when_not_configured():
+    stats = push_triggers.run_push_trigger_sweep(environ={})
+    assert stats["ok"] is False
+    assert stats["configured"] is False
+    assert stats["pushes_sent"] == 0
+    assert stats["errors"]
+
+
+def test_fetch_push_recipients_groups_tokens_by_user():
+    response = Mock(status_code=200)
+    response.json.return_value = [
+        {"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"},
+        {"user_id": "u1", "expo_push_token": "ExponentPushToken[b]"},
+        {"user_id": "u2", "expo_push_token": "ExponentPushToken[c]"},
+    ]
+    with patch("requests.get", return_value=response):
+        recipients = push_triggers.fetch_push_recipients(_config())
+    assert recipients == {
+        "u1": ["ExponentPushToken[a]", "ExponentPushToken[b]"],
+        "u2": ["ExponentPushToken[c]"],
+    }
+
+
+def test_fetch_push_recipients_returns_empty_when_not_configured():
+    unconfigured = push_triggers.PushTriggerConfig()
+    with patch("requests.get") as mock_get:
+        recipients = push_triggers.fetch_push_recipients(unconfigured)
+    assert recipients == {}
+    mock_get.assert_not_called()
+
+
+def test_resolve_roster_for_sleeper_user_matches_owner_id():
+    rosters = [{"roster_id": 1, "owner_id": "other"}, {"roster_id": 2, "owner_id": "me"}]
+    match = push_triggers.resolve_roster_for_sleeper_user(rosters, "me")
+    assert match == {"roster_id": 2, "owner_id": "me"}
+    assert push_triggers.resolve_roster_for_sleeper_user(rosters, "nobody") is None
+
+
+def test_already_notified_true_when_row_exists():
+    response = Mock(status_code=200)
+    response.json.return_value = [{"recommendation_id": "rec1"}]
+    with patch("requests.get", return_value=response):
+        assert push_triggers.already_notified(_config(), user_id="u1", recommendation_id="rec1")
+
+
+def test_already_notified_false_when_no_row():
+    response = Mock(status_code=200)
+    response.json.return_value = []
+    with patch("requests.get", return_value=response):
+        assert not push_triggers.already_notified(_config(), user_id="u1", recommendation_id="rec1")
+
+
+def test_already_notified_fails_closed_on_transport_error():
+    with patch("requests.get", side_effect=Exception("network down")):
+        assert push_triggers.already_notified(_config(), user_id="u1", recommendation_id="rec1")
+
+
+def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    fake_item = Mock(category="top_priority", headline="Trade with Rival GM", recommendation_id="rec-abc")
+    fake_briefing = Mock(items=[fake_item])
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 50}])
+
+    push_tokens_response = Mock(status_code=200)
+    push_tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
+    profiles_response = Mock(status_code=200)
+    profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
+    not_notified_response = Mock(status_code=200)
+    not_notified_response.json.return_value = []
+    already_notified_response = Mock(status_code=200)
+    already_notified_response.json.return_value = [{"recommendation_id": "rec-abc"}]
+
+    with patch(
+        "modules.push_triggers.load_valued_players", return_value=(players_df, "dynasty_score")
+    ):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper_leagues.get_user_leagues",
+                return_value=[{"league_id": "league-1", "name": "Test League"}],
+            ):
+                with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+                    with patch(
+                        "modules.sleeper.get_rosters",
+                        return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+                    ):
+                        with patch(
+                            "modules.dashboard_engine.compose_next_move_briefing",
+                            return_value=fake_briefing,
+                        ):
+                            with patch(
+                                "requests.get",
+                                side_effect=[
+                                    push_tokens_response,
+                                    profiles_response,
+                                    not_notified_response,
+                                ],
+                            ):
+                                with patch("requests.post") as mock_post:
+                                    mock_post.return_value = Mock(status_code=200, json=lambda: {"data": [{"status": "ok"}]})
+                                    first_stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+
+    assert first_stats["configured"] is True
+    assert first_stats["accounts_checked"] == 1
+    assert first_stats["leagues_checked"] == 1
+    assert first_stats["pushes_sent"] == 1
+    assert not first_stats["errors"]
+    # First post is the Expo push send, second is the dedup-log insert.
+    push_call = mock_post.call_args_list[0]
+    assert push_call.args[0] == push_tokens.EXPO_PUSH_API_URL
+    assert push_call.kwargs["json"][0]["to"] == "ExponentPushToken[a]"
+    log_call = mock_post.call_args_list[1]
+    assert "push_notification_log" in log_call.args[0]
+    assert log_call.kwargs["json"]["recommendation_id"] == "rec-abc"
+
+    # Second sweep: the log now reports this recommendation as already sent.
+    with patch(
+        "modules.push_triggers.load_valued_players", return_value=(players_df, "dynasty_score")
+    ):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper_leagues.get_user_leagues",
+                return_value=[{"league_id": "league-1", "name": "Test League"}],
+            ):
+                with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+                    with patch(
+                        "modules.sleeper.get_rosters",
+                        return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+                    ):
+                        with patch(
+                            "modules.dashboard_engine.compose_next_move_briefing",
+                            return_value=fake_briefing,
+                        ):
+                            with patch(
+                                "requests.get",
+                                side_effect=[
+                                    push_tokens_response,
+                                    profiles_response,
+                                    already_notified_response,
+                                ],
+                            ):
+                                with patch("requests.post") as mock_post_second:
+                                    mock_post_second.return_value = Mock(status_code=200, json=lambda: {"data": []})
+                                    second_stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+
+    assert second_stats["pushes_sent"] == 0
+    mock_post_second.assert_not_called()
