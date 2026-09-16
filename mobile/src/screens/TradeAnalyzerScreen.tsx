@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -9,8 +10,10 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import PlayerAvatar from '../components/PlayerAvatar';
+import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer, type TeamStrategy, type TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -219,8 +222,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     );
   }
 
-  return (
-    <View style={styles.container}>
+  const header = (
+    <View>
       <Text style={styles.disclaimer}>
         The real accept / decline / counter verdict for {leagueName} — weighs asset value, starting
         lineup impact, roster needs, age, draft capital, and injury risk.
@@ -296,7 +299,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       </TouchableOpacity>
 
       {analyzeError ? <Text style={styles.error}>{analyzeError}</Text> : null}
-      {verdict ? <VerdictCard verdict={verdict} /> : null}
+      {verdict ? <VerdictCard verdict={verdict} sendIds={sendIds} receiveIds={receiveIds} leagueName={leagueName} /> : null}
 
       <TextInput
         style={styles.searchInput}
@@ -312,44 +315,90 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         autoCapitalize="none"
         placeholderTextColor={colors.textTertiary}
       />
+    </View>
+  );
 
-      <FlatList
-        data={searchResults}
-        keyExtractor={(item) => item.player_id}
-        contentContainerStyle={styles.resultsList}
-        keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.resultRow} onPress={() => addToSide(item)}>
-            <PlayerAvatar playerId={item.player_id} size={36} tier={item.tier} style={styles.resultAvatar} />
-            <View style={styles.resultInfo}>
-              <Text style={styles.resultName} numberOfLines={1}>
-                {item.name ?? 'Unknown'}
-              </Text>
+  return (
+    <FlatList
+      style={styles.container}
+      data={searchResults}
+      keyExtractor={(item) => item.player_id}
+      contentContainerStyle={styles.resultsList}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={header}
+      renderItem={({ item }) => (
+        <TouchableOpacity style={styles.resultRow} onPress={() => addToSide(item)}>
+          <PlayerAvatar playerId={item.player_id} size={36} tier={item.tier} style={styles.resultAvatar} />
+          <View style={styles.resultInfo}>
+            <Text style={styles.resultName} numberOfLines={1}>
+              {item.name ?? 'Unknown'}
+            </Text>
+            <View style={styles.resultMetaRow}>
               <Text style={styles.resultMeta}>
                 {[item.position, item.team].filter(Boolean).join(' · ')}
               </Text>
+              <TierBadge storedTier={item.tier} />
             </View>
-            <Text style={styles.resultScore}>{Math.round(playerScore(item))}</Text>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.empty}>
-            {activeSide === 'send' && myRosterIds.size === 0
-              ? 'No roster players found.'
-              : search
-                ? 'No matching players.'
-                : 'Start typing to search.'}
-          </Text>
-        }
-      />
-    </View>
+          </View>
+          <Text style={styles.resultScore}>{Math.round(playerScore(item))}</Text>
+        </TouchableOpacity>
+      )}
+      ListEmptyComponent={
+        <Text style={styles.empty}>
+          {activeSide === 'send' && myRosterIds.size === 0
+            ? 'No roster players found.'
+            : search
+              ? 'No matching players.'
+              : 'Start typing to search.'}
+        </Text>
+      }
+    />
   );
 }
 
-function VerdictCard({ verdict }: { verdict: TradeVerdict }) {
+function VerdictCard({
+  verdict,
+  sendIds,
+  receiveIds,
+  leagueName,
+}: {
+  verdict: TradeVerdict;
+  sendIds: RankedPlayer[];
+  receiveIds: RankedPlayer[];
+  leagueName: string;
+}) {
+  const onShare = () => {
+    const sendNames = sendIds.map((p) => p.name ?? 'Unknown').join(', ') || 'Nothing';
+    const receiveNames = receiveIds.map((p) => p.name ?? 'Unknown').join(', ') || 'Nothing';
+    const lines = [
+      `${leagueName} trade — ${verdict.band} (${verdict.confidence})`,
+      '',
+      `You send: ${sendNames}`,
+      `You receive: ${receiveNames}`,
+      '',
+      verdict.rationale,
+      '',
+      `Value: ${verdict.value_summary}`,
+      `Roster fit: ${verdict.roster_summary}`,
+      `Strategy fit: ${verdict.strategy_summary}`,
+      `Risk: ${verdict.risk_summary}`,
+    ];
+    if (verdict.counter_guidance) {
+      lines.push(`Counter guidance: ${verdict.counter_guidance}`);
+    }
+    lines.push('', 'Analyzed with FantasyGM Lab');
+    Share.share({ message: lines.join('\n') }).catch(() => {});
+  };
+
   return (
-    <View style={[styles.verdictCard, { borderColor: TONE_COLORS[verdict.tone] }]}>
-      <Text style={[styles.verdictBand, { color: TONE_COLORS[verdict.tone] }]}>{verdict.band}</Text>
+    <View style={[styles.verdictCard, { borderLeftColor: TONE_COLORS[verdict.tone] }]}>
+      <View style={styles.verdictHeaderRow}>
+        <Text style={[styles.verdictBand, { color: TONE_COLORS[verdict.tone] }]}>{verdict.band}</Text>
+        <TouchableOpacity style={styles.shareButton} onPress={onShare} hitSlop={8}>
+          <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
+          <Text style={styles.shareButtonText}>Share</Text>
+        </TouchableOpacity>
+      </View>
       <Text style={styles.verdictConfidence}>{verdict.confidence}</Text>
       <Text style={styles.verdictText}>{verdict.rationale}</Text>
       <Text style={styles.verdictLabel}>Value</Text>
@@ -467,11 +516,25 @@ const styles = StyleSheet.create({
   verdictCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
-    borderWidth: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 4,
     padding: spacing.lg,
     marginBottom: spacing.md,
   },
+  verdictHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   verdictBand: { fontSize: 18, fontWeight: '800', marginBottom: spacing.xs },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   verdictConfidence: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.sm },
   verdictLabel: {
     fontSize: 11,
@@ -504,7 +567,8 @@ const styles = StyleSheet.create({
   resultAvatar: { marginRight: spacing.sm },
   resultInfo: { flex: 1, marginRight: spacing.sm },
   resultName: { fontSize: 15, fontWeight: '500', color: colors.textPrimary },
-  resultMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  resultMeta: { fontSize: 12, color: colors.textSecondary },
+  resultMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   resultScore: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },

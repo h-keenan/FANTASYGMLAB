@@ -148,6 +148,54 @@ LEGAL_PAGES: dict[str, LegalPage] = {
             ),
         ),
     ),
+    "subscription_terms": LegalPage(
+        key="subscription_terms",
+        title="Subscription Terms",
+        kicker=f"{brand_identity.PREMIUM_LABEL} Subscription",
+        note=f"How {brand_identity.PRODUCT_NAME} Premium billing, renewal, and cancellation work.",
+        sections=(
+            LegalSection(
+                "Auto-renewing subscription",
+                (
+                    f"{brand_identity.PRODUCT_NAME} Premium is offered as an auto-renewing subscription. "
+                    "Payment is charged to your Apple ID (or Google Play) account at confirmation of purchase.",
+                    "Your subscription automatically renews for the same length of time unless "
+                    "auto-renew is turned off at least 24 hours before the end of the current period. "
+                    "Your account will be charged for renewal within 24 hours before the end of the "
+                    "current period, at the price you agreed to when subscribing.",
+                ),
+            ),
+            LegalSection(
+                "Managing or canceling",
+                (
+                    "You can manage or cancel your subscription anytime in your device's account "
+                    "settings — on iOS, under Settings > [your name] > Subscriptions; on Android, under "
+                    "the Google Play Store's Subscriptions page. Canceling stops future renewals but does "
+                    "not refund the current billing period.",
+                    "Current pricing and available plans (monthly, annual, or other terms) are shown on "
+                    f"the {brand_identity.PRODUCT_NAME} Premium screen before you subscribe, since pricing "
+                    "can vary by plan, region, and promotion.",
+                ),
+            ),
+            LegalSection(
+                "What Premium includes",
+                (
+                    "Premium unlocks full player rankings, unlimited saved leagues, and the complete "
+                    "Trade Analyzer and roster-analysis feature set. Feature availability may evolve as "
+                    f"{brand_identity.PRODUCT_NAME} develops; material reductions to paid functionality "
+                    "will be communicated where required by the app store you subscribed through.",
+                ),
+            ),
+            LegalSection(
+                "Related terms",
+                (
+                    "This page covers subscription billing specifically. See Terms of Use for the "
+                    "general conditions of using the app, and Privacy Policy for how account and usage "
+                    "data is handled.",
+                ),
+            ),
+        ),
+    ),
     "no_affiliation": LegalPage(
         key="no_affiliation",
         title="No-Affiliation Disclaimer",
@@ -178,6 +226,7 @@ LEGAL_FOOTER_LINKS = (
     ("About / Disclaimer", "about_disclaimer"),
     ("Terms", "terms"),
     ("Privacy", "privacy"),
+    ("Subscription Terms", "subscription_terms"),
     ("No Affiliation", "no_affiliation"),
 )
 

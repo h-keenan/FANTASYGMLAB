@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerAward, type QuickViewBio, type QuickViewStatItem, type QuickViewStats } from '../lib/api';
@@ -10,32 +11,55 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerDetail'>;
 
-function Stat({ label, value }: { label: string; value: string | number | null }) {
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
   return (
-    <View style={styles.statRow}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value ?? '—'}</Text>
+    <View style={styles.sectionHeadingRow}>
+      <Ionicons name={icon} size={15} color={colors.accent} style={styles.sectionHeadingIcon} />
+      <Text style={styles.sectionTitle}>{title}</Text>
     </View>
   );
 }
 
-function StatItemRow({ item }: { item: QuickViewStatItem }) {
+function StatCell({ label, value }: { label: string; value: string | number | null }) {
+  const display = value === null || value === undefined || value === '' ? '—' : value;
   return (
-    <View style={styles.statRow}>
-      <Text style={styles.statLabel}>{item.label}</Text>
-      <Text style={styles.statValue}>{item.value || '—'}</Text>
+    <View style={styles.statCell}>
+      <Text style={styles.statCellLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={styles.statCellValue} numberOfLines={1}>
+        {display}
+      </Text>
     </View>
   );
 }
 
-function StatSection({ title, items }: { title: string; items: QuickViewStatItem[] }) {
+function StatGrid({ items }: { items: Array<{ label: string; value: string | number | null }> }) {
+  return (
+    <View style={styles.statGrid}>
+      {items.map((item, index) => (
+        <StatCell key={`${item.label}-${index}`} label={item.label} value={item.value} />
+      ))}
+    </View>
+  );
+}
+
+function StatSection({
+  title,
+  icon,
+  items,
+}: {
+  title: string;
+  icon: IoniconName;
+  items: QuickViewStatItem[];
+}) {
   if (items.length === 0) return null;
   return (
     <View style={[styles.card, styles.cardSpaced]}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {items.map((item, index) => (
-        <StatItemRow key={`${item.label}-${index}`} item={item} />
-      ))}
+      <SectionHeading title={title} icon={icon} />
+      <StatGrid items={items.map((item) => ({ label: item.label, value: item.value || null }))} />
     </View>
   );
 }
@@ -50,14 +74,19 @@ function AwardsSection({ awards }: { awards: PlayerAward[] }) {
   if (awards.length === 0) return null;
   return (
     <View style={[styles.card, styles.cardSpaced]}>
-      <Text style={styles.sectionTitle}>Awards</Text>
+      <SectionHeading title="Awards" icon="trophy-outline" />
       <View style={styles.awardsWrap}>
         {awards.map((award) => {
           const tierColor = award.tier ? AWARD_TIER_COLORS[award.tier] : colors.border;
           return (
-            <View key={award.badge_id} style={[styles.awardChip, { borderColor: tierColor }]}>
-              <Text style={[styles.awardChipLabel, { color: tierColor }]}>{award.short_label}</Text>
-              {award.season ? <Text style={styles.awardChipSeason}>{award.season}</Text> : null}
+            <View key={award.badge_id} style={[styles.awardChip, { borderLeftColor: tierColor }]}>
+              <View style={[styles.awardMedal, { backgroundColor: `${tierColor}26` }]}>
+                <Ionicons name="medal" size={18} color={tierColor} />
+              </View>
+              <View style={styles.awardChipTextGroup}>
+                <Text style={[styles.awardChipLabel, { color: tierColor }]}>{award.short_label}</Text>
+                {award.season ? <Text style={styles.awardChipSeason}>{award.season}</Text> : null}
+              </View>
             </View>
           );
         })}
@@ -81,10 +110,8 @@ function BioSection({ bio }: { bio: QuickViewBio }) {
 
   return (
     <View style={[styles.card, styles.cardSpaced]}>
-      <Text style={styles.sectionTitle}>Bio</Text>
-      {rows.map(([label, value]) => (
-        <Stat key={label} label={label} value={value} />
-      ))}
+      <SectionHeading title="Bio" icon="person-outline" />
+      <StatGrid items={rows.map(([label, value]) => ({ label, value }))} />
     </View>
   );
 }
@@ -212,12 +239,17 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       </View>
 
       <View style={styles.card}>
-        <Stat label="Value score" value={player.score != null ? Math.round(player.score) : null} />
-        <Stat label="Overall rank" value={player.overall_rank} />
-        <Stat label="Position rank" value={player.position_rank} />
-        <Stat label="Age" value={player.age} />
-        <Stat label="Status" value={player.status} />
-        <Stat label="Injury status" value={player.injury_status ?? 'Healthy'} />
+        <SectionHeading title="Snapshot" icon="flash-outline" />
+        <StatGrid
+          items={[
+            { label: 'Value score', value: player.score != null ? Math.round(player.score) : null },
+            { label: 'Overall rank', value: player.overall_rank },
+            { label: 'Position rank', value: player.position_rank },
+            { label: 'Age', value: player.age },
+            { label: 'Status', value: player.status },
+            { label: 'Injury status', value: player.injury_status ?? 'Healthy' },
+          ]}
+        />
       </View>
 
       {player.rank_unavailable_reason ? (
@@ -232,12 +264,14 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           {season ? (
             <>
               <Text style={styles.seasonLabel}>{season.label}</Text>
-              <StatSection title="Production" items={season.key_stats} />
-              <StatSection title="Fantasy" items={season.fantasy} />
-              <StatSection title="Usage" items={season.usage} />
+              <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} />
+              <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} />
+              <StatSection title="Usage" icon="speedometer-outline" items={season.usage} />
             </>
           ) : null}
-          {stats?.college_available ? <StatSection title="College" items={stats.college} /> : null}
+          {stats?.college_available ? (
+            <StatSection title="College" icon="school-outline" items={stats.college} />
+          ) : null}
           {bio ? <BioSection bio={bio} /> : null}
           {!season && !stats?.college_available && !bio && awards.length === 0 ? (
             <Text style={styles.notice}>No additional stats available for this player yet.</Text>
@@ -294,27 +328,49 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  awardsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  awardsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   awardChip: {
-    borderWidth: 1.5,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 3,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
+    minWidth: '46%',
+    backgroundColor: colors.background,
   },
+  awardMedal: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  awardChipTextGroup: { flexShrink: 1 },
   awardChipLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
-  awardChipSeason: { fontSize: 10, color: colors.textTertiary, fontWeight: '600' },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  awardChipSeason: { fontSize: 10, color: colors.textTertiary, fontWeight: '600', marginTop: 1 },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  sectionHeadingIcon: { marginRight: spacing.xs },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  statCell: {
+    minWidth: '46%',
+    flexGrow: 1,
+    backgroundColor: colors.background,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
-  statLabel: { fontSize: 14, color: colors.textSecondary },
-  statValue: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  statCellLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  statCellValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   notice: {
     marginTop: spacing.md,
     fontSize: 12,

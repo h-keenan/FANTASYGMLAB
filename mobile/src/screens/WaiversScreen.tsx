@@ -12,7 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
-import { resolvePlayerTier } from '../lib/playerTier';
+import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -121,9 +121,12 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 <Text style={styles.name} numberOfLines={1}>
                   {item.name ?? 'Unknown'}
                 </Text>
-                <Text style={styles.meta}>
-                  {[item.position, item.team, item.tier ? resolvePlayerTier(item.tier).shortLabel : null].filter(Boolean).join(' · ')}
-                </Text>
+                <View style={styles.metaRow}>
+                  <Text style={styles.meta}>
+                    {[item.position, item.team].filter(Boolean).join(' · ')}
+                  </Text>
+                  <TierBadge storedTier={item.tier} />
+                </View>
               </View>
               <Text style={styles.score}>{item.score != null ? Math.round(item.score) : '—'}</Text>
             </AnimatedCard>
@@ -189,7 +192,8 @@ const styles = StyleSheet.create({
   rankText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  meta: { fontSize: 12, color: colors.textSecondary },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
