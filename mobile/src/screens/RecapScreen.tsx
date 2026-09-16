@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -30,6 +31,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   const [notReady, setNotReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useScreenHeaderTitle(navigation, 'Recap', leagueName);
 
@@ -83,13 +85,29 @@ export default function RecapScreen({ route, navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.kicker}>LEAGUE MEMORY</Text>
-      <Text style={styles.headline}>{recap.headline}</Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.kicker}>LEAGUE MEMORY</Text>
+          <Text style={styles.headline}>{recap.headline}</Text>
+        </View>
+        {!recap.incomplete ? (
+          <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+            <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.shareButtonText}>Share</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
       {recap.incomplete ? (
         <Text style={styles.incompleteNotice}>{recap.empty_reason || 'Not enough historical data yet.'}</Text>
       ) : (
         recap.stories.map((story, index) => <StoryCard key={`${story.story_type}-${index}`} story={story} />)
       )}
+      <RecapSharePreviewModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        leagueName={leagueName}
+        recap={recap}
+      />
     </ScrollView>
   );
 }
@@ -166,8 +184,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.xl,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  headerTextGroup: { flex: 1 },
   kicker: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.8, marginBottom: 4 },
-  headline: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.lg },
+  headline: { fontSize: 26, fontWeight: '700', color: colors.textPrimary },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 2,
+  },
+  shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   incompleteNotice: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
   storyCard: { marginBottom: spacing.sm },
   storyHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
