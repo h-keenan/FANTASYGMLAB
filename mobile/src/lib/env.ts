@@ -27,4 +27,13 @@ export const env = {
   ),
   revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_SDK_KEY ?? '',
   revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_SDK_KEY ?? '',
+  // Defaults are Google's published, permanent AdMob test unit IDs — they
+  // always fill with a test creative, so rewarded-ad unlock works out of
+  // the box before a real AdMob account/app is set up. Swap in production
+  // IDs (and mobile/app.json's react-native-google-mobile-ads app IDs) once
+  // that account exists — same pattern as the Apple/RevenueCat keys.
+  admobIosRewardedUnitId:
+    process.env.EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT_ID ?? 'ca-app-pub-3940256099942544/1712485313',
+  admobAndroidRewardedUnitId:
+    process.env.EXPO_PUBLIC_ADMOB_ANDROID_REWARDED_UNIT_ID ?? 'ca-app-pub-3940256099942544/5224354917',
 };

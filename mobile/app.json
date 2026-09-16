@@ -43,7 +43,21 @@
         {
           "color": "#22D3EE"
         }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "userTrackingUsageDescription": "This identifier lets us show ads relevant to you."
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5cd60a55-5a95-4966-b008-be7151d79c45"
+      }
+    },
+    "owner": "pilot_reach"
   }
 }

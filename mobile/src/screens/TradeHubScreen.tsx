@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
-import { api, type PresentationAsset, type TeamStrategy, type TradeIdea } from '../lib/api';
+import { api, type PresentationAsset, type TeamStrategy, type TradeHubEntitlement, type TradeIdea } from '../lib/api';
+import { showRewardedAd } from '../lib/ads';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -36,24 +37,29 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const { leagueId, leagueName } = route.params;
   const [strategy, setStrategy] = useState<TeamStrategy>('retool');
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
+  const [entitlement, setEntitlement] = useState<TradeHubEntitlement | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [adUnlocks, setAdUnlocks] = useState(0);
+  const [watchingAd, setWatchingAd] = useState(false);
 
   useScreenHeaderTitle(navigation, 'Trade Hub', leagueName);
 
   const load = useCallback(
-    async (nextStrategy: TeamStrategy) => {
+    async (nextStrategy: TeamStrategy, nextAdUnlocks: number) => {
       setLoading(true);
       setError(null);
       try {
-        const result = await api.getTradeHubIdeas(leagueId, nextStrategy);
+        const result = await api.getTradeHubIdeas(leagueId, nextStrategy, nextAdUnlocks);
         if (result.reason) {
           setNotReadyReason(result.reason);
           setIdeas(null);
+          setEntitlement(null);
         } else {
           setNotReadyReason(null);
           setIdeas(result.ideas);
+          setEntitlement(result.entitlement ?? null);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load Trade Hub ideas.');
@@ -65,8 +71,20 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   );
 
   useEffect(() => {
-    void load(strategy);
+    setAdUnlocks(0);
+    void load(strategy, 0);
   }, [load, strategy]);
+
+  const onWatchAd = useCallback(async () => {
+    if (watchingAd) return;
+    setWatchingAd(true);
+    const earned = await showRewardedAd();
+    setWatchingAd(false);
+    if (!earned) return;
+    const next = adUnlocks + 1;
+    setAdUnlocks(next);
+    void load(strategy, next);
+  }, [adUnlocks, load, strategy, watchingAd]);
 
   return (
     <FlatList
@@ -109,7 +127,64 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           </Text>
         ) : null
       }
+      ListFooterComponent={
+        !loading && !error && !notReadyReason && entitlement && entitlement.hidden_count > 0 ? (
+          <TradeHubGateCard
+            entitlement={entitlement}
+            watchingAd={watchingAd}
+            onWatchAd={onWatchAd}
+            onUpgrade={() => navigation.navigate('Paywall')}
+          />
+        ) : null
+      }
     />
+  );
+}
+
+function TradeHubGateCard({
+  entitlement,
+  watchingAd,
+  onWatchAd,
+  onUpgrade,
+}: {
+  entitlement: TradeHubEntitlement;
+  watchingAd: boolean;
+  onWatchAd: () => void;
+  onUpgrade: () => void;
+}) {
+  const canWatchMoreAds = entitlement.ad_unlocks_applied < entitlement.max_ad_unlocks;
+  return (
+    <AnimatedCard style={styles.gateCard}>
+      <View style={styles.gateIconDisc}>
+        <Ionicons name="lock-closed" size={20} color={colors.premium} />
+      </View>
+      <Text style={styles.gateTitle}>
+        {entitlement.hidden_count} more {entitlement.hidden_count === 1 ? 'idea' : 'ideas'} on this board
+      </Text>
+      <Text style={styles.gateBody}>
+        Free shows the top {entitlement.free_limit}. Watch a quick ad to reveal {entitlement.ad_bonus_per_unlock}{' '}
+        more, or go Pro to unlock the full board.
+      </Text>
+      <View style={styles.gateButtonRow}>
+        {canWatchMoreAds ? (
+          <TouchableOpacity style={styles.gateSecondaryButton} onPress={onWatchAd} disabled={watchingAd}>
+            {watchingAd ? (
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+            ) : (
+              <>
+                <Ionicons name="play-circle-outline" size={16} color={colors.textPrimary} />
+                <Text style={styles.gateSecondaryButtonText}>
+                  Watch ad for +{entitlement.ad_bonus_per_unlock}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity style={styles.gatePrimaryButton} onPress={onUpgrade}>
+          <Text style={styles.gatePrimaryButtonText}>Upgrade to Pro</Text>
+        </TouchableOpacity>
+      </View>
+    </AnimatedCard>
   );
 }
 
@@ -221,6 +296,46 @@ function TradeIdeaCard({ idea }: { idea: TradeIdea }) {
 }
 
 const styles = StyleSheet.create({
+  gateCard: { alignItems: 'center', padding: spacing.lg, marginTop: spacing.xs },
+  gateIconDisc: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.premiumMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  gateTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  gateBody: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 4,
+    marginBottom: spacing.md,
+  },
+  gateButtonRow: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
+  gateSecondaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.md,
+    backgroundColor: colors.border,
+  },
+  gateSecondaryButtonText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  gatePrimaryButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.md,
+    backgroundColor: colors.accent,
+  },
+  gatePrimaryButtonText: { fontSize: 13, fontWeight: '700', color: colors.background },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 11, color: colors.textTertiary, marginBottom: spacing.md },

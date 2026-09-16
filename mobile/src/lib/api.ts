@@ -397,10 +397,22 @@ export interface TradeIdea {
   package: TradePackage;
 }
 
+export interface TradeHubEntitlement {
+  is_premium: boolean;
+  approved_count: number;
+  visible_count: number;
+  hidden_count: number;
+  free_limit: number;
+  ad_bonus_per_unlock: number;
+  max_ad_unlocks: number;
+  ad_unlocks_applied: number;
+}
+
 export interface TradeHubResponse {
   ok: true;
   ideas: TradeIdea[];
   reason: string;
+  entitlement?: TradeHubEntitlement;
 }
 
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
@@ -438,9 +450,9 @@ export const api = {
     authorizedFetch<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap`),
   getLeagueDashboard: (leagueId: string) =>
     authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
-  getTradeHubIdeas: (leagueId: string, strategy: TeamStrategy = 'retool') =>
+  getTradeHubIdeas: (leagueId: string, strategy: TeamStrategy = 'retool', adUnlocks = 0) =>
     authorizedFetch<TradeHubResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${strategy}`,
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${strategy}&ad_unlocks=${adUnlocks}`,
     ),
   getLeagueAlerts: (leagueId: string, limit = 12) =>
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
