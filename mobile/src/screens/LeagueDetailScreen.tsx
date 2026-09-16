@@ -3,11 +3,14 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import { api } from '../lib/api';
+import AnimatedCard from '../components/AnimatedCard';
+import TeamAvatar from '../components/TeamAvatar';
+import { api, type DashboardItem } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { colors, gradients, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LeagueDetail'>;
 
@@ -18,16 +21,22 @@ interface LeagueSummary {
   scoring: string;
 }
 
+interface MyTeamInfo {
+  teamName: string;
+  avatarId: string;
+  playerCount: number;
+  playerIds: string[];
+}
+
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const QUICK_ACTIONS: Array<{ label: string; route: string; icon: IconName }> = [
-  { label: 'Next Move', route: 'Dashboard', icon: 'flash-outline' },
-  { label: 'Teams', route: 'Teams', icon: 'people-circle-outline' },
-  { label: 'Players', route: 'Players', icon: 'people-outline' },
-  { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline' },
   { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline' },
   { label: 'Trade\nAnalyzer', route: 'TradeAnalyzer', icon: 'git-compare-outline' },
+  { label: 'Players', route: 'Players', icon: 'people-outline' },
+  { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline' },
   { label: 'GM Targets', route: 'GmTargets', icon: 'bookmark-outline' },
+  { label: 'Teams', route: 'Teams', icon: 'people-circle-outline' },
   { label: 'Recap', route: 'Recap', icon: 'newspaper-outline' },
   { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline' },
 ];
@@ -42,6 +51,10 @@ function scoringLabel(scoringSettings: Record<string, unknown> | undefined): str
 export default function LeagueDetailScreen({ route, navigation }: Props) {
   const { leagueId, leagueName } = route.params;
   const [summary, setSummary] = useState<LeagueSummary | null>(null);
+  const [dashboardItems, setDashboardItems] = useState<DashboardItem[]>([]);
+  const [dashboardQuiet, setDashboardQuiet] = useState(false);
+  const [myTeam, setMyTeam] = useState<MyTeamInfo | null>(null);
+  const [recapReady, setRecapReady] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +69,13 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
     async function load() {
       try {
-        const leagueResult = await api.getLeague(leagueId).catch(() => null);
+        const [leagueResult, dashboardResult, myRosterResult, profilesResult, recapResult] = await Promise.all([
+          api.getLeague(leagueId).catch(() => null),
+          api.getLeagueDashboard(leagueId).catch(() => null),
+          api.getMyRoster(leagueId).catch(() => null),
+          api.getLeagueTeamProfiles(leagueId).catch(() => null),
+          api.getLeagueRecap(leagueId).catch(() => null),
+        ]);
         if (cancelled) return;
 
         if (leagueResult?.league) {
@@ -68,6 +87,28 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
             teamCount: String(league.total_rosters ?? '—'),
             scoring: scoringLabel(league.scoring_settings as Record<string, unknown>),
           });
+        }
+
+        if (dashboardResult) {
+          setDashboardItems(dashboardResult.items ?? []);
+          setDashboardQuiet(dashboardResult.quiet);
+        }
+
+        const roster = myRosterResult?.roster as { roster_id?: unknown; players?: unknown } | null | undefined;
+        if (roster && profilesResult) {
+          const rosterId = String(roster.roster_id ?? '');
+          const profile = profilesResult.profiles[rosterId];
+          const playerIds = Array.isArray(roster.players) ? roster.players.map(String) : [];
+          setMyTeam({
+            teamName: profile?.team_name || 'Your team',
+            avatarId: profile?.avatar_id || '',
+            playerCount: playerIds.length,
+            playerIds,
+          });
+        }
+
+        if (recapResult?.recap && !recapResult.recap.incomplete) {
+          setRecapReady(recapResult.recap.week);
         }
       } catch (err) {
         if (!cancelled) {
@@ -100,26 +141,35 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
     );
   }
 
+  const heroHeadline = dashboardQuiet || dashboardItems.length === 0
+    ? 'Quiet week — nothing urgent'
+    : `${dashboardItems.length} priority move${dashboardItems.length === 1 ? '' : 's'} identified`;
+  const heroSubtitle = dashboardItems[0]?.headline ?? 'Your roster looks steady right now.';
+
   return (
     <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}
+      >
+        <LinearGradient colors={gradients.hero} style={styles.heroCard}>
+          <Text style={styles.heroKicker}>TODAY'S GAME PLAN</Text>
+          <Text style={styles.heroHeadline}>{heroHeadline}</Text>
+          <Text style={styles.heroSubtitle} numberOfLines={1}>
+            {heroSubtitle}
+          </Text>
+          <View style={styles.heroButton}>
+            <Text style={styles.heroButtonText}>View Plan</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+
       {summary ? (
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{summary.season}</Text>
-            <Text style={styles.summaryLabel}>Season</Text>
-          </View>
-          <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{summary.week}</Text>
-            <Text style={styles.summaryLabel}>Week</Text>
-          </View>
-          <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{summary.teamCount}</Text>
-            <Text style={styles.summaryLabel}>Teams</Text>
-          </View>
-          <View style={styles.summaryStat}>
-            <Text style={styles.summaryValue}>{summary.scoring}</Text>
-            <Text style={styles.summaryLabel}>Scoring</Text>
-          </View>
+        <View style={styles.contextRow}>
+          <Ionicons name="calendar-outline" size={13} color={colors.textTertiary} />
+          <Text style={styles.contextText}>
+            {summary.season} · Week {summary.week} · {summary.teamCount} teams · {summary.scoring}
+          </Text>
         </View>
       ) : null}
 
@@ -140,13 +190,54 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         ))}
       </View>
+
+      {myTeam ? (
+        <AnimatedCard
+          style={styles.stripCard}
+          onPress={() =>
+            navigation.navigate('TeamRoster', {
+              ownerName: myTeam.teamName,
+              playerIds: myTeam.playerIds,
+              leagueId,
+              leagueName,
+            })
+          }
+        >
+          <TeamAvatar avatarId={myTeam.avatarId} size={36} style={styles.stripAvatar} />
+          <View style={styles.stripTextGroup}>
+            <View style={styles.stripNameRow}>
+              <Text style={styles.stripName} numberOfLines={1}>
+                {myTeam.teamName}
+              </Text>
+              <View style={styles.youBadge}>
+                <Text style={styles.youBadgeText}>You</Text>
+              </View>
+            </View>
+          </View>
+          <Text style={styles.stripValue}>{myTeam.playerCount}</Text>
+          <Text style={styles.stripValueLabel}>PLAYERS</Text>
+        </AnimatedCard>
+      ) : null}
+
+      {recapReady !== null ? (
+        <AnimatedCard
+          style={styles.stripCard}
+          onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
+        >
+          <View style={styles.recapIconDisc}>
+            <Ionicons name="newspaper-outline" size={18} color={colors.accent} />
+          </View>
+          <Text style={styles.stripTextGroup2}>Week {recapReady} recap ready</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </AnimatedCard>
+      ) : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   list: { backgroundColor: colors.background },
-  listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3 },
+  listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.md },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -154,34 +245,36 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     backgroundColor: colors.background,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
+  heroCard: {
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.md,
+    padding: spacing.lg,
+    minHeight: 132,
   },
-  summaryStat: { flex: 1, alignItems: 'center' },
-  summaryValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  summaryLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: 2,
+  heroKicker: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.8 },
+  heroHeadline: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginTop: 4 },
+  heroSubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  heroButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    marginTop: spacing.md,
   },
+  heroButtonText: { fontSize: 12, fontWeight: '700', color: colors.background },
+  contextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  contextText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, letterSpacing: 0.2 },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
   quickActionTile: {
-    width: '31%',
+    width: '23%',
     backgroundColor: colors.surface,
-    borderRadius: radii.md,
+    borderRadius: radii.tile,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     paddingVertical: spacing.md,
@@ -189,10 +282,28 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   quickActionLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: colors.textPrimary,
     textAlign: 'center',
   },
+  stripCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, gap: spacing.sm },
+  stripAvatar: {},
+  stripTextGroup: { flex: 1 },
+  stripNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  stripName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+  youBadge: { backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  youBadgeText: { color: colors.background, fontSize: 10, fontWeight: '700' },
+  stripValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  stripValueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
+  recapIconDisc: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.accentMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stripTextGroup2: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   error: { color: colors.danger, textAlign: 'center' },
 });
