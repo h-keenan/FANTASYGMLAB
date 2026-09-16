@@ -40,6 +40,33 @@ def measure(page: Page) -> dict[str, Any]:
     return page.evaluate(MEASURE_JS)
 
 
+def wait_for_scroll_stable(page: Page, *, timeout_ms: int = 1200, poll_ms: int = 100) -> dict[str, Any]:
+    """Poll mainScrollTop until it stops moving, instead of a fixed sleep.
+
+    A flat `wait_for_timeout` assumes the open/close animation always
+    settles within that window; under CI runner load it sometimes hasn't,
+    producing a spurious scroll-delta failure. Requiring two consecutive
+    identical reads (not just one) guards against catching the scroll
+    mid-animation at a moment it happens to pause; the timeout is still a
+    hard ceiling so a genuinely stuck animation doesn't hang the check.
+    """
+    last = measure(page)
+    stable_reads = 0
+    elapsed = 0
+    while elapsed < timeout_ms:
+        page.wait_for_timeout(poll_ms)
+        elapsed += poll_ms
+        current = measure(page)
+        if current["mainScrollTop"] == last["mainScrollTop"]:
+            stable_reads += 1
+            if stable_reads >= 2:
+                return current
+        else:
+            stable_reads = 0
+        last = current
+    return last
+
+
 def wait_app(page: Page) -> None:
     page.wait_for_selector('[data-testid="stApp"]', timeout=90_000)
     page.wait_for_selector('[data-testid="stMain"]', timeout=90_000)
@@ -202,8 +229,7 @@ def run_viewport_matrix(page: Page, *, base_url: str) -> dict[str, Any]:
         scroll_action_into_view(page, "Open GM menu", target_y=400)
         orb_before = measure(page)
         orb.first.click()
-        page.wait_for_timeout(1200)
-        orb_after = measure(page)
+        orb_after = wait_for_scroll_stable(page, timeout_ms=1200)
         delta = abs(orb_after["mainScrollTop"] - orb_before["mainScrollTop"])
         if delta > 48:
             raise AssertionError(f"GM Orb open changed page scroll by {delta}px")
@@ -212,8 +238,7 @@ def run_viewport_matrix(page: Page, *, base_url: str) -> dict[str, Any]:
         close = page.get_by_role("button", name=re.compile(r"^Close$", re.I))
         if close.count():
             close.first.click()
-            page.wait_for_timeout(800)
-            orb_closed = measure(page)
+            orb_closed = wait_for_scroll_stable(page, timeout_ms=800)
             if orb_closed.get("atMainBottom"):
                 raise AssertionError("GM Orb close jumped to the bottom")
         report["cases"]["gm_orb"] = {"before": orb_before, "after": orb_after, "scrollDelta": delta}
