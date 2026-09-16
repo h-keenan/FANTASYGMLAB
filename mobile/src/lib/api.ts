@@ -365,6 +365,44 @@ export interface DashboardResponse {
   reason: string;
 }
 
+export interface PresentationAsset {
+  asset_type: 'player' | 'pick';
+  label?: string;
+  player_id?: string;
+  name?: string;
+  position?: string;
+  team?: string;
+  age?: number | null;
+  score?: number | null;
+  role?: string;
+  injury_status?: string;
+  season?: string;
+  round?: string;
+  pick_no?: number;
+  projected_range?: string;
+}
+
+export interface TradePackage {
+  send: PresentationAsset[];
+  receive: PresentationAsset[];
+}
+
+export interface TradeIdea {
+  partner_team_name: string;
+  rationale: string;
+  trade_gain: number;
+  confidence_label: string;
+  market_realism_label: string;
+  reasoning_tags: string[];
+  package: TradePackage;
+}
+
+export interface TradeHubResponse {
+  ok: true;
+  ideas: TradeIdea[];
+  reason: string;
+}
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -400,6 +438,10 @@ export const api = {
     authorizedFetch<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap`),
   getLeagueDashboard: (leagueId: string) =>
     authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
+  getTradeHubIdeas: (leagueId: string, strategy: TeamStrategy = 'retool') =>
+    authorizedFetch<TradeHubResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${strategy}`,
+    ),
   getLeagueAlerts: (leagueId: string, limit = 12) =>
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
   getPlayerQuickView: (playerId: string) =>

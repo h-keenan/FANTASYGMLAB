@@ -32,6 +32,7 @@ const LEAGUE_DESTINATIONS: Destination[] = [
   { label: 'Players', route: 'Players', icon: 'people-outline', needsLeague: true },
   { label: 'GM Targets', route: 'GmTargets', icon: 'bookmark-outline', needsLeague: true },
   { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', needsLeague: true },
+  { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', needsLeague: true },
   { label: 'Trade Analyzer', route: 'TradeAnalyzer', icon: 'git-compare-outline', needsLeague: true },
   { label: 'Trade Calculator', route: 'TradeCalculator', icon: 'calculator-outline', needsLeague: true },
   { label: 'Recap', route: 'Recap', icon: 'newspaper-outline', needsLeague: true },

@@ -27,6 +27,7 @@ Deployment topology (Render):
   - POST /v1/push/unregister  — remove one of the caller's tokens (sign-out)
   - POST /v1/push/test        — send a test push to all of the caller's tokens
   - GET  /v1/leagues/{id}/dashboard — the caller's "Next Move" briefing
+  - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -76,6 +77,7 @@ from modules import (
     sleeper,
     sleeper_leagues,
     trade_analyzer_fit,
+    trade_hub_engine,
     trade_offer_analyzer,
 )
 from modules.trade_analyzer_assembly import player_asset_from_mapping
@@ -1207,3 +1209,63 @@ def get_league_dashboard(
         "quiet_reason": briefing.quiet_reason,
         "reason": "",
     }
+
+
+@app.get("/v1/leagues/{league_id}/trade-hub")
+def get_trade_hub_ideas(
+    league_id: str,
+    strategy: str = "retool",
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Real trade ideas for the caller's roster in this league.
+
+    Shares the exact same idea-generation engine as the web app's Trade Hub
+    (modules.trade_ideas.build_trade_ideas) and the same production Trust
+    enforcement boundary, via modules.trade_hub_engine — see that module's
+    docstring for why it's a fresh composition rather than importing
+    app.py directly (modules/ never imports app.py).
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    my_roster, reason = _resolve_my_roster(user, league_id)
+    if my_roster is None:
+        return {"ok": True, "ideas": [], "reason": reason}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_trade_hub"
+    )
+    if players_df.empty:
+        return {"ok": True, "ideas": [], "reason": "no_player_data"}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    roster_id = my_roster.get("roster_id")
+    if roster_id is None:
+        return {"ok": True, "ideas": [], "reason": "empty_roster"}
+
+    rosters = sleeper.get_rosters(league_id)
+    cards = trade_hub_engine.generate_trade_ideas(
+        league_id=league_id,
+        my_roster_id=int(roster_id),
+        players_df=valued,
+        rosters=rosters,
+        league_settings=settings,
+        score_field=score_field,
+        team_strategy=strategy,
+    )
+    return {"ok": True, "ideas": [card.to_dict() for card in cards], "reason": ""}
