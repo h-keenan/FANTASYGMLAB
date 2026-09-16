@@ -347,6 +347,14 @@ export interface PushMutationResponse {
 
 export type DashboardItemCategory = 'top_priority' | 'watch' | 'waiver_opportunity' | 'league_movement';
 
+export interface DashboardTradePresentation {
+  trade_package: TradePackage;
+  trade_gain: number;
+  trade_confidence_label: string;
+  trade_market_realism_label: string;
+  partner_team_name: string;
+}
+
 export interface DashboardItem {
   category: DashboardItemCategory;
   headline: string;
@@ -355,6 +363,7 @@ export interface DashboardItem {
   destination: string;
   route_player_id: string;
   recommendation_narrative: Record<string, unknown> | null;
+  presentation: DashboardTradePresentation | null;
 }
 
 export interface DashboardResponse {

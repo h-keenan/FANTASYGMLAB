@@ -1,26 +1,43 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
-import { api, type DashboardItem, type DashboardItemCategory } from '../lib/api';
+import PlayerAvatar from '../components/PlayerAvatar';
+import { api, type DashboardItem, type DashboardItemCategory, type PresentationAsset } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, spacing } from '../theme';
+import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
+type DashboardNavigation = Props['navigation'];
 
 const CATEGORY_META: Record<
   DashboardItemCategory,
   { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }
 > = {
-  top_priority: { label: 'Your Next Move', icon: 'flash', color: colors.accent },
+  top_priority: { label: 'Top Priority', icon: 'flash', color: colors.accent },
   watch: { label: 'Watch', icon: 'eye-outline', color: colors.danger },
   waiver_opportunity: { label: 'Waiver Opportunity', icon: 'swap-horizontal-outline', color: colors.premium },
   league_movement: { label: 'League Movement', icon: 'trending-up-outline', color: colors.textSecondary },
 };
+
+// Only destinations mobile can navigate to with just {leagueId, leagueName} —
+// "my_team" would need TeamRoster's ownerName/playerIds params, which this
+// screen doesn't have on hand, so it's left without a button rather than
+// navigating somewhere wrong.
+const DESTINATION_BUTTON_LABEL: Record<string, string> = {
+  trade_hub: 'Review in Trade Hub',
+  waivers: 'Open Waivers',
+};
+const DESTINATION_ROUTE: Record<string, string> = {
+  trade_hub: 'TradeHub',
+  waivers: 'Waivers',
+};
+
+const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
 export default function DashboardScreen({ route, navigation }: Props) {
   const { leagueId, leagueName } = route.params;
@@ -99,7 +116,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
           </Text>
         </View>
       ) : (
-        items.map((item, index) => <BriefingCard key={`${item.category}-${index}`} item={item} />)
+        items.map((item, index) => (
+          <BriefingCard
+            key={`${item.category}-${index}`}
+            item={item}
+            leagueId={leagueId}
+            leagueName={leagueName}
+            navigation={navigation}
+          />
+        ))
       )}
       </ScrollView>
     </View>
@@ -114,16 +139,163 @@ const NOT_READY_MESSAGES: Record<string, string> = {
   empty_roster: "This roster doesn't have any players yet.",
 };
 
-function BriefingCard({ item }: { item: DashboardItem }) {
+function DestinationButton({
+  item,
+  leagueId,
+  leagueName,
+  navigation,
+}: {
+  item: DashboardItem;
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+}) {
+  const label = DESTINATION_BUTTON_LABEL[item.destination];
+  const routeName = DESTINATION_ROUTE[item.destination];
+  if (!label || !routeName) return null;
+  return (
+    <TouchableOpacity
+      style={styles.destButton}
+      onPress={() => {
+        if (!routeName) return;
+        (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName });
+      }}
+    >
+      <Text style={styles.destButtonText}>{label.toUpperCase()}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
+  if (asset.asset_type === 'pick') {
+    return (
+      <View style={styles.assetRow}>
+        <View style={styles.pickDisc}>
+          <Ionicons name="ticket-outline" size={16} color={colors.premium} />
+        </View>
+        <Text style={styles.assetName} numberOfLines={1}>
+          {asset.label || 'Draft pick'}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.assetRow}>
+      <PlayerAvatar playerId={asset.player_id} size={32} style={styles.assetAvatar} />
+      <View style={styles.assetTextGroup}>
+        <Text style={styles.assetName} numberOfLines={1}>
+          {asset.name ?? 'Unknown'}
+        </Text>
+        <Text style={styles.assetMeta} numberOfLines={1}>
+          {[asset.position, asset.team].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function TopPriorityTradeCard({
+  item,
+  leagueId,
+  leagueName,
+  navigation,
+}: {
+  item: DashboardItem;
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+}) {
+  const presentation = item.presentation!;
+  const gain = presentation.trade_gain;
+  const gainColor = gain > 0 ? colors.successBright : gain < 0 ? colors.danger : colors.textSecondary;
+  const confidenceLevel = CONFIDENCE_LEVELS[presentation.trade_confidence_label?.toLowerCase()] ?? 1;
+
+  return (
+    <AnimatedCard style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.accent } as ViewStyle])}>
+      <View style={styles.cardHeaderRow}>
+        <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
+        <Text style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</Text>
+        <View style={styles.tradeBadge}>
+          <Ionicons name="swap-horizontal" size={12} color={colors.textSecondary} />
+          <Text style={styles.tradeBadgeText}>TRADE</Text>
+        </View>
+      </View>
+      <Text style={styles.cardHeadline}>{presentation.partner_team_name}</Text>
+
+      <View style={styles.sideBlock}>
+        <View style={[styles.sideBar, { backgroundColor: colors.danger }]} />
+        <View style={styles.sideContent}>
+          <Text style={styles.sideLabel}>YOU GIVE</Text>
+          {presentation.trade_package.send.map((asset, index) => (
+            <TradeAssetRow key={`send-${index}`} asset={asset} />
+          ))}
+        </View>
+      </View>
+      <View style={styles.sideBlock}>
+        <View style={[styles.sideBar, { backgroundColor: colors.successBright }]} />
+        <View style={styles.sideContent}>
+          <Text style={styles.sideLabel}>YOU GET</Text>
+          {presentation.trade_package.receive.map((asset, index) => (
+            <TradeAssetRow key={`receive-${index}`} asset={asset} />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.valueRow}>
+        <Text style={styles.valueLabel}>
+          TRADE VALUE / {presentation.trade_market_realism_label.toUpperCase()}
+        </Text>
+        <Text style={[styles.valueNumber, { color: gainColor }]}>
+          {gain > 0 ? '+' : ''}
+          {gain}
+        </Text>
+      </View>
+      <View style={styles.meterRow}>
+        <Text style={styles.meterLabel}>CONFIDENCE</Text>
+        <View style={styles.meterSegments}>
+          {[1, 2, 3].map((segment) => (
+            <View
+              key={segment}
+              style={[
+                styles.meterSegment,
+                { backgroundColor: segment <= confidenceLevel ? colors.accent : colors.borderStrong },
+              ]}
+            />
+          ))}
+        </View>
+        <Text style={styles.meterValue}>{presentation.trade_confidence_label}</Text>
+      </View>
+
+      {item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
+      <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+    </AnimatedCard>
+  );
+}
+
+function BriefingCard({
+  item,
+  leagueId,
+  leagueName,
+  navigation,
+}: {
+  item: DashboardItem;
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+}) {
+  if (item.presentation?.trade_package) {
+    return <TopPriorityTradeCard item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />;
+  }
   const meta = CATEGORY_META[item.category] ?? CATEGORY_META.watch;
   return (
     <AnimatedCard style={StyleSheet.flatten([styles.card, { borderLeftColor: meta.color } as ViewStyle])}>
       <View style={styles.cardHeaderRow}>
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
-        <Text style={[styles.cardLabel, { color: meta.color }]}>{meta.label}</Text>
+        <Text style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
       </View>
       <Text style={styles.cardHeadline}>{item.headline}</Text>
       {item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
+      <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
     </AnimatedCard>
   );
 }
@@ -149,7 +321,66 @@ const styles = StyleSheet.create({
   cardIcon: { marginRight: spacing.xs },
   cardLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   cardHeadline: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-  cardReason: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  cardReason: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
+  tradeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 'auto',
+    backgroundColor: colors.border,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  tradeBadgeText: { fontSize: 9, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 },
+  sideBlock: { flexDirection: 'row', marginTop: spacing.sm },
+  sideBar: { width: 3, borderRadius: 2, marginRight: spacing.sm },
+  sideContent: { flex: 1, gap: spacing.xs },
+  sideLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  assetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  assetAvatar: {},
+  pickDisc: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  assetTextGroup: { flex: 1 },
+  assetName: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  assetMeta: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  valueRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  valueLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  valueNumber: { fontSize: 18, fontWeight: '800' },
+  meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  meterLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  meterSegments: { flexDirection: 'row', gap: 3 },
+  meterSegment: { width: 14, height: 4, borderRadius: 2 },
+  meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+  destButton: {
+    marginTop: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
+    borderRadius: radii.sm,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  destButtonText: { fontSize: 12, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
   emptyCard: {
     alignItems: 'center',
     padding: spacing.xl,

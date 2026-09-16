@@ -1141,6 +1141,7 @@ def _project_briefing_item(item: Any) -> dict[str, Any]:
         "destination": payload.get("destination"),
         "route_player_id": payload.get("route_player_id") or "",
         "recommendation_narrative": payload.get("recommendation_narrative"),
+        "presentation": payload.get("presentation"),
     }
 
 

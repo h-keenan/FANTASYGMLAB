@@ -197,6 +197,12 @@ def test_build_trade_tile_composes_a_top_trade_opportunity_tile():
     assert tile["note"]
     assert tile["recommendation_narrative"] is not None
     assert tile["recommendation_id"]
+    presentation = tile["presentation"]
+    assert presentation["trade_gain"] == 40
+    assert presentation["partner_team_name"] == "Rival GM"
+    package = presentation["trade_package"]
+    assert package["send"][0]["name"] == "My RB2"
+    assert package["receive"][0]["name"] == "Target WR1"
 
 
 def test_build_trade_tile_returns_none_without_a_headline_idea():
@@ -247,9 +253,14 @@ def test_compose_next_move_briefing_includes_trade_tile_when_rosters_given():
 
     assert mock_generate.call_args.kwargs["my_roster_id"] == 1
     assert mock_generate.call_args.kwargs["league_id"] == league_id
-    assert any(
-        "target-wr1" in (item.route_player_id or "") for item in briefing.items
-    ), f"expected the trade tile's target player to surface, got: {[i.to_dict() for i in briefing.items]}"
+    trade_items = [item for item in briefing.items if "target-wr1" in (item.route_player_id or "")]
+    assert trade_items, f"expected the trade tile's target player to surface, got: {[i.to_dict() for i in briefing.items]}"
+    # The rich trade-package data must survive tile -> DailyBriefingItem
+    # projection (via the "presentation" field) for the mobile Dashboard's
+    # Top Priority card to render player rows, not just narrative prose.
+    presentation = trade_items[0].presentation
+    assert presentation is not None
+    assert presentation["trade_package"]["receive"][0]["player_id"] == "target-wr1"
 
 
 def test_compose_next_move_briefing_flags_roster_pressure_when_over_limit():
