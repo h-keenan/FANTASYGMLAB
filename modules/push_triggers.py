@@ -29,7 +29,7 @@ from typing import Any, Mapping
 import pandas as pd
 import requests
 
-from modules import app_config, dashboard_engine, league_recaps, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues
+from modules import alert_presentation, app_config, dashboard_engine, league_recaps, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues
 
 
 PLAYERS_DB_PATH = "data/players.db"
@@ -41,6 +41,7 @@ PUSH_TITLE_BY_CATEGORY = {
     "top_priority": "Your Next Move",
     "watch": "Watch",
     "recap": "Recap Ready",
+    "injury": "Injury Update",
 }
 DEFAULT_LENS = "Dynasty"
 
@@ -292,6 +293,55 @@ def recap_push_item(league_id: str, league: Mapping[str, Any]) -> dict[str, Any]
     }
 
 
+def injury_status_push_items(
+    *,
+    league_id: str,
+    league_name: str,
+    roster_player_ids: set[str],
+    players_df: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    """Push items for roster players carrying a real availability-risk status.
+
+    Reuses the exact same Out/Doubtful/IR/etc. classification the Alerts
+    feed uses (modules.alert_presentation.UNAVAILABLE_INJURY_STATUSES) —
+    "Questionable" is deliberately excluded (too common to be push-worthy;
+    it stays visible in-app via Alerts, same as today). No history is
+    stored: recommendation_id is keyed on (player, status), so the durable
+    push_notification_log dedup already used everywhere else in this sweep
+    naturally re-fires only when the status text actually changes, and
+    naturally never re-fires for an unchanged status. The first sweep after
+    this ships will push once for anyone already carrying a risk status —
+    a one-time, bounded backfill, not a recurring spam source.
+    """
+
+    if not roster_player_ids or players_df is None or players_df.empty:
+        return []
+    if "injury_status" not in players_df.columns or "player_id" not in players_df.columns:
+        return []
+
+    rows = players_df[players_df["player_id"].astype(str).isin(roster_player_ids)]
+    items: list[dict[str, Any]] = []
+    for _, row in rows.iterrows():
+        status_raw = _safe_text(row.get("injury_status"))
+        status_norm = status_raw.strip().casefold()
+        if status_norm not in alert_presentation.UNAVAILABLE_INJURY_STATUSES:
+            continue
+        player_id = _safe_text(row.get("player_id"))
+        name = _safe_text(row.get("name"), "A player on your roster")
+        if not player_id:
+            continue
+        items.append(
+            {
+                "league_id": league_id,
+                "league_name": league_name,
+                "category": "injury",
+                "headline": f"{name} is now {status_raw}",
+                "recommendation_id": f"injury:{player_id}:{status_norm}",
+            }
+        )
+    return items
+
+
 def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) -> dict[str, Any]:
     """One sweep: check every registered account's leagues, push what's new.
 
@@ -361,14 +411,31 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                 stats["errors"].append(f"{user_id}/{league_id}: briefing failed ({exc})")
                 continue
 
+            league_payload: dict[str, Any] = {}
             try:
-                league_payload = sleeper.get_league(league_id)
+                league_payload = sleeper.get_league(league_id) or {}
                 if league_payload:
                     recap_item = recap_push_item(league_id, league_payload)
                     if recap_item:
                         push_items.append(recap_item)
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: recap check failed ({exc})")
+
+            try:
+                rosters = sleeper.get_rosters(league_id)
+                my_roster = resolve_roster_for_sleeper_user(rosters, sleeper_user_id)
+                if my_roster is not None:
+                    roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+                    push_items.extend(
+                        injury_status_push_items(
+                            league_id=league_id,
+                            league_name=_safe_text(league_payload.get("name"), "Your league"),
+                            roster_player_ids=roster_player_ids,
+                            players_df=players_df,
+                        )
+                    )
+            except Exception as exc:
+                stats["errors"].append(f"{user_id}/{league_id}: injury status check failed ({exc})")
 
             already_sent = already_notified_batch(
                 config,
