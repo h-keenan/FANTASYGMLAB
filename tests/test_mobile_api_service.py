@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -1537,3 +1538,82 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
     categories = [item["category"] for item in body["items"]]
     assert waiver_items, f"expected a waiver_opportunity tile, got categories: {categories}"
     assert waiver_items[0]["route_player_id"] == "target_rb"
+
+
+def test_trade_hub_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/trade-hub")
+    assert response.status_code == 401
+
+
+def test_trade_hub_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/leagues/abc/trade-hub",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["ideas"] == []
+    assert body["reason"] == "no_sleeper_username_linked"
+
+
+def test_trade_hub_resolves_roster_and_projects_generated_ideas(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    fake_card = SimpleNamespace(
+        to_dict=lambda: {
+            "partner_team_name": "Rival GM",
+            "rationale": "Clear upgrade at RB.",
+            "trade_gain": 25,
+            "confidence_label": "High",
+            "market_realism_label": "Realistic",
+            "reasoning_tags": ["Need-Based"],
+            "package": {"send": [{"label": "Bench Runner"}], "receive": [{"label": "Target Runner"}]},
+        }
+    )
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids}],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            with patch(
+                                "modules.trade_hub_engine.generate_trade_ideas",
+                                return_value=[fake_card],
+                            ) as mock_generate:
+                                response = client.get(
+                                    "/v1/leagues/abc/trade-hub?strategy=contender",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    assert body["ideas"] == [fake_card.to_dict()]
+    assert mock_generate.call_args.kwargs["my_roster_id"] == 1
+    assert mock_generate.call_args.kwargs["team_strategy"] == "contender"
+    assert mock_generate.call_args.kwargs["league_id"] == "abc"
