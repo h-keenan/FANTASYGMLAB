@@ -11,6 +11,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
@@ -62,6 +63,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <GridBackground />
       <TextInput
         style={styles.searchInput}
         placeholder="Search players"

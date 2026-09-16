@@ -3,6 +3,7 @@ import { FlatList, Linking, RefreshControl, StyleSheet, Text, View } from 'react
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import { api, type NewsItem } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 
@@ -57,6 +58,7 @@ export default function NewsScreen() {
 
   return (
     <View style={styles.container}>
+      <GridBackground />
       <Text style={styles.disclaimer}>
         General NFL news — injury, role, transaction, and off-field signal only. Not filtered to
         your specific rosters yet.

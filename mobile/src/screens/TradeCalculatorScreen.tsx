@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type RankedPlayer } from '../lib/api';
 import { valueDirectionLabel } from '../lib/tradeValue';
@@ -109,6 +110,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <GridBackground />
       <Text style={styles.disclaimer}>
         Raw asset value only — {leagueName}'s {'“'}Dynasty{'”'} valuations. Doesn't yet
         weigh roster fit or strategy, unlike the full web Trade Analyzer.
