@@ -70,23 +70,46 @@ def test_resolve_roster_for_sleeper_user_matches_owner_id():
     assert push_triggers.resolve_roster_for_sleeper_user(rosters, "nobody") is None
 
 
-def test_already_notified_true_when_row_exists():
+def test_already_notified_batch_returns_matching_ids():
     response = Mock(status_code=200)
     response.json.return_value = [{"recommendation_id": "rec1"}]
-    with patch("requests.get", return_value=response):
-        assert push_triggers.already_notified(_config(), user_id="u1", recommendation_id="rec1")
+    with patch("requests.get", return_value=response) as mock_get:
+        result = push_triggers.already_notified_batch(_config(), user_id="u1", recommendation_ids=["rec1", "rec2"])
+    assert result == {"rec1"}
+    # One round trip covers every id, not one per id.
+    assert mock_get.call_count == 1
+    assert mock_get.call_args.kwargs["params"]["recommendation_id"] == "in.(rec1,rec2)"
 
 
-def test_already_notified_false_when_no_row():
+def test_already_notified_batch_empty_when_no_rows():
     response = Mock(status_code=200)
     response.json.return_value = []
     with patch("requests.get", return_value=response):
-        assert not push_triggers.already_notified(_config(), user_id="u1", recommendation_id="rec1")
+        result = push_triggers.already_notified_batch(_config(), user_id="u1", recommendation_ids=["rec1"])
+    assert result == set()
 
 
-def test_already_notified_fails_closed_on_transport_error():
+def test_already_notified_batch_returns_empty_set_without_ids():
+    with patch("requests.get") as mock_get:
+        result = push_triggers.already_notified_batch(_config(), user_id="u1", recommendation_ids=[])
+    assert result == set()
+    mock_get.assert_not_called()
+
+
+def test_already_notified_batch_fails_closed_on_transport_error():
     with patch("requests.get", side_effect=Exception("network down")):
-        assert push_triggers.already_notified(_config(), user_id="u1", recommendation_id="rec1")
+        result = push_triggers.already_notified_batch(_config(), user_id="u1", recommendation_ids=["rec1", "rec2"])
+    assert result == {"rec1", "rec2"}
+
+
+def test_already_notified_batch_fails_closed_on_unsafe_id_characters():
+    # A literal "," or ")" would corrupt the in.(...) filter — refuse to
+    # send it and treat every id as already-notified rather than push
+    # something the filter might have silently mismatched.
+    with patch("requests.get") as mock_get:
+        result = push_triggers.already_notified_batch(_config(), user_id="u1", recommendation_ids=["rec1", "a)b"])
+    assert result == {"rec1", "a)b"}
+    mock_get.assert_not_called()
 
 
 def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():

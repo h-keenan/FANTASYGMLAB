@@ -144,9 +144,26 @@ def fetch_sleeper_usernames(config: PushTriggerConfig, user_ids: list[str]) -> d
     return usernames
 
 
-def already_notified(config: PushTriggerConfig, *, user_id: str, recommendation_id: str) -> bool:
-    if not config.configured or not user_id or not recommendation_id:
-        return False
+def already_notified_batch(config: PushTriggerConfig, *, user_id: str, recommendation_ids: list[str]) -> set[str]:
+    """Which of these recommendation_ids have already been pushed to this user.
+
+    One Supabase round trip per league's worth of push_items rather than one
+    per item — at sweep scale (many users × many leagues), that per-item
+    dedup lookup is the dominant cost. Fails closed: treats every id as
+    already-notified (skip, don't push) on any transport/parse failure, so a
+    missed push beats a duplicate one.
+    """
+    ids = [rid for rid in dict.fromkeys(recommendation_ids) if rid]
+    if not config.configured or not user_id or not ids:
+        return set()
+    # PostgREST's `in.(...)` filter has no escaping for a literal "," or ")"
+    # inside a value; every recommendation_id this codebase generates is a
+    # sha256 hex digest or a colon-joined id/int string, so this can't
+    # actually happen — but fail closed (skip pushing) rather than corrupt
+    # the filter if it ever does.
+    safe_ids = [rid for rid in ids if "," not in rid and ")" not in rid]
+    if len(safe_ids) != len(ids):
+        return set(ids)
     try:
         response = requests.get(
             f"{config.url}/rest/v1/{NOTIFICATION_LOG_TABLE}",
@@ -154,22 +171,21 @@ def already_notified(config: PushTriggerConfig, *, user_id: str, recommendation_
             params={
                 "select": "recommendation_id",
                 "user_id": f"eq.{user_id}",
-                "recommendation_id": f"eq.{recommendation_id}",
-                "limit": "1",
+                "recommendation_id": "in.(" + ",".join(safe_ids) + ")",
             },
             timeout=15,
         )
     except Exception:
-        # Fail closed on the side of NOT re-notifying an unreachable log —
-        # a missed push is much better than a spammy duplicate one.
-        return True
+        return set(ids)
     if response.status_code >= 400:
-        return True
+        return set(ids)
     try:
         rows = response.json()
     except Exception:
-        return True
-    return bool(rows)
+        return set(ids)
+    if not isinstance(rows, list):
+        return set(ids)
+    return {str(row.get("recommendation_id")) for row in rows if isinstance(row, dict) and row.get("recommendation_id")}
 
 
 def record_notification(config: PushTriggerConfig, *, user_id: str, recommendation_id: str, league_id: str) -> None:
@@ -354,9 +370,14 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: recap check failed ({exc})")
 
+            already_sent = already_notified_batch(
+                config,
+                user_id=user_id,
+                recommendation_ids=[item["recommendation_id"] for item in push_items],
+            )
             for push_item in push_items:
                 recommendation_id = push_item["recommendation_id"]
-                if already_notified(config, user_id=user_id, recommendation_id=recommendation_id):
+                if recommendation_id in already_sent:
                     continue
                 title = PUSH_TITLE_BY_CATEGORY.get(push_item["category"], "Watch")
                 result = push_tokens.send_expo_push_notifications(
