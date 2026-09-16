@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
+import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import { api, type RankedPlayer, type TeamStrategy, type TradeVerdict } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -366,34 +366,13 @@ function VerdictCard({
   receiveIds: RankedPlayer[];
   leagueName: string;
 }) {
-  const onShare = () => {
-    const sendNames = sendIds.map((p) => p.name ?? 'Unknown').join(', ') || 'Nothing';
-    const receiveNames = receiveIds.map((p) => p.name ?? 'Unknown').join(', ') || 'Nothing';
-    const lines = [
-      `${leagueName} trade — ${verdict.band} (${verdict.confidence})`,
-      '',
-      `You send: ${sendNames}`,
-      `You receive: ${receiveNames}`,
-      '',
-      verdict.rationale,
-      '',
-      `Value: ${verdict.value_summary}`,
-      `Roster fit: ${verdict.roster_summary}`,
-      `Strategy fit: ${verdict.strategy_summary}`,
-      `Risk: ${verdict.risk_summary}`,
-    ];
-    if (verdict.counter_guidance) {
-      lines.push(`Counter guidance: ${verdict.counter_guidance}`);
-    }
-    lines.push('', 'Analyzed with FantasyGM Lab');
-    Share.share({ message: lines.join('\n') }).catch(() => {});
-  };
+  const [shareOpen, setShareOpen] = useState(false);
 
   return (
     <View style={[styles.verdictCard, { borderLeftColor: TONE_COLORS[verdict.tone] }]}>
       <View style={styles.verdictHeaderRow}>
         <Text style={[styles.verdictBand, { color: TONE_COLORS[verdict.tone] }]}>{verdict.band}</Text>
-        <TouchableOpacity style={styles.shareButton} onPress={onShare} hitSlop={8}>
+        <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           <Text style={styles.shareButtonText}>Share</Text>
         </TouchableOpacity>
@@ -414,6 +393,15 @@ function VerdictCard({
           <Text style={styles.verdictText}>{verdict.counter_guidance}</Text>
         </>
       ) : null}
+
+      <TradeSharePreviewModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        leagueName={leagueName}
+        verdict={verdict}
+        sendPlayers={sendIds}
+        receivePlayers={receiveIds}
+      />
     </View>
   );
 }
