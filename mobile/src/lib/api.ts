@@ -364,6 +364,7 @@ export interface DashboardItem {
   route_player_id: string;
   recommendation_narrative: Record<string, unknown> | null;
   presentation: DashboardTradePresentation | null;
+  recommendation_id: string;
 }
 
 export interface DashboardResponse {
