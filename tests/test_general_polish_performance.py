@@ -164,7 +164,7 @@ def test_package_ttl_stale_clears_live_inputs():
 def test_clear_live_league_caches_preserve_username_and_players():
     source = (ROOT / "modules" / "sleeper.py").read_text(encoding="utf-8")
     assert "def clear_live_league_endpoint_caches" in source
-    assert "get_rosters.cache_clear()" in source
+    assert "_get_rosters_cached.cache_clear()" in source
     assert "get_user_id.cache_clear()" not in source
     assert "get_players.cache_clear()" not in source
     sleeper.clear_live_league_endpoint_caches()
