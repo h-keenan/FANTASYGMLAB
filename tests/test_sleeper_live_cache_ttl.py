@@ -19,6 +19,9 @@ def _clear_all():
     sleeper._get_league_cached.cache_clear()
     sleeper._get_rosters_cached.cache_clear()
     sleeper._get_users_cached.cache_clear()
+    sleeper._get_traded_picks_cached.cache_clear()
+    sleeper._get_transactions_cached.cache_clear()
+    sleeper._get_matchups_cached.cache_clear()
 
 
 def test_get_league_hits_cache_within_the_same_ttl_bucket():
@@ -63,6 +66,54 @@ def test_get_rosters_and_get_users_also_expire_on_bucket_advance():
             second = sleeper.get_rosters("L1")
     assert len(first) == 1
     assert len(second) == 2
+
+
+def test_get_traded_picks_expires_on_bucket_advance():
+    _clear_all()
+    stale = Mock(status_code=200)
+    stale.json.return_value = []
+    fresh = Mock(status_code=200)
+    fresh.json.return_value = [{"season": "2027", "round": 1, "owner_id": "2"}]
+    with patch("requests.get", side_effect=[stale, fresh]) as mock_get:
+        with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
+            first = sleeper.get_traded_picks("L1")
+        with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
+            second = sleeper.get_traded_picks("L1")
+    assert first == []
+    assert len(second) == 1
+    assert mock_get.call_count == 2
+
+
+def test_get_transactions_expires_on_bucket_advance():
+    _clear_all()
+    stale = Mock(status_code=200)
+    stale.json.return_value = []
+    fresh = Mock(status_code=200)
+    fresh.json.return_value = [{"type": "waiver", "status": "complete"}]
+    with patch("requests.get", side_effect=[stale, fresh]) as mock_get:
+        with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
+            first = sleeper.get_transactions("L1", 3)
+        with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
+            second = sleeper.get_transactions("L1", 3)
+    assert first == []
+    assert len(second) == 1
+    assert mock_get.call_count == 2
+
+
+def test_get_matchups_expires_on_bucket_advance():
+    _clear_all()
+    stale = Mock(status_code=200)
+    stale.json.return_value = [{"roster_id": 1, "points": 90.0}]
+    fresh = Mock(status_code=200)
+    fresh.json.return_value = [{"roster_id": 1, "points": 112.4}]
+    with patch("requests.get", side_effect=[stale, fresh]) as mock_get:
+        with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
+            first = sleeper.get_matchups("L1", 3)
+        with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
+            second = sleeper.get_matchups("L1", 3)
+    assert first[0]["points"] == 90.0
+    assert second[0]["points"] == 112.4
+    assert mock_get.call_count == 2
 
 
 def test_clear_live_league_endpoint_caches_does_not_raise():
