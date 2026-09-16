@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -10,8 +10,11 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 import { useAuth } from '../context/AuthContext';
+import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
+import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { colors, gradients, radii, spacing, typography } from '../theme';
 
 export default function LoginScreen() {
@@ -22,6 +25,16 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  const google = useGoogleSignIn();
+
+  useEffect(() => {
+    void isAppleAuthAvailable().then(setAppleAvailable);
+  }, []);
+
+  useEffect(() => {
+    if (google.error) setError(google.error);
+  }, [google.error]);
 
   const submit = async () => {
     setError(null);
@@ -39,6 +52,13 @@ export default function LoginScreen() {
     }
   };
 
+  const onApplePress = async () => {
+    setError(null);
+    setNotice(null);
+    const result = await signInWithApple();
+    if (result.error) setError(result.error);
+  };
+
   return (
     <View style={styles.root}>
       <LinearGradient colors={gradients.hero} style={styles.hero} />
@@ -50,6 +70,38 @@ export default function LoginScreen() {
         <Text style={styles.subtitle}>
           {mode === 'signIn' ? 'Sign in to your account' : 'Create an account'}
         </Text>
+
+        {appleAvailable ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+            cornerRadius={radii.sm}
+            style={styles.appleButton}
+            onPress={onApplePress}
+          />
+        ) : null}
+
+        {google.available ? (
+          <TouchableOpacity
+            style={[styles.socialButton, !google.ready && styles.buttonDisabled]}
+            onPress={() => void google.signIn()}
+            disabled={!google.ready || google.submitting}
+          >
+            {google.submitting ? (
+              <ActivityIndicator color={colors.textPrimary} />
+            ) : (
+              <Text style={styles.socialButtonText}>Continue with Google</Text>
+            )}
+          </TouchableOpacity>
+        ) : null}
+
+        {appleAvailable || google.available ? (
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+        ) : null}
 
         <TextInput
           style={styles.input}
@@ -121,6 +173,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
+  appleButton: {
+    width: '100%',
+    height: 48,
+    marginBottom: spacing.sm,
+  },
+  socialButton: {
+    height: 48,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSolid,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  socialButtonText: { color: colors.textPrimary, fontSize: 16, fontWeight: '600' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.md },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  dividerText: { color: colors.textTertiary, fontSize: 12, marginHorizontal: spacing.sm },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
