@@ -28,19 +28,6 @@ interface MyTeamInfo {
   playerIds: string[];
 }
 
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
-
-const QUICK_ACTIONS: Array<{ label: string; route: string; icon: IconName }> = [
-  { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline' },
-  { label: 'Trade\nAnalyzer', route: 'TradeAnalyzer', icon: 'git-compare-outline' },
-  { label: 'Players', route: 'Players', icon: 'people-outline' },
-  { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline' },
-  { label: 'GM Targets', route: 'GmTargets', icon: 'bookmark-outline' },
-  { label: 'Teams', route: 'Teams', icon: 'people-circle-outline' },
-  { label: 'Recap', route: 'Recap', icon: 'newspaper-outline' },
-  { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline' },
-];
-
 function scoringLabel(scoringSettings: Record<string, unknown> | undefined): string {
   const rec = Number(scoringSettings?.rec ?? 0);
   if (rec >= 1) return 'PPR';
@@ -173,24 +160,6 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
-      <View style={styles.quickActionsGrid}>
-        {QUICK_ACTIONS.map((action) => (
-          <TouchableOpacity
-            key={action.route}
-            style={styles.quickActionTile}
-            onPress={() =>
-              (navigation.navigate as (name: string, params?: object) => void)(action.route, {
-                leagueId,
-                leagueName,
-              })
-            }
-          >
-            <Ionicons name={action.icon} size={22} color={colors.accent} />
-            <Text style={styles.quickActionLabel}>{action.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       {myTeam ? (
         <AnimatedCard
           style={styles.stripCard}
@@ -266,27 +235,6 @@ const styles = StyleSheet.create({
   heroButtonText: { fontSize: 12, fontWeight: '700', color: colors.background },
   contextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   contextText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, letterSpacing: 0.2 },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  quickActionTile: {
-    width: '23%',
-    backgroundColor: colors.surface,
-    borderRadius: radii.tile,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  quickActionLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
   stripCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, gap: spacing.sm },
   stripAvatar: {},
   stripTextGroup: { flex: 1 },
