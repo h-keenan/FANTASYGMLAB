@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -84,7 +85,9 @@ export default function RecapScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.root}>
+      <GridBackground />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <View style={styles.headerTextGroup}>
           <Text style={styles.kicker}>LEAGUE MEMORY</Text>
@@ -108,7 +111,8 @@ export default function RecapScreen({ route, navigation }: Props) {
         leagueName={leagueName}
         recap={recap}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -175,7 +179,8 @@ function StoryCard({ story }: { story: RecapStory }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   center: {
     flex: 1,

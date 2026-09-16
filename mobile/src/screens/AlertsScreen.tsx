@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type AlertItem, type RankedPlayer } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -119,6 +120,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <GridBackground />
       <Text style={styles.disclaimer}>
         Recent news about players on your roster in {leagueName} — injury, role, transaction, and
         off-field signal only.

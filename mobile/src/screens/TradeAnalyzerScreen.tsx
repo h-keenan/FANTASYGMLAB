@@ -11,6 +11,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
+import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
@@ -340,7 +341,9 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   );
 
   return (
-    <FlatList
+    <View style={styles.root}>
+      <GridBackground />
+      <FlatList
       style={styles.container}
       data={searchResults}
       keyExtractor={(item) => item.player_id}
@@ -373,7 +376,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
               : 'Start typing to search.'}
         </Text>
       }
-    />
+      />
+    </View>
   );
 }
 
@@ -472,7 +476,8 @@ function TradeSide({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
+  root: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {
     flex: 1,
     alignItems: 'center',

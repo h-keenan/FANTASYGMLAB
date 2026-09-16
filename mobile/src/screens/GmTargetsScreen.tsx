@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, Touchabl
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
@@ -77,6 +78,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <GridBackground />
       <Text style={styles.disclaimer}>
         Players you're watching — considering buying, selling, adding, or just keeping an eye on in{' '}
         {leagueName}.

@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerSummary, type RankedPlayer } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -85,7 +86,9 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   }
 
   return (
-    <FlatList
+    <View style={styles.root}>
+      <GridBackground />
+      <FlatList
       style={styles.list}
       data={players}
       keyExtractor={(item) => item.player_id}
@@ -122,12 +125,14 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
           ) : null}
         </AnimatedCard>
       )}
-    />
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.background },
+  list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.sm },
   center: {
     flex: 1,
