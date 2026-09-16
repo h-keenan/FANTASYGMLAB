@@ -78,7 +78,13 @@ export default function GmOrb() {
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
-  const insets = useSafeAreaInsets();
+  const rawInsets = useSafeAreaInsets();
+  // Clamped defensively: a bad/stale safe-area measurement (seen on some
+  // devices before the inset context settles) should never be able to push
+  // the orb far from the true bottom edge — the visible symptom reported
+  // was the orb sitting mid-screen, consistent with an inflated bottom inset.
+  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), 40);
+  const insets = { ...rawInsets, bottom: safeBottom };
   const league = open ? currentLeagueContext() : null;
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
