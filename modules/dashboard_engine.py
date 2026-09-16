@@ -39,6 +39,7 @@ import pandas as pd
 
 from modules import canonical_recommendation_narrative, daily_gm_briefing, dashboard_workflow, injury_ui, sleeper, trade_hub_ui, trade_hub_engine
 from modules.canonical_recommendation_narrative import build_waiver_narrative
+from modules.compact_fantasy_assets import compact_package
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
 from modules.league_workspace_ui import _format_score
 from modules.player_cards import recommendation_reason_text
@@ -271,7 +272,13 @@ def build_trade_tile(
     receive_assets = [
         asset for asset in (headline_idea.get("receive_assets") or []) if isinstance(asset, Mapping)
     ]
+    send_assets = [
+        asset for asset in (headline_idea.get("send_assets") or []) if isinstance(asset, Mapping)
+    ]
     route_player_id = _text(receive_assets[0].get("player_id")) if receive_assets else ""
+    package = compact_package(
+        send_assets, receive_assets, value_edge=value_delta, confidence=confidence_label
+    )
     return {
         "label": "Top Trade Opportunity",
         "value": _text(narrative.target_label, _text(headline_idea.get("partner_team_name"), "Open Trade Hub")),
@@ -282,6 +289,19 @@ def build_trade_tile(
         "route_focus_mode": "target_player",
         "recommendation_narrative": narrative.to_dict(),
         "recommendation_id": narrative.recommendation_id,
+        # Mobile's rich "Top Priority" trade card renders this directly
+        # rather than re-deriving it from narrative prose — same shape
+        # Trade Hub's own cards already use (modules.compact_fantasy_assets).
+        # Nested under "presentation" — daily_gm_briefing._presentation_from_tile
+        # is the one field that survives tile -> DailyBriefingItem projection
+        # verbatim; anything else here would be silently dropped.
+        "presentation": {
+            "trade_package": package,
+            "trade_gain": gain,
+            "trade_confidence_label": confidence_label,
+            "trade_market_realism_label": _text(headline_idea.get("market_realism_label"), "Thin"),
+            "partner_team_name": _text(headline_idea.get("partner_team_name"), "Trade partner"),
+        },
     }
 
 
