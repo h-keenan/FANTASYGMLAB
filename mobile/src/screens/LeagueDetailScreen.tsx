@@ -159,7 +159,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   list: { backgroundColor: colors.background },
-  listContent: { padding: spacing.lg, gap: spacing.sm },
+  listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.sm },
   center: {
     flex: 1,
     alignItems: 'center',

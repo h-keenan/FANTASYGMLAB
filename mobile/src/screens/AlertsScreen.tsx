@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     lineHeight: 16,
   },
-  listContent: { padding: spacing.lg, paddingTop: 0, gap: spacing.sm },
+  listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
   card: { padding: spacing.lg },
   cardRead: { opacity: 0.6 },
   headerRow: {

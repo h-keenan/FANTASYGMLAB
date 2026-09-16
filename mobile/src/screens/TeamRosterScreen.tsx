@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerSummary } from '../lib/api';
 import { cardShadow, colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -84,6 +85,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
       }
       renderItem={({ item }) => (
         <View style={styles.card}>
+          <PlayerAvatar playerId={item.playerId} size={40} style={styles.avatar} />
           <View style={styles.positionBadge}>
             <Text style={styles.positionText}>{item.position ?? '—'}</Text>
           </View>
@@ -108,7 +110,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   list: { backgroundColor: colors.background },
-  listContent: { padding: spacing.lg, gap: spacing.sm },
+  listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.sm },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -131,9 +133,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     ...cardShadow,
   },
+  avatar: { marginRight: spacing.sm },
   positionBadge: {
-    width: 40,
-    height: 32,
+    width: 34,
+    height: 26,
     borderRadius: radii.sm,
     backgroundColor: colors.badgeBackground,
     alignItems: 'center',

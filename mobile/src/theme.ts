@@ -5,33 +5,37 @@ import { Platform } from 'react-native';
  * shadow. Kept deliberately small: this is a client-side presentation layer
  * only, it doesn't encode any product/valuation logic.
  *
- * Dark-first palette: fantasy sports apps (Sleeper, ESPN Fantasy) live in
- * dark mode by default, and it reads as "trading desk," not "spreadsheet."
+ * These are the actual FantasyGM Lab brand values (modules/brand_identity.py
+ * on the web app — BRAND_BG/BRAND_ACCENT/etc.), not an independently invented
+ * dark palette, so the mobile app reads as the same product as the web app.
  */
 
 export const colors = {
-  background: '#0B0E14',
-  backgroundElevated: '#11151F',
+  background: '#050607', // BRAND_BG
+  backgroundElevated: '#1B1E23', // BRAND_SURFACE_RAISED
   surface: 'rgba(255,255,255,0.05)',
-  surfaceSolid: '#161B26',
+  surfaceSolid: '#0F1114', // BRAND_SURFACE
   border: 'rgba(255,255,255,0.10)',
   borderStrong: 'rgba(255,255,255,0.18)',
-  textPrimary: '#F3F5F9',
-  textSecondary: '#8A93A6',
-  textTertiary: '#5B6478',
-  accent: '#5B8DEF',
-  accentMuted: 'rgba(91,141,239,0.16)',
-  danger: '#F0596A',
-  dangerMuted: 'rgba(240,89,106,0.16)',
-  success: '#2ECC8F',
-  successMuted: 'rgba(46,204,143,0.16)',
-  badgeBackground: 'rgba(91,141,239,0.18)',
-  badgeText: '#9DBBFA',
+  textPrimary: '#F8FAFC', // BRAND_TEXT
+  textSecondary: '#A8ADB7', // BRAND_TEXT_MUTED
+  textTertiary: '#6B7280',
+  accent: '#22D3EE', // BRAND_ACCENT (Analyze trajectory cyan)
+  accentSoft: '#67E8F9', // BRAND_ACCENT_SOFT
+  accentMuted: 'rgba(34,211,238,0.16)',
+  danger: '#EF4444', // BRAND_TRAJECTORY_EXECUTE
+  dangerMuted: 'rgba(239,68,68,0.16)',
+  success: '#22C55E', // BRAND_SUCCESS
+  successMuted: 'rgba(34,197,94,0.16)',
+  premium: '#FACC15', // BRAND_PREMIUM / BRAND_TRAJECTORY_PROJECT
+  premiumMuted: 'rgba(250,204,21,0.16)',
+  badgeBackground: 'rgba(34,211,238,0.18)',
+  badgeText: '#67E8F9',
 };
 
 export const gradients = {
-  hero: ['#1B2340', '#0B0E14'] as const,
-  accent: ['#6E9BFF', '#5B8DEF'] as const,
+  hero: ['#1B2340', '#050607'] as const,
+  accent: ['#67E8F9', '#22D3EE'] as const,
 };
 
 export const spacing = {

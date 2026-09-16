@@ -5,6 +5,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { colors } from '../theme';
 import type { RankedPlayer } from '../lib/api';
+import GmOrb from '../components/GmOrb';
+import { navigationRef } from './navigationRef';
 
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
@@ -70,8 +72,9 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       {session ? (
+        <View style={{ flex: 1 }}>
         <AppStack.Navigator>
           <AppStack.Screen
             name="Home"
@@ -113,6 +116,8 @@ export default function RootNavigator() {
             options={{ presentation: 'modal', title: 'Premium' }}
           />
         </AppStack.Navigator>
+        <GmOrb />
+        </View>
       ) : (
         <AuthStack.Navigator screenOptions={{ headerShown: false }}>
           <AuthStack.Screen name="Login" component={LoginScreen} />
