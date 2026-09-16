@@ -26,7 +26,7 @@ TOAST_HIGH = "high"
 TOAST_IMPORTANT = "important"
 TOAST_INFORMATIONAL = "informational"
 
-_UNAVAILABLE_STATUS = frozenset(
+UNAVAILABLE_INJURY_STATUSES = frozenset(
     {
         "ir",
         "pup",
@@ -565,7 +565,7 @@ def relevance_score(row: Mapping[str, Any]) -> int:
 
 def _status_unavailable(value: object) -> bool:
     text = str(value or "").strip().casefold()
-    return any(token in text for token in _UNAVAILABLE_STATUS)
+    return any(token in text for token in UNAVAILABLE_INJURY_STATUSES)
 
 
 def _player_row(frame: Any, player_id: str) -> Any | None:

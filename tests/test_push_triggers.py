@@ -276,3 +276,109 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
     push_call = mock_post.call_args_list[0]
     assert push_call.kwargs["json"][0]["title"] == "Recap Ready — Test League"
     assert push_call.kwargs["json"][0]["body"] == "Week 3 recap is ready"
+
+
+def test_injury_status_push_items_fires_for_risk_status():
+    players_df = pd.DataFrame(
+        [
+            {"player_id": "p1", "name": "Hurt Guy", "injury_status": "Out"},
+            {"player_id": "p2", "name": "Fine Guy", "injury_status": ""},
+        ]
+    )
+    items = push_triggers.injury_status_push_items(
+        league_id="league-1",
+        league_name="Test League",
+        roster_player_ids={"p1", "p2"},
+        players_df=players_df,
+    )
+    assert items == [
+        {
+            "league_id": "league-1",
+            "league_name": "Test League",
+            "category": "injury",
+            "headline": "Hurt Guy is now Out",
+            "recommendation_id": "injury:p1:out",
+        }
+    ]
+
+
+def test_injury_status_push_items_excludes_questionable():
+    players_df = pd.DataFrame([{"player_id": "p1", "name": "Iffy Guy", "injury_status": "Questionable"}])
+    items = push_triggers.injury_status_push_items(
+        league_id="league-1",
+        league_name="Test League",
+        roster_player_ids={"p1"},
+        players_df=players_df,
+    )
+    assert items == []
+
+
+def test_injury_status_push_items_ignores_non_roster_players():
+    players_df = pd.DataFrame([{"player_id": "other", "name": "Not Mine", "injury_status": "Out"}])
+    items = push_triggers.injury_status_push_items(
+        league_id="league-1",
+        league_name="Test League",
+        roster_player_ids={"p1"},
+        players_df=players_df,
+    )
+    assert items == []
+
+
+def test_injury_status_push_items_empty_without_column_or_roster():
+    assert push_triggers.injury_status_push_items(
+        league_id="league-1",
+        league_name="Test League",
+        roster_player_ids=set(),
+        players_df=pd.DataFrame([{"player_id": "p1", "injury_status": "Out"}]),
+    ) == []
+    assert push_triggers.injury_status_push_items(
+        league_id="league-1",
+        league_name="Test League",
+        roster_player_ids={"p1"},
+        players_df=pd.DataFrame([{"player_id": "p1"}]),
+    ) == []
+
+
+def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    players_df = pd.DataFrame(
+        [{"player_id": "p1", "name": "Hurt Guy", "position": "RB", "dynasty_score": 50, "injury_status": "Out"}]
+    )
+
+    push_tokens_response = Mock(status_code=200)
+    push_tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
+    profiles_response = Mock(status_code=200)
+    profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
+    not_notified_response = Mock(status_code=200)
+    not_notified_response.json.return_value = []
+
+    with patch("modules.push_triggers.load_valued_players", return_value=(players_df, "dynasty_score")):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper_leagues.get_user_leagues",
+                return_value=[{"league_id": "league-1", "name": "Test League"}],
+            ):
+                with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+                    with patch(
+                        "modules.sleeper.get_rosters",
+                        return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+                    ):
+                        with patch(
+                            "modules.dashboard_engine.compose_next_move_briefing",
+                            return_value=Mock(items=[]),
+                        ):
+                            with patch("modules.push_triggers.recap_push_item", return_value=None):
+                                with patch(
+                                    "requests.get",
+                                    side_effect=[push_tokens_response, profiles_response, not_notified_response],
+                                ):
+                                    with patch("requests.post") as mock_post:
+                                        mock_post.return_value = Mock(
+                                            status_code=200, json=lambda: {"data": [{"status": "ok"}]}
+                                        )
+                                        stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+
+    assert stats["pushes_sent"] == 1
+    push_call = mock_post.call_args_list[0]
+    assert push_call.kwargs["json"][0]["title"] == "Injury Update — Test League"
+    assert push_call.kwargs["json"][0]["body"] == "Hurt Guy is now Out"
