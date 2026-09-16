@@ -60,6 +60,7 @@ class OfferVerdict:
     fit_total: int
     value_delta: int
     tone: str  # accept | counter | decline | fair
+    counter_action: dict[str, Any] | None = None
 
     def to_public_dict(self) -> dict[str, Any]:
         return {
@@ -75,6 +76,7 @@ class OfferVerdict:
             "fit_total": self.fit_total,
             "value_delta": self.value_delta,
             "tone": self.tone,
+            "counter_action": self.counter_action,
         }
 
 
@@ -183,13 +185,22 @@ def build_counter_guidance(
     value_delta: int,
     send_assets: Sequence[Mapping[str, Any]],
     partner_assets: Sequence[Mapping[str, Any]] | None = None,
-) -> str:
-    """Practical counter copy. Specific assets only when ownership is verified."""
+) -> tuple[str, dict[str, Any] | None]:
+    """Practical counter copy, plus a machine-actionable version when possible.
+
+    The text alone used to be the only output — every branch below already
+    identifies one specific asset before writing it into a sentence. Returns
+    that asset too (as `action`) so a caller (mobile's "build the counter"
+    button) can apply it to a trade package directly instead of re-parsing
+    the sentence. `action` is None whenever the guidance is generic
+    (no specific asset identified) — specific assets only when ownership is
+    verified, same restraint as the text has always had.
+    """
 
     if band not in {VERDICT_COUNTER, VERDICT_FAIR, VERDICT_DECLINE}:
-        return ""
+        return "", None
     if value_delta >= -150 and band == VERDICT_FAIR:
-        return "Preference call — counter only if you want a different shape, not because value is broken."
+        return "Preference call — counter only if you want a different shape, not because value is broken.", None
 
     gap = abs(min(0, int(value_delta)))
     send_sorted = sorted(
@@ -201,7 +212,13 @@ def build_counter_guidance(
         weak_score = int(weakest.get("score") or weakest.get("value_score") or 0)
         weak_label = str(weakest.get("name") or weakest.get("label") or "").strip()
         if weak_label and weak_score > 0 and gap > 0 and weak_score <= gap * 1.35:
-            return f"Remove {weak_label} from your outgoing side."
+            action = {
+                "action": "remove_from_send",
+                "player_id": str(weakest.get("player_id") or ""),
+                "asset_type": str(weakest.get("asset_type") or "player"),
+                "label": weak_label,
+            }
+            return f"Remove {weak_label} from your outgoing side.", action
 
     verified_partner = [
         dict(a)
@@ -220,13 +237,19 @@ def build_counter_guidance(
         if 0.55 * gap <= pick_score <= 1.6 * gap:
             label = str(pick.get("name") or pick.get("label") or "").strip()
             if label:
-                return f"Ask for {label} (verified on their roster) or equivalent value."
+                action = {
+                    "action": "add_to_receive",
+                    "player_id": str(pick.get("player_id") or ""),
+                    "asset_type": str(pick.get("asset_type") or "player"),
+                    "label": label,
+                }
+                return f"Ask for {label} (verified on their roster) or equivalent value.", action
 
     if gap < 500:
-        return "Ask for a small sweetener or trim your lowest outgoing piece."
+        return "Ask for a small sweetener or trim your lowest outgoing piece.", None
     if gap < 1500:
-        return "Ask for a future 2nd or equivalent value."
-    return "Ask for a first-round equivalent or remove a major piece from your side."
+        return "Ask for a future 2nd or equivalent value.", None
+    return "Ask for a first-round equivalent or remove a major piece from your side.", None
 
 
 def decide_offer_verdict(
@@ -312,7 +335,7 @@ def decide_offer_verdict(
     else:
         rationale = "This is a preference call — either side can be right."
 
-    counter = build_counter_guidance(
+    counter, counter_action = build_counter_guidance(
         band=band,
         value_delta=value_delta,
         send_assets=send_assets or (),
@@ -342,6 +365,7 @@ def decide_offer_verdict(
         fit_total=fit_total,
         value_delta=value_delta,
         tone=tone,
+        counter_action=counter_action,
     )
 
 

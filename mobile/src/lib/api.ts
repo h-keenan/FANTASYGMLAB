@@ -196,6 +196,13 @@ export type TeamStrategy =
   | 'rebuild'
   | 'tank';
 
+export interface TradeCounterAction {
+  action: 'remove_from_send' | 'add_to_receive';
+  player_id: string;
+  asset_type: string;
+  label: string;
+}
+
 export interface TradeVerdict {
   band: string;
   ui_verdict: 'ACCEPT' | 'DECLINE' | 'COUNTER' | 'FAIR';
@@ -209,6 +216,7 @@ export interface TradeVerdict {
   fit_total: number;
   value_delta: number;
   tone: 'accept' | 'counter' | 'decline' | 'fair';
+  counter_action?: TradeCounterAction | null;
 }
 
 export type TradeAnalyzerReason =
@@ -504,6 +512,7 @@ export const api = {
       receivePlayerIds: string[];
       strategy?: TeamStrategy;
       lens?: ValuationLens;
+      partnerRosterId?: string;
     },
   ) =>
     authorizedPost<TradeAnalyzerResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/trade-analyzer`, {
@@ -511,6 +520,7 @@ export const api = {
       receive_player_ids: body.receivePlayerIds,
       strategy: body.strategy ?? 'retool',
       lens: body.lens ?? 'Dynasty',
+      partner_roster_id: body.partnerRosterId ?? '',
     }),
   getPlayers: async (playerIds: string[]): Promise<Record<string, PlayerSummary>> => {
     const uniqueIds = [...new Set(playerIds.filter(Boolean))];
