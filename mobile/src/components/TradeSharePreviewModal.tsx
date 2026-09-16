@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
   previewWrap: {
     transform: [{ scale: 0.82 }],
-    marginVertical: -40,
+    marginVertical: -45,
   },
   primaryButton: {
     flexDirection: 'row',
