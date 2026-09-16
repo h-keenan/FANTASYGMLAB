@@ -9,6 +9,7 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type DashboardItem, type DashboardItemCategory, type PresentationAsset } from '../lib/api';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { useDensity } from '../context/DensityContext';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -50,6 +51,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
+  const { showExplanations } = useDensity();
 
   useScreenHeaderTitle(navigation, 'Next Move', leagueName);
 
@@ -144,6 +146,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
             leagueName={leagueName}
             navigation={navigation}
             isNew={newRecommendationIds.has(item.recommendation_id)}
+            showExplanations={showExplanations}
           />
         ))
       )}
@@ -229,12 +232,14 @@ function TopPriorityTradeCard({
   leagueName,
   navigation,
   isNew,
+  showExplanations,
 }: {
   item: DashboardItem;
   leagueId: string;
   leagueName: string;
   navigation: DashboardNavigation;
   isNew: boolean;
+  showExplanations: boolean;
 }) {
   const presentation = item.presentation!;
   const gain = presentation.trade_gain;
@@ -298,7 +303,7 @@ function TopPriorityTradeCard({
         <Text style={styles.meterValue}>{presentation.trade_confidence_label}</Text>
       </View>
 
-      {item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
+      {showExplanations && item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
     </AnimatedCard>
   );
@@ -310,12 +315,14 @@ function BriefingCard({
   leagueName,
   navigation,
   isNew,
+  showExplanations,
 }: {
   item: DashboardItem;
   leagueId: string;
   leagueName: string;
   navigation: DashboardNavigation;
   isNew: boolean;
+  showExplanations: boolean;
 }) {
   if (item.presentation?.trade_package) {
     return (
@@ -325,6 +332,7 @@ function BriefingCard({
         leagueName={leagueName}
         navigation={navigation}
         isNew={isNew}
+        showExplanations={showExplanations}
       />
     );
   }
@@ -337,7 +345,7 @@ function BriefingCard({
         {isNew ? <NewBadge /> : null}
       </View>
       <Text style={styles.cardHeadline}>{item.headline}</Text>
-      {item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
+      {showExplanations && item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
     </AnimatedCard>
   );

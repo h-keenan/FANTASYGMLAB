@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import { syncPushToken } from '../lib/pushNotifications';
 import { colors, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { useDensity, type UiDensity } from '../context/DensityContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 
@@ -18,8 +19,14 @@ const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: React.Component
   { pageKey: 'no_affiliation', label: 'No-Affiliation Disclaimer', icon: 'alert-circle-outline' },
 ];
 
+const DENSITY_OPTIONS: Array<{ value: UiDensity; label: string; description: string }> = [
+  { value: 'guided', label: 'Guided', description: 'Show the reasoning behind every recommendation' },
+  { value: 'compact', label: 'Compact', description: 'Just the calls — hide the explanation text' },
+];
+
 export default function MoreScreen({ navigation }: Props) {
   const [sendingTestPush, setSendingTestPush] = useState(false);
+  const { density, setDensity } = useDensity();
 
   const onSendTestPush = async () => {
     setSendingTestPush(true);
@@ -45,6 +52,25 @@ export default function MoreScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.sectionLabel}>Display</Text>
+      <View style={styles.densityRow}>
+        {DENSITY_OPTIONS.map((option) => {
+          const active = density === option.value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              style={[styles.densityOption, active && styles.densityOptionActive]}
+              onPress={() => setDensity(option.value)}
+            >
+              <Text style={[styles.densityOptionLabel, active && styles.densityOptionLabelActive]}>
+                {option.label}
+              </Text>
+              <Text style={styles.densityOptionDescription}>{option.description}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <Text style={styles.sectionLabel}>Notifications</Text>
       <TouchableOpacity style={styles.row} onPress={onSendTestPush} disabled={sendingTestPush}>
         <View style={styles.labelGroup}>
@@ -98,4 +124,34 @@ const styles = StyleSheet.create({
   icon: { marginRight: spacing.sm },
   label: { fontSize: 16, color: colors.textPrimary, flexShrink: 1 },
   chevron: { fontSize: 20, color: colors.textSecondary },
+  densityRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  densityOption: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+  },
+  densityOptionActive: {
+    borderColor: colors.accent,
+  },
+  densityOptionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  densityOptionLabelActive: {
+    color: colors.accent,
+  },
+  densityOptionDescription: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
 });
