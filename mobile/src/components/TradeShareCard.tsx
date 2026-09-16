@@ -1,12 +1,15 @@
 import React, { forwardRef } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 
 import type { RankedPlayer, TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import PlayerAvatar from './PlayerAvatar';
 
 const CARD_WIDTH = 360;
-const CARD_HEIGHT = 450;
+const CARD_HEIGHT = 500;
+const SHARE_QR_URL = 'https://fantasygmlab.com';
+const QR_SIZE = 60;
 
 const HEADLINE_META: Record<TradeVerdict['tone'], { headline: string; color: string }> = {
   accept: { headline: 'TRADE ACCEPTED', color: colors.accent },
@@ -103,6 +106,27 @@ const TradeShareCard = forwardRef<View, {
         {verdict.rationale}
       </Text>
 
+      <View style={styles.qrRow}>
+        <View style={styles.qrTextGroup}>
+          <Text style={styles.qrKicker}>SCAN TO TRY</Text>
+          <Text style={styles.qrTitle}>FantasyGM Lab</Text>
+          <Text style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</Text>
+        </View>
+        <View style={styles.qrWrap}>
+          <QRCode
+            value={SHARE_QR_URL}
+            size={QR_SIZE}
+            color={colors.background}
+            backgroundColor="#fff"
+            logo={require('../../assets/icon.png')}
+            logoSize={QR_SIZE * 0.28}
+            logoBorderRadius={4}
+            logoBackgroundColor="#fff"
+            ecl="H"
+          />
+        </View>
+      </View>
+
       <View style={styles.footer}>
         <Text style={styles.footerText}>
           <Text style={{ color: colors.accent }}>PLAN. </Text>
@@ -152,6 +176,24 @@ const styles = StyleSheet.create({
   assetMeta: { fontSize: 10, color: colors.textSecondary },
   whyLabel: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
   whyText: { fontSize: 11, color: colors.textSecondary, lineHeight: 15, marginTop: 2 },
+  qrRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    gap: spacing.md,
+  },
+  qrTextGroup: { flex: 1 },
+  qrKicker: { fontSize: 9, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
+  qrTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
+  qrSubtitle: { fontSize: 10, color: colors.textSecondary, lineHeight: 13, marginTop: 2 },
+  qrWrap: {
+    padding: 6,
+    backgroundColor: '#fff',
+    borderRadius: radii.sm,
+  },
   footer: { position: 'absolute', bottom: spacing.md, left: 0, right: 0, alignItems: 'center' },
   footerText: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
 });
