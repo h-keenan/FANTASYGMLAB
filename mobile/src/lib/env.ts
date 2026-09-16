@@ -36,4 +36,11 @@ export const env = {
     process.env.EXPO_PUBLIC_ADMOB_IOS_REWARDED_UNIT_ID ?? 'ca-app-pub-3940256099942544/1712485313',
   admobAndroidRewardedUnitId:
     process.env.EXPO_PUBLIC_ADMOB_ANDROID_REWARDED_UNIT_ID ?? 'ca-app-pub-3940256099942544/5224354917',
+  // No default — Google sign-in stays hidden until a real OAuth client
+  // exists (Google Cloud Console). iOS/Android need their own native
+  // client IDs; Web is required too since it's what Supabase's Google
+  // provider itself is configured with (used as the `aud` fallback here).
+  googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '',
+  googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '',
+  googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
 };

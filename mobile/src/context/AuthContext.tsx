@@ -63,7 +63,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       signUp: async (email, password) => {
-        const { error } = await supabase.auth.signUp({ email, password });
+        // Without this, Supabase's confirmation link falls back to the
+        // project's Site URL — the web app — which is a confusing surface
+        // switch for someone who started signing up on mobile. This at
+        // least opens back into this app; Apple/Google sign-in (no email
+        // confirmation step at all) is the real fix for that flow.
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: 'fantasygmlab://' },
+        });
         return { error: error?.message ?? null };
       },
       signOut: async () => {
