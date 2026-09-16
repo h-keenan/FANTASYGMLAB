@@ -173,6 +173,19 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     setVerdict(null);
   };
 
+  const applyCounterAction = () => {
+    const action = verdict?.counter_action;
+    if (!action || action.asset_type !== 'player' || !action.player_id) return;
+    if (action.action === 'remove_from_send') {
+      setSendIds((prev) => prev.filter((p) => p.player_id !== action.player_id));
+    } else if (action.action === 'add_to_receive') {
+      const player = rankings.find((p) => p.player_id === action.player_id);
+      if (!player) return;
+      setReceiveIds((prev) => (prev.some((p) => p.player_id === player.player_id) ? prev : [...prev, player]));
+    }
+    setVerdict(null);
+  };
+
   const analyze = async () => {
     setAnalyzeError(null);
     setAnalyzing(true);
@@ -182,6 +195,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         receivePlayerIds: receiveIds.map((p) => p.player_id),
         strategy,
         lens: 'Dynasty',
+        partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? '' : selectedTeamId,
       });
       if (result.verdict) {
         setVerdict(result.verdict);
@@ -298,7 +312,15 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       </TouchableOpacity>
 
       {analyzeError ? <Text style={styles.error}>{analyzeError}</Text> : null}
-      {verdict ? <VerdictCard verdict={verdict} sendIds={sendIds} receiveIds={receiveIds} leagueName={leagueName} /> : null}
+      {verdict ? (
+        <VerdictCard
+          verdict={verdict}
+          sendIds={sendIds}
+          receiveIds={receiveIds}
+          leagueName={leagueName}
+          onBuildCounter={applyCounterAction}
+        />
+      ) : null}
 
       <TextInput
         style={styles.searchInput}
@@ -360,11 +382,13 @@ function VerdictCard({
   sendIds,
   receiveIds,
   leagueName,
+  onBuildCounter,
 }: {
   verdict: TradeVerdict;
   sendIds: RankedPlayer[];
   receiveIds: RankedPlayer[];
   leagueName: string;
+  onBuildCounter: () => void;
 }) {
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -391,6 +415,12 @@ function VerdictCard({
         <>
           <Text style={styles.verdictLabel}>Counter guidance</Text>
           <Text style={styles.verdictText}>{verdict.counter_guidance}</Text>
+          {verdict.counter_action && verdict.counter_action.asset_type === 'player' ? (
+            <TouchableOpacity style={styles.counterButton} onPress={onBuildCounter}>
+              <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+              <Text style={styles.counterButtonText}>Build the counter</Text>
+            </TouchableOpacity>
+          ) : null}
         </>
       ) : null}
 
@@ -522,6 +552,17 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  counterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
+  },
+  counterButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   verdictConfidence: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.sm },
   verdictLabel: {
     fontSize: 11,

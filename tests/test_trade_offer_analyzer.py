@@ -87,16 +87,23 @@ def test_counter_guidance_prefers_removing_weak_send():
     )
     assert verdict.ui_verdict == toa.UI_VERDICT_COUNTER
     assert "Depth Piece" in verdict.counter_guidance
+    assert verdict.counter_action == {
+        "action": "remove_from_send",
+        "player_id": "",
+        "asset_type": "player",
+        "label": "Depth Piece",
+    }
 
 
 def test_counter_specific_asset_requires_verified_ownership():
-    guidance = toa.build_counter_guidance(
+    guidance, action = toa.build_counter_guidance(
         band=toa.VERDICT_COUNTER,
         value_delta=-900,
         send_assets=[{"asset_type": "player", "name": "Expensive", "score": 4000}],
         partner_assets=[
             {
                 "asset_type": "player",
+                "player_id": "partner-wr-1",
                 "name": "Partner WR",
                 "score": 950,
                 "owner_roster_id": "partner-1",
@@ -104,6 +111,22 @@ def test_counter_specific_asset_requires_verified_ownership():
         ],
     )
     assert "Partner WR" in guidance
+    assert action == {
+        "action": "add_to_receive",
+        "player_id": "partner-wr-1",
+        "asset_type": "player",
+        "label": "Partner WR",
+    }
+
+
+def test_counter_guidance_returns_no_action_for_generic_text():
+    guidance, action = toa.build_counter_guidance(
+        band=toa.VERDICT_COUNTER,
+        value_delta=-5000,
+        send_assets=[],
+    )
+    assert guidance
+    assert action is None
 
 
 def test_impossible_ownership_warnings():

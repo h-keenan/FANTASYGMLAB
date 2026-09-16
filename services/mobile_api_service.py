@@ -515,6 +515,10 @@ class TradeAnalyzerRequest(BaseModel):
     # modules.team_eval.normalize_team_strategy — so this is never rejected.
     strategy: str = "retool"
     lens: str = "Dynasty"
+    # Optional: the proposing partner's roster_id. When given, verdict.counter_action
+    # can suggest a specific verified partner asset to ask for instead of just
+    # generic guidance text — see modules.trade_offer_analyzer.build_counter_guidance.
+    partner_roster_id: str = ""
 
 
 @app.post("/v1/leagues/{league_id}/trade-analyzer")
@@ -581,6 +585,25 @@ def post_trade_analyzer(
     if not send_assets and not receive_assets:
         return {"ok": True, "verdict": None, "reason": "assets_not_found"}
 
+    partner_assets: list[dict[str, Any]] = []
+    if body.partner_roster_id:
+        partner_player_ids = {
+            str(pid)
+            for roster in sleeper.get_rosters(league_id)
+            if str(roster.get("roster_id")) == str(body.partner_roster_id)
+            for pid in (roster.get("players") or [])
+        }
+        if partner_player_ids:
+            partner_rows = valued[valued["player_id"].astype(str).isin(partner_player_ids)]
+            partner_assets = [
+                player_asset_from_mapping(
+                    row,
+                    score_field=score_field,
+                    owner_info={"owner_roster_id": body.partner_roster_id},
+                )
+                for _, row in partner_rows.iterrows()
+            ]
+
     fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
         my_team_df=my_team_df,
         all_players_df=valued,
@@ -598,6 +621,7 @@ def post_trade_analyzer(
         fit,
         send_assets=send_assets,
         receive_assets=receive_assets,
+        partner_assets=partner_assets,
     )
     return {"ok": True, "verdict": verdict.to_public_dict(), "reason": ""}
 
