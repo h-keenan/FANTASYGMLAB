@@ -78,6 +78,7 @@ from modules import (
     sleeper_leagues,
     trade_analyzer_fit,
     trade_hub_engine,
+    trade_hub_ui,
     trade_offer_analyzer,
 )
 from modules.trade_analyzer_assembly import player_asset_from_mapping
@@ -1211,11 +1212,20 @@ def get_league_dashboard(
     }
 
 
+# Mobile-only reveal mechanic: watching a rewarded ad temporarily raises the
+# Free-tier visible count above modules.trade_hub_ui.FREE_VISIBLE_IDEAS (2),
+# same board/ranking as web. Web has no ad path, so this bonus is layered on
+# top of the shared engine rather than added to trade_hub_ui itself.
+AD_BONUS_IDEAS_PER_UNLOCK = 2
+MAX_AD_UNLOCKS = 3
+
+
 @app.get("/v1/leagues/{league_id}/trade-hub")
 def get_trade_hub_ideas(
     league_id: str,
     strategy: str = "retool",
     lens: str = "Dynasty",
+    ad_unlocks: int = 0,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Real trade ideas for the caller's roster in this league.
@@ -1225,6 +1235,13 @@ def get_trade_hub_ideas(
     enforcement boundary, via modules.trade_hub_engine — see that module's
     docstring for why it's a fresh composition rather than importing
     app.py directly (modules/ never imports app.py).
+
+    Free-tier gating reuses the web app's own ranking and free-count
+    contract (modules.trade_hub_ui.order_trade_hub_visible_ideas /
+    FREE_VISIBLE_IDEAS) so the "first 2 ideas" a Free mobile user sees are
+    identically chosen to the web app's. `ad_unlocks` (client-tracked,
+    reset per session) temporarily raises that ceiling — a mobile-only
+    reward mechanic, not part of the shared entitlement contract.
     """
 
     if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
@@ -1268,4 +1285,35 @@ def get_trade_hub_ideas(
         score_field=score_field,
         team_strategy=strategy,
     )
-    return {"ok": True, "ideas": [card.to_dict() for card in cards], "reason": ""}
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    ranked = trade_hub_ui.order_trade_hub_visible_ideas([card.to_dict() for card in cards])
+    approved_count = len(ranked)
+    ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
+    effective_limit = (
+        approved_count
+        if is_premium
+        else min(
+            approved_count,
+            trade_hub_ui.FREE_VISIBLE_IDEAS + AD_BONUS_IDEAS_PER_UNLOCK * ad_unlocks_applied,
+        )
+    )
+    visible = ranked[:effective_limit]
+    return {
+        "ok": True,
+        "ideas": visible,
+        "reason": "",
+        "entitlement": {
+            "is_premium": is_premium,
+            "approved_count": approved_count,
+            "visible_count": len(visible),
+            "hidden_count": approved_count - len(visible),
+            "free_limit": trade_hub_ui.FREE_VISIBLE_IDEAS,
+            "ad_bonus_per_unlock": AD_BONUS_IDEAS_PER_UNLOCK,
+            "max_ad_unlocks": MAX_AD_UNLOCKS,
+            "ad_unlocks_applied": ad_unlocks_applied,
+        },
+    }

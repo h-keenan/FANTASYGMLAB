@@ -6,10 +6,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
+import { initAds } from './src/lib/ads';
 
 export default function App() {
   useEffect(() => {
     configureRevenueCat();
+    void initAds();
   }, []);
 
   return (
