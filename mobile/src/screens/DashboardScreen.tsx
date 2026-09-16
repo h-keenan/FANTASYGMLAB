@@ -7,6 +7,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type DashboardItem, type DashboardItemCategory, type PresentationAsset } from '../lib/api';
+import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -47,6 +48,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
+  const [isFirstVisit, setIsFirstVisit] = useState(true);
 
   useScreenHeaderTitle(navigation, 'Next Move', leagueName);
 
@@ -62,6 +65,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
           setItems(result.items);
           setQuiet(result.quiet);
           setQuietReason(result.quiet_reason ?? '');
+          const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
+            leagueId,
+            result.items.map((item) => item.recommendation_id),
+          );
+          if (!cancelled) {
+            setNewRecommendationIds(newIds);
+            setIsFirstVisit(firstVisit);
+          }
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load your Next Move briefing.');
@@ -108,6 +119,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
         The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and
         waiver signals the web app's Dashboard uses.
       </Text>
+      {!isFirstVisit && newRecommendationIds.size > 0 ? (
+        <View style={styles.checkInBanner}>
+          <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
+          <Text style={styles.checkInText}>
+            Since your last check-in: {newRecommendationIds.size} new{' '}
+            {newRecommendationIds.size === 1 ? 'item' : 'items'} below
+          </Text>
+        </View>
+      ) : null}
       {quiet || !items || items.length === 0 ? (
         <View style={styles.emptyCard}>
           <Ionicons name="checkmark-done-outline" size={22} color={colors.success} />
@@ -123,6 +143,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
             leagueId={leagueId}
             leagueName={leagueName}
             navigation={navigation}
+            isNew={newRecommendationIds.has(item.recommendation_id)}
           />
         ))
       )}
@@ -194,16 +215,26 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
   );
 }
 
+function NewBadge() {
+  return (
+    <View style={styles.newBadge}>
+      <Text style={styles.newBadgeText}>NEW</Text>
+    </View>
+  );
+}
+
 function TopPriorityTradeCard({
   item,
   leagueId,
   leagueName,
   navigation,
+  isNew,
 }: {
   item: DashboardItem;
   leagueId: string;
   leagueName: string;
   navigation: DashboardNavigation;
+  isNew: boolean;
 }) {
   const presentation = item.presentation!;
   const gain = presentation.trade_gain;
@@ -215,6 +246,7 @@ function TopPriorityTradeCard({
       <View style={styles.cardHeaderRow}>
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
         <Text style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</Text>
+        {isNew ? <NewBadge /> : null}
         <View style={styles.tradeBadge}>
           <Ionicons name="swap-horizontal" size={12} color={colors.textSecondary} />
           <Text style={styles.tradeBadgeText}>TRADE</Text>
@@ -277,14 +309,24 @@ function BriefingCard({
   leagueId,
   leagueName,
   navigation,
+  isNew,
 }: {
   item: DashboardItem;
   leagueId: string;
   leagueName: string;
   navigation: DashboardNavigation;
+  isNew: boolean;
 }) {
   if (item.presentation?.trade_package) {
-    return <TopPriorityTradeCard item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />;
+    return (
+      <TopPriorityTradeCard
+        item={item}
+        leagueId={leagueId}
+        leagueName={leagueName}
+        navigation={navigation}
+        isNew={isNew}
+      />
+    );
   }
   const meta = CATEGORY_META[item.category] ?? CATEGORY_META.watch;
   return (
@@ -292,6 +334,7 @@ function BriefingCard({
       <View style={styles.cardHeaderRow}>
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
         <Text style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
+        {isNew ? <NewBadge /> : null}
       </View>
       <Text style={styles.cardHeadline}>{item.headline}</Text>
       {item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
@@ -312,6 +355,25 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16 },
+  checkInBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.accentMuted,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  checkInText: { fontSize: 12, fontWeight: '600', color: colors.accent, flexShrink: 1 },
+  newBadge: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 2,
+    marginLeft: spacing.xs,
+  },
+  newBadgeText: { fontSize: 8, fontWeight: '800', color: colors.background, letterSpacing: 0.4 },
   card: {
     borderLeftWidth: 4,
     padding: spacing.lg,
