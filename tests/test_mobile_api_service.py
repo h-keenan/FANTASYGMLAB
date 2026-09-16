@@ -1530,14 +1530,19 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
     assert body["reason"] == ""
     # Real modules.dashboard_engine composition, not a mocked result — the
     # only unrostered player (target_rb) should surface as the waiver tile.
+    # With no trade partner holding any players, there's no trade candidate,
+    # so (per app.py's default tile order — see dashboard_engine's module
+    # docstring) the waiver tile becomes the primary recommendation
+    # ("top_priority"), same as modules.daily_gm_briefing's own
+    # `_append(briefing.primary, CATEGORY_TOP_PRIORITY)`.
     assert len(body["items"]) >= 1
     for item in body["items"]:
         assert item["headline"]
         assert item["destination"]
-    waiver_items = [item for item in body["items"] if item["category"] == "waiver_opportunity"]
+    top_priority_items = [item for item in body["items"] if item["category"] == "top_priority"]
     categories = [item["category"] for item in body["items"]]
-    assert waiver_items, f"expected a waiver_opportunity tile, got categories: {categories}"
-    assert waiver_items[0]["route_player_id"] == "target_rb"
+    assert top_priority_items, f"expected a top_priority tile, got categories: {categories}"
+    assert top_priority_items[0]["route_player_id"] == "target_rb"
 
 
 def test_trade_hub_requires_auth(monkeypatch):
@@ -1576,17 +1581,16 @@ def test_trade_hub_resolves_roster_and_projects_generated_ideas(monkeypatch):
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
-    fake_card = SimpleNamespace(
-        to_dict=lambda: {
-            "partner_team_name": "Rival GM",
-            "rationale": "Clear upgrade at RB.",
-            "trade_gain": 25,
-            "confidence_label": "High",
-            "market_realism_label": "Realistic",
-            "reasoning_tags": ["Need-Based"],
-            "package": {"send": [{"label": "Bench Runner"}], "receive": [{"label": "Target Runner"}]},
-        }
-    )
+    fake_record = {
+        "partner_team_name": "Rival GM",
+        "rationale": "Clear upgrade at RB.",
+        "trade_gain": 25,
+        "trade_confidence_label": "High",
+        "market_realism_label": "Realistic",
+        "reasoning_tags": ["Need-Based"],
+        "send_assets": [],
+        "receive_assets": [],
+    }
 
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
@@ -1601,8 +1605,8 @@ def test_trade_hub_resolves_roster_and_projects_generated_ideas(monkeypatch):
                             side_effect=lambda df, **kwargs: df,
                         ):
                             with patch(
-                                "modules.trade_hub_engine.generate_trade_ideas",
-                                return_value=[fake_card],
+                                "modules.trade_hub_engine.generate_trade_idea_records",
+                                return_value=[fake_record],
                             ) as mock_generate:
                                 response = client.get(
                                     "/v1/leagues/abc/trade-hub?strategy=contender",
@@ -1613,25 +1617,26 @@ def test_trade_hub_resolves_roster_and_projects_generated_ideas(monkeypatch):
     body = response.json()
     assert body["ok"] is True
     assert body["reason"] == ""
-    assert body["ideas"] == [fake_card.to_dict()]
+    assert len(body["ideas"]) == 1
+    assert body["ideas"][0]["partner_team_name"] == "Rival GM"
+    assert body["ideas"][0]["trade_gain"] == 25
+    assert body["ideas"][0]["confidence_label"] == "High"
     assert mock_generate.call_args.kwargs["my_roster_id"] == 1
     assert mock_generate.call_args.kwargs["team_strategy"] == "contender"
     assert mock_generate.call_args.kwargs["league_id"] == "abc"
 
 
-def _fake_idea_card(name: str, *, gain: int) -> SimpleNamespace:
-    return SimpleNamespace(
-        to_dict=lambda: {
-            "partner_team_name": name,
-            "rationale": "Clear upgrade.",
-            "trade_gain": gain,
-            "trade_confidence_label": "High",
-            "confidence_label": "High",
-            "market_realism_label": "Realistic",
-            "reasoning_tags": [],
-            "package": {"send": [], "receive": []},
-        }
-    )
+def _fake_idea_record(name: str, *, gain: int) -> dict:
+    return {
+        "partner_team_name": name,
+        "rationale": "Clear upgrade.",
+        "trade_gain": gain,
+        "trade_confidence_label": "High",
+        "market_realism_label": "Realistic",
+        "reasoning_tags": [],
+        "send_assets": [],
+        "receive_assets": [],
+    }
 
 
 def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monkeypatch):
@@ -1643,7 +1648,7 @@ def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monke
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
-    fake_cards = [_fake_idea_card(f"Rival {i}", gain=10 - i) for i in range(4)]
+    fake_cards = [_fake_idea_record(f"Rival {i}", gain=10 - i) for i in range(4)]
 
     # Two full requests, each: require_user's auth check + _resolve_my_roster's
     # profile fetch + this endpoint's own entitlement profile fetch.
@@ -1661,7 +1666,7 @@ def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monke
                             side_effect=lambda df, **kwargs: df,
                         ):
                             with patch(
-                                "modules.trade_hub_engine.generate_trade_ideas",
+                                "modules.trade_hub_engine.generate_trade_idea_records",
                                 return_value=fake_cards,
                             ):
                                 free_response = client.get(
@@ -1704,7 +1709,7 @@ def test_trade_hub_premium_entitlement_sees_full_board_ignoring_ad_unlocks(monke
     profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
-    fake_cards = [_fake_idea_card(f"Rival {i}", gain=10 - i) for i in range(3)]
+    fake_cards = [_fake_idea_record(f"Rival {i}", gain=10 - i) for i in range(3)]
 
     with patch("requests.get", side_effect=[auth_user_response, profile_response, profile_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
@@ -1719,7 +1724,7 @@ def test_trade_hub_premium_entitlement_sees_full_board_ignoring_ad_unlocks(monke
                             side_effect=lambda df, **kwargs: df,
                         ):
                             with patch(
-                                "modules.trade_hub_engine.generate_trade_ideas",
+                                "modules.trade_hub_engine.generate_trade_idea_records",
                                 return_value=fake_cards,
                             ):
                                 response = client.get(

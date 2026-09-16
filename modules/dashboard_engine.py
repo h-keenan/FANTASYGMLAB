@@ -13,23 +13,43 @@ enough to keep in sync by inspection.
 Composition (organize_dashboard_items -> compose_daily_gm_briefing) reuses
 modules.dashboard_workflow and modules.daily_gm_briefing exactly as the web
 app does — those two modules were already pure and session-independent.
+
+`build_trade_tile`'s Top Trade Opportunity is composed the same way app.py
+builds its own `trade_item`: every reason/label/verdict piece is a real
+modules/ function app.py itself calls (modules.trade_hub_ui.trade_target_reason
+et al., modules.trade_analyzer_fit.trade_value_verdict,
+modules.canonical_recommendation_narrative.build_trade_narrative) — app.py's
+`_trade_target_reason` etc. are themselves just thin aliases to these same
+functions (see app.py lines ~1658-1683), so nothing here is a duplicate or a
+port. The one simplification: `route_player_id` links to the headline idea's
+own first "receive" asset rather than replicating app.py's separate
+`franchise_trade_summary` buy-low derivation across the full idea list —
+equally correct for a single headline idea, and much simpler. Tile ordering
+(roster pressure, trade, waiver, need, injury) matches app.py's default
+dashboard-phase branch; the startup/playoff/early-season phase variants
+aren't replicated here.
 """
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Mapping
 
 import pandas as pd
 
-from modules import daily_gm_briefing, dashboard_workflow, injury_ui, sleeper
+from modules import canonical_recommendation_narrative, daily_gm_briefing, dashboard_workflow, injury_ui, sleeper, trade_hub_ui, trade_hub_engine
 from modules.canonical_recommendation_narrative import build_waiver_narrative
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
+from modules.league_workspace_ui import _format_score
+from modules.player_cards import recommendation_reason_text
+from modules.rankings import injury_level
 from modules.roster_needs import TeamNeedsAssessment
 from modules.team_eval import suggest_optimal_lineup
 from modules.trade_analyzer_fit import (
     build_team_needs_assessment,
     get_needed_positions,
     roster_injury_context,
+    trade_value_verdict,
 )
 from modules.waivers_ui import select_top_waiver_opportunity, waiver_recommendation_label
 
@@ -196,6 +216,75 @@ def build_waiver_tile(
     }
 
 
+_trade_asset_injury_context = partial(trade_hub_ui.trade_asset_injury_context, injury_level=injury_level)
+_trade_idea_injury_display_context = partial(
+    trade_hub_ui.trade_idea_injury_display_context, asset_injury_context=_trade_asset_injury_context
+)
+
+
+def build_trade_tile(
+    headline_idea: Mapping[str, Any] | None,
+    *,
+    league_id: str,
+    roster_id: str,
+    score_field: str,
+) -> dict[str, Any] | None:
+    """The Top Trade Opportunity tile — see module docstring."""
+
+    if not headline_idea:
+        return None
+
+    target_reason = trade_hub_ui.trade_target_reason(
+        headline_idea, recommendation_reason_text=recommendation_reason_text
+    )
+    partner_reason = trade_hub_ui.trade_partner_reason(
+        headline_idea, recommendation_reason_text=recommendation_reason_text
+    )
+    confidence_reason = trade_hub_ui.trade_confidence_reason(
+        headline_idea,
+        recommendation_reason_text=recommendation_reason_text,
+        injury_display_context=_trade_idea_injury_display_context,
+    )
+    confidence_label = trade_hub_ui.trade_display_confidence_label(
+        headline_idea, injury_display_context=_trade_idea_injury_display_context
+    )
+    gain = int(headline_idea.get("trade_gain") or 0)
+    value_delta = (
+        f"+{_format_score(gain)}"
+        if gain > 0
+        else (f"-{_format_score(abs(gain))}" if gain < 0 else "Even")
+    )
+    narrative = canonical_recommendation_narrative.build_trade_narrative(
+        headline_idea,
+        league_id=league_id,
+        roster_id=roster_id,
+        valuation_lens=score_field,
+        source_surface="dashboard",
+        target_reason=target_reason,
+        partner_reason=partner_reason,
+        confidence_reason=confidence_reason,
+        confidence_label=confidence_label,
+        value_verdict=trade_value_verdict(gain),
+        value_delta=value_delta,
+        health_context=_trade_idea_injury_display_context(headline_idea),
+    )
+    receive_assets = [
+        asset for asset in (headline_idea.get("receive_assets") or []) if isinstance(asset, Mapping)
+    ]
+    route_player_id = _text(receive_assets[0].get("player_id")) if receive_assets else ""
+    return {
+        "label": "Top Trade Opportunity",
+        "value": _text(narrative.target_label, _text(headline_idea.get("partner_team_name"), "Open Trade Hub")),
+        "note": narrative.shorten("reason", 150),
+        "tone": "trade",
+        "route_key": "trade_hub",
+        "route_player_id": route_player_id,
+        "route_focus_mode": "target_player",
+        "recommendation_narrative": narrative.to_dict(),
+        "recommendation_id": narrative.recommendation_id,
+    }
+
+
 def compose_next_move_briefing(
     *,
     league_id: str,
@@ -206,6 +295,8 @@ def compose_next_move_briefing(
     league_settings: Mapping[str, Any] | None,
     score_field: str,
     entitlement: str = "free",
+    rosters: list[dict] | None = None,
+    team_strategy: str = "retool",
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
@@ -237,9 +328,35 @@ def compose_next_move_briefing(
         top_waiver, league_id=league_id, roster_id=roster_id, score_field=score_field
     )
 
-    items = [roster_pressure_tile, need_tile, injury_tile]
+    trade_tile = None
+    try:
+        my_roster_id = int(roster_id)
+    except (TypeError, ValueError):
+        my_roster_id = None
+    if my_roster_id is not None and rosters:
+        records = trade_hub_engine.generate_trade_idea_records(
+            league_id=league_id,
+            my_roster_id=my_roster_id,
+            players_df=players_df,
+            rosters=rosters,
+            league_settings=league_settings,
+            score_field=score_field,
+            team_strategy=team_strategy,
+        )
+        ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
+        headline_idea = ranked_records[0] if ranked_records else None
+        trade_tile = build_trade_tile(
+            headline_idea, league_id=league_id, roster_id=roster_id, score_field=score_field
+        )
+
+    # Order matches app.py's default dashboard-phase branch (roster_pressure,
+    # trade, waiver, need, injury) — see module docstring.
+    items = [roster_pressure_tile]
+    if trade_tile is not None:
+        items.append(trade_tile)
     if waiver_tile is not None:
         items.append(waiver_tile)
+    items.extend([need_tile, injury_tile])
 
     immediate_labels = frozenset(
         label

@@ -296,7 +296,7 @@ class TradeIdeaCard:
         }
 
 
-def _project_idea(idea: Mapping[str, Any]) -> TradeIdeaCard:
+def project_trade_idea_card(idea: Mapping[str, Any]) -> TradeIdeaCard:
     gain = int(idea.get("trade_gain") or 0)
     edge_label = f"+{gain}" if gain > 0 else (f"-{abs(gain)}" if gain < 0 else "")
     package = compact_package(
@@ -316,7 +316,7 @@ def _project_idea(idea: Mapping[str, Any]) -> TradeIdeaCard:
     )
 
 
-def generate_trade_ideas(
+def generate_trade_idea_records(
     *,
     league_id: str,
     my_roster_id: int,
@@ -326,12 +326,16 @@ def generate_trade_ideas(
     score_field: str,
     team_strategy: str = "retool",
     max_ideas: int = MAX_TRADE_IDEAS,
-) -> list[TradeIdeaCard]:
-    """The mobile Trade Hub board — same engine call as the web app's Trade
-    Hub (modules.trade_ideas.build_trade_ideas) and the same production
-    Trust enforcement boundary, fed by a fresh per-request league summary
-    (modules.team_eval.build_league_summary) rather than app.py's
-    Streamlit-session-cached version — see module docstring for why."""
+) -> list[dict[str, Any]]:
+    """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
+    and modules.trade_hub_ui already work with (trade_confidence_label,
+    send_assets/receive_assets, fit_grade, hub_* reason fields, etc.).
+
+    `generate_trade_ideas` narrows these to TradeIdeaCard for the mobile
+    Trade Hub card UI; callers that need the raw engine fields — ranking via
+    modules.trade_hub_ui.order_trade_hub_visible_ideas, or narrative
+    building via modules.canonical_recommendation_narrative.build_trade_narrative
+    (the Dashboard's Top Trade Opportunity tile) — should call this instead."""
 
     df_summary = build_league_summary(
         players_df,
@@ -380,4 +384,34 @@ def generate_trade_ideas(
         my_roster_id=my_roster_id,
         rosters=rosters,
     )
-    return [_project_idea(idea) for idea in enforced]
+    return list(enforced)
+
+
+def generate_trade_ideas(
+    *,
+    league_id: str,
+    my_roster_id: int,
+    players_df: pd.DataFrame,
+    rosters: list[dict],
+    league_settings: Mapping[str, Any] | None,
+    score_field: str,
+    team_strategy: str = "retool",
+    max_ideas: int = MAX_TRADE_IDEAS,
+) -> list[TradeIdeaCard]:
+    """The mobile Trade Hub board — same engine call as the web app's Trade
+    Hub (modules.trade_ideas.build_trade_ideas) and the same production
+    Trust enforcement boundary, fed by a fresh per-request league summary
+    (modules.team_eval.build_league_summary) rather than app.py's
+    Streamlit-session-cached version — see module docstring for why."""
+
+    enforced = generate_trade_idea_records(
+        league_id=league_id,
+        my_roster_id=my_roster_id,
+        players_df=players_df,
+        rosters=rosters,
+        league_settings=league_settings,
+        score_field=score_field,
+        team_strategy=team_strategy,
+        max_ideas=max_ideas,
+    )
+    return [project_trade_idea_card(idea) for idea in enforced]

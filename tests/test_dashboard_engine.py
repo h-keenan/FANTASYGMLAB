@@ -147,16 +147,109 @@ def test_compose_next_move_briefing_returns_a_real_composed_briefing():
     assert briefing.league_id == league_id
     assert briefing.roster_id == roster_id
     # Real engine output, not a mocked result — the free-agent WR is the only
-    # unrostered player, so the waiver engine should surface it by name.
+    # unrostered player, so the waiver engine should surface it by name. With
+    # no `rosters` passed there's no trade candidate, so app.py's default
+    # tile order (roster_pressure, waiver, need, injury — see
+    # dashboard_engine's module docstring) makes the waiver tile the primary
+    # recommendation (category "top_priority"), same as the web app's own
+    # `_append(briefing.primary, CATEGORY_TOP_PRIORITY)` — it does not also
+    # appear under "waiver_opportunity" since that category only pulls from
+    # the intelligence/additional zones, not primary.
     categories = {item.category for item in briefing.items}
     assert categories  # at least one tile survived organize_dashboard_items
-    waiver_items = [item for item in briefing.items if item.category == "waiver_opportunity"]
-    assert waiver_items, f"expected a waiver_opportunity tile, got categories: {categories}"
-    assert any("fa-wr" in (item.route_player_id or "") for item in waiver_items)
+    top_priority_items = [item for item in briefing.items if item.category == "top_priority"]
+    assert top_priority_items, f"expected a top_priority tile, got categories: {categories}"
+    assert any("fa-wr" in (item.route_player_id or "") for item in top_priority_items)
     for item in briefing.items:
         payload = item.to_dict()
         assert payload["headline"]
         assert payload["league_id"] == league_id
+
+
+def _fake_trade_idea_record(*, partner: str = "Rival GM", gain: int = 40) -> dict:
+    return {
+        "partner_team_name": partner,
+        "rationale": "Clear dynasty upgrade at a position of need.",
+        "trade_gain": gain,
+        "trade_confidence_label": "High",
+        "market_realism_label": "Realistic",
+        "reasoning_tags": ["Need-Based"],
+        "send_assets": [{"asset_type": "player", "player_id": "my-rb2", "name": "My RB2"}],
+        "receive_assets": [
+            {"asset_type": "player", "player_id": "target-wr1", "name": "Target WR1", "status": "Active"}
+        ],
+    }
+
+
+def test_build_trade_tile_composes_a_top_trade_opportunity_tile():
+    tile = dashboard_engine.build_trade_tile(
+        _fake_trade_idea_record(),
+        league_id="league-1",
+        roster_id="1",
+        score_field="dynasty_score",
+    )
+    assert tile is not None
+    assert tile["label"] == "Top Trade Opportunity"
+    assert tile["tone"] == "trade"
+    assert tile["route_key"] == "trade_hub"
+    assert tile["route_focus_mode"] == "target_player"
+    assert tile["route_player_id"] == "target-wr1"
+    assert tile["note"]
+    assert tile["recommendation_narrative"] is not None
+    assert tile["recommendation_id"]
+
+
+def test_build_trade_tile_returns_none_without_a_headline_idea():
+    assert dashboard_engine.build_trade_tile(None, league_id="l", roster_id="1", score_field="dynasty_score") is None
+
+
+def test_compose_next_move_briefing_includes_trade_tile_when_rosters_given():
+    league_id = "dashboard-engine-test-league-2"
+    roster_id = "1"
+    my_players = [
+        _player("qb1", "QB", value=80),
+        _player("rb1", "RB", value=70),
+        _player("rb2", "RB", value=40),
+        _player("wr1", "WR", value=65),
+        _player("wr2", "WR", value=30),
+        _player("te1", "TE", value=25),
+    ]
+    other_roster_players = [_player("opp-rb", "RB", value=55)]
+    players_df = pd.DataFrame(my_players + other_roster_players)
+    rosters = [
+        {"roster_id": 1, "players": [p["player_id"] for p in my_players]},
+        {"roster_id": 2, "players": [p["player_id"] for p in other_roster_players]},
+    ]
+
+    league_payload = _sleeper_response(
+        {
+            "roster_positions": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"] + ["BN"] * 6,
+            "settings": {"taxi_slots": 0, "reserve_slots": 0},
+        }
+    )
+    rosters_payload = _sleeper_response(rosters)
+
+    with patch("requests.get", side_effect=[league_payload, rosters_payload]):
+        with patch(
+            "modules.trade_hub_engine.generate_trade_idea_records",
+            return_value=[_fake_trade_idea_record()],
+        ) as mock_generate:
+            briefing = dashboard_engine.compose_next_move_briefing(
+                league_id=league_id,
+                roster_id=roster_id,
+                players_df=players_df,
+                roster_player_ids={p["player_id"] for p in my_players},
+                all_rostered_player_ids={p["player_id"] for p in my_players + other_roster_players},
+                league_settings=SETTINGS,
+                score_field="dynasty_score",
+                rosters=rosters,
+            )
+
+    assert mock_generate.call_args.kwargs["my_roster_id"] == 1
+    assert mock_generate.call_args.kwargs["league_id"] == league_id
+    assert any(
+        "target-wr1" in (item.route_player_id or "") for item in briefing.items
+    ), f"expected the trade tile's target player to surface, got: {[i.to_dict() for i in briefing.items]}"
 
 
 def test_compose_next_move_briefing_flags_roster_pressure_when_over_limit():
