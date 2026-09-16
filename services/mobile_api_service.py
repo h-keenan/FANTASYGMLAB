@@ -1149,9 +1149,10 @@ def get_league_dashboard(
     modules.trade_analyzer_fit, modules.injury_ui, modules.waivers_ui) via
     modules.dashboard_engine — see that module's docstring for why it's a
     fresh composition rather than importing app.py directly (modules/ never
-    imports app.py). Does not yet include a trade-opportunity tile — that
-    depends on the same trade-ideas engine Trade Hub needs, not yet wired
-    to mobile.
+    imports app.py). Includes a Top Trade Opportunity tile fed by the same
+    Trade Hub engine (modules.trade_hub_engine), defaulting to the "retool"
+    strategy — the same default both the web app's dashboard and mobile's
+    own Trade Hub screen fall back to.
     """
 
     if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
@@ -1185,8 +1186,9 @@ def get_league_dashboard(
     if not roster_player_ids:
         return {"ok": True, "items": [], "quiet": True, "reason": "empty_roster"}
 
+    rosters = sleeper.get_rosters(league_id)
     all_rostered_player_ids: set[str] = set()
-    for roster in sleeper.get_rosters(league_id):
+    for roster in rosters:
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
 
     config = auth_supabase.get_supabase_config()
@@ -1202,6 +1204,7 @@ def get_league_dashboard(
         league_settings=settings,
         score_field=score_field,
         entitlement=str(profile.get("entitlement") or "free"),
+        rosters=rosters,
     )
     return {
         "ok": True,
@@ -1276,7 +1279,7 @@ def get_trade_hub_ideas(
         return {"ok": True, "ideas": [], "reason": "empty_roster"}
 
     rosters = sleeper.get_rosters(league_id)
-    cards = trade_hub_engine.generate_trade_ideas(
+    records = trade_hub_engine.generate_trade_idea_records(
         league_id=league_id,
         my_roster_id=int(roster_id),
         players_df=valued,
@@ -1290,7 +1293,11 @@ def get_trade_hub_ideas(
     user_id = str(user.get("id") or "")
     profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
     is_premium = str(profile.get("entitlement") or "free") == "premium"
-    ranked = trade_hub_ui.order_trade_hub_visible_ideas([card.to_dict() for card in cards])
+    # Rank on the raw engine records (trade_confidence_label, tier, etc.) —
+    # the same fields the web app's Trade Hub sorts on — then project only
+    # the visible slice to the narrower mobile card shape.
+    ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
+    ranked = [trade_hub_engine.project_trade_idea_card(record).to_dict() for record in ranked_records]
     approved_count = len(ranked)
     ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
     effective_limit = (
