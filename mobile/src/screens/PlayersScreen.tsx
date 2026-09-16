@@ -12,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
+import { resolvePlayerTier } from '../lib/playerTier';
 import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -117,7 +118,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
                   {item.name ?? 'Unknown'}
                 </Text>
                 <Text style={styles.meta}>
-                  {[item.position, item.team, item.tier].filter(Boolean).join(' · ')}
+                  {[item.position, item.team, item.tier ? resolvePlayerTier(item.tier).shortLabel : null].filter(Boolean).join(' · ')}
                 </Text>
               </View>
               <Text style={styles.score}>{item.score != null ? Math.round(item.score) : '—'}</Text>

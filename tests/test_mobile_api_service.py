@@ -163,6 +163,25 @@ def test_league_endpoints_wrap_sleeper_module(monkeypatch):
         assert rosters.status_code == 200
         assert rosters.json()["rosters"] == [{"roster_id": 1}]
 
+        with patch(
+            "modules.sleeper.get_rosters",
+            return_value=[{"roster_id": 1, "owner_id": "u1", "metadata": {}}],
+        ):
+            with patch(
+                "modules.sleeper.get_users",
+                return_value=[{"user_id": "u1", "display_name": "Alice", "avatar": "abc123"}],
+            ):
+                profiles = client.get(
+                    "/v1/leagues/abc/team-profiles",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+        assert profiles.status_code == 200
+        body = profiles.json()["profiles"]
+        # Real modules.sleeper.get_league_roster_profiles engine, not a mocked
+        # result — exercises the actual team_name/avatar fallback chain.
+        assert body["1"]["team_name"] == "Alice"
+        assert body["1"]["avatar_url"].endswith("abc123")
+
 
 def test_my_roster_requires_auth(monkeypatch):
     client = _client(monkeypatch)
@@ -895,6 +914,7 @@ def test_alerts_returns_real_roster_relevant_news(monkeypatch):
     # modules.my_news filtering/curation, not a mocked result.
     assert len(items) == 1
     assert items[0]["matched_player"] == "Star Wideout"
+    assert items[0]["matched_player_id"] == "9001"
     assert "ankle" in items[0]["title"].casefold()
     assert items[0]["read"] is False
     assert items[0]["alert_key"]

@@ -9,6 +9,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}                — Sleeper league metadata
   - GET  /v1/leagues/{id}/users          — Sleeper league members
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
+  - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
@@ -229,6 +230,18 @@ def get_league_users(league_id: str, _user: dict[str, Any] = Depends(require_use
 @app.get("/v1/leagues/{league_id}/rosters")
 def get_league_rosters(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     return {"ok": True, "rosters": sleeper.get_rosters(league_id)}
+
+
+@app.get("/v1/leagues/{league_id}/team-profiles")
+def get_league_team_profiles(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Team identity per roster (name/owner/avatar), keyed by roster_id.
+
+    Reuses modules.sleeper.get_league_roster_profiles verbatim — the same
+    team_name/avatar fallback chain (roster metadata -> user metadata ->
+    display name -> username) the web app's league workspace uses.
+    """
+
+    return {"ok": True, "profiles": sleeper.get_league_roster_profiles(league_id)}
 
 
 def _resolve_my_roster(user: dict[str, Any], league_id: str) -> tuple[dict[str, Any] | None, str]:
@@ -674,12 +687,16 @@ def _fetch_read_alert_keys(
     return {str(row.get("alert_key")) for row in rows if isinstance(row, dict) and row.get("alert_key")}
 
 
-def _project_alert_item(item: dict[str, Any], *, read_keys: set[str]) -> dict[str, Any]:
+def _project_alert_item(
+    item: dict[str, Any], *, read_keys: set[str], player_ids_by_name: dict[str, str]
+) -> dict[str, Any]:
     payload = _project_news_item(item)
     alert_key = _alert_key_for_link(str(item.get("link") or ""))
     payload["alert_key"] = alert_key
     payload["read"] = alert_key in read_keys
+    matched_player = str(item.get("matched_player") or "")
     payload["matched_player"] = _clean_json_value(item.get("matched_player"))
+    payload["matched_player_id"] = player_ids_by_name.get(matched_player)
     payload["relevance_reason"] = _clean_json_value(item.get("relevance_reason"))
     return payload
 
@@ -722,6 +739,11 @@ def get_league_alerts(
     roster_teams = sorted({str(team) for team in mine.get("team", []) if str(team).strip()})
     if not player_names:
         return {"ok": True, "items": [], "reason": "no_player_data"}
+    player_ids_by_name = {
+        str(row["name"]): str(row["player_id"])
+        for _, row in mine.iterrows()
+        if str(row.get("name") or "").strip()
+    }
 
     news_cache.schedule_news_cache_refresh()
     pool = news_cache.load_cached_news_pool()
@@ -732,7 +754,10 @@ def get_league_alerts(
     user_id = str(user.get("id") or "")
     read_keys = _fetch_read_alert_keys(config, user_id, str(user.get("_access_token") or ""), league_id)
 
-    items = [_project_alert_item(item, read_keys=read_keys) for item in curated]
+    items = [
+        _project_alert_item(item, read_keys=read_keys, player_ids_by_name=player_ids_by_name)
+        for item in curated
+    ]
     return {"ok": True, "items": items, "reason": ""}
 
 

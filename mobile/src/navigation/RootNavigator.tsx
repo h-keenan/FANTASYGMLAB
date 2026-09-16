@@ -29,7 +29,7 @@ import GmTargetsScreen from '../screens/GmTargetsScreen';
 export type RootStackParamList = {
   Home: undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
-  TeamRoster: { ownerName: string; playerIds: string[] };
+  TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string };
   Paywall: undefined;
   TradeCalculator: { leagueId: string; leagueName: string };
   News: undefined;

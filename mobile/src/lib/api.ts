@@ -96,6 +96,21 @@ export interface LeagueRostersResponse {
   rosters: Array<Record<string, unknown>>;
 }
 
+export interface TeamProfile {
+  team_name: string;
+  owner_name: string;
+  username: string;
+  avatar_id: string;
+  avatar_url: string;
+  roster_id: number | string;
+  owner_id: string;
+}
+
+export interface LeagueTeamProfilesResponse {
+  ok: true;
+  profiles: Record<string, TeamProfile>;
+}
+
 export interface PlayerSummary {
   full_name: string | null;
   first_name: string | null;
@@ -156,6 +171,7 @@ export interface AlertItem extends NewsItem {
   alert_key: string;
   read: boolean;
   matched_player: string | null;
+  matched_player_id: string | null;
   relevance_reason: string | null;
 }
 
@@ -338,6 +354,10 @@ export const api = {
   getLeagueRosters: (leagueId: string) =>
     authorizedFetch<LeagueRostersResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rosters`,
+    ),
+  getLeagueTeamProfiles: (leagueId: string) =>
+    authorizedFetch<LeagueTeamProfilesResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/team-profiles`,
     ),
   getMyRoster: (leagueId: string) =>
     authorizedFetch<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),

@@ -187,7 +187,7 @@ export default function PaywallScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.xl, paddingBottom: spacing.xl * 2 },
+  content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   center: {
     flex: 1,
     alignItems: 'center',
