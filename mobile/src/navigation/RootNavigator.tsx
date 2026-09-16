@@ -27,6 +27,7 @@ import AlertsScreen from '../screens/AlertsScreen';
 import GmTargetsScreen from '../screens/GmTargetsScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradeHubScreen from '../screens/TradeHubScreen';
+import TeamsScreen from '../screens/TeamsScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -45,6 +46,7 @@ export type RootStackParamList = {
   Recap: { leagueId: string; leagueName: string };
   Dashboard: { leagueId: string; leagueName: string };
   TradeHub: { leagueId: string; leagueName: string };
+  Teams: { leagueId: string; leagueName: string };
   Alerts: { leagueId: string; leagueName: string };
 };
 
@@ -79,7 +81,15 @@ export default function RootNavigator() {
     <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       {session ? (
         <View style={{ flex: 1 }}>
-        <AppStack.Navigator>
+        <AppStack.Navigator
+          screenOptions={{
+            // Default iOS behavior shows the previous screen's title next to
+            // the back chevron — on a league-scoped stack that repeats the
+            // league name as a redundant "pill" on every screen. "minimal"
+            // keeps just the chevron.
+            headerBackButtonDisplayMode: 'minimal',
+          }}
+        >
           <AppStack.Screen
             name="Home"
             component={HomeScreen}
@@ -114,6 +124,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Recap" component={RecapScreen} />
           <AppStack.Screen name="Dashboard" component={DashboardScreen} />
           <AppStack.Screen name="TradeHub" component={TradeHubScreen} />
+          <AppStack.Screen name="Teams" component={TeamsScreen} />
           <AppStack.Screen name="Alerts" component={AlertsScreen} />
           <AppStack.Screen name="GmTargets" component={GmTargetsScreen} />
           <AppStack.Screen
