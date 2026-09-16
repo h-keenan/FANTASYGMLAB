@@ -86,6 +86,7 @@ export default function GmOrb() {
   const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), 40);
   const insets = { ...rawInsets, bottom: safeBottom };
   const league = open ? currentLeagueContext() : null;
+  const currentRouteName = open && navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sheetY = useSharedValue(400);
@@ -193,20 +194,31 @@ export default function GmOrb() {
             {league ? (
               <>
                 <Text style={styles.sectionLabel}>{league.leagueName}</Text>
-                <View style={styles.tileGrid}>
-                  {LEAGUE_DESTINATIONS.map((destination) => (
+                {LEAGUE_DESTINATIONS.map((destination) => {
+                  const isCurrent = destination.route === currentRouteName;
+                  return (
                     <TouchableOpacity
                       key={destination.route}
-                      style={styles.tile}
+                      style={[styles.destRow, isCurrent && styles.destRowCurrent]}
                       onPress={() => go(destination)}
                     >
-                      <Ionicons name={destination.icon} size={20} color={colors.accent} />
-                      <Text style={styles.tileText} numberOfLines={2}>
+                      <Ionicons
+                        name={destination.icon}
+                        size={20}
+                        color={isCurrent ? colors.accent : colors.textSecondary}
+                        style={styles.destIcon}
+                      />
+                      <Text style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
                         {destination.label}
                       </Text>
+                      {isCurrent ? (
+                        <Text style={styles.destCurrentBadge}>CURRENT</Text>
+                      ) : (
+                        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                      )}
                     </TouchableOpacity>
-                  ))}
-                </View>
+                  );
+                })}
               </>
             ) : (
               <Text style={styles.sectionNote}>
@@ -234,16 +246,31 @@ export default function GmOrb() {
             ) : null}
 
             <Text style={styles.sectionLabel}>General</Text>
-            <View style={styles.generalRow}>
-              {GENERAL_DESTINATIONS.map((destination) => (
-                <TouchableOpacity key={destination.route} style={styles.generalItem} onPress={() => go(destination)}>
-                  <View style={styles.generalIconCircle}>
-                    <Ionicons name={destination.icon} size={18} color={colors.textSecondary} />
-                  </View>
-                  <Text style={styles.generalText}>{destination.label}</Text>
+            {GENERAL_DESTINATIONS.map((destination) => {
+              const isCurrent = destination.route === currentRouteName;
+              return (
+                <TouchableOpacity
+                  key={destination.route}
+                  style={[styles.destRow, isCurrent && styles.destRowCurrent]}
+                  onPress={() => go(destination)}
+                >
+                  <Ionicons
+                    name={destination.icon}
+                    size={20}
+                    color={isCurrent ? colors.accent : colors.textSecondary}
+                    style={styles.destIcon}
+                  />
+                  <Text style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
+                    {destination.label}
+                  </Text>
+                  {isCurrent ? (
+                    <Text style={styles.destCurrentBadge}>CURRENT</Text>
+                  ) : (
+                    <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                  )}
                 </TouchableOpacity>
-              ))}
-            </View>
+              );
+            })}
           </ScrollView>
         </Animated.View>
       </Modal>
@@ -329,18 +356,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: spacing.sm,
   },
-  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tile: {
-    width: '31%',
-    backgroundColor: colors.surface,
-    borderRadius: radii.tile,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  tileText: { fontSize: 11, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -350,15 +365,19 @@ const styles = StyleSheet.create({
   },
   rowIcon: { marginRight: spacing.sm },
   rowText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
-  generalRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  generalItem: { alignItems: 'center', gap: spacing.xs },
-  generalIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.border,
+  destRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    borderLeftWidth: 2,
+    borderLeftColor: 'transparent',
   },
-  generalText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+  destRowCurrent: { borderLeftColor: colors.accent, backgroundColor: colors.accentMuted },
+  destIcon: { marginRight: spacing.md, width: 20 },
+  destText: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  destTextCurrent: { color: colors.accent },
+  destCurrentBadge: { fontSize: 10, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
 });
