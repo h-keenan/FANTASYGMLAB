@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import { api } from '../lib/api';
+import { api, type PushCategory } from '../lib/api';
 import { syncPushToken } from '../lib/pushNotifications';
 import { colors, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -24,9 +24,50 @@ const DENSITY_OPTIONS: Array<{ value: UiDensity; label: string; description: str
   { value: 'compact', label: 'Compact', description: 'Just the calls — hide the explanation text' },
 ];
 
+const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; description: string }> = [
+  { value: 'top_priority', label: 'Top Priority moves', description: 'The single most urgent recommendation for your roster' },
+  { value: 'watch', label: 'Watch items', description: 'Worth knowing, not urgent' },
+  { value: 'recap', label: 'Weekly recaps', description: 'When a new League Recap is ready' },
+  { value: 'injury', label: 'Injury updates', description: 'A status change on your own roster (Questionable, Out, etc.)' },
+];
+
 export default function MoreScreen({ navigation }: Props) {
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const { density, setDensity } = useDensity();
+  const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
+  const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPushPreferences()
+      .then((result) => {
+        if (!cancelled && result.ok) setPushCategories(result.categories);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onTogglePushCategory = async (category: PushCategory, nextEnabled: boolean) => {
+    if (!pushCategories) return;
+    const previous = pushCategories;
+    setPushCategories({ ...pushCategories, [category]: nextEnabled });
+    setUpdatingCategory(category);
+    try {
+      const result = await api.updatePushPreference(category, nextEnabled);
+      if (result.ok) {
+        setPushCategories(result.categories);
+      } else {
+        setPushCategories(previous);
+      }
+    } catch {
+      setPushCategories(previous);
+    } finally {
+      setUpdatingCategory(null);
+    }
+  };
 
   const onSendTestPush = async () => {
     setSendingTestPush(true);
@@ -80,6 +121,25 @@ export default function MoreScreen({ navigation }: Props) {
         {sendingTestPush ? <ActivityIndicator size="small" color={colors.accent} /> : <Text style={styles.chevron}>{'›'}</Text>}
       </TouchableOpacity>
 
+      {pushCategories
+        ? PUSH_CATEGORY_LABELS.map((item) => (
+            <View key={item.value} style={styles.row}>
+              <View style={styles.labelGroup}>
+                <View style={styles.toggleTextGroup}>
+                  <Text style={styles.label}>{item.label}</Text>
+                  <Text style={styles.toggleDescription}>{item.description}</Text>
+                </View>
+              </View>
+              <Switch
+                value={pushCategories[item.value]}
+                onValueChange={(next) => onTogglePushCategory(item.value, next)}
+                disabled={updatingCategory === item.value}
+                trackColor={{ true: colors.accent, false: colors.border }}
+              />
+            </View>
+          ))
+        : null}
+
       <Text style={styles.sectionLabel}>Legal</Text>
       {LEGAL_ITEMS.map((item) => (
         <TouchableOpacity
@@ -124,6 +184,8 @@ const styles = StyleSheet.create({
   icon: { marginRight: spacing.sm },
   label: { fontSize: 16, color: colors.textPrimary, flexShrink: 1 },
   chevron: { fontSize: 20, color: colors.textSecondary },
+  toggleTextGroup: { flexShrink: 1, paddingRight: spacing.md },
+  toggleDescription: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   densityRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.xl,

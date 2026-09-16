@@ -353,6 +353,14 @@ export interface PushMutationResponse {
   sent?: number;
 }
 
+// Matches modules/push_triggers.py's TOGGLEABLE_PUSH_CATEGORIES.
+export type PushCategory = 'top_priority' | 'watch' | 'recap' | 'injury';
+
+export interface PushPreferencesResponse {
+  ok: boolean;
+  categories: Record<PushCategory, boolean>;
+}
+
 export type DashboardItemCategory = 'top_priority' | 'watch' | 'waiver_opportunity' | 'league_movement';
 
 export interface DashboardTradePresentation {
@@ -500,6 +508,9 @@ export const api = {
       expo_push_token: expoPushToken,
     }),
   sendTestPush: () => authorizedPost<PushMutationResponse>('/v1/push/test', {}),
+  getPushPreferences: () => authorizedFetch<PushPreferencesResponse>('/v1/push/preferences'),
+  updatePushPreference: (category: PushCategory, enabled: boolean) =>
+    authorizedPost<PushPreferencesResponse>('/v1/push/preferences', { category, enabled }),
   markAlertRead: (leagueId: string, alertKey: string) =>
     authorizedPost<{ ok: boolean; reason: string }>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,

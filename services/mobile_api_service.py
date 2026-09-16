@@ -73,6 +73,7 @@ from modules import (
     player_eligibility,
     player_quick_view,
     push_tokens,
+    push_triggers,
     rankings,
     sleeper,
     sleeper_leagues,
@@ -1153,6 +1154,62 @@ def send_test_push(user: dict[str, Any] = Depends(require_user)) -> dict[str, An
         data={"kind": "test"},
     )
     return {"ok": bool(result.get("ok")), "reason": "" if result.get("ok") else "delivery_failed", "sent": result.get("sent", 0)}
+
+
+class UpdatePushPreferenceRequest(BaseModel):
+    category: str
+    enabled: bool
+
+
+def _push_categories_from_settings(settings: dict[str, Any]) -> dict[str, bool]:
+    stored = settings.get("push_categories") if isinstance(settings.get("push_categories"), dict) else {}
+    return {category: bool(stored.get(category, True)) for category in push_triggers.TOGGLEABLE_PUSH_CATEGORIES}
+
+
+@app.get("/v1/push/preferences")
+def get_push_preferences(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Per-category push toggles — same categories the automated push-trigger
+    sweep sends (top_priority/watch/recap/injury). Backed by the existing
+    user_settings table/RLS (auth.uid()=user_id) under a "push_categories"
+    key, not a new table — the sweep (its own service-role process) reads
+    this same key via modules.push_triggers.fetch_push_preferences.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    settings, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, "categories": _push_categories_from_settings({})}
+    return {"ok": True, "categories": _push_categories_from_settings(settings.get("settings") or {})}
+
+
+@app.post("/v1/push/preferences")
+def update_push_preference(
+    body: UpdatePushPreferenceRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    if body.category not in push_triggers.TOGGLEABLE_PUSH_CATEGORIES:
+        raise HTTPException(
+            status_code=422,
+            detail="category must be one of: " + ", ".join(push_triggers.TOGGLEABLE_PUSH_CATEGORIES),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, "categories": _push_categories_from_settings({})}
+    settings = dict(current.get("settings") or {})
+    categories = _push_categories_from_settings(settings)
+    categories[body.category] = body.enabled
+    settings["push_categories"] = categories
+    payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
+    ok, error = account_store.upsert_user_settings(config, access_token, payload)
+    if not ok:
+        return {"ok": False, "categories": categories}
+    return {"ok": True, "categories": categories}
 
 
 def _project_briefing_item(item: Any) -> dict[str, Any]:

@@ -122,6 +122,8 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
     push_tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
     profiles_response = Mock(status_code=200)
     profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
+    preferences_response = Mock(status_code=200)
+    preferences_response.json.return_value = []
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
     already_notified_response = Mock(status_code=200)
@@ -150,6 +152,7 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                                     side_effect=[
                                         push_tokens_response,
                                         profiles_response,
+                                        preferences_response,
                                         not_notified_response,
                                     ],
                                 ):
@@ -194,6 +197,7 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                                     side_effect=[
                                         push_tokens_response,
                                         profiles_response,
+                                        preferences_response,
                                         already_notified_response,
                                     ],
                                 ):
@@ -234,6 +238,8 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
     push_tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
     profiles_response = Mock(status_code=200)
     profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
+    preferences_response = Mock(status_code=200)
+    preferences_response.json.return_value = []
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -264,7 +270,7 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
                             ):
                                 with patch(
                                     "requests.get",
-                                    side_effect=[push_tokens_response, profiles_response, not_notified_response],
+                                    side_effect=[push_tokens_response, profiles_response, preferences_response, not_notified_response],
                                 ):
                                     with patch("requests.post") as mock_post:
                                         mock_post.return_value = Mock(
@@ -349,6 +355,8 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
     push_tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
     profiles_response = Mock(status_code=200)
     profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
+    preferences_response = Mock(status_code=200)
+    preferences_response.json.return_value = []
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -370,7 +378,7 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
                             with patch("modules.push_triggers.recap_push_item", return_value=None):
                                 with patch(
                                     "requests.get",
-                                    side_effect=[push_tokens_response, profiles_response, not_notified_response],
+                                    side_effect=[push_tokens_response, profiles_response, preferences_response, not_notified_response],
                                 ):
                                     with patch("requests.post") as mock_post:
                                         mock_post.return_value = Mock(
@@ -382,3 +390,82 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
     push_call = mock_post.call_args_list[0]
     assert push_call.kwargs["json"][0]["title"] == "Injury Update — Test League"
     assert push_call.kwargs["json"][0]["body"] == "Hurt Guy is now Out"
+
+
+def test_fetch_push_preferences_defaults_missing_categories_to_enabled():
+    response = Mock(status_code=200)
+    response.json.return_value = [
+        {"user_id": "u1", "settings": {"push_categories": {"injury": False}}},
+        {"user_id": "u2", "settings": {}},
+    ]
+    with patch("requests.get", return_value=response):
+        preferences = push_triggers.fetch_push_preferences(_config(), ["u1", "u2"])
+    assert preferences["u1"] == {"top_priority": True, "watch": True, "recap": True, "injury": False}
+    assert preferences["u2"] == {"top_priority": True, "watch": True, "recap": True, "injury": True}
+
+
+def test_fetch_push_preferences_empty_without_ids_or_config():
+    with patch("requests.get") as mock_get:
+        assert push_triggers.fetch_push_preferences(_config(), []) == {}
+    mock_get.assert_not_called()
+    unconfigured = push_triggers.PushTriggerConfig()
+    with patch("requests.get") as mock_get:
+        assert push_triggers.fetch_push_preferences(unconfigured, ["u1"]) == {}
+    mock_get.assert_not_called()
+
+
+def test_fetch_push_preferences_fails_open_on_transport_error():
+    with patch("requests.get", side_effect=Exception("network down")):
+        assert push_triggers.fetch_push_preferences(_config(), ["u1"]) == {}
+
+
+def test_push_item_allowed_defaults_true_without_a_settings_row():
+    assert push_triggers.push_item_allowed({}, user_id="u1", category="injury") is True
+
+
+def test_push_item_allowed_respects_disabled_category():
+    preferences = {"u1": {"top_priority": True, "watch": True, "recap": True, "injury": False}}
+    assert push_triggers.push_item_allowed(preferences, user_id="u1", category="injury") is False
+    assert push_triggers.push_item_allowed(preferences, user_id="u1", category="watch") is True
+
+
+def test_run_push_trigger_sweep_skips_a_disabled_category(monkeypatch):
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    players_df = pd.DataFrame(
+        [{"player_id": "p1", "name": "Hurt Guy", "position": "RB", "dynasty_score": 50, "injury_status": "Out"}]
+    )
+
+    push_tokens_response = Mock(status_code=200)
+    push_tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
+    profiles_response = Mock(status_code=200)
+    profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
+    preferences_response = Mock(status_code=200)
+    preferences_response.json.return_value = [
+        {"user_id": "u1", "settings": {"push_categories": {"injury": False}}}
+    ]
+
+    with patch("modules.push_triggers.load_valued_players", return_value=(players_df, "dynasty_score")):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper_leagues.get_user_leagues",
+                return_value=[{"league_id": "league-1", "name": "Test League"}],
+            ):
+                with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+                    with patch(
+                        "modules.sleeper.get_rosters",
+                        return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+                    ):
+                        with patch(
+                            "modules.dashboard_engine.compose_next_move_briefing",
+                            return_value=Mock(items=[]),
+                        ):
+                            with patch("modules.push_triggers.recap_push_item", return_value=None):
+                                with patch(
+                                    "requests.get",
+                                    side_effect=[push_tokens_response, profiles_response, preferences_response],
+                                ):
+                                    with patch("requests.post") as mock_post:
+                                        stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+
+    assert stats["pushes_sent"] == 0
+    mock_post.assert_not_called()
