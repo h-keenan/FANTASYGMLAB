@@ -285,6 +285,25 @@ export interface QuickViewResponse {
   reason: '' | 'not_found';
 }
 
+export interface PlayerAward {
+  badge_id: string;
+  category: string;
+  title: string;
+  short_label: string;
+  tier: 'gold' | 'silver' | 'bronze' | null;
+  season: number | null;
+  rank: number | null;
+  metric_value: number | null;
+  description: string;
+  occurrence_count: number;
+}
+
+export interface PlayerAwardsResponse {
+  ok: true;
+  awards: PlayerAward[];
+  reason: '' | 'not_found';
+}
+
 export interface GmTarget {
   player_id: string;
   source_surface: string;
@@ -337,6 +356,8 @@ export const api = {
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
   getPlayerQuickView: (playerId: string) =>
     authorizedFetch<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
+  getPlayerAwards: (playerId: string) =>
+    authorizedFetch<PlayerAwardsResponse>(`/v1/players/${encodeURIComponent(playerId)}/awards`),
   getGmTargets: (leagueId: string) =>
     authorizedFetch<GmTargetsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`),
   addGmTarget: (leagueId: string, playerId: string, sourceSurface = 'gm_targets') =>

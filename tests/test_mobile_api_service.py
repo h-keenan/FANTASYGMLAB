@@ -1249,3 +1249,70 @@ def test_remove_gm_target_deletes_row(monkeypatch):
     assert "user_id=eq.user-123" in requested_url
     assert "league_id=eq.abc" in requested_url
     assert "player_id=eq.9001" in requested_url
+
+
+def test_player_awards_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/players/9001/awards")
+    assert response.status_code == 401
+
+
+def test_player_awards_reports_not_found_for_unknown_player(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_fake_quick_view_frame()):
+            response = client.get(
+                "/v1/players/does-not-exist/awards",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["awards"] == []
+    assert body["reason"] == "not_found"
+
+
+def test_player_awards_returns_real_badges_for_a_qualifying_season(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_frame = pd.DataFrame([{"player_id": "9001", "name": "Star Wideout", "position": "WR"}])
+    fake_index = (
+        {
+            "path": "data/sleeper_player_stats_2025.json",
+            "season": 2025,
+            "payload": {
+                "9001": {
+                    "stats_season": 2025,
+                    "receiving_yards": 1600,
+                    "fantasy_points_ppr": 50.0,
+                },
+                "9002": {"stats_season": 2025, "fantasy_points_ppr": 10.0},
+            },
+        },
+    )
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_frame):
+            with patch("modules.player_awards.build_season_cache_index", return_value=fake_index):
+                response = client.get(
+                    "/v1/players/9001/awards",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    # Real modules.player_awards engine, not a mocked result — 1600 receiving
+    # yards clears the WR gold threshold (>= 1500).
+    assert any(award["short_label"] == "1,500+ Rec Yds" for award in body["awards"])
+    for award in body["awards"]:
+        assert award["tier"] in {"gold", "silver", "bronze", None}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   Modal,
@@ -10,33 +10,45 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
+import { setLastLeague } from '../lib/lastLeague';
+import { supabase } from '../lib/supabase';
 import { colors, radii, spacing } from '../theme';
+
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 interface Destination {
   label: string;
   route: string;
+  icon: IconName;
   needsLeague?: boolean;
 }
 
 const LEAGUE_DESTINATIONS: Destination[] = [
-  { label: 'League Overview', route: 'LeagueDetail', needsLeague: true },
-  { label: 'Players', route: 'Players', needsLeague: true },
-  { label: 'GM Targets', route: 'GmTargets', needsLeague: true },
-  { label: 'Waivers', route: 'Waivers', needsLeague: true },
-  { label: 'Trade Analyzer', route: 'TradeAnalyzer', needsLeague: true },
-  { label: 'Trade Calculator', route: 'TradeCalculator', needsLeague: true },
-  { label: 'Recap', route: 'Recap', needsLeague: true },
-  { label: 'Alerts', route: 'Alerts', needsLeague: true },
+  { label: 'League Overview', route: 'LeagueDetail', icon: 'grid-outline', needsLeague: true },
+  { label: 'Players', route: 'Players', icon: 'people-outline', needsLeague: true },
+  { label: 'GM Targets', route: 'GmTargets', icon: 'bookmark-outline', needsLeague: true },
+  { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', needsLeague: true },
+  { label: 'Trade Analyzer', route: 'TradeAnalyzer', icon: 'git-compare-outline', needsLeague: true },
+  { label: 'Trade Calculator', route: 'TradeCalculator', icon: 'calculator-outline', needsLeague: true },
+  { label: 'Recap', route: 'Recap', icon: 'newspaper-outline', needsLeague: true },
+  { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', needsLeague: true },
 ];
 
 const GENERAL_DESTINATIONS: Destination[] = [
-  { label: 'Home', route: 'Home' },
-  { label: 'News', route: 'News' },
-  { label: 'Premium', route: 'Paywall' },
-  { label: 'More', route: 'More' },
+  { label: 'Home', route: 'Home', icon: 'home-outline' },
+  { label: 'News', route: 'News', icon: 'globe-outline' },
+  { label: 'Premium', route: 'Paywall', icon: 'star-outline' },
+  { label: 'More', route: 'More', icon: 'ellipsis-horizontal-outline' },
 ];
+
+interface SavedLeagueRow {
+  id: string;
+  league_id: string;
+  league_name: string;
+}
 
 /**
  * The floating "GM" brand-mark button + destination sheet — the mobile
@@ -47,8 +59,23 @@ const GENERAL_DESTINATIONS: Destination[] = [
  */
 export default function GmOrb() {
   const [open, setOpen] = useState(false);
+  const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const insets = useSafeAreaInsets();
   const league = open ? currentLeagueContext() : null;
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    supabase
+      .from('saved_leagues')
+      .select('id, league_id, league_name')
+      .then(({ data }) => {
+        if (!cancelled && data) setSavedLeagues(data as SavedLeagueRow[]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const go = (destination: Destination) => {
     setOpen(false);
@@ -62,6 +89,15 @@ export default function GmOrb() {
       navigate(destination.route, league);
     } else {
       navigate(destination.route);
+    }
+  };
+
+  const switchToLeague = (row: SavedLeagueRow) => {
+    setOpen(false);
+    const target = { leagueId: row.league_id, leagueName: row.league_name || 'League' };
+    void setLastLeague(target);
+    if (navigationRef.isReady()) {
+      (navigationRef.navigate as (name: string, params?: object) => void)('LeagueDetail', target);
     }
   };
 
@@ -93,6 +129,7 @@ export default function GmOrb() {
                       style={styles.row}
                       onPress={() => go(destination)}
                     >
+                      <Ionicons name={destination.icon} size={18} color={colors.accent} style={styles.rowIcon} />
                       <Text style={styles.rowText}>{destination.label}</Text>
                     </TouchableOpacity>
                   ))}
@@ -103,9 +140,29 @@ export default function GmOrb() {
                 </Text>
               )}
 
+              {savedLeagues.length > 1 ? (
+                <>
+                  <Text style={styles.sectionLabel}>Switch League</Text>
+                  {savedLeagues.map((row) => (
+                    <TouchableOpacity key={row.id} style={styles.row} onPress={() => switchToLeague(row)}>
+                      <Ionicons
+                        name={row.league_id === league?.leagueId ? 'radio-button-on' : 'radio-button-off'}
+                        size={18}
+                        color={row.league_id === league?.leagueId ? colors.accent : colors.textTertiary}
+                        style={styles.rowIcon}
+                      />
+                      <Text style={styles.rowText} numberOfLines={1}>
+                        {row.league_name || row.league_id}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              ) : null}
+
               <Text style={styles.sectionLabel}>General</Text>
               {GENERAL_DESTINATIONS.map((destination) => (
                 <TouchableOpacity key={destination.route} style={styles.row} onPress={() => go(destination)}>
+                  <Ionicons name={destination.icon} size={18} color={colors.textSecondary} style={styles.rowIcon} />
                   <Text style={styles.rowText}>{destination.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -126,7 +183,7 @@ const ORB_SIZE = 56;
 const styles = StyleSheet.create({
   orb: {
     position: 'absolute',
-    right: spacing.lg,
+    left: spacing.lg,
     width: ORB_SIZE,
     height: ORB_SIZE,
     borderRadius: radii.lg,
@@ -189,11 +246,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  rowText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  rowIcon: { marginRight: spacing.sm },
+  rowText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
   closeButton: {
     alignItems: 'center',
     paddingVertical: spacing.md,
