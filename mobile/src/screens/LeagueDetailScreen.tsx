@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -44,9 +45,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    navigation.setOptions({ title: leagueName });
-  }, [leagueName, navigation]);
+  useScreenHeaderTitle(navigation, 'League Overview', leagueName);
 
   useEffect(() => {
     void setLastLeague({ leagueId, leagueName });

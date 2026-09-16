@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerSummary, type RankedPlayer } from '../lib/api';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -33,9 +34,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    navigation.setOptions({ title: ownerName });
-  }, [ownerName, navigation]);
+  useScreenHeaderTitle(navigation, ownerName, leagueName);
 
   useEffect(() => {
     let cancelled = false;

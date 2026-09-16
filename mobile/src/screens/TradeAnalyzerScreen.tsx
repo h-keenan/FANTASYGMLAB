@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer, type TeamStrategy, type TradeVerdict } from '../lib/api';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -75,9 +76,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  useEffect(() => {
-    navigation.setOptions({ title: 'Trade Analyzer' });
-  }, [navigation]);
+  useScreenHeaderTitle(navigation, 'Trade Analyzer', leagueName);
 
   useEffect(() => {
     let cancelled = false;

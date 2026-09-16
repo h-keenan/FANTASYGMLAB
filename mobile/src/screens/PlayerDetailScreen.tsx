@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerAward, type QuickViewBio, type QuickViewStatItem, type QuickViewStats } from '../lib/api';
 import { resolvePlayerTier } from '../lib/playerTier';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -125,9 +126,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
 
-  useEffect(() => {
-    navigation.setOptions({ title: player.name ?? 'Player' });
-  }, [navigation, player.name]);
+  useScreenHeaderTitle(navigation, player.name ?? 'Player');
 
   useEffect(() => {
     let cancelled = false;

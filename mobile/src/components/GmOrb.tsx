@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
   Modal,
@@ -11,11 +11,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { setLastLeague } from '../lib/lastLeague';
 import { supabase } from '../lib/supabase';
-import { colors, radii, spacing } from '../theme';
+import { colors, motion, radii, shadows, spacing } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -53,18 +61,31 @@ interface SavedLeagueRow {
   league_name: string;
 }
 
+const ORB_SIZE = 64;
+const CLOSE_MS = 260;
+
 /**
  * The floating "GM" brand-mark button + destination sheet — the mobile
  * counterpart to the web app's gm_orb_floating_trigger/render_mobile_destination_sheet
  * (modules/brand_identity.py, app.py). Rendered once, globally, so every
  * screen gets the same always-available navigation affordance instead of
- * each screen inventing its own per-page tool row.
+ * each screen inventing its own per-page tool row. Bottom-center (not
+ * bottom-left/right) since it's the app's primary global navigation,
+ * reachable by either thumb, and doesn't collide with left-aligned avatars
+ * or right-aligned values in list rows.
  */
 export default function GmOrb() {
+  const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const insets = useSafeAreaInsets();
   const league = open ? currentLeagueContext() : null;
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sheetY = useSharedValue(400);
+  const backdropOpacity = useSharedValue(0);
+  const orbScale = useSharedValue(1);
+  const orbOpacity = useSharedValue(1);
 
   useEffect(() => {
     if (!open) return;
@@ -80,8 +101,28 @@ export default function GmOrb() {
     };
   }, [open]);
 
-  const go = (destination: Destination) => {
+  const openSheet = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setVisible(true);
+    setOpen(true);
+    sheetY.value = withSpring(0, motion.sheetSpring);
+    backdropOpacity.value = withTiming(0.55, { duration: 220 });
+    orbScale.value = withTiming(0.9, { duration: 180 });
+    orbOpacity.value = withTiming(0, { duration: 180 });
+  };
+
+  const closeSheet = () => {
     setOpen(false);
+    sheetY.value = withTiming(400, { duration: CLOSE_MS });
+    backdropOpacity.value = withTiming(0, { duration: 200 });
+    orbScale.value = withTiming(1, { duration: 200 });
+    orbOpacity.value = withTiming(1, { duration: 200 });
+    closeTimer.current = setTimeout(() => setVisible(false), CLOSE_MS);
+  };
+
+  const go = (destination: Destination) => {
+    closeSheet();
     if (!navigationRef.isReady()) return;
     // Destinations are a data-driven list (not a single statically-known
     // route), so this dispatches dynamically rather than through the
@@ -96,7 +137,7 @@ export default function GmOrb() {
   };
 
   const switchToLeague = (row: SavedLeagueRow) => {
-    setOpen(false);
+    closeSheet();
     const target = { leagueId: row.league_id, leagueName: row.league_name || 'League' };
     void setLastLeague(target);
     if (navigationRef.isReady()) {
@@ -104,125 +145,159 @@ export default function GmOrb() {
     }
   };
 
+  const orbAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: orbScale.value }],
+    opacity: orbOpacity.value,
+  }));
+  const backdropAnimatedStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({ transform: [{ translateY: sheetY.value }] }));
+
   return (
     <>
-      <TouchableOpacity
-        style={[styles.orb, { bottom: insets.bottom + spacing.lg }]}
-        onPress={() => setOpen(true)}
-        accessibilityLabel="Open GM menu"
-        activeOpacity={0.85}
-      >
-        <Image source={require('../../assets/icon.png')} style={styles.orbImage} />
-      </TouchableOpacity>
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(13,17,23,0)', 'rgba(13,17,23,0.92)']}
+        style={[styles.scrim, { height: 112 + insets.bottom }]}
+      />
+      <Animated.View style={[styles.orbWrap, { bottom: insets.bottom + spacing.md }, orbAnimatedStyle]}>
+        <TouchableOpacity
+          style={styles.orb}
+          onPress={openSheet}
+          accessibilityLabel="Open GM menu"
+          activeOpacity={0.85}
+        >
+          <Image source={require('../../assets/icon.png')} style={styles.orbImage} />
+        </TouchableOpacity>
+      </Animated.View>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+      <Modal visible={visible} transparent animationType="none" onRequestClose={closeSheet}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
+          <Animated.View style={[styles.backdrop, backdropAnimatedStyle]} />
+        </Pressable>
+        <Animated.View
+          style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }, sheetAnimatedStyle]}
+        >
+          <Pressable style={styles.sheetHandleRow} onPress={closeSheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.sheetKicker}>FantasyGM Lab</Text>
-            <Text style={styles.sheetTitle}>Where to go</Text>
+          </Pressable>
+          <Text style={styles.sheetKicker}>FantasyGM Lab</Text>
+          <Text style={styles.sheetTitle}>Where to go</Text>
 
-            <ScrollView contentContainerStyle={styles.sheetContent}>
-              {league ? (
-                <>
-                  <Text style={styles.sectionLabel}>{league.leagueName}</Text>
+          <ScrollView contentContainerStyle={styles.sheetContent}>
+            {league ? (
+              <>
+                <Text style={styles.sectionLabel}>{league.leagueName}</Text>
+                <View style={styles.tileGrid}>
                   {LEAGUE_DESTINATIONS.map((destination) => (
                     <TouchableOpacity
                       key={destination.route}
-                      style={styles.row}
+                      style={styles.tile}
                       onPress={() => go(destination)}
                     >
-                      <Ionicons name={destination.icon} size={18} color={colors.accent} style={styles.rowIcon} />
-                      <Text style={styles.rowText}>{destination.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              ) : (
-                <Text style={styles.sectionNote}>
-                  Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
-                </Text>
-              )}
-
-              {savedLeagues.length > 1 ? (
-                <>
-                  <Text style={styles.sectionLabel}>Switch League</Text>
-                  {savedLeagues.map((row) => (
-                    <TouchableOpacity key={row.id} style={styles.row} onPress={() => switchToLeague(row)}>
-                      <Ionicons
-                        name={row.league_id === league?.leagueId ? 'radio-button-on' : 'radio-button-off'}
-                        size={18}
-                        color={row.league_id === league?.leagueId ? colors.accent : colors.textTertiary}
-                        style={styles.rowIcon}
-                      />
-                      <Text style={styles.rowText} numberOfLines={1}>
-                        {row.league_name || row.league_id}
+                      <Ionicons name={destination.icon} size={20} color={colors.accent} />
+                      <Text style={styles.tileText} numberOfLines={2}>
+                        {destination.label}
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </>
-              ) : null}
+                </View>
+              </>
+            ) : (
+              <Text style={styles.sectionNote}>
+                Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
+              </Text>
+            )}
 
-              <Text style={styles.sectionLabel}>General</Text>
+            {savedLeagues.length > 1 ? (
+              <>
+                <Text style={styles.sectionLabel}>Switch League</Text>
+                {savedLeagues.map((row) => (
+                  <TouchableOpacity key={row.id} style={styles.row} onPress={() => switchToLeague(row)}>
+                    <Ionicons
+                      name={row.league_id === league?.leagueId ? 'radio-button-on' : 'radio-button-off'}
+                      size={18}
+                      color={row.league_id === league?.leagueId ? colors.accent : colors.textTertiary}
+                      style={styles.rowIcon}
+                    />
+                    <Text style={styles.rowText} numberOfLines={1}>
+                      {row.league_name || row.league_id}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            ) : null}
+
+            <Text style={styles.sectionLabel}>General</Text>
+            <View style={styles.generalRow}>
               {GENERAL_DESTINATIONS.map((destination) => (
-                <TouchableOpacity key={destination.route} style={styles.row} onPress={() => go(destination)}>
-                  <Ionicons name={destination.icon} size={18} color={colors.textSecondary} style={styles.rowIcon} />
-                  <Text style={styles.rowText}>{destination.label}</Text>
+                <TouchableOpacity key={destination.route} style={styles.generalItem} onPress={() => go(destination)}>
+                  <View style={styles.generalIconCircle}>
+                    <Ionicons name={destination.icon} size={18} color={colors.textSecondary} />
+                  </View>
+                  <Text style={styles.generalText}>{destination.label}</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-
-            <TouchableOpacity style={styles.closeButton} onPress={() => setOpen(false)}>
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
+            </View>
+          </ScrollView>
+        </Animated.View>
       </Modal>
     </>
   );
 }
 
-const ORB_SIZE = 56;
-
 const styles = StyleSheet.create({
-  orb: {
+  scrim: {
     position: 'absolute',
-    left: spacing.lg,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
+  },
+  orbWrap: {
+    position: 'absolute',
+    left: '50%',
+    marginLeft: -ORB_SIZE / 2,
     width: ORB_SIZE,
     height: ORB_SIZE,
-    borderRadius: radii.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    zIndex: 6,
+    ...shadows.orb,
   },
-  orbImage: { width: ORB_SIZE, height: ORB_SIZE },
+  orb: {
+    width: ORB_SIZE,
+    height: ORB_SIZE,
+    borderRadius: ORB_SIZE / 2,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0,212,255,0.55)',
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.orbGlow,
+  },
+  orbImage: { width: ORB_SIZE * 1.15, height: ORB_SIZE * 1.15 },
   backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
   },
   sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: colors.backgroundElevated,
     borderTopLeftRadius: radii.lg,
     borderTopRightRadius: radii.lg,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.xl,
-    maxHeight: '75%',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderBottomWidth: 0,
+    maxHeight: '78%',
+    ...shadows.sheet,
   },
+  sheetHandleRow: { alignItems: 'center', paddingVertical: spacing.xs },
   sheetHandle: {
-    alignSelf: 'center',
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.border,
-    marginBottom: spacing.md,
+    backgroundColor: colors.borderStrong,
   },
   sheetKicker: {
     fontSize: 11,
@@ -240,7 +315,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: spacing.md,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   sectionNote: {
     fontSize: 13,
@@ -248,6 +323,18 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: spacing.sm,
   },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  tile: {
+    width: '31%',
+    backgroundColor: colors.surface,
+    borderRadius: radii.tile,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  tileText: { fontSize: 11, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -257,10 +344,15 @@ const styles = StyleSheet.create({
   },
   rowIcon: { marginRight: spacing.sm },
   rowText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
-  closeButton: {
+  generalRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  generalItem: { alignItems: 'center', gap: spacing.xs },
+  generalIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.border,
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
+    justifyContent: 'center',
   },
-  closeButtonText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  generalText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
 });

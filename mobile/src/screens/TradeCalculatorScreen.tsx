@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type RankedPlayer } from '../lib/api';
 import { valueDirectionLabel } from '../lib/tradeValue';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -35,9 +36,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
   const [activeSide, setActiveSide] = useState<Side>('A');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    navigation.setOptions({ title: `Trade Calculator` });
-  }, [navigation]);
+  useScreenHeaderTitle(navigation, 'Trade Calculator', leagueName);
 
   useEffect(() => {
     let cancelled = false;

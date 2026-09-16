@@ -6,6 +6,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -22,9 +23,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    navigation.setOptions({ title: `GM Targets — ${leagueName}` });
-  }, [leagueName, navigation]);
+  useScreenHeaderTitle(navigation, 'GM Targets', leagueName);
 
   const load = useCallback(async () => {
     setError(null);
