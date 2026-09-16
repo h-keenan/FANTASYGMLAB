@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type DashboardItem } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
@@ -134,7 +135,9 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const heroSubtitle = dashboardItems[0]?.headline ?? 'Your roster looks steady right now.';
 
   return (
-    <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+    <View style={styles.root}>
+      <GridBackground />
+      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}
@@ -200,12 +203,14 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </AnimatedCard>
       ) : null}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.background },
+  list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.md },
   center: {
     flex: 1,

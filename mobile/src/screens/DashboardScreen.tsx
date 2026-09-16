@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import { api, type DashboardItem, type DashboardItemCategory } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, spacing } from '../theme';
@@ -83,7 +84,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.root}>
+      <GridBackground />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.disclaimer}>
         The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and
         waiver signals the web app's Dashboard uses.
@@ -98,7 +101,8 @@ export default function DashboardScreen({ route, navigation }: Props) {
       ) : (
         items.map((item, index) => <BriefingCard key={`${item.category}-${index}`} item={item} />)
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -125,7 +129,8 @@ function BriefingCard({ item }: { item: DashboardItem }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   center: {
     flex: 1,

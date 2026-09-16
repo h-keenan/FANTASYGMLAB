@@ -12,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer } from '../lib/api';
@@ -85,6 +86,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <GridBackground />
       <Text style={styles.disclaimer}>
         Best available free agents — nobody's roster in this league has them. Ranked by raw
         value, not yet tailored to your specific team needs.
@@ -220,9 +222,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  pillActive: { backgroundColor: 'transparent', borderColor: colors.accent, borderWidth: 1.5 },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pillTextActive: { color: '#fff' },
+  pillTextActive: { color: colors.accent, fontWeight: '700' },
   loading: { marginTop: spacing.xl },
   listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
   card: { padding: spacing.md },

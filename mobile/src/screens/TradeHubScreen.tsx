@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import {
@@ -138,7 +139,9 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   }, [adUnlocks, load, strategy, watchingAd]);
 
   return (
-    <FlatList
+    <View style={styles.root}>
+      <GridBackground />
+      <FlatList
       style={styles.container}
       data={loading || error || notReadyReason ? [] : ideas ?? []}
       keyExtractor={(_, index) => String(index)}
@@ -188,7 +191,8 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           />
         ) : null
       }
-    />
+      />
+    </View>
   );
 }
 
@@ -400,7 +404,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   gatePrimaryButtonText: { fontSize: 13, fontWeight: '700', color: colors.background },
-  container: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 11, color: colors.textTertiary, marginBottom: spacing.md },
   strategyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
@@ -412,9 +417,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  pillActive: { backgroundColor: 'transparent', borderColor: colors.accent, borderWidth: 1.5 },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pillTextActive: { color: colors.background, fontWeight: '700' },
+  pillTextActive: { color: colors.accent, fontWeight: '700' },
   loading: { marginVertical: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginTop: spacing.lg },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20, marginTop: spacing.xl },
