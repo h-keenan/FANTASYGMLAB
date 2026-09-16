@@ -29,7 +29,7 @@ from typing import Any, Mapping
 import pandas as pd
 import requests
 
-from modules import app_config, dashboard_engine, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues
+from modules import app_config, dashboard_engine, league_recaps, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues
 
 
 PLAYERS_DB_PATH = "data/players.db"
@@ -37,6 +37,11 @@ PUSH_TOKENS_TABLE = "push_tokens"
 PROFILES_TABLE = "profiles"
 NOTIFICATION_LOG_TABLE = "push_notification_log"
 PUSH_CATEGORIES = frozenset({"top_priority", "watch"})
+PUSH_TITLE_BY_CATEGORY = {
+    "top_priority": "Your Next Move",
+    "watch": "Watch",
+    "recap": "Recap Ready",
+}
 DEFAULT_LENS = "Dynasty"
 
 
@@ -250,6 +255,27 @@ def league_briefing_push_items(
     ]
 
 
+def recap_push_item(league_id: str, league: Mapping[str, Any]) -> dict[str, Any] | None:
+    """A "Week N recap is ready" push item — same completed-week detection
+    the mobile Recap screen already uses (modules.league_recaps), so a push
+    only fires once the exact same data that screen would show is ready."""
+
+    _, _, max_history_week = league_recaps.league_history_window(league)
+    matchup_rows = league_recaps.build_matchup_history_rows(
+        league_id, max_history_week, fetch_matchups=sleeper.get_matchups
+    )
+    week = league_recaps.completed_recap_week(league, matchup_rows)
+    if week <= 0:
+        return None
+    return {
+        "league_id": league_id,
+        "league_name": _safe_text(league.get("name"), "Your league"),
+        "category": "recap",
+        "headline": f"Week {week} recap is ready",
+        "recommendation_id": f"recap:{league_id}:{week}",
+    }
+
+
 def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) -> dict[str, Any]:
     """One sweep: check every registered account's leagues, push what's new.
 
@@ -319,11 +345,20 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                 stats["errors"].append(f"{user_id}/{league_id}: briefing failed ({exc})")
                 continue
 
+            try:
+                league_payload = sleeper.get_league(league_id)
+                if league_payload:
+                    recap_item = recap_push_item(league_id, league_payload)
+                    if recap_item:
+                        push_items.append(recap_item)
+            except Exception as exc:
+                stats["errors"].append(f"{user_id}/{league_id}: recap check failed ({exc})")
+
             for push_item in push_items:
                 recommendation_id = push_item["recommendation_id"]
                 if already_notified(config, user_id=user_id, recommendation_id=recommendation_id):
                     continue
-                title = "Your Next Move" if push_item["category"] == "top_priority" else "Watch"
+                title = PUSH_TITLE_BY_CATEGORY.get(push_item["category"], "Watch")
                 result = push_tokens.send_expo_push_notifications(
                     tokens,
                     title=f"{title} — {push_item['league_name']}",

@@ -121,17 +121,18 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                             "modules.dashboard_engine.compose_next_move_briefing",
                             return_value=fake_briefing,
                         ):
-                            with patch(
-                                "requests.get",
-                                side_effect=[
-                                    push_tokens_response,
-                                    profiles_response,
-                                    not_notified_response,
-                                ],
-                            ):
-                                with patch("requests.post") as mock_post:
-                                    mock_post.return_value = Mock(status_code=200, json=lambda: {"data": [{"status": "ok"}]})
-                                    first_stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+                            with patch("modules.push_triggers.recap_push_item", return_value=None):
+                                with patch(
+                                    "requests.get",
+                                    side_effect=[
+                                        push_tokens_response,
+                                        profiles_response,
+                                        not_notified_response,
+                                    ],
+                                ):
+                                    with patch("requests.post") as mock_post:
+                                        mock_post.return_value = Mock(status_code=200, json=lambda: {"data": [{"status": "ok"}]})
+                                        first_stats = push_triggers.run_push_trigger_sweep(environ=config_env)
 
     assert first_stats["configured"] is True
     assert first_stats["accounts_checked"] == 1
@@ -164,17 +165,91 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                             "modules.dashboard_engine.compose_next_move_briefing",
                             return_value=fake_briefing,
                         ):
-                            with patch(
-                                "requests.get",
-                                side_effect=[
-                                    push_tokens_response,
-                                    profiles_response,
-                                    already_notified_response,
-                                ],
-                            ):
-                                with patch("requests.post") as mock_post_second:
-                                    mock_post_second.return_value = Mock(status_code=200, json=lambda: {"data": []})
-                                    second_stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+                            with patch("modules.push_triggers.recap_push_item", return_value=None):
+                                with patch(
+                                    "requests.get",
+                                    side_effect=[
+                                        push_tokens_response,
+                                        profiles_response,
+                                        already_notified_response,
+                                    ],
+                                ):
+                                    with patch("requests.post") as mock_post_second:
+                                        mock_post_second.return_value = Mock(status_code=200, json=lambda: {"data": []})
+                                        second_stats = push_triggers.run_push_trigger_sweep(environ=config_env)
 
     assert second_stats["pushes_sent"] == 0
     mock_post_second.assert_not_called()
+
+
+def test_recap_push_item_none_when_no_completed_week():
+    with patch("modules.league_recaps.league_history_window", return_value=(1, 1, 1)):
+        with patch("modules.league_recaps.build_matchup_history_rows", return_value=[]):
+            with patch("modules.league_recaps.completed_recap_week", return_value=0):
+                assert push_triggers.recap_push_item("league-1", {"name": "Test League"}) is None
+
+
+def test_recap_push_item_builds_a_stable_dedup_id_per_week():
+    with patch("modules.league_recaps.league_history_window", return_value=(1, 3, 3)):
+        with patch("modules.league_recaps.build_matchup_history_rows", return_value=[{"week": 3}]):
+            with patch("modules.league_recaps.completed_recap_week", return_value=3):
+                item = push_triggers.recap_push_item("league-1", {"name": "Test League"})
+    assert item == {
+        "league_id": "league-1",
+        "league_name": "Test League",
+        "category": "recap",
+        "headline": "Week 3 recap is ready",
+        "recommendation_id": "recap:league-1:3",
+    }
+
+
+def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 50}])
+
+    push_tokens_response = Mock(status_code=200)
+    push_tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
+    profiles_response = Mock(status_code=200)
+    profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
+    not_notified_response = Mock(status_code=200)
+    not_notified_response.json.return_value = []
+
+    with patch("modules.push_triggers.load_valued_players", return_value=(players_df, "dynasty_score")):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper_leagues.get_user_leagues",
+                return_value=[{"league_id": "league-1", "name": "Test League"}],
+            ):
+                with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+                    with patch(
+                        "modules.sleeper.get_rosters",
+                        return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+                    ):
+                        with patch(
+                            "modules.dashboard_engine.compose_next_move_briefing",
+                            return_value=Mock(items=[]),
+                        ):
+                            with patch(
+                                "modules.push_triggers.recap_push_item",
+                                return_value={
+                                    "league_id": "league-1",
+                                    "league_name": "Test League",
+                                    "category": "recap",
+                                    "headline": "Week 3 recap is ready",
+                                    "recommendation_id": "recap:league-1:3",
+                                },
+                            ):
+                                with patch(
+                                    "requests.get",
+                                    side_effect=[push_tokens_response, profiles_response, not_notified_response],
+                                ):
+                                    with patch("requests.post") as mock_post:
+                                        mock_post.return_value = Mock(
+                                            status_code=200, json=lambda: {"data": [{"status": "ok"}]}
+                                        )
+                                        stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+
+    assert stats["pushes_sent"] == 1
+    push_call = mock_post.call_args_list[0]
+    assert push_call.kwargs["json"][0]["title"] == "Recap Ready — Test League"
+    assert push_call.kwargs["json"][0]["body"] == "Week 3 recap is ready"
