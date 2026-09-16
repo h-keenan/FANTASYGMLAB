@@ -253,7 +253,12 @@ def get_league_team_profiles(league_id: str, _user: dict[str, Any] = Depends(req
     return {"ok": True, "profiles": sleeper.get_league_roster_profiles(league_id)}
 
 
-def _resolve_my_roster(user: dict[str, Any], league_id: str) -> tuple[dict[str, Any] | None, str]:
+def _resolve_my_roster(
+    user: dict[str, Any],
+    league_id: str,
+    *,
+    profile: dict[str, str] | None = None,
+) -> tuple[dict[str, Any] | None, str]:
     """Identify which of this league's rosters belongs to the signed-in user.
 
     Resolves via the Sleeper username linked on their profile (same
@@ -261,11 +266,16 @@ def _resolve_my_roster(user: dict[str, Any], league_id: str) -> tuple[dict[str, 
     roster whose owner_id matches. All non-matches are expected, everyday
     states (not errors) — callers return 200 with the `reason` rather than
     an HTTP error status for any of them.
+
+    `profile` lets a caller that already fetched the profile (e.g. for
+    entitlement) pass it in instead of this function fetching it again —
+    same Supabase round trip, not two.
     """
 
-    config = auth_supabase.get_supabase_config()
-    user_id = str(user.get("id") or "")
-    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    if profile is None:
+        config = auth_supabase.get_supabase_config()
+        user_id = str(user.get("id") or "")
+        profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
     sleeper_username = str(profile.get("sleeper_username") or "")
     if not sleeper_username:
         return None, "no_sleeper_username_linked"
@@ -1161,7 +1171,11 @@ def get_league_dashboard(
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
 
-    my_roster, reason = _resolve_my_roster(user, league_id)
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
     if my_roster is None:
         return {"ok": True, "items": [], "quiet": True, "reason": reason}
 
@@ -1190,10 +1204,6 @@ def get_league_dashboard(
     all_rostered_player_ids: set[str] = set()
     for roster in rosters:
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
-
-    config = auth_supabase.get_supabase_config()
-    user_id = str(user.get("id") or "")
-    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
 
     briefing = dashboard_engine.compose_next_move_briefing(
         league_id=league_id,
@@ -1253,7 +1263,11 @@ def get_trade_hub_ideas(
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
 
-    my_roster, reason = _resolve_my_roster(user, league_id)
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
     if my_roster is None:
         return {"ok": True, "ideas": [], "reason": reason}
 
@@ -1289,9 +1303,6 @@ def get_trade_hub_ideas(
         team_strategy=strategy,
     )
 
-    config = auth_supabase.get_supabase_config()
-    user_id = str(user.get("id") or "")
-    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
     is_premium = str(profile.get("entitlement") or "free") == "premium"
     # Rank on the raw engine records (trade_confidence_label, tier, etc.) —
     # the same fields the web app's Trade Hub sorts on — then project only
