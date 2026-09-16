@@ -2,8 +2,12 @@
 set -e
 
 # Xcode Cloud clones the whole FANTASYGMLAB monorepo; the Expo app lives
-# under mobile/. CI_WORKSPACE is set by Xcode Cloud to the repo root.
-cd "$CI_WORKSPACE/mobile"
+# under mobile/. CI_PRIMARY_REPOSITORY_PATH is Apple's documented Xcode
+# Cloud env var for the repo checkout root (CI_WORKSPACE is not a real
+# Xcode Cloud variable — that was a GitHub Actions naming assumption that
+# leaked in here and silently evaluated to an empty string, so `cd` landed
+# on `/mobile` instead of the actual checkout path).
+cd "$CI_PRIMARY_REPOSITORY_PATH/mobile"
 
 # Xcode Cloud's macOS images include Homebrew but not necessarily the Node
 # version this project expects.
