@@ -345,6 +345,26 @@ export interface PushMutationResponse {
   sent?: number;
 }
 
+export type DashboardItemCategory = 'top_priority' | 'watch' | 'waiver_opportunity' | 'league_movement';
+
+export interface DashboardItem {
+  category: DashboardItemCategory;
+  headline: string;
+  reason: string;
+  supporting_context: string;
+  destination: string;
+  route_player_id: string;
+  recommendation_narrative: Record<string, unknown> | null;
+}
+
+export interface DashboardResponse {
+  ok: true;
+  items: DashboardItem[];
+  quiet: boolean;
+  quiet_reason?: string;
+  reason: string;
+}
+
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
 // large roster/league fetch can't silently exceed it.
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
@@ -378,6 +398,8 @@ export const api = {
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
   getLeagueRecap: (leagueId: string) =>
     authorizedFetch<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap`),
+  getLeagueDashboard: (leagueId: string) =>
+    authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
   getLeagueAlerts: (leagueId: string, limit = 12) =>
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
   getPlayerQuickView: (playerId: string) =>

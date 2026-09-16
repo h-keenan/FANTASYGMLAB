@@ -25,6 +25,7 @@ import TradeAnalyzerScreen from '../screens/TradeAnalyzerScreen';
 import RecapScreen from '../screens/RecapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import GmTargetsScreen from '../screens/GmTargetsScreen';
+import DashboardScreen from '../screens/DashboardScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -41,6 +42,7 @@ export type RootStackParamList = {
   Waivers: { leagueId: string; leagueName: string };
   TradeAnalyzer: { leagueId: string; leagueName: string };
   Recap: { leagueId: string; leagueName: string };
+  Dashboard: { leagueId: string; leagueName: string };
   Alerts: { leagueId: string; leagueName: string };
 };
 
@@ -108,6 +110,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Waivers" component={WaiversScreen} />
           <AppStack.Screen name="TradeAnalyzer" component={TradeAnalyzerScreen} />
           <AppStack.Screen name="Recap" component={RecapScreen} />
+          <AppStack.Screen name="Dashboard" component={DashboardScreen} />
           <AppStack.Screen name="Alerts" component={AlertsScreen} />
           <AppStack.Screen name="GmTargets" component={GmTargetsScreen} />
           <AppStack.Screen
