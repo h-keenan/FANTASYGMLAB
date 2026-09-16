@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
+import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import {
@@ -119,7 +120,7 @@ export default function PaywallScreen({ navigation }: Props) {
       <View style={styles.features}>
         {FEATURES.map((feature) => (
           <View key={feature} style={styles.featureRow}>
-            <Text style={styles.featureBullet}>✓</Text>
+            <Ionicons name="checkmark-circle" size={18} color={colors.success} style={styles.featureIcon} />
             <Text style={styles.featureText}>{feature}</Text>
           </View>
         ))}
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.xl, lineHeight: 20 },
   features: { marginBottom: spacing.xl, gap: spacing.sm },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  featureBullet: { color: colors.success, fontWeight: '700', marginRight: spacing.sm, fontSize: 15 },
+  featureIcon: { marginRight: spacing.sm, marginTop: 1 },
   featureText: { flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 21 },
   loadingIndicator: { marginVertical: spacing.xl },
   packages: { gap: spacing.sm, marginBottom: spacing.lg },
