@@ -36,6 +36,10 @@ PLAYERS_DB_PATH = "data/players.db"
 PUSH_TOKENS_TABLE = "push_tokens"
 PROFILES_TABLE = "profiles"
 NOTIFICATION_LOG_TABLE = "push_notification_log"
+USER_SETTINGS_TABLE = "user_settings"
+# Every push category a user can individually toggle off — the Notification
+# Settings screen (mobile) reads/writes exactly this key set.
+TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury")
 PUSH_CATEGORIES = frozenset({"top_priority", "watch"})
 PUSH_TITLE_BY_CATEGORY = {
     "top_priority": "Your Next Move",
@@ -143,6 +147,59 @@ def fetch_sleeper_usernames(config: PushTriggerConfig, user_ids: list[str]) -> d
         if user_id and username:
             usernames[user_id] = username
     return usernames
+
+
+def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, dict[str, bool]]:
+    """user_id -> {category: enabled}, defaulting every category to True.
+
+    Reuses modules.account_store's existing user_settings table (one JSONB
+    `settings` blob per user, auth.uid()=user_id RLS — service-role bypasses
+    that here same as it does for push_tokens/profiles above) rather than a
+    new table: push category preferences are just another namespaced key
+    under the same per-user settings blob the mobile app already has a
+    working read/write path for (modules.account_store.fetch_user_settings /
+    upsert_user_settings), under the "push_categories" key.
+    """
+    ids = [uid for uid in (_safe_text(u) for u in user_ids) if uid]
+    if not config.configured or not ids:
+        return {}
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{USER_SETTINGS_TABLE}",
+            headers=_headers(config),
+            params={"select": "user_id,settings", "user_id": f"in.({','.join(ids)})"},
+            timeout=15,
+        )
+    except Exception:
+        return {}
+    if response.status_code >= 400:
+        return {}
+    try:
+        rows = response.json()
+    except Exception:
+        return {}
+    preferences: dict[str, dict[str, bool]] = {}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, Mapping):
+            continue
+        user_id = _safe_text(row.get("user_id"))
+        if not user_id:
+            continue
+        settings = row.get("settings") if isinstance(row.get("settings"), Mapping) else {}
+        categories = settings.get("push_categories") if isinstance(settings.get("push_categories"), Mapping) else {}
+        preferences[user_id] = {
+            category: bool(categories.get(category, True)) for category in TOGGLEABLE_PUSH_CATEGORIES
+        }
+    return preferences
+
+
+def push_item_allowed(preferences: dict[str, dict[str, bool]], *, user_id: str, category: str) -> bool:
+    """Default-open: no settings row (or an unrecognized category) means enabled."""
+
+    user_prefs = preferences.get(user_id)
+    if user_prefs is None:
+        return True
+    return bool(user_prefs.get(category, True))
 
 
 def already_notified_batch(config: PushTriggerConfig, *, user_id: str, recommendation_ids: list[str]) -> set[str]:
@@ -368,6 +425,7 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
         return stats
 
     usernames = fetch_sleeper_usernames(config, list(recipients.keys()))
+    preferences = fetch_push_preferences(config, list(recipients.keys()))
     players_cache: dict[str, tuple[pd.DataFrame, str]] = {}
 
     for user_id, tokens in recipients.items():
@@ -436,6 +494,10 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     )
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: injury status check failed ({exc})")
+
+            push_items = [
+                item for item in push_items if push_item_allowed(preferences, user_id=user_id, category=item["category"])
+            ]
 
             already_sent = already_notified_batch(
                 config,

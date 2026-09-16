@@ -1522,6 +1522,98 @@ def test_send_test_push_delivers_via_expo_for_registered_tokens(monkeypatch):
     ]
 
 
+def test_get_push_preferences_defaults_all_categories_enabled(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/push/preferences", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["categories"] == {"top_priority": True, "watch": True, "recap": True, "injury": True}
+
+
+def test_get_push_preferences_reflects_stored_overrides(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {"user_id": "user-123", "settings": {"push_categories": {"injury": False}}}
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/push/preferences", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json()["categories"]["injury"] is False
+    assert response.json()["categories"]["watch"] is True
+
+
+def test_update_push_preference_rejects_unknown_category(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/push/preferences",
+            json={"category": "not_a_real_category", "enabled": False},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 422
+
+
+def test_update_push_preference_upserts_merged_settings(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {"user_id": "user-123", "settings": {"push_categories": {"watch": False}}}
+    ]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/push/preferences",
+                json={"category": "injury", "enabled": False},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "ok": True,
+        "categories": {"top_priority": True, "watch": False, "recap": True, "injury": False},
+    }
+    # Existing "watch": False override is preserved, not clobbered by the new write.
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["push_categories"] == {
+        "top_priority": True,
+        "watch": False,
+        "recap": True,
+        "injury": False,
+    }
+
+
+def test_push_preferences_require_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/push/preferences").status_code == 401
+    assert client.post("/v1/push/preferences", json={"category": "watch", "enabled": True}).status_code == 401
+
+
 def test_dashboard_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/dashboard")
