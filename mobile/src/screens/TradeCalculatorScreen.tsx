@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type RankedPlayer } from '../lib/api';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { colors, radii, spacing } from '../theme';
@@ -153,6 +154,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.resultRow} onPress={() => addToActiveSide(item)}>
+            <PlayerAvatar playerId={item.player_id} size={36} tier={item.tier} style={styles.resultAvatar} />
             <View style={styles.resultInfo}>
               <Text style={styles.resultName} numberOfLines={1}>
                 {item.name ?? 'Unknown'}
@@ -279,6 +281,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  resultAvatar: { marginRight: spacing.sm },
   resultInfo: { flex: 1, marginRight: spacing.sm },
   resultName: { fontSize: 15, fontWeight: '500', color: colors.textPrimary },
   resultMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },

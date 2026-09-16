@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
 import { api } from '../lib/api';
+import { setLastLeague } from '../lib/lastLeague';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -26,21 +27,9 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
     navigation.setOptions({ title: leagueName });
   }, [leagueName, navigation]);
 
-  const tools: Array<{ label: string; onPress: () => void }> = [
-    { label: 'Alerts', onPress: () => navigation.navigate('Alerts', { leagueId, leagueName }) },
-    { label: 'Players', onPress: () => navigation.navigate('Players', { leagueId, leagueName }) },
-    { label: 'GM Targets', onPress: () => navigation.navigate('GmTargets', { leagueId, leagueName }) },
-    { label: 'Waivers', onPress: () => navigation.navigate('Waivers', { leagueId, leagueName }) },
-    {
-      label: 'Trade Calc',
-      onPress: () => navigation.navigate('TradeCalculator', { leagueId, leagueName }),
-    },
-    {
-      label: 'Trade Analyzer',
-      onPress: () => navigation.navigate('TradeAnalyzer', { leagueId, leagueName }),
-    },
-    { label: 'Recap', onPress: () => navigation.navigate('Recap', { leagueId, leagueName }) },
-  ];
+  useEffect(() => {
+    void setLastLeague({ leagueId, leagueName });
+  }, [leagueId, leagueName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,15 +106,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       contentContainerStyle={styles.listContent}
       data={teams}
       keyExtractor={(item) => String(item.rosterId)}
-      ListHeaderComponent={
-        <View style={styles.toolRow}>
-          {tools.map((tool) => (
-            <TouchableOpacity key={tool.label} style={styles.toolChip} onPress={tool.onPress}>
-              <Text style={styles.toolChipText}>{tool.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      }
+      ListHeaderComponent={<Text style={styles.sectionTitle}>Teams</Text>}
       renderItem={({ item }) => (
         <AnimatedCard
           style={StyleSheet.flatten([styles.card, item.isMine && styles.cardMine])}
@@ -193,17 +174,12 @@ const styles = StyleSheet.create({
   },
   count: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   error: { color: colors.danger, textAlign: 'center' },
-  toolRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
   },
-  toolChip: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  toolChipText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 });

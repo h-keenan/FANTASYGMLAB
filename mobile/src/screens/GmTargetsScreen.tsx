@@ -103,7 +103,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
                 : undefined
             }
           >
-            <PlayerAvatar playerId={item.target.player_id} size={40} style={styles.avatar} />
+            <PlayerAvatar playerId={item.target.player_id} size={40} tier={item.player?.tier} style={styles.avatar} />
             <View style={styles.nameColumn}>
               <Text style={styles.name} numberOfLines={1}>
                 {item.player?.name ?? `Player ${item.target.player_id}`}

@@ -1,17 +1,18 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 
-const LEGAL_ITEMS: Array<{ pageKey: string; label: string }> = [
-  { pageKey: 'about_disclaimer', label: 'About / Disclaimer' },
-  { pageKey: 'terms', label: 'Terms of Use' },
-  { pageKey: 'privacy', label: 'Privacy Policy' },
-  { pageKey: 'no_affiliation', label: 'No-Affiliation Disclaimer' },
+const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = [
+  { pageKey: 'about_disclaimer', label: 'About / Disclaimer', icon: 'information-circle-outline' },
+  { pageKey: 'terms', label: 'Terms of Use', icon: 'document-text-outline' },
+  { pageKey: 'privacy', label: 'Privacy Policy', icon: 'shield-checkmark-outline' },
+  { pageKey: 'no_affiliation', label: 'No-Affiliation Disclaimer', icon: 'alert-circle-outline' },
 ];
 
 export default function MoreScreen({ navigation }: Props) {
@@ -23,7 +24,10 @@ export default function MoreScreen({ navigation }: Props) {
           style={styles.row}
           onPress={() => navigation.navigate('LegalPage', { pageKey: item.pageKey })}
         >
-          <Text style={styles.label}>{item.label}</Text>
+          <View style={styles.labelGroup}>
+            <Ionicons name={item.icon} size={18} color={colors.accent} style={styles.icon} />
+            <Text style={styles.label}>{item.label}</Text>
+          </View>
           <Text style={styles.chevron}>{'›'}</Text>
         </TouchableOpacity>
       ))}
@@ -43,6 +47,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-  label: { fontSize: 16, color: colors.textPrimary },
+  labelGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  icon: { marginRight: spacing.sm },
+  label: { fontSize: 16, color: colors.textPrimary, flexShrink: 1 },
   chevron: { fontSize: 20, color: colors.textSecondary },
 });

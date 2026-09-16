@@ -18,6 +18,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
+  - GET  /v1/players/{id}/awards         — verified fantasy-performance badges (career history)
   - GET  /v1/leagues/{id}/gm-targets           — the caller's watchlist in this league
   - POST /v1/leagues/{id}/gm-targets           — add a player to the watchlist (cap-enforced)
   - DELETE /v1/leagues/{id}/gm-targets/{pid}   — remove a player from the watchlist
@@ -61,6 +62,7 @@ from modules import (
     my_news,
     news as news_cache,
     news_signal,
+    player_awards,
     player_eligibility,
     player_quick_view,
     rankings,
@@ -957,3 +959,44 @@ def remove_gm_target(
     if not ok:
         return {"ok": False, "reason": "not_available"}
     return {"ok": True, "reason": ""}
+
+
+def _project_award(badge: player_awards.PlayerBadge) -> dict[str, Any]:
+    return {
+        "badge_id": badge.badge_id,
+        "category": badge.category,
+        "title": badge.title,
+        "short_label": badge.short_label,
+        "tier": badge.tier,
+        "season": badge.season,
+        "rank": badge.rank,
+        "metric_value": badge.metric_value,
+        "description": badge.description,
+        "occurrence_count": badge.occurrence_count,
+    }
+
+
+@app.get("/v1/players/{player_id}/awards")
+def get_player_awards(
+    player_id: str,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Verified fantasy-performance badges (modules.player_awards) — never
+    invented, never AI-generated. Reads the same local season stat cache
+    files the web app's career résumé uses; empty when a player has no
+    qualifying seasons on file, not an error.
+    """
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    matches = players_df[players_df["player_id"] == player_id]
+    if matches.empty:
+        return {"ok": True, "awards": [], "reason": "not_found"}
+
+    position = str(matches.iloc[0].get("position") or "")
+    index = player_awards.build_season_cache_index()
+    season_rows = player_awards.award_rows_for_player(index, player_id=player_id, position=position)
+    badges = player_awards.build_player_awards(season_rows, position=position)
+    display = player_awards.select_display_badges(badges)
+    return {"ok": True, "awards": [_project_award(badge) for badge in display], "reason": ""}

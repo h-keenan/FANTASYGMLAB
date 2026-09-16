@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,11 +12,13 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GlassPanel from '../components/GlassPanel';
 import { api, type MeResponse } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { getLastLeague } from '../lib/lastLeague';
 import { supabase } from '../lib/supabase';
 import { colors, gradients, radii, spacing, typography } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -37,6 +39,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [meError, setMeError] = useState<string | null>(null);
   const [leaguesError, setLeaguesError] = useState<string | null>(null);
+  const autoNavigated = useRef(false);
 
   // Independent requests: the backend API and Supabase are separate
   // services, so one failing (e.g. the API isn't reachable) shouldn't also
@@ -79,6 +82,27 @@ export default function HomeScreen({ navigation }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Skip the "pick a league" step on repeat visits: jump straight into the
+  // last league opened (or the marked default) once, on first load. Home
+  // stays reachable afterward via the GM Orb, so this never traps anyone.
+  useEffect(() => {
+    if (autoNavigated.current || !leagues || leagues.length === 0) return;
+    autoNavigated.current = true;
+    (async () => {
+      const last = await getLastLeague();
+      const target =
+        (last ? leagues.find((league) => league.league_id === last.leagueId) : null) ??
+        leagues.find((league) => league.is_default) ??
+        null;
+      if (target) {
+        navigation.navigate('LeagueDetail', {
+          leagueId: target.league_id,
+          leagueName: target.league_name || 'League',
+        });
+      }
+    })();
+  }, [leagues, navigation]);
 
   if (loading) {
     return (
@@ -153,13 +177,17 @@ export default function HomeScreen({ navigation }: Props) {
                     })
                   }
                 >
-                  <Text style={styles.quickActionPrimaryLabel}>Continue in</Text>
+                  <View style={styles.quickActionPrimaryRow}>
+                    <Ionicons name="grid-outline" size={16} color={colors.accentSoft} />
+                    <Text style={styles.quickActionPrimaryLabel}>Continue in</Text>
+                  </View>
                   <Text style={styles.quickActionPrimaryValue} numberOfLines={1}>
                     {defaultLeague.league_name || defaultLeague.league_id}
                   </Text>
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity style={styles.quickActionSecondary} onPress={() => navigation.navigate('News')}>
+                <Ionicons name="globe-outline" size={20} color={colors.textPrimary} />
                 <Text style={styles.quickActionSecondaryLabel}>News</Text>
               </TouchableOpacity>
             </View>
@@ -245,6 +273,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.accent,
   },
+  quickActionPrimaryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   quickActionPrimaryLabel: { fontSize: 11, fontWeight: '600', color: colors.accentSoft, textTransform: 'uppercase' },
   quickActionPrimaryValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
   quickActionSecondary: {
@@ -254,6 +283,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 2,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },

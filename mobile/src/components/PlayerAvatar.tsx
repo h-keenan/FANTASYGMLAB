@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Image, StyleSheet, View, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors } from '../theme';
+import { resolvePlayerTier } from '../lib/playerTier';
 
 const SLEEPER_HEADSHOT_BASE = 'https://sleepercdn.com/content/nfl/players';
 
 interface PlayerAvatarProps {
   playerId: string | null | undefined;
   size?: number;
+  tier?: string | null;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -17,19 +19,25 @@ interface PlayerAvatarProps {
  * web app). Many players (rookies, IDP, deep bench) have no photo on file,
  * so a load failure quietly falls back to a blank avatar circle rather than
  * a broken-image icon.
+ *
+ * When `tier` is passed, the avatar gets a colored ring matching the same
+ * prestige-tier ladder the web app's portrait frames use (see
+ * modules/player_tier_identity.py's portrait_frame_classes).
  */
-export default function PlayerAvatar({ playerId, size = 40, style }: PlayerAvatarProps) {
+export default function PlayerAvatar({ playerId, size = 40, tier, style }: PlayerAvatarProps) {
   const [failed, setFailed] = useState(false);
   const dimension = { width: size, height: size, borderRadius: size / 2 };
+  const ringColor = tier ? resolvePlayerTier(tier).color : colors.border;
+  const ring = { borderWidth: tier ? 2 : StyleSheet.hairlineWidth, borderColor: ringColor };
 
   if (!playerId || failed) {
-    return <View style={[styles.fallback, dimension, style]} />;
+    return <View style={[styles.fallback, dimension, ring, style]} />;
   }
 
   return (
     <Image
       source={{ uri: `${SLEEPER_HEADSHOT_BASE}/${playerId}.jpg` }}
-      style={[dimension, style] as StyleProp<ImageStyle>}
+      style={[dimension, ring, style] as StyleProp<ImageStyle>}
       onError={() => setFailed(true)}
     />
   );
@@ -38,7 +46,5 @@ export default function PlayerAvatar({ playerId, size = 40, style }: PlayerAvata
 const styles = StyleSheet.create({
   fallback: {
     backgroundColor: colors.surfaceSolid,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
   },
 });

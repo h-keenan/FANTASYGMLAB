@@ -3,7 +3,8 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacit
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PlayerAvatar from '../components/PlayerAvatar';
-import { api, type QuickViewBio, type QuickViewStatItem, type QuickViewStats } from '../lib/api';
+import { api, type PlayerAward, type QuickViewBio, type QuickViewStatItem, type QuickViewStats } from '../lib/api';
+import { resolvePlayerTier } from '../lib/playerTier';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -39,6 +40,32 @@ function StatSection({ title, items }: { title: string; items: QuickViewStatItem
   );
 }
 
+const AWARD_TIER_COLORS: Record<string, string> = {
+  gold: '#D8B85A',
+  silver: '#D7DBE2',
+  bronze: '#9DA4AE',
+};
+
+function AwardsSection({ awards }: { awards: PlayerAward[] }) {
+  if (awards.length === 0) return null;
+  return (
+    <View style={[styles.card, styles.cardSpaced]}>
+      <Text style={styles.sectionTitle}>Awards</Text>
+      <View style={styles.awardsWrap}>
+        {awards.map((award) => {
+          const tierColor = award.tier ? AWARD_TIER_COLORS[award.tier] : colors.border;
+          return (
+            <View key={award.badge_id} style={[styles.awardChip, { borderColor: tierColor }]}>
+              <Text style={[styles.awardChipLabel, { color: tierColor }]}>{award.short_label}</Text>
+              {award.season ? <Text style={styles.awardChipSeason}>{award.season}</Text> : null}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function BioSection({ bio }: { bio: QuickViewBio }) {
   const rows: Array<[string, string]> = [
     ['Experience', bio.years_in_league],
@@ -66,6 +93,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const { player, leagueId } = route.params;
   const [stats, setStats] = useState<QuickViewStats | null>(null);
   const [bio, setBio] = useState<QuickViewBio | null>(null);
+  const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [loading, setLoading] = useState(true);
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
@@ -90,6 +118,21 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [player.player_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPlayerAwards(player.player_id)
+      .then((result) => {
+        if (!cancelled) setAwards(result.awards);
+      })
+      .catch(() => {
+        // Awards are an enrichment — a failed fetch just omits the section.
       });
     return () => {
       cancelled = true;
@@ -140,18 +183,19 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   };
 
   const season = stats?.seasons[0];
+  const tierIdentity = resolvePlayerTier(player.tier);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <PlayerAvatar playerId={player.player_id} size={88} style={styles.heroAvatar} />
+        <PlayerAvatar playerId={player.player_id} size={88} tier={player.tier} style={styles.heroAvatar} />
         <Text style={styles.name}>{player.name ?? 'Unknown player'}</Text>
         <Text style={styles.meta}>
           {[player.position, player.team].filter(Boolean).join(' · ')}
         </Text>
         {player.tier ? (
-          <View style={styles.tierBadge}>
-            <Text style={styles.tierText}>{player.tier}</Text>
+          <View style={[styles.tierBadge, { backgroundColor: `${tierIdentity.color}29`, borderColor: tierIdentity.color }]}>
+            <Text style={[styles.tierText, { color: tierIdentity.color }]}>{tierIdentity.shortLabel}</Text>
           </View>
         ) : null}
         {watching !== null ? (
@@ -184,6 +228,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         <ActivityIndicator style={styles.loader} color={colors.accent} />
       ) : (
         <>
+          <AwardsSection awards={awards} />
           {season ? (
             <>
               <Text style={styles.seasonLabel}>{season.label}</Text>
@@ -194,7 +239,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           ) : null}
           {stats?.college_available ? <StatSection title="College" items={stats.college} /> : null}
           {bio ? <BioSection bio={bio} /> : null}
-          {!season && !stats?.college_available && !bio ? (
+          {!season && !stats?.college_available && !bio && awards.length === 0 ? (
             <Text style={styles.notice}>No additional stats available for this player yet.</Text>
           ) : null}
         </>
@@ -249,6 +294,18 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
+  awardsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  awardChip: {
+    borderWidth: 1.5,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  awardChipLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
+  awardChipSeason: { fontSize: 10, color: colors.textTertiary, fontWeight: '600' },
   statRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
