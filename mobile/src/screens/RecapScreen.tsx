@@ -1,14 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, spacing } from '../theme';
+import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Recap'>;
+
+const STORY_META: Record<
+  string,
+  { icon: React.ComponentProps<typeof Ionicons>['name']; color: string }
+> = {
+  performance: { icon: 'trophy', color: colors.premium },
+  matchup: { icon: 'flame', color: colors.danger },
+  waiver: { icon: 'cash-outline', color: colors.success },
+  trade: { icon: 'swap-horizontal', color: colors.accent },
+  activity: { icon: 'repeat', color: colors.violet },
+  roster_riser: { icon: 'trending-up', color: colors.accent },
+};
+const DEFAULT_STORY_META = { icon: 'newspaper-outline' as const, color: colors.textSecondary };
 
 export default function RecapScreen({ route, navigation }: Props) {
   const { leagueId, leagueName } = route.params;
@@ -69,6 +83,7 @@ export default function RecapScreen({ route, navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.kicker}>LEAGUE MEMORY</Text>
       <Text style={styles.headline}>{recap.headline}</Text>
       {recap.incomplete ? (
         <Text style={styles.incompleteNotice}>{recap.empty_reason || 'Not enough historical data yet.'}</Text>
@@ -80,23 +95,70 @@ export default function RecapScreen({ route, navigation }: Props) {
 }
 
 function StoryCard({ story }: { story: RecapStory }) {
+  const meta = STORY_META[story.story_type] ?? DEFAULT_STORY_META;
+  const isMatchup = story.story_type === 'matchup';
+  const isTrade = story.story_type === 'trade';
+
   return (
     <AnimatedCard style={styles.storyCard}>
-      <Text style={styles.storyTitle}>{story.title}</Text>
-      <Text style={styles.storySummary}>{story.summary}</Text>
-      {story.metric_label ? (
-        <View style={styles.metricRow}>
-          <Text style={styles.metricLabel}>{story.metric_label}</Text>
-          <Text style={styles.metricValue}>{story.metric_value}</Text>
+      <View style={styles.storyHeaderRow}>
+        <View style={[styles.iconDisc, { backgroundColor: `${meta.color}26` }]}>
+          <Ionicons name={meta.icon} size={20} color={meta.color} />
+        </View>
+        <View style={styles.storyTextGroup}>
+          <Text style={[styles.storyKicker, { color: meta.color }]}>
+            {story.story_type.replace(/_/g, ' ').toUpperCase()}
+          </Text>
+          <Text style={styles.storyTitle} numberOfLines={1}>
+            {story.title}
+          </Text>
+        </View>
+        {story.metric_label ? (
+          <View style={styles.metricGroup}>
+            <Text style={[styles.metricValue, { color: meta.color }]}>{story.metric_value}</Text>
+            <Text style={styles.metricLabel}>{story.metric_label.toUpperCase()}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {isMatchup ? (
+        <View style={styles.matchupRow}>
+          <Text style={styles.matchupTeam} numberOfLines={1}>
+            {story.primary_team}
+          </Text>
+          <Text style={styles.matchupVs}>vs</Text>
+          <Text style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
+            {story.secondary_team}
+          </Text>
         </View>
       ) : null}
+
+      {isTrade && story.secondary_team ? (
+        <View style={styles.tradeRow}>
+          <View style={styles.tradeChip}>
+            <Text style={styles.tradeChipText} numberOfLines={1}>
+              {story.primary_team}
+            </Text>
+          </View>
+          <Ionicons name="swap-horizontal" size={14} color={colors.textTertiary} />
+          <View style={styles.tradeChip}>
+            <Text style={styles.tradeChipText} numberOfLines={1}>
+              {story.secondary_team}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      <Text style={styles.storySummary} numberOfLines={3}>
+        {story.summary}
+      </Text>
     </AnimatedCard>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -104,21 +166,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.xl,
   },
-  headline: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.lg },
+  kicker: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.8, marginBottom: 4 },
+  headline: { fontSize: 26, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.lg },
   incompleteNotice: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
-  storyCard: { padding: spacing.lg, marginBottom: spacing.sm },
-  storyTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
-  storySummary: { fontSize: 14, color: colors.textPrimary, lineHeight: 20 },
-  metricRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  storyCard: { marginBottom: spacing.sm },
+  storyHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  iconDisc: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  metricLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
-  metricValue: { fontSize: 12, color: colors.textPrimary, fontWeight: '700' },
+  storyTextGroup: { flex: 1 },
+  storyKicker: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
+  storyTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  metricGroup: { alignItems: 'flex-end' },
+  metricValue: { fontSize: 20, fontWeight: '700' },
+  metricLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  matchupRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  matchupTeam: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  matchupTeamMuted: { color: colors.textSecondary, fontWeight: '500' },
+  matchupVs: { fontSize: 11, color: colors.textTertiary, fontWeight: '600' },
+  tradeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  tradeChip: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  tradeChipText: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  storySummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
 });
