@@ -59,13 +59,20 @@ export const spacing = {
  * fully-round chips/avatars/buttons). `sm`/`lg` cover the smaller and
  * larger ends (tiny inline tags; bottom sheets and modals).
  */
+// Ported verbatim from the web app's canonical geometry scale
+// (modules/design_tokens.py: --radius-sm/md/lg/control/panel are all 0 —
+// "a small intentional scale (square / control / panel / pill / segment)").
+// Hard edges are a deliberate brand choice there, not an oversight — only
+// genuine segmented filter chips get a true pill (--radius-segment: 999px).
+// Apple-style elevation/motion (see `shadows`/`motion` below) comes from
+// shadow depth and spring animation, not rounded corners.
 export const radii = {
-  sm: 10,
-  md: 16,
-  lg: 24,
+  sm: 0,
+  md: 0,
+  lg: 0,
   pill: 999,
-  tile: 14,
-  input: 12,
+  tile: 0,
+  input: 0,
 };
 
 export const typography = {
