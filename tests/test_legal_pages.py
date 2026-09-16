@@ -30,6 +30,7 @@ def test_legal_pages_include_terms_privacy_and_disclaimer_content():
         "about_disclaimer",
         "terms",
         "privacy",
+        "subscription_terms",
         "no_affiliation",
     }
 

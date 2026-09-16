@@ -12,6 +12,7 @@ const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: React.Component
   { pageKey: 'about_disclaimer', label: 'About / Disclaimer', icon: 'information-circle-outline' },
   { pageKey: 'terms', label: 'Terms of Use', icon: 'document-text-outline' },
   { pageKey: 'privacy', label: 'Privacy Policy', icon: 'shield-checkmark-outline' },
+  { pageKey: 'subscription_terms', label: 'Subscription Terms', icon: 'card-outline' },
   { pageKey: 'no_affiliation', label: 'No-Affiliation Disclaimer', icon: 'alert-circle-outline' },
 ];
 

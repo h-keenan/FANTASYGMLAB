@@ -30,6 +30,7 @@ LIVE_DRAFT_DISCOVERY_SKIP_ROUTES = frozenset(
         "about_disclaimer",
         "terms",
         "privacy",
+        "subscription_terms",
         "no_affiliation",
         "founder_ops",
         "founder_labs",

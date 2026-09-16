@@ -121,6 +121,43 @@
         }
       ]
     },
+    "subscription_terms": {
+      "title": "Subscription Terms",
+      "kicker": "Premium Subscription",
+      "note": "How FantasyGM Lab Premium billing, renewal, and cancellation work.",
+      "sections": [
+        {
+          "title": "Auto-renewing subscription",
+          "paragraphs": [
+            "FantasyGM Lab Premium is offered as an auto-renewing subscription. Payment is charged to your Apple ID (or Google Play) account at confirmation of purchase.",
+            "Your subscription automatically renews for the same length of time unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours before the end of the current period, at the price you agreed to when subscribing."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Managing or canceling",
+          "paragraphs": [
+            "You can manage or cancel your subscription anytime in your device's account settings \u2014 on iOS, under Settings > [your name] > Subscriptions; on Android, under the Google Play Store's Subscriptions page. Canceling stops future renewals but does not refund the current billing period.",
+            "Current pricing and available plans (monthly, annual, or other terms) are shown on the FantasyGM Lab Premium screen before you subscribe, since pricing can vary by plan, region, and promotion."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "What Premium includes",
+          "paragraphs": [
+            "Premium unlocks full player rankings, unlimited saved leagues, and the complete Trade Analyzer and roster-analysis feature set. Feature availability may evolve as FantasyGM Lab develops; material reductions to paid functionality will be communicated where required by the app store you subscribed through."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Related terms",
+          "paragraphs": [
+            "This page covers subscription billing specifically. See Terms of Use for the general conditions of using the app, and Privacy Policy for how account and usage data is handled."
+          ],
+          "bullets": []
+        }
+      ]
+    },
     "no_affiliation": {
       "title": "No-Affiliation Disclaimer",
       "kicker": "Independent Product",

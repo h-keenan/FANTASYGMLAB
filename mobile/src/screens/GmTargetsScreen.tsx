@@ -4,8 +4,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
+import TierBadge from '../components/TierBadge';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
-import { resolvePlayerTier } from '../lib/playerTier';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -109,17 +109,14 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
               <Text style={styles.name} numberOfLines={1}>
                 {item.player?.name ?? `Player ${item.target.player_id}`}
               </Text>
-              <Text style={styles.meta}>
-                {item.player
-                  ? [
-                      item.player.position,
-                      item.player.team,
-                      item.player.tier ? resolvePlayerTier(item.player.tier).shortLabel : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')
-                  : 'Not on the current rankings board'}
-              </Text>
+              <View style={styles.metaRow}>
+                <Text style={styles.meta}>
+                  {item.player
+                    ? [item.player.position, item.player.team].filter(Boolean).join(' · ')
+                    : 'Not on the current rankings board'}
+                </Text>
+                {item.player ? <TierBadge storedTier={item.player.tier} /> : null}
+              </View>
             </View>
             <Text style={styles.score}>
               {item.player?.score != null ? Math.round(item.player.score) : '—'}
@@ -153,7 +150,8 @@ const styles = StyleSheet.create({
   avatar: { marginRight: spacing.sm },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  meta: { fontSize: 12, color: colors.textSecondary },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginRight: spacing.md },
   removeButton: {
     paddingHorizontal: spacing.sm,

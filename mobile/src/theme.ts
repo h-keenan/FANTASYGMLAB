@@ -46,11 +46,19 @@ export const spacing = {
   xl: 24,
 };
 
+/**
+ * The web app's actual FGL identity (modules/design_tokens.py) is a sharp,
+ * bordered "dossier" look — --radius-* is 0 everywhere, even "pills" are a
+ * near-square 2px. Mobile keeps a small amount of rounding for touch
+ * affordance (fully square controls read as broken on iOS/Android), but
+ * stays much closer to that flat, editorial identity than generic rounded
+ * mobile-card defaults would.
+ */
 export const radii = {
-  sm: 10,
-  md: 14,
-  lg: 20,
-  pill: 999,
+  sm: 6,
+  md: 8,
+  lg: 12,
+  pill: 6,
 };
 
 export const typography = {

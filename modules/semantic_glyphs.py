@@ -46,6 +46,7 @@ DESTINATION_CONCEPT = {
     "about_disclaimer": "more",
     "terms": "more",
     "privacy": "more",
+    "subscription_terms": "more",
     "no_affiliation": "more",
     "founder_ops": "more",
     "founder_labs": "more",

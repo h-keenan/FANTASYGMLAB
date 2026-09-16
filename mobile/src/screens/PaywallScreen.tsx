@@ -182,6 +182,24 @@ export default function PaywallScreen({ navigation }: Props) {
           {restoring ? 'Restoring…' : 'Restore purchases'}
         </Text>
       </TouchableOpacity>
+
+      <Text style={styles.disclosure}>
+        Payment is charged to your account at confirmation of purchase. Your subscription
+        automatically renews unless auto-renew is turned off at least 24 hours before the end of
+        the current period. Manage or cancel anytime in your device's account settings. By
+        continuing, you agree to our{' '}
+        <Text style={styles.disclosureLink} onPress={() => navigation.navigate('LegalPage', { pageKey: 'terms' })}>
+          Terms of Use
+        </Text>{' '}
+        and{' '}
+        <Text
+          style={styles.disclosureLink}
+          onPress={() => navigation.navigate('LegalPage', { pageKey: 'subscription_terms' })}
+        >
+          Subscription Terms
+        </Text>
+        .
+      </Text>
     </ScrollView>
   );
 }
@@ -230,6 +248,14 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   restoreButton: { alignItems: 'center', marginTop: spacing.lg },
   restoreButtonText: { color: colors.accent, fontSize: 14, fontWeight: '500' },
+  disclosure: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+  },
+  disclosureLink: { color: colors.accent, fontWeight: '600' },
   error: { color: colors.danger, marginBottom: spacing.md },
   successTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
   successSubtitle: {
