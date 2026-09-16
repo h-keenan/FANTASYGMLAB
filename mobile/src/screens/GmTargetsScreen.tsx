@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
+import { resolvePlayerTier } from '../lib/playerTier';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -110,7 +111,13 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
               </Text>
               <Text style={styles.meta}>
                 {item.player
-                  ? [item.player.position, item.player.team, item.player.tier].filter(Boolean).join(' · ')
+                  ? [
+                      item.player.position,
+                      item.player.team,
+                      item.player.tier ? resolvePlayerTier(item.player.tier).shortLabel : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
                   : 'Not on the current rankings board'}
               </Text>
             </View>

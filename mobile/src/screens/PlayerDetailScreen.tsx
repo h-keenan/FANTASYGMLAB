@@ -250,7 +250,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.xl },
+  content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   header: { alignItems: 'center', marginBottom: spacing.xl },
   heroAvatar: { marginBottom: spacing.md },
   name: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },

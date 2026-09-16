@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Linking, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
-import { api, type AlertItem } from '../lib/api';
+import PlayerAvatar from '../components/PlayerAvatar';
+import { api, type AlertItem, type RankedPlayer } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -79,6 +80,25 @@ export default function AlertsScreen({ route, navigation }: Props) {
     if (item.link) void Linking.openURL(item.link);
   };
 
+  const openPlayer = (item: AlertItem) => {
+    if (!item.matched_player_id || !item.matched_player) return;
+    const player: RankedPlayer = {
+      player_id: item.matched_player_id,
+      name: item.matched_player,
+      position: null,
+      team: null,
+      age: null,
+      status: null,
+      injury_status: null,
+      tier: null,
+      score: null,
+      overall_rank: null,
+      position_rank: null,
+      rank_unavailable_reason: null,
+    };
+    navigation.navigate('PlayerDetail', { player, leagueId, leagueName });
+  };
+
   if (notReadyReason) {
     return (
       <View style={styles.center}>
@@ -115,9 +135,17 @@ export default function AlertsScreen({ route, navigation }: Props) {
               <View style={styles.headerLeft}>
                 {!item.read ? <View style={styles.unreadDot} /> : null}
                 {item.matched_player ? (
-                  <View style={styles.playerBadge}>
+                  <TouchableOpacity
+                    style={styles.playerBadge}
+                    onPress={() => openPlayer(item)}
+                    disabled={!item.matched_player_id}
+                    hitSlop={4}
+                  >
+                    {item.matched_player_id ? (
+                      <PlayerAvatar playerId={item.matched_player_id} size={18} style={styles.playerBadgeAvatar} />
+                    ) : null}
                     <Text style={styles.playerBadgeText}>{item.matched_player}</Text>
-                  </View>
+                  </TouchableOpacity>
                 ) : null}
               </View>
               <Text style={styles.time}>{relativeTime(item.published_ts)}</Text>
@@ -182,11 +210,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   playerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.badgeBackground,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radii.pill,
   },
+  playerBadgeAvatar: { marginRight: spacing.xs },
   playerBadgeText: { color: colors.badgeText, fontSize: 11, fontWeight: '700' },
   badge: {
     alignSelf: 'flex-start',

@@ -2,20 +2,34 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
-import { api, type PlayerSummary } from '../lib/api';
-import { cardShadow, colors, radii, spacing } from '../theme';
+import { api, type PlayerSummary, type RankedPlayer } from '../lib/api';
+import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeamRoster'>;
 
-interface RosterRow extends PlayerSummary {
-  playerId: string;
+function toRankedPlayer(playerId: string, summary: PlayerSummary | undefined): RankedPlayer {
+  return {
+    player_id: playerId,
+    name: summary?.full_name ?? null,
+    position: summary?.position ?? null,
+    team: summary?.team ?? null,
+    age: summary?.age ?? null,
+    status: summary?.status ?? null,
+    injury_status: summary?.injury_status ?? null,
+    tier: null,
+    score: null,
+    overall_rank: null,
+    position_rank: null,
+    rank_unavailable_reason: null,
+  };
 }
 
 export default function TeamRosterScreen({ route, navigation }: Props) {
-  const { ownerName, playerIds } = route.params;
-  const [players, setPlayers] = useState<RosterRow[]>([]);
+  const { ownerName, playerIds, leagueId, leagueName } = route.params;
+  const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,14 +42,16 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 
     async function load() {
       try {
-        const byId = await api.getPlayers(playerIds);
+        const [rankingsResult, summariesById] = await Promise.all([
+          api.getLeagueRankings(leagueId, { limit: 300 }),
+          api.getPlayers(playerIds),
+        ]);
         if (cancelled) return;
+
+        const rankedById = new Map(rankingsResult.players.map((p) => [p.player_id, p]));
         const rows = playerIds
-          .map((playerId) => {
-            const player = byId[playerId];
-            return player ? { ...player, playerId } : null;
-          })
-          .filter((row): row is RosterRow => row !== null)
+          .map((playerId) => rankedById.get(playerId) ?? toRankedPlayer(playerId, summariesById[playerId]))
+          .filter((row) => row.name !== null || rankedById.has(row.player_id))
           .sort((a, b) => (a.position ?? '').localeCompare(b.position ?? ''));
         setPlayers(rows);
       } catch (err) {
@@ -51,7 +67,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [playerIds]);
+  }, [leagueId, playerIds]);
 
   if (loading) {
     return (
@@ -73,7 +89,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
     <FlatList
       style={styles.list}
       data={players}
-      keyExtractor={(item) => item.playerId}
+      keyExtractor={(item) => item.player_id}
       contentContainerStyle={
         players.length === 0 ? styles.emptyContainer : styles.listContent
       }
@@ -84,14 +100,17 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
         </Text>
       }
       renderItem={({ item }) => (
-        <View style={styles.card}>
-          <PlayerAvatar playerId={item.playerId} size={40} style={styles.avatar} />
+        <AnimatedCard
+          style={styles.card}
+          onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
+        >
+          <PlayerAvatar playerId={item.player_id} size={40} tier={item.tier} style={styles.avatar} />
           <View style={styles.positionBadge}>
             <Text style={styles.positionText}>{item.position ?? '—'}</Text>
           </View>
           <View style={styles.nameColumn}>
             <Text style={styles.name} numberOfLines={1}>
-              {item.full_name ?? 'Unknown player'}
+              {item.name ?? 'Unknown player'}
             </Text>
             <Text style={styles.meta}>
               {[item.team, item.status].filter(Boolean).join(' · ') || '—'}
@@ -102,7 +121,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
               <Text style={styles.injuryText}>{item.injury_status}</Text>
             </View>
           ) : null}
-        </View>
+        </AnimatedCard>
       )}
     />
   );
@@ -128,10 +147,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
     padding: spacing.md,
-    ...cardShadow,
   },
   avatar: { marginRight: spacing.sm },
   positionBadge: {

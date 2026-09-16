@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import TeamAvatar from '../components/TeamAvatar';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { colors, radii, spacing } from '../theme';
@@ -12,7 +13,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'LeagueDetail'>;
 
 interface TeamRow {
   rosterId: number | string;
-  ownerName: string;
+  teamName: string;
+  avatarId: string;
   playerIds: string[];
   isMine: boolean;
 }
@@ -36,33 +38,25 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
     async function load() {
       try {
-        const [usersResult, rostersResult, myRosterResult] = await Promise.all([
-          api.getLeagueUsers(leagueId),
+        const [profilesResult, rostersResult, myRosterResult] = await Promise.all([
+          api.getLeagueTeamProfiles(leagueId),
           api.getLeagueRosters(leagueId),
           api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
         ]);
         if (cancelled) return;
-
-        const usersById = new Map<string, string>();
-        for (const user of usersResult.users) {
-          const id = String(user.user_id ?? '');
-          const name = String(
-            user.display_name ?? user.username ?? 'Unknown owner',
-          );
-          if (id) usersById.set(id, name);
-        }
 
         const myRosterId = myRosterResult.roster
           ? String(myRosterResult.roster.roster_id ?? '')
           : '';
 
         const rows: TeamRow[] = rostersResult.rosters.map((roster) => {
-          const ownerId = String(roster.owner_id ?? '');
-          const players = Array.isArray(roster.players) ? roster.players : [];
           const rosterId = String(roster.roster_id ?? '');
+          const players = Array.isArray(roster.players) ? roster.players : [];
+          const profile = profilesResult.profiles[rosterId];
           return {
             rosterId,
-            ownerName: usersById.get(ownerId) ?? 'Unclaimed team',
+            teamName: profile?.team_name || 'Unclaimed team',
+            avatarId: profile?.avatar_id || '',
             playerIds: players.map(String),
             isMine: Boolean(myRosterId) && rosterId === myRosterId,
           };
@@ -112,15 +106,18 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           style={StyleSheet.flatten([styles.card, item.isMine && styles.cardMine])}
           onPress={() =>
             navigation.navigate('TeamRoster', {
-              ownerName: item.ownerName,
+              ownerName: item.teamName,
               playerIds: item.playerIds,
+              leagueId,
+              leagueName,
             })
           }
         >
           <View style={styles.row}>
+            <TeamAvatar avatarId={item.avatarId} size={36} style={styles.avatar} />
             <View style={styles.ownerGroup}>
               <Text style={styles.owner} numberOfLines={1}>
-                {item.ownerName}
+                {item.teamName}
               </Text>
               {item.isMine ? (
                 <View style={styles.mineBadge}>
@@ -152,9 +149,9 @@ const styles = StyleSheet.create({
   cardMine: { borderWidth: 2, borderColor: colors.accent },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
+  avatar: { marginRight: spacing.sm },
   ownerGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: spacing.sm },
   owner: { fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm, flexShrink: 1 },
   mineBadge: {
