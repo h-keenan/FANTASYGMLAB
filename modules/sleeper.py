@@ -673,11 +673,7 @@ def get_draft_picks(draft_id: str) -> List[Dict[str, Any]]:
 
 
 @lru_cache(maxsize=128)
-def get_traded_picks(league_id: str) -> List[Dict[str, Any]]:
-    """
-    Get traded draft picks for a league. Untraded picks are not returned by
-    Sleeper, so callers should assume original ownership unless listed here.
-    """
+def _get_traded_picks_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
     if not league_id:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/traded_picks"
@@ -688,11 +684,20 @@ def get_traded_picks(league_id: str) -> List[Dict[str, Any]]:
         return []
 
 
+def get_traded_picks(league_id: str) -> List[Dict[str, Any]]:
+    """
+    Get traded draft picks for a league. Untraded picks are not returned by
+    Sleeper, so callers should assume original ownership unless listed here.
+
+    Time-bucketed like get_league/get_rosters/get_users above — a trade
+    changes pick ownership immediately, and services/mobile_api_service.py's
+    long-lived process has no other invalidation hook for it.
+    """
+    return _get_traded_picks_cached(league_id, _live_league_cache_bucket())
+
+
 @lru_cache(maxsize=512)
-def get_transactions(league_id: str, round_num: int) -> List[Dict[str, Any]]:
-    """
-    Get league transactions for a specific round/week from Sleeper.
-    """
+def _get_transactions_cached(league_id: str, round_num: int, _bucket: int) -> List[Dict[str, Any]]:
     if not league_id or round_num is None:
         return []
     try:
@@ -710,6 +715,16 @@ def get_transactions(league_id: str, round_num: int) -> List[Dict[str, Any]]:
         return []
 
 
+def get_transactions(league_id: str, round_num: int) -> List[Dict[str, Any]]:
+    """
+    Get league transactions for a specific round/week from Sleeper.
+
+    Time-bucketed — waiver claims and adds/drops land on this endpoint in
+    real time, and mobile's long-lived process has no other way to see them.
+    """
+    return _get_transactions_cached(league_id, round_num, _live_league_cache_bucket())
+
+
 def clear_live_league_endpoint_caches() -> None:
     """Drop in-process LRU for live Sleeper league endpoints.
 
@@ -724,16 +739,13 @@ def clear_live_league_endpoint_caches() -> None:
     get_league_drafts.cache_clear()
     get_draft.cache_clear()
     get_draft_picks.cache_clear()
-    get_traded_picks.cache_clear()
-    get_transactions.cache_clear()
-    get_matchups.cache_clear()
+    _get_traded_picks_cached.cache_clear()
+    _get_transactions_cached.cache_clear()
+    _get_matchups_cached.cache_clear()
 
 
 @lru_cache(maxsize=512)
-def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
-    """
-    Get league matchups for a specific round/week from Sleeper.
-    """
+def _get_matchups_cached(league_id: str, round_num: int, _bucket: int) -> List[Dict[str, Any]]:
     if not league_id or round_num is None:
         return []
     try:
@@ -749,6 +761,16 @@ def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
         return matchups if isinstance(matchups, list) else []
     except Exception:
         return []
+
+
+def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
+    """
+    Get league matchups for a specific round/week from Sleeper.
+
+    Time-bucketed — scores update live during games, and mobile's long-lived
+    process has no other invalidation hook for this endpoint.
+    """
+    return _get_matchups_cached(league_id, round_num, _live_league_cache_bucket())
 
 
 def get_user_roster_id(league_id: str, username: str) -> Optional[int]:

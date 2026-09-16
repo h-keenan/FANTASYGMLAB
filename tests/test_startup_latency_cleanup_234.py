@@ -133,7 +133,7 @@ def test_golden_startup_provider_leagues_budget_with_lru(monkeypatch):
     sleeper.get_league_drafts.cache_clear()
     sleeper.get_draft.cache_clear()
     sleeper.get_draft_picks.cache_clear()
-    sleeper.get_traded_picks.cache_clear()
+    sleeper._get_traded_picks_cached.cache_clear()
 
     league_id = "league-234"
     sleeper.get_league(league_id)
