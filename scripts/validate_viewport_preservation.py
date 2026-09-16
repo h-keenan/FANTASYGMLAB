@@ -40,6 +40,24 @@ def measure(page: Page) -> dict[str, Any]:
     return page.evaluate(MEASURE_JS)
 
 
+def wait_for_restore_kick(page: Page, old_seq: int, *, timeout_ms: int = 90_000) -> None:
+    """Wait for the same rerun-completion signal click_in_place() uses.
+
+    A GM Orb open/close click triggers a full Streamlit rerun like any other
+    button — on a loaded CI runner that rerun (plus the app's own scroll
+    restore ladder, up to 1200ms after the kick — see
+    modules.viewport_preservation's restore() setTimeout schedule) can take
+    longer than any fixed guess. Waiting for this signal to actually fire,
+    rather than assuming it has after N milliseconds, is what
+    click_in_place() already does for every other in-place action here.
+    """
+    page.wait_for_function(
+        "old => Number(window.__dgViewportRestoreKickSeq || 0) > old",
+        arg=old_seq,
+        timeout=timeout_ms,
+    )
+
+
 def wait_for_scroll_stable(page: Page, *, timeout_ms: int = 1200, poll_ms: int = 100) -> dict[str, Any]:
     """Poll mainScrollTop until it stops moving, instead of a fixed sleep.
 
@@ -228,8 +246,10 @@ def run_viewport_matrix(page: Page, *, base_url: str) -> dict[str, Any]:
     if orb.count():
         scroll_action_into_view(page, "Open GM menu", target_y=400)
         orb_before = measure(page)
+        old_seq = page.evaluate("window.__dgViewportRestoreKickSeq || 0")
         orb.first.click()
-        orb_after = wait_for_scroll_stable(page, timeout_ms=1200)
+        wait_for_restore_kick(page, old_seq)
+        orb_after = wait_for_scroll_stable(page, timeout_ms=1500)
         delta = abs(orb_after["mainScrollTop"] - orb_before["mainScrollTop"])
         if delta > 48:
             raise AssertionError(f"GM Orb open changed page scroll by {delta}px")
@@ -237,8 +257,10 @@ def run_viewport_matrix(page: Page, *, base_url: str) -> dict[str, Any]:
             raise AssertionError("GM Orb open jumped to the bottom")
         close = page.get_by_role("button", name=re.compile(r"^Close$", re.I))
         if close.count():
+            close_old_seq = page.evaluate("window.__dgViewportRestoreKickSeq || 0")
             close.first.click()
-            orb_closed = wait_for_scroll_stable(page, timeout_ms=800)
+            wait_for_restore_kick(page, close_old_seq)
+            orb_closed = wait_for_scroll_stable(page, timeout_ms=1500)
             if orb_closed.get("atMainBottom"):
                 raise AssertionError("GM Orb close jumped to the bottom")
         report["cases"]["gm_orb"] = {"before": orb_before, "after": orb_after, "scrollDelta": delta}
