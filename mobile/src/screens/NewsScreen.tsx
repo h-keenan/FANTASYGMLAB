@@ -1,15 +1,25 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Linking, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import { api, type NewsItem } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
+
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const EVENT_BADGE_COLORS: Record<string, string> = {
   'injury/status': colors.danger,
   transaction: colors.accent,
   'role/depth chart': colors.success,
   'off-field/drama': colors.textSecondary,
+};
+
+const EVENT_BADGE_ICONS: Record<string, IconName> = {
+  'injury/status': 'medkit-outline',
+  transaction: 'swap-horizontal-outline',
+  'role/depth chart': 'layers-outline',
+  'off-field/drama': 'alert-circle-outline',
 };
 
 function relativeTime(publishedTs: number | null): string {
@@ -77,6 +87,12 @@ export default function NewsScreen() {
                     { backgroundColor: EVENT_BADGE_COLORS[item.event_type] ?? colors.textSecondary },
                   ]}
                 >
+                  <Ionicons
+                    name={EVENT_BADGE_ICONS[item.event_type] ?? 'information-circle-outline'}
+                    size={11}
+                    color="#fff"
+                    style={styles.badgeIcon}
+                  />
                   <Text style={styles.badgeText}>{item.event_type}</Text>
                 </View>
               ) : null}
@@ -116,10 +132,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radii.pill,
   },
+  badgeIcon: { marginRight: 4 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   time: { fontSize: 12, color: colors.textSecondary },
   title: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.xs },
