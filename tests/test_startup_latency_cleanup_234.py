@@ -129,7 +129,7 @@ def test_golden_startup_provider_leagues_budget_with_lru(monkeypatch):
         return {}
 
     monkeypatch.setattr(sleeper, "_request_json", fake_request)
-    sleeper.get_league.cache_clear()
+    sleeper._get_league_cached.cache_clear()
     sleeper.get_league_drafts.cache_clear()
     sleeper.get_draft.cache_clear()
     sleeper.get_draft_picks.cache_clear()

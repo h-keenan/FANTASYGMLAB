@@ -552,11 +552,26 @@ def get_user_id(username: str) -> Optional[str]:
     return None
 
 
+# These three live endpoints change constantly (rosters via trades/waivers/
+# drops, users/league settings less often but still live) — a bare
+# lru_cache here would cache them for the rest of the process's life,
+# refreshed only by clear_live_league_endpoint_caches() below. The web app
+# calls that on its own Game Plan TTL/manual-refresh, but services/
+# mobile_api_service.py (a separate long-running process) never does —
+# without this, a mobile Render instance would serve one stale roster
+# snapshot per league for its entire uptime between deploys. The time
+# bucket in the cache key makes every entry expire on its own after
+# LIVE_LEAGUE_ENDPOINT_TTL_SECONDS regardless of whether anything ever
+# calls clear_live_league_endpoint_caches() for this process.
+LIVE_LEAGUE_ENDPOINT_TTL_SECONDS = 30
+
+
+def _live_league_cache_bucket() -> int:
+    return int(time.time() // LIVE_LEAGUE_ENDPOINT_TTL_SECONDS)
+
+
 @lru_cache(maxsize=128)
-def get_users(league_id: str) -> List[Dict[str, Any]]:
-    """
-    Get all users in a league.[web:4]
-    """
+def _get_users_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
     if not league_id:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/users"
@@ -567,11 +582,15 @@ def get_users(league_id: str) -> List[Dict[str, Any]]:
         return []
 
 
+def get_users(league_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all users in a league.[web:4]
+    """
+    return _get_users_cached(league_id, _live_league_cache_bucket())
+
+
 @lru_cache(maxsize=128)
-def get_rosters(league_id: str) -> List[Dict[str, Any]]:
-    """
-    Get all rosters in a league.[web:4]
-    """
+def _get_rosters_cached(league_id: str, _bucket: int) -> List[Dict[str, Any]]:
     if not league_id:
         return []
     url = f"{SLEEPER_BASE}/league/{league_id}/rosters"
@@ -582,11 +601,15 @@ def get_rosters(league_id: str) -> List[Dict[str, Any]]:
         return []
 
 
+def get_rosters(league_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all rosters in a league.[web:4]
+    """
+    return _get_rosters_cached(league_id, _live_league_cache_bucket())
+
+
 @lru_cache(maxsize=128)
-def get_league(league_id: str) -> Dict[str, Any]:
-    """
-    Get league metadata/settings from Sleeper.
-    """
+def _get_league_cached(league_id: str, _bucket: int) -> Dict[str, Any]:
     if not league_id:
         return {}
     url = f"{SLEEPER_BASE}/league/{league_id}"
@@ -595,6 +618,13 @@ def get_league(league_id: str) -> Dict[str, Any]:
         return league if isinstance(league, dict) else {}
     except Exception:
         return {}
+
+
+def get_league(league_id: str) -> Dict[str, Any]:
+    """
+    Get league metadata/settings from Sleeper.
+    """
+    return _get_league_cached(league_id, _live_league_cache_bucket())
 
 
 @lru_cache(maxsize=128)
@@ -688,9 +718,9 @@ def clear_live_league_endpoint_caches() -> None:
     anonymous presentation-only reruns.
     """
 
-    get_users.cache_clear()
-    get_rosters.cache_clear()
-    get_league.cache_clear()
+    _get_users_cached.cache_clear()
+    _get_rosters_cached.cache_clear()
+    _get_league_cached.cache_clear()
     get_league_drafts.cache_clear()
     get_draft.cache_clear()
     get_draft_picks.cache_clear()
