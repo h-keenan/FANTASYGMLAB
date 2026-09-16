@@ -28,6 +28,7 @@ interface Destination {
 
 const LEAGUE_DESTINATIONS: Destination[] = [
   { label: 'League Overview', route: 'LeagueDetail', icon: 'grid-outline', needsLeague: true },
+  { label: 'Next Move', route: 'Dashboard', icon: 'flash-outline', needsLeague: true },
   { label: 'Players', route: 'Players', icon: 'people-outline', needsLeague: true },
   { label: 'GM Targets', route: 'GmTargets', icon: 'bookmark-outline', needsLeague: true },
   { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', needsLeague: true },

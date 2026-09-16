@@ -26,6 +26,7 @@ Deployment topology (Render):
   - POST /v1/push/register    — upsert the caller's Expo push token
   - POST /v1/push/unregister  — remove one of the caller's tokens (sign-out)
   - POST /v1/push/test        — send a test push to all of the caller's tokens
+  - GET  /v1/leagues/{id}/dashboard — the caller's "Next Move" briefing
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -59,6 +60,7 @@ from modules import (
     account_store,
     auth_supabase,
     canonical_player_ranking,
+    dashboard_engine,
     gm_targets,
     league_history,
     league_recaps,
@@ -1114,3 +1116,94 @@ def send_test_push(user: dict[str, Any] = Depends(require_user)) -> dict[str, An
         data={"kind": "test"},
     )
     return {"ok": bool(result.get("ok")), "reason": "" if result.get("ok") else "delivery_failed", "sent": result.get("sent", 0)}
+
+
+def _project_briefing_item(item: Any) -> dict[str, Any]:
+    payload = item.to_dict()
+    return {
+        "category": payload.get("category"),
+        "headline": payload.get("headline"),
+        "reason": payload.get("reason"),
+        "supporting_context": payload.get("supporting_context"),
+        "destination": payload.get("destination"),
+        "route_player_id": payload.get("route_player_id") or "",
+        "recommendation_narrative": payload.get("recommendation_narrative"),
+    }
+
+
+@app.get("/v1/leagues/{league_id}/dashboard")
+def get_league_dashboard(
+    league_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """The caller's "Next Move" briefing for this league.
+
+    Shares the same composition pipeline as the web app's Dashboard
+    (modules.dashboard_workflow.organize_dashboard_items ->
+    modules.daily_gm_briefing.compose_daily_gm_briefing) and the same
+    underlying engines for each tile (modules.team_eval,
+    modules.trade_analyzer_fit, modules.injury_ui, modules.waivers_ui) via
+    modules.dashboard_engine — see that module's docstring for why it's a
+    fresh composition rather than importing app.py directly (modules/ never
+    imports app.py). Does not yet include a trade-opportunity tile — that
+    depends on the same trade-ideas engine Trade Hub needs, not yet wired
+    to mobile.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    my_roster, reason = _resolve_my_roster(user, league_id)
+    if my_roster is None:
+        return {"ok": True, "items": [], "quiet": True, "reason": reason}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_dashboard"
+    )
+    if players_df.empty:
+        return {"ok": True, "items": [], "quiet": True, "reason": "no_player_data"}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    if not roster_player_ids:
+        return {"ok": True, "items": [], "quiet": True, "reason": "empty_roster"}
+
+    all_rostered_player_ids: set[str] = set()
+    for roster in sleeper.get_rosters(league_id):
+        all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+
+    briefing = dashboard_engine.compose_next_move_briefing(
+        league_id=league_id,
+        roster_id=str(my_roster.get("roster_id") or ""),
+        players_df=valued,
+        roster_player_ids=roster_player_ids,
+        all_rostered_player_ids=all_rostered_player_ids,
+        league_settings=settings,
+        score_field=score_field,
+        entitlement=str(profile.get("entitlement") or "free"),
+    )
+    return {
+        "ok": True,
+        "items": [_project_briefing_item(item) for item in briefing.items],
+        "quiet": briefing.quiet,
+        "quiet_reason": briefing.quiet_reason,
+        "reason": "",
+    }

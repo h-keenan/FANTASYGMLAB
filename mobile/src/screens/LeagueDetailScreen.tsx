@@ -30,6 +30,7 @@ interface LeagueSummary {
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const QUICK_ACTIONS: Array<{ label: string; route: string; icon: IconName }> = [
+  { label: 'Next Move', route: 'Dashboard', icon: 'flash-outline' },
   { label: 'Players', route: 'Players', icon: 'people-outline' },
   { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline' },
   { label: 'Trade\nAnalyzer', route: 'TradeAnalyzer', icon: 'git-compare-outline' },
