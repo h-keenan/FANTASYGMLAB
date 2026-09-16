@@ -23,6 +23,9 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/gm-targets           — the caller's watchlist in this league
   - POST /v1/leagues/{id}/gm-targets           — add a player to the watchlist (cap-enforced)
   - DELETE /v1/leagues/{id}/gm-targets/{pid}   — remove a player from the watchlist
+  - POST /v1/push/register    — upsert the caller's Expo push token
+  - POST /v1/push/unregister  — remove one of the caller's tokens (sign-out)
+  - POST /v1/push/test        — send a test push to all of the caller's tokens
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -66,6 +69,7 @@ from modules import (
     player_awards,
     player_eligibility,
     player_quick_view,
+    push_tokens,
     rankings,
     sleeper,
     sleeper_leagues,
@@ -1025,3 +1029,88 @@ def get_player_awards(
     badges = player_awards.build_player_awards(season_rows, position=position)
     display = player_awards.select_display_badges(badges)
     return {"ok": True, "awards": [_project_award(badge) for badge in display], "reason": ""}
+
+
+class RegisterPushTokenRequest(BaseModel):
+    expo_push_token: str
+    platform: str = ""
+    device_name: str = ""
+
+
+class UnregisterPushTokenRequest(BaseModel):
+    expo_push_token: str
+
+
+@app.post("/v1/push/register")
+def register_push_token(
+    payload: RegisterPushTokenRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Upsert the caller's Expo push token (docs/supabase_push_tokens.sql).
+
+    Idempotent by design — the mobile app calls this on every app launch
+    where a session exists, not just on first grant, since Expo push tokens
+    can rotate.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    ok, error = push_tokens.register_token(
+        config,
+        access_token,
+        user_id=user_id,
+        expo_push_token=payload.expo_push_token,
+        platform=payload.platform,
+        device_name=payload.device_name,
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+@app.post("/v1/push/unregister")
+def unregister_push_token(
+    payload: UnregisterPushTokenRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Remove one of the caller's tokens — called on sign-out so a shared or
+    reused device doesn't keep delivering pushes meant for this account.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    ok, error = push_tokens.unregister_token(
+        config,
+        access_token,
+        user_id=user_id,
+        expo_push_token=payload.expo_push_token,
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+@app.post("/v1/push/test")
+def send_test_push(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Send a test push to every device the caller has registered — lets the
+    app verify the whole pipeline (permission -> token -> backend -> Expo ->
+    device) without waiting on a real alert to fire.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    tokens, error = push_tokens.fetch_tokens_for_user(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, "reason": "not_available"}
+    if not tokens:
+        return {"ok": False, "reason": "no_registered_tokens"}
+    result = push_tokens.send_expo_push_notifications(
+        tokens,
+        title="FantasyGM Lab",
+        body="Push notifications are working — you'll hear from us when your roster needs attention.",
+        data={"kind": "test"},
+    )
+    return {"ok": bool(result.get("ok")), "reason": "" if result.get("ok") else "delivery_failed", "sent": result.get("sent", 0)}

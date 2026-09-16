@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 
 import { identifyRevenueCatUser, signOutRevenueCatUser } from '../lib/revenuecat';
+import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotifications';
 import { supabase } from '../lib/supabase';
 
 interface AuthContextValue {
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       if (data.session) {
         void identifyRevenueCatUser(data.session.user.id);
+        void syncPushToken();
       }
     });
 
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(nextSession);
         if (nextSession) {
           void identifyRevenueCatUser(nextSession.user.id);
+          void syncPushToken();
         }
       },
     );
@@ -64,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       signOut: async () => {
+        await unregisterCurrentPushToken();
         await supabase.auth.signOut();
         await signOutRevenueCatUser();
       },
