@@ -416,6 +416,7 @@ PUBLIC_PLAYER_SNAPSHOT_HYDRATION_COLUMNS = (
     "injury_risk_score",
     "injury_multiplier",
     "risk_multiplier",
+    "non_injury_risk_multiplier",
     *PLAYER_STATS_FIELDS,
     *PRIOR_PLAYER_STATS_FIELDS,
     *RECENCY_PLAYER_FIELDS,
@@ -1974,11 +1975,20 @@ def injury_risk_score(status: str, injury_status: str = "") -> float:
     return 0.0
 
 
-def risk_multiplier(status: str, team: str, search_rank, injury_status: str = "") -> float:
+def non_injury_risk_multiplier(status: str, team: str, search_rank) -> float:
+    """Roster-presence/status/searchability risk only — no injury component.
+
+    Same components as risk_multiplier() below, minus injury_multiplier().
+    compose_composite_score() applies this (not the full risk_multiplier)
+    to the role/opportunity factors, since apply_role_and_opportunity()
+    already bakes its own injury adjustment into those two factors — the
+    "no team" / "bad status" / "unranked" risk captured here is still real
+    for role/opportunity (an unsigned player genuinely has no NFL role),
+    it's only the injury double-count that needs excluding.
+    """
     status = str(status or "").strip().lower()
     if not team or not str(team).strip():
         return 0.35
-    injury_risk = injury_multiplier(status, injury_status)
     base_risk = 1.0
     if status and status not in PLAYABLE_OR_INJURED_STATUSES and status != "active":
         base_risk = 0.72
@@ -1988,6 +1998,14 @@ def risk_multiplier(status: str, team: str, search_rank, injury_status: str = ""
         rank = UNRANKED_SEARCH_RANK
     if rank >= UNRANKED_SEARCH_RANK:
         base_risk = min(base_risk, 0.80)
+    return base_risk
+
+
+def risk_multiplier(status: str, team: str, search_rank, injury_status: str = "") -> float:
+    if not team or not str(team).strip():
+        return 0.35
+    injury_risk = injury_multiplier(status, injury_status)
+    base_risk = non_injury_risk_multiplier(status, team, search_rank)
     return min(base_risk, injury_risk)
 
 
@@ -3062,6 +3080,10 @@ def apply_injury_risk_fields(df: pd.DataFrame) -> pd.DataFrame:
             status_values, team_values, rank_values, injury_values
         )
     ]
+    work["non_injury_risk_multiplier"] = [
+        non_injury_risk_multiplier(status, team, rank)
+        for status, team, rank in zip(status_values, team_values, rank_values)
+    ]
     return work
 
 
@@ -3090,21 +3112,26 @@ def compose_composite_score(df: pd.DataFrame) -> pd.DataFrame:
     scarcity = _factor("scarcity_score", 0.0)
     role = _factor("role_score", 0.0)
     risk = _factor("risk_multiplier", 1.0)
+    # role_score/opportunity_score already carry their own injury adjustment
+    # from apply_role_and_opportunity (e.g. a major-injury starter is set to
+    # the fixed "Starter At Risk" opportunity score, not scaled by a separate
+    # multiplier) — applying the full risk_multiplier (which folds injury_
+    # multiplier in via min()) to those two factors as well double-counts
+    # injury specifically. non_injury_risk_multiplier carries the same
+    # roster-presence/status/searchability risk minus that injury component,
+    # so it's what applies here instead — an unsigned/unranked player's
+    # role and opportunity are still discounted, just not for injury twice.
+    role_risk = _factor("non_injury_risk_multiplier", 1.0)
     work["factor_market"] = market * COMPOSITE_WEIGHT_MARKET
     work["factor_age"] = age_curve * COMPOSITE_WEIGHT_AGE
     work["factor_production"] = prod_series * COMPOSITE_WEIGHT_PRODUCTION
     work["factor_scarcity"] = scarcity * COMPOSITE_WEIGHT_SCARCITY
     work["factor_role"] = role * COMPOSITE_WEIGHT_ROLE
     work["factor_opportunity"] = opp_series * COMPOSITE_WEIGHT_OPPORTUNITY
-    composite = (
-        work["factor_market"]
-        + work["factor_age"]
-        + work["factor_production"]
-        + work["factor_scarcity"]
-        + work["factor_role"]
-        + work["factor_opportunity"]
-    )
-    work["score"] = (composite * risk).clip(lower=0).round().astype(int)
+    risk_sensitive = work["factor_market"] + work["factor_age"] + work["factor_production"] + work["factor_scarcity"]
+    role_and_opportunity = work["factor_role"] + work["factor_opportunity"]
+    composite = (risk_sensitive * risk) + (role_and_opportunity * role_risk)
+    work["score"] = composite.clip(lower=0).round().astype(int)
     work["age_penalty"] = (age_curve - market).round().astype(int)
     work["news_factor"] = 0.0
     work["dynasty_score"] = work["score"]
