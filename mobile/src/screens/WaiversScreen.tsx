@@ -14,6 +14,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer } from '../lib/api';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -29,9 +30,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [position, setPosition] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    navigation.setOptions({ title: `Waivers — ${leagueName}` });
-  }, [leagueName, navigation]);
+  useScreenHeaderTitle(navigation, 'Waivers', leagueName);
 
   useEffect(() => {
     let cancelled = false;

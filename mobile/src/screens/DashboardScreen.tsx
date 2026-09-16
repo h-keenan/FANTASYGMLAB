@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import { api, type DashboardItem, type DashboardItemCategory } from '../lib/api';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -29,9 +30,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    navigation.setOptions({ title: `Next Move — ${leagueName}` });
-  }, [leagueName, navigation]);
+  useScreenHeaderTitle(navigation, 'Next Move', leagueName);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,41 +1,47 @@
 import { Platform } from 'react-native';
 
 /**
- * Shared design tokens — colors, spacing, radii, and a native-feeling card
- * shadow. Kept deliberately small: this is a client-side presentation layer
- * only, it doesn't encode any product/valuation logic.
+ * Shared design tokens — colors, spacing, radii, shadows, and motion
+ * constants. Kept deliberately small: this is a client-side presentation
+ * layer only, it doesn't encode any product/valuation logic.
  *
- * These are the actual FantasyGM Lab brand values (modules/brand_identity.py
- * on the web app — BRAND_BG/BRAND_ACCENT/etc.), not an independently invented
- * dark palette, so the mobile app reads as the same product as the web app.
+ * Palette matches the FGL brand style sheet (blue-black canvas, #151B22
+ * cards, #00D4FF/#FFC43D/#FF4D4D trajectory colors) rather than the web
+ * app's own flat/dossier CSS tokens — the brand sheet is the newer,
+ * explicitly-approved source of truth for how the *mobile app* should look
+ * (deliberate divergence from modules/design_tokens.py, which the web app
+ * still uses as-is).
  */
 
 export const colors = {
-  background: '#050607', // BRAND_BG
-  backgroundElevated: '#1B1E23', // BRAND_SURFACE_RAISED
-  surface: 'rgba(255,255,255,0.05)',
-  surfaceSolid: '#0F1114', // BRAND_SURFACE
-  border: 'rgba(255,255,255,0.10)',
-  borderStrong: 'rgba(255,255,255,0.18)',
-  textPrimary: '#F8FAFC', // BRAND_TEXT
-  textSecondary: '#A8ADB7', // BRAND_TEXT_MUTED
-  textTertiary: '#6B7280',
-  accent: '#22D3EE', // BRAND_ACCENT (Analyze trajectory cyan)
-  accentSoft: '#67E8F9', // BRAND_ACCENT_SOFT
-  accentMuted: 'rgba(34,211,238,0.16)',
-  danger: '#EF4444', // BRAND_TRAJECTORY_EXECUTE
-  dangerMuted: 'rgba(239,68,68,0.16)',
-  success: '#22C55E', // BRAND_SUCCESS
-  successMuted: 'rgba(34,197,94,0.16)',
-  premium: '#FACC15', // BRAND_PREMIUM / BRAND_TRAJECTORY_PROJECT
-  premiumMuted: 'rgba(250,204,21,0.16)',
-  badgeBackground: 'rgba(34,211,238,0.18)',
-  badgeText: '#67E8F9',
+  background: '#0D1117',
+  backgroundElevated: '#1E2631',
+  surface: '#151B22',
+  surfaceSolid: '#151B22',
+  border: '#1E2631',
+  borderStrong: '#2A3441',
+  hairline: 'rgba(255,255,255,0.08)',
+  textPrimary: '#F2F4F7',
+  textSecondary: '#A6B0BB',
+  textTertiary: '#6F7A87',
+  accent: '#00D4FF',
+  accentSoft: '#5CE4FF',
+  accentMuted: 'rgba(0,212,255,0.14)',
+  danger: '#FF4D4D',
+  dangerMuted: 'rgba(255,77,77,0.14)',
+  success: '#22C55E',
+  successBright: '#4ADE80',
+  successMuted: 'rgba(34,197,94,0.14)',
+  premium: '#FFC43D',
+  premiumMuted: 'rgba(255,196,61,0.14)',
+  badgeBackground: 'rgba(0,212,255,0.14)',
+  badgeText: '#5CE4FF',
+  violet: '#8B93FF',
 };
 
 export const gradients = {
-  hero: ['#1B2340', '#050607'] as const,
-  accent: ['#67E8F9', '#22D3EE'] as const,
+  hero: ['#16202C', '#0D1117'] as const,
+  accent: ['#5CE4FF', '#00D4FF'] as const,
 };
 
 export const spacing = {
@@ -44,46 +50,87 @@ export const spacing = {
   md: 12,
   lg: 16,
   xl: 24,
+  xxl: 32,
 };
 
 /**
- * The web app's actual FGL identity (modules/design_tokens.py) is a sharp,
- * bordered "dossier" look — --radius-* is 0 everywhere, even "pills" are a
- * near-square 2px. Mobile keeps a small amount of rounding for touch
- * affordance (fully square controls read as broken on iOS/Android), but
- * stays much closer to that flat, editorial identity than generic rounded
- * mobile-card defaults would.
+ * Named after the brand sheet's structure rather than a size scale:
+ * `md`/`pill` are the two values almost everything uses (card corners and
+ * fully-round chips/avatars/buttons). `sm`/`lg` cover the smaller and
+ * larger ends (tiny inline tags; bottom sheets and modals).
  */
 export const radii = {
-  sm: 6,
-  md: 8,
-  lg: 12,
-  pill: 6,
+  sm: 10,
+  md: 16,
+  lg: 24,
+  pill: 999,
+  tile: 14,
+  input: 12,
 };
 
 export const typography = {
+  display: { fontSize: 34, fontWeight: '700' as const, letterSpacing: -0.5 },
   title: { fontSize: 22, fontWeight: '700' as const },
-  heading: { fontSize: 17, fontWeight: '700' as const },
-  body: { fontSize: 14, fontWeight: '400' as const },
+  heading: { fontSize: 17, fontWeight: '600' as const },
+  body: { fontSize: 15, fontWeight: '400' as const },
+  bodyMuted: { fontSize: 13, fontWeight: '400' as const },
   label: { fontSize: 12, fontWeight: '600' as const },
+  kicker: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 0.8 },
   caption: { fontSize: 11, fontWeight: '500' as const },
+  badge: { fontSize: 9, fontWeight: '800' as const, letterSpacing: 0.3 },
 };
 
 /**
- * A soft elevation for card surfaces. Dark surfaces barely show a shadow, so
- * this stays subtle and does most of its work through `colors.border`
- * instead — the glass-card look leans on translucency + hairline borders,
- * not drop shadow, to read as "elevated" against a near-black background.
+ * Apple-style dark-mode elevation: a black drop shadow alone reads as a
+ * smudge on a near-black background, so every level pairs a shadow with a
+ * hairline "rim" border (applied separately via `colors.border`/
+ * `colors.borderStrong`) — components add the border, these just provide
+ * the shadow/elevation half.
  */
-export const cardShadow = Platform.select({
-  ios: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-  },
-  android: {
-    elevation: 4,
-  },
-  default: {},
-});
+export const shadows = {
+  resting: Platform.select({
+    ios: { shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+    android: { elevation: 6 },
+    default: {},
+  }),
+  pressed: Platform.select({
+    ios: { shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+    android: { elevation: 2 },
+    default: {},
+  }),
+  sheet: Platform.select({
+    ios: { shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 28, shadowOffset: { width: 0, height: -8 } },
+    android: { elevation: 16 },
+    default: {},
+  }),
+  modal: Platform.select({
+    ios: { shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 28, shadowOffset: { width: 0, height: 12 } },
+    android: { elevation: 16 },
+    default: {},
+  }),
+  orb: Platform.select({
+    ios: { shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
+    android: { elevation: 14 },
+    default: {},
+  }),
+  orbGlow: Platform.select({
+    ios: { shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 0 } },
+    android: {},
+    default: {},
+  }),
+  focus: Platform.select({
+    ios: { shadowColor: colors.accent, shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } },
+    android: { elevation: 4 },
+    default: {},
+  }),
+};
+
+/** Legacy alias — prefer `shadows.resting` in new code. */
+export const cardShadow = shadows.resting;
+
+/** Named springs/easings for reanimated — see AnimatedCard/GmOrb for usage. */
+export const motion = {
+  pressSpring: { damping: 18, stiffness: 320, mass: 0.7 },
+  sheetSpring: { damping: 28, stiffness: 260, mass: 1, overshootClamping: true },
+  easeOutQuintMs: 320,
+};

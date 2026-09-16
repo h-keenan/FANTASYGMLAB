@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -16,9 +17,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    navigation.setOptions({ title: `Recap — ${leagueName}` });
-  }, [leagueName, navigation]);
+  useScreenHeaderTitle(navigation, 'Recap', leagueName);
 
   useEffect(() => {
     let cancelled = false;

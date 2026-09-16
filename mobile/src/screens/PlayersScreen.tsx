@@ -14,6 +14,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
+import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -31,9 +32,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    navigation.setOptions({ title: `Players — ${leagueName}` });
-  }, [leagueName, navigation]);
+  useScreenHeaderTitle(navigation, 'Players', leagueName);
 
   useEffect(() => {
     let cancelled = false;

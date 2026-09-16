@@ -1,7 +1,8 @@
 import React from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { Image, TouchableOpacity, View } from 'react-native';
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme';
 import type { RankedPlayer } from '../lib/api';
@@ -28,6 +29,7 @@ import GmTargetsScreen from '../screens/GmTargetsScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradeHubScreen from '../screens/TradeHubScreen';
 import TeamsScreen from '../screens/TeamsScreen';
+import LoadingScreen from '../screens/LoadingScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -59,9 +61,9 @@ const navigationTheme: Theme = {
     ...DarkTheme.colors,
     primary: colors.accent,
     background: colors.background,
-    card: colors.backgroundElevated,
+    card: colors.background,
     text: colors.textPrimary,
-    border: colors.border,
+    border: colors.hairline,
     notification: colors.danger,
   },
 };
@@ -71,9 +73,7 @@ export default function RootNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
+      <LoadingScreen />
     );
   }
 
@@ -88,20 +88,27 @@ export default function RootNavigator() {
             // league name as a redundant "pill" on every screen. "minimal"
             // keeps just the chevron.
             headerBackButtonDisplayMode: 'minimal',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.textPrimary,
+            headerShadowVisible: true,
+            headerTitleAlign: 'center',
+            contentStyle: { backgroundColor: colors.background },
           }}
         >
           <AppStack.Screen
             name="Home"
             component={HomeScreen}
             options={({ navigation }) => ({
-              title: 'FantasyGM Lab',
+              headerTitle: () => (
+                <Image source={require('../../assets/icon.png')} style={{ width: 28, height: 28, borderRadius: 8 }} />
+              ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', gap: 16 }}>
                   <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8}>
-                    <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '600' }}>News</Text>
+                    <Ionicons name="globe-outline" size={22} color={colors.textSecondary} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8}>
-                    <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '600' }}>More</Text>
+                    <Ionicons name="ellipsis-horizontal-outline" size={22} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
               ),
