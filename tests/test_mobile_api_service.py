@@ -2060,3 +2060,78 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
     # league-global canonical rank.
     assert target["position_rank"] == 1
     assert target["overall_rank"] == 1
+
+
+def test_team_rankings_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/team-rankings")
+    assert response.status_code == 401
+
+
+def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    fake_rosters = [
+        {
+            "roster_id": 1,
+            "owner_id": "sleeper-user-1",
+            "players": my_roster_ids,
+            "settings": {"wins": 7, "losses": 6, "ties": 0},
+        },
+        {
+            "roster_id": 2,
+            "owner_id": "sleeper-user-2",
+            "players": ["target_rb"],
+            "settings": {"wins": 3, "losses": 10, "ties": 0},
+        },
+    ]
+    fake_users = [
+        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+    ]
+
+    # require_user is the only auth check here (no _resolve_my_roster / no
+    # profile fetch — team-rankings is public league-wide data, same as
+    # /team-profiles and /rosters), so exactly one requests.get call fires.
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                with patch("modules.sleeper.get_users", return_value=fake_users):
+                    with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/team-rankings",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    teams = body["teams"]
+    assert len(teams) == 2
+    by_roster = {t["roster_id"]: t for t in teams}
+    # Roster 1's 10 starter-weighted players comfortably outscore roster 2's
+    # single player, so roster 1 gets the top power/franchise rank.
+    assert by_roster["1"]["power_rank"] == 1
+    assert by_roster["2"]["power_rank"] == 2
+    assert by_roster["1"]["franchise_rank"] == 1
+    # Standings come straight off each roster's own settings, independent of
+    # the rank computation.
+    assert by_roster["1"]["wins"] == 7
+    assert by_roster["1"]["losses"] == 6
+    assert by_roster["2"]["wins"] == 3
+    assert by_roster["2"]["losses"] == 10
+    assert isinstance(by_roster["1"]["average_age"], (int, float))
+    # No draft picks in this fixture (get_traded_picks returns []), so every
+    # roster's draft_capital and its rank should reflect that consistently
+    # rather than crashing on an empty picks list.
+    assert by_roster["1"]["draft_capital_rank"] == by_roster["2"]["draft_capital_rank"]
