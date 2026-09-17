@@ -843,6 +843,7 @@ def test_recap_reports_no_completed_week(monkeypatch):
     body = response.json()
     assert body["recap"] is None
     assert body["reason"] == "no_completed_week"
+    assert body["max_completed_week"] == 0
 
 
 def test_recap_returns_real_weekly_recap(monkeypatch):
@@ -884,6 +885,61 @@ def test_recap_returns_real_weekly_recap(monkeypatch):
     # would leave this empty.
     assert recap["stories"]
     assert recap["incomplete"] is False
+    assert body["max_completed_week"] == 3
+
+
+def test_recap_accepts_an_explicit_past_week(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_profiles = {
+        "1": {"team_name": "Home Team", "owner_name": "Alice", "username": "alice"},
+        "2": {"team_name": "Away Team", "owner_name": "Bob", "username": "bob"},
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_RECAP_LEAGUE):
+            with patch("modules.sleeper.get_matchups", side_effect=_recap_matchups):
+                with patch("modules.sleeper.get_transactions", side_effect=_recap_transactions):
+                    with patch("modules.sleeper.get_league_roster_profiles", return_value=fake_profiles):
+                        with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/recap?week=2",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    # Week 2 has matchups but (per _recap_transactions) no transactions —
+    # build_weekly_recap should still return a real recap for that week,
+    # not silently fall back to the latest completed week (3).
+    assert body["recap"] is not None
+    assert body["recap"]["week"] == 2
+    assert body["max_completed_week"] == 3
+
+
+def test_recap_rejects_a_week_outside_the_completed_range(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_RECAP_LEAGUE):
+            with patch("modules.sleeper.get_matchups", side_effect=_recap_matchups):
+                response = client.get(
+                    "/v1/leagues/abc/recap?week=99",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 422
 
 
 def test_alerts_requires_auth(monkeypatch):

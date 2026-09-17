@@ -757,13 +757,22 @@ def post_trade_analyzer(
 
 
 @app.get("/v1/leagues/{league_id}/recap")
-def get_league_recap(league_id: str, _user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
-    """Latest completed-week recap — shares the exact same builder as the web
-    app's League Recaps page (modules.league_recaps.build_weekly_recap). Does
-    not invent new stories, headline templates, or narrative logic. Movement
-    (power-rank trend) and power_ranks are omitted, same as the web app's own
-    call site when a league is first opened — build_weekly_recap simply
-    skips the story categories that need them.
+def get_league_recap(
+    league_id: str,
+    week: int | None = None,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Weekly recap — shares the exact same builder as the web app's League
+    Recaps page (modules.league_recaps.build_weekly_recap). Does not invent
+    new stories, headline templates, or narrative logic. Movement (power-rank
+    trend) and power_ranks are omitted, same as the web app's own call site
+    when a league is first opened — build_weekly_recap simply skips the
+    story categories that need them.
+
+    Defaults to the latest completed week when `week` is omitted (original
+    behavior, unchanged). Passing an explicit `week` lets the client browse
+    recap history — `max_completed_week` is always returned so it can build
+    a week picker without a second round trip.
     """
 
     league = sleeper.get_league(league_id)
@@ -774,9 +783,16 @@ def get_league_recap(league_id: str, _user: dict[str, Any] = Depends(require_use
     matchup_rows = league_recaps.build_matchup_history_rows(
         league_id, max_history_week, fetch_matchups=sleeper.get_matchups
     )
-    week = league_recaps.completed_recap_week(league, matchup_rows)
-    if week <= 0:
-        return {"ok": True, "recap": None, "reason": "no_completed_week"}
+    completed_week = league_recaps.completed_recap_week(league, matchup_rows)
+    if completed_week <= 0:
+        return {"ok": True, "recap": None, "reason": "no_completed_week", "max_completed_week": 0}
+
+    if week is None:
+        week = completed_week
+    elif week < 1 or week > completed_week:
+        raise HTTPException(
+            status_code=422, detail=f"week must be between 1 and {completed_week}"
+        )
 
     profiles = sleeper.get_league_roster_profiles(league_id) or {}
 
@@ -818,7 +834,7 @@ def get_league_recap(league_id: str, _user: dict[str, Any] = Depends(require_use
         movement=None,
         power_ranks=None,
     )
-    return {"ok": True, "recap": recap, "reason": ""}
+    return {"ok": True, "recap": recap, "reason": "", "max_completed_week": completed_week}
 
 
 def _alert_key_for_link(link: str) -> str:

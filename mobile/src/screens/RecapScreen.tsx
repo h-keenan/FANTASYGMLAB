@@ -31,6 +31,8 @@ export default function RecapScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [recap, setRecap] = useState<WeeklyRecap | null>(null);
+  const [maxCompletedWeek, setMaxCompletedWeek] = useState(0);
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [notReady, setNotReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,11 +43,14 @@ export default function RecapScreen({ route, navigation }: Props) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoading(true);
       try {
-        const result = await api.getLeagueRecap(leagueId);
+        const result = await api.getLeagueRecap(leagueId, selectedWeek != null ? { week: selectedWeek } : undefined);
         if (cancelled) return;
+        setMaxCompletedWeek(result.max_completed_week);
         if (result.recap) {
           setRecap(result.recap);
+          setNotReady(false);
         } else {
           setNotReady(true);
         }
@@ -58,9 +63,9 @@ export default function RecapScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [leagueId]);
+  }, [leagueId, selectedWeek]);
 
-  if (loading) {
+  if (loading && !recap) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} />
@@ -76,12 +81,33 @@ export default function RecapScreen({ route, navigation }: Props) {
     );
   }
 
+  const weekPicker =
+    maxCompletedWeek > 1 ? (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weekPickerRow}>
+        {Array.from({ length: maxCompletedWeek }, (_, i) => i + 1).map((weekNum) => {
+          const active = (selectedWeek ?? maxCompletedWeek) === weekNum;
+          return (
+            <TouchableOpacity
+              key={weekNum}
+              style={[styles.weekPill, active && styles.weekPillActive]}
+              onPress={() => setSelectedWeek(weekNum)}
+            >
+              <Text style={[styles.weekPillText, active && styles.weekPillTextActive]}>Wk {weekNum}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    ) : null;
+
   if (notReady || !recap) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.notReadyText}>
-          No recap is ready yet — check back after this week's matchups finish scoring.
-        </Text>
+      <View style={styles.root}>
+        {weekPicker}
+        <View style={styles.center}>
+          <Text style={styles.notReadyText}>
+            No recap is ready yet — check back after this week's matchups finish scoring.
+          </Text>
+        </View>
       </View>
     );
   }
@@ -89,6 +115,12 @@ export default function RecapScreen({ route, navigation }: Props) {
   return (
     <View style={styles.root}>
       <GridBackground />
+      {weekPicker}
+      {loading ? (
+        <View style={styles.inlineLoadingRow}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      ) : (
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <View style={styles.headerRow}>
         <View style={styles.headerTextGroup}>
@@ -107,13 +139,14 @@ export default function RecapScreen({ route, navigation }: Props) {
       ) : (
         recap.stories.map((story, index) => <StoryCard key={`${story.story_type}-${index}`} story={story} />)
       )}
+      </ScrollView>
+      )}
       <RecapSharePreviewModal
         visible={shareOpen}
         onClose={() => setShareOpen(false)}
         leagueName={leagueName}
         recap={recap}
       />
-      </ScrollView>
     </View>
   );
 }
@@ -191,6 +224,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.xl,
   },
+  weekPickerRow: {
+    flexGrow: 0,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  weekPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginRight: spacing.sm,
+  },
+  weekPillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
+  weekPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  weekPillTextActive: { color: colors.accent },
+  inlineLoadingRow: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
