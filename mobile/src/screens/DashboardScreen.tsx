@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
-import { api, type DashboardItem, type DashboardItemCategory, type PresentationAsset } from '../lib/api';
+import { api, type DashboardItem, type DashboardItemCategory, type PresentationAsset, type TeamSnapshot } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -46,6 +46,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<DashboardItem[] | null>(null);
+  const [teamSnapshot, setTeamSnapshot] = useState<TeamSnapshot | null>(null);
   const [quiet, setQuiet] = useState(false);
   const [quietReason, setQuietReason] = useState('');
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
@@ -67,6 +68,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           setNotReadyReason(result.reason);
         } else {
           setItems(result.items);
+          setTeamSnapshot(result.team_snapshot);
           setQuiet(result.quiet);
           setQuietReason(result.quiet_reason ?? '');
           const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
@@ -132,6 +134,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           </Text>
         </View>
       ) : null}
+      {teamSnapshot ? <TeamSnapshotRow snapshot={teamSnapshot} /> : null}
       {quiet || !items || items.length === 0 ? (
         <View style={styles.emptyCard}>
           <Ionicons name="checkmark-done-outline" size={22} color={colors.success} />
@@ -224,6 +227,30 @@ function NewBadge() {
   return (
     <View style={styles.newBadge}>
       <Text style={styles.newBadgeText}>NEW</Text>
+    </View>
+  );
+}
+
+function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
+  const record =
+    snapshot.wins != null && snapshot.losses != null
+      ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
+      : '—';
+  const tiles = [
+    { label: 'Record', value: record },
+    { label: 'Health', value: snapshot.health_flag || 'Stable' },
+    { label: 'Avg Age', value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—' },
+  ];
+  return (
+    <View style={styles.snapshotRow}>
+      {tiles.map((tile) => (
+        <View key={tile.label} style={styles.snapshotTile}>
+          <Text style={styles.snapshotValue} numberOfLines={1}>
+            {tile.value}
+          </Text>
+          <Text style={styles.snapshotLabel}>{tile.label}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -376,6 +403,29 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   checkInText: { fontSize: 12, fontWeight: '600', color: colors.accent, flexShrink: 1 },
+  snapshotRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  snapshotTile: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  snapshotValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  snapshotLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: 2,
+  },
   newBadge: {
     backgroundColor: colors.accent,
     borderRadius: radii.pill,
