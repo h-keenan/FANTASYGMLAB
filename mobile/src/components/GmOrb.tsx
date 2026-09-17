@@ -8,12 +8,15 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -24,6 +27,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { setLastLeague } from '../lib/lastLeague';
 import { ORB_INSET_CEILING, ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
+import { useOrbHorizontalFraction } from '../lib/orbPosition';
 import { supabase } from '../lib/supabase';
 import { colors, motion, radii, shadows, spacing } from '../theme';
 
@@ -78,22 +82,31 @@ const SHOW_ORB_DEBUG_OVERLAY = process.env.EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY ==
  * counterpart to the web app's gm_orb_floating_trigger/render_mobile_destination_sheet
  * (modules/brand_identity.py, app.py). Rendered once, globally, so every
  * screen gets the same always-available navigation affordance instead of
- * each screen inventing its own per-page tool row. Bottom-center (not
- * bottom-left/right) since it's the app's primary global navigation,
- * reachable by either thumb, and doesn't collide with left-aligned avatars
- * or right-aligned values in list rows.
+ * each screen inventing its own per-page tool row. Defaults to bottom-center
+ * since it's the app's primary global navigation, reachable by either thumb,
+ * and doesn't collide with left-aligned avatars or right-aligned values in
+ * list rows — but that's a default, not a mandate: touch-and-hold lets
+ * someone drag it to whichever side suits their own grip, persisted per
+ * device (see orbPosition.ts). Horizontal movement only; vertical position
+ * always stays anchored to the safe-area bottom via useOrbClearance, so a
+ * dragged orb can never collide with content the way an orb that moved
+ * vertically could (see PR #514's history).
  */
 export default function GmOrb() {
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const rawInsets = useSafeAreaInsets();
-  // Defensive clamp on a pathological/stale inset reading — kept as a
-  // belt-and-suspenders guard, though it turned out not to be the cause of
-  // the real-device bug (see useOrbClearance in lib/orbLayout.ts for that).
-  // Measured directly on a real device with this clamp active: the orb sits
-  // exactly where this math predicts (top ~87%, centre ~90% down screen),
-  // proving the orb's own position was never wrong.
+  // Purely precautionary — no evidence this has ever actually fired. This
+  // was originally written to defend against an inflated bottom inset,
+  // which was the leading theory for a reported bug where the orb appeared
+  // to sit mid-screen. That bug turned out to be content sliding underneath
+  // a correctly-positioned orb (see useOrbClearance in lib/orbLayout.ts),
+  // not the orb itself moving — confirmed by measuring rawInsets.bottom on
+  // a real iPhone (34), an iOS simulator (34), and an Android emulator (48),
+  // none of them inflated. If you're reading this because you found an
+  // inset-inflation bug on some device, that would be new evidence this
+  // clamp doesn't currently have — nothing observed so far justifies it.
   const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), ORB_INSET_CEILING);
   const insets = { ...rawInsets, bottom: safeBottom };
   const league = open ? currentLeagueContext() : null;
@@ -104,6 +117,43 @@ export default function GmOrb() {
   const backdropOpacity = useSharedValue(0);
   const orbScale = useSharedValue(1);
   const orbOpacity = useSharedValue(1);
+
+  // Tap-and-hold to reposition — horizontal only (see orbPosition.ts for
+  // why). `activateAfterLongPress` means a quick tap still falls through to
+  // the TouchableOpacity's onPress below instead of starting a drag.
+  const { width: screenWidth } = useWindowDimensions();
+  const [horizontalFraction, setHorizontalFraction] = useOrbHorizontalFraction();
+  const dragX = useSharedValue(0);
+  const dragStartX = useSharedValue(0);
+
+  // How far the orb's center can move from screen-center before it would
+  // sit under a notch/rounded corner or off the horizontal safe area.
+  // Recomputed every render (not cached) so rotation and iPad split-view/
+  // Stage Manager resizing re-clamp automatically instead of trusting a
+  // stale bound — deliberately not memoized for the same reason the
+  // persisted value below is a fraction, not a pixel offset.
+  const leftBound = Math.min(-1, insets.left + ORB_SIZE / 2 + spacing.sm - screenWidth / 2);
+  const rightBound = Math.max(1, screenWidth - insets.right - ORB_SIZE / 2 - spacing.sm - screenWidth / 2);
+
+  useEffect(() => {
+    dragX.value = horizontalFraction >= 0 ? horizontalFraction * rightBound : horizontalFraction * -leftBound;
+  }, [horizontalFraction, leftBound, rightBound]);
+
+  const dragGesture = Gesture.Pan()
+    .activateAfterLongPress(350)
+    .onStart(() => {
+      dragStartX.value = dragX.value;
+      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+    })
+    .onUpdate((event) => {
+      const next = dragStartX.value + event.translationX;
+      dragX.value = Math.min(rightBound, Math.max(leftBound, next));
+    })
+    .onEnd(() => {
+      const finalX = dragX.value;
+      const fraction = finalX >= 0 ? finalX / rightBound : finalX / -leftBound;
+      runOnJS(setHorizontalFraction)(fraction);
+    });
 
   useEffect(() => {
     if (!open) return;
@@ -164,7 +214,7 @@ export default function GmOrb() {
   };
 
   const orbAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: orbScale.value }],
+    transform: [{ scale: orbScale.value }, { translateX: dragX.value }],
     opacity: orbOpacity.value,
   }));
   const backdropAnimatedStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
@@ -178,16 +228,24 @@ export default function GmOrb() {
         style={[styles.scrim, { height: ORB_SCRIM_BASE_HEIGHT + insets.bottom }]}
       />
       <View style={[styles.orbWrap, { bottom: insets.bottom + spacing.md }]}>
-        <Animated.View style={orbAnimatedStyle}>
-          <TouchableOpacity
-            style={styles.orb}
-            onPress={openSheet}
-            accessibilityLabel="Open GM menu"
-            activeOpacity={0.85}
-          >
-            <Image source={require('../../assets/icon.png')} style={styles.orbImage} />
-          </TouchableOpacity>
-        </Animated.View>
+        <GestureDetector gesture={dragGesture}>
+          <Animated.View style={orbAnimatedStyle}>
+            <TouchableOpacity
+              style={styles.orb}
+              onPress={openSheet}
+              accessibilityLabel="Open GM menu"
+              accessibilityHint="Double tap to open. Touch and hold, then drag, to move it."
+              activeOpacity={0.85}
+              // ORB_SIZE (48) already meets both platforms' stated minimum
+              // touch target (44pt iOS, 48dp Android) with zero margin —
+              // hitSlop gives real headroom above the bare minimum rather
+              // than sitting exactly on the line.
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Image source={require('../../assets/icon.png')} style={styles.orbImage} />
+            </TouchableOpacity>
+          </Animated.View>
+        </GestureDetector>
       </View>
 
       {SHOW_ORB_DEBUG_OVERLAY && (
