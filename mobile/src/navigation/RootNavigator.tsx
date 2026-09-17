@@ -19,6 +19,7 @@ import TradeCalculatorScreen from '../screens/TradeCalculatorScreen';
 import NewsScreen from '../screens/NewsScreen';
 import MoreScreen from '../screens/MoreScreen';
 import LegalPageScreen from '../screens/LegalPageScreen';
+import HowWeEvaluateScreen from '../screens/HowWeEvaluateScreen';
 import PlayersScreen from '../screens/PlayersScreen';
 import PlayerDetailScreen from '../screens/PlayerDetailScreen';
 import WaiversScreen from '../screens/WaiversScreen';
@@ -40,6 +41,7 @@ export type RootStackParamList = {
   News: undefined;
   More: undefined;
   LegalPage: { pageKey: string };
+  HowWeEvaluate: undefined;
   Players: { leagueId: string; leagueName: string };
   PlayerDetail: { player: RankedPlayer; leagueId: string; leagueName: string };
   GmTargets: { leagueId: string; leagueName: string };
@@ -124,6 +126,11 @@ export default function RootNavigator() {
           <AppStack.Screen name="News" component={NewsScreen} options={{ title: 'News' }} />
           <AppStack.Screen name="More" component={MoreScreen} options={{ title: 'More' }} />
           <AppStack.Screen name="LegalPage" component={LegalPageScreen} />
+          <AppStack.Screen
+            name="HowWeEvaluate"
+            component={HowWeEvaluateScreen}
+            options={{ title: 'How We Evaluate' }}
+          />
           <AppStack.Screen name="Players" component={PlayersScreen} />
           <AppStack.Screen name="PlayerDetail" component={PlayerDetailScreen} />
           <AppStack.Screen name="Waivers" component={WaiversScreen} />
