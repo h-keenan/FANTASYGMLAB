@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<rect width="1024" height="1024" rx="210" fill="#0D1117"/>
+<rect x="18" y="18" width="988" height="988" rx="195" fill="none" stroke="#00D4FF" stroke-width="10"/>
+<g transform="translate(75,55) scale(.86)">
+<path d="M160 340 C350 80 570 90 760 280" fill="none" stroke="#00D4FF" stroke-width="48" stroke-linecap="round"/>
+<path d="M180 410 C370 170 590 170 790 320" fill="none" stroke="#FFCA3D" stroke-width="48" stroke-linecap="round"/>
+<path d="M200 480 C390 270 610 250 820 370" fill="none" stroke="#FF4D4D" stroke-width="48" stroke-linecap="round"/>
+<circle cx="160" cy="340" r="24" fill="#0D1117" stroke="#00D4FF" stroke-width="18"/>
+<circle cx="180" cy="410" r="24" fill="#0D1117" stroke="#FFCA3D" stroke-width="18"/>
+<circle cx="200" cy="480" r="24" fill="#0D1117" stroke="#FF4D4D" stroke-width="18"/>
+<polygon points="760,280 700,240 728,315" fill="#00D4FF"/>
+<polygon points="790,320 730,280 758,355" fill="#FFCA3D"/>
+<polygon points="820,370 760,330 788,405" fill="#FF4D4D"/>
+</g>
+<text x="512" y="815" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="245" font-weight="900" font-style="italic" fill="#F2F4F7" letter-spacing="-18">FGL</text>
+</svg>
