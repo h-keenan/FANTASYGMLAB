@@ -155,6 +155,8 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
         "score": asset.get("score", asset.get("value_score")),
         "role": role,
         "injury_status": _text(asset.get("injury_status")),
+        "injury_level": _text(asset.get("injury_level")),
+        "opportunity_explanation": _text(asset.get("opportunity_explanation")),
     }
 
 

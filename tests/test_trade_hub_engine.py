@@ -157,3 +157,59 @@ def test_generate_trade_ideas_runs_the_real_search_engine_without_crashing():
     assert isinstance(cards, list)
     for card in cards:
         assert card.to_dict()["package"]
+
+
+def _fake_idea(**overrides):
+    idea = {
+        "partner_team_name": "Rival GM",
+        "rationale": "Clear value upgrade at a position of need.",
+        "trade_gain": 25,
+        "trade_confidence_label": "High",
+        "market_realism_label": "Realistic",
+        "reasoning_tags": ["Need-Based"],
+        "send_assets": [
+            {
+                "asset_type": "player",
+                "player_id": "my-rb",
+                "name": "my-rb",
+                "position": "RB",
+                "team": "KC",
+                "age": 27,
+                "injury_status": "Questionable",
+                "injury_level": "minor",
+                "opportunity_explanation": "Locked in as the early-down back.",
+            }
+        ],
+        "receive_assets": [{"asset_type": "player", "player_id": "opp-rb", "name": "opp-rb"}],
+    }
+    idea.update(overrides)
+    return idea
+
+
+def test_project_trade_idea_card_includes_category_and_value_edge_band():
+    card = trade_hub_engine.project_trade_idea_card(_fake_idea(trade_gain=800))
+    payload = card.to_dict()
+    # +800 clears the >=500 threshold in modules.trade_visual_language's band.
+    assert payload["value_edge_band"] == "Favorable"
+    # Non-headline: falls back to trade_hub_ui.trade_hub_display_section's
+    # classification. reasoning_tags=["Need-Based"] contains the substring
+    # "need" (checked before the trade_confidence_label=="High" fallback
+    # this test originally expected), so it's classified Need-Based first.
+    assert payload["category"] == "Need-Based"
+
+
+def test_project_trade_idea_card_marks_the_headline_slot_explicitly():
+    card = trade_hub_engine.project_trade_idea_card(_fake_idea(), is_headline=True)
+    assert card.to_dict()["category"] == "Headline Recommendation"
+
+
+def test_project_trade_idea_card_forwards_injury_and_opportunity_detail_on_assets():
+    card = trade_hub_engine.project_trade_idea_card(_fake_idea())
+    sent = card.to_dict()["package"]["send"][0]
+    assert sent["injury_level"] == "minor"
+    assert sent["opportunity_explanation"] == "Locked in as the early-down back."
+
+
+def test_project_trade_idea_card_maps_negative_gain_to_an_overpay_band():
+    card = trade_hub_engine.project_trade_idea_card(_fake_idea(trade_gain=-2000))
+    assert card.to_dict()["value_edge_band"] == "Major Overpay"
