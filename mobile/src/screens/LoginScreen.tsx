@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -76,6 +77,7 @@ export default function LoginScreen() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
         <Text style={styles.title}>FantasyGM Lab</Text>
         <Text style={styles.subtitle}>
           {mode === 'signIn' ? 'Sign in to your account' : 'Create an account'}
@@ -182,6 +184,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
+  },
+  brandMark: {
+    width: 72,
+    height: 72,
+    borderRadius: radii.md,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
   },
   title: {
     ...typography.title,

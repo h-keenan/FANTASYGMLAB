@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1200">
+      <path d="M220 400 C470 70 760 70 980 330" fill="none" stroke="#00D4FF" stroke-width="38" stroke-linecap="round"/>
+      <path d="M250 430 C500 160 760 150 1010 360" fill="none" stroke="#FFCA3D" stroke-width="38" stroke-linecap="round"/>
+      <path d="M280 460 C520 260 780 240 1040 395" fill="none" stroke="#FF4D4D" stroke-width="38" stroke-linecap="round"/>
+      <circle cx="220" cy="400" r="20" fill="#0D1117" stroke="#00D4FF" stroke-width="16"/>
+      <circle cx="250" cy="430" r="20" fill="#0D1117" stroke="#FFCA3D" stroke-width="16"/>
+      <circle cx="280" cy="460" r="20" fill="#0D1117" stroke="#FF4D4D" stroke-width="16"/>
+      <polygon points="980,330 925,292 948,360" fill="#00D4FF"/>
+      <polygon points="1010,360 955,322 978,390" fill="#FFCA3D"/>
+      <polygon points="1040,395 985,357 1008,425" fill="#FF4D4D"/>
+    
+        <text x="120" y="760" font-family="Arial, Helvetica, sans-serif" font-size="220" font-weight="900" font-style="italic" fill="#F2F4F7" letter-spacing="-8">FANTASY<tspan fill="#00D4FF">GM</tspan>LAB</text>
+        <text x="500" y="930" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="700" fill="#00D4FF" letter-spacing="20">PLAN. <tspan fill="#FFCA3D">PROJECT.</tspan> <tspan fill="#FF4D4D">WIN.</tspan></text></svg>
