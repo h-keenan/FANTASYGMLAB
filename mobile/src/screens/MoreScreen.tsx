@@ -140,6 +140,15 @@ export default function MoreScreen({ navigation }: Props) {
           ))
         : null}
 
+      <Text style={styles.sectionLabel}>About</Text>
+      <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('HowWeEvaluate')}>
+        <View style={styles.labelGroup}>
+          <Ionicons name="school-outline" size={18} color={colors.accent} style={styles.icon} />
+          <Text style={styles.label}>How We Evaluate</Text>
+        </View>
+        <Text style={styles.chevron}>{'›'}</Text>
+      </TouchableOpacity>
+
       <Text style={styles.sectionLabel}>Legal</Text>
       {LEGAL_ITEMS.map((item) => (
         <TouchableOpacity
