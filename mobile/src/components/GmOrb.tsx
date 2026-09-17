@@ -23,7 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { setLastLeague } from '../lib/lastLeague';
-import { ORB_INSET_CEILING, ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
+import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { supabase } from '../lib/supabase';
 import { colors, motion, radii, shadows, spacing } from '../theme';
 
@@ -82,20 +82,34 @@ const SHOW_ORB_DEBUG_OVERLAY = process.env.EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY ==
  * bottom-left/right) since it's the app's primary global navigation,
  * reachable by either thumb, and doesn't collide with left-aligned avatars
  * or right-aligned values in list rows.
+ *
+ * History, because git log alone won't tell it: reported as "the orb floats
+ * too high, in the middle of the screen." First fix attempt clamped
+ * insets.bottom, on the theory that a native SDK was inflating it — measured
+ * normal (34-48) on every device anyone checked, so that was never it.
+ * Second fix attempt split a layout style from a Reanimated animated style
+ * on the theory that Fabric was resolving the wrong frame — changed nothing,
+ * confirmed by a controlled before/after, and was retracted. Actual cause:
+ * every scrollable screen reserved less bottom padding than GmOrb's scrim +
+ * orb actually occupy, so a list's last item rendered underneath it —
+ * fixed by useOrbClearance in lib/orbLayout.ts. coridian_ confirmed this was
+ * the same bug from the first report, not a second one, which is why the
+ * inset clamp was removed rather than kept as a "just in case."
  */
 export default function GmOrb() {
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
-  const rawInsets = useSafeAreaInsets();
-  // Defensive clamp on a pathological/stale inset reading — kept as a
-  // belt-and-suspenders guard, though it turned out not to be the cause of
-  // the real-device bug (see useOrbClearance in lib/orbLayout.ts for that).
-  // Measured directly on a real device with this clamp active: the orb sits
-  // exactly where this math predicts (top ~87%, centre ~90% down screen),
-  // proving the orb's own position was never wrong.
-  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), ORB_INSET_CEILING);
-  const insets = { ...rawInsets, bottom: safeBottom };
+  // No clamp on insets.bottom — one used to live here, defending against an
+  // inflated bottom inset that was the leading theory for a reported bug
+  // where the orb appeared to sit mid-screen. coridian_ confirmed that bug
+  // was the exact same thing later traced to content sliding underneath a
+  // correctly-positioned orb (see useOrbClearance in lib/orbLayout.ts), not
+  // the orb moving, and insets.bottom was measured normal (34-48) on every
+  // device anyone checked. The clamp had nothing left to defend against and
+  // could only ever clip a legitimate value, so it's gone — useOrbClearance
+  // uses this same unclamped value, and the two have to agree.
+  const insets = useSafeAreaInsets();
   const league = open ? currentLeagueContext() : null;
   const currentRouteName = open && navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -191,10 +205,10 @@ export default function GmOrb() {
       </View>
 
       {SHOW_ORB_DEBUG_OVERLAY && (
-        <View pointerEvents="none" style={[styles.debugOverlay, { top: rawInsets.top + 4 }]}>
+        <View pointerEvents="none" style={[styles.debugOverlay, { top: insets.top + 4 }]}>
           <Text style={styles.debugOverlayText}>
-            win:{Math.round(Dimensions.get('window').height)} rawBottom:{Math.round(rawInsets.bottom)}{' '}
-            clampedBottom:{Math.round(insets.bottom)} orbBottomOffset:{Math.round(insets.bottom + spacing.md)}
+            win:{Math.round(Dimensions.get('window').height)} insetsBottom:{Math.round(insets.bottom)}{' '}
+            orbBottomOffset:{Math.round(insets.bottom + spacing.md)}
           </Text>
         </View>
       )}
