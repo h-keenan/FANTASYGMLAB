@@ -349,6 +349,7 @@ export interface RecapResponse {
   ok: true;
   recap: WeeklyRecap | null;
   reason: '' | 'no_completed_week';
+  max_completed_week: number;
 }
 
 export interface QuickViewStatItem {
@@ -596,8 +597,14 @@ export const api = {
     );
   },
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
-  getLeagueRecap: (leagueId: string) =>
-    authorizedFetch<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap`),
+  getLeagueRecap: (leagueId: string, options?: { week?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.week != null) params.set('week', String(options.week));
+    const query = params.toString();
+    return authorizedFetch<RecapResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/recap${query ? `?${query}` : ''}`,
+    );
+  },
   getLeagueDashboard: (leagueId: string) =>
     authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
   getTradeHubIdeas: (leagueId: string, strategy: TeamStrategy = 'retool', adUnlocks = 0) =>
