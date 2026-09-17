@@ -1941,10 +1941,20 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
                             "modules.player_eligibility.filter_current_fantasy_players",
                             side_effect=lambda df, **kwargs: df,
                         ):
-                            response = client.get(
-                                "/v1/leagues/abc/waivers",
-                                headers={"Authorization": "Bearer good-token"},
-                            )
+                            # player_state_authority imports this name directly
+                            # (`from modules.player_eligibility import
+                            # filter_current_fantasy_players`), so it has its own
+                            # bound reference the patch above doesn't reach —
+                            # waiver_actionable_player_pool calls that one
+                            # internally, and it needs patching separately.
+                            with patch(
+                                "modules.player_state_authority.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/waivers",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
 
     assert response.status_code == 200
     body = response.json()
