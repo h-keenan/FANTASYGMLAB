@@ -1,6 +1,109 @@
 {
   "lastUpdated": "June 22, 2026",
   "pages": {
+    "methodology": {
+      "title": "How We Evaluate",
+      "kicker": "HOW FANTASYGM LAB THINKS ABOUT VALUE",
+      "note": "How FantasyGM Lab evaluates players in league context, and how rankings differ from trade recommendations.",
+      "sections": [
+        {
+          "title": "What values are (and aren't)",
+          "paragraphs": [
+            "FantasyGM Lab values are built for a specific league and roster situation. They are not universal player grades, and they are not a promise about what will happen next week or next season.",
+            "The same player can be worth more or less once scoring, lineup rules, and league size are applied. Superflex and 2QB leagues raise quarterback value. Tight-end premium raises tight ends. PPR, half-PPR, and standard scoring shift running backs versus receivers. Deeper starting lineups and larger leagues increase demand for usable depth. Taxi squads can give a little extra room to stash young skill players."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "What we weigh",
+          "paragraphs": [],
+          "bullets": [
+            "Market context: Dynasty market prices are a major input. They reflect how the player is currently valued in dynasty formats, not a private forecast.",
+            "Age and career stage: Younger players and longer remaining windows are treated differently from veterans, especially at running back. Current points do not erase an aging curve.",
+            "Production: Scoring over a meaningful sample is part of the evaluation. A hot week or a quiet week is not enough on its own, and missing stats are not treated as secret market confirmation.",
+            "Role and opportunity: Depth-chart role, usage, and related workload signals matter. A backup with elite talent is not valued like a locked-in starter.",
+            "Positional scarcity: Players are compared with others at the same position. Harder-to-replace production at a thin position counts more than raw points in a vacuum.",
+            "Availability: Injury and inactive status can reduce near-term usefulness. Dynasty value is not zeroed out for a typical injury, but current-season usefulness can be discounted more sharply."
+          ]
+        },
+        {
+          "title": "Production vs. dynasty value",
+          "paragraphs": [
+            "Season scoring is one ingredient, not the whole recipe. Dynasty value also weighs age, remaining window, role, scarcity, and how the market already prices the player. That is why a high-scoring veteran can rank behind a younger player with a longer runway, and why this year's points per game should not be read as a finished dynasty ranking."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Team strategy",
+          "paragraphs": [
+            "Your team's direction can change whether an asset is attractive even when the league-wide player value stays similar. FantasyGM Lab can auto-read a direction from the roster or follow a manager override."
+          ],
+          "bullets": [
+            "Contender: Leans toward present production and useful starters, and treats future picks a bit more cheaply.",
+            "Fringe contender: Looks for lineup upgrades without spending the entire future.",
+            "Retool: Keeps a blend of current production, young starters, and draft capital.",
+            "Rebuild: Favors youth and draft capital, and is slower to pay up for aging veterans.",
+            "Tank / rebuild: Puts even more weight on picks and young players over short-term scoring."
+          ]
+        },
+        {
+          "title": "Valuation lens",
+          "paragraphs": [
+            "Separately, a valuation lens can lean Dynasty, Rebuild, or current-season. That lens changes how much long-term value versus this-year usefulness is emphasized. The current evaluation philosophy is a balanced dynasty approach; additional philosophies are not selectable yet."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Draft picks",
+          "paragraphs": [
+            "Draft picks are valued as future assets, not as named prospects. Round matters most. Expected range — early, middle, or late in the round — is estimated from the original team's current standing, and later-year picks are treated with more uncertainty. Superflex and 2QB formats raise early-round pick value. Tight-end premium can lift early picks slightly. Larger dynasty leagues make picks a bit more important. Rebuild-oriented teams treat picks as more valuable; contenders treat them as a little cheaper. In redraft, picks are discounted heavily. A pick is not a guarantee of a specific player."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "Recommendations vs. rankings",
+          "paragraphs": [
+            "Rankings order eligible skill players by the league-adjusted evaluation. Trade recommendations start from those values, then ask a different question: is this a realistic deal for these two rosters right now?"
+          ],
+          "bullets": [
+            "Roster fit and positional need on your team",
+            "Whether the other manager has a reason to do the deal",
+            "Whether the headline players and picks look fair enough to be taken seriously",
+            "Team direction — contending versus collecting future value",
+            "Protected or core players that should not be shopped casually",
+            "Whether current player-status evidence is strong enough to show the idea"
+          ]
+        },
+        {
+          "title": "Confidence",
+          "paragraphs": [
+            "Confidence is not a prediction score. It describes how complete the current evidence is. Incomplete identity or status information can lower confidence or keep a recommendation off the board instead of guessing. Injury notes can qualify an otherwise strong-looking trade. Opportunity reads also carry their own confidence when workload evidence is thin."
+          ],
+          "bullets": []
+        },
+        {
+          "title": "What this doesn't do",
+          "paragraphs": [],
+          "bullets": [
+            "It does not predict the future or guarantee wins, playoff odds, or trade outcomes.",
+            "It does not claim perfect accuracy, complete injury news, or up-to-the-minute reporting.",
+            "It is not gambling, betting, or financial advice.",
+            "It does not replace league rules, film study, or your judgment.",
+            "A ranking, a value, and a trade recommendation are related tools — not identical answers."
+          ]
+        },
+        {
+          "title": "Frequently asked",
+          "paragraphs": [],
+          "bullets": [
+            "Why might two leagues show different values for the same player? Scoring, quarterback format, tight-end premium, starter counts, league size, and taxi or bench depth all change how positions are priced. Values are rebuilt for the active league's settings.",
+            "Why might two managers in the same league see different trade ideas? Each roster has a different mix of needs, direction, protected players, and partners. A win-now team and a rebuilding team should not get the same shopping list.",
+            "If a player is scoring a lot, why isn't that the ranking? Production is included, but age, role, scarcity, and market context still matter. Dynasty value is about the remaining asset, not only this season's box score.",
+            "Can a recommendation disappear even if the values look close? Yes. Guardrails can withhold or qualify ideas when player identity, ownership, or current status cannot be trusted, or when a package would move a protected core piece without a clear upgrade."
+          ]
+        }
+      ]
+    },
     "about_disclaimer": {
       "title": "About / Disclaimer",
       "kicker": "Launch Information",

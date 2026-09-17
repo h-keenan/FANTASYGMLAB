@@ -12,6 +12,7 @@ import { useDensity, type UiDensity } from '../context/DensityContext';
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 
 const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = [
+  { pageKey: 'methodology', label: 'How We Evaluate', icon: 'school-outline' },
   { pageKey: 'about_disclaimer', label: 'About / Disclaimer', icon: 'information-circle-outline' },
   { pageKey: 'terms', label: 'Terms of Use', icon: 'document-text-outline' },
   { pageKey: 'privacy', label: 'Privacy Policy', icon: 'shield-checkmark-outline' },
