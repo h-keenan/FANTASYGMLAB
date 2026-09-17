@@ -146,6 +146,37 @@ export interface LeagueTeamRankingsResponse {
   reason: string;
 }
 
+export interface DraftPosture {
+  label: string;
+  note: string;
+  tone: string;
+  draft_capital_rank: number | null;
+  draft_capital: number | null;
+  future_draft_capital_rank: number | null;
+  future_draft_capital: number | null;
+  strategy_display: string | null;
+  power_rank: number | null;
+  franchise_rank: number | null;
+  first_rounders: number | null;
+  pick_count: number | null;
+}
+
+export interface DraftCard {
+  label: string;
+  title: string;
+  tone: string;
+  items: string[];
+}
+
+export interface DraftCenterResponse {
+  ok: true;
+  reason: string;
+  posture: DraftPosture | null;
+  posture_reason: string;
+  decision_cards: DraftCard[];
+  partner_cards: DraftCard[];
+}
+
 export interface PlayerSummary {
   full_name: string | null;
   first_name: string | null;
@@ -580,6 +611,14 @@ export const api = {
     ),
   getMyRoster: (leagueId: string) =>
     authorizedFetch<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),
+  getLeagueDraftCenter: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<DraftCenterResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/draft-center${query ? `?${query}` : ''}`,
+    );
+  },
   getLeagueRankings: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

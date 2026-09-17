@@ -139,3 +139,102 @@ def test_add_league_detail_ranks_on_empty_frame_is_a_no_op():
     empty = pd.DataFrame()
     result = league_rankings.add_league_detail_ranks(empty)
     assert result.empty
+
+
+def test_draft_year_columns_sorts_by_year_ignoring_other_columns():
+    df = pd.DataFrame(
+        columns=["roster_id", "pick_value_2027", "pick_value_2025", "pick_value_2026", "team_name"]
+    )
+    assert league_rankings.draft_year_columns(df) == [
+        "pick_value_2025",
+        "pick_value_2026",
+        "pick_value_2027",
+    ]
+
+
+def test_build_draft_workspace_frame_on_empty_summary_is_a_no_op():
+    result = league_rankings.build_draft_workspace_frame(pd.DataFrame(), None)
+    assert result.empty
+
+
+def test_build_draft_workspace_frame_computes_future_capital_without_intel():
+    draft_capital_summary = pd.DataFrame(
+        [
+            {
+                "roster_id": 1,
+                "team_name": "Alpha",
+                "mode": "rebuild",
+                "draft_capital_rank": 1,
+                "draft_capital": 6000,
+                "pick_count": 2,
+                "first_rounders": 1,
+                "pick_value_2026": 2000,
+                "pick_value_2027": 4000,
+            },
+            {
+                "roster_id": 2,
+                "team_name": "Beta",
+                "mode": "contender",
+                "draft_capital_rank": 2,
+                "draft_capital": 1000,
+                "pick_count": 1,
+                "first_rounders": 0,
+                "pick_value_2026": 1000,
+                "pick_value_2027": 0,
+            },
+        ]
+    )
+    result = league_rankings.build_draft_workspace_frame(draft_capital_summary, None, draft_year=2026)
+    by_roster = {int(row["roster_id"]): row for _, row in result.iterrows()}
+
+    # future_draft_capital only sums pick_value_<year> columns for years
+    # AFTER draft_year (2026 itself is the current rookie draft, not future).
+    assert by_roster[1]["future_draft_capital"] == 4000
+    assert by_roster[2]["future_draft_capital"] == 0
+    assert by_roster[1]["future_draft_capital_rank"] == 1
+    assert by_roster[2]["future_draft_capital_rank"] == 2
+
+    # No df_intel supplied: power_rank/franchise_rank/age_rank default to
+    # len(summary) (the graceful-degradation fallback), and strategy_display
+    # falls back to team_strategy_label(mode) rather than staying blank.
+    assert by_roster[1]["power_rank"] == 2
+    assert by_roster[1]["franchise_rank"] == 2
+    assert by_roster[1]["strategy_display"] == "Rebuild"
+    assert by_roster[2]["strategy_display"] == "Contender"
+    assert by_roster[1]["strategy_key"] == "rebuild"
+
+
+def test_build_draft_workspace_frame_merges_real_intel_when_provided():
+    draft_capital_summary = pd.DataFrame(
+        [
+            {
+                "roster_id": 1,
+                "team_name": "Alpha",
+                "mode": "rebuild",
+                "draft_capital_rank": 1,
+                "draft_capital": 6000,
+                "pick_count": 2,
+                "first_rounders": 1,
+            },
+        ]
+    )
+    df_intel = pd.DataFrame(
+        [
+            {
+                "roster_id": 1,
+                "power_rank": 5,
+                "franchise_rank": 4,
+                "age_rank": 3,
+                "avg_age": 26.5,
+                "strategy_display": "Aggressive Rebuild",
+            },
+        ]
+    )
+    result = league_rankings.build_draft_workspace_frame(draft_capital_summary, df_intel)
+    row = result.iloc[0]
+    # Real intel values win over the graceful-degradation defaults.
+    assert row["power_rank"] == 5
+    assert row["franchise_rank"] == 4
+    assert row["age_rank"] == 3
+    assert row["avg_age"] == 26.5
+    assert row["strategy_display"] == "Aggressive Rebuild"
