@@ -113,10 +113,16 @@ def test_build_league_display_frame_computes_power_and_franchise_rank():
 
 
 def test_add_league_detail_ranks_computes_starter_bench_age_ranks():
+    # current_roster_score has to be a real column, even if unused by these
+    # assertions — add_league_detail_ranks does ranked.get("current_roster_
+    # score"), and DataFrame.get on a genuinely missing column returns a bare
+    # None/scalar NaN rather than a Series, which .fillna() can't handle.
+    # build_league_summary's real output always includes this column; only a
+    # synthetic test fixture would ever omit it.
     df_display = pd.DataFrame(
         [
-            {"roster_id": 1, "raw_roster_score": 9000, "starter_score": 6000, "bench_score": 3000, "avg_age": 24.0},
-            {"roster_id": 2, "raw_roster_score": 3000, "starter_score": 2000, "bench_score": 1000, "avg_age": 29.0},
+            {"roster_id": 1, "raw_roster_score": 9000, "current_roster_score": 9000, "starter_score": 6000, "bench_score": 3000, "avg_age": 24.0},
+            {"roster_id": 2, "raw_roster_score": 3000, "current_roster_score": 3000, "starter_score": 2000, "bench_score": 1000, "avg_age": 29.0},
         ]
     )
     result = league_rankings.add_league_detail_ranks(df_display)
