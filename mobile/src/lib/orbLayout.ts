@@ -6,7 +6,7 @@ import { spacing } from '../theme';
 // screen so their bottom padding can actually clear it. Duplicated here
 // instead of imported from GmOrb.tsx to avoid a screen-to-component import
 // cycle; GmOrb.tsx imports these back so the two can never drift apart.
-export const ORB_SIZE = 64;
+export const ORB_SIZE = 48;
 export const ORB_INSET_CEILING = 100;
 
 // GmOrb also renders a LinearGradient scrim behind the orb, absolutely
