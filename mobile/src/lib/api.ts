@@ -149,6 +149,55 @@ export interface LeagueRankingsResponse {
   players: RankedPlayer[];
 }
 
+// player_id/name/position/team/age/status/injury_status/tier/score are the
+// same shape as RankedPlayer, but position_rank/overall_rank here are
+// wire-relative (rank among available free agents), not the league-global
+// canonical_* rank /rankings returns — deliberately separate, matching
+// services/mobile_api_service.py's get_league_waivers.
+export interface WaiverPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  status: string | null;
+  injury_status: string | null;
+  tier: string | null;
+  opportunity_label: string | null;
+  score: number | null;
+  position_rank: number | null;
+  overall_rank: number | null;
+  stale_free_agent: boolean;
+  injury_replacement_fit: boolean;
+  injury_replacement_note: string;
+}
+
+export interface WaiverFaabGuidance {
+  low_bid: number;
+  high_bid: number;
+  pct_low: number;
+  pct_high: number;
+  remaining: number | null;
+  dollars_known: boolean;
+  label: string;
+}
+
+export interface WaiverPriorityAdd extends WaiverPlayer {
+  recommendation_label: string;
+  recommendation_tone: string;
+  faab: WaiverFaabGuidance;
+}
+
+export interface WaiversResponse {
+  ok: true;
+  players: WaiverPlayer[];
+  priority_adds: WaiverPriorityAdd[];
+  needed_positions: string[];
+  available_count?: number;
+  avg_wire_score?: number;
+  reason: string;
+}
+
 // Matches modules/league_value_settings.py's VALUATION_LENS_TO_SCORE_FIELD keys.
 export type ValuationLens = 'Dynasty' | 'Rebuild' | 'Non-Dynasty';
 
@@ -469,6 +518,14 @@ export const api = {
     params.set('limit', String(options?.limit ?? 300));
     return authorizedFetch<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?${params.toString()}`,
+    );
+  },
+  getLeagueWaivers: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    if (options?.limit) params.set('limit', String(options.limit));
+    return authorizedFetch<WaiversResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/waivers?${params.toString()}`,
     );
   },
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
