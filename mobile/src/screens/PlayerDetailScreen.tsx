@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import {
   api,
   type PlayerAward,
@@ -316,9 +317,10 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       <View style={styles.header}>
         <PlayerAvatar playerId={player.player_id} size={88} tier={player.tier} style={styles.heroAvatar} />
         <Text style={styles.name}>{player.name ?? 'Unknown player'}</Text>
-        <Text style={styles.meta}>
-          {[player.position, player.team].filter(Boolean).join(' · ')}
-        </Text>
+        <View style={styles.heroMetaRow}>
+          <PositionBadge position={player.position} size="md" />
+          {player.team ? <Text style={styles.meta}>{player.team}</Text> : null}
+        </View>
         {player.tier ? (
           <View style={[styles.tierBadge, { backgroundColor: `${tierIdentity.color}29`, borderColor: tierIdentity.color }]}>
             <Text style={[styles.tierText, { color: tierIdentity.color }]}>{tierIdentity.shortLabel}</Text>
@@ -401,7 +403,8 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: spacing.xl },
   heroAvatar: { marginBottom: spacing.md },
   name: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  meta: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.xs },
+  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  meta: { fontSize: 14, color: colors.textSecondary },
   tierBadge: {
     marginTop: spacing.sm,
     backgroundColor: colors.badgeBackground,

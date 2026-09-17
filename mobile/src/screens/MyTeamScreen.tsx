@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import { api, type LineupPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -151,9 +152,10 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
         <Text style={styles.name} numberOfLines={1}>
           {player.name ?? 'Unknown player'}
         </Text>
-        <Text style={styles.meta}>
-          {[player.position, player.team, player.opportunity_label].filter(Boolean).join(' · ') || '—'}
-        </Text>
+        <View style={styles.metaRow}>
+          <PositionBadge position={player.position} />
+          <Text style={styles.meta}>{[player.team, player.opportunity_label].filter(Boolean).join(' · ') || '—'}</Text>
+        </View>
       </View>
       {player.injury_status ? (
         <View style={styles.injuryPill}>
@@ -200,7 +202,8 @@ const styles = StyleSheet.create({
   avatar: { marginRight: spacing.sm },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  meta: { fontSize: 12, color: colors.textSecondary },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
   injuryPill: {
     backgroundColor: colors.dangerMuted,
     borderRadius: radii.pill,

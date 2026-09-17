@@ -5,6 +5,7 @@ import QRCode from 'react-native-qrcode-svg';
 import type { RankedPlayer, TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import PlayerAvatar from './PlayerAvatar';
+import PositionBadge from './PositionBadge';
 
 const CARD_WIDTH = 360;
 const CARD_HEIGHT = 500;
@@ -26,9 +27,12 @@ function AssetLine({ player }: { player: RankedPlayer }) {
         <Text style={styles.assetName} numberOfLines={1}>
           {player.name ?? 'Unknown'}
         </Text>
-        <Text style={styles.assetMeta} numberOfLines={1}>
-          {[player.position, player.team].filter(Boolean).join(' · ')}
-        </Text>
+        <View style={styles.assetMetaRow}>
+          <PositionBadge position={player.position} />
+          <Text style={styles.assetMeta} numberOfLines={1}>
+            {player.team}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -174,6 +178,7 @@ const styles = StyleSheet.create({
   assetTextGroup: { flex: 1 },
   assetName: { fontSize: 12, fontWeight: '600', color: colors.textPrimary },
   assetMeta: { fontSize: 10, color: colors.textSecondary },
+  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   whyLabel: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
   whyText: { fontSize: 11, color: colors.textSecondary, lineHeight: 15, marginTop: 2 },
   qrRow: {

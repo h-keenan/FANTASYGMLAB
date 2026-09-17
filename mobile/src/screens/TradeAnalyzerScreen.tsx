@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import { api, type DraftPickAsset, type RankedPlayer, type TeamStrategy, type TradeVerdict } from '../lib/api';
@@ -435,9 +436,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
                 {item.player.name ?? 'Unknown'}
               </Text>
               <View style={styles.resultMetaRow}>
-                <Text style={styles.resultMeta}>
-                  {[item.player.position, item.player.team].filter(Boolean).join(' · ')}
-                </Text>
+                <PositionBadge position={item.player.position} />
+                <Text style={styles.resultMeta}>{item.player.team}</Text>
                 <TierBadge storedTier={item.player.tier} />
               </View>
             </View>

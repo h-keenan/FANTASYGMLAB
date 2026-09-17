@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -272,9 +273,10 @@ function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPre
           <Text style={styles.name} numberOfLines={1}>
             {player.name ?? 'Unknown'}
           </Text>
-          <Text style={styles.meta}>
-            {[player.position, player.team].filter(Boolean).join(' · ')}
-          </Text>
+          <View style={styles.metaRow}>
+            <PositionBadge position={player.position} />
+            <Text style={styles.meta}>{player.team}</Text>
+          </View>
           {player.injury_replacement_fit ? (
             <Text style={styles.injuryFitText}>{player.injury_replacement_note}</Text>
           ) : injuryColor ? (
@@ -324,9 +326,8 @@ function WaiverCard({
             {player.name ?? 'Unknown'}
           </Text>
           <View style={styles.metaRow}>
-            <Text style={styles.meta}>
-              {[player.position, player.team].filter(Boolean).join(' · ')}
-            </Text>
+            <PositionBadge position={player.position} />
+            <Text style={styles.meta}>{player.team}</Text>
             {player.position_rank ? (
               <View style={styles.positionRankPill}>
                 <Text style={styles.positionRankText}>
