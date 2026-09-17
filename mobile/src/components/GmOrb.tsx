@@ -71,7 +71,13 @@ const CLOSE_MS = 260;
 // debugger can hand back the one measurement that actually settles it: is
 // insets.bottom inflated (a native SDK setting additionalSafeAreaInsets and
 // never clearing it), or is it normal and the bug lives elsewhere.
-const SHOW_ORB_DEBUG_OVERLAY = true;
+//
+// Deliberately NOT gated on __DEV__ — the bug this instruments only shows up
+// on a real device / release build, which is exactly where __DEV__ is false.
+// Gated on a build-time env var instead so it defaults OFF (including in a
+// normal TestFlight build) unless someone explicitly opts a build into it —
+// set EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY=1 when building the diagnostic build.
+const SHOW_ORB_DEBUG_OVERLAY = process.env.EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY === '1';
 
 /**
  * The floating "GM" brand-mark button + destination sheet — the mobile
