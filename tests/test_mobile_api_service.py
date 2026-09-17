@@ -2344,3 +2344,92 @@ def test_draft_center_posture_is_null_without_a_resolved_roster(monkeypatch):
     assert body["posture_reason"] == "no_sleeper_username_linked"
     assert body["decision_cards"]
     assert body["partner_cards"]
+
+
+def test_my_team_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/my-team")
+    assert response.status_code == 401
+
+
+def test_my_team_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["starters"] == []
+    assert body["bench"] == []
+    assert body["reason"] == "no_sleeper_username_linked"
+
+
+def test_my_team_returns_the_real_suggested_lineup_split(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            response = client.get(
+                                "/v1/leagues/abc/my-team",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+
+    # Real modules.team_eval.suggest_optimal_lineup output, not a mocked
+    # result. The fixture roster has 1 QB, 4 RB, 4 WR, 1 TE (10 players);
+    # _TRADE_ANALYZER_LEAGUE's roster_positions is
+    # ["QB","RB","RB","WR","WR","WR","TE","FLEX","BN","BN"], i.e. 8
+    # assignable starter slots (QB1+RB2+WR3+TE1+FLEX1) — so exactly 8
+    # starters and 2 bench, regardless of which specific tied-score players
+    # land in which slot (that tie-break isn't this test's business).
+    starters = body["starters"]
+    bench = body["bench"]
+    assert len(starters) == 8
+    assert len(bench) == 2
+    assert len(starters) + len(bench) == 10
+
+    for player in starters:
+        assert player["suggested_starter"] is True
+        assert player["slot"] != "BENCH"
+    for player in bench:
+        assert player["suggested_starter"] is False
+        assert player["slot"] == "BENCH"
+
+    # Starters are ordered QB first (matches _LINEUP_SLOT_ORDER), and the
+    # one clearly-weakest roster player (score 300 vs. everyone else's
+    # 2000) is deterministically bench regardless of tie-breaking among
+    # the 2000-score players.
+    assert starters[0]["slot"] == "QB"
+    bench_ids = {player["player_id"] for player in bench}
+    assert "my_bench_rb" in bench_ids

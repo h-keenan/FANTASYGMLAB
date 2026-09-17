@@ -177,6 +177,28 @@ export interface DraftCenterResponse {
   partner_cards: DraftCard[];
 }
 
+export interface LineupPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  status: string | null;
+  injury_status: string | null;
+  tier: string | null;
+  score: number | null;
+  slot: string | null;
+  suggested_starter: boolean;
+  opportunity_label: string | null;
+}
+
+export interface MyTeamResponse {
+  ok: true;
+  starters: LineupPlayer[];
+  bench: LineupPlayer[];
+  reason: string;
+}
+
 export interface PlayerSummary {
   full_name: string | null;
   first_name: string | null;
@@ -617,6 +639,14 @@ export const api = {
     const query = params.toString();
     return authorizedFetch<DraftCenterResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/draft-center${query ? `?${query}` : ''}`,
+    );
+  },
+  getLeagueMyTeam: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<MyTeamResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/my-team${query ? `?${query}` : ''}`,
     );
   },
   getLeagueRankings: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
