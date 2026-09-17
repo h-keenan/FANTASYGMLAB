@@ -24,8 +24,10 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from modules import trade_hub_ui
 from modules import trade_ideas as trade_ideas_module
 from modules import trade_trust
+from modules import trade_visual_language
 from modules import trust_enforcement
 from modules.compact_fantasy_assets import compact_package
 from modules.player_tiers import assign_player_tiers
@@ -283,6 +285,8 @@ class TradeIdeaCard:
     market_realism_label: str
     reasoning_tags: tuple[str, ...]
     package: dict[str, Any]
+    category: str
+    value_edge_band: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -293,10 +297,12 @@ class TradeIdeaCard:
             "market_realism_label": self.market_realism_label,
             "reasoning_tags": list(self.reasoning_tags),
             "package": self.package,
+            "category": self.category,
+            "value_edge_band": self.value_edge_band,
         }
 
 
-def project_trade_idea_card(idea: Mapping[str, Any]) -> TradeIdeaCard:
+def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = False) -> TradeIdeaCard:
     gain = int(idea.get("trade_gain") or 0)
     edge_label = f"+{gain}" if gain > 0 else (f"-{abs(gain)}" if gain < 0 else "")
     package = compact_package(
@@ -305,6 +311,13 @@ def project_trade_idea_card(idea: Mapping[str, Any]) -> TradeIdeaCard:
         value_edge=edge_label,
         confidence=_safe_text(idea.get("trade_confidence_label")),
     )
+    # Headline placement is presentation order, not a property on the idea
+    # itself — web's select_trade_hub_headline_idea is literally
+    # order_trade_hub_visible_ideas(ideas)[0] (app.py), so the caller (which
+    # already computes that same ordering) tells us via is_headline rather
+    # than this function re-deriving rank from a Mapping with no board
+    # context. modules/ can't import app.py to reuse that helper directly.
+    category = "Headline Recommendation" if is_headline else trade_hub_ui.trade_hub_display_section(dict(idea))
     return TradeIdeaCard(
         partner_team_name=_safe_text(idea.get("partner_team_name"), "Trade partner"),
         rationale=_safe_text(idea.get("rationale")),
@@ -313,6 +326,8 @@ def project_trade_idea_card(idea: Mapping[str, Any]) -> TradeIdeaCard:
         market_realism_label=_safe_text(idea.get("market_realism_label"), "Thin"),
         reasoning_tags=tuple(str(tag) for tag in (idea.get("reasoning_tags") or ())),
         package=package,
+        category=category,
+        value_edge_band=trade_visual_language.trade_value_band(edge_label),
     )
 
 

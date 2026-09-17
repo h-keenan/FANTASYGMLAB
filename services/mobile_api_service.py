@@ -1731,7 +1731,10 @@ def get_trade_hub_ideas(
     # the same fields the web app's Trade Hub sorts on — then project only
     # the visible slice to the narrower mobile card shape.
     ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
-    ranked = [trade_hub_engine.project_trade_idea_card(record).to_dict() for record in ranked_records]
+    ranked = [
+        trade_hub_engine.project_trade_idea_card(record, is_headline=(index == 0)).to_dict()
+        for index, record in enumerate(ranked_records)
+    ]
     approved_count = len(ranked)
     ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
     effective_limit = (

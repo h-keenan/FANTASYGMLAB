@@ -250,7 +250,7 @@ function AssetRow({ asset }: { asset: PresentationAsset }) {
     return (
       <View style={styles.assetRow}>
         <View style={styles.pickDisc}>
-          <Ionicons name="ticket-outline" size={18} color={colors.premium} />
+          <Text style={styles.pickPlateText}>{asset.round ? `R${asset.round}` : 'PICK'}</Text>
         </View>
         <View style={styles.assetTextGroup}>
           <Text style={styles.assetName} numberOfLines={1}>
@@ -263,6 +263,9 @@ function AssetRow({ asset }: { asset: PresentationAsset }) {
       </View>
     );
   }
+  const metaLine = [asset.position, asset.team, asset.age != null ? `Age ${asset.age}` : null]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <View style={styles.assetRow}>
       <PlayerAvatar playerId={asset.player_id} size={36} style={styles.assetAvatar} />
@@ -271,9 +274,38 @@ function AssetRow({ asset }: { asset: PresentationAsset }) {
           {asset.name ?? 'Unknown'}
         </Text>
         <Text style={styles.assetMeta} numberOfLines={1}>
-          {[asset.position, asset.team].filter(Boolean).join(' · ')}
+          {metaLine}
         </Text>
+        {asset.role ? (
+          <Text style={styles.assetRole} numberOfLines={1}>
+            {asset.role}
+          </Text>
+        ) : null}
+        {asset.injury_status ? (
+          <Text style={styles.assetInjury} numberOfLines={1}>
+            {asset.injury_status}
+          </Text>
+        ) : null}
       </View>
+    </View>
+  );
+}
+
+const VALUE_EDGE_BAND_COLOR: Record<string, string> = {
+  Favorable: colors.success,
+  Fair: colors.textSecondary,
+  'Slight Overpay': colors.premium,
+  'Major Overpay': colors.danger,
+};
+
+function CategoryBadge({ category }: { category: string }) {
+  if (!category) return null;
+  const isHeadline = category === 'Headline Recommendation';
+  return (
+    <View style={[styles.categoryBadge, isHeadline && styles.categoryBadgeHeadline]}>
+      <Text style={[styles.categoryBadgeText, isHeadline && styles.categoryBadgeTextHeadline]} numberOfLines={1}>
+        {category.toUpperCase()}
+      </Text>
     </View>
   );
 }
@@ -301,8 +333,15 @@ function TradeIdeaCard({ idea, leagueName }: { idea: TradeIdea; leagueName: stri
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
 
+  const bandColor = VALUE_EDGE_BAND_COLOR[idea.value_edge_band] ?? colors.textSecondary;
+
   return (
     <AnimatedCard style={styles.card}>
+      {idea.category ? (
+        <View style={styles.categoryRow}>
+          <CategoryBadge category={idea.category} />
+        </View>
+      ) : null}
       <View style={styles.partnerRow}>
         <View style={styles.partnerAvatar}>
           <Text style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</Text>
@@ -322,6 +361,15 @@ function TradeIdeaCard({ idea, leagueName }: { idea: TradeIdea; leagueName: stri
           </Text>
         </View>
       </View>
+
+      {idea.value_edge_band ? (
+        <View style={styles.valueEdgeRow}>
+          <Text style={styles.valueEdgeLabel}>TRADE VALUE</Text>
+          <View style={[styles.valueEdgeChip, { borderColor: bandColor }]}>
+            <Text style={[styles.valueEdgeText, { color: bandColor }]}>{idea.value_edge_band}</Text>
+          </View>
+        </View>
+      ) : null}
 
       <TradeSharePreviewModal
         visible={shareOpen}
@@ -427,6 +475,40 @@ const styles = StyleSheet.create({
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20, marginTop: spacing.xl },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl, lineHeight: 20 },
   card: { padding: 0, marginBottom: spacing.md },
+  categoryRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.border,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  categoryBadgeHeadline: { backgroundColor: colors.accentMuted },
+  categoryBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 0.5,
+  },
+  categoryBadgeTextHeadline: { color: colors.accent },
+  valueEdgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  valueEdgeLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  valueEdgeChip: {
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+  },
+  valueEdgeText: { fontSize: 10, fontWeight: '700' },
+  pickPlateText: { fontSize: 11, fontWeight: '700', color: colors.premium },
+  assetRole: { fontSize: 11, color: colors.accent, marginTop: 1 },
+  assetInjury: { fontSize: 11, color: colors.danger, marginTop: 1 },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',

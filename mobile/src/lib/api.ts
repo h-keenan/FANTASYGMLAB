@@ -487,6 +487,10 @@ export interface PresentationAsset {
   score?: number | null;
   role?: string;
   injury_status?: string;
+  // A short severity word (e.g. "minor"/"significant") — separate from
+  // injury_status, which is Sleeper's raw status string (e.g. "Questionable").
+  injury_level?: string;
+  opportunity_explanation?: string;
   season?: string;
   round?: string;
   pick_no?: number;
@@ -496,6 +500,11 @@ export interface PresentationAsset {
 export interface TradePackage {
   send: PresentationAsset[];
   receive: PresentationAsset[];
+  // Signed value-delta string (e.g. "+150"/"-800") and the confidence label,
+  // computed server-side alongside send/receive — already shipping in the
+  // response, just wasn't declared here before.
+  value_edge: string;
+  confidence: string;
 }
 
 export interface TradeIdea {
@@ -506,6 +515,13 @@ export interface TradeIdea {
   market_realism_label: string;
   reasoning_tags: string[];
   package: TradePackage;
+  // "Headline Recommendation" for the top-ranked idea, otherwise one of
+  // High Confidence / Need-Based / Contender / Rebuild / Draft Capital /
+  // Age Optimization / Health Relief — matches web's Trade Hub categories.
+  category: string;
+  // Favorable / Fair / Slight Overpay / Major Overpay — a presentation
+  // bucket derived from trade_gain, not a new/different number.
+  value_edge_band: string;
 }
 
 export interface TradeHubEntitlement {
