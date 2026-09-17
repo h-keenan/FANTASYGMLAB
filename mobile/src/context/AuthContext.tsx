@@ -16,6 +16,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInAsGuest: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -73,6 +74,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           options: { emailRedirectTo: 'fantasygmlab://' },
         });
+        return { error: error?.message ?? null };
+      },
+      signInAsGuest: async () => {
+        // Requires "Allow anonymous sign-ins" enabled in the Supabase
+        // dashboard (Authentication -> Settings) — a project config toggle,
+        // not something this call can turn on itself. Everything
+        // downstream (saved leagues, Sleeper linking, entitlement) keys off
+        // the session's user id, never email, so an anonymous session works
+        // transparently through the rest of the app.
+        const { error } = await supabase.auth.signInAnonymously();
         return { error: error?.message ?? null };
       },
       signOut: async () => {

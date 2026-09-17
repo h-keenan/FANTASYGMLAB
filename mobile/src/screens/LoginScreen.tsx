@@ -18,11 +18,12 @@ import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { colors, gradients, radii, spacing, typography } from '../theme';
 
 export default function LoginScreen() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInAsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [submitting, setSubmitting] = useState(false);
+  const [guestSubmitting, setGuestSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -56,6 +57,15 @@ export default function LoginScreen() {
     setError(null);
     setNotice(null);
     const result = await signInWithApple();
+    if (result.error) setError(result.error);
+  };
+
+  const onGuestPress = async () => {
+    setError(null);
+    setNotice(null);
+    setGuestSubmitting(true);
+    const result = await signInAsGuest();
+    setGuestSubmitting(false);
     if (result.error) setError(result.error);
   };
 
@@ -147,6 +157,19 @@ export default function LoginScreen() {
               : 'Already have an account? Sign in'}
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity onPress={onGuestPress} disabled={guestSubmitting} style={styles.guestButton}>
+          {guestSubmitting ? (
+            <ActivityIndicator color={colors.textSecondary} />
+          ) : (
+            <>
+              <Text style={styles.guestButtonText}>Continue as Guest</Text>
+              <Text style={styles.guestCaption}>
+                No account needed — a guest session can't be recovered if you lose this device.
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </View>
   );
@@ -220,6 +243,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.lg,
     color: colors.accent,
+  },
+  guestButton: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  guestButtonText: {
+    color: colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  guestCaption: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: spacing.lg,
   },
   error: {
     color: colors.danger,

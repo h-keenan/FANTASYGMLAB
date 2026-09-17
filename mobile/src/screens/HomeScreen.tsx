@@ -133,7 +133,7 @@ export default function HomeScreen({ navigation }: Props) {
                   <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
                   <View>
                     <Text style={styles.brandName}>FantasyGM Lab</Text>
-                    <Text style={styles.email}>{session?.user.email}</Text>
+                    <Text style={styles.email}>{session?.user.is_anonymous ? 'Guest' : session?.user.email}</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={() => void signOut()} hitSlop={8}>
