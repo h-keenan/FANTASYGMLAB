@@ -97,12 +97,16 @@ export default function GmOrb() {
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const rawInsets = useSafeAreaInsets();
-  // Defensive clamp on a pathological/stale inset reading — kept as a
-  // belt-and-suspenders guard, though it turned out not to be the cause of
-  // the real-device bug (see useOrbClearance in lib/orbLayout.ts for that).
-  // Measured directly on a real device with this clamp active: the orb sits
-  // exactly where this math predicts (top ~87%, centre ~90% down screen),
-  // proving the orb's own position was never wrong.
+  // Purely precautionary — no evidence this has ever actually fired. This
+  // was originally written to defend against an inflated bottom inset,
+  // which was the leading theory for a reported bug where the orb appeared
+  // to sit mid-screen. That bug turned out to be content sliding underneath
+  // a correctly-positioned orb (see useOrbClearance in lib/orbLayout.ts),
+  // not the orb itself moving — confirmed by measuring rawInsets.bottom on
+  // a real iPhone (34), an iOS simulator (34), and an Android emulator (48),
+  // none of them inflated. If you're reading this because you found an
+  // inset-inflation bug on some device, that would be new evidence this
+  // clamp doesn't currently have — nothing observed so far justifies it.
   const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), ORB_INSET_CEILING);
   const insets = { ...rawInsets, bottom: safeBottom };
   const league = open ? currentLeagueContext() : null;
