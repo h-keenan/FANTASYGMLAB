@@ -130,6 +130,14 @@ export interface TeamRanking {
   bench_rank: number | null;
   age_rank: number | null;
   average_age: number | null;
+  strategy: string | null;
+  strategy_label: string | null;
+  archetype: string | null;
+  archetype_label: string | null;
+  archetype_explanation: string | null;
+  archetype_strengths: string[];
+  archetype_risks: string[];
+  archetype_recommendations: string[];
 }
 
 export interface LeagueTeamRankingsResponse {
@@ -169,6 +177,7 @@ export interface RankedPlayer {
   overall_rank: number | null;
   position_rank: number | null;
   rank_unavailable_reason: string | null;
+  opportunity_label: string | null;
 }
 
 export interface LeagueRankingsResponse {

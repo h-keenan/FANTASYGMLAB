@@ -34,7 +34,7 @@ import LoadingScreen from '../screens/LoadingScreen';
 export type RootStackParamList = {
   Home: undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
-  TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string };
+  TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string; rosterId: string };
   Paywall: undefined;
   TradeCalculator: { leagueId: string; leagueName: string };
   News: undefined;

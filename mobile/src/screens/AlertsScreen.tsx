@@ -106,6 +106,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
       overall_rank: null,
       position_rank: null,
       rank_unavailable_reason: null,
+      opportunity_label: null,
     };
     navigation.navigate('PlayerDetail', { player, leagueId, leagueName });
   };

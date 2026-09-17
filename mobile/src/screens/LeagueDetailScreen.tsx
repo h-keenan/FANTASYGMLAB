@@ -28,6 +28,7 @@ interface MyTeamInfo {
   avatarId: string;
   playerCount: number;
   playerIds: string[];
+  rosterId: string;
 }
 
 function scoringLabel(scoringSettings: Record<string, unknown> | undefined): string {
@@ -94,6 +95,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
             avatarId: profile?.avatar_id || '',
             playerCount: playerIds.length,
             playerIds,
+            rosterId,
           });
         }
 
@@ -174,6 +176,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
               playerIds: myTeam.playerIds,
               leagueId,
               leagueName,
+              rosterId: myTeam.rosterId,
             })
           }
         >

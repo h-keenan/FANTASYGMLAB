@@ -648,6 +648,7 @@ def test_rankings_endpoint_returns_ranked_players_for_real_league_settings(monke
     for player in players:
         assert "score" in player
         assert "tier" in player
+        assert "opportunity_label" in player
 
 
 def test_rankings_endpoint_returns_404_for_missing_league(monkeypatch):
@@ -2137,3 +2138,17 @@ def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
     # this test has no business predicting.
     assert isinstance(by_roster["1"]["draft_capital_rank"], int)
     assert isinstance(by_roster["2"]["draft_capital_rank"], int)
+    # Archetype/strategy classification (modules.team_eval.refine_team_directions)
+    # runs on real strength inputs here (starter/bench/age/draft-capital ranks
+    # all come from the fixture, not neutral fallbacks) — asserting the fields
+    # are populated, non-empty labels is the honest claim; the exact archetype
+    # a 2-team, lopsided-roster fixture lands on isn't this test's business.
+    for team in teams:
+        assert isinstance(team["strategy"], str) and team["strategy"]
+        assert isinstance(team["strategy_label"], str) and team["strategy_label"]
+        assert isinstance(team["archetype"], str) and team["archetype"]
+        assert isinstance(team["archetype_label"], str) and team["archetype_label"]
+        assert isinstance(team["archetype_explanation"], str) and team["archetype_explanation"]
+        assert isinstance(team["archetype_strengths"], list)
+        assert isinstance(team["archetype_risks"], list)
+        assert isinstance(team["archetype_recommendations"], list)
