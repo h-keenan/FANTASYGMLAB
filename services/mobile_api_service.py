@@ -12,6 +12,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
   - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
   - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
+  - GET  /v1/leagues/{id}/my-team        — your own roster's suggested starters vs. bench
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
@@ -1639,6 +1640,95 @@ def get_league_dashboard(
         "team_snapshot": team_snapshot,
         "reason": "",
     }
+
+
+# Display order for My Team's starters section — matches
+# modules.team_eval.suggest_optimal_lineup's own slot-assignment order.
+# Bench keeps the frame's existing sort_score-descending order untouched.
+_LINEUP_SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K"]
+
+
+def _project_lineup_row(row: pd.Series, score_field: str) -> dict[str, Any]:
+    return {
+        "player_id": _clean_json_value(row.get("player_id")),
+        "name": _clean_json_value(row.get("name")),
+        "position": _clean_json_value(row.get("position")),
+        "team": _clean_json_value(row.get("team")),
+        "age": _clean_json_value(row.get("age")),
+        "status": _clean_json_value(row.get("status")),
+        "injury_status": _clean_json_value(row.get("injury_status")),
+        "tier": _clean_json_value(row.get("player_tier")),
+        "score": _clean_json_value(row.get(score_field)),
+        "slot": _clean_json_value(row.get("slot")),
+        "suggested_starter": bool(row.get("suggested_starter")),
+        "opportunity_label": _clean_json_value(row.get("opportunity_label")),
+    }
+
+
+@app.get("/v1/leagues/{league_id}/my-team")
+def get_league_my_team(
+    league_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Your own roster's suggested starting lineup vs. bench.
+
+    Runs the exact same modules.team_eval.suggest_optimal_lineup computation
+    get_league_dashboard already calls internally for its injury/health
+    tiles, surfaced here directly as a real starters/bench breakdown instead
+    of folded into a briefing summary.
+
+    Lightweight scope: this is the lineup view only, not the web app's full
+    My Team page (which also supports persisted untouchable-player tags and
+    a manual strategy override). Those need new stateful product surface —
+    a Supabase table and real UI for editing/persisting per-user roster
+    state — not a port of existing pure logic, so they're an explicit,
+    separate follow-up rather than silently reduced scope here.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return {"ok": True, "starters": [], "bench": [], "reason": reason}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_my_team")
+    if players_df.empty:
+        return {"ok": True, "starters": [], "bench": [], "reason": "no_player_data"}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    if not roster_player_ids:
+        return {"ok": True, "starters": [], "bench": [], "reason": "empty_roster"}
+
+    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+
+    players = [_project_lineup_row(row, score_field) for _, row in lineup_df.iterrows()]
+    starters = [p for p in players if p["suggested_starter"]]
+    starters.sort(
+        key=lambda p: _LINEUP_SLOT_ORDER.index(p["slot"]) if p["slot"] in _LINEUP_SLOT_ORDER else len(_LINEUP_SLOT_ORDER)
+    )
+    bench = [p for p in players if not p["suggested_starter"]]
+
+    return {"ok": True, "starters": starters, "bench": bench, "reason": ""}
 
 
 def _project_waiver_row(row: pd.Series, score_field: str) -> dict[str, Any]:
