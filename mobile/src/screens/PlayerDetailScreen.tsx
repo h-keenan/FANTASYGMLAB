@@ -4,12 +4,27 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import PlayerAvatar from '../components/PlayerAvatar';
-import { api, type PlayerAward, type QuickViewBio, type QuickViewStatItem, type QuickViewStats } from '../lib/api';
+import {
+  api,
+  type PlayerAward,
+  type QuickViewBio,
+  type QuickViewModel,
+  type QuickViewSeason,
+  type QuickViewStatItem,
+  type QuickViewStats,
+} from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { resolvePlayerTier } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+
+type DetailTab = 'stats' | 'career' | 'model';
+const TABS: Array<{ key: DetailTab; label: string }> = [
+  { key: 'stats', label: 'Stats' },
+  { key: 'career', label: 'Career' },
+  { key: 'model', label: 'Model' },
+];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerDetail'>;
 
@@ -118,10 +133,92 @@ function BioSection({ bio }: { bio: QuickViewBio }) {
   );
 }
 
+function TabRow({ active, onChange }: { active: DetailTab; onChange: (tab: DetailTab) => void }) {
+  return (
+    <View style={styles.tabRow}>
+      {TABS.map((tab) => (
+        <TouchableOpacity
+          key={tab.key}
+          style={[styles.tabPill, active === tab.key && styles.tabPillActive]}
+          onPress={() => onChange(tab.key)}
+        >
+          <Text style={[styles.tabPillText, active === tab.key && styles.tabPillTextActive]}>{tab.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+function SeasonCard({ season }: { season: QuickViewSeason }) {
+  return (
+    <View style={[styles.card, styles.cardSpaced]}>
+      <SectionHeading title={season.label} icon="calendar-outline" />
+      {season.key_stats.length > 0 ? (
+        <StatGrid items={season.key_stats.map((item) => ({ label: item.label, value: item.value || null }))} />
+      ) : (
+        <Text style={styles.notice}>No stats recorded for this season.</Text>
+      )}
+    </View>
+  );
+}
+
+function CareerSection({ seasons }: { seasons: QuickViewSeason[] }) {
+  if (seasons.length === 0) {
+    return <Text style={styles.notice}>No season history available for this player yet.</Text>;
+  }
+  return (
+    <>
+      {seasons.map((season, index) => (
+        <SeasonCard key={`${season.season ?? 'season'}-${season.season_type}-${index}`} season={season} />
+      ))}
+    </>
+  );
+}
+
+const WORKLOAD_TREND_COLOR: Record<string, string> = {
+  rising: colors.success,
+  climbing: colors.success,
+  increasing: colors.success,
+  falling: colors.danger,
+  declining: colors.danger,
+  decreasing: colors.danger,
+};
+
+function ModelSection({ model }: { model: QuickViewModel }) {
+  const trendKey = (model.workload_trend ?? '').toLowerCase();
+  const trendColor = WORKLOAD_TREND_COLOR[trendKey] ?? colors.textSecondary;
+  return (
+    <View style={styles.card}>
+      <SectionHeading title="Model Breakdown" icon="analytics-outline" />
+      <StatGrid
+        items={[
+          { label: 'Market', value: model.market_score != null ? Math.round(model.market_score) : null },
+          { label: 'Opportunity', value: model.opportunity_score != null ? Math.round(model.opportunity_score) : null },
+          { label: 'Scarcity', value: model.scarcity_score != null ? Math.round(model.scarcity_score) : null },
+          { label: 'Role', value: model.role_score != null ? Math.round(model.role_score) : null },
+          { label: model.age_score_label, value: model.age_score != null ? Math.round(model.age_score) : null },
+          {
+            label: 'Confidence',
+            value: model.opportunity_confidence != null ? `${Math.round(model.opportunity_confidence)}%` : null,
+          },
+        ]}
+      />
+      {model.workload_trend ? (
+        <View style={styles.trendRow}>
+          <Ionicons name="trending-up-outline" size={14} color={trendColor} />
+          <Text style={[styles.trendText, { color: trendColor }]}>Workload trend: {model.workload_trend}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export default function PlayerDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { player, leagueId } = route.params;
   const [stats, setStats] = useState<QuickViewStats | null>(null);
+  const [model, setModel] = useState<QuickViewModel | null>(null);
+  const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [bio, setBio] = useState<QuickViewBio | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,6 +236,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         if (cancelled) return;
         setStats(result.stats);
         setBio(result.bio);
+        setModel(result.model);
       })
       .catch(() => {
         // Quick View is a nice-to-have enrichment — the core rank card above
@@ -262,19 +360,33 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       ) : (
         <>
           <AwardsSection awards={awards} />
-          {season ? (
+
+          {stats?.seasons.length || model ? <TabRow active={activeTab} onChange={setActiveTab} /> : null}
+
+          {activeTab === 'stats' && season ? (
             <>
               <Text style={styles.seasonLabel}>{season.label}</Text>
               <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} />
               <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} />
               <StatSection title="Usage" icon="speedometer-outline" items={season.usage} />
+              {stats?.college_available ? (
+                <StatSection title="College" icon="school-outline" items={stats.college} />
+              ) : null}
             </>
           ) : null}
-          {stats?.college_available ? (
-            <StatSection title="College" icon="school-outline" items={stats.college} />
+
+          {activeTab === 'career' ? <CareerSection seasons={stats?.seasons ?? []} /> : null}
+
+          {activeTab === 'model' ? (
+            model ? (
+              <ModelSection model={model} />
+            ) : (
+              <Text style={styles.notice}>No model breakdown available for this player yet.</Text>
+            )
           ) : null}
+
           {bio ? <BioSection bio={bio} /> : null}
-          {!season && !stats?.college_available && !bio && awards.length === 0 ? (
+          {!season && !model && !stats?.college_available && !bio && awards.length === 0 ? (
             <Text style={styles.notice}>No additional stats available for this player yet.</Text>
           ) : null}
         </>
@@ -315,6 +427,33 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   cardSpaced: { marginTop: spacing.lg },
+  tabRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+  },
+  tabPill: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tabPillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
+  tabPillText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  tabPillTextActive: { color: colors.accent },
+  trendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  trendText: { fontSize: 12, fontWeight: '600' },
   seasonLabel: {
     fontSize: 13,
     fontWeight: '600',

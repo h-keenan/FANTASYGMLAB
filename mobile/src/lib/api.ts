@@ -441,10 +441,22 @@ export interface QuickViewBio {
   contract_status: string;
 }
 
+export interface QuickViewModel {
+  market_score: number | null;
+  opportunity_score: number | null;
+  scarcity_score: number | null;
+  role_score: number | null;
+  age_score: number | null;
+  age_score_label: string;
+  opportunity_confidence: number | null;
+  workload_trend: string | null;
+}
+
 export interface QuickViewResponse {
   ok: true;
   stats: QuickViewStats | null;
   bio: QuickViewBio | null;
+  model: QuickViewModel | null;
   reason: '' | 'not_found';
 }
 
