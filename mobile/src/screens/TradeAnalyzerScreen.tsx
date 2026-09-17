@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +19,7 @@ import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import { api, type DraftPickAsset, type RankedPlayer, type TeamStrategy, type TradeVerdict } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -92,6 +95,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  const orbClearance = useOrbClearance();
 
   useScreenHeaderTitle(navigation, 'Trade Analyzer', leagueName);
 
@@ -418,13 +423,16 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   );
 
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <GridBackground />
       <FlatList
       style={styles.container}
       data={searchResults}
       keyExtractor={(item) => (item.kind === 'player' ? item.player.player_id : item.pick.pick_id)}
-      contentContainerStyle={styles.resultsList}
+      contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance }]}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={header}
       renderItem={({ item }) =>
@@ -472,7 +480,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         </Text>
       }
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

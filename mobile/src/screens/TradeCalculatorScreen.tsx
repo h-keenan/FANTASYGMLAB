@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +16,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import { api, type RankedPlayer } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -37,6 +40,8 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
   const [sideB, setSideB] = useState<RankedPlayer[]>([]);
   const [activeSide, setActiveSide] = useState<Side>('A');
   const [search, setSearch] = useState('');
+
+  const orbClearance = useOrbClearance();
 
   useScreenHeaderTitle(navigation, 'Trade Calculator', leagueName);
 
@@ -110,7 +115,10 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <GridBackground />
       <Text style={styles.disclaimer}>
         Raw asset value only — {leagueName}'s {'“'}Dynasty{'”'} valuations. Doesn't yet
@@ -152,7 +160,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       <FlatList
         data={searchResults}
         keyExtractor={(item) => item.player_id}
-        contentContainerStyle={styles.resultsList}
+        contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance }]}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.resultRow} onPress={() => addToActiveSide(item)}>
@@ -175,7 +183,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
           </Text>
         }
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -50,9 +51,11 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
     }
   }, [leagueId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const removeTarget = useCallback(
     async (playerId: string) => {
@@ -117,11 +120,15 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
                 {item.player ? (
                   <>
                     <PositionBadge position={item.player.position} />
-                    <Text style={styles.meta}>{item.player.team}</Text>
+                    <Text style={styles.meta} numberOfLines={1}>
+                      {item.player.team}
+                    </Text>
                     <TierBadge storedTier={item.player.tier} />
                   </>
                 ) : (
-                  <Text style={styles.meta}>Not on the current rankings board</Text>
+                  <Text style={styles.meta} numberOfLines={1}>
+                    Not on the current rankings board
+                  </Text>
                 )}
               </View>
             </View>
@@ -157,7 +164,7 @@ const styles = StyleSheet.create({
   avatar: { marginRight: spacing.sm },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary },
+  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginRight: spacing.md },
   removeButton: {

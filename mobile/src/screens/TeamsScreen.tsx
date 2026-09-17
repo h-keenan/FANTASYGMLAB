@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -33,58 +34,60 @@ export default function TeamsScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, 'Teams', leagueName);
 
-  useEffect(() => {
-    let cancelled = false;
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
 
-    async function load() {
-      try {
-        const [profilesResult, rostersResult, myRosterResult, rankingsResult] = await Promise.all([
-          api.getLeagueTeamProfiles(leagueId),
-          api.getLeagueRosters(leagueId),
-          api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
-          api
-            .getLeagueTeamRankings(leagueId)
-            .catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
-        ]);
-        if (cancelled) return;
+      async function load() {
+        try {
+          const [profilesResult, rostersResult, myRosterResult, rankingsResult] = await Promise.all([
+            api.getLeagueTeamProfiles(leagueId),
+            api.getLeagueRosters(leagueId),
+            api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
+            api
+              .getLeagueTeamRankings(leagueId)
+              .catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
+          ]);
+          if (cancelled) return;
 
-        const myRosterId = myRosterResult.roster ? String(myRosterResult.roster.roster_id ?? '') : '';
-        const rankingsByRoster = new Map(rankingsResult.teams.map((team) => [team.roster_id, team]));
+          const myRosterId = myRosterResult.roster ? String(myRosterResult.roster.roster_id ?? '') : '';
+          const rankingsByRoster = new Map(rankingsResult.teams.map((team) => [team.roster_id, team]));
 
-        const rows: TeamRow[] = rostersResult.rosters.map((roster) => {
-          const rosterId = String(roster.roster_id ?? '');
-          const players = Array.isArray(roster.players) ? roster.players : [];
-          const profile = profilesResult.profiles[rosterId];
-          const ranking = rankingsByRoster.get(rosterId);
-          return {
-            rosterId,
-            teamName: profile?.team_name || 'Unclaimed team',
-            avatarId: profile?.avatar_id || '',
-            playerIds: players.map(String),
-            isMine: Boolean(myRosterId) && rosterId === myRosterId,
-            powerRank: ranking?.power_rank ?? null,
-            recordLabel: ranking?.record_label ?? null,
-            archetypeLabel: ranking?.archetype_label ?? null,
-          };
-        });
-        rows.sort((a, b) => {
-          if (a.isMine !== b.isMine) return Number(b.isMine) - Number(a.isMine);
-          if (a.powerRank != null && b.powerRank != null) return a.powerRank - b.powerRank;
-          return 0;
-        });
-        setTeams(rows);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load teams.');
-      } finally {
-        if (!cancelled) setLoading(false);
+          const rows: TeamRow[] = rostersResult.rosters.map((roster) => {
+            const rosterId = String(roster.roster_id ?? '');
+            const players = Array.isArray(roster.players) ? roster.players : [];
+            const profile = profilesResult.profiles[rosterId];
+            const ranking = rankingsByRoster.get(rosterId);
+            return {
+              rosterId,
+              teamName: profile?.team_name || 'Unclaimed team',
+              avatarId: profile?.avatar_id || '',
+              playerIds: players.map(String),
+              isMine: Boolean(myRosterId) && rosterId === myRosterId,
+              powerRank: ranking?.power_rank ?? null,
+              recordLabel: ranking?.record_label ?? null,
+              archetypeLabel: ranking?.archetype_label ?? null,
+            };
+          });
+          rows.sort((a, b) => {
+            if (a.isMine !== b.isMine) return Number(b.isMine) - Number(a.isMine);
+            if (a.powerRank != null && b.powerRank != null) return a.powerRank - b.powerRank;
+            return 0;
+          });
+          setTeams(rows);
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load teams.');
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
       }
-    }
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
+      void load();
+      return () => {
+        cancelled = true;
+      };
+    }, [leagueId]),
+  );
 
   if (loading) {
     return (

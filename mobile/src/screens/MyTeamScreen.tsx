@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -62,25 +63,27 @@ export default function MyTeamScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, 'My Team', leagueName);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await api.getLeagueMyTeam(leagueId);
-        if (cancelled) return;
-        setStarters(result.starters);
-        setBench(result.bench);
-        setNotice(result.reason ? reasonMessage(result.reason) : null);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load your lineup.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const result = await api.getLeagueMyTeam(leagueId);
+          if (cancelled) return;
+          setStarters(result.starters);
+          setBench(result.bench);
+          setNotice(result.reason ? reasonMessage(result.reason) : null);
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load your lineup.');
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [leagueId]),
+  );
 
   if (loading) {
     return (
@@ -154,7 +157,9 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
         </Text>
         <View style={styles.metaRow}>
           <PositionBadge position={player.position} />
-          <Text style={styles.meta}>{[player.team, player.opportunity_label].filter(Boolean).join(' · ') || '—'}</Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {[player.team, player.opportunity_label].filter(Boolean).join(' · ') || '—'}
+          </Text>
         </View>
       </View>
       {player.injury_status ? (
@@ -202,7 +207,7 @@ const styles = StyleSheet.create({
   avatar: { marginRight: spacing.sm },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary },
+  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
   injuryPill: {
     backgroundColor: colors.dangerMuted,

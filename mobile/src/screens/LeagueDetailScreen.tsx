@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -55,67 +56,69 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
     void setLastLeague({ leagueId, leagueName });
   }, [leagueId, leagueName]);
 
-  useEffect(() => {
-    let cancelled = false;
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
 
-    async function load() {
-      try {
-        const [leagueResult, dashboardResult, myRosterResult, profilesResult, recapResult] = await Promise.all([
-          api.getLeague(leagueId).catch(() => null),
-          api.getLeagueDashboard(leagueId).catch(() => null),
-          api.getMyRoster(leagueId).catch(() => null),
-          api.getLeagueTeamProfiles(leagueId).catch(() => null),
-          api.getLeagueRecap(leagueId).catch(() => null),
-        ]);
-        if (cancelled) return;
+      async function load() {
+        try {
+          const [leagueResult, dashboardResult, myRosterResult, profilesResult, recapResult] = await Promise.all([
+            api.getLeague(leagueId).catch(() => null),
+            api.getLeagueDashboard(leagueId).catch(() => null),
+            api.getMyRoster(leagueId).catch(() => null),
+            api.getLeagueTeamProfiles(leagueId).catch(() => null),
+            api.getLeagueRecap(leagueId).catch(() => null),
+          ]);
+          if (cancelled) return;
 
-        if (leagueResult?.league) {
-          const league = leagueResult.league;
-          const settings = (league.settings as Record<string, unknown>) ?? {};
-          setSummary({
-            season: String(league.season ?? '—'),
-            week: settings.leg ? String(settings.leg) : '—',
-            teamCount: String(league.total_rosters ?? '—'),
-            scoring: scoringLabel(league.scoring_settings as Record<string, unknown>),
-          });
-        }
+          if (leagueResult?.league) {
+            const league = leagueResult.league;
+            const settings = (league.settings as Record<string, unknown>) ?? {};
+            setSummary({
+              season: String(league.season ?? '—'),
+              week: settings.leg ? String(settings.leg) : '—',
+              teamCount: String(league.total_rosters ?? '—'),
+              scoring: scoringLabel(league.scoring_settings as Record<string, unknown>),
+            });
+          }
 
-        if (dashboardResult) {
-          setDashboardItems(dashboardResult.items ?? []);
-          setDashboardQuiet(dashboardResult.quiet);
-        }
+          if (dashboardResult) {
+            setDashboardItems(dashboardResult.items ?? []);
+            setDashboardQuiet(dashboardResult.quiet);
+          }
 
-        const roster = myRosterResult?.roster as { roster_id?: unknown; players?: unknown } | null | undefined;
-        if (roster && profilesResult) {
-          const rosterId = String(roster.roster_id ?? '');
-          const profile = profilesResult.profiles[rosterId];
-          const playerIds = Array.isArray(roster.players) ? roster.players.map(String) : [];
-          setMyTeam({
-            teamName: profile?.team_name || 'Your team',
-            avatarId: profile?.avatar_id || '',
-            playerCount: playerIds.length,
-            playerIds,
-            rosterId,
-          });
-        }
+          const roster = myRosterResult?.roster as { roster_id?: unknown; players?: unknown } | null | undefined;
+          if (roster && profilesResult) {
+            const rosterId = String(roster.roster_id ?? '');
+            const profile = profilesResult.profiles[rosterId];
+            const playerIds = Array.isArray(roster.players) ? roster.players.map(String) : [];
+            setMyTeam({
+              teamName: profile?.team_name || 'Your team',
+              avatarId: profile?.avatar_id || '',
+              playerCount: playerIds.length,
+              playerIds,
+              rosterId,
+            });
+          }
 
-        if (recapResult?.recap && !recapResult.recap.incomplete) {
-          setRecapReady(recapResult.recap.week);
+          if (recapResult?.recap && !recapResult.recap.incomplete) {
+            setRecapReady(recapResult.recap.week);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : 'Failed to load league.');
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
         }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load league.');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
-    }
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
+      void load();
+      return () => {
+        cancelled = true;
+      };
+    }, [leagueId]),
+  );
 
   if (loading) {
     return (
