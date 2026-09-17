@@ -39,6 +39,28 @@ export const colors = {
   violet: '#8B93FF',
 };
 
+/**
+ * Position identity — byte-identical to modules/design_tokens.py's
+ * --color-position-* tokens (unlike the rest of `colors` above, which is a
+ * deliberate brand-sheet divergence from web's palette, position colors
+ * were simply never ported at all — confirmed by direct grep, every screen
+ * rendered position as plain secondary-color text). Chip/accent only, per
+ * design_tokens.py's own comment: never recolor the whole player card.
+ */
+export const positionColors: Record<string, string> = {
+  QB: '#C4B5FD',
+  RB: '#86EFAC',
+  WR: '#7DD3FC',
+  TE: '#FCD34D',
+  K: '#FDA4AF',
+  DEF: '#D4D4D8',
+  DST: '#D4D4D8',
+};
+
+export function positionColor(position: string | null | undefined): string {
+  return positionColors[(position ?? '').toUpperCase()] ?? colors.textSecondary;
+}
+
 export const gradients = {
   hero: ['#16202C', '#0D1117'] as const,
   accent: ['#5CE4FF', '#00D4FF'] as const,

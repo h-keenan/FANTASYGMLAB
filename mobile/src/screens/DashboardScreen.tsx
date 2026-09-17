@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import { api, type DashboardItem, type DashboardItemCategory, type PresentationAsset, type TeamSnapshot } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
@@ -215,9 +216,12 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
         <Text style={styles.assetName} numberOfLines={1}>
           {asset.name ?? 'Unknown'}
         </Text>
-        <Text style={styles.assetMeta} numberOfLines={1}>
-          {[asset.position, asset.team].filter(Boolean).join(' · ')}
-        </Text>
+        <View style={styles.assetMetaRow}>
+          <PositionBadge position={asset.position} />
+          <Text style={styles.assetMeta} numberOfLines={1}>
+            {asset.team}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -481,7 +485,8 @@ const styles = StyleSheet.create({
   },
   assetTextGroup: { flex: 1 },
   assetName: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  assetMeta: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  assetMeta: { fontSize: 11, color: colors.textSecondary },
+  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 1 },
   valueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

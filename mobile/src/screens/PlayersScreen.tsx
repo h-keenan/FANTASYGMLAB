@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -187,8 +188,9 @@ export default function PlayersScreen({ route, navigation }: Props) {
                   {item.name ?? 'Unknown'}
                 </Text>
                 <View style={styles.metaRow}>
+                  <PositionBadge position={item.position} />
                   <Text style={styles.meta} numberOfLines={1}>
-                    {[item.position, item.team, item.opportunity_label].filter(Boolean).join(' · ')}
+                    {[item.team, item.opportunity_label].filter(Boolean).join(' · ')}
                   </Text>
                   <TierBadge storedTier={item.tier} />
                 </View>

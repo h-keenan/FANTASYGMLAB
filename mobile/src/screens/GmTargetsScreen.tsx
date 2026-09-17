@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -113,12 +114,15 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
                 {item.player?.name ?? `Player ${item.target.player_id}`}
               </Text>
               <View style={styles.metaRow}>
-                <Text style={styles.meta}>
-                  {item.player
-                    ? [item.player.position, item.player.team].filter(Boolean).join(' · ')
-                    : 'Not on the current rankings board'}
-                </Text>
-                {item.player ? <TierBadge storedTier={item.player.tier} /> : null}
+                {item.player ? (
+                  <>
+                    <PositionBadge position={item.player.position} />
+                    <Text style={styles.meta}>{item.player.team}</Text>
+                    <TierBadge storedTier={item.player.tier} />
+                  </>
+                ) : (
+                  <Text style={styles.meta}>Not on the current rankings board</Text>
+                )}
               </View>
             </View>
             <Text style={styles.score}>

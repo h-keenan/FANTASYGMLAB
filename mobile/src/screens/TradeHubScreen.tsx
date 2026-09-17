@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import {
   api,
@@ -264,9 +265,7 @@ function AssetRow({ asset }: { asset: PresentationAsset }) {
       </View>
     );
   }
-  const metaLine = [asset.position, asset.team, asset.age != null ? `Age ${asset.age}` : null]
-    .filter(Boolean)
-    .join(' · ');
+  const metaLine = [asset.team, asset.age != null ? `Age ${asset.age}` : null].filter(Boolean).join(' · ');
   return (
     <View style={styles.assetRow}>
       <PlayerAvatar playerId={asset.player_id} size={36} style={styles.assetAvatar} />
@@ -274,9 +273,12 @@ function AssetRow({ asset }: { asset: PresentationAsset }) {
         <Text style={styles.assetName} numberOfLines={1}>
           {asset.name ?? 'Unknown'}
         </Text>
-        <Text style={styles.assetMeta} numberOfLines={1}>
-          {metaLine}
-        </Text>
+        <View style={styles.assetMetaRow}>
+          <PositionBadge position={asset.position} />
+          <Text style={styles.assetMeta} numberOfLines={1}>
+            {metaLine}
+          </Text>
+        </View>
         {asset.role ? (
           <Text style={styles.assetRole} numberOfLines={1}>
             {asset.role}
@@ -571,6 +573,7 @@ const styles = StyleSheet.create({
   assetTextGroup: { flex: 1 },
   assetName: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   assetMeta: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   rationaleLabel: {
     fontSize: 12,
     fontWeight: '700',

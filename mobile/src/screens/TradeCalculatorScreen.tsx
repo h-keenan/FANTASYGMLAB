@@ -12,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PositionBadge from '../components/PositionBadge';
 import { api, type RankedPlayer } from '../lib/api';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -160,9 +161,10 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
               <Text style={styles.resultName} numberOfLines={1}>
                 {item.name ?? 'Unknown'}
               </Text>
-              <Text style={styles.resultMeta}>
-                {[item.position, item.team].filter(Boolean).join(' · ')}
-              </Text>
+              <View style={styles.resultMetaRow}>
+                <PositionBadge position={item.position} />
+                <Text style={styles.resultMeta}>{item.team}</Text>
+              </View>
             </View>
             <Text style={styles.resultScore}>{Math.round(playerScore(item))}</Text>
           </TouchableOpacity>
@@ -285,7 +287,8 @@ const styles = StyleSheet.create({
   resultAvatar: { marginRight: spacing.sm },
   resultInfo: { flex: 1, marginRight: spacing.sm },
   resultName: { fontSize: 15, fontWeight: '500', color: colors.textPrimary },
-  resultMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  resultMeta: { fontSize: 12, color: colors.textSecondary },
+  resultMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
   resultScore: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center' },
