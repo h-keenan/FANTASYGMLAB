@@ -750,6 +750,9 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
         },
     ]
 
+    from modules import news as news_module
+
+    news_module.clear_enriched_news_pool_cache()
     with patch("requests.get", return_value=auth_user_response):
         with patch("modules.news.schedule_news_cache_refresh", return_value=False):
             with patch("modules.news.load_cached_news_pool", return_value=fake_pool):

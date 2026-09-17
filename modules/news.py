@@ -11,6 +11,7 @@ import hashlib
 import os
 import threading
 import time
+from functools import lru_cache
 from urllib.parse import quote_plus
 
 import feedparser
@@ -182,6 +183,38 @@ def load_cached_news_pool():
         return []
     cached.sort(key=_news_item_timestamp, reverse=True)
     return cached
+
+
+# enrich_news_item() is a pure per-article classification (regex/keyword
+# matching, no side effects) — cheap for a single Streamlit rerun, but
+# services/mobile_api_service.py's GET /v1/news re-runs it over the WHOLE
+# pool on every single request. The underlying disk cache only refreshes
+# every NEWS_CACHE_TTL_SECONDS (20 min), so a much shorter in-process TTL
+# here still feels live while eliminating repeat reclassification of an
+# unchanged pool within that window.
+ENRICHED_NEWS_POOL_TTL_SECONDS = 60
+
+
+def _enriched_news_pool_bucket() -> int:
+    return int(time.time() // ENRICHED_NEWS_POOL_TTL_SECONDS)
+
+
+@lru_cache(maxsize=4)
+def _enriched_news_pool_cached(_bucket: int) -> tuple:
+    pool = load_cached_news_pool()
+    return tuple(news_signal.enrich_news_item(item) for item in pool if isinstance(item, dict))
+
+
+def enriched_news_pool() -> list:
+    """The disk-cached news pool with signal_* classification attached."""
+
+    return list(_enriched_news_pool_cached(_enriched_news_pool_bucket()))
+
+
+def clear_enriched_news_pool_cache() -> None:
+    """Drop the in-process enriched-pool cache — tests, and any manual refresh hook."""
+
+    _enriched_news_pool_cached.cache_clear()
 
 
 def _load_roster_cache():

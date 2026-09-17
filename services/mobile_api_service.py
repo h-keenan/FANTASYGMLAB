@@ -488,9 +488,8 @@ def get_news(
         raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_NEWS_LIMIT}.")
 
     news_cache.schedule_news_cache_refresh()
-    pool = news_cache.load_cached_news_pool()
+    enriched = news_cache.enriched_news_pool()
 
-    enriched = (news_signal.enrich_news_item(item) for item in pool if isinstance(item, dict))
     actionable = [item for item in enriched if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS]
     actionable.sort(key=my_news.news_timestamp, reverse=True)
 
