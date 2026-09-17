@@ -19,6 +19,8 @@ interface TeamRow {
   avatarId: string;
   playerIds: string[];
   isMine: boolean;
+  powerRank: number | null;
+  recordLabel: string | null;
 }
 
 export default function TeamsScreen({ route, navigation }: Props) {
@@ -35,28 +37,39 @@ export default function TeamsScreen({ route, navigation }: Props) {
 
     async function load() {
       try {
-        const [profilesResult, rostersResult, myRosterResult] = await Promise.all([
+        const [profilesResult, rostersResult, myRosterResult, rankingsResult] = await Promise.all([
           api.getLeagueTeamProfiles(leagueId),
           api.getLeagueRosters(leagueId),
           api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
+          api
+            .getLeagueTeamRankings(leagueId)
+            .catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
         ]);
         if (cancelled) return;
 
         const myRosterId = myRosterResult.roster ? String(myRosterResult.roster.roster_id ?? '') : '';
+        const rankingsByRoster = new Map(rankingsResult.teams.map((team) => [team.roster_id, team]));
 
         const rows: TeamRow[] = rostersResult.rosters.map((roster) => {
           const rosterId = String(roster.roster_id ?? '');
           const players = Array.isArray(roster.players) ? roster.players : [];
           const profile = profilesResult.profiles[rosterId];
+          const ranking = rankingsByRoster.get(rosterId);
           return {
             rosterId,
             teamName: profile?.team_name || 'Unclaimed team',
             avatarId: profile?.avatar_id || '',
             playerIds: players.map(String),
             isMine: Boolean(myRosterId) && rosterId === myRosterId,
+            powerRank: ranking?.power_rank ?? null,
+            recordLabel: ranking?.record_label ?? null,
           };
         });
-        rows.sort((a, b) => Number(b.isMine) - Number(a.isMine));
+        rows.sort((a, b) => {
+          if (a.isMine !== b.isMine) return Number(b.isMine) - Number(a.isMine);
+          if (a.powerRank != null && b.powerRank != null) return a.powerRank - b.powerRank;
+          return 0;
+        });
         setTeams(rows);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load teams.');
@@ -110,18 +123,28 @@ export default function TeamsScreen({ route, navigation }: Props) {
           <View style={styles.row}>
             <TeamAvatar avatarId={item.avatarId} size={36} style={styles.avatar} />
             <View style={styles.ownerGroup}>
-              <Text style={styles.owner} numberOfLines={1}>
-                {item.teamName}
-              </Text>
-              {item.isMine ? (
-                <View style={styles.mineBadge}>
-                  <Text style={styles.mineBadgeText}>You</Text>
-                </View>
-              ) : null}
+              <View style={styles.nameRow}>
+                <Text style={styles.owner} numberOfLines={1}>
+                  {item.teamName}
+                </Text>
+                {item.isMine ? (
+                  <View style={styles.mineBadge}>
+                    <Text style={styles.mineBadgeText}>You</Text>
+                  </View>
+                ) : null}
+              </View>
+              {item.recordLabel ? <Text style={styles.record}>{item.recordLabel}</Text> : null}
             </View>
-            <View style={styles.countPill}>
-              <Text style={styles.count}>{item.playerIds.length}</Text>
-            </View>
+            {item.powerRank != null ? (
+              <View style={styles.rankPill}>
+                <Text style={styles.rankLabel}>POWER</Text>
+                <Text style={styles.rankValue}>#{item.powerRank}</Text>
+              </View>
+            ) : (
+              <View style={styles.countPill}>
+                <Text style={styles.count}>{item.playerIds.length}</Text>
+              </View>
+            )}
           </View>
         </AnimatedCard>
       )}
@@ -145,8 +168,25 @@ const styles = StyleSheet.create({
   cardMine: { borderWidth: 2, borderColor: colors.accent },
   row: { flexDirection: 'row', alignItems: 'center' },
   avatar: { marginRight: spacing.sm },
-  ownerGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', marginRight: spacing.sm },
+  ownerGroup: { flex: 1, marginRight: spacing.sm },
+  nameRow: { flexDirection: 'row', alignItems: 'center' },
   owner: { fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm, flexShrink: 1 },
+  record: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  rankPill: {
+    backgroundColor: colors.background,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    alignItems: 'center',
+    minWidth: 52,
+  },
+  rankLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.4,
+  },
+  rankValue: { fontSize: 15, fontWeight: '700', color: colors.accent },
   mineBadge: {
     backgroundColor: colors.accent,
     borderRadius: radii.pill,

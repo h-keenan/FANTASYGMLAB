@@ -111,6 +111,33 @@ export interface LeagueTeamProfilesResponse {
   profiles: Record<string, TeamProfile>;
 }
 
+export interface TeamRanking {
+  roster_id: string;
+  team_name: string | null;
+  owner_name: string | null;
+  owner_username: string | null;
+  avatar_url: string | null;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  record_label: string | null;
+  points_for: number | null;
+  points_against: number | null;
+  power_rank: number | null;
+  franchise_rank: number | null;
+  draft_capital_rank: number | null;
+  starter_rank: number | null;
+  bench_rank: number | null;
+  age_rank: number | null;
+  average_age: number | null;
+}
+
+export interface LeagueTeamRankingsResponse {
+  ok: true;
+  teams: TeamRanking[];
+  reason: string;
+}
+
 export interface PlayerSummary {
   full_name: string | null;
   first_name: string | null;
@@ -518,6 +545,10 @@ export const api = {
   getLeagueTeamProfiles: (leagueId: string) =>
     authorizedFetch<LeagueTeamProfilesResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-profiles`,
+    ),
+  getLeagueTeamRankings: (leagueId: string) =>
+    authorizedFetch<LeagueTeamRankingsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/team-rankings`,
     ),
   getMyRoster: (leagueId: string) =>
     authorizedFetch<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),
