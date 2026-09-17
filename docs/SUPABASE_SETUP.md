@@ -75,7 +75,13 @@ DynastyGM does not send auth email directly. Supabase Auth sends confirmation ma
 2. **Email / password provider: enabled**
 3. **URL Configuration** (already set for production; do not change unless broken):
    - Site URL: `https://app.fantasygmlab.com`
-   - Redirect allowlist: `https://app.fantasygmlab.com` and `https://app.fantasygmlab.com/**`
+   - Redirect allowlist: `https://app.fantasygmlab.com`, `https://app.fantasygmlab.com/**`, and
+     **`fantasygmlab://`** (the mobile app's deep link scheme, declared in `mobile/app.json`'s
+     `expo.scheme`). Mobile signup (`mobile/src/context/AuthContext.tsx`) passes
+     `emailRedirectTo: 'fantasygmlab://'` — if this scheme isn't on the allowlist, Supabase
+     silently falls back to the Site URL, and a mobile user's confirmation email opens the web
+     app instead of returning to the mobile app. **Verify this entry exists in the dashboard —
+     it is easy to add during initial setup and never revisit.**
 4. **Custom SMTP** for public launch: **required** for reliable delivery.
    Supabase built-in mail is rate-limited (~2 emails/hour on free tier) and is not enough for public users. Configure Authentication → SMTP Settings with a production mail provider before inviting the public.
 5. Customize **Authentication → Email Templates** (Confirm signup) so the sender/subject is recognizable.

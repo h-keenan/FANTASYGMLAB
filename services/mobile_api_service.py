@@ -188,9 +188,18 @@ def require_user(authorization: str | None = Header(default=None)) -> dict[str, 
 
 
 def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict[str, str]:
-    """Read select `profiles` columns using the caller's own token (RLS-scoped)."""
+    """Read select `profiles` columns using the caller's own token (RLS-scoped).
 
-    defaults = {"entitlement": "free", "sleeper_username": ""}
+    Entitlement always fails closed to "free" on any error (network, HTTP,
+    parse, RLS denial) — correct for revenue protection. But that default is
+    indistinguishable from a genuine free user unless callers also check
+    `status`: a transient Supabase error would otherwise make a paying user
+    look and behave exactly like a free one, with no signal anything is
+    wrong (mirrors the web app's `profile_status="error"` handling in
+    modules/account_store.py).
+    """
+
+    defaults = {"entitlement": "free", "sleeper_username": "", "status": "error"}
     url = auth_supabase.rest_api_url(
         config,
         "profiles",
@@ -216,15 +225,18 @@ def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict
         return {
             "entitlement": entitlement if entitlement in {"free", "premium"} else "free",
             "sleeper_username": str(row.get("sleeper_username") or "").strip(),
+            "status": "ok",
         }
-    return defaults
+    # No row found (e.g. profile bootstrap hasn't run yet) is a real, known
+    # state — not an error — so a brand new user isn't shown a false alarm.
+    return {"entitlement": "free", "sleeper_username": "", "status": "ok"}
 
 
 @app.get("/v1/me")
 def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
-    profile = {"entitlement": "free", "sleeper_username": ""}
+    profile = {"entitlement": "free", "sleeper_username": "", "status": "ok"}
     if user_id:
         profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
     return {
@@ -234,6 +246,10 @@ def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
             "email": user.get("email") or "",
             "entitlement": profile["entitlement"],
             "sleeper_username": profile["sleeper_username"],
+            # "ok" | "error" — "error" means entitlement above is a fail-closed
+            # default, not necessarily this user's real plan. See
+            # _fetch_profile_fields.
+            "profile_status": profile["status"],
         },
     }
 
