@@ -54,6 +54,28 @@ def asc_api_key
   )
 end
 
+# app.json has no ios.buildNumber (expo prebuild defaults CFBundleVersion to
+# "1" every time, since ios/ is regenerated fresh and nothing here persists
+# it — the exact same problem bump_android_version_code exists to solve for
+# Android's versionCode) — App Store Connect rejects re-uploading a build
+# number it's already seen for this app, so bump it past whatever ASC has
+# on record before each build. Must run after asc_api_key (needs the token
+# it sets up) and before ensure_native_project (needs app.json updated
+# before expo prebuild reads it).
+def bump_ios_build_number
+  require "spaceship"
+  app = Spaceship::ConnectAPI::App.find(ENV.fetch("FGL_BUNDLE_ID"))
+  existing_versions = (app.get_builds(sort: "-uploadedDate") || []).map { |b| b.version.to_i }
+  next_version = (existing_versions.max || 0) + 1
+
+  app_json_path = "../app.json"
+  config = JSON.parse(File.read(app_json_path))
+  config["expo"]["ios"] ||= {}
+  config["expo"]["ios"]["buildNumber"] = next_version.to_s
+  File.write(app_json_path, JSON.pretty_generate(config) + "\n")
+  UI.success("Set ios.buildNumber to #{next_version} (App Store Connect's highest known: #{existing_versions.max || 'none'})")
+end
+
 platform :ios do
   desc "Check whether the App Store Connect app record exists"
   lane :app_status do
@@ -113,8 +135,9 @@ platform :ios do
 
   desc "Build and upload a TestFlight build"
   lane :beta do
-    ensure_native_project(:ios, force: true)
     api_key = asc_api_key
+    bump_ios_build_number
+    ensure_native_project(:ios, force: true)
     match(type: "appstore", api_key: api_key, readonly: true)
     # expo prebuild's generated Xcode project defaults to automatic signing,
     # which ignores the match-installed profile and reaches for whatever
