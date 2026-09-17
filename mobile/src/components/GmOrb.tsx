@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Dimensions,
   Image,
   Modal,
   Pressable,
@@ -63,6 +64,14 @@ interface SavedLeagueRow {
 
 const ORB_SIZE = 64;
 const CLOSE_MS = 260;
+
+// TEMPORARY — remove once the real-device orb-position bug (reported by
+// coridian_/ocyws, not reproducible on an iOS simulator) is confirmed fixed.
+// Surfaces the exact numbers a screenshot can't show, so a reporter without a
+// debugger can hand back the one measurement that actually settles it: is
+// insets.bottom inflated (a native SDK setting additionalSafeAreaInsets and
+// never clearing it), or is it normal and the bug lives elsewhere.
+const SHOW_ORB_DEBUG_OVERLAY = true;
 
 /**
  * The floating "GM" brand-mark button + destination sheet — the mobile
@@ -183,6 +192,15 @@ export default function GmOrb() {
         </Animated.View>
       </View>
 
+      {SHOW_ORB_DEBUG_OVERLAY && (
+        <View pointerEvents="none" style={[styles.debugOverlay, { top: rawInsets.top + 4 }]}>
+          <Text style={styles.debugOverlayText}>
+            win:{Math.round(Dimensions.get('window').height)} rawBottom:{Math.round(rawInsets.bottom)}{' '}
+            clampedBottom:{Math.round(insets.bottom)} orbBottomOffset:{Math.round(insets.bottom + spacing.md)}
+          </Text>
+        </View>
+      )}
+
       <Modal visible={visible} transparent animationType="none" onRequestClose={closeSheet}>
         <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
           <Animated.View style={[styles.backdrop, backdropAnimatedStyle]} />
@@ -300,6 +318,22 @@ const styles = StyleSheet.create({
     height: ORB_SIZE,
     zIndex: 6,
     ...shadows.orb,
+  },
+  debugOverlay: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    zIndex: 100,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  debugOverlayText: {
+    color: '#00FF88',
+    fontSize: 11,
+    fontFamily: 'Courier',
+    textAlign: 'center',
   },
   orb: {
     width: ORB_SIZE,
