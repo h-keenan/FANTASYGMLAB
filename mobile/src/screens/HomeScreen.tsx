@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { LinearGradient } from 'expo-linear-gradient';
@@ -81,9 +82,14 @@ export default function HomeScreen({ navigation }: Props) {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // useFocusEffect (not a plain mount effect) so returning here after a
+  // Premium purchase (Paywall -> goBack) or an entitlement change made
+  // elsewhere re-fetches /v1/me instead of showing stale Free/Premium state.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   // Skip the "pick a league" step on repeat visits: jump straight into the
   // last league opened (or the marked default) once, on first load. Home
@@ -143,7 +149,7 @@ export default function HomeScreen({ navigation }: Props) {
               {me ? (
                 <TouchableOpacity
                   disabled={me.entitlement === 'premium'}
-                  onPress={() => navigation.navigate('Paywall')}
+                  onPress={() => (me.profile_status === 'error' ? void load() : navigation.navigate('Paywall'))}
                   style={[
                     styles.entitlementPill,
                     me.entitlement === 'premium' && styles.entitlementPillPremium,
@@ -155,7 +161,11 @@ export default function HomeScreen({ navigation }: Props) {
                       me.entitlement === 'premium' && styles.entitlementTextPremium,
                     ]}
                   >
-                    {me.entitlement === 'premium' ? 'Premium' : 'Free — Upgrade'}
+                    {me.profile_status === 'error'
+                      ? "Couldn't verify your plan — tap to retry"
+                      : me.entitlement === 'premium'
+                        ? 'Premium'
+                        : 'Free — Upgrade'}
                   </Text>
                 </TouchableOpacity>
               ) : null}

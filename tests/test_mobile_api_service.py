@@ -105,6 +105,7 @@ def test_me_returns_user_and_entitlement(monkeypatch):
     assert body["user"]["email"] == "gm@example.com"
     assert body["user"]["entitlement"] == "premium"
     assert body["user"]["sleeper_username"] == ""
+    assert body["user"]["profile_status"] == "ok"
 
 
 def test_me_returns_linked_sleeper_username(monkeypatch):
@@ -135,7 +136,30 @@ def test_me_defaults_to_free_when_profile_lookup_fails(monkeypatch):
         response = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
-    assert response.json()["user"]["entitlement"] == "free"
+    body = response.json()
+    assert body["user"]["entitlement"] == "free"
+    # A profile-lookup failure must be distinguishable from a genuine free
+    # user — otherwise a paying user hitting a transient error looks and
+    # behaves exactly like a non-payer with no signal anything is wrong.
+    assert body["user"]["profile_status"] == "error"
+
+
+def test_me_reports_ok_status_for_a_new_user_with_no_profile_row_yet(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user"]["entitlement"] == "free"
+    assert body["user"]["profile_status"] == "ok"
 
 
 def test_league_endpoints_wrap_sleeper_module(monkeypatch):

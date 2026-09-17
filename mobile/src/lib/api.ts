@@ -72,6 +72,9 @@ export interface MeResponse {
     email: string;
     entitlement: 'free' | 'premium';
     sleeper_username: string;
+    // "error" means `entitlement` above is a fail-closed default because the
+    // profile lookup itself failed — not necessarily this user's real plan.
+    profile_status: 'ok' | 'error';
   };
 }
 
