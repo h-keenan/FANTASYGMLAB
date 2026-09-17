@@ -42,6 +42,7 @@ function shareAssetsToPlayers(assets: PresentationAsset[]): RankedPlayer[] {
       overall_rank: null,
       position_rank: null,
       rank_unavailable_reason: null,
+      opportunity_label: asset.opportunity_explanation ?? null,
     }));
 }
 

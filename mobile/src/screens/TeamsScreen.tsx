@@ -117,6 +117,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
               playerIds: item.playerIds,
               leagueId,
               leagueName,
+              rosterId: String(item.rosterId),
             })
           }
         >

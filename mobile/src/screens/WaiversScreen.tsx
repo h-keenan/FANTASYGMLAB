@@ -188,6 +188,7 @@ function toRankedPlayer(player: WaiverPlayer) {
     overall_rank: null,
     position_rank: null,
     rank_unavailable_reason: null,
+    opportunity_label: null,
   };
 }
 

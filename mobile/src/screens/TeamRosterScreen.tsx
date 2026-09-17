@@ -1,17 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, SectionList, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
-import { api, type PlayerSummary, type RankedPlayer } from '../lib/api';
+import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeamRoster'>;
+
+const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 function toRankedPlayer(playerId: string, summary: PlayerSummary | undefined): RankedPlayer {
   return {
@@ -27,13 +29,41 @@ function toRankedPlayer(playerId: string, summary: PlayerSummary | undefined): R
     overall_rank: null,
     position_rank: null,
     rank_unavailable_reason: null,
+    opportunity_label: null,
   };
 }
 
+function positionSortKey(position: string | null): number {
+  const index = POSITION_ORDER.indexOf(position ?? '');
+  return index === -1 ? POSITION_ORDER.length : index;
+}
+
+interface RankTile {
+  label: string;
+  value: string;
+}
+
+function buildRankTiles(ranking: TeamRanking): RankTile[] {
+  const tiles: RankTile[] = [];
+  const push = (label: string, value: number | null) => {
+    if (value != null) tiles.push({ label, value: `#${value}` });
+  };
+  push('Power', ranking.power_rank);
+  push('Franchise', ranking.franchise_rank);
+  push('Draft Capital', ranking.draft_capital_rank);
+  push('Starters', ranking.starter_rank);
+  push('Bench', ranking.bench_rank);
+  push('Age', ranking.age_rank);
+  return tiles;
+}
+
+type RosterSection = { title: string; data: RankedPlayer[] };
+
 export default function TeamRosterScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
-  const { ownerName, playerIds, leagueId, leagueName } = route.params;
+  const { ownerName, playerIds, leagueId, leagueName, rosterId } = route.params;
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
+  const [ranking, setRanking] = useState<TeamRanking | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,9 +74,10 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 
     async function load() {
       try {
-        const [rankingsResult, summariesById] = await Promise.all([
+        const [rankingsResult, summariesById, teamRankingsResult] = await Promise.all([
           api.getLeagueRankings(leagueId, { limit: 300 }),
           api.getPlayers(playerIds),
+          api.getLeagueTeamRankings(leagueId).catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
         ]);
         if (cancelled) return;
 
@@ -54,8 +85,11 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
         const rows = playerIds
           .map((playerId) => rankedById.get(playerId) ?? toRankedPlayer(playerId, summariesById[playerId]))
           .filter((row) => row.name !== null || rankedById.has(row.player_id))
-          .sort((a, b) => (a.position ?? '').localeCompare(b.position ?? ''));
+          .sort((a, b) => positionSortKey(a.position) - positionSortKey(b.position));
         setPlayers(rows);
+
+        const matchedRanking = teamRankingsResult.teams.find((team) => team.roster_id === rosterId) ?? null;
+        setRanking(matchedRanking);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load roster.');
@@ -69,7 +103,20 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [leagueId, playerIds]);
+  }, [leagueId, playerIds, rosterId]);
+
+  const sections = useMemo<RosterSection[]>(() => {
+    const byPosition = new Map<string, RankedPlayer[]>();
+    for (const player of players) {
+      const key = player.position ?? '—';
+      const bucket = byPosition.get(key);
+      if (bucket) bucket.push(player);
+      else byPosition.set(key, [player]);
+    }
+    return Array.from(byPosition.entries())
+      .sort((a, b) => positionSortKey(a[0]) - positionSortKey(b[0]))
+      .map(([title, data]) => ({ title, data }));
+  }, [players]);
 
   if (loading) {
     return (
@@ -87,49 +134,118 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
     );
   }
 
+  const rankTiles = ranking ? buildRankTiles(ranking) : [];
+
   return (
     <View style={styles.root}>
       <GridBackground />
-      <FlatList
-      style={styles.list}
-      data={players}
-      keyExtractor={(item) => item.player_id}
-      contentContainerStyle={
-        players.length === 0
-          ? styles.emptyContainer
-          : [styles.listContent, { paddingBottom: orbClearance }]
-      }
-      ListEmptyComponent={
-        <Text style={styles.empty}>
-          No player data available for this roster (Sleeper doesn't have
-          records for these player ids, or the roster is empty).
-        </Text>
-      }
-      renderItem={({ item }) => (
-        <AnimatedCard
-          style={styles.card}
-          onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
-        >
-          <PlayerAvatar playerId={item.player_id} size={40} tier={item.tier} style={styles.avatar} />
-          <View style={styles.positionBadge}>
-            <Text style={styles.positionText}>{item.position ?? '—'}</Text>
-          </View>
-          <View style={styles.nameColumn}>
-            <Text style={styles.name} numberOfLines={1}>
-              {item.name ?? 'Unknown player'}
-            </Text>
-            <Text style={styles.meta}>
-              {[item.team, item.status].filter(Boolean).join(' · ') || '—'}
-            </Text>
-          </View>
-          {item.injury_status ? (
-            <View style={styles.injuryPill}>
-              <Text style={styles.injuryText}>{item.injury_status}</Text>
+      <SectionList
+        style={styles.list}
+        sections={sections}
+        stickySectionHeadersEnabled={false}
+        keyExtractor={(item) => item.player_id}
+        contentContainerStyle={
+          sections.length === 0 ? styles.emptyContainer : [styles.listContent, { paddingBottom: orbClearance }]
+        }
+        ListEmptyComponent={
+          <Text style={styles.empty}>
+            No player data available for this roster (Sleeper doesn't have
+            records for these player ids, or the roster is empty).
+          </Text>
+        }
+        ListHeaderComponent={
+          ranking ? (
+            <View style={styles.headerGroup}>
+              {ranking.record_label ? <Text style={styles.recordLabel}>{ranking.record_label}</Text> : null}
+              {rankTiles.length > 0 ? (
+                <View style={styles.tileRow}>
+                  {rankTiles.map((tile) => (
+                    <View key={tile.label} style={styles.tile}>
+                      <Text style={styles.tileValue} numberOfLines={1}>
+                        {tile.value}
+                      </Text>
+                      <Text style={styles.tileLabel}>{tile.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              {ranking.archetype_label ? (
+                <AnimatedCard style={styles.archetypeCard}>
+                  <View style={styles.archetypeHeaderRow}>
+                    <Text style={styles.archetypeLabel}>{ranking.archetype_label}</Text>
+                    {ranking.strategy_label ? (
+                      <View style={styles.strategyPill}>
+                        <Text style={styles.strategyPillText}>{ranking.strategy_label}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {ranking.archetype_explanation ? (
+                    <Text style={styles.archetypeExplanation}>{ranking.archetype_explanation}</Text>
+                  ) : null}
+                  {ranking.archetype_strengths.length > 0 ? (
+                    <ArchetypeDetailList label="Strengths" items={ranking.archetype_strengths} color={colors.success} />
+                  ) : null}
+                  {ranking.archetype_risks.length > 0 ? (
+                    <ArchetypeDetailList label="Risks" items={ranking.archetype_risks} color={colors.danger} />
+                  ) : null}
+                  {ranking.archetype_recommendations.length > 0 ? (
+                    <ArchetypeDetailList
+                      label="Recommendations"
+                      items={ranking.archetype_recommendations}
+                      color={colors.accent}
+                    />
+                  ) : null}
+                </AnimatedCard>
+              ) : null}
+              {sections.length > 0 ? <Text style={styles.sectionIntro}>Roster Core</Text> : null}
             </View>
-          ) : null}
-        </AnimatedCard>
-      )}
+          ) : null
+        }
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{section.title}</Text>
+          </View>
+        )}
+        renderItem={({ item }) => (
+          <AnimatedCard
+            style={styles.card}
+            onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
+          >
+            <PlayerAvatar playerId={item.player_id} size={40} tier={item.tier} style={styles.avatar} />
+            <View style={styles.nameColumn}>
+              <Text style={styles.name} numberOfLines={1}>
+                {item.name ?? 'Unknown player'}
+              </Text>
+              <Text style={styles.meta}>
+                {[item.team, item.opportunity_label ?? item.status].filter(Boolean).join(' · ') || '—'}
+              </Text>
+            </View>
+            {item.overall_rank != null ? (
+              <View style={styles.rankPill}>
+                <Text style={styles.rankValue}>#{item.overall_rank}</Text>
+              </View>
+            ) : null}
+            {item.injury_status ? (
+              <View style={styles.injuryPill}>
+                <Text style={styles.injuryText}>{item.injury_status}</Text>
+              </View>
+            ) : null}
+          </AnimatedCard>
+        )}
       />
+    </View>
+  );
+}
+
+function ArchetypeDetailList({ label, items, color }: { label: string; items: string[]; color: string }) {
+  return (
+    <View style={styles.detailListGroup}>
+      <Text style={[styles.detailListLabel, { color }]}>{label}</Text>
+      {items.map((item, index) => (
+        <Text key={`${label}-${index}`} style={styles.detailListItem}>
+          {'•'} {item}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -152,25 +268,80 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     lineHeight: 20,
   },
+  headerGroup: { gap: spacing.md, marginBottom: spacing.sm },
+  recordLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  tile: {
+    flexBasis: '30%',
+    flexGrow: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  tileValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  tileLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: 2,
+  },
+  archetypeCard: { padding: spacing.lg, gap: spacing.sm },
+  archetypeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  archetypeLabel: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
+  strategyPill: {
+    backgroundColor: colors.badgeBackground,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  strategyPillText: { fontSize: 11, fontWeight: '700', color: colors.badgeText },
+  archetypeExplanation: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  detailListGroup: { gap: 2 },
+  detailListLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  sectionIntro: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: spacing.sm,
+  },
+  sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  sectionHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.4,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
   },
   avatar: { marginRight: spacing.sm },
-  positionBadge: {
-    width: 34,
-    height: 26,
-    borderRadius: radii.sm,
-    backgroundColor: colors.badgeBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  positionText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  rankPill: {
+    backgroundColor: colors.background,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    marginRight: spacing.sm,
+  },
+  rankValue: { fontSize: 13, fontWeight: '700', color: colors.accent },
   injuryPill: {
     backgroundColor: colors.dangerMuted,
     borderRadius: radii.pill,

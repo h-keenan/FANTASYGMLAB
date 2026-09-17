@@ -90,7 +90,7 @@ from modules import (
     trade_offer_analyzer,
     waivers_ui,
 )
-from modules.team_eval import suggest_optimal_lineup
+from modules.team_eval import refine_team_directions, suggest_optimal_lineup
 from modules.trade_analyzer_assembly import player_asset_from_mapping
 
 
@@ -311,6 +311,16 @@ def get_league_team_rankings(
     if rankings_frame.empty:
         return {"ok": True, "teams": [], "reason": "no_rankings_data"}
 
+    # Archetype/strategy classification degrades gracefully without a full
+    # league-intelligence frame (health/balance inputs default to neutral —
+    # see modules.team_eval._rank_strength's fallback), so it's safe to run
+    # directly on the cheap rankings_frame rather than needing the heavier
+    # per-roster injury-summary pass web's cached_league_intelligence_frame
+    # does. Manager tendencies (trading style, activity level) are NOT here —
+    # those need a full-season Sleeper transaction scan that doesn't exist
+    # in modules/ yet; a real, separate follow-up.
+    rankings_frame = refine_team_directions(rankings_frame)
+
     rosters = sleeper.get_rosters(league_id)
     roster_profiles = sleeper.get_league_roster_profiles(league_id)
     standings_bundle = league_standings.build_league_standings_bundle(
@@ -349,6 +359,14 @@ def get_league_team_rankings(
                 "bench_rank": _clean_json_value(row.get("bench_rank")),
                 "age_rank": _clean_json_value(row.get("age_rank")),
                 "average_age": _clean_json_value(row.get("avg_age")),
+                "strategy": _clean_json_value(row.get("strategy")),
+                "strategy_label": _clean_json_value(row.get("strategy_label")),
+                "archetype": _clean_json_value(row.get("archetype")),
+                "archetype_label": _clean_json_value(row.get("archetype_label")),
+                "archetype_explanation": _clean_json_value(row.get("archetype_explanation")),
+                "archetype_strengths": _as_string_list(row.get("archetype_strengths")),
+                "archetype_risks": _as_string_list(row.get("archetype_risks")),
+                "archetype_recommendations": _as_string_list(row.get("archetype_recommendations")),
             }
         )
 
@@ -483,6 +501,16 @@ def _clean_json_value(value: Any) -> Any:
     return value
 
 
+def _as_string_list(value: Any) -> list[str]:
+    """A DataFrame cell holding a list-of-strings column, defensively —
+    modules.team_eval._assign_team_archetype always builds these as real
+    lists, but a pandas cell can surface as a bare float NaN if a row ever
+    lacked one, and `nan or []` doesn't fall through to the default (NaN is
+    truthy), so this checks the type explicitly instead."""
+
+    return [str(item) for item in value] if isinstance(value, (list, tuple)) else []
+
+
 def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
     overall_rank = row.get("canonical_overall_rank")
     if pd.isna(overall_rank):
@@ -503,6 +531,7 @@ def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
         "overall_rank": _clean_json_value(overall_rank),
         "position_rank": _clean_json_value(position_rank),
         "rank_unavailable_reason": _clean_json_value(row.get("rank_unavailable_reason")),
+        "opportunity_label": _clean_json_value(row.get("opportunity_label")),
     }
 
 
