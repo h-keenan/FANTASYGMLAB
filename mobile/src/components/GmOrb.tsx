@@ -79,10 +79,14 @@ export default function GmOrb() {
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const rawInsets = useSafeAreaInsets();
-  // Clamped defensively: a bad/stale safe-area measurement (seen on some
-  // devices before the inset context settles) should never be able to push
-  // the orb far from the true bottom edge — the visible symptom reported
-  // was the orb sitting mid-screen, consistent with an inflated bottom inset.
+  // Belt-and-suspenders clamp — kept even though instrumented measurements
+  // (RootNavigator's wrapper, useSafeAreaFrame, and this hook) all agreed the
+  // insets were never actually wrong. The real bug was mixing a layout-
+  // affecting inline `bottom` with a Reanimated animated style on the same
+  // Animated.View below; that combination can resolve position against a
+  // stale frame under Fabric. Fixed by keeping `orbWrap`'s positioning on a
+  // plain View and moving the scale/opacity animation to an inner
+  // Animated.View that carries no layout props of its own.
   const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), 40);
   const insets = { ...rawInsets, bottom: safeBottom };
   const league = open ? currentLeagueContext() : null;
@@ -166,16 +170,18 @@ export default function GmOrb() {
         colors={['rgba(13,17,23,0)', 'rgba(13,17,23,0.92)']}
         style={[styles.scrim, { height: 112 + insets.bottom }]}
       />
-      <Animated.View style={[styles.orbWrap, { bottom: insets.bottom + spacing.md }, orbAnimatedStyle]}>
-        <TouchableOpacity
-          style={styles.orb}
-          onPress={openSheet}
-          accessibilityLabel="Open GM menu"
-          activeOpacity={0.85}
-        >
-          <Image source={require('../../assets/icon.png')} style={styles.orbImage} />
-        </TouchableOpacity>
-      </Animated.View>
+      <View style={[styles.orbWrap, { bottom: insets.bottom + spacing.md }]}>
+        <Animated.View style={orbAnimatedStyle}>
+          <TouchableOpacity
+            style={styles.orb}
+            onPress={openSheet}
+            accessibilityLabel="Open GM menu"
+            activeOpacity={0.85}
+          >
+            <Image source={require('../../assets/icon.png')} style={styles.orbImage} />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
 
       <Modal visible={visible} transparent animationType="none" onRequestClose={closeSheet}>
         <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
