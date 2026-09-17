@@ -6,6 +6,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerSummary, type RankedPlayer } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -30,6 +31,7 @@ function toRankedPlayer(playerId: string, summary: PlayerSummary | undefined): R
 }
 
 export default function TeamRosterScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { ownerName, playerIds, leagueId, leagueName } = route.params;
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +95,9 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
       data={players}
       keyExtractor={(item) => item.player_id}
       contentContainerStyle={
-        players.length === 0 ? styles.emptyContainer : styles.listContent
+        players.length === 0
+          ? styles.emptyContainer
+          : [styles.listContent, { paddingBottom: orbClearance }]
       }
       ListEmptyComponent={
         <Text style={styles.empty}>

@@ -6,6 +6,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import TeamAvatar from '../components/TeamAvatar';
 import { api } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -21,6 +22,7 @@ interface TeamRow {
 }
 
 export default function TeamsScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +92,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
       <GridBackground />
       <FlatList
       style={styles.list}
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
       data={teams}
       keyExtractor={(item) => String(item.rosterId)}
       renderItem={({ item }) => (

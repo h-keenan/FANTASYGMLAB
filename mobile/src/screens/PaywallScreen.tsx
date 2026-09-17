@@ -12,6 +12,7 @@ import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import { useOrbClearance } from '../lib/orbLayout';
 import {
   getCurrentOffering,
   purchasePackage,
@@ -30,6 +31,7 @@ const FEATURES = [
 ];
 
 export default function PaywallScreen({ navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -107,7 +109,7 @@ export default function PaywallScreen({ navigation }: Props) {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
       showsVerticalScrollIndicator={false}
     >
       <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={8}>

@@ -8,6 +8,7 @@ import GridBackground from '../components/GridBackground';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type DashboardItem } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, gradients, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -37,6 +38,7 @@ function scoringLabel(scoringSettings: Record<string, unknown> | undefined): str
 }
 
 export default function LeagueDetailScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [summary, setSummary] = useState<LeagueSummary | null>(null);
   const [dashboardItems, setDashboardItems] = useState<DashboardItem[]>([]);
@@ -137,7 +139,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   return (
     <View style={styles.root}>
       <GridBackground />
-      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+      <ScrollView style={styles.list} contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}

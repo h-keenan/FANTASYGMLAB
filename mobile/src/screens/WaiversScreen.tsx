@@ -16,6 +16,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -36,6 +37,7 @@ function injuryPillColor(status: string | null): string | null {
 }
 
 export default function WaiversScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [freeAgents, setFreeAgents] = useState<RankedPlayer[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -120,7 +122,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.player_id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
           renderItem={({ item, index }) => (
             <WaiverCard
               player={item}

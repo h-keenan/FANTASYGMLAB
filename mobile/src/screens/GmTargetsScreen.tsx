@@ -7,6 +7,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -19,6 +20,7 @@ interface TargetRow {
 }
 
 export default function GmTargetsScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [rows, setRows] = useState<TargetRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
       <FlatList
         data={sorted}
         keyExtractor={(row) => row.target.player_id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
         ListEmptyComponent={
           <Text style={styles.empty}>

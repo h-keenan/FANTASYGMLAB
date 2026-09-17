@@ -19,6 +19,7 @@ import GlassPanel from '../components/GlassPanel';
 import { api, type MeResponse } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { getLastLeague } from '../lib/lastLeague';
+import { useOrbClearance } from '../lib/orbLayout';
 import { supabase } from '../lib/supabase';
 import { colors, gradients, radii, spacing, typography } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -33,6 +34,7 @@ interface SavedLeague {
 }
 
 export default function HomeScreen({ navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { session, signOut } = useAuth();
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
   const [leagues, setLeagues] = useState<SavedLeague[] | null>(null);
@@ -121,7 +123,7 @@ export default function HomeScreen({ navigation }: Props) {
       <FlatList
         data={leagues ?? []}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accent} />}
         ListHeaderComponent={
           <>

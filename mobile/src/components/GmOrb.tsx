@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Dimensions,
   Image,
   Modal,
   Pressable,
@@ -23,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { setLastLeague } from '../lib/lastLeague';
+import { ORB_INSET_CEILING, ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { supabase } from '../lib/supabase';
 import { colors, motion, radii, shadows, spacing } from '../theme';
 
@@ -62,22 +62,7 @@ interface SavedLeagueRow {
   league_name: string;
 }
 
-const ORB_SIZE = 64;
 const CLOSE_MS = 260;
-
-// TEMPORARY — remove once the real-device orb-position bug (reported by
-// coridian_/ocyws, not reproducible on an iOS simulator) is confirmed fixed.
-// Surfaces the exact numbers a screenshot can't show, so a reporter without a
-// debugger can hand back the one measurement that actually settles it: is
-// insets.bottom inflated (a native SDK setting additionalSafeAreaInsets and
-// never clearing it), or is it normal and the bug lives elsewhere.
-//
-// Deliberately NOT gated on __DEV__ — the bug this instruments only shows up
-// on a real device / release build, which is exactly where __DEV__ is false.
-// Gated on a build-time env var instead so it defaults OFF (including in a
-// normal TestFlight build) unless someone explicitly opts a build into it —
-// set EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY=1 when building the diagnostic build.
-const SHOW_ORB_DEBUG_OVERLAY = process.env.EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY === '1';
 
 /**
  * The floating "GM" brand-mark button + destination sheet — the mobile
@@ -94,27 +79,13 @@ export default function GmOrb() {
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const rawInsets = useSafeAreaInsets();
-  // Belt-and-suspenders clamp — kept even though instrumented measurements
-  // (RootNavigator's wrapper, useSafeAreaFrame, and this hook) all agreed the
-  // insets were never actually wrong. The real bug was mixing a layout-
-  // affecting inline `bottom` with a Reanimated animated style on the same
-  // Animated.View below; that combination can resolve position against a
-  // stale frame under Fabric. Fixed by keeping `orbWrap`'s positioning on a
-  // plain View and moving the scale/opacity animation to an inner
-  // Animated.View that carries no layout props of its own.
-  //
-  // Ceiling raised from 40 to 100: an Android emulator with gesture navigation
-  // measured a legitimate rawBottom of 48, which the old 40 ceiling was
-  // clipping 8dp short of the intended position — and 48 is just one stock
-  // image, not the full range of OEM nav-bar variants. Rather than chase each
-  // newly-measured device one bump at a time, 100 is chosen with real margin:
-  // the clamp only stays useful as a diagnostic (able to rule out inset
-  // inflation as the cause of the reported ~65-70%-down symptom) as long as
-  // the resulting bottom offset stays under ~198 — see the arithmetic in
-  // PR #513/#510. 100 clears every legitimate inset seen so far with room to
-  // spare, while leaving ~98pt of headroom below where the clamp would start
-  // masking the actual bug instead of ruling it out.
-  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), 100);
+  // Defensive clamp on a pathological/stale inset reading — kept as a
+  // belt-and-suspenders guard, though it turned out not to be the cause of
+  // the real-device bug (see useOrbClearance in lib/orbLayout.ts for that).
+  // Measured directly on a real device with this clamp active: the orb sits
+  // exactly where this math predicts (top ~87%, centre ~90% down screen),
+  // proving the orb's own position was never wrong.
+  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), ORB_INSET_CEILING);
   const insets = { ...rawInsets, bottom: safeBottom };
   const league = open ? currentLeagueContext() : null;
   const currentRouteName = open && navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
@@ -195,7 +166,7 @@ export default function GmOrb() {
       <LinearGradient
         pointerEvents="none"
         colors={['rgba(13,17,23,0)', 'rgba(13,17,23,0.92)']}
-        style={[styles.scrim, { height: 112 + insets.bottom }]}
+        style={[styles.scrim, { height: ORB_SCRIM_BASE_HEIGHT + insets.bottom }]}
       />
       <View style={[styles.orbWrap, { bottom: insets.bottom + spacing.md }]}>
         <Animated.View style={orbAnimatedStyle}>
@@ -209,15 +180,6 @@ export default function GmOrb() {
           </TouchableOpacity>
         </Animated.View>
       </View>
-
-      {SHOW_ORB_DEBUG_OVERLAY && (
-        <View pointerEvents="none" style={[styles.debugOverlay, { top: rawInsets.top + 4 }]}>
-          <Text style={styles.debugOverlayText}>
-            win:{Math.round(Dimensions.get('window').height)} rawBottom:{Math.round(rawInsets.bottom)}{' '}
-            clampedBottom:{Math.round(insets.bottom)} orbBottomOffset:{Math.round(insets.bottom + spacing.md)}
-          </Text>
-        </View>
-      )}
 
       <Modal visible={visible} transparent animationType="none" onRequestClose={closeSheet}>
         <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
@@ -330,28 +292,11 @@ const styles = StyleSheet.create({
   },
   orbWrap: {
     position: 'absolute',
-    left: '50%',
-    marginLeft: -ORB_SIZE / 2,
+    left: spacing.lg,
     width: ORB_SIZE,
     height: ORB_SIZE,
     zIndex: 6,
     ...shadows.orb,
-  },
-  debugOverlay: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    zIndex: 100,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  debugOverlayText: {
-    color: '#00FF88',
-    fontSize: 11,
-    fontFamily: 'Courier',
-    textAlign: 'center',
   },
   orb: {
     width: ORB_SIZE,
