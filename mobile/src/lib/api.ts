@@ -305,12 +305,15 @@ export interface NewsResponse {
   items: NewsItem[];
 }
 
+export type RosterRelationship = 'starter' | 'bench' | 'taxi' | 'ir' | null;
+
 export interface AlertItem extends NewsItem {
   alert_key: string;
   read: boolean;
   matched_player: string | null;
   matched_player_id: string | null;
   relevance_reason: string | null;
+  roster_relationship: RosterRelationship;
 }
 
 export type AlertsReason =

@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
-import { api, type AlertItem, type RankedPlayer } from '../lib/api';
+import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -27,6 +27,20 @@ const EVENT_BADGE_ICONS: Record<string, IconName> = {
   transaction: 'swap-horizontal-outline',
   'role/depth chart': 'layers-outline',
   'off-field/drama': 'alert-circle-outline',
+};
+
+const ROSTER_RELATIONSHIP_LABEL: Record<Exclude<RosterRelationship, null>, string> = {
+  starter: 'Starter',
+  bench: 'Bench',
+  taxi: 'Taxi',
+  ir: 'IR',
+};
+
+const ROSTER_RELATIONSHIP_COLOR: Record<Exclude<RosterRelationship, null>, string> = {
+  starter: colors.success,
+  bench: colors.textSecondary,
+  taxi: colors.violet,
+  ir: colors.danger,
 };
 
 const NOT_READY_MESSAGES: Record<string, string> = {
@@ -54,6 +68,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<AlertItem[]>([]);
+  const [recapReadyWeek, setRecapReadyWeek] = useState<number | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,12 +79,16 @@ export default function AlertsScreen({ route, navigation }: Props) {
     setError(null);
     setNotReadyReason(null);
     try {
-      const result = await api.getLeagueAlerts(leagueId, 12);
+      const [result, recapResult] = await Promise.all([
+        api.getLeagueAlerts(leagueId, 12),
+        api.getLeagueRecap(leagueId).catch(() => null),
+      ]);
       if (result.reason) {
         setNotReadyReason(result.reason);
       } else {
         setItems(result.items);
       }
+      setRecapReadyWeek(recapResult?.recap && !recapResult.recap.incomplete ? recapResult.recap.week : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load alerts.');
     } finally {
@@ -136,6 +155,22 @@ export default function AlertsScreen({ route, navigation }: Props) {
         keyExtractor={(item, index) => item.link ?? String(index)}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+        ListHeaderComponent={
+          recapReadyWeek != null ? (
+            <TouchableOpacity onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}>
+              <AnimatedCard style={styles.recapCard}>
+                <View style={styles.recapIconDisc}>
+                  <Ionicons name="newspaper-outline" size={18} color={colors.accent} />
+                </View>
+                <View style={styles.recapTextGroup}>
+                  <Text style={styles.recapTitle}>Week {recapReadyWeek} League Recap is ready</Text>
+                  <Text style={styles.recapSubtitle}>Tap to see this week's storylines</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </AnimatedCard>
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={
           !loading ? <Text style={styles.empty}>No relevant news for your roster right now.</Text> : null
         }
@@ -159,6 +194,23 @@ export default function AlertsScreen({ route, navigation }: Props) {
                     ) : null}
                     <Text style={styles.playerBadgeText}>{item.matched_player}</Text>
                   </TouchableOpacity>
+                ) : null}
+                {item.roster_relationship ? (
+                  <View
+                    style={[
+                      styles.relationshipPill,
+                      { backgroundColor: `${ROSTER_RELATIONSHIP_COLOR[item.roster_relationship]}26` },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.relationshipPillText,
+                        { color: ROSTER_RELATIONSHIP_COLOR[item.roster_relationship] },
+                      ]}
+                    >
+                      {ROSTER_RELATIONSHIP_LABEL[item.roster_relationship]}
+                    </Text>
+                  </View>
                 ) : null}
               </View>
               <Text style={styles.time}>{relativeTime(item.published_ts)}</Text>
@@ -213,6 +265,26 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
+  recapCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.accentMuted,
+  },
+  recapIconDisc: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.badgeBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  recapTextGroup: { flex: 1 },
+  recapTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  recapSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   card: { padding: spacing.lg },
   cardRead: { opacity: 0.6 },
   headerRow: {
@@ -238,6 +310,8 @@ const styles = StyleSheet.create({
   },
   playerBadgeAvatar: { marginRight: spacing.xs },
   playerBadgeText: { color: colors.badgeText, fontSize: 11, fontWeight: '700' },
+  relationshipPill: { borderRadius: radii.pill, paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
+  relationshipPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1129,17 +1129,49 @@ def _fetch_read_alert_keys(
     return {str(row.get("alert_key")) for row in rows if isinstance(row, dict) and row.get("alert_key")}
 
 
+def _roster_relationship_map(roster: dict[str, Any]) -> dict[str, str]:
+    """player_id -> "starter"|"bench"|"taxi"|"ir" for every rostered player.
+
+    Sleeper's own roster payload already separates these (players/starters/
+    taxi/reserve) — no lineup computation needed, this just reads the
+    league's actual current state, not a suggested optimal lineup.
+    """
+
+    starters = {str(pid) for pid in (roster.get("starters") or []) if pid}
+    taxi = {str(pid) for pid in (roster.get("taxi") or []) if pid}
+    reserve = {str(pid) for pid in (roster.get("reserve") or []) if pid}
+    players = {str(pid) for pid in (roster.get("players") or []) if pid}
+
+    relationship: dict[str, str] = {}
+    for player_id in players:
+        if player_id in reserve:
+            relationship[player_id] = "ir"
+        elif player_id in taxi:
+            relationship[player_id] = "taxi"
+        elif player_id in starters:
+            relationship[player_id] = "starter"
+        else:
+            relationship[player_id] = "bench"
+    return relationship
+
+
 def _project_alert_item(
-    item: dict[str, Any], *, read_keys: set[str], player_ids_by_name: dict[str, str]
+    item: dict[str, Any],
+    *,
+    read_keys: set[str],
+    player_ids_by_name: dict[str, str],
+    roster_relationship: dict[str, str],
 ) -> dict[str, Any]:
     payload = _project_news_item(item)
     alert_key = _alert_key_for_link(str(item.get("link") or ""))
     payload["alert_key"] = alert_key
     payload["read"] = alert_key in read_keys
     matched_player = str(item.get("matched_player") or "")
+    matched_player_id = player_ids_by_name.get(matched_player)
     payload["matched_player"] = _clean_json_value(item.get("matched_player"))
-    payload["matched_player_id"] = player_ids_by_name.get(matched_player)
+    payload["matched_player_id"] = matched_player_id
     payload["relevance_reason"] = _clean_json_value(item.get("relevance_reason"))
+    payload["roster_relationship"] = roster_relationship.get(matched_player_id or "")
     return payload
 
 
@@ -1195,9 +1227,15 @@ def get_league_alerts(
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     read_keys = _fetch_read_alert_keys(config, user_id, str(user.get("_access_token") or ""), league_id)
+    roster_relationship = _roster_relationship_map(my_roster)
 
     items = [
-        _project_alert_item(item, read_keys=read_keys, player_ids_by_name=player_ids_by_name)
+        _project_alert_item(
+            item,
+            read_keys=read_keys,
+            player_ids_by_name=player_ids_by_name,
+            roster_relationship=roster_relationship,
+        )
         for item in curated
     ]
     return {"ok": True, "items": items, "reason": ""}

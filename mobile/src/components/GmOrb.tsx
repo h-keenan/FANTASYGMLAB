@@ -25,6 +25,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
+import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { ORB_INSET_CEILING, ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
@@ -98,6 +99,7 @@ export default function GmOrb() {
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
+  const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const rawInsets = useSafeAreaInsets();
   // Purely precautionary — no evidence this has ever actually fired. This
   // was originally written to defend against an inflated bottom inset,
@@ -170,6 +172,29 @@ export default function GmOrb() {
       cancelled = true;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !league) {
+      setUnreadAlertCount(0);
+      return;
+    }
+    let cancelled = false;
+    api
+      .getLeagueAlerts(league.leagueId, 12)
+      .then((result) => {
+        if (!cancelled) setUnreadAlertCount(result.items.filter((item) => !item.read).length);
+      })
+      .catch(() => {
+        if (!cancelled) setUnreadAlertCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `league` is a
+    // fresh object literal from currentLeagueContext() every render (not
+    // memoized); depending on it directly would refetch every render while
+    // the sheet is open. leagueId is the only part that actually matters.
+  }, [open, league?.leagueId]);
 
   const openSheet = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -293,6 +318,13 @@ export default function GmOrb() {
                       <Text style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
                         {destination.label}
                       </Text>
+                      {destination.route === 'Alerts' && unreadAlertCount > 0 ? (
+                        <View style={styles.unreadCountBadge}>
+                          <Text style={styles.unreadCountBadgeText}>
+                            {unreadAlertCount > 9 ? '9+' : unreadAlertCount}
+                          </Text>
+                        </View>
+                      ) : null}
                       {isCurrent ? (
                         <Text style={styles.destCurrentBadge}>CURRENT</Text>
                       ) : (
@@ -478,4 +510,15 @@ const styles = StyleSheet.create({
   destText: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   destTextCurrent: { color: colors.accent },
   destCurrentBadge: { fontSize: 10, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
+  unreadCountBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.xs,
+  },
+  unreadCountBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
 });
