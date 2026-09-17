@@ -98,7 +98,7 @@ export default function HomeScreen({ navigation }: Props) {
         leagues.find((league) => league.is_default) ??
         null;
       if (target) {
-        navigation.navigate('LeagueDetail', {
+        navigation.navigate('Dashboard', {
           leagueId: target.league_id,
           leagueName: target.league_name || 'League',
         });
@@ -173,7 +173,7 @@ export default function HomeScreen({ navigation }: Props) {
                 <TouchableOpacity
                   style={styles.quickActionPrimary}
                   onPress={() =>
-                    navigation.navigate('LeagueDetail', {
+                    navigation.navigate('Dashboard', {
                       leagueId: defaultLeague.league_id,
                       leagueName: defaultLeague.league_name || 'League',
                     })
@@ -208,7 +208,7 @@ export default function HomeScreen({ navigation }: Props) {
           <AnimatedCard
             style={styles.leagueCard}
             onPress={() =>
-              navigation.navigate('LeagueDetail', {
+              navigation.navigate('Dashboard', {
                 leagueId: item.league_id,
                 leagueName: item.league_name || 'League',
               })
