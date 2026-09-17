@@ -1926,6 +1926,17 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
 
+    # waiver_actionable_player_pool runs the real (unmocked)
+    # player_eligibility() check per row — unlike the dashboard/trade-hub
+    # tests, which never call it. That function requires at least one
+    # "current signal" (recent news, depth chart, current-season stats,
+    # market value, or rookie flag) beyond just status="Active", or it
+    # returns eligible=False with reason "missing_current_player_
+    # corroboration". The shared fixture has none of those, so give
+    # target_rb a current stats_season to satisfy it.
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+
     with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
@@ -1936,7 +1947,7 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
                 ],
             ):
                 with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
-                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                    with patch("modules.rankings.load_players", return_value=roster_frame):
                         with patch(
                             "modules.player_eligibility.filter_current_fantasy_players",
                             side_effect=lambda df, **kwargs: df,
