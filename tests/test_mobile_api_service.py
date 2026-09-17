@@ -1886,3 +1886,107 @@ def test_trade_hub_premium_entitlement_sees_full_board_ignoring_ad_unlocks(monke
     assert len(body["ideas"]) == 3
     assert body["entitlement"]["is_premium"] is True
     assert body["entitlement"]["hidden_count"] == 0
+
+
+def test_waivers_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/waivers")
+    assert response.status_code == 401
+
+
+def test_waivers_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/leagues/abc/waivers",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["players"] == []
+    assert body["priority_adds"] == []
+    assert body["reason"] == "no_sleeper_username_linked"
+
+
+def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    # waiver_actionable_player_pool runs the real (unmocked)
+    # player_eligibility() check per row — unlike the dashboard/trade-hub
+    # tests, which never call it. That function requires at least one
+    # "current signal" (recent news, depth chart, current-season stats,
+    # market value, or rookie flag) beyond just status="Active", or it
+    # returns eligible=False with reason "missing_current_player_
+    # corroboration". The shared fixture has none of those, so give
+    # target_rb a current stats_season to satisfy it.
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=roster_frame):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            # player_state_authority imports this name directly
+                            # (`from modules.player_eligibility import
+                            # filter_current_fantasy_players`), so it has its own
+                            # bound reference the patch above doesn't reach —
+                            # waiver_actionable_player_pool calls that one
+                            # internally, and it needs patching separately.
+                            with patch(
+                                "modules.player_state_authority.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/waivers",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    # Every my*/my_bench_rb id is rostered (roster 1 or 2); target_rb is the
+    # one player in the fixture nobody owns, so it's the entire free-agent
+    # pool — same fixture the dashboard/trade-hub tests reuse.
+    player_ids = [p["player_id"] for p in body["players"]]
+    assert player_ids == ["target_rb"]
+    assert body["available_count"] == 1
+    target = body["players"][0]
+    # apply_valuation_lens recomputes the Dynasty score from the player's
+    # attributes rather than echoing the fixture's raw dynasty_score field
+    # (5428 for this row, not the fixture's 6000) — assert self-consistency
+    # with the single free agent's own score instead of a hardcoded formula
+    # output this test has no business predicting.
+    assert body["avg_wire_score"] == round(target["score"])
+    assert target["score"] > 0
+    assert target["stale_free_agent"] is False
+    # Wire-relative rank among the (single-player) free-agent pool, not the
+    # league-global canonical rank.
+    assert target["position_rank"] == 1
+    assert target["overall_rank"] == 1
