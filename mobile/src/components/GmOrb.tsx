@@ -102,7 +102,14 @@ export default function GmOrb() {
   // stale frame under Fabric. Fixed by keeping `orbWrap`'s positioning on a
   // plain View and moving the scale/opacity animation to an inner
   // Animated.View that carries no layout props of its own.
-  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), 40);
+  //
+  // Ceiling raised from 40 to 60: an Android emulator with gesture navigation
+  // measured a legitimate rawBottom of 48, which the old ceiling was clipping
+  // 8dp short of the intended position. 60 stays well below the ~130+ range
+  // that would actually reproduce the reported bug, while clearing every
+  // normal platform inset seen so far (iOS notch/home-indicator ~34, Android
+  // gesture/3-button nav up to ~48-58).
+  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), 60);
   const insets = { ...rawInsets, bottom: safeBottom };
   const league = open ? currentLeagueContext() : null;
   const currentRouteName = open && navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
