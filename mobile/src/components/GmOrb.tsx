@@ -77,7 +77,14 @@ const CLOSE_MS = 260;
 // Gated on a build-time env var instead so it defaults OFF (including in a
 // normal TestFlight build) unless someone explicitly opts a build into it —
 // set EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY=1 when building the diagnostic build.
-const SHOW_ORB_DEBUG_OVERLAY = process.env.EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY === '1';
+//
+// THIS BRANCH (h-keenan/ios-testflight-orb-diagnostic) hardcodes it on instead
+// of relying on the env var, the same reasoning as the Android diagnostic
+// build: this is the one TestFlight build meant to answer the real-device
+// question, and it should not be possible to accidentally ship it with the
+// overlay silently missing. DO NOT MERGE this branch to main — it exists only
+// to be submitted to TestFlight directly.
+const SHOW_ORB_DEBUG_OVERLAY = true;
 
 /**
  * The floating "GM" brand-mark button + destination sheet — the mobile
