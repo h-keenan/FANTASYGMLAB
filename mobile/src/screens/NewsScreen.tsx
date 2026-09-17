@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Linking, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Linking, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -36,6 +36,34 @@ function relativeTime(publishedTs: number | null): string {
   return `${days}d ago`;
 }
 
+const DATE_BUCKET_ORDER = ['Today', 'Yesterday', 'Earlier'];
+
+function dateBucket(publishedTs: number | null): string {
+  if (!publishedTs) return 'Earlier';
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+  const published = new Date(publishedTs * 1000);
+  if (published >= startOfToday) return 'Today';
+  if (published >= startOfYesterday) return 'Yesterday';
+  return 'Earlier';
+}
+
+function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsItem[] }> {
+  const buckets = new Map<string, NewsItem[]>();
+  for (const item of items) {
+    const bucket = dateBucket(item.published_ts);
+    const existing = buckets.get(bucket);
+    if (existing) existing.push(item);
+    else buckets.set(bucket, [item]);
+  }
+  return DATE_BUCKET_ORDER.filter((bucket) => buckets.has(bucket)).map((bucket) => ({
+    title: bucket,
+    data: buckets.get(bucket) ?? [],
+  }));
+}
+
 export default function NewsScreen() {
   const orbClearance = useOrbClearance();
   const [items, setItems] = useState<NewsItem[]>([]);
@@ -58,6 +86,8 @@ export default function NewsScreen() {
     void load();
   }, [load]);
 
+  const sections = useMemo(() => groupByDate(items), [items]);
+
   return (
     <View style={styles.container}>
       <GridBackground />
@@ -68,11 +98,17 @@ export default function NewsScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <FlatList
-        data={items}
-        keyExtractor={(item, index) => item.link ?? String(index)}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item, index) => item.link ?? `${item.title ?? 'item'}-${item.published_ts ?? 0}-${index}`}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+        stickySectionHeadersEnabled={false}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{section.title}</Text>
+          </View>
+        )}
         ListEmptyComponent={
           !loading ? <Text style={styles.empty}>No fantasy-relevant news right now.</Text> : null
         }
@@ -128,6 +164,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
+  sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  sectionHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   card: { padding: spacing.lg },
   headerRow: {
     flexDirection: 'row',
