@@ -28,6 +28,7 @@ Deployment topology (Render):
   - POST /v1/push/test        — send a test push to all of the caller's tokens
   - GET  /v1/leagues/{id}/dashboard — the caller's "Next Move" briefing
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
+  - GET  /v1/leagues/{id}/waivers   — roster-need-aware free-agent pool + FAAB guidance
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -62,6 +63,7 @@ from modules import (
     auth_supabase,
     canonical_player_ranking,
     dashboard_engine,
+    faab,
     gm_targets,
     league_history,
     league_recaps,
@@ -72,6 +74,7 @@ from modules import (
     player_awards,
     player_eligibility,
     player_quick_view,
+    player_state_authority,
     push_tokens,
     push_triggers,
     rankings,
@@ -81,7 +84,9 @@ from modules import (
     trade_hub_engine,
     trade_hub_ui,
     trade_offer_analyzer,
+    waivers_ui,
 )
+from modules.team_eval import suggest_optimal_lineup
 from modules.trade_analyzer_assembly import player_asset_from_mapping
 
 
@@ -1303,6 +1308,215 @@ def get_league_dashboard(
         "items": [_project_briefing_item(item) for item in briefing.items],
         "quiet": briefing.quiet,
         "quiet_reason": briefing.quiet_reason,
+        "reason": "",
+    }
+
+
+def _project_waiver_row(row: pd.Series, score_field: str) -> dict[str, Any]:
+    return {
+        "player_id": _clean_json_value(row.get("player_id")),
+        "name": _clean_json_value(row.get("name")),
+        "position": _clean_json_value(row.get("position")),
+        "team": _clean_json_value(row.get("team")),
+        "age": _clean_json_value(row.get("age")),
+        "status": _clean_json_value(row.get("status")),
+        "injury_status": _clean_json_value(row.get("injury_status")),
+        "tier": _clean_json_value(row.get("player_tier")),
+        "opportunity_label": _clean_json_value(row.get("opportunity_label")),
+        "score": _clean_json_value(row.get(score_field)),
+        # Wire-relative ranks (rank among available free agents only), not the
+        # league-global canonical_* ranks /rankings returns — deliberately
+        # separate, matching the web app's waivers page (app.py comment:
+        # "FA-relative ranks for waiver logic only; canonical_* stay
+        # league-global").
+        "position_rank": _clean_json_value(row.get("position_rank")),
+        "overall_rank": _clean_json_value(row.get("overall_rank")),
+        "stale_free_agent": bool(row.get("stale_free_agent") or False),
+        "injury_replacement_fit": bool(row.get("injury_replacement_fit") or False),
+        "injury_replacement_note": _clean_json_value(row.get("injury_replacement_note")) or "",
+    }
+
+
+def _project_priority_add(
+    row: pd.Series, score_field: str, guidance: "faab.FaabGuidance"
+) -> dict[str, Any]:
+    projected = _project_waiver_row(row, score_field)
+    position_rank = int(row.get("position_rank") or 99) or 99
+    label, tone = waivers_ui.waiver_recommendation_label(row, position_rank)
+    projected["recommendation_label"] = label
+    projected["recommendation_tone"] = tone
+    projected["faab"] = {
+        "low_bid": guidance.low_bid,
+        "high_bid": guidance.high_bid,
+        "pct_low": guidance.pct_low,
+        "pct_high": guidance.pct_high,
+        "remaining": guidance.remaining,
+        "dollars_known": guidance.dollars_known,
+        "label": guidance.as_label(),
+    }
+    return projected
+
+
+@app.get("/v1/leagues/{league_id}/waivers")
+def get_league_waivers(
+    league_id: str,
+    lens: str = "Dynasty",
+    limit: int = 150,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Free-agent pool + roster-need-aware Priority Adds + FAAB guidance.
+
+    Replaces the previous mobile approach (client-side filtering the full
+    /rankings list to exclude rostered players, with no roster-need
+    awareness at all) with the same server-side pipeline the web app's
+    waivers page uses: modules.player_state_authority for the
+    rostered-id exclusion, modules.rankings.is_probably_stale_free_agent
+    for stale/retired detection, modules.trade_analyzer_fit for roster
+    needs + injury-replacement context, modules.waivers_ui for the
+    Priority Adds ranking, and modules.faab for bid guidance.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return {"ok": True, "players": [], "priority_adds": [], "needed_positions": [], "reason": reason}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_waivers"
+    )
+    if players_df.empty:
+        return {"ok": True, "players": [], "priority_adds": [], "needed_positions": [], "reason": "no_player_data"}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    rosters = sleeper.get_rosters(league_id)
+    roster_player_map = {
+        str(roster.get("roster_id")): tuple(
+            str(pid) for pid in (roster.get("players") or []) if pid is not None
+        )
+        for roster in rosters
+        if roster.get("roster_id") is not None
+    }
+
+    free_agents = player_state_authority.waiver_actionable_player_pool(
+        valued, roster_player_map, surface="mobile_api_waivers"
+    )
+    if free_agents.empty:
+        return {
+            "ok": True,
+            "players": [],
+            "priority_adds": [],
+            "needed_positions": [],
+            "available_count": 0,
+            "avg_wire_score": 0,
+            "reason": "",
+        }
+
+    free_agents = free_agents.copy()
+    free_agents["stale_free_agent"] = free_agents.apply(rankings.is_probably_stale_free_agent, axis=1)
+    free_agents.loc[free_agents["stale_free_agent"], ["dynasty_score", "value_score"]] = 0
+    free_agents = free_agents.sort_values(["stale_free_agent", score_field], ascending=[True, False])
+
+    score_series = pd.to_numeric(free_agents.get(score_field, 0), errors="coerce").fillna(0)
+    free_agents["position_rank"] = (
+        free_agents.groupby("position")[score_field]
+        .rank(method="first", ascending=False)
+        .fillna(0)
+        .astype(int)
+    )
+    free_agents["overall_rank"] = score_series.rank(method="first", ascending=False).fillna(0).astype(int)
+    avg_wire_score = int(score_series.mean()) if len(score_series) else 0
+
+    roster_id = str(my_roster.get("roster_id") or "")
+    roster_player_ids = roster_player_map.get(roster_id, ())
+    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+
+    needed_positions: list[str] = []
+    injury_positions: set[str] = set()
+    if not roster_df.empty:
+        lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+        team_needs = trade_analyzer_fit.build_team_needs_assessment(
+            roster_df, None, settings, lineup_df=lineup_df, score_field=score_field
+        )
+        needed_positions = trade_analyzer_fit.get_needed_positions(
+            roster_df, None, settings, include_fallback=False, assessment=team_needs
+        )
+        injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+        injury_positions = {
+            str(pos).upper()
+            for pos in (injury_context.get("injury_need_positions") or set())
+            if str(pos).upper() in {"QB", "RB", "WR", "TE", "K"}
+        }
+
+    if injury_positions:
+        positions_upper = free_agents["position"].fillna("").astype(str).str.upper()
+        fit_mask = positions_upper.isin(injury_positions) & (score_series > 0) & (~free_agents["stale_free_agent"])
+        free_agents["injury_replacement_fit"] = fit_mask
+        free_agents["injury_replacement_note"] = [
+            f"Healthy cover for your injury-hit {pos} room." if fit else ""
+            for pos, fit in zip(positions_upper, fit_mask)
+        ]
+    else:
+        free_agents["injury_replacement_fit"] = False
+        free_agents["injury_replacement_note"] = ""
+
+    limited = free_agents.head(max(1, min(limit, 300)))
+    players = [_project_waiver_row(row, score_field) for _, row in limited.iterrows()]
+
+    priority_df = waivers_ui.rank_priority_add_candidates(
+        free_agents,
+        score_field=score_field,
+        needed_positions=needed_positions,
+        league_settings=settings,
+        roster_df=roster_df,
+        max_items=6,
+    )
+    faab_budget = faab.sleeper_faab_budget_context(league, rosters, roster_id=roster_id)
+    needed_upper = {pos.upper() for pos in needed_positions}
+    priority_adds: list[dict[str, Any]] = []
+    for _, row in priority_df.iterrows():
+        try:
+            player_score = int(round(float(row.get(score_field) or 0)))
+        except (TypeError, ValueError):
+            player_score = 0
+        guidance = faab.recommend_faab_guidance(
+            player_score=player_score,
+            position=str(row.get("position") or ""),
+            budget=faab_budget.initial or 100,
+            league_settings=settings,
+            status=str(row.get("status") or ""),
+            injury_status=str(row.get("injury_status") or ""),
+            injury_need_match=bool(row.get("injury_replacement_fit")),
+            remaining_budget=faab_budget.remaining,
+            roster_need=str(row.get("position") or "").upper() in needed_upper,
+        )
+        priority_adds.append(_project_priority_add(row, score_field, guidance))
+
+    return {
+        "ok": True,
+        "players": players,
+        "priority_adds": priority_adds,
+        "needed_positions": needed_positions,
+        "available_count": int(len(free_agents)),
+        "avg_wire_score": avg_wire_score,
         "reason": "",
     }
 
