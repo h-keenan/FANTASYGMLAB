@@ -373,6 +373,26 @@ export interface TradeAnalyzerResponse {
   reason: TradeAnalyzerReason;
 }
 
+export interface DraftPickAsset {
+  pick_id: string;
+  label: string | null;
+  score: number | null;
+  season: number | null;
+  round: number | null;
+  original_roster_id: string;
+  owner_roster_id: string;
+  original_team_name: string | null;
+  owner_team_name: string | null;
+  pick_tier: string | null;
+  projected_pick_range: string | null;
+}
+
+export interface DraftPicksResponse {
+  ok: true;
+  picks: DraftPickAsset[];
+  reason: string;
+}
+
 export interface RecapStory {
   story_type: string;
   title: string;
@@ -733,6 +753,8 @@ export const api = {
     body: {
       sendPlayerIds: string[];
       receivePlayerIds: string[];
+      sendPickIds?: string[];
+      receivePickIds?: string[];
       strategy?: TeamStrategy;
       lens?: ValuationLens;
       partnerRosterId?: string;
@@ -741,10 +763,20 @@ export const api = {
     authorizedPost<TradeAnalyzerResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/trade-analyzer`, {
       send_player_ids: body.sendPlayerIds,
       receive_player_ids: body.receivePlayerIds,
+      send_pick_ids: body.sendPickIds ?? [],
+      receive_pick_ids: body.receivePickIds ?? [],
       strategy: body.strategy ?? 'retool',
       lens: body.lens ?? 'Dynasty',
       partner_roster_id: body.partnerRosterId ?? '',
     }),
+  getLeagueDraftPicks: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<DraftPicksResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/draft-picks${query ? `?${query}` : ''}`,
+    );
+  },
   getPlayers: async (playerIds: string[]): Promise<Record<string, PlayerSummary>> => {
     const uniqueIds = [...new Set(playerIds.filter(Boolean))];
     if (uniqueIds.length === 0) return {};
