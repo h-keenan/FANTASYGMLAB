@@ -102,7 +102,19 @@ export default function GmOrb() {
   // stale frame under Fabric. Fixed by keeping `orbWrap`'s positioning on a
   // plain View and moving the scale/opacity animation to an inner
   // Animated.View that carries no layout props of its own.
-  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), 40);
+  //
+  // Ceiling raised from 40 to 100: an Android emulator with gesture navigation
+  // measured a legitimate rawBottom of 48, which the old 40 ceiling was
+  // clipping 8dp short of the intended position — and 48 is just one stock
+  // image, not the full range of OEM nav-bar variants. Rather than chase each
+  // newly-measured device one bump at a time, 100 is chosen with real margin:
+  // the clamp only stays useful as a diagnostic (able to rule out inset
+  // inflation as the cause of the reported ~65-70%-down symptom) as long as
+  // the resulting bottom offset stays under ~198 — see the arithmetic in
+  // PR #513/#510. 100 clears every legitimate inset seen so far with room to
+  // spare, while leaving ~98pt of headroom below where the clamp would start
+  // masking the actual bug instead of ruling it out.
+  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), 100);
   const insets = { ...rawInsets, bottom: safeBottom };
   const league = open ? currentLeagueContext() : null;
   const currentRouteName = open && navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
