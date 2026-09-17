@@ -8,6 +8,6 @@
       <polygon points="980,330 925,292 948,360" fill="#00D4FF"/>
       <polygon points="1010,360 955,322 978,390" fill="#FFCA3D"/>
       <polygon points="1040,395 985,357 1008,425" fill="#FF4D4D"/>
-    
+
         <text x="110" y="760" font-family="Arial, Helvetica, sans-serif" font-size="235" font-weight="900" font-style="italic" fill="#F2F4F7">FANTASY</text>
         <text x="110" y="1000" font-family="Arial, Helvetica, sans-serif" font-size="235" font-weight="900" font-style="italic" fill="#00D4FF">GM <tspan fill="#F2F4F7">LAB</tspan></text></svg>
