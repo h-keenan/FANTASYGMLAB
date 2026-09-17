@@ -16,7 +16,7 @@ import {
   type TradeIdea,
   type TradeVerdict,
 } from '../lib/api';
-import { showRewardedAd } from '../lib/ads';
+import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -207,7 +207,7 @@ function TradeHubGateCard({
   onWatchAd: () => void;
   onUpgrade: () => void;
 }) {
-  const canWatchMoreAds = entitlement.ad_unlocks_applied < entitlement.max_ad_unlocks;
+  const canWatchMoreAds = adsAvailable && entitlement.ad_unlocks_applied < entitlement.max_ad_unlocks;
   return (
     <AnimatedCard style={styles.gateCard}>
       <View style={styles.gateIconDisc}>

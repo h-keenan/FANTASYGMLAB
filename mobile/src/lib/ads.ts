@@ -1,62 +1,28 @@
-import { Platform } from 'react-native';
-import mobileAds, { RewardedAd, RewardedAdEventType, AdEventType } from 'react-native-google-mobile-ads';
+// AdMob (react-native-google-mobile-ads) is temporarily disabled — the
+// package's current release pins a Google Ads SDK version that requires a
+// newer Kotlin than Expo SDK 54 allows, breaking every Android build. This
+// shim keeps the same exported surface (initAds/showRewardedAd) so callers
+// (App.tsx, TradeHubScreen.tsx) need no changes: initAds() resolves
+// immediately, showRewardedAd() always resolves false (the same "declined/
+// unavailable" outcome the real implementation already returned when no ad
+// unit was configured), and `adsAvailable` lets a screen hide ad-gated UI
+// entirely instead of offering a button that can never succeed.
+//
+// To re-enable: restore the real implementation (see git history prior to
+// this commit), re-add react-native-google-mobile-ads to package.json and
+// the plugins list in app.json, and confirm it builds on Android first.
 
-import { env } from './env';
+export const adsAvailable = false;
 
-const REWARDED_UNIT_ID = Platform.select({
-  ios: env.admobIosRewardedUnitId,
-  android: env.admobAndroidRewardedUnitId,
-  default: env.admobAndroidRewardedUnitId,
-});
-
-let initPromise: Promise<void> | null = null;
-
-/** Call once at app startup — safe to call more than once. */
+/** Call once at app startup — safe to call more than once. No-op while ads are disabled. */
 export function initAds(): Promise<void> {
-  if (!initPromise) {
-    initPromise = mobileAds()
-      .initialize()
-      .then(() => undefined)
-      .catch(() => undefined);
-  }
-  return initPromise;
+  return Promise.resolve();
 }
 
 /**
  * Show a rewarded ad and resolve `true` only once the viewer actually earned
- * the reward (watched it through) — resolves `false` on skip, close, load
- * failure, or a platform with no unit configured. Never throws.
+ * the reward. Always resolves `false` while ads are disabled.
  */
 export function showRewardedAd(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (!REWARDED_UNIT_ID) {
-      resolve(false);
-      return;
-    }
-    const rewarded = RewardedAd.createForAdRequest(REWARDED_UNIT_ID);
-    let earned = false;
-    let settled = false;
-    const finish = (result: boolean) => {
-      if (settled) return;
-      settled = true;
-      unsubscribeLoaded();
-      unsubscribeEarned();
-      unsubscribeClosed();
-      unsubscribeError();
-      resolve(result);
-    };
-    const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => {
-      rewarded.show();
-    });
-    const unsubscribeEarned = rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, () => {
-      earned = true;
-    });
-    const unsubscribeClosed = rewarded.addAdEventListener(AdEventType.CLOSED, () => {
-      finish(earned);
-    });
-    const unsubscribeError = rewarded.addAdEventListener(AdEventType.ERROR, () => {
-      finish(false);
-    });
-    rewarded.load();
-  });
+  return Promise.resolve(false);
 }
