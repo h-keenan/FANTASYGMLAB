@@ -1429,16 +1429,17 @@ def get_league_dashboard(
         rosters=rosters,
     )
 
-    # Team Snapshot — deliberately only the fields free of a new league-wide
-    # computation: record comes straight off the roster we already fetched,
-    # health/average age reuse the same roster_df + injury pipeline
-    # dashboard_engine.compose_next_move_briefing already runs internally
-    # (recomputed here rather than threaded through DailyGmBriefing, which
-    # modules.push_triggers also constructs and shouldn't need to change
-    # shape for a mobile-only display field). Starter/bench/power/franchise
-    # rank need a league-wide frame ported out of app.py's
-    # add_league_detail_ranks/build_league_display_frame — real, but a
-    # separate, larger follow-up, not bundled into this one.
+    # Team Snapshot: record comes straight off the roster we already
+    # fetched, health/average age reuse the same roster_df + injury
+    # pipeline dashboard_engine.compose_next_move_briefing already runs
+    # internally (recomputed here rather than threaded through
+    # DailyGmBriefing, which modules.push_triggers also constructs and
+    # shouldn't need to change shape for a mobile-only display field).
+    # Power/franchise rank now reuse modules.league_rankings (ported out of
+    # app.py's add_league_detail_ranks/build_league_display_frame in PR
+    # #520 for get_league_team_rankings) — the same league-wide frame that
+    # endpoint already computes on demand, so this is no longer the
+    # separate follow-up it once was.
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
     injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
@@ -1449,6 +1450,19 @@ def get_league_dashboard(
         if not roster_df.empty and roster_df["age"].notna().any()
         else None
     )
+
+    power_rank = None
+    franchise_rank = None
+    rankings_frame = league_rankings.build_league_rankings_frame(
+        valued, league_id, score_field=score_field, league_settings=settings
+    )
+    if not rankings_frame.empty:
+        my_roster_id = str(my_roster.get("roster_id") or "")
+        match = rankings_frame[rankings_frame["roster_id"].astype(str) == my_roster_id]
+        if not match.empty:
+            power_rank = _clean_json_value(match.iloc[0].get("power_rank"))
+            franchise_rank = _clean_json_value(match.iloc[0].get("franchise_rank"))
+
     roster_settings = my_roster.get("settings") or {}
     team_snapshot = {
         "wins": roster_settings.get("wins"),
@@ -1456,6 +1470,8 @@ def get_league_dashboard(
         "ties": roster_settings.get("ties"),
         "health_flag": health_flag,
         "average_age": round(average_age, 1) if average_age is not None else None,
+        "power_rank": power_rank,
+        "franchise_rank": franchise_rank,
     }
 
     return {

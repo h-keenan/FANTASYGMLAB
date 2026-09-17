@@ -21,6 +21,7 @@ interface TeamRow {
   isMine: boolean;
   powerRank: number | null;
   recordLabel: string | null;
+  archetypeLabel: string | null;
 }
 
 export default function TeamsScreen({ route, navigation }: Props) {
@@ -63,6 +64,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
             isMine: Boolean(myRosterId) && rosterId === myRosterId,
             powerRank: ranking?.power_rank ?? null,
             recordLabel: ranking?.record_label ?? null,
+            archetypeLabel: ranking?.archetype_label ?? null,
           };
         });
         rows.sort((a, b) => {
@@ -135,6 +137,13 @@ export default function TeamsScreen({ route, navigation }: Props) {
                 ) : null}
               </View>
               {item.recordLabel ? <Text style={styles.record}>{item.recordLabel}</Text> : null}
+              {item.archetypeLabel ? (
+                <View style={styles.archetypeBadge}>
+                  <Text style={styles.archetypeBadgeText} numberOfLines={1}>
+                    {item.archetypeLabel}
+                  </Text>
+                </View>
+              ) : null}
             </View>
             {item.powerRank != null ? (
               <View style={styles.rankPill}>
@@ -173,6 +182,15 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center' },
   owner: { fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm, flexShrink: 1 },
   record: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  archetypeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.badgeBackground,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    marginTop: spacing.xs,
+  },
+  archetypeBadgeText: { fontSize: 10, fontWeight: '700', color: colors.badgeText },
   rankPill: {
     backgroundColor: colors.background,
     borderRadius: radii.sm,

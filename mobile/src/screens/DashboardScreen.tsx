@@ -241,6 +241,8 @@ function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
     { label: 'Health', value: snapshot.health_flag || 'Stable' },
     { label: 'Avg Age', value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—' },
   ];
+  if (snapshot.power_rank != null) tiles.push({ label: 'Power', value: `#${snapshot.power_rank}` });
+  if (snapshot.franchise_rank != null) tiles.push({ label: 'Franchise', value: `#${snapshot.franchise_rank}` });
   return (
     <View style={styles.snapshotRow}>
       {tiles.map((tile) => (
@@ -405,11 +407,13 @@ const styles = StyleSheet.create({
   checkInText: { fontSize: 12, fontWeight: '600', color: colors.accent, flexShrink: 1 },
   snapshotRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
   snapshotTile: {
-    flex: 1,
+    flexBasis: '30%',
+    flexGrow: 1,
     backgroundColor: colors.surface,
     borderRadius: radii.sm,
     borderWidth: 1,

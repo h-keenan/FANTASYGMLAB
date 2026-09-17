@@ -24,6 +24,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Waivers'>;
 
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
+const BEST_AVAILABLE_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K'];
 
 const INJURY_RISK_STATUSES = new Set(['out', 'ir', 'doubtful', 'pup', 'suspended']);
 const INJURY_WATCH_STATUSES = new Set(['questionable', 'sus']);
@@ -98,6 +99,23 @@ export default function WaiversScreen({ route, navigation }: Props) {
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
   }, [freeAgents, position, search]);
 
+  // Mirrors modules/waivers_ui.py's render_free_agent_summary_cards: prefer
+  // non-stale players with a real score as the pool, falling back to the
+  // full free-agent list only if nothing qualifies league-wide (not a
+  // per-position fallback) — then the single top scorer per position, plus
+  // how many active options exist at that position.
+  const bestAvailable = useMemo(() => {
+    if (!freeAgents || freeAgents.length === 0) return [];
+    const activeAgents = freeAgents.filter((p) => !p.stale_free_agent && (p.score ?? 0) > 0);
+    const source = activeAgents.length > 0 ? activeAgents : freeAgents;
+    return BEST_AVAILABLE_POSITIONS.map((pos) => {
+      const group = source.filter((p) => p.position === pos);
+      if (group.length === 0) return null;
+      const top = [...group].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+      return { position: pos, player: top, count: group.length };
+    }).filter((entry): entry is { position: string; player: WaiverPlayer; count: number } => entry !== null);
+  }, [freeAgents]);
+
   return (
     <View style={styles.container}>
       <GridBackground />
@@ -139,16 +157,38 @@ export default function WaiversScreen({ route, navigation }: Props) {
           data={filtered}
           keyExtractor={(item) => item.player_id}
           ListHeaderComponent={
-            priorityAdds.length > 0 ? (
-              <View style={styles.priorityBlock}>
-                <Text style={styles.sectionLabel}>Priority Adds</Text>
-                {priorityAdds.map((player) => (
-                  <PriorityAddCard
-                    key={player.player_id}
-                    player={player}
-                    onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
-                  />
-                ))}
+            bestAvailable.length > 0 || priorityAdds.length > 0 ? (
+              <View>
+                {bestAvailable.length > 0 ? (
+                  <View style={styles.bestAvailableBlock}>
+                    <Text style={styles.sectionLabel}>Best Available</Text>
+                    <View style={styles.bestAvailableRow}>
+                      {bestAvailable.map(({ position: pos, player, count }) => (
+                        <BestAvailableCard
+                          key={pos}
+                          position={pos}
+                          player={player}
+                          count={count}
+                          onPress={() =>
+                            navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })
+                          }
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+                {priorityAdds.length > 0 ? (
+                  <View style={styles.priorityBlock}>
+                    <Text style={styles.sectionLabel}>Priority Adds</Text>
+                    {priorityAdds.map((player) => (
+                      <PriorityAddCard
+                        key={player.player_id}
+                        player={player}
+                        onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
+                      />
+                    ))}
+                  </View>
+                ) : null}
                 <Text style={styles.sectionLabel}>All Free Agents</Text>
               </View>
             ) : null
@@ -190,6 +230,32 @@ function toRankedPlayer(player: WaiverPlayer) {
     rank_unavailable_reason: null,
     opportunity_label: null,
   };
+}
+
+function BestAvailableCard({
+  position,
+  player,
+  count,
+  onPress,
+}: {
+  position: string;
+  player: WaiverPlayer;
+  count: number;
+  onPress: () => void;
+}) {
+  return (
+    <AnimatedCard style={styles.bestAvailableCard} onPress={onPress}>
+      <View style={styles.bestAvailablePosBadge}>
+        <Text style={styles.bestAvailablePosText}>{position}</Text>
+      </View>
+      <PlayerAvatar playerId={player.player_id} size={36} tier={player.tier} style={styles.avatarWrap} />
+      <Text style={styles.bestAvailableName} numberOfLines={1}>
+        {player.name ?? 'Unknown'}
+      </Text>
+      <Text style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</Text>
+      <Text style={styles.bestAvailableCount}>{count} active</Text>
+    </AnimatedCard>
+  );
 }
 
 function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPress: () => void }) {
@@ -340,6 +406,26 @@ const styles = StyleSheet.create({
   loading: { marginTop: spacing.xl },
   listHeader: { marginBottom: spacing.sm },
   listContent: { padding: spacing.lg, paddingTop: 0, gap: spacing.sm },
+  bestAvailableBlock: { gap: spacing.sm },
+  bestAvailableRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  bestAvailableCard: {
+    flexBasis: '30%',
+    flexGrow: 1,
+    padding: spacing.sm,
+    alignItems: 'center',
+    gap: 2,
+  },
+  bestAvailablePosBadge: {
+    backgroundColor: colors.badgeBackground,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    marginBottom: spacing.xs,
+  },
+  bestAvailablePosText: { fontSize: 10, fontWeight: '700', color: colors.badgeText },
+  bestAvailableName: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.xs },
+  bestAvailableScore: { fontSize: 14, fontWeight: '700', color: colors.accent },
+  bestAvailableCount: { fontSize: 10, color: colors.textTertiary },
   priorityBlock: { gap: spacing.sm },
   priorityCard: { padding: spacing.md, borderColor: colors.premium, borderWidth: 1 },
   priorityTopRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
