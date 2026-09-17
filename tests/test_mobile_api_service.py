@@ -478,6 +478,146 @@ def test_trade_analyzer_passes_partner_roster_assets_when_given(monkeypatch):
     assert partner_assets[0]["owner_roster_id"] == "2"
 
 
+def test_draft_picks_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/draft-picks")
+    assert response.status_code == 401
+
+
+def _draft_picks_fixture_context():
+    """(rosters, users) for a 2-team league whose draft-capital chain is
+    already proven to produce real, non-empty pick assets — the exact
+    fixture test_team_rankings_returns_power_and_franchise_ranks already
+    exercises for the same league (_TRADE_ANALYZER_LEAGUE)."""
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    rosters = [
+        {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+        {"roster_id": 2, "owner_id": "sleeper-user-2", "players": ["target_rb"]},
+    ]
+    users = [
+        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+    ]
+    return rosters, users
+
+
+def test_draft_picks_returns_real_pick_assets(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_rosters, fake_users = _draft_picks_fixture_context()
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                with patch("modules.sleeper.get_users", return_value=fake_users):
+                    with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/draft-picks",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    picks = body["picks"]
+    # Real modules.trade_ideas.list_draft_pick_assets output, not mocked —
+    # a 2-roster dynasty league with no traded picks should generate real
+    # future-pick assets for both rosters.
+    assert picks
+    for pick in picks:
+        assert pick["pick_id"] == f"{pick['season']}:{pick['round']}:{pick['original_roster_id']}"
+        assert pick["owner_roster_id"] in {"1", "2"}
+        assert isinstance(pick["score"], (int, float))
+
+
+def test_trade_analyzer_includes_a_real_pick_asset_when_pick_ids_given(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    fake_rosters, fake_users = _draft_picks_fixture_context()
+
+    with patch("requests.get", side_effect=[auth_user_response, auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                    with patch("modules.sleeper.get_users", return_value=fake_users):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    picks_response = client.get(
+                                        "/v1/leagues/abc/draft-picks",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+                                    assert picks_response.status_code == 200
+                                    a_pick_id = picks_response.json()["picks"][0]["pick_id"]
+
+                                    response = client.post(
+                                        "/v1/leagues/abc/trade-analyzer",
+                                        json={
+                                            "send_player_ids": ["my_bench_rb"],
+                                            "receive_pick_ids": [a_pick_id],
+                                            "strategy": "contender",
+                                        },
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    # A real verdict came back at all — proves the pick_id round-tripped
+    # through list_draft_pick_assets -> pick_asset_from_mapping ->
+    # trade_analyzer_fit without crashing on a mixed player+pick package.
+    assert body["verdict"] is not None
+
+
+def test_trade_analyzer_reports_assets_not_found_for_an_unknown_pick_id(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    fake_rosters, fake_users = _draft_picks_fixture_context()
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                with patch("modules.sleeper.get_users", return_value=fake_users):
+                    with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    response = client.post(
+                                        "/v1/leagues/abc/trade-analyzer",
+                                        json={"receive_pick_ids": ["9999:9:999"]},
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["verdict"] is None
+    assert body["reason"] == "assets_not_found"
+
+
 def _fake_players_dataset():
     return {
         "1001": {

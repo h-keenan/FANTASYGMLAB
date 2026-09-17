@@ -15,13 +15,23 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
-import { api, type RankedPlayer, type TeamStrategy, type TradeVerdict } from '../lib/api';
+import { api, type DraftPickAsset, type RankedPlayer, type TeamStrategy, type TradeVerdict } from '../lib/api';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeAnalyzer'>;
 type Side = 'send' | 'receive';
+type AssetType = 'players' | 'picks';
+
+interface SideChip {
+  id: string;
+  name: string;
+}
+
+type SearchItem =
+  | { kind: 'player'; player: RankedPlayer }
+  | { kind: 'pick'; pick: DraftPickAsset };
 
 const MAX_SEARCH_RESULTS = 40;
 
@@ -65,12 +75,17 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [myRosterIds, setMyRosterIds] = useState<Set<string>>(new Set());
+  const [myRosterId, setMyRosterId] = useState('');
   const [otherTeams, setOtherTeams] = useState<OtherTeam[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>(ALL_TEAMS_ID);
   const [rankings, setRankings] = useState<RankedPlayer[]>([]);
+  const [allPicks, setAllPicks] = useState<DraftPickAsset[]>([]);
   const [sendIds, setSendIds] = useState<RankedPlayer[]>([]);
   const [receiveIds, setReceiveIds] = useState<RankedPlayer[]>([]);
+  const [sendPicks, setSendPicks] = useState<DraftPickAsset[]>([]);
+  const [receivePicks, setReceivePicks] = useState<DraftPickAsset[]>([]);
   const [activeSide, setActiveSide] = useState<Side>('send');
+  const [assetType, setAssetType] = useState<AssetType>('players');
   const [search, setSearch] = useState('');
   const [strategy, setStrategy] = useState<TeamStrategy>('retool');
   const [analyzing, setAnalyzing] = useState(false);
@@ -83,11 +98,12 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [myRoster, rankingsResult, usersResult, rostersResult] = await Promise.all([
+        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult] = await Promise.all([
           api.getMyRoster(leagueId),
           api.getLeagueRankings(leagueId, { lens: 'Dynasty', limit: 300 }),
           api.getLeagueUsers(leagueId),
           api.getLeagueRosters(leagueId),
+          api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: 'unavailable' })),
         ]);
         if (cancelled) return;
 
@@ -98,7 +114,9 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           const players = Array.isArray(myRoster.roster?.players) ? (myRoster.roster!.players as unknown[]) : [];
           setMyRosterIds(new Set(players.map(String)));
           myId = String(myRoster.roster?.roster_id ?? '');
+          setMyRosterId(myId);
         }
+        setAllPicks(picksResult.picks);
 
         const usersById = new Map<string, string>();
         for (const user of usersResult.users) {
@@ -135,6 +153,12 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     () => new Set([...sendIds, ...receiveIds].map((p) => p.player_id)),
     [sendIds, receiveIds],
   );
+  const selectedPickIds = useMemo(
+    () => new Set([...sendPicks, ...receivePicks].map((p) => p.pick_id)),
+    [sendPicks, receivePicks],
+  );
+  const hasAnyAssets =
+    sendIds.length > 0 || receiveIds.length > 0 || sendPicks.length > 0 || receivePicks.length > 0;
 
   const searchPool = useMemo(() => {
     if (activeSide === 'send') {
@@ -148,15 +172,33 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     return rankings.filter((p) => team.playerIds.has(p.player_id));
   }, [rankings, myRosterIds, otherTeams, selectedTeamId, activeSide]);
 
-  const searchResults = useMemo(() => {
+  const pickSearchPool = useMemo(() => {
+    if (activeSide === 'send') {
+      return allPicks.filter((p) => p.owner_roster_id === myRosterId);
+    }
+    if (selectedTeamId === ALL_TEAMS_ID) {
+      return allPicks.filter((p) => p.owner_roster_id !== myRosterId);
+    }
+    return allPicks.filter((p) => p.owner_roster_id === selectedTeamId);
+  }, [allPicks, myRosterId, selectedTeamId, activeSide]);
+
+  const searchResults = useMemo<SearchItem[]>(() => {
     const query = search.trim().toLowerCase();
+    if (assetType === 'picks') {
+      return pickSearchPool
+        .filter((p) => !selectedPickIds.has(p.pick_id))
+        .filter((p) => !query || (p.label ?? '').toLowerCase().includes(query))
+        .slice(0, MAX_SEARCH_RESULTS)
+        .map((pick) => ({ kind: 'pick' as const, pick }));
+    }
     return searchPool
       .filter((p) => !selectedIds.has(p.player_id))
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query))
-      .slice(0, MAX_SEARCH_RESULTS);
-  }, [searchPool, selectedIds, search]);
+      .slice(0, MAX_SEARCH_RESULTS)
+      .map((player) => ({ kind: 'player' as const, player }));
+  }, [assetType, searchPool, pickSearchPool, selectedIds, selectedPickIds, search]);
 
-  const addToSide = (player: RankedPlayer) => {
+  const addPlayerToSide = (player: RankedPlayer) => {
     if (activeSide === 'send') {
       setSendIds((prev) => [...prev, player]);
     } else {
@@ -165,11 +207,22 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     setVerdict(null);
   };
 
-  const removeFromSide = (side: Side, playerId: string) => {
-    if (side === 'send') {
-      setSendIds((prev) => prev.filter((p) => p.player_id !== playerId));
+  const addPickToSide = (pick: DraftPickAsset) => {
+    if (activeSide === 'send') {
+      setSendPicks((prev) => [...prev, pick]);
     } else {
-      setReceiveIds((prev) => prev.filter((p) => p.player_id !== playerId));
+      setReceivePicks((prev) => [...prev, pick]);
+    }
+    setVerdict(null);
+  };
+
+  const removeFromSide = (side: Side, id: string) => {
+    if (side === 'send') {
+      setSendIds((prev) => prev.filter((p) => p.player_id !== id));
+      setSendPicks((prev) => prev.filter((p) => p.pick_id !== id));
+    } else {
+      setReceiveIds((prev) => prev.filter((p) => p.player_id !== id));
+      setReceivePicks((prev) => prev.filter((p) => p.pick_id !== id));
     }
     setVerdict(null);
   };
@@ -194,6 +247,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       const result = await api.postTradeAnalyzer(leagueId, {
         sendPlayerIds: sendIds.map((p) => p.player_id),
         receivePlayerIds: receiveIds.map((p) => p.player_id),
+        sendPickIds: sendPicks.map((p) => p.pick_id),
+        receivePickIds: receivePicks.map((p) => p.pick_id),
         strategy,
         lens: 'Dynasty',
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? '' : selectedTeamId,
@@ -246,18 +301,39 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       <View style={styles.sidesRow}>
         <TradeSide
           label="You Send"
-          players={sendIds}
+          items={[
+            ...sendIds.map((p) => ({ id: p.player_id, name: p.name ?? 'Unknown' })),
+            ...sendPicks.map((p) => ({ id: p.pick_id, name: p.label ?? 'Draft pick' })),
+          ]}
           active={activeSide === 'send'}
           onPressHeader={() => setActiveSide('send')}
           onRemove={(id) => removeFromSide('send', id)}
         />
         <TradeSide
           label="You Receive"
-          players={receiveIds}
+          items={[
+            ...receiveIds.map((p) => ({ id: p.player_id, name: p.name ?? 'Unknown' })),
+            ...receivePicks.map((p) => ({ id: p.pick_id, name: p.label ?? 'Draft pick' })),
+          ]}
           active={activeSide === 'receive'}
           onPressHeader={() => setActiveSide('receive')}
           onRemove={(id) => removeFromSide('receive', id)}
         />
+      </View>
+
+      <View style={styles.assetTypeRow}>
+        <TouchableOpacity
+          style={[styles.pill, assetType === 'players' && styles.pillActive]}
+          onPress={() => setAssetType('players')}
+        >
+          <Text style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.pill, assetType === 'picks' && styles.pillActive]}
+          onPress={() => setAssetType('picks')}
+        >
+          <Text style={[styles.pillText, assetType === 'picks' && styles.pillTextActive]}>Picks</Text>
+        </TouchableOpacity>
       </View>
 
       {activeSide === 'receive' && otherTeams.length > 0 ? (
@@ -305,9 +381,9 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       </View>
 
       <TouchableOpacity
-        style={[styles.analyzeButton, (sendIds.length === 0 && receiveIds.length === 0) && styles.analyzeButtonDisabled]}
+        style={[styles.analyzeButton, !hasAnyAssets && styles.analyzeButtonDisabled]}
         onPress={analyze}
-        disabled={analyzing || (sendIds.length === 0 && receiveIds.length === 0)}
+        disabled={analyzing || !hasAnyAssets}
       >
         {analyzing ? <ActivityIndicator color="#fff" /> : <Text style={styles.analyzeButtonText}>Analyze Trade</Text>}
       </TouchableOpacity>
@@ -327,10 +403,10 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         style={styles.searchInput}
         placeholder={
           activeSide === 'send'
-            ? 'Search your roster'
+            ? `Search your ${assetType === 'picks' ? 'picks' : 'roster'}`
             : selectedTeamId === ALL_TEAMS_ID
-              ? 'Search players to receive'
-              : `Search ${otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? 'team'}'s roster`
+              ? `Search ${assetType === 'picks' ? 'picks' : 'players'} to receive`
+              : `Search ${otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? 'team'}'s ${assetType === 'picks' ? 'picks' : 'roster'}`
         }
         value={search}
         onChangeText={setSearch}
@@ -346,33 +422,52 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       <FlatList
       style={styles.container}
       data={searchResults}
-      keyExtractor={(item) => item.player_id}
+      keyExtractor={(item) => (item.kind === 'player' ? item.player.player_id : item.pick.pick_id)}
       contentContainerStyle={styles.resultsList}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={header}
-      renderItem={({ item }) => (
-        <TouchableOpacity style={styles.resultRow} onPress={() => addToSide(item)}>
-          <PlayerAvatar playerId={item.player_id} size={36} tier={item.tier} style={styles.resultAvatar} />
-          <View style={styles.resultInfo}>
-            <Text style={styles.resultName} numberOfLines={1}>
-              {item.name ?? 'Unknown'}
-            </Text>
-            <View style={styles.resultMetaRow}>
-              <Text style={styles.resultMeta}>
-                {[item.position, item.team].filter(Boolean).join(' · ')}
+      renderItem={({ item }) =>
+        item.kind === 'player' ? (
+          <TouchableOpacity style={styles.resultRow} onPress={() => addPlayerToSide(item.player)}>
+            <PlayerAvatar playerId={item.player.player_id} size={36} tier={item.player.tier} style={styles.resultAvatar} />
+            <View style={styles.resultInfo}>
+              <Text style={styles.resultName} numberOfLines={1}>
+                {item.player.name ?? 'Unknown'}
               </Text>
-              <TierBadge storedTier={item.tier} />
+              <View style={styles.resultMetaRow}>
+                <Text style={styles.resultMeta}>
+                  {[item.player.position, item.player.team].filter(Boolean).join(' · ')}
+                </Text>
+                <TierBadge storedTier={item.player.tier} />
+              </View>
             </View>
-          </View>
-          <Text style={styles.resultScore}>{Math.round(playerScore(item))}</Text>
-        </TouchableOpacity>
-      )}
+            <Text style={styles.resultScore}>{Math.round(playerScore(item.player))}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.resultRow} onPress={() => addPickToSide(item.pick)}>
+            <View style={styles.pickBadge}>
+              <Ionicons name="albums-outline" size={18} color={colors.accent} />
+            </View>
+            <View style={styles.resultInfo}>
+              <Text style={styles.resultName} numberOfLines={1}>
+                {item.pick.label ?? 'Draft pick'}
+              </Text>
+              <View style={styles.resultMetaRow}>
+                <Text style={styles.resultMeta}>
+                  {[item.pick.pick_tier, item.pick.projected_pick_range].filter(Boolean).join(' · ')}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.resultScore}>{item.pick.score != null ? Math.round(item.pick.score) : '—'}</Text>
+          </TouchableOpacity>
+        )
+      }
       ListEmptyComponent={
         <Text style={styles.empty}>
-          {activeSide === 'send' && myRosterIds.size === 0
+          {assetType === 'players' && activeSide === 'send' && myRosterIds.size === 0
             ? 'No roster players found.'
             : search
-              ? 'No matching players.'
+              ? `No matching ${assetType === 'picks' ? 'picks' : 'players'}.`
               : 'Start typing to search.'}
         </Text>
       }
@@ -442,35 +537,31 @@ function VerdictCard({
 
 function TradeSide({
   label,
-  players,
+  items,
   active,
   onPressHeader,
   onRemove,
 }: {
   label: string;
-  players: RankedPlayer[];
+  items: SideChip[];
   active: boolean;
   onPressHeader: () => void;
-  onRemove: (playerId: string) => void;
+  onRemove: (id: string) => void;
 }) {
   return (
     <View style={[styles.side, active && styles.sideActive]}>
       <TouchableOpacity onPress={onPressHeader}>
         <Text style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</Text>
       </TouchableOpacity>
-      {players.map((player) => (
-        <TouchableOpacity
-          key={player.player_id}
-          style={styles.chip}
-          onPress={() => onRemove(player.player_id)}
-        >
+      {items.map((item) => (
+        <TouchableOpacity key={item.id} style={styles.chip} onPress={() => onRemove(item.id)}>
           <Text style={styles.chipText} numberOfLines={1}>
-            {player.name ?? 'Unknown'}
+            {item.name}
           </Text>
           <Text style={styles.chipRemove}>{'×'}</Text>
         </TouchableOpacity>
       ))}
-      {players.length === 0 ? <Text style={styles.sideEmpty}>Tap to add</Text> : null}
+      {items.length === 0 ? <Text style={styles.sideEmpty}>Tap to add</Text> : null}
     </View>
   );
 }
@@ -513,6 +604,7 @@ const styles = StyleSheet.create({
   },
   chipText: { flex: 1, fontSize: 13, color: colors.textPrimary, marginRight: spacing.xs },
   chipRemove: { fontSize: 14, color: colors.textSecondary, fontWeight: '700' },
+  assetTypeRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
   teamRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   strategyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   pill: {
@@ -598,6 +690,15 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   resultAvatar: { marginRight: spacing.sm },
+  pickBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.pill,
+    backgroundColor: colors.badgeBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
   resultInfo: { flex: 1, marginRight: spacing.sm },
   resultName: { fontSize: 15, fontWeight: '500', color: colors.textPrimary },
   resultMeta: { fontSize: 12, color: colors.textSecondary },

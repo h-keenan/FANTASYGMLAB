@@ -12,6 +12,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
   - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
   - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
+  - GET  /v1/leagues/{id}/draft-picks    — every draft pick asset, for the Trade Analyzer picks browser
   - GET  /v1/leagues/{id}/my-team        — your own roster's suggested starters vs. bench
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
@@ -90,11 +91,12 @@ from modules import (
     trade_analyzer_fit,
     trade_hub_engine,
     trade_hub_ui,
+    trade_ideas,
     trade_offer_analyzer,
     waivers_ui,
 )
 from modules.team_eval import refine_team_directions, suggest_optimal_lineup
-from modules.trade_analyzer_assembly import player_asset_from_mapping
+from modules.trade_analyzer_assembly import pick_asset_from_mapping, player_asset_from_mapping
 
 
 SERVICE_NAME = "mobile-api"
@@ -515,6 +517,76 @@ def get_league_draft_center(
     }
 
 
+@app.get("/v1/leagues/{league_id}/draft-picks")
+def get_league_draft_picks(
+    league_id: str,
+    lens: str = "Dynasty",
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Every draft pick asset in the league, for the mobile Trade Analyzer's
+    Players/Picks roster browser.
+
+    Each pick gets a stable pick_id — f"{season}:{round}:{original_roster_id}"
+    — the client sends back in POST /trade-analyzer's send_pick_ids/
+    receive_pick_ids. (season, round, original_roster_id) is already a
+    unique key for a pick asset regardless of its current owner (only one
+    roster can hold a given original team's given-round pick in a given
+    year at a time), so no separate id scheme is needed.
+
+    Shares modules.trade_ideas.list_draft_pick_assets verbatim — the same
+    per-pick valuation (round, expected range, class/prospect strength,
+    team context) the web app's Draft Center and Trade Hub already use in
+    modules/, via modules.league_rankings.build_league_summary_and_draft_capital
+    for the df_summary it needs as an input.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_draft_picks")
+    if players_df.empty:
+        return {"ok": True, "picks": [], "reason": "no_player_data"}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    df_summary, _ = league_rankings.build_league_summary_and_draft_capital(
+        valued, league_id, score_field=score_field, league_settings=settings
+    )
+    if df_summary.empty:
+        return {"ok": True, "picks": [], "reason": "no_rankings_data"}
+
+    picks = trade_ideas.list_draft_pick_assets(league_id, df_summary, league_settings=settings)
+    projected = [
+        {
+            "pick_id": f"{pick.get('season')}:{pick.get('round')}:{pick.get('original_roster_id')}",
+            "label": _clean_json_value(pick.get("label")),
+            "score": _clean_json_value(pick.get("score")),
+            "season": _clean_json_value(pick.get("season")),
+            "round": _clean_json_value(pick.get("round")),
+            "original_roster_id": str(pick.get("original_roster_id")),
+            "owner_roster_id": str(pick.get("owner_roster_id")),
+            "original_team_name": _clean_json_value(pick.get("original_team_name")),
+            "owner_team_name": _clean_json_value(pick.get("owner_team_name")),
+            "pick_tier": _clean_json_value(pick.get("pick_tier")),
+            "projected_pick_range": _clean_json_value(pick.get("projected_pick_range")),
+        }
+        for pick in picks
+    ]
+    return {"ok": True, "picks": projected, "reason": ""}
+
+
 def _resolve_my_roster(
     user: dict[str, Any],
     league_id: str,
@@ -783,6 +855,10 @@ def get_news(
 class TradeAnalyzerRequest(BaseModel):
     send_player_ids: list[str] = Field(default_factory=list)
     receive_player_ids: list[str] = Field(default_factory=list)
+    # pick_id values from GET /v1/leagues/{id}/draft-picks
+    # (f"{season}:{round}:{original_roster_id}").
+    send_pick_ids: list[str] = Field(default_factory=list)
+    receive_pick_ids: list[str] = Field(default_factory=list)
     # Any unrecognized value falls back to "retool" — see
     # modules.team_eval.normalize_team_strategy — so this is never rejected.
     strategy: str = "retool"
@@ -809,6 +885,13 @@ def post_trade_analyzer(
     resolution's non-match states, or an empty/invalid package, return 200
     with a `reason` rather than an HTTP error, since they're everyday
     states a client should handle gracefully (e.g. prompt to link Sleeper).
+
+    Draft picks (send_pick_ids/receive_pick_ids, ids from GET
+    .../draft-picks) are resolved and projected exactly like players and
+    appended to the same send_assets/receive_assets lists —
+    modules.trade_analyzer_fit already sums/counts asset_type == "pick"
+    assets throughout the fit engine, so this needed no changes there,
+    only wiring the ids through.
     """
 
     if body.lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
@@ -816,8 +899,13 @@ def post_trade_analyzer(
             status_code=422,
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
-    if not body.send_player_ids and not body.receive_player_ids:
-        raise HTTPException(status_code=422, detail="Provide at least one player on either side of the trade.")
+    if (
+        not body.send_player_ids
+        and not body.receive_player_ids
+        and not body.send_pick_ids
+        and not body.receive_pick_ids
+    ):
+        raise HTTPException(status_code=422, detail="Provide at least one asset on either side of the trade.")
 
     my_roster, reason = _resolve_my_roster(user, league_id)
     if my_roster is None:
@@ -852,8 +940,31 @@ def post_trade_analyzer(
         rows = valued[valued["player_id"].astype(str).isin(wanted)]
         return [player_asset_from_mapping(row, score_field=score_field) for _, row in rows.iterrows()]
 
-    send_assets = build_assets(body.send_player_ids)
-    receive_assets = build_assets(body.receive_player_ids)
+    send_pick_assets: list[dict[str, Any]] = []
+    receive_pick_assets: list[dict[str, Any]] = []
+    if body.send_pick_ids or body.receive_pick_ids:
+        pick_summary, _ = league_rankings.build_league_summary_and_draft_capital(
+            valued, league_id, score_field=score_field, league_settings=settings
+        )
+        if not pick_summary.empty:
+            all_picks = trade_ideas.list_draft_pick_assets(league_id, pick_summary, league_settings=settings)
+            picks_by_id = {
+                f"{pick.get('season')}:{pick.get('round')}:{pick.get('original_roster_id')}": pick
+                for pick in all_picks
+            }
+
+            def resolve_picks(pick_ids: list[str]) -> list[dict[str, Any]]:
+                return [
+                    pick_asset_from_mapping(picks_by_id[pick_id])
+                    for pick_id in pick_ids
+                    if pick_id in picks_by_id
+                ]
+
+            send_pick_assets = resolve_picks(body.send_pick_ids)
+            receive_pick_assets = resolve_picks(body.receive_pick_ids)
+
+    send_assets = build_assets(body.send_player_ids) + send_pick_assets
+    receive_assets = build_assets(body.receive_player_ids) + receive_pick_assets
     if not send_assets and not receive_assets:
         return {"ok": True, "verdict": None, "reason": "assets_not_found"}
 
