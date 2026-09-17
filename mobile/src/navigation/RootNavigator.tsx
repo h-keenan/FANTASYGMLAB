@@ -30,6 +30,7 @@ import GmTargetsScreen from '../screens/GmTargetsScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradeHubScreen from '../screens/TradeHubScreen';
 import TeamsScreen from '../screens/TeamsScreen';
+import DraftCenterScreen from '../screens/DraftCenterScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 
 export type RootStackParamList = {
@@ -51,6 +52,7 @@ export type RootStackParamList = {
   Dashboard: { leagueId: string; leagueName: string };
   TradeHub: { leagueId: string; leagueName: string };
   Teams: { leagueId: string; leagueName: string };
+  DraftCenter: { leagueId: string; leagueName: string };
   Alerts: { leagueId: string; leagueName: string };
 };
 
@@ -139,6 +141,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Dashboard" component={DashboardScreen} />
           <AppStack.Screen name="TradeHub" component={TradeHubScreen} />
           <AppStack.Screen name="Teams" component={TeamsScreen} />
+          <AppStack.Screen name="DraftCenter" component={DraftCenterScreen} />
           <AppStack.Screen name="Alerts" component={AlertsScreen} />
           <AppStack.Screen name="GmTargets" component={GmTargetsScreen} />
           <AppStack.Screen

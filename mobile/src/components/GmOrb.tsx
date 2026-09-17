@@ -50,6 +50,7 @@ const LEAGUE_DESTINATIONS: Destination[] = [
   { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', needsLeague: true },
   { label: 'Trade Analyzer', route: 'TradeAnalyzer', icon: 'git-compare-outline', needsLeague: true },
   { label: 'Trade Calculator', route: 'TradeCalculator', icon: 'calculator-outline', needsLeague: true },
+  { label: 'Draft Center', route: 'DraftCenter', icon: 'albums-outline', needsLeague: true },
   { label: 'Recap', route: 'Recap', icon: 'newspaper-outline', needsLeague: true },
   { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', needsLeague: true },
 ];

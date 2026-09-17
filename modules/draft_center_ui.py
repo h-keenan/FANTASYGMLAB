@@ -795,6 +795,12 @@ def _draft_posture_profile(
     }
 
 
+# Public alias — same pure function render_your_draft_posture uses
+# internally, exposed under a non-underscore name for callers outside this
+# module (e.g. services/mobile_api_service.py).
+draft_posture_profile = _draft_posture_profile
+
+
 def _draft_workspace_team_lines(
     df: pd.DataFrame,
     *,

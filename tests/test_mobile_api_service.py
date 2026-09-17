@@ -2223,3 +2223,124 @@ def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
         assert isinstance(team["archetype_strengths"], list)
         assert isinstance(team["archetype_risks"], list)
         assert isinstance(team["archetype_recommendations"], list)
+
+
+def test_draft_center_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/draft-center")
+    assert response.status_code == 401
+
+
+def _draft_center_rosters_and_users():
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    rosters = [
+        {
+            "roster_id": 1,
+            "owner_id": "sleeper-user-1",
+            "players": my_roster_ids,
+            "settings": {"wins": 7, "losses": 6, "ties": 0},
+        },
+        {
+            "roster_id": 2,
+            "owner_id": "sleeper-user-2",
+            "players": ["target_rb"],
+            "settings": {"wins": 3, "losses": 10, "ties": 0},
+        },
+    ]
+    users = [
+        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+    ]
+    return rosters, users
+
+
+def test_draft_center_returns_league_wide_cards_and_resolved_posture(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    fake_rosters, fake_users = _draft_center_rosters_and_users()
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                    with patch("modules.sleeper.get_users", return_value=fake_users):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/draft-center",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+
+    # Decision/partner cards are real modules.draft_center_ui output, not
+    # mocked — each is a {label, title, tone, items: [str]} card.
+    assert body["decision_cards"]
+    assert body["partner_cards"]
+    for card in body["decision_cards"] + body["partner_cards"]:
+        assert card["label"]
+        assert card["title"]
+        assert card["tone"]
+        assert isinstance(card["items"], list) and card["items"]
+
+    # Roster 1's Sleeper username resolves to its own roster, so posture
+    # should be populated (real modules.draft_center_ui.draft_posture_profile
+    # output against the roster's own real draft-capital row).
+    posture = body["posture"]
+    assert body["posture_reason"] == ""
+    assert posture is not None
+    assert posture["label"]
+    assert posture["note"]
+    assert posture["tone"]
+    assert isinstance(posture["draft_capital_rank"], int)
+    assert isinstance(posture["future_draft_capital_rank"], int)
+    assert isinstance(posture["power_rank"], int)
+    assert isinstance(posture["franchise_rank"], int)
+
+
+def test_draft_center_posture_is_null_without_a_resolved_roster(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    fake_rosters, fake_users = _draft_center_rosters_and_users()
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                with patch("modules.sleeper.get_users", return_value=fake_users):
+                    with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/draft-center",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    # No linked Sleeper username: posture can't be resolved, but the
+    # league-wide cards don't gate on that — they're still real output.
+    assert body["posture"] is None
+    assert body["posture_reason"] == "no_sleeper_username_linked"
+    assert body["decision_cards"]
+    assert body["partner_cards"]

@@ -13,13 +13,14 @@ function so a caller only needs a league_id and a valued players frame.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import pandas as pd
 
 from modules import trade_ideas
 from modules.league_value_settings import _safe_float, _safe_positive_int
-from modules.team_eval import build_league_summary, team_strategy_label
+from modules.team_eval import build_league_summary, normalize_team_strategy, team_strategy_label
 
 
 def safe_pick_value(pick: dict) -> int:
@@ -189,6 +190,42 @@ def add_league_detail_ranks(df_display: pd.DataFrame) -> pd.DataFrame:
     return ranked
 
 
+def build_league_summary_and_draft_capital(
+    df_players: pd.DataFrame,
+    league_id: str,
+    *,
+    score_field: str = "dynasty_score",
+    current_score_field: str = "value_score",
+    league_settings: dict[str, Any] | None = None,
+    adapter=None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(df_summary, draft_capital_summary) — the shared first half of
+    build_league_rankings_frame, split out so a caller that needs the raw
+    draft_capital_summary too (e.g. build_draft_workspace_frame) doesn't
+    have to recompute df_summary/draft_picks a second time.
+
+    draft_status is intentionally omitted from the list_draft_pick_assets
+    call — see build_league_rankings_frame's docstring.
+    """
+
+    df_summary = build_league_summary(
+        df_players,
+        league_id,
+        score_field=score_field,
+        current_score_field=current_score_field,
+        lineup_settings=league_settings,
+        adapter=adapter,
+    )
+    if df_summary.empty:
+        return df_summary, pd.DataFrame()
+
+    draft_picks = trade_ideas.list_draft_pick_assets(
+        league_id, df_summary, league_settings=league_settings, adapter=adapter
+    )
+    draft_capital_summary = build_draft_capital_summary(df_summary, draft_picks)
+    return df_summary, draft_capital_summary
+
+
 def build_league_rankings_frame(
     df_players: pd.DataFrame,
     league_id: str,
@@ -202,28 +239,158 @@ def build_league_rankings_frame(
     starter_rank, bench_rank, age_rank, avg_age — the full "Rankings" page
     computation, minus the archetype/strategy-refine layer (not needed for
     these columns; see the investigation this was built from).
-
-    draft_status is intentionally omitted from the list_draft_pick_assets
-    call — that parameter only affects whether current-year rookie picks
-    count as active trade capital, and omitting it (None) falls back to
-    future_picks_are_trade_capital(league_settings), the same effective
-    default the "Rankings" page's real production traffic already uses.
     """
 
-    df_summary = build_league_summary(
+    df_summary, draft_capital_summary = build_league_summary_and_draft_capital(
         df_players,
         league_id,
         score_field=score_field,
         current_score_field=current_score_field,
-        lineup_settings=league_settings,
+        league_settings=league_settings,
         adapter=adapter,
     )
     if df_summary.empty:
         return df_summary
 
-    draft_picks = trade_ideas.list_draft_pick_assets(
-        league_id, df_summary, league_settings=league_settings, adapter=adapter
-    )
-    draft_capital_summary = build_draft_capital_summary(df_summary, draft_picks)
     df_display = build_league_display_frame(df_summary, draft_capital_summary, include_picks=True)
     return add_league_detail_ranks(df_display)
+
+
+def draft_year_columns(df: pd.DataFrame) -> list[str]:
+    """Ported verbatim from app.py — the sorted list of `pick_value_<year>`
+    columns a draft-capital summary frame carries."""
+
+    return sorted(
+        [column for column in df.columns if str(column).startswith("pick_value_")],
+        key=lambda column: int(str(column).replace("pick_value_", "") or 0),
+    )
+
+
+def _safe_text(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except (TypeError, ValueError):
+        pass
+    return str(value)
+
+
+def build_draft_workspace_frame(
+    draft_capital_summary: pd.DataFrame,
+    df_intel: pd.DataFrame | None,
+    *,
+    draft_year: int | None = None,
+) -> pd.DataFrame:
+    """Ported verbatim from app.py (confirmed pure pandas, no Streamlit
+    dependency anywhere in it) — feeds modules.draft_center_ui's
+    build_draft_decision_cards/build_draft_partner_cards. `df_intel` is
+    optional: every column it would otherwise supply (power_rank,
+    franchise_rank, age_rank, avg_age, strategy_display, trading_style,
+    roster_philosophy, asset_behavior, activity_level,
+    manager_tendencies_summary, manager_trade_implication) already has a
+    graceful fallback default below when absent."""
+
+    if draft_capital_summary is None or draft_capital_summary.empty:
+        return pd.DataFrame()
+
+    current_draft_year = _safe_positive_int(draft_year, datetime.now().year) or datetime.now().year
+    summary = draft_capital_summary.copy()
+    for column in ["draft_capital", "pick_count", "first_rounders", "second_rounders", "third_rounders", "draft_capital_rank"]:
+        if column not in summary.columns:
+            summary[column] = 0
+        summary[column] = pd.to_numeric(summary.get(column), errors="coerce").fillna(0)
+
+    year_cols = draft_year_columns(summary)
+    future_year_cols = [
+        column
+        for column in year_cols
+        if _safe_positive_int(str(column).replace("pick_value_", ""), 0) > current_draft_year
+    ]
+    summary["future_draft_capital"] = (
+        summary[future_year_cols].sum(axis=1)
+        if future_year_cols
+        else 0
+    )
+    summary["future_draft_capital_rank"] = (
+        pd.to_numeric(summary["future_draft_capital"], errors="coerce")
+        .fillna(0)
+        .rank(method="dense", ascending=False)
+        .astype(int)
+    )
+
+    if df_intel is not None and not df_intel.empty:
+        intel_cols = [
+            "roster_id",
+            "team_name",
+            "owner_name",
+            "owner_username",
+            "power_rank",
+            "franchise_rank",
+            "age_rank",
+            "avg_age",
+            "strategy_display",
+            "trading_style",
+            "roster_philosophy",
+            "asset_behavior",
+            "activity_level",
+            "manager_tendencies_summary",
+            "manager_trade_implication",
+        ]
+        available_cols = [column for column in intel_cols if column in df_intel.columns]
+        intel_frame = df_intel[available_cols].copy()
+        rename_map = {}
+        for column in [column for column in available_cols if column != "roster_id" and column in summary.columns]:
+            rename_map[column] = f"intel_{column}"
+        if rename_map:
+            intel_frame = intel_frame.rename(columns=rename_map)
+        summary = summary.merge(intel_frame, on="roster_id", how="left")
+        for base_column in ["team_name", "owner_name"]:
+            intel_column = f"intel_{base_column}"
+            if intel_column in summary.columns:
+                summary[base_column] = summary[intel_column].where(
+                    summary[intel_column].fillna("").astype(str).str.strip() != "",
+                    summary.get(base_column),
+                )
+
+    numeric_defaults = {
+        "draft_capital_rank": len(summary),
+        "future_draft_capital_rank": len(summary),
+        "power_rank": len(summary),
+        "franchise_rank": len(summary),
+        "age_rank": len(summary),
+        "avg_age": 0.0,
+        "future_draft_capital": 0.0,
+    }
+    for column, default in numeric_defaults.items():
+        if column not in summary.columns:
+            summary[column] = default
+        summary[column] = pd.to_numeric(summary.get(column), errors="coerce").fillna(default)
+
+    if "strategy_display" not in summary.columns:
+        summary["strategy_display"] = ""
+    if "mode" not in summary.columns:
+        summary["mode"] = ""
+    summary["strategy_display"] = summary.apply(
+        lambda row: _safe_text(row.get("strategy_display")) or team_strategy_label(row.get("mode")),
+        axis=1,
+    )
+
+    for column, default in [
+        ("trading_style", "Unknown"),
+        ("roster_philosophy", "Balanced"),
+        ("asset_behavior", "Balanced Asset Manager"),
+        ("activity_level", "Average Activity"),
+        ("manager_tendencies_summary", ""),
+        ("manager_trade_implication", ""),
+    ]:
+        if column not in summary.columns:
+            summary[column] = default
+        summary[column] = summary[column].fillna(default).astype(str)
+
+    summary["strategy_key"] = summary.apply(
+        lambda row: normalize_team_strategy(row.get("strategy") or row.get("mode")),
+        axis=1,
+    )
+    return summary.sort_values(["draft_capital_rank", "draft_capital", "team_name"], ascending=[True, False, True]).reset_index(drop=True)

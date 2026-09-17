@@ -11,6 +11,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
   - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
   - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
+  - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
@@ -64,6 +65,7 @@ from modules import (
     auth_supabase,
     canonical_player_ranking,
     dashboard_engine,
+    draft_center_ui,
     faab,
     gm_targets,
     injury_ui,
@@ -371,6 +373,145 @@ def get_league_team_rankings(
         )
 
     return {"ok": True, "teams": teams, "reason": ""}
+
+
+@app.get("/v1/leagues/{league_id}/draft-center")
+def get_league_draft_center(
+    league_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Draft Center Overview: your own draft posture (if your roster can be
+    resolved) plus league-wide draft decision signals and partner discovery.
+
+    Shares the web app's real computation chain: modules.league_rankings
+    (build_league_summary_and_draft_capital, build_draft_workspace_frame —
+    the latter ported verbatim from app.py, confirmed pure pandas with no
+    Streamlit dependency) plus modules.draft_center_ui's already-pure
+    build_draft_decision_cards / build_draft_partner_cards /
+    draft_posture_profile.
+
+    Manager-tendency fields (trading_style, roster_philosophy, asset_behavior,
+    activity_level) are not threaded into df_intel here — those need a real
+    full-season Sleeper transaction scan that doesn't exist in modules/ yet
+    (same deferred scope noted in get_league_team_rankings). Everything
+    build_draft_workspace_frame would otherwise read from those columns
+    degrades to a neutral default when they're absent, same as every other
+    graceful-degradation case in this file — strategy_display is threaded
+    through explicitly (aliased from the archetype/strategy classification
+    get_league_team_rankings already computes) since that one is cheap and
+    already available.
+
+    Decision/partner cards are public league-wide data and are always
+    returned; posture is personal and can be null (see posture_reason) if
+    the caller's own roster can't be resolved — the two don't need to gate
+    each other.
+
+    Only the "Overview" pane. Current Draft/History (live draft board
+    tracking) and Scouting are real, separate, much bigger surfaces not
+    covered here.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_draft_center")
+    if players_df.empty:
+        return {
+            "ok": True,
+            "reason": "no_player_data",
+            "posture": None,
+            "posture_reason": "",
+            "decision_cards": [],
+            "partner_cards": [],
+        }
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    df_summary, draft_capital_summary = league_rankings.build_league_summary_and_draft_capital(
+        valued, league_id, score_field=score_field, league_settings=settings
+    )
+    if df_summary.empty or draft_capital_summary.empty:
+        return {
+            "ok": True,
+            "reason": "no_rankings_data",
+            "posture": None,
+            "posture_reason": "",
+            "decision_cards": [],
+            "partner_cards": [],
+        }
+
+    intel_frame = league_rankings.add_league_detail_ranks(
+        league_rankings.build_league_display_frame(df_summary, draft_capital_summary, include_picks=False)
+    )
+    intel_frame = refine_team_directions(intel_frame)
+    intel_frame["strategy_display"] = intel_frame.get("strategy_label", "")
+
+    draft_workspace = league_rankings.build_draft_workspace_frame(draft_capital_summary, intel_frame)
+    if draft_workspace.empty:
+        return {
+            "ok": True,
+            "reason": "no_rankings_data",
+            "posture": None,
+            "posture_reason": "",
+            "decision_cards": [],
+            "partner_cards": [],
+        }
+
+    decision_cards = draft_center_ui.build_draft_decision_cards(draft_workspace)
+    partner_cards = draft_center_ui.build_draft_partner_cards(draft_workspace)
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    my_roster, roster_reason = _resolve_my_roster(user, league_id, profile=profile)
+
+    posture: dict[str, Any] | None = None
+    posture_reason = roster_reason
+    if my_roster is not None:
+        my_roster_id = str(my_roster.get("roster_id") or "")
+        match = draft_workspace[draft_workspace["roster_id"].astype(str) == my_roster_id]
+        if match.empty:
+            posture_reason = "no_draft_capital_row"
+        else:
+            team_row = match.iloc[0]
+            profile_posture = draft_center_ui.draft_posture_profile(team_row, len(draft_workspace))
+            posture_reason = ""
+            posture = {
+                "label": profile_posture["label"],
+                "note": profile_posture["note"],
+                "tone": profile_posture["tone"],
+                "draft_capital_rank": _clean_json_value(team_row.get("draft_capital_rank")),
+                "draft_capital": _clean_json_value(team_row.get("draft_capital")),
+                "future_draft_capital_rank": _clean_json_value(team_row.get("future_draft_capital_rank")),
+                "future_draft_capital": _clean_json_value(team_row.get("future_draft_capital")),
+                "strategy_display": _clean_json_value(team_row.get("strategy_display")),
+                "power_rank": _clean_json_value(team_row.get("power_rank")),
+                "franchise_rank": _clean_json_value(team_row.get("franchise_rank")),
+                "first_rounders": _clean_json_value(team_row.get("first_rounders")),
+                "pick_count": _clean_json_value(team_row.get("pick_count")),
+            }
+
+    return {
+        "ok": True,
+        "reason": "",
+        "posture": posture,
+        "posture_reason": posture_reason,
+        "decision_cards": decision_cards,
+        "partner_cards": partner_cards,
+    }
 
 
 def _resolve_my_roster(
