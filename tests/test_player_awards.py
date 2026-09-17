@@ -342,3 +342,28 @@ def test_mobile_accolade_cluster_stays_readable():
     )
     assert rookie == ()
     assert "font-size:var(--font-size-body)" in PLAYER_QUICK_VIEW_CSS
+
+
+def test_season_cache_index_hits_cache_within_the_same_ttl_bucket(tmp_path, monkeypatch):
+    (tmp_path / "sleeper_player_stats_2024.json").write_text(json.dumps({"a": {}}), encoding="utf-8")
+    player_awards.clear_season_cache_index()
+    monkeypatch.setattr(player_awards, "_season_cache_index_bucket", lambda: 42)
+    first = player_awards.build_season_cache_index(tmp_path)
+    # A second file added after the first read must not appear yet — proves
+    # the second call is a cache hit, not a fresh glob/read.
+    (tmp_path / "sleeper_player_stats_2025.json").write_text(json.dumps({"b": {}}), encoding="utf-8")
+    second = player_awards.build_season_cache_index(tmp_path)
+    assert first == second
+    assert len(first) == 1
+
+
+def test_season_cache_index_refetches_once_the_ttl_bucket_advances(tmp_path, monkeypatch):
+    (tmp_path / "sleeper_player_stats_2024.json").write_text(json.dumps({"a": {}}), encoding="utf-8")
+    player_awards.clear_season_cache_index()
+    monkeypatch.setattr(player_awards, "_season_cache_index_bucket", lambda: 1)
+    first = player_awards.build_season_cache_index(tmp_path)
+    (tmp_path / "sleeper_player_stats_2025.json").write_text(json.dumps({"b": {}}), encoding="utf-8")
+    monkeypatch.setattr(player_awards, "_season_cache_index_bucket", lambda: 2)
+    second = player_awards.build_season_cache_index(tmp_path)
+    assert len(first) == 1
+    assert len(second) == 2

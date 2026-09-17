@@ -53,7 +53,9 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -476,11 +478,22 @@ def remaining_badges(
     return ordered[max(0, limit) :]
 
 
-def build_season_cache_index(
-    cache_dir: str | Path = "data",
-) -> tuple[dict[str, Any], ...]:
-    """Load local Sleeper season JSON. Never fetches. Empty when files are absent."""
+# Glob + read + JSON-parse every sleeper_player_stats_*.json file on disk —
+# cheap for a Streamlit rerun, but a real per-request cost for
+# services/mobile_api_service.py's long-lived process (GET .../awards calls
+# this on every single request). The underlying files only change on their
+# own refresh cadence (modules.sleeper's PLAYER_STATS_CACHE_TTL_SECONDS,
+# 12h for the active season), so an hourly time-bucketed cache is well
+# inside that window — same pattern as modules.sleeper's live-endpoint fix.
+SEASON_CACHE_INDEX_TTL_SECONDS = 60 * 60
 
+
+def _season_cache_index_bucket() -> int:
+    return int(time.time() // SEASON_CACHE_INDEX_TTL_SECONDS)
+
+
+@lru_cache(maxsize=8)
+def _build_season_cache_index_cached(cache_dir: str, _bucket: int) -> tuple[dict[str, Any], ...]:
     seasons: list[dict[str, Any]] = []
     for path in sorted(Path(cache_dir).glob("sleeper_player_stats_*.json")):
         try:
@@ -493,6 +506,20 @@ def build_season_cache_index(
         file_season = int(match.group(1)) if match else None
         seasons.append({"path": str(path), "season": file_season, "payload": payload})
     return tuple(seasons)
+
+
+def build_season_cache_index(
+    cache_dir: str | Path = "data",
+) -> tuple[dict[str, Any], ...]:
+    """Load local Sleeper season JSON. Never fetches. Empty when files are absent."""
+
+    return _build_season_cache_index_cached(str(cache_dir), _season_cache_index_bucket())
+
+
+def clear_season_cache_index() -> None:
+    """Drop the in-process season-file cache — tests, and any future manual refresh hook."""
+
+    _build_season_cache_index_cached.cache_clear()
 
 
 def award_rows_for_player(
