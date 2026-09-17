@@ -24,12 +24,42 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Players'>;
 
 const LENSES: ValuationLens[] = ['Dynasty', 'Rebuild', 'Non-Dynasty'];
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
+const AGE_FILTERS = ['ALL', 'Under 25', '25-28', '29+'] as const;
+const STATUS_FILTERS = ['ALL', 'Active', 'Inactive'] as const;
+const AVAILABILITY_FILTERS = ['ALL', 'Healthy', 'Injured'] as const;
+
+type AgeFilter = (typeof AGE_FILTERS)[number];
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+type AvailabilityFilter = (typeof AVAILABILITY_FILTERS)[number];
+
+function matchesAge(age: number | null, filter: AgeFilter): boolean {
+  if (filter === 'ALL') return true;
+  if (age == null) return false;
+  if (filter === 'Under 25') return age < 25;
+  if (filter === '25-28') return age >= 25 && age <= 28;
+  return age >= 29;
+}
+
+function matchesStatus(status: string | null, filter: StatusFilter): boolean {
+  if (filter === 'ALL') return true;
+  const normalized = (status ?? '').trim().toLowerCase();
+  return filter === 'Active' ? normalized === 'active' : normalized !== 'active' && normalized !== '';
+}
+
+function matchesAvailability(injuryStatus: string | null, filter: AvailabilityFilter): boolean {
+  if (filter === 'ALL') return true;
+  const hasInjury = Boolean((injuryStatus ?? '').trim());
+  return filter === 'Injured' ? hasInjury : !hasInjury;
+}
 
 export default function PlayersScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [lens, setLens] = useState<ValuationLens>('Dynasty');
   const [position, setPosition] = useState('ALL');
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>('ALL');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('ALL');
   const [search, setSearch] = useState('');
   const [players, setPlayers] = useState<RankedPlayer[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,8 +90,11 @@ export default function PlayersScreen({ route, navigation }: Props) {
     const query = search.trim().toLowerCase();
     return players
       .filter((p) => position === 'ALL' || p.position === position)
+      .filter((p) => matchesAge(p.age, ageFilter))
+      .filter((p) => matchesStatus(p.status, statusFilter))
+      .filter((p) => matchesAvailability(p.injury_status, availabilityFilter))
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
-  }, [players, position, search]);
+  }, [players, position, ageFilter, statusFilter, availabilityFilter, search]);
 
   return (
     <View style={styles.container}>
@@ -97,6 +130,39 @@ export default function PlayersScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         ))}
       </View>
+      <View style={styles.filterRow}>
+        {AGE_FILTERS.map((option) => (
+          <TouchableOpacity
+            key={option}
+            style={[styles.pill, ageFilter === option && styles.pillActive]}
+            onPress={() => setAgeFilter(option)}
+          >
+            <Text style={[styles.pillText, ageFilter === option && styles.pillTextActive]}>{option}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={styles.filterRow}>
+        {STATUS_FILTERS.map((option) => (
+          <TouchableOpacity
+            key={`status-${option}`}
+            style={[styles.pill, statusFilter === option && styles.pillActive]}
+            onPress={() => setStatusFilter(option)}
+          >
+            <Text style={[styles.pillText, statusFilter === option && styles.pillTextActive]}>{option}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={styles.filterRow}>
+        {AVAILABILITY_FILTERS.map((option) => (
+          <TouchableOpacity
+            key={`availability-${option}`}
+            style={[styles.pill, availabilityFilter === option && styles.pillActive]}
+            onPress={() => setAvailabilityFilter(option)}
+          >
+            <Text style={[styles.pillText, availabilityFilter === option && styles.pillTextActive]}>{option}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -121,8 +187,8 @@ export default function PlayersScreen({ route, navigation }: Props) {
                   {item.name ?? 'Unknown'}
                 </Text>
                 <View style={styles.metaRow}>
-                  <Text style={styles.meta}>
-                    {[item.position, item.team].filter(Boolean).join(' · ')}
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {[item.position, item.team, item.opportunity_label].filter(Boolean).join(' · ')}
                   </Text>
                   <TierBadge storedTier={item.tier} />
                 </View>
@@ -184,7 +250,7 @@ const styles = StyleSheet.create({
   rankText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary },
+  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
