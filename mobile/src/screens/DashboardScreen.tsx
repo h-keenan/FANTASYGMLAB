@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -59,38 +60,40 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, 'Next Move', leagueName);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await api.getLeagueDashboard(leagueId);
-        if (cancelled) return;
-        if (result.reason) {
-          setNotReadyReason(result.reason);
-        } else {
-          setItems(result.items);
-          setTeamSnapshot(result.team_snapshot);
-          setQuiet(result.quiet);
-          setQuietReason(result.quiet_reason ?? '');
-          const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
-            leagueId,
-            result.items.map((item) => item.recommendation_id),
-          );
-          if (!cancelled) {
-            setNewRecommendationIds(newIds);
-            setIsFirstVisit(firstVisit);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const result = await api.getLeagueDashboard(leagueId);
+          if (cancelled) return;
+          if (result.reason) {
+            setNotReadyReason(result.reason);
+          } else {
+            setItems(result.items);
+            setTeamSnapshot(result.team_snapshot);
+            setQuiet(result.quiet);
+            setQuietReason(result.quiet_reason ?? '');
+            const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
+              leagueId,
+              result.items.map((item) => item.recommendation_id),
+            );
+            if (!cancelled) {
+              setNewRecommendationIds(newIds);
+              setIsFirstVisit(firstVisit);
+            }
           }
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load your Next Move briefing.');
+        } finally {
+          if (!cancelled) setLoading(false);
         }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load your Next Move briefing.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [leagueId]),
+  );
 
   if (loading) {
     return (

@@ -23,6 +23,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StackActions } from '@react-navigation/routers';
 
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { api } from '../lib/api';
@@ -219,16 +220,21 @@ export default function GmOrb() {
   const go = (destination: Destination) => {
     closeSheet();
     if (!navigationRef.isReady()) return;
-    // Destinations are a data-driven list (not a single statically-known
-    // route), so this dispatches dynamically rather than through the
-    // strongly-typed `navigate` overloads.
-    const navigate = navigationRef.navigate as (name: string, params?: object) => void;
-    if (destination.needsLeague) {
-      if (!league) return;
-      navigate(destination.route, league);
-    } else {
-      navigate(destination.route);
+    // The orb is the app's only cross-section navigation affordance, so a
+    // session hops between the same hub screens repeatedly (Home -> Waivers
+    // -> TradeHub -> MyTeam -> Waivers -> ...). Plain `navigate()` in
+    // React Navigation 7 only reuses an existing screen instance when it's
+    // already the current route; otherwise it pushes a new one, so the back
+    // stack would grow without bound. `popTo` pops back to an existing
+    // instance of the destination if one is already on the stack, or
+    // replaces the current screen with it if not - the stack never grows
+    // past one screen per orb hop.
+    if (!destination.needsLeague) {
+      navigationRef.dispatch(StackActions.popTo(destination.route));
+      return;
     }
+    if (!league) return;
+    navigationRef.dispatch(StackActions.popTo(destination.route, league));
   };
 
   const switchToLeague = (row: SavedLeagueRow) => {
@@ -236,7 +242,7 @@ export default function GmOrb() {
     const target = { leagueId: row.league_id, leagueName: row.league_name || 'League' };
     void setLastLeague(target);
     if (navigationRef.isReady()) {
-      (navigationRef.navigate as (name: string, params?: object) => void)('LeagueDetail', target);
+      navigationRef.dispatch(StackActions.popTo('LeagueDetail', target));
     }
   };
 

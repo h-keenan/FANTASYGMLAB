@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -109,7 +110,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
         placeholderTextColor={colors.textTertiary}
       />
 
-      <View style={styles.filterRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {LENSES.map((option) => (
           <TouchableOpacity
             key={option}
@@ -119,8 +120,8 @@ export default function PlayersScreen({ route, navigation }: Props) {
             <Text style={[styles.pillText, lens === option && styles.pillTextActive]}>{option}</Text>
           </TouchableOpacity>
         ))}
-      </View>
-      <View style={styles.filterRow}>
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {POSITIONS.map((option) => (
           <TouchableOpacity
             key={option}
@@ -130,8 +131,8 @@ export default function PlayersScreen({ route, navigation }: Props) {
             <Text style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</Text>
           </TouchableOpacity>
         ))}
-      </View>
-      <View style={styles.filterRow}>
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {AGE_FILTERS.map((option) => (
           <TouchableOpacity
             key={option}
@@ -141,8 +142,8 @@ export default function PlayersScreen({ route, navigation }: Props) {
             <Text style={[styles.pillText, ageFilter === option && styles.pillTextActive]}>{option}</Text>
           </TouchableOpacity>
         ))}
-      </View>
-      <View style={styles.filterRow}>
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {STATUS_FILTERS.map((option) => (
           <TouchableOpacity
             key={`status-${option}`}
@@ -152,8 +153,8 @@ export default function PlayersScreen({ route, navigation }: Props) {
             <Text style={[styles.pillText, statusFilter === option && styles.pillTextActive]}>{option}</Text>
           </TouchableOpacity>
         ))}
-      </View>
-      <View style={styles.filterRow}>
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {AVAILABILITY_FILTERS.map((option) => (
           <TouchableOpacity
             key={`availability-${option}`}
@@ -163,7 +164,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
             <Text style={[styles.pillText, availabilityFilter === option && styles.pillTextActive]}>{option}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 

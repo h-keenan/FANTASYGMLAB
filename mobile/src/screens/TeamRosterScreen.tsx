@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, SectionList, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -69,41 +70,43 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, ownerName, leagueName);
 
-  useEffect(() => {
-    let cancelled = false;
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
 
-    async function load() {
-      try {
-        const [rankingsResult, summariesById, teamRankingsResult] = await Promise.all([
-          api.getLeagueRankings(leagueId, { limit: 300 }),
-          api.getPlayers(playerIds),
-          api.getLeagueTeamRankings(leagueId).catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
-        ]);
-        if (cancelled) return;
+      async function load() {
+        try {
+          const [rankingsResult, summariesById, teamRankingsResult] = await Promise.all([
+            api.getLeagueRankings(leagueId, { limit: 300 }),
+            api.getPlayers(playerIds),
+            api.getLeagueTeamRankings(leagueId).catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
+          ]);
+          if (cancelled) return;
 
-        const rankedById = new Map(rankingsResult.players.map((p) => [p.player_id, p]));
-        const rows = playerIds
-          .map((playerId) => rankedById.get(playerId) ?? toRankedPlayer(playerId, summariesById[playerId]))
-          .filter((row) => row.name !== null || rankedById.has(row.player_id))
-          .sort((a, b) => positionSortKey(a.position) - positionSortKey(b.position));
-        setPlayers(rows);
+          const rankedById = new Map(rankingsResult.players.map((p) => [p.player_id, p]));
+          const rows = playerIds
+            .map((playerId) => rankedById.get(playerId) ?? toRankedPlayer(playerId, summariesById[playerId]))
+            .filter((row) => row.name !== null || rankedById.has(row.player_id))
+            .sort((a, b) => positionSortKey(a.position) - positionSortKey(b.position));
+          setPlayers(rows);
 
-        const matchedRanking = teamRankingsResult.teams.find((team) => team.roster_id === rosterId) ?? null;
-        setRanking(matchedRanking);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load roster.');
+          const matchedRanking = teamRankingsResult.teams.find((team) => team.roster_id === rosterId) ?? null;
+          setRanking(matchedRanking);
+        } catch (err) {
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : 'Failed to load roster.');
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
-    }
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId, playerIds, rosterId]);
+      void load();
+      return () => {
+        cancelled = true;
+      };
+    }, [leagueId, playerIds, rosterId]),
+  );
 
   const sections = useMemo<RosterSection[]>(() => {
     const byPosition = new Map<string, RankedPlayer[]>();

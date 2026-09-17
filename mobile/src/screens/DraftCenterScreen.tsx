@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -42,27 +43,29 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, 'Draft Center', leagueName);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await api.getLeagueDraftCenter(leagueId);
-        if (cancelled) return;
-        setPosture(result.posture);
-        setPostureReason(result.posture_reason);
-        setDecisionCards(result.decision_cards);
-        setPartnerCards(result.partner_cards);
-        setReason(result.reason);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load Draft Center.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const result = await api.getLeagueDraftCenter(leagueId);
+          if (cancelled) return;
+          setPosture(result.posture);
+          setPostureReason(result.posture_reason);
+          setDecisionCards(result.decision_cards);
+          setPartnerCards(result.partner_cards);
+          setReason(result.reason);
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load Draft Center.');
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [leagueId]),
+  );
 
   if (loading) {
     return (

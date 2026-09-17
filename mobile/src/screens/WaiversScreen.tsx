@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -71,26 +72,28 @@ export default function WaiversScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, 'Waivers', leagueName);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await api.getLeagueWaivers(leagueId, { lens: 'Dynasty', limit: 300 });
-        if (cancelled) return;
-        setFreeAgents(result.players);
-        setPriorityAdds(result.priority_adds);
-        setNeededPositions(result.needed_positions);
-        setNotice(result.reason ? reasonMessage(result.reason) : null);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load waivers.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const result = await api.getLeagueWaivers(leagueId, { lens: 'Dynasty', limit: 300 });
+          if (cancelled) return;
+          setFreeAgents(result.players);
+          setPriorityAdds(result.priority_adds);
+          setNeededPositions(result.needed_positions);
+          setNotice(result.reason ? reasonMessage(result.reason) : null);
+        } catch (err) {
+          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load waivers.');
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [leagueId]),
+  );
 
   const filtered = useMemo(() => {
     if (!freeAgents) return [];
@@ -275,7 +278,7 @@ function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPre
           </Text>
           <View style={styles.metaRow}>
             <PositionBadge position={player.position} />
-            <Text style={styles.meta}>{player.team}</Text>
+            <Text style={styles.meta} numberOfLines={1}>{player.team}</Text>
           </View>
           {player.injury_replacement_fit ? (
             <Text style={styles.injuryFitText}>{player.injury_replacement_note}</Text>
@@ -327,7 +330,7 @@ function WaiverCard({
           </Text>
           <View style={styles.metaRow}>
             <PositionBadge position={player.position} />
-            <Text style={styles.meta}>{player.team}</Text>
+            <Text style={styles.meta} numberOfLines={1}>{player.team}</Text>
             {player.position_rank ? (
               <View style={styles.positionRankPill}>
                 <Text style={styles.positionRankText}>
@@ -476,7 +479,7 @@ const styles = StyleSheet.create({
   rankText: { color: colors.badgeText, fontSize: 10, fontWeight: '700' },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary },
+  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   positionRankPill: {
     backgroundColor: colors.border,
