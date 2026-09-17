@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerAward, type QuickViewBio, type QuickViewStatItem, type QuickViewStats } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { resolvePlayerTier } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -118,6 +119,7 @@ function BioSection({ bio }: { bio: QuickViewBio }) {
 }
 
 export default function PlayerDetailScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { player, leagueId } = route.params;
   const [stats, setStats] = useState<QuickViewStats | null>(null);
   const [bio, setBio] = useState<QuickViewBio | null>(null);
@@ -212,7 +214,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const tierIdentity = resolvePlayerTier(player.tier);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <View style={styles.header}>
         <PlayerAvatar playerId={player.player_id} size={88} tier={player.tier} style={styles.heroAvatar} />
         <Text style={styles.name}>{player.name ?? 'Unknown player'}</Text>

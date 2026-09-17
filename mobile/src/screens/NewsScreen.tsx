@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import { api, type NewsItem } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { colors, radii, spacing } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -36,6 +37,7 @@ function relativeTime(publishedTs: number | null): string {
 }
 
 export default function NewsScreen() {
+  const orbClearance = useOrbClearance();
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export default function NewsScreen() {
       <FlatList
         data={items}
         keyExtractor={(item, index) => item.link ?? String(index)}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListEmptyComponent={
           !loading ? <Text style={styles.empty}>No fantasy-relevant news right now.</Text> : null

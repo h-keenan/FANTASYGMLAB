@@ -15,6 +15,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -25,6 +26,7 @@ const LENSES: ValuationLens[] = ['Dynasty', 'Rebuild', 'Non-Dynasty'];
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
 
 export default function PlayersScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [lens, setLens] = useState<ValuationLens>('Dynasty');
   const [position, setPosition] = useState('ALL');
@@ -104,7 +106,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.player_id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
           renderItem={({ item }) => (
             <AnimatedCard
               style={styles.card}

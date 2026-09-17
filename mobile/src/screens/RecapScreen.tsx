@@ -7,6 +7,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -27,6 +28,7 @@ const STORY_META: Record<
 const DEFAULT_STORY_META = { icon: 'newspaper-outline' as const, color: colors.textSecondary };
 
 export default function RecapScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [recap, setRecap] = useState<WeeklyRecap | null>(null);
   const [notReady, setNotReady] = useState(false);
@@ -87,7 +89,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   return (
     <View style={styles.root}>
       <GridBackground />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <View style={styles.headerRow}>
         <View style={styles.headerTextGroup}>
           <Text style={styles.kicker}>LEAGUE MEMORY</Text>

@@ -17,6 +17,7 @@ import {
   type TradeVerdict,
 } from '../lib/api';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -86,6 +87,7 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 };
 
 export default function TradeHubScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [strategy, setStrategy] = useState<TeamStrategy>('retool');
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
@@ -145,7 +147,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       style={styles.container}
       data={loading || error || notReadyReason ? [] : ideas ?? []}
       keyExtractor={(_, index) => String(index)}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
       ListHeaderComponent={
         <View>
           <View style={styles.strategyRow}>

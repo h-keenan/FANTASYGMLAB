@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import legalContent from '../data/legalContent.json';
+import { useOrbClearance } from '../lib/orbLayout';
 import { colors, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -25,6 +26,7 @@ const PAGES = (legalContent as { lastUpdated: string; pages: Record<string, Lega
 const LAST_UPDATED = (legalContent as { lastUpdated: string }).lastUpdated;
 
 export default function LegalPageScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const page = PAGES[route.params.pageKey];
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export default function LegalPageScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <Text style={styles.kicker}>{page.kicker}</Text>
       <Text style={styles.note}>{page.note}</Text>
 

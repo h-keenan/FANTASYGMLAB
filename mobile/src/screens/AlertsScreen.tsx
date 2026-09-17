@@ -7,6 +7,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type AlertItem, type RankedPlayer } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -50,6 +51,7 @@ function relativeTime(publishedTs: number | null): string {
 }
 
 export default function AlertsScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<AlertItem[]>([]);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
@@ -131,7 +133,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
       <FlatList
         data={items}
         keyExtractor={(item, index) => item.link ?? String(index)}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListEmptyComponent={
           !loading ? <Text style={styles.empty}>No relevant news for your roster right now.</Text> : null

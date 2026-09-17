@@ -7,6 +7,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type DashboardItem, type DashboardItemCategory, type PresentationAsset } from '../lib/api';
+import { useOrbClearance } from '../lib/orbLayout';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
@@ -42,6 +43,7 @@ const DESTINATION_ROUTE: Record<string, string> = {
 const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
 export default function DashboardScreen({ route, navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<DashboardItem[] | null>(null);
   const [quiet, setQuiet] = useState(false);
@@ -116,7 +118,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   return (
     <View style={styles.root}>
       <GridBackground />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <Text style={styles.disclaimer}>
         The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and
         waiver signals the web app's Dashboard uses.
