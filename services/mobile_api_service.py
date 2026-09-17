@@ -10,6 +10,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/users          — Sleeper league members
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
   - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
+  - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
@@ -67,7 +68,9 @@ from modules import (
     gm_targets,
     injury_ui,
     league_history,
+    league_rankings,
     league_recaps,
+    league_standings,
     league_value_settings,
     my_news,
     news as news_cache,
@@ -258,6 +261,98 @@ def get_league_team_profiles(league_id: str, _user: dict[str, Any] = Depends(req
     """
 
     return {"ok": True, "profiles": sleeper.get_league_roster_profiles(league_id)}
+
+
+@app.get("/v1/leagues/{league_id}/team-rankings")
+def get_league_team_rankings(
+    league_id: str,
+    lens: str = "Dynasty",
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Power Rank / Franchise Rank / Draft Capital Rank / standings for every
+    roster in the league.
+
+    Shares the web app's real "Rankings" page computation
+    (modules.league_rankings, ported from app.py's production chain — see
+    that module's docstring) plus modules.league_standings for win-loss/
+    points-for-against, which is already modules-based and independent of
+    the rank computation (the two pieces are never merged into one frame on
+    web either — see league_rankings.py). No caller-roster resolution
+    needed: this is public league-wide data, same auth pattern as
+    /team-profiles and /rosters.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_team_rankings"
+    )
+    if players_df.empty:
+        return {"ok": True, "teams": [], "reason": "no_player_data"}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    rankings_frame = league_rankings.build_league_rankings_frame(
+        valued, league_id, score_field=score_field, league_settings=settings
+    )
+    if rankings_frame.empty:
+        return {"ok": True, "teams": [], "reason": "no_rankings_data"}
+
+    rosters = sleeper.get_rosters(league_id)
+    roster_profiles = sleeper.get_league_roster_profiles(league_id)
+    standings_bundle = league_standings.build_league_standings_bundle(
+        rosters=rosters,
+        roster_profiles=roster_profiles,
+        league=league,
+        team_frame=rankings_frame,
+    )
+    standings_by_roster: dict[str, dict[str, Any]] = {}
+    standings_frame = standings_bundle.get("frame")
+    if isinstance(standings_frame, pd.DataFrame) and not standings_frame.empty:
+        for _, row in standings_frame.iterrows():
+            standings_by_roster[str(row.get("roster_id"))] = row.to_dict()
+
+    teams: list[dict[str, Any]] = []
+    for _, row in rankings_frame.iterrows():
+        roster_id = str(row.get("roster_id"))
+        standing = standings_by_roster.get(roster_id, {})
+        teams.append(
+            {
+                "roster_id": roster_id,
+                "team_name": _clean_json_value(row.get("team_name")),
+                "owner_name": _clean_json_value(standing.get("owner_name") or row.get("owner_name")),
+                "owner_username": _clean_json_value(standing.get("owner_username")),
+                "avatar_url": _clean_json_value(standing.get("avatar_url") or row.get("avatar_url")),
+                "wins": _clean_json_value(standing.get("wins")),
+                "losses": _clean_json_value(standing.get("losses")),
+                "ties": _clean_json_value(standing.get("ties")),
+                "record_label": _clean_json_value(standing.get("record_label")),
+                "points_for": _clean_json_value(standing.get("points_for")),
+                "points_against": _clean_json_value(standing.get("points_against")),
+                "power_rank": _clean_json_value(row.get("power_rank")),
+                "franchise_rank": _clean_json_value(row.get("franchise_rank")),
+                "draft_capital_rank": _clean_json_value(row.get("draft_capital_rank")),
+                "starter_rank": _clean_json_value(row.get("starter_rank")),
+                "bench_rank": _clean_json_value(row.get("bench_rank")),
+                "age_rank": _clean_json_value(row.get("age_rank")),
+                "average_age": _clean_json_value(row.get("avg_age")),
+            }
+        )
+
+    return {"ok": True, "teams": teams, "reason": ""}
 
 
 def _resolve_my_roster(
