@@ -1665,15 +1665,20 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
                 ],
             ):
                 with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
-                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
-                        with patch(
-                            "modules.player_eligibility.filter_current_fantasy_players",
-                            side_effect=lambda df, **kwargs: df,
-                        ):
-                            response = client.get(
-                                "/v1/leagues/abc/dashboard",
-                                headers={"Authorization": "Bearer good-token"},
-                            )
+                    with patch("modules.sleeper.get_users", return_value=[
+                        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+                        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+                    ]):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/dashboard",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
 
     assert response.status_code == 200
     body = response.json()
@@ -1721,15 +1726,20 @@ def test_dashboard_includes_team_snapshot(monkeypatch):
                 ],
             ):
                 with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
-                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
-                        with patch(
-                            "modules.player_eligibility.filter_current_fantasy_players",
-                            side_effect=lambda df, **kwargs: df,
-                        ):
-                            response = client.get(
-                                "/v1/leagues/abc/dashboard",
-                                headers={"Authorization": "Bearer good-token"},
-                            )
+                    with patch("modules.sleeper.get_users", return_value=[
+                        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+                        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+                    ]):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/dashboard",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
 
     assert response.status_code == 200
     body = response.json()
@@ -1744,6 +1754,11 @@ def test_dashboard_includes_team_snapshot(monkeypatch):
     assert 26.0 <= snapshot["average_age"] <= 27.0
     assert isinstance(snapshot["health_flag"], str)
     assert snapshot["health_flag"]
+    # Roster 1's 10 starter-weighted players comfortably outscore roster 2's
+    # empty roster, so it takes the top power/franchise rank — same real
+    # modules.league_rankings computation get_league_team_rankings uses.
+    assert snapshot["power_rank"] == 1
+    assert snapshot["franchise_rank"] == 1
 
 
 def test_dashboard_team_snapshot_is_none_without_a_resolved_roster(monkeypatch):

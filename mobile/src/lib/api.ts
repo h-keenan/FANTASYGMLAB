@@ -474,6 +474,8 @@ export interface TeamSnapshot {
   ties: number | null;
   health_flag: string;
   average_age: number | null;
+  power_rank: number | null;
+  franchise_rank: number | null;
 }
 
 export interface DashboardResponse {
