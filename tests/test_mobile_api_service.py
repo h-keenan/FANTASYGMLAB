@@ -1695,6 +1695,76 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
     assert top_priority_items[0]["route_player_id"] == "target_rb"
 
 
+def test_dashboard_includes_team_snapshot(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {
+                        "roster_id": 1,
+                        "owner_id": "sleeper-user-1",
+                        "players": my_roster_ids,
+                        "settings": {"wins": 7, "losses": 6, "ties": 0},
+                    },
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            response = client.get(
+                                "/v1/leagues/abc/dashboard",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    snapshot = body["team_snapshot"]
+    assert snapshot is not None
+    assert snapshot["wins"] == 7
+    assert snapshot["losses"] == 6
+    assert snapshot["ties"] == 0
+    # _fake_roster_frame's roster rows are all age 26 (except the bench RB at
+    # 30), so the average is pulled up slightly above 26 but nowhere near 30.
+    assert 26.0 <= snapshot["average_age"] <= 27.0
+    assert isinstance(snapshot["health_flag"], str)
+    assert snapshot["health_flag"]
+
+
+def test_dashboard_team_snapshot_is_none_without_a_resolved_roster(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/leagues/abc/dashboard",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["team_snapshot"] is None
+    assert body["reason"] == "no_sleeper_username_linked"
+
+
 def test_trade_hub_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/trade-hub")

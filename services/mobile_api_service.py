@@ -65,6 +65,7 @@ from modules import (
     dashboard_engine,
     faab,
     gm_targets,
+    injury_ui,
     league_history,
     league_recaps,
     league_value_settings,
@@ -1264,7 +1265,7 @@ def get_league_dashboard(
 
     my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
     if my_roster is None:
-        return {"ok": True, "items": [], "quiet": True, "reason": reason}
+        return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": reason}
 
     league = sleeper.get_league(league_id)
     if not league:
@@ -1278,14 +1279,14 @@ def get_league_dashboard(
         players_df, surface="mobile_api_dashboard"
     )
     if players_df.empty:
-        return {"ok": True, "items": [], "quiet": True, "reason": "no_player_data"}
+        return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": "no_player_data"}
 
     valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
 
     roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
     if not roster_player_ids:
-        return {"ok": True, "items": [], "quiet": True, "reason": "empty_roster"}
+        return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": "empty_roster"}
 
     rosters = sleeper.get_rosters(league_id)
     all_rostered_player_ids: set[str] = set()
@@ -1303,11 +1304,42 @@ def get_league_dashboard(
         entitlement=str(profile.get("entitlement") or "free"),
         rosters=rosters,
     )
+
+    # Team Snapshot — deliberately only the fields free of a new league-wide
+    # computation: record comes straight off the roster we already fetched,
+    # health/average age reuse the same roster_df + injury pipeline
+    # dashboard_engine.compose_next_move_briefing already runs internally
+    # (recomputed here rather than threaded through DailyGmBriefing, which
+    # modules.push_triggers also constructs and shouldn't need to change
+    # shape for a mobile-only display field). Starter/bench/power/franchise
+    # rank need a league-wide frame ported out of app.py's
+    # add_league_detail_ranks/build_league_display_frame — real, but a
+    # separate, larger follow-up, not bundled into this one.
+    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+    injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+    injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
+    health_flag = injury_ui.team_injury_display_label(injury_display_context, include_uncertainty=True) or "Stable"
+    average_age = (
+        float(roster_df["age"].mean())
+        if not roster_df.empty and roster_df["age"].notna().any()
+        else None
+    )
+    roster_settings = my_roster.get("settings") or {}
+    team_snapshot = {
+        "wins": roster_settings.get("wins"),
+        "losses": roster_settings.get("losses"),
+        "ties": roster_settings.get("ties"),
+        "health_flag": health_flag,
+        "average_age": round(average_age, 1) if average_age is not None else None,
+    }
+
     return {
         "ok": True,
         "items": [_project_briefing_item(item) for item in briefing.items],
         "quiet": briefing.quiet,
         "quiet_reason": briefing.quiet_reason,
+        "team_snapshot": team_snapshot,
         "reason": "",
     }
 

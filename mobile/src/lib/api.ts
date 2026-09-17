@@ -432,11 +432,20 @@ export interface DashboardItem {
   recommendation_id: string;
 }
 
+export interface TeamSnapshot {
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  health_flag: string;
+  average_age: number | null;
+}
+
 export interface DashboardResponse {
   ok: true;
   items: DashboardItem[];
   quiet: boolean;
   quiet_reason?: string;
+  team_snapshot: TeamSnapshot | null;
   reason: string;
 }
 
