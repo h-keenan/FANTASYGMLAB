@@ -79,6 +79,7 @@ export default function GmOrb() {
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const rawInsets = useSafeAreaInsets();
+  console.log('ORB INSETS', rawInsets);
   // Clamped defensively: a bad/stale safe-area measurement (seen on some
   // devices before the inset context settles) should never be able to push
   // the orb far from the true bottom edge — the visible symptom reported

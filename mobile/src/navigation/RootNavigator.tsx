@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, TouchableOpacity, View } from 'react-native';
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -80,7 +80,18 @@ export default function RootNavigator() {
   return (
     <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       {session ? (
-        <View style={{ flex: 1 }}>
+        <View
+          style={{ flex: 1 }}
+          onLayout={(e) => {
+            const { height, y } = e.nativeEvent.layout;
+            console.log('ORB WRAPPER', {
+              height,
+              y,
+              window: Dimensions.get('window').height,
+              screen: Dimensions.get('screen').height,
+            });
+          }}
+        >
         <AppStack.Navigator
           screenOptions={{
             // Default iOS behavior shows the previous screen's title next to
