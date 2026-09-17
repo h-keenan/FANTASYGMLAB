@@ -1196,6 +1196,7 @@ def test_quick_view_reports_not_found_for_unknown_player(monkeypatch):
     assert body["ok"] is True
     assert body["stats"] is None
     assert body["bio"] is None
+    assert body["model"] is None
     assert body["reason"] == "not_found"
 
 
@@ -1229,6 +1230,12 @@ def test_quick_view_returns_real_season_stats_and_bio(monkeypatch):
     usage_labels = {item["label"] for item in season["usage"]}
     assert "Snap %" in usage_labels
     assert body["bio"]["years_in_league"] == "3 seasons"
+    # The fixture has no market/opportunity/etc. columns at all — a
+    # defensive shape (all fields None, no crash), not the "real values"
+    # case, which is covered by the dedicated model tests below.
+    assert body["model"] is not None
+    assert body["model"]["market_score"] is None
+    assert body["model"]["age_score_label"] == "Age Lens"
 
 
 def test_quick_view_reports_no_seasons_when_stats_unavailable(monkeypatch):
@@ -1249,6 +1256,84 @@ def test_quick_view_reports_no_seasons_when_stats_unavailable(monkeypatch):
     assert body["ok"] is True
     assert body["stats"]["seasons"] == []
     assert body["bio"]["years_in_league"] == "Rookie"
+
+
+def test_quick_view_model_projects_real_score_columns(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    frame = pd.DataFrame(
+        [
+            {
+                "player_id": "9003",
+                "name": "Model Player",
+                "position": "RB",
+                "years_exp": 4,
+                "market_score": 71.4,
+                "opportunity_score": 82.9,
+                "scarcity_score": 65.0,
+                "role_score": 90.2,
+                "age_score": 55.6,
+                "opportunity_confidence": 78,
+                "workload_trend": "Rising",
+            }
+        ]
+    )
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            response = client.get(
+                "/v1/players/9003/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    model = response.json()["model"]
+    assert model["market_score"] == 71.4
+    assert model["opportunity_score"] == 82.9
+    assert model["scarcity_score"] == 65.0
+    assert model["role_score"] == 90.2
+    # A native age_score column present (not NaN) wins the "Age Score" label
+    # over the coarser age_penalty fallback.
+    assert model["age_score"] == 55.6
+    assert model["age_score_label"] == "Age Score"
+    assert model["opportunity_confidence"] == 78
+    assert model["workload_trend"] == "Rising"
+
+
+def test_quick_view_model_falls_back_to_age_lens_when_age_score_missing(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    frame = pd.DataFrame(
+        [
+            {
+                "player_id": "9004",
+                "name": "Lens Player",
+                "position": "RB",
+                "years_exp": 2,
+                "age_penalty": -12.5,
+            }
+        ]
+    )
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            response = client.get(
+                "/v1/players/9004/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    model = response.json()["model"]
+    # No age_score column at all: falls back to age_penalty under the
+    # "Age Lens" label instead of the "Age Score" one.
+    assert model["age_score"] == -12.5
+    assert model["age_score_label"] == "Age Lens"
 
 
 def test_gm_targets_requires_auth(monkeypatch):

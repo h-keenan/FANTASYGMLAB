@@ -1162,12 +1162,46 @@ def _quick_view_stats_dict(stats: player_quick_view.PlayerQuickViewStats) -> dic
     }
 
 
+def _project_player_model(row: pd.Series) -> dict[str, Any]:
+    """The web dossier's "Model" grid — market/opportunity/scarcity/role/age/
+    confidence/workload-trend — ported from app.py's player-card assembly
+    (~app.py:4098-4110). Every field here is a plain column already present
+    on the same row build_stats_view/build_executive_snapshot already read;
+    this is a pure projection, not a new computation.
+
+    age_score is a native per-player metric when present; some player rows
+    only carry the coarser age_penalty (a lens-relative adjustment) instead
+    — age_score_label tells the client which one it's showing, matching
+    app.py's own "Age Score" vs. "Age Lens" distinction.
+    """
+
+    age_score_raw = row.get("age_score") if "age_score" in row.index else None
+    age_score_native = False
+    if age_score_raw is not None:
+        try:
+            age_score_native = pd.notna(age_score_raw)
+        except (TypeError, ValueError):
+            age_score_native = False
+
+    return {
+        "market_score": _clean_json_value(row.get("market_score")),
+        "opportunity_score": _clean_json_value(row.get("opportunity_score")),
+        "scarcity_score": _clean_json_value(row.get("scarcity_score")),
+        "role_score": _clean_json_value(row.get("role_score")),
+        "age_score": _clean_json_value(age_score_raw if age_score_native else row.get("age_penalty")),
+        "age_score_label": "Age Score" if age_score_native else "Age Lens",
+        "opportunity_confidence": _clean_json_value(row.get("opportunity_confidence")),
+        "workload_trend": _clean_json_value(row.get("workload_trend")),
+    }
+
+
 @app.get("/v1/players/{player_id}/quick-view")
 def get_player_quick_view(
     player_id: str,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    """Player Quick View: season stats + bio for the player detail pop-up.
+    """Player Quick View: season stats + bio + model breakdown for the
+    player detail screen.
 
     Reuses modules.player_quick_view.build_stats_view/build_executive_snapshot
     verbatim — the same engine that renders the web app's player dossier
@@ -1181,7 +1215,7 @@ def get_player_quick_view(
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
     matches = players_df[players_df["player_id"] == player_id]
     if matches.empty:
-        return {"ok": True, "stats": None, "bio": None, "reason": "not_found"}
+        return {"ok": True, "stats": None, "bio": None, "model": None, "reason": "not_found"}
 
     row = matches.iloc[0]
     stats = player_quick_view.build_stats_view(row)
@@ -1190,6 +1224,7 @@ def get_player_quick_view(
         "ok": True,
         "stats": _quick_view_stats_dict(stats),
         "bio": dataclasses.asdict(bio),
+        "model": _project_player_model(row),
         "reason": "",
     }
 
