@@ -4108,6 +4108,10 @@ def render_player_quick_view_content(
     opportunity_confidence = _safe_positive_int(row.get("opportunity_confidence"), 0)
     projected_starter = bool(row.get("projected_starter"))
     workload_trend = _safe_text(row.get("workload_trend"), "Unknown")
+    # Already computed per player by rankings.compute_recency_features and
+    # already blended into opportunity — this just narrates it. None when the
+    # sample is too small to be worth a human-facing claim.
+    usage_trend = rankings_module.recency_trend_display(row)
     opportunity_source_flags = {
         part.strip().lower()
         for part in str(row.get("opportunity_source_flags") or "").split("|")
@@ -4224,6 +4228,14 @@ def render_player_quick_view_content(
         }:
             health_answer = f"{injury_level_text} · {_truncate_text(injury_note, 42)}"
         identity_badges.append(("Health", health_answer))
+    if usage_trend:
+        identity_badges.append(
+            (
+                "Usage",
+                f"{usage_trend['arrow']} {usage_trend['magnitude_pct']}% "
+                f"· {usage_trend['confidence_label']}",
+            )
+        )
 
     show_action_tile = not (on_roster and primary_status in {"Core Asset", "Untouchable"})
     if on_roster:
@@ -4297,6 +4309,18 @@ def render_player_quick_view_content(
             "Positional scarcity in the current league lens.",
         ),
     ]
+    if usage_trend:
+        metric_cards.append(
+            (
+                "Usage Trend",
+                f"{usage_trend['arrow']} {usage_trend['trend_pct']:+d}%",
+                _truncate_text(
+                    f"{usage_trend['label']} ({usage_trend['confidence_label']}). "
+                    f"{usage_trend['detail']}",
+                    140,
+                ),
+            )
+        )
     if show_opportunity_confidence:
         confidence_note = "Role-based opportunity confidence from the current depth-chart signal."
         if "team_competition" in opportunity_source_flags:
@@ -5013,34 +5037,52 @@ def render_player_detail_content(
     source_flags = row.get("opportunity_source_flags") or []
     if not isinstance(source_flags, list):
         source_flags = [str(source_flags)] if _safe_text(source_flags) else []
-    render_summary_tiles(
-        [
+    opportunity_tiles = [
+        {
+            "label": "Opportunity Label",
+            "value": opportunity_label,
+            "note": _safe_text(row.get("opportunity_explanation"), "No opportunity explanation available yet."),
+            "tone": "opportunity",
+        },
+        {
+            "label": "Projected Starter",
+            "value": "Yes" if bool(row.get("projected_starter")) else "No / Unclear",
+            "note": f"Confidence {_safe_positive_int(row.get('opportunity_confidence'), 0)} / 100",
+            "tone": "power",
+        },
+        {
+            "label": "Workload Trend",
+            "value": _safe_text(row.get("workload_trend"), "Unknown"),
+            "note": "Phase 1 uses depth, injuries, and role context. Snap and route metrics remain nullable.",
+            "tone": "strategy",
+        },
+    ]
+    # The weekly-recency read already inside opportunity, stated plainly.
+    # Hidden entirely below the display gate — see
+    # rankings.recency_trend_display for why 4+ usable games and a 5% move.
+    detail_usage_trend = rankings_module.recency_trend_display(row)
+    if detail_usage_trend:
+        opportunity_tiles.append(
             {
-                "label": "Opportunity Label",
-                "value": opportunity_label,
-                "note": _safe_text(row.get("opportunity_explanation"), "No opportunity explanation available yet."),
-                "tone": "opportunity",
-            },
-            {
-                "label": "Projected Starter",
-                "value": "Yes" if bool(row.get("projected_starter")) else "No / Unclear",
-                "note": f"Confidence {_safe_positive_int(row.get('opportunity_confidence'), 0)} / 100",
-                "tone": "power",
-            },
-            {
-                "label": "Workload Trend",
-                "value": _safe_text(row.get("workload_trend"), "Unknown"),
-                "note": "Phase 1 uses depth, injuries, and role context. Snap and route metrics remain nullable.",
-                "tone": "strategy",
-            },
-            {
-                "label": "Source Flags",
-                "value": str(len(source_flags)),
-                "note": ", ".join(source_flags[:4]) if source_flags else "Depth-chart inference only.",
-                "tone": "franchise",
-            },
-        ]
+                "label": "Usage Trend",
+                "value": f"{detail_usage_trend['arrow']} {detail_usage_trend['trend_pct']:+d}%",
+                "note": (
+                    f"{detail_usage_trend['label']} "
+                    f"({detail_usage_trend['confidence_label']}). "
+                    f"{detail_usage_trend['detail']}"
+                ),
+                "tone": "strength" if detail_usage_trend["direction"] == "up" else "risk",
+            }
+        )
+    opportunity_tiles.append(
+        {
+            "label": "Source Flags",
+            "value": str(len(source_flags)),
+            "note": ", ".join(source_flags[:4]) if source_flags else "Depth-chart inference only.",
+            "tone": "franchise",
+        }
     )
+    render_summary_tiles(opportunity_tiles)
 
     render_player_profile_stat_sections(row, compact=False)
 

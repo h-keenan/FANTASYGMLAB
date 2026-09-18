@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -16,7 +17,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
-import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
+import { api, type RankedPlayer, type UsageTrend, type ValuationLens } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -52,6 +53,30 @@ function matchesAvailability(injuryStatus: string | null, filter: AvailabilityFi
   if (filter === 'ALL') return true;
   const hasInjury = Boolean((injuryStatus ?? '').trim());
   return filter === 'Injured' ? hasInjury : !hasInjury;
+}
+
+/**
+ * Inline usage-trend pill for a ranked row — arrow plus the signed move, no
+ * words, because the row is already dense; Player Detail carries the full
+ * "trending up (high confidence)" sentence. The server only sends a
+ * usage_trend at all once the read clears its confidence gate
+ * (modules/rankings.py: recency_trend_display), so there is nothing to
+ * threshold here.
+ */
+function UsageTrendPill({ trend }: { trend: UsageTrend }) {
+  const rising = trend.direction === 'up';
+  const tint = rising ? colors.success : colors.danger;
+  return (
+    <View
+      style={[
+        styles.trendPill,
+        { backgroundColor: rising ? colors.successMuted : colors.dangerMuted, borderColor: tint },
+      ]}
+    >
+      <Ionicons name={rising ? 'arrow-up' : 'arrow-down'} size={9} color={tint} />
+      <Text style={[styles.trendPillText, { color: tint }]}>{trend.magnitude_pct}%</Text>
+    </View>
+  );
 }
 
 export default function PlayersScreen({ route, navigation }: Props) {
@@ -193,6 +218,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
                   <Text style={styles.meta} numberOfLines={1}>
                     {[item.team, item.opportunity_label].filter(Boolean).join(' · ')}
                   </Text>
+                  {item.usage_trend ? <UsageTrendPill trend={item.usage_trend} /> : null}
                   <TierBadge storedTier={item.tier} />
                 </View>
               </View>
@@ -255,6 +281,19 @@ const styles = StyleSheet.create({
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
+  // Geometry copied from PositionBadge, its immediate neighbour in this row,
+  // so the two read as one family of inline tags.
+  trendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 1,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 1,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  trendPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
   score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },

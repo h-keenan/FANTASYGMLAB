@@ -564,3 +564,33 @@ def test_trade_hub_inspect_fixture_uses_canonical_pqv_not_snapshot():
     ]
     assert "render_player_quick_view_content(" in dossier
     assert "render_player_quick_view_modal(" not in dossier
+
+
+def test_usage_trend_sits_with_opportunity_and_stays_conditional():
+    """The weekly-recency read is surfaced beside its sibling opportunity
+    signal on both web surfaces, and only when the shared gate allows it."""
+
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    dossier_start = source.index("def render_player_quick_view_content(")
+    detail_start = source.index("def render_player_detail_content(", dossier_start)
+    dossier = source[dossier_start:detail_start]
+    detail = source[detail_start:]
+
+    # PQV: one read, rendered into the Model matrix next to Opportunity and
+    # as an identity badge — both behind `if usage_trend:`, never a default.
+    assert dossier.count("usage_trend = rankings_module.recency_trend_display(row)") == 1
+    assert dossier.count("if usage_trend:") == 2
+    assert '"Usage Trend",' in dossier
+    assert 'identity_badges.append(\n            (\n                "Usage",' in dossier
+
+    # Player detail: an extra Opportunity tile, appended only when present,
+    # so the existing tiles are unchanged for players without a read.
+    assert "detail_usage_trend = rankings_module.recency_trend_display(row)" in detail
+    assert "if detail_usage_trend:" in detail
+    assert '"label": "Usage Trend",' in detail
+    assert "render_summary_tiles(opportunity_tiles)" in detail
+    # Direction drives tone; neither surface invents its own threshold.
+    assert 'detail_usage_trend["direction"] == "up"' in detail
+    for surface in (dossier, detail):
+        assert "recency_confidence" not in surface
+        assert "recency_sample_n" not in surface

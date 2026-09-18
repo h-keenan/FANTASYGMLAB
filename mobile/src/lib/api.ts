@@ -234,6 +234,12 @@ export interface RankedPlayer {
   position_rank: number | null;
   rank_unavailable_reason: string | null;
   opportunity_label: string | null;
+  // Optional rather than `| null` because several screens (Waivers, Alerts,
+  // Trade Hub, MyTeam, TeamRoster) hand-build a lean player of this shape
+  // from their own payloads to navigate into Player Detail; only the real
+  // /rankings wire rows carry this, and Player Detail fetches its own copy
+  // from /quick-view regardless.
+  usage_trend?: UsageTrend | null;
 }
 
 export interface LeagueRankingsResponse {
@@ -556,6 +562,36 @@ export interface QuickViewBio {
   contract_status: string;
 }
 
+/**
+ * The weekly-usage recency read the backend already computes for every
+ * player (modules/rankings.py: compute_recency_features) and blends into
+ * opportunity. The server decides whether it is trustworthy enough to show
+ * at all — 4+ usable games and a >= 5% move — so the client never
+ * re-derives or re-gates it: a non-null value is safe to render as-is, and
+ * null simply means "no trend worth stating".
+ *
+ * `trend_pct` is signed (+18 / -12); `magnitude_pct` is the same number
+ * unsigned, for copy that already carries the direction in words.
+ */
+export interface UsageTrend {
+  direction: 'up' | 'down';
+  trend: number;
+  trend_pct: number;
+  magnitude_pct: number;
+  confidence: number;
+  confidence_key: 'high' | 'moderate';
+  confidence_label: string;
+  sample_n: number;
+  window: number;
+  usage_rate: number | null;
+  baseline_rate: number | null;
+  arrow: string;
+  tone: 'positive' | 'negative';
+  label: string;
+  summary: string;
+  detail: string;
+}
+
 export interface QuickViewModel {
   market_score: number | null;
   opportunity_score: number | null;
@@ -565,6 +601,7 @@ export interface QuickViewModel {
   age_score_label: string;
   opportunity_confidence: number | null;
   workload_trend: string | null;
+  usage_trend: UsageTrend | null;
 }
 
 export interface WeeklyStatPoint {

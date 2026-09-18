@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 pytestmark = pytest.mark.usefixtures("committed_fantasycalc")
@@ -11,6 +13,8 @@ import pandas as pd
 from modules import news_signal
 from modules import rankings
 from modules import sleeper
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _weeks_from_usage(position: str, usages: list[float], start_week: int = 1):
@@ -308,3 +312,133 @@ def test_missing_weekly_fail_neutral():
     assert features["recency_confidence"] == 0.0
     row = _score(position="TE", weekly=None, targets=40, receptions=25, games_played=8)
     assert "weekly_recency" not in str(row["opportunity_source_flags"])
+
+
+# ---------------------------------------------------------------------------
+# Presentation gate: which already-computed recency reads are worth narrating
+# to a human (rankings.recency_trend_display). Nothing below changes what
+# recency_trend/recency_confidence mean or how valuation consumes them.
+# ---------------------------------------------------------------------------
+
+
+def _display_row(**overrides):
+    row = {
+        "recency_sample_n": 7,
+        "recency_trend": 0.18,
+        "recency_confidence": 1.0,
+        "recency_usage_rate": 18.2,
+        "recency_baseline_rate": 15.4,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_display_gate_hides_thin_samples_and_flat_trends():
+    # n=3 scores 0.33 confidence by design ("suppresses one-game-after-two
+    # spikes") — the exact sample we decline to narrate, however big the move.
+    assert rankings.recency_trend_display(
+        _display_row(recency_sample_n=3, recency_confidence=0.33, recency_trend=0.40)
+    ) is None
+    # Below RECENCY_MIN_SAMPLE there is no read at all.
+    assert rankings.recency_trend_display(
+        _display_row(recency_sample_n=2, recency_confidence=0.0, recency_trend=0.0)
+    ) is None
+    # A real sample but a sub-5% move is noise, not a story.
+    assert rankings.recency_trend_display(_display_row(recency_trend=0.04)) is None
+    assert rankings.recency_trend_display(_display_row(recency_trend=-0.049)) is None
+    assert rankings.recency_trend_display(None) is None
+    assert rankings.recency_trend_display({}) is None
+
+
+def test_display_gate_matches_the_documented_thresholds():
+    assert rankings.RECENCY_DISPLAY_MIN_CONFIDENCE == 0.66
+    assert rankings.RECENCY_DISPLAY_MIN_TREND == 0.05
+    # 4 usable games is the first confidence the gate admits; 3 is not.
+    four_games = rankings.compute_recency_features(
+        "WR", _weeks_from_usage("WR", [4, 5, 9, 11]), status="Active"
+    )
+    assert four_games["recency_sample_n"] == 4
+    assert four_games["recency_confidence"] >= rankings.RECENCY_DISPLAY_MIN_CONFIDENCE
+    assert rankings.recency_trend_display(four_games) is not None
+    three_games = rankings.compute_recency_features(
+        "WR", _weeks_from_usage("WR", [4, 8, 12]), status="Active"
+    )
+    assert three_games["recency_sample_n"] == 3
+    assert three_games["recency_confidence"] < rankings.RECENCY_DISPLAY_MIN_CONFIDENCE
+    assert rankings.recency_trend_display(three_games) is None
+
+
+def test_display_read_states_direction_magnitude_and_confidence():
+    up = rankings.recency_trend_display(_display_row())
+    assert up["direction"] == "up"
+    assert up["trend_pct"] == 18
+    assert up["magnitude_pct"] == 18
+    assert up["confidence_key"] == "high"
+    assert up["summary"] == "Usage trending up 18% (high confidence)"
+    assert up["tone"] == "positive"
+    assert "last 4 games" in up["detail"]
+    assert "7 usable games" in up["detail"]
+
+    down = rankings.recency_trend_display(
+        _display_row(recency_trend=-0.12, recency_confidence=0.67, recency_sample_n=4)
+    )
+    assert down["direction"] == "down"
+    assert down["trend_pct"] == -12
+    assert down["magnitude_pct"] == 12
+    assert down["confidence_key"] == "moderate"
+    assert down["summary"] == "Usage trending down 12% (moderate confidence)"
+    assert down["tone"] == "negative"
+
+
+def test_display_never_narrates_an_injury_damped_decline():
+    # A moderate injury damps a negative read to 0.35x confidence upstream so
+    # missed time never reads as role collapse — that damping alone has to
+    # drop it under the display gate, with no separate injury check here.
+    features = rankings.compute_recency_features(
+        "RB",
+        _weeks_from_usage("RB", [18, 17, 16, 6, 5]),
+        status="Active",
+        injury_status="Doubtful",
+    )
+    assert features["recency_trend"] < 0
+    assert features["recency_confidence"] < rankings.RECENCY_DISPLAY_MIN_CONFIDENCE
+    assert rankings.recency_trend_display(features) is None
+
+
+def test_display_reads_a_real_player_row_end_to_end():
+    players = pd.DataFrame(
+        [{"player_id": "p1", "name": "A", "position": "WR", "status": "Active", "injury_status": ""}]
+    )
+    stats = {
+        "p1": {
+            "stats_season": 2025,
+            "games_played": 6,
+            "targets": 45,
+            "weekly": _weeks_from_usage("WR", [4, 4, 5, 9, 10, 11]),
+        }
+    }
+    joined = rankings.attach_player_stats(players, stats, prior_stats={})
+    read = rankings.recency_trend_display(joined.iloc[0])
+    assert read is not None
+    assert read["direction"] == "up"
+    # Never exceeds the clip the computation itself applies.
+    assert abs(read["trend"]) <= rankings.RECENCY_TREND_CLIP
+
+
+def test_display_is_the_only_gate_both_surfaces_use():
+    """Neither app may re-threshold the read with numbers of its own."""
+
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # The PQV dossier and the full player-detail page, and nowhere else.
+    assert app_source.count("rankings_module.recency_trend_display(row)") == 2
+    mobile_source = (ROOT / "services" / "mobile_api_service.py").read_text(encoding="utf-8")
+    assert "rankings.recency_trend_display(row)" in mobile_source
+    for surface in (app_source, mobile_source):
+        assert "RECENCY_DISPLAY_MIN_CONFIDENCE" not in surface
+        assert "RECENCY_DISPLAY_MIN_TREND" not in surface
+    # The mobile client renders whatever it is handed; it owns no threshold.
+    for screen in ("PlayerDetailScreen.tsx", "PlayersScreen.tsx"):
+        client = (ROOT / "mobile" / "src" / "screens" / screen).read_text(encoding="utf-8")
+        assert "usage_trend" in client
+        assert "sample_n" not in client
+        assert "confidence >" not in client

@@ -25,6 +25,7 @@ import {
   type QuickViewSeason,
   type QuickViewStatItem,
   type QuickViewStats,
+  type UsageTrend,
   type WeeklyStatPoint,
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -442,6 +443,30 @@ const WORKLOAD_TREND_COLOR: Record<string, string> = {
   decreasing: colors.danger,
 };
 
+/**
+ * The weekly-usage recency read, as a tinted chip. Purely a renderer: the
+ * server has already decided this read is strong enough to state (see
+ * UsageTrend / modules/rankings.py's recency_trend_display), so anything
+ * non-null here gets shown, and nothing is re-thresholded client-side.
+ */
+function UsageTrendChip({ trend }: { trend: UsageTrend }) {
+  const rising = trend.direction === 'up';
+  const tint = rising ? colors.success : colors.danger;
+  const tintMuted = rising ? colors.successMuted : colors.dangerMuted;
+  return (
+    <View style={[styles.usageTrendChip, { backgroundColor: tintMuted, borderColor: tint }]}>
+      <Ionicons name={rising ? 'arrow-up' : 'arrow-down'} size={12} color={tint} />
+      <Text style={[styles.usageTrendValue, { color: tint }]}>
+        {trend.trend_pct > 0 ? '+' : ''}
+        {trend.trend_pct}%
+      </Text>
+      <Text style={styles.usageTrendLabel} numberOfLines={1}>
+        {trend.label.toLowerCase()} · {trend.confidence_label}
+      </Text>
+    </View>
+  );
+}
+
 function ModelSection({ model }: { model: QuickViewModel }) {
   const trendKey = (model.workload_trend ?? '').toLowerCase();
   const trendColor = WORKLOAD_TREND_COLOR[trendKey] ?? colors.textSecondary;
@@ -465,6 +490,12 @@ function ModelSection({ model }: { model: QuickViewModel }) {
         <View style={styles.trendRow}>
           <Ionicons name="trending-up-outline" size={14} color={trendColor} />
           <Text style={[styles.trendText, { color: trendColor }]}>Workload trend: {model.workload_trend}</Text>
+        </View>
+      ) : null}
+      {model.usage_trend ? (
+        <View style={styles.usageTrendBlock}>
+          <UsageTrendChip trend={model.usage_trend} />
+          <Text style={styles.usageTrendDetail}>{model.usage_trend.detail}</Text>
         </View>
       ) : null}
     </View>
@@ -827,6 +858,20 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   trendText: { fontSize: 12, fontWeight: '600' },
+  usageTrendBlock: { marginTop: spacing.sm, gap: spacing.xs },
+  usageTrendChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  usageTrendValue: { fontSize: 12, fontWeight: '700' },
+  usageTrendLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+  usageTrendDetail: { fontSize: 11, color: colors.textTertiary },
   seasonLabel: {
     fontSize: 13,
     fontWeight: '600',
