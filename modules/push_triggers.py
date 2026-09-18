@@ -24,6 +24,7 @@ leagues into one push, and league_movement-category pushes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
 import pandas as pd
@@ -37,6 +38,11 @@ PUSH_TOKENS_TABLE = "push_tokens"
 PROFILES_TABLE = "profiles"
 NOTIFICATION_LOG_TABLE = "push_notification_log"
 USER_SETTINGS_TABLE = "user_settings"
+TRADE_OUTCOMES_TABLE = "trade_outcomes"
+# Matches services/mobile_api_service.py's own copy of this constant — the
+# mobile API and this cron script are separate processes, so it's a
+# duplicated value rather than a shared import (see docs/supabase_trade_outcomes.sql).
+TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS = 20
 # Every push category a user can individually toggle off — the Notification
 # Settings screen (mobile) reads/writes exactly this key set.
 TOGGLEABLE_PUSH_CATEGORIES = ("top_priority", "watch", "recap", "injury")
@@ -520,5 +526,115 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     stats["pushes_sent"] += 1
                 else:
                     stats["errors"].append(f"{user_id}/{league_id}: {result.get('error')}")
+
+    return stats
+
+
+def fetch_pending_trade_outcome_followups(config: PushTriggerConfig) -> list[dict[str, Any]]:
+    """trade_outcomes rows old enough to ask about and not yet pushed
+    (service-role, cross-user — see docs/supabase_trade_outcomes.sql).
+    """
+
+    if not config.configured:
+        return []
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS)).isoformat()
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{TRADE_OUTCOMES_TABLE}",
+            headers=_headers(config),
+            params={
+                "select": "id,user_id,league_id,partner_team_name",
+                "outcome": "eq.pending",
+                "followup_pushed_at": "is.null",
+                "shared_at": f"lte.{cutoff}",
+            },
+            timeout=15,
+        )
+    except Exception:
+        return []
+    if response.status_code >= 400:
+        return []
+    try:
+        rows = response.json()
+    except Exception:
+        return []
+    return [row for row in rows if isinstance(row, Mapping)] if isinstance(rows, list) else []
+
+
+def mark_trade_outcome_followup_pushed(config: PushTriggerConfig, *, outcome_id: str) -> None:
+    """Stop asking again next sweep — set regardless of whether a push was
+    actually delivered (e.g. no registered device): the in-app "pending"
+    prompt (GET /v1/trade-outcomes/pending) never reads this column, so a
+    user without a push token still gets asked next time they open the app.
+    """
+
+    if not config.configured or not outcome_id:
+        return
+    try:
+        requests.patch(
+            f"{config.url}/rest/v1/{TRADE_OUTCOMES_TABLE}",
+            headers=_headers(config, prefer="return=minimal"),
+            params={"id": f"eq.{outcome_id}"},
+            json={"followup_pushed_at": datetime.now(timezone.utc).isoformat()},
+            timeout=15,
+        )
+    except Exception:
+        pass
+
+
+def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: Any = None) -> dict[str, Any]:
+    """One sweep of the "did this trade happen?" push follow-up.
+
+    Independent of run_push_trigger_sweep's per-league briefing loop —
+    trade_outcomes rows carry everything needed (user_id, partner name)
+    without resolving Sleeper leagues/rosters at all. Never raises; a bad
+    row is logged into `errors` and skipped.
+    """
+
+    config = load_push_trigger_config(environ=environ, secrets=secrets)
+    stats: dict[str, Any] = {
+        "ok": True,
+        "configured": config.configured,
+        "outcomes_checked": 0,
+        "pushes_sent": 0,
+        "errors": [],
+    }
+    if not config.configured:
+        stats["ok"] = False
+        stats["errors"].append("Supabase service-role is not configured.")
+        return stats
+
+    pending = fetch_pending_trade_outcome_followups(config)
+    if not pending:
+        return stats
+
+    recipients = fetch_push_recipients(config)
+    for row in pending:
+        stats["outcomes_checked"] += 1
+        outcome_id = _safe_text(row.get("id"))
+        user_id = _safe_text(row.get("user_id"))
+        if not outcome_id or not user_id:
+            continue
+        tokens = recipients.get(user_id) or []
+        if not tokens:
+            mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
+            continue
+        partner = _safe_text(row.get("partner_team_name")) or "your trade partner"
+        try:
+            result = push_tokens.send_expo_push_notifications(
+                tokens,
+                title="Did this trade happen?",
+                body=f"You shared a trade with {partner} — let us know if it went through.",
+                data={"type": "trade_outcome_followup", "outcome_id": outcome_id},
+            )
+        except Exception as exc:
+            stats["errors"].append(f"{user_id}: trade outcome push failed ({exc})")
+            mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
+            continue
+        mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
+        if result.get("ok"):
+            stats["pushes_sent"] += 1
+        else:
+            stats["errors"].append(f"{user_id}: {result.get('error')}")
 
     return stats

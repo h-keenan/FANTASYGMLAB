@@ -469,3 +469,86 @@ def test_run_push_trigger_sweep_skips_a_disabled_category(monkeypatch):
 
     assert stats["pushes_sent"] == 0
     mock_post.assert_not_called()
+
+
+def test_fetch_pending_trade_outcome_followups_returns_rows():
+    response = Mock(status_code=200)
+    response.json.return_value = [
+        {"id": "outcome-1", "user_id": "u1", "league_id": "league-1", "partner_team_name": "Team Rocket"},
+    ]
+    with patch("requests.get", return_value=response) as mock_get:
+        rows = push_triggers.fetch_pending_trade_outcome_followups(_config())
+    assert rows == [{"id": "outcome-1", "user_id": "u1", "league_id": "league-1", "partner_team_name": "Team Rocket"}]
+    params = mock_get.call_args.kwargs["params"]
+    assert params["outcome"] == "eq.pending"
+    assert params["followup_pushed_at"] == "is.null"
+    assert params["shared_at"].startswith("lte.")
+
+
+def test_fetch_pending_trade_outcome_followups_empty_when_not_configured():
+    with patch("requests.get") as mock_get:
+        rows = push_triggers.fetch_pending_trade_outcome_followups(push_triggers.PushTriggerConfig())
+    assert rows == []
+    mock_get.assert_not_called()
+
+
+def test_mark_trade_outcome_followup_pushed_patches_the_row():
+    with patch("requests.patch") as mock_patch:
+        push_triggers.mark_trade_outcome_followup_pushed(_config(), outcome_id="outcome-1")
+    call = mock_patch.call_args
+    assert "trade_outcomes" in call.args[0]
+    assert call.kwargs["params"] == {"id": "eq.outcome-1"}
+    assert "followup_pushed_at" in call.kwargs["json"]
+
+
+def test_run_trade_outcome_followup_sweep_sends_and_marks_pushed():
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    pending_response = Mock(status_code=200)
+    pending_response.json.return_value = [
+        {"id": "outcome-1", "user_id": "u1", "league_id": "league-1", "partner_team_name": "Team Rocket"},
+    ]
+    tokens_response = Mock(status_code=200)
+    tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
+    expo_response = Mock(status_code=200, json=lambda: {"data": [{"status": "ok"}]})
+
+    with patch("requests.get", side_effect=[pending_response, tokens_response]):
+        with patch("requests.post", return_value=expo_response) as mock_post:
+            with patch("requests.patch") as mock_patch:
+                stats = push_triggers.run_trade_outcome_followup_sweep(environ=config_env)
+
+    assert stats["configured"] is True
+    assert stats["outcomes_checked"] == 1
+    assert stats["pushes_sent"] == 1
+    assert not stats["errors"]
+    assert mock_post.call_args.args[0] == push_tokens.EXPO_PUSH_API_URL
+    assert mock_post.call_args.kwargs["json"][0]["to"] == "ExponentPushToken[a]"
+    assert "Team Rocket" in mock_post.call_args.kwargs["json"][0]["body"]
+    mock_patch.assert_called_once()
+    assert mock_patch.call_args.kwargs["params"] == {"id": "eq.outcome-1"}
+
+
+def test_run_trade_outcome_followup_sweep_marks_pushed_without_a_token():
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    pending_response = Mock(status_code=200)
+    pending_response.json.return_value = [
+        {"id": "outcome-1", "user_id": "u1", "league_id": "league-1", "partner_team_name": "Team Rocket"},
+    ]
+    tokens_response = Mock(status_code=200)
+    tokens_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[pending_response, tokens_response]):
+        with patch("requests.post") as mock_post:
+            with patch("requests.patch") as mock_patch:
+                stats = push_triggers.run_trade_outcome_followup_sweep(environ=config_env)
+
+    assert stats["pushes_sent"] == 0
+    mock_post.assert_not_called()
+    mock_patch.assert_called_once()
+
+
+def test_run_trade_outcome_followup_sweep_fails_soft_when_not_configured():
+    stats = push_triggers.run_trade_outcome_followup_sweep(environ={})
+    assert stats["ok"] is False
+    assert stats["configured"] is False
+    assert stats["pushes_sent"] == 0
+    assert stats["errors"]

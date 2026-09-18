@@ -2770,3 +2770,181 @@ def test_my_team_returns_the_real_suggested_lineup_split(monkeypatch):
     assert starters[0]["slot"] == "QB"
     bench_ids = {player["player_id"] for player in bench}
     assert "my_bench_rb" in bench_ids
+
+
+def test_trade_outcomes_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.post("/v1/leagues/abc/trade-outcomes", json={}).status_code == 401
+    assert client.get("/v1/trade-outcomes/pending").status_code == 401
+    assert client.post("/v1/trade-outcomes/some-id/answer", json={"outcome": "yes"}).status_code == 401
+
+
+def test_record_trade_share_writes_a_snapshot_with_callers_own_token(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    post_response = Mock(status_code=201)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=post_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/abc/trade-outcomes",
+                json={
+                    "partner_team_name": "Team Rocket",
+                    "send": [{"name": "Player A", "position": "RB"}],
+                    "receive": [{"name": "Player B", "position": "WR"}],
+                    "value_edge_label": "+120",
+                },
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    call_kwargs = mock_post.call_args.kwargs
+    assert call_kwargs["headers"]["Authorization"] == "Bearer good-token"
+    body = call_kwargs["json"]
+    assert body["user_id"] == "user-123"
+    assert body["league_id"] == "abc"
+    assert body["partner_team_name"] == "Team Rocket"
+    assert body["trade_summary"]["send"] == [{"name": "Player A", "position": "RB"}]
+    assert body["trade_summary"]["receive"] == [{"name": "Player B", "position": "WR"}]
+    assert body["trade_summary"]["value_edge_label"] == "+120"
+
+
+def test_record_trade_share_fails_closed_when_table_missing(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    post_response = Mock(status_code=404)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=post_response):
+            response = client.post(
+                "/v1/leagues/abc/trade-outcomes",
+                json={"partner_team_name": "Team Rocket"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "reason": "not_available"}
+
+
+def test_pending_trade_outcomes_returns_real_rows(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    pending_response = Mock(status_code=200)
+    pending_response.json.return_value = [
+        {
+            "id": "outcome-1",
+            "league_id": "abc",
+            "partner_team_name": "Team Rocket",
+            "trade_summary": {"send": [], "receive": [], "value_edge_label": "+120"},
+            "shared_at": "2026-09-01T00:00:00Z",
+        }
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, pending_response]) as mock_get:
+        response = client.get("/v1/trade-outcomes/pending", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["outcomes"] == [
+        {
+            "id": "outcome-1",
+            "league_id": "abc",
+            "partner_team_name": "Team Rocket",
+            "trade_summary": {"send": [], "receive": [], "value_edge_label": "+120"},
+            "shared_at": "2026-09-01T00:00:00Z",
+        }
+    ]
+    # The pending query must filter to this user's own rows, still-pending
+    # outcomes, an aged-enough shared_at, and an expired-or-absent snooze —
+    # not just "everything in the table".
+    pending_url = mock_get.call_args_list[1].args[0]
+    assert "user_id=eq.user-123" in pending_url
+    assert "outcome=eq.pending" in pending_url
+    assert "shared_at=lte." in pending_url
+    assert "snoozed_until" in pending_url
+
+
+def test_pending_trade_outcomes_fails_soft_when_table_unreachable(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    error_response = Mock(status_code=404)
+
+    with patch("requests.get", side_effect=[auth_user_response, error_response]):
+        response = client.get("/v1/trade-outcomes/pending", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "outcomes": []}
+
+
+def test_answer_trade_outcome_rejects_an_invalid_outcome(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/trade-outcomes/outcome-1/answer",
+            json={"outcome": "maybe"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_answer_trade_outcome_records_yes_with_callers_own_token(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    patch_response = Mock(status_code=204)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.patch", return_value=patch_response) as mock_patch:
+            response = client.post(
+                "/v1/trade-outcomes/outcome-1/answer",
+                json={"outcome": "yes"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    call_kwargs = mock_patch.call_args.kwargs
+    assert call_kwargs["headers"]["Authorization"] == "Bearer good-token"
+    assert call_kwargs["json"]["outcome"] == "yes"
+    assert "outcome_recorded_at" in call_kwargs["json"]
+    patch_url = mock_patch.call_args.args[0]
+    assert "id=eq.outcome-1" in patch_url
+    assert "user_id=eq.user-123" in patch_url
+
+
+def test_answer_trade_outcome_still_pending_only_snoozes(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    patch_response = Mock(status_code=204)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.patch", return_value=patch_response) as mock_patch:
+            response = client.post(
+                "/v1/trade-outcomes/outcome-1/answer",
+                json={"outcome": "still_pending"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    call_kwargs = mock_patch.call_args.kwargs
+    assert "snoozed_until" in call_kwargs["json"]
+    assert "outcome" not in call_kwargs["json"]
+    assert "outcome_recorded_at" not in call_kwargs["json"]
