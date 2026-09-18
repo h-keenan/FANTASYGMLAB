@@ -70,3 +70,17 @@ export function resolvePlayerTier(storedTier: string | null | undefined): Player
   if (!mappedId) return DEFAULT_TIER;
   return TIER_BY_ID.get(mappedId) ?? DEFAULT_TIER;
 }
+
+/** Black or white, whichever reads on a solid fill of this color — the
+ * tier ladder spans light cyans/grays through dark slate, so a single
+ * hardcoded text color washes out on half of them. Used for the
+ * high-emphasis solid-fill tier pill (Player Detail hero); the dense-list
+ * TierBadge chip stays translucent-on-dark and doesn't need this. */
+export function contrastTextColor(hex: string): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? '#0D1117' : '#F2F4F7';
+}

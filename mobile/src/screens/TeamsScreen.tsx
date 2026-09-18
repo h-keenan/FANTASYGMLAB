@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
@@ -156,9 +157,15 @@ export default function TeamsScreen({ route, navigation }: Props) {
               ) : null}
             </View>
             {item.powerRank != null ? (
-              <View style={styles.rankPill}>
-                <Text style={styles.rankLabel}>POWER</Text>
-                <Text style={styles.rankValue}>#{item.powerRank}</Text>
+              <View style={[styles.rankPill, item.powerRank === 1 && styles.rankPillFirst]}>
+                {item.powerRank === 1 ? (
+                  <Ionicons name="trophy" size={13} color={colors.premium} style={styles.rankTrophy} />
+                ) : (
+                  <Text style={styles.rankLabel}>POWER</Text>
+                )}
+                <Text style={[styles.rankValue, item.powerRank === 1 && styles.rankValueFirst]}>
+                  #{item.powerRank}
+                </Text>
               </View>
             ) : (
               <View style={styles.countPill}>
@@ -215,6 +222,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   rankValue: { fontSize: 15, fontWeight: '700', color: colors.accent },
+  // League #1 gets the same premium/gold hue as an award badge instead of
+  // the standard accent — a leaderboard's top spot should read as "the"
+  // rank at a glance, not just another pill in the same color as #2-#12.
+  rankPillFirst: { backgroundColor: `${colors.premium}1F`, borderWidth: 1, borderColor: `${colors.premium}80` },
+  rankTrophy: { marginBottom: 1 },
+  rankValueFirst: { color: colors.premium },
   mineBadge: {
     backgroundColor: colors.accent,
     borderRadius: radii.pill,
