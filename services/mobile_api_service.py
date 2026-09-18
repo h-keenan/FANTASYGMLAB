@@ -1889,6 +1889,12 @@ def _project_briefing_item(item: Any) -> dict[str, Any]:
     }
 
 
+# Matches web's app.py `visible_action_items = action_center_items if
+# is_premium else action_center_items[:4]` — the free-tier cap on Today's
+# Game Plan.
+FREE_DASHBOARD_VISIBLE_ITEMS = 4
+
+
 @app.get("/v1/leagues/{league_id}/dashboard")
 def get_league_dashboard(
     league_id: str,
@@ -2007,13 +2013,28 @@ def get_league_dashboard(
         "franchise_rank": franchise_rank,
     }
 
+    # Free-tier cap matches the web app's own gate (app.py:
+    # `visible_action_items = action_center_items if is_premium else
+    # action_center_items[:4]`) — applied here to the already-composed,
+    # priority-ordered Today's Game Plan list rather than the pre-
+    # reorganization raw tile list web slices, since that's the exact
+    # sequence this response actually displays.
+    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    all_items = list(briefing.items)
+    visible_items = all_items if is_premium else all_items[:FREE_DASHBOARD_VISIBLE_ITEMS]
+
     return {
         "ok": True,
-        "items": [_project_briefing_item(item) for item in briefing.items],
+        "items": [_project_briefing_item(item) for item in visible_items],
         "quiet": briefing.quiet,
         "quiet_reason": briefing.quiet_reason,
         "team_snapshot": team_snapshot,
         "reason": "",
+        "entitlement": {
+            "is_premium": is_premium,
+            "visible_count": len(visible_items),
+            "hidden_count": len(all_items) - len(visible_items),
+        },
     }
 
 
@@ -2304,6 +2325,42 @@ def get_league_waivers(
         )
         priority_adds.append(_project_priority_add(row, score_field, guidance))
 
+    # Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
+    # Shortlist) — matches web's Premium-only gate (modules/waivers_ui.py:
+    # "if not is_premium: render_premium_lock(...); return", app.py's
+    # classification just above that call). Adapted, not a byte-for-byte
+    # port: web dedupes against its own `featured_free_agents` presentation
+    # slice, which isn't reproduced here — this dedupes against the same
+    # Priority Adds list this endpoint already returns instead.
+    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    stash_candidates: list[dict[str, Any]] = []
+    watchlist_candidates: list[dict[str, Any]] = []
+    faab_targets: list[dict[str, Any]] = []
+    if is_premium and not free_agents.empty:
+        priority_ids = {str(row.get("player_id")) for _, row in priority_df.iterrows()}
+        age_numeric = pd.to_numeric(free_agents.get("age"), errors="coerce").fillna(99)
+        upside_labels = {"Backup With Upside", "Starter At Risk", "Committee Back"}
+        opportunity = free_agents.get("opportunity_label", pd.Series("", index=free_agents.index)).fillna("")
+        stash_mask = (age_numeric <= 24) | opportunity.isin(upside_labels)
+        stash_df = (
+            free_agents[stash_mask & ~free_agents["player_id"].astype(str).isin(priority_ids)]
+            .drop_duplicates(subset=["player_id"])
+            .head(6)
+        )
+        seen_after_stash = priority_ids | set(stash_df["player_id"].astype(str))
+        watchlist_df = free_agents[~free_agents["player_id"].astype(str).isin(seen_after_stash)].head(6)
+        seen_after_watchlist = seen_after_stash | set(watchlist_df["player_id"].astype(str))
+        faab_pool = free_agents[
+            (~free_agents["stale_free_agent"])
+            & (score_series > 0)
+            & (~free_agents["player_id"].astype(str).isin(seen_after_watchlist))
+        ]
+        faab_df = faab_pool.sort_values(score_field, ascending=False).head(4)
+
+        stash_candidates = [_project_waiver_row(row, score_field) for _, row in stash_df.iterrows()]
+        watchlist_candidates = [_project_waiver_row(row, score_field) for _, row in watchlist_df.iterrows()]
+        faab_targets = [_project_waiver_row(row, score_field) for _, row in faab_df.iterrows()]
+
     return {
         "ok": True,
         "players": players,
@@ -2311,6 +2368,10 @@ def get_league_waivers(
         "needed_positions": needed_positions,
         "available_count": int(len(free_agents)),
         "avg_wire_score": avg_wire_score,
+        "stash_candidates": stash_candidates,
+        "watchlist_candidates": watchlist_candidates,
+        "faab_targets": faab_targets,
+        "entitlement": {"is_premium": is_premium},
         "reason": "",
     }
 
