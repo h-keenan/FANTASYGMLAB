@@ -819,6 +819,7 @@ def ranked_leaderboard_row_html(
     tap_class: str = "",
     tap_attrs: str = "",
     top_three: bool = False,
+    first_place: bool = False,
     is_current: bool = False,
     status_category: str = "",
     status_subtype: str = "",
@@ -834,6 +835,10 @@ def ranked_leaderboard_row_html(
     classes.append(f"dg-dense-row--{density_key}")
     if top_three:
         classes.append("dg-ranked-row--top")
+    # Rank 1 is the league leader, not just "another top-three row" — it gets
+    # the gold/premium treatment on top of the shared top-three border.
+    if first_place:
+        classes.append("dg-ranked-row--first")
     if is_current:
         classes.append("dg-ranked-row--current")
     if tap_class:
@@ -1123,6 +1128,7 @@ def render_power_rankings_board(
                 tap_class=tap_class,
                 tap_attrs=tap_attrs,
                 top_three=bool(rank_value and rank_value <= 3),
+                first_place=bool(rank_value == 1),
                 is_current=bool(current_key and roster_key and roster_key == current_key),
                 density="compact",
             )
@@ -1358,6 +1364,7 @@ def render_standings_board(
                     tap_class=tap_class,
                     tap_attrs=tap_attrs,
                     top_three=bool(standing_rank and standing_rank <= 3),
+                    first_place=bool(standing_rank == 1),
                     is_current=bool(
                         current_key and roster_key and roster_key == current_key
                     ),

@@ -17,6 +17,9 @@ DENSE_LIST_CSS = """
 .dg-ranked-row.dg-dense-row--standard{padding:var(--space-sm)}.dg-ranked-row.dg-dense-row--rich{padding:var(--space-sm) var(--space-md)}
 .dg-ranked-row--current,.dg-intel-card.dg-ranked-row--current{border-inline-start:var(--border-width-semantic) solid var(--color-accent)}
 .dg-ranked-row--top,.dg-dense-row--emphasis{border-color:var(--border-accent)}
+/* Rank 1 only: league leader reads gold, not "one of the top three". */
+.dg-ranked-row.dg-ranked-row--first,.dg-intel-card.dg-ranked-row--first{background:linear-gradient(90deg,color-mix(in srgb,var(--color-premium) 10%,transparent),var(--surface-1) 40%);border-color:color-mix(in srgb,var(--color-premium) 48%,transparent);border-inline-start:var(--border-width-semantic) solid var(--color-premium)}
+.dg-ranked-row--first .dg-ranked-rank,.dg-ranked-row--first .dg-dense-lead{background:color-mix(in srgb,var(--color-premium) 16%,var(--surface-raised));border-color:color-mix(in srgb,var(--color-premium) 52%,transparent);color:var(--color-premium)}
 .dg-ranked-rank,.dg-dense-lead{align-items:center;background:var(--surface-raised);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-control);color:var(--text-primary);display:flex;font:var(--font-weight-display) var(--font-size-badge)/1 var(--font-family-sans);height:1.75rem;justify-content:center;min-width:1.75rem;padding:0 var(--space-2xs)}
 .dg-dense-dual-rank{align-content:center;display:grid;gap:1px;height:auto;justify-items:start;min-width:4.75rem;padding:var(--space-2xs) var(--space-xs)}
 .dg-dense-dual-rank__item{color:var(--text-muted);font:var(--type-supporting-metadata);font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1.2;text-transform:uppercase;white-space:nowrap}

@@ -29,6 +29,10 @@ div[class*="st-key-pqv_detail_nav_rail"]{margin:0;max-width:56rem}
 div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[data-testid="stDialog"] .pqv-hero-portrait .player-detail-avatar,div[data-testid="stDialog"] .pqv-hero-portrait img{flex:1 1 auto !important;height:100% !important;max-height:none !important;max-width:none !important;min-height:0 !important;min-width:0 !important;width:100% !important}
 .pqv-hero-tier,.pqv-hero-role{color:var(--color-text-primary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:var(--space-2xs) 0 0;text-transform:uppercase}
 .pqv-hero-tier{font-size:var(--font-size-badge);font-weight:var(--font-weight-button);margin:0 0 var(--space-2xs)}
+/* Hero tier pill: solid fill in the tier's own color (--dg-tier-fill/--dg-tier-ink
+   set inline per player by modules/player_tier_identity.py). Deliberately not the
+   translucent dg-tier-* list chip — this is the one hero display for this player. */
+.pqv-hero-tier.pqv-hero-tier--solid{align-items:center;align-self:start;background:var(--dg-tier-fill,var(--color-prestige-depth));border-radius:var(--radius-pill);color:var(--dg-tier-ink,var(--color-text-primary));display:inline-flex;justify-self:start;line-height:var(--line-height-badge);min-height:1.25rem;padding:var(--space-2xs) var(--space-sm);width:fit-content}
 .player-dossier-rank-strip{display:flex;flex-wrap:wrap;gap:var(--space-sm) var(--space-md);margin:var(--space-xs) 0 0;padding:0}
 .player-dossier-rank-cell{display:grid;gap:2px;min-width:0}
 .player-dossier-rank-cell span,.pqv-signal-badge-question,.pqv-why-factor span,.pqv-recommendation-confidence,.pqv-glance-cell span,.pqv-career-glance-cell span,.pqv-kicker{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}

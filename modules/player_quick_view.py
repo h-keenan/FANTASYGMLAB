@@ -20,6 +20,7 @@ from modules.player_tier_identity import (
     PlayerTierIdentity,
     player_tier_legend_html,
     portrait_frame_classes,
+    tier_solid_pill_style,
 )
 from modules.player_history import (
     CareerResume,
@@ -684,8 +685,14 @@ def pqv_hero_html(
             f" title='{escape(identity.accessibility_label, quote=True)}'"
             f" aria-label='{escape(identity.accessibility_label, quote=True)}'"
         )
+        # Hero header: one solid-fill pill for this one player, filled with the
+        # tier's own color and inked for contrast. Dense lists keep the
+        # translucent dg-tier-* chip; this is the single-player display.
         tier_label_html = (
-            f"<div class='pqv-hero-tier' title='{escape(identity.accessibility_label, quote=True)}'>"
+            "<div class='pqv-hero-tier pqv-hero-tier--solid'"
+            f" data-player-tier='{escape(identity.tier_id, quote=True)}'"
+            f" style='{escape(tier_solid_pill_style(identity), quote=True)}'"
+            f" title='{escape(identity.accessibility_label, quote=True)}'>"
             f"{escape(identity.short_label)}</div>"
         )
     legend_html = (

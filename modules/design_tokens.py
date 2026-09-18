@@ -2,7 +2,12 @@
 
 This module is intentionally CSS-only. It owns stable visual primitives while
 existing selectors continue to own presentation during incremental migration.
+The one Python-side export, ``DESIGN_TOKEN_HEX``, is read back out of that same
+CSS so code that must *compute* on a token (contrast, for example) never
+restates a hex value.
 """
+
+import re
 
 DESIGN_TOKEN_CSS = """
 /* DynastyGM semantic design tokens */
@@ -200,3 +205,11 @@ DESIGN_TOKEN_CSS = """
     --text-color: var(--color-text-primary);
 }
 """
+
+
+_TOKEN_HEX_DECLARATION = re.compile(r"(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;")
+
+# Literal #rrggbb tokens, resolved from the CSS above — the single source.
+DESIGN_TOKEN_HEX: dict[str, str] = {
+    name: value.lower() for name, value in _TOKEN_HEX_DECLARATION.findall(DESIGN_TOKEN_CSS)
+}

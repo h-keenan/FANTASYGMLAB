@@ -197,6 +197,79 @@ def portrait_frame_classes(
     )
 
 
+# Solid-fill tier colors. Same tier → same token the portrait frame already
+# uses in modules/football_asset_styles.py (.dg-tier-frame--<tier_id>), so the
+# hero pill and the frame around the portrait can never disagree.
+PLAYER_TIER_FILL_TOKENS: dict[str, str] = {
+    "generational": "--color-accent",
+    "elite": "--color-diagnostic",
+    "impact_starter": "--color-danger",
+    "starter": "--color-prestige-elite",
+    "contributor": "--color-prestige-starter",
+    "committee_role": "--color-warning",
+    "depth_developmental": "--color-prestige-depth",
+}
+
+# Ink tokens for a solid fill: near-black page ground, or primary text.
+TIER_INK_DARK_TOKEN = "--color-bg"
+TIER_INK_LIGHT_TOKEN = "--color-text-primary"
+
+# Above this perceived brightness a fill needs dark ink. Matches
+# mobile/src/lib/playerTier.ts's contrastTextColor so a tier reads the same
+# way on both platforms.
+_TIER_INK_BRIGHTNESS_PIVOT = 0.55
+
+
+def _perceived_brightness(hex_color: str) -> float:
+    """0..1 perceived brightness of a ``#rrggbb`` color (ITU-R BT.601 weights)."""
+
+    clean = str(hex_color).strip().lstrip("#")
+    if len(clean) != 6:
+        return 0.0
+    try:
+        red, green, blue = (int(clean[index : index + 2], 16) for index in (0, 2, 4))
+    except ValueError:
+        return 0.0
+    return (0.299 * red + 0.587 * green + 0.114 * blue) / 255.0
+
+
+def tier_fill_token(identity: PlayerTierIdentity | None) -> str:
+    """Design token holding this tier's solid fill color."""
+
+    fallback = PLAYER_TIER_FILL_TOKENS[DEFAULT_PLAYER_TIER.tier_id]
+    if identity is None:
+        return fallback
+    return PLAYER_TIER_FILL_TOKENS.get(identity.tier_id, fallback)
+
+
+def tier_ink_token(identity: PlayerTierIdentity | None) -> str:
+    """Token for text sitting *on* this tier's solid fill.
+
+    The ladder runs from pale cyan through dark slate, so one hardcoded text
+    color washes out on half of it; pick per tier from the fill's brightness.
+    """
+
+    from modules.design_tokens import DESIGN_TOKEN_HEX
+
+    fill_hex = DESIGN_TOKEN_HEX.get(tier_fill_token(identity), "")
+    if _perceived_brightness(fill_hex) > _TIER_INK_BRIGHTNESS_PIVOT:
+        return TIER_INK_DARK_TOKEN
+    return TIER_INK_LIGHT_TOKEN
+
+
+def tier_solid_pill_style(identity: PlayerTierIdentity | None) -> str:
+    """Inline custom properties for the one solid-fill hero pill.
+
+    High-emphasis single-player surfaces only (the PQV hero header). Dense
+    lists keep the translucent ``dg-tier-*`` chip instead.
+    """
+
+    return (
+        f"--dg-tier-fill:var({tier_fill_token(identity)});"
+        f"--dg-tier-ink:var({tier_ink_token(identity)})"
+    )
+
+
 def player_tier_legend_html(*, disclosure: bool = True, compact: bool = False) -> str:
     items = "".join(
         (
