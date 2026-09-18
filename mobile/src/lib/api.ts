@@ -579,6 +579,14 @@ export interface PushPreferencesResponse {
   categories: Record<PushCategory, boolean>;
 }
 
+export type UiDensityValue = 'guided' | 'compact';
+
+export interface DevicePreferencesResponse {
+  ok: boolean;
+  ui_density: UiDensityValue;
+  last_league: { league_id: string; league_name: string } | null;
+}
+
 export type DashboardItemCategory = 'top_priority' | 'watch' | 'waiver_opportunity' | 'league_movement';
 
 export interface DashboardTradePresentation {
@@ -796,6 +804,17 @@ export const api = {
   getPushPreferences: () => authorizedFetch<PushPreferencesResponse>('/v1/push/preferences'),
   updatePushPreference: (category: PushCategory, enabled: boolean) =>
     authorizedPost<PushPreferencesResponse>('/v1/push/preferences', { category, enabled }),
+  getDevicePreferences: () => authorizedFetch<DevicePreferencesResponse>('/v1/preferences'),
+  updateDevicePreferences: (body: {
+    uiDensity?: UiDensityValue;
+    lastLeagueId?: string;
+    lastLeagueName?: string;
+  }) =>
+    authorizedPost<DevicePreferencesResponse>('/v1/preferences', {
+      ui_density: body.uiDensity,
+      last_league_id: body.lastLeagueId,
+      last_league_name: body.lastLeagueName,
+    }),
   markAlertRead: (leagueId: string, alertKey: string) =>
     authorizedPost<{ ok: boolean; reason: string }>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,

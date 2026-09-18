@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
+import { api } from '../lib/api';
+
 export type UiDensity = 'guided' | 'compact';
 
 const KEY = 'fgl:ui-density';
@@ -11,6 +13,12 @@ interface DensityContextValue {
   setDensity: (density: UiDensity) => void;
   /** Convenience: true when "why"/explanation copy should render. */
   showExplanations: boolean;
+  /**
+   * For AuthContext only: apply a value fetched from the durable
+   * /v1/preferences store without re-writing it back (avoids a redundant
+   * round trip and can't loop). Local-only signed-out use never calls this.
+   */
+  syncDensityFromServer: (density: UiDensity) => void;
 }
 
 const DensityContext = createContext<DensityContextValue | undefined>(undefined);
@@ -21,11 +29,13 @@ const DensityContext = createContext<DensityContextValue | undefined>(undefined)
  * need this to work" is showing "why"/confidence-reasoning copy by default
  * and letting it be collapsed (e.g. "How this board is ranked" expanders in
  * modules/trade_hub_ui.py). Mobile didn't have an equivalent toggle; this
- * is a single per-device preference (not synced — it's a display setting,
- * not account state) that screens can read to show/hide that same class of
- * explanatory copy. Applied to the Dashboard's reason text as the first
- * concrete usage; other screens can adopt the same `showExplanations` flag
- * as a follow-up.
+ * is a per-device preference cached in AsyncStorage for instant reads, and
+ * also synced to the durable /v1/preferences store (the same user_settings
+ * blob push-category preferences already use) so it survives a reinstall
+ * or carries to a second device — AuthContext calls syncDensityFromServer
+ * once a session is established. Applied to the Dashboard's reason text as
+ * the first concrete usage; other screens can adopt the same
+ * `showExplanations` flag as a follow-up.
  */
 export function DensityProvider({ children }: { children: React.ReactNode }) {
   const [density, setDensityState] = useState<UiDensity>(DEFAULT_DENSITY);
@@ -46,10 +56,16 @@ export function DensityProvider({ children }: { children: React.ReactNode }) {
   const setDensity = (next: UiDensity) => {
     setDensityState(next);
     AsyncStorage.setItem(KEY, next).catch(() => {});
+    api.updateDevicePreferences({ uiDensity: next }).catch(() => {});
+  };
+
+  const syncDensityFromServer = (next: UiDensity) => {
+    setDensityState(next);
+    AsyncStorage.setItem(KEY, next).catch(() => {});
   };
 
   const value = useMemo<DensityContextValue>(
-    () => ({ density, setDensity, showExplanations: density === 'guided' }),
+    () => ({ density, setDensity, showExplanations: density === 'guided', syncDensityFromServer }),
     [density],
   );
 

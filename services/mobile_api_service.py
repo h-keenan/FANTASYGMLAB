@@ -36,6 +36,8 @@ Deployment topology (Render):
   - POST /v1/leagues/{id}/trade-outcomes        — record a shared trade for later "did this happen?" follow-up
   - GET  /v1/trade-outcomes/pending             — this user's shared trades ready to be asked about
   - POST /v1/trade-outcomes/{id}/answer         — record yes/no/didnt_send, or snooze with still_pending
+  - GET  /v1/preferences                        — cross-device display density + last-viewed league
+  - POST /v1/preferences                        — partial update to those same preferences
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -1872,6 +1874,85 @@ def update_push_preference(
     if not ok:
         return {"ok": False, "categories": categories}
     return {"ok": True, "categories": categories}
+
+
+UI_DENSITY_VALUES = {"guided", "compact"}
+
+
+def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    density = str(settings.get("ui_density") or "guided")
+    if density not in UI_DENSITY_VALUES:
+        density = "guided"
+    last_league_id = str(settings.get("last_league_id") or "")
+    last_league_name = str(settings.get("last_league_name") or "")
+    return {
+        "ui_density": density,
+        "last_league": (
+            {"league_id": last_league_id, "league_name": last_league_name} if last_league_id else None
+        ),
+    }
+
+
+@app.get("/v1/preferences")
+def get_device_preferences(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Cross-device account preferences: display density (guided/compact)
+    and the last league opened. Backed by the same user_settings blob as
+    push preferences, under "ui_density"/"last_league_id"/"last_league_name"
+    keys — not a new table. Mobile keeps its own AsyncStorage copy for
+    instant reads; this is the durable source of truth a second device or
+    reinstall reconciles against.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, **_device_preferences_from_settings({})}
+    return {"ok": True, **_device_preferences_from_settings(current.get("settings") or {})}
+
+
+class UpdateDevicePreferencesRequest(BaseModel):
+    ui_density: str | None = None
+    last_league_id: str | None = None
+    last_league_name: str | None = None
+
+
+@app.post("/v1/preferences")
+def update_device_preferences(
+    body: UpdateDevicePreferencesRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Partial update — only the fields the caller actually sends are
+    changed, matching update_push_preference's read-modify-write pattern
+    (PostgREST upsert replaces the whole `settings` column, so a naive
+    write would silently drop push_categories or the other preference).
+    """
+
+    if body.ui_density is not None and body.ui_density not in UI_DENSITY_VALUES:
+        raise HTTPException(
+            status_code=422,
+            detail="ui_density must be one of: " + ", ".join(UI_DENSITY_VALUES),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, **_device_preferences_from_settings({})}
+    settings = dict(current.get("settings") or {})
+    if body.ui_density is not None:
+        settings["ui_density"] = body.ui_density
+    if body.last_league_id is not None:
+        settings["last_league_id"] = body.last_league_id
+    if body.last_league_name is not None:
+        settings["last_league_name"] = body.last_league_name
+    payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
+    ok, error = account_store.upsert_user_settings(config, access_token, payload)
+    if not ok:
+        return {"ok": False, **_device_preferences_from_settings(settings)}
+    return {"ok": True, **_device_preferences_from_settings(settings)}
 
 
 def _project_briefing_item(item: Any) -> dict[str, Any]:
