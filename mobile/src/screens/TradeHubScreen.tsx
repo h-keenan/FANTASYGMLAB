@@ -25,6 +25,28 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
+// PlayerDetail's route param still expects the /rankings RankedPlayer shape;
+// Trade Hub only ever has the idea's own lean PresentationAsset, and
+// PlayerDetail fetches the real overall/position rank itself on mount, so
+// those two fields are just placeholders here.
+function assetToRankedPlayer(asset: PresentationAsset): RankedPlayer {
+  return {
+    player_id: asset.player_id ?? '',
+    name: asset.name ?? null,
+    position: asset.position ?? null,
+    team: asset.team ?? null,
+    age: asset.age ?? null,
+    status: null,
+    injury_status: asset.injury_status ?? null,
+    tier: null,
+    score: asset.score ?? null,
+    overall_rank: null,
+    position_rank: null,
+    rank_unavailable_reason: null,
+    opportunity_label: asset.opportunity_explanation ?? null,
+  };
+}
+
 /** Trade Hub ideas don't carry a full RankedPlayer or TradeVerdict — both
  * are adapted here from the idea's own fields so the same share PNG
  * (built for Trade Analyzer's single-trade evaluation) can render a Trade
@@ -200,7 +222,9 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           ) : null}
         </View>
       }
-      renderItem={({ item }) => <TradeIdeaCard idea={item} leagueId={leagueId} leagueName={leagueName} />}
+      renderItem={({ item }) => (
+        <TradeIdeaCard idea={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+      )}
       ListEmptyComponent={
         !loading && !error && !notReadyReason ? (
           <Text style={styles.empty}>
@@ -270,7 +294,13 @@ function TradeHubGateCard({
   );
 }
 
-function AssetRow({ asset }: { asset: PresentationAsset }) {
+function AssetRow({
+  asset,
+  onPressPlayer,
+}: {
+  asset: PresentationAsset;
+  onPressPlayer?: (asset: PresentationAsset) => void;
+}) {
   if (asset.asset_type === 'pick') {
     return (
       <View style={styles.assetRow}>
@@ -289,8 +319,14 @@ function AssetRow({ asset }: { asset: PresentationAsset }) {
     );
   }
   const metaLine = [asset.team, asset.age != null ? `Age ${asset.age}` : null].filter(Boolean).join(' · ');
+  const canOpen = Boolean(onPressPlayer && asset.player_id);
   return (
-    <View style={styles.assetRow}>
+    <TouchableOpacity
+      style={styles.assetRow}
+      disabled={!canOpen}
+      activeOpacity={canOpen ? 0.7 : 1}
+      onPress={() => onPressPlayer?.(asset)}
+    >
       <PlayerAvatar playerId={asset.player_id} size={36} style={styles.assetAvatar} />
       <View style={styles.assetTextGroup}>
         <Text style={styles.assetName} numberOfLines={1}>
@@ -313,7 +349,8 @@ function AssetRow({ asset }: { asset: PresentationAsset }) {
           </Text>
         ) : null}
       </View>
-    </View>
+      {canOpen ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
+    </TouchableOpacity>
   );
 }
 
@@ -357,16 +394,20 @@ function TradeIdeaCard({
   idea,
   leagueId,
   leagueName,
+  navigation,
 }: {
   idea: TradeIdea;
   leagueId: string;
   leagueName: string;
+  navigation: Props['navigation'];
 }) {
   const { showExplanations } = useDensity();
   const gainColor = idea.trade_gain > 0 ? colors.success : idea.trade_gain < 0 ? colors.danger : colors.textSecondary;
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
+  const openPlayer = (asset: PresentationAsset) =>
+    navigation.navigate('PlayerDetail', { player: assetToRankedPlayer(asset), leagueId, leagueName });
 
   const bandColor = VALUE_EDGE_BAND_COLOR[idea.value_edge_band] ?? colors.textSecondary;
 
@@ -421,7 +462,7 @@ function TradeIdeaCard({
         <View style={styles.exchangeSide}>
           <Text style={styles.exchangeLabel}>You Send</Text>
           {idea.package.send.map((asset, index) => (
-            <AssetRow key={`send-${index}`} asset={asset} />
+            <AssetRow key={`send-${index}`} asset={asset} onPressPlayer={openPlayer} />
           ))}
         </View>
         <View style={styles.exchangeGutter}>
@@ -432,7 +473,7 @@ function TradeIdeaCard({
         <View style={styles.exchangeSide}>
           <Text style={styles.exchangeLabel}>You Receive</Text>
           {idea.package.receive.map((asset, index) => (
-            <AssetRow key={`receive-${index}`} asset={asset} />
+            <AssetRow key={`receive-${index}`} asset={asset} onPressPlayer={openPlayer} />
           ))}
         </View>
       </View>

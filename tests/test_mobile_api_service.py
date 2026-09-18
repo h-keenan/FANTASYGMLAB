@@ -850,6 +850,88 @@ def test_rankings_endpoint_rejects_bad_limit(monkeypatch):
         assert response.status_code == 422
 
 
+def test_player_rank_in_league_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/players/9001/rank")
+    assert response.status_code == 401
+
+
+def test_player_rank_in_league_returns_404_for_missing_league(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={}):
+            response = client.get(
+                "/v1/leagues/missing/players/9001/rank",
+                headers={"Authorization": "Bearer good-token"},
+            )
+    assert response.status_code == 404
+
+
+def test_player_rank_in_league_returns_the_players_real_rank(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    response = client.get(
+                        "/v1/leagues/abc/players/9002/rank?lens=Dynasty",
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    # 9002 ("Backup Runner") is the weaker of the two fake players, so this
+    # exercises the real ranking engine landing it at #2, not #1 by accident.
+    assert body["player"]["name"] == "Backup Runner"
+    assert body["player"]["overall_rank"] == 2
+
+
+def test_player_rank_in_league_returns_none_for_unknown_player(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    response = client.get(
+                        "/v1/leagues/abc/players/nonexistent/rank",
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "player": None}
+
+
 def test_news_endpoint_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/news")

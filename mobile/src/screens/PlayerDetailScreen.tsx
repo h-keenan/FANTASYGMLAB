@@ -225,8 +225,38 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
+  const [rank, setRank] = useState({
+    overall_rank: player.overall_rank,
+    position_rank: player.position_rank,
+    rank_unavailable_reason: player.rank_unavailable_reason,
+  });
 
   useScreenHeaderTitle(navigation, player.name ?? 'Player');
+
+  useEffect(() => {
+    // Several callers (Waivers, MyTeam, Trade Hub) only ever have a lean
+    // player shape with no rank fields to pass in route params, so this
+    // screen always fetches the real league-adjusted rank itself instead of
+    // trusting whatever (if anything) the tapped-from screen supplied.
+    let cancelled = false;
+    api
+      .getPlayerRankInLeague(leagueId, player.player_id)
+      .then((result) => {
+        if (cancelled || !result.player) return;
+        setRank({
+          overall_rank: result.player.overall_rank,
+          position_rank: result.player.position_rank,
+          rank_unavailable_reason: result.player.rank_unavailable_reason,
+        });
+      })
+      .catch(() => {
+        // Keep whatever the route params already had (often nothing) —
+        // this is an enrichment, not a blocking fetch.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId, player.player_id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -344,8 +374,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         <StatGrid
           items={[
             { label: 'Value score', value: player.score != null ? Math.round(player.score) : null },
-            { label: 'Overall rank', value: player.overall_rank },
-            { label: 'Position rank', value: player.position_rank },
+            { label: 'Overall rank', value: rank.overall_rank },
+            { label: 'Position rank', value: rank.position_rank },
             { label: 'Age', value: player.age },
             { label: 'Status', value: player.status },
             { label: 'Injury status', value: player.injury_status ?? 'Healthy' },
@@ -353,8 +383,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         />
       </View>
 
-      {player.rank_unavailable_reason ? (
-        <Text style={styles.notice}>{player.rank_unavailable_reason}</Text>
+      {rank.rank_unavailable_reason ? (
+        <Text style={styles.notice}>{rank.rank_unavailable_reason}</Text>
       ) : null}
 
       {loading ? (
