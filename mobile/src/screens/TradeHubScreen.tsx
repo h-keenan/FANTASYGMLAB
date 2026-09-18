@@ -342,12 +342,32 @@ const VALUE_EDGE_BAND_COLOR: Record<string, string> = {
   'Major Overpay': colors.danger,
 };
 
+// modules/trade_hub_ui.py's trade_hub_display_section() taxonomy — mapped
+// to the app's existing semantic palette (not a new color per category)
+// so a scan down the Trade Hub feed reads as distinct idea types instead
+// of one flat gray/blue-gray repeated on every card ("two-tone bluish
+// gray... does not look good").
+const CATEGORY_COLORS: Record<string, string> = {
+  'Headline Recommendation': colors.accent,
+  'Health Relief': colors.danger,
+  'Draft Capital': colors.premium,
+  'Age Optimization': colors.violet,
+  Rebuild: colors.violet,
+  Contender: colors.success,
+  'Need-Based': colors.accentSoft,
+  'High Confidence': colors.success,
+};
+
+function categoryColor(category: string): string {
+  return CATEGORY_COLORS[category] ?? colors.textSecondary;
+}
+
 function CategoryBadge({ category }: { category: string }) {
   if (!category) return null;
-  const isHeadline = category === 'Headline Recommendation';
+  const color = categoryColor(category);
   return (
-    <View style={[styles.categoryBadge, isHeadline && styles.categoryBadgeHeadline]}>
-      <Text style={[styles.categoryBadgeText, isHeadline && styles.categoryBadgeTextHeadline]} numberOfLines={1}>
+    <View style={[styles.categoryBadge, { backgroundColor: `${color}26`, borderColor: `${color}80` }]}>
+      <Text style={[styles.categoryBadgeText, { color }]} numberOfLines={1}>
         {category.toUpperCase()}
       </Text>
     </View>
@@ -392,8 +412,10 @@ function TradeIdeaCard({
 
   const bandColor = VALUE_EDGE_BAND_COLOR[idea.value_edge_band] ?? colors.textSecondary;
 
+  const categoryAccent = categoryColor(idea.category);
+
   return (
-    <AnimatedCard style={styles.card}>
+    <AnimatedCard style={{ ...styles.card, borderLeftWidth: 3, borderLeftColor: categoryAccent }}>
       {idea.category ? (
         <View style={styles.categoryRow}>
           <CategoryBadge category={idea.category} />
@@ -551,19 +573,16 @@ const styles = StyleSheet.create({
   categoryRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.border,
     borderRadius: radii.sm,
+    borderWidth: 1,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
   },
-  categoryBadgeHeadline: { backgroundColor: colors.accentMuted },
   categoryBadgeText: {
     fontSize: 9,
     fontWeight: '700',
-    color: colors.textSecondary,
     letterSpacing: 0.5,
   },
-  categoryBadgeTextHeadline: { color: colors.accent },
   valueEdgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
