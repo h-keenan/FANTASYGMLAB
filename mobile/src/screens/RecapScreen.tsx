@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
+import IconCircle from '../components/IconCircle';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -159,9 +160,7 @@ function StoryCard({ story }: { story: RecapStory }) {
   return (
     <AnimatedCard style={styles.storyCard}>
       <View style={styles.storyHeaderRow}>
-        <View style={[styles.iconDisc, { backgroundColor: `${meta.color}26` }]}>
-          <Ionicons name={meta.icon} size={20} color={meta.color} />
-        </View>
+        <IconCircle name={meta.icon} color={meta.color} size={40} />
         <View style={styles.storyTextGroup}>
           <Text style={[styles.storyKicker, { color: meta.color }]}>
             {story.story_type.replace(/_/g, ' ').toUpperCase()}
@@ -265,13 +264,6 @@ const styles = StyleSheet.create({
   incompleteNotice: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xl },
   storyCard: { marginBottom: spacing.sm },
   storyHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  iconDisc: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   storyTextGroup: { flex: 1 },
   storyKicker: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
   storyTitle: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },

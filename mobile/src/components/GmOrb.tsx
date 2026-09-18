@@ -25,6 +25,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { StackActions } from '@react-navigation/routers';
 
+import IconCircle from './IconCircle';
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
@@ -120,12 +121,7 @@ const SHOW_ORB_DEBUG_OVERLAY = process.env.EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY ==
  * colored backdrop per icon reads as a scannable landmark, not just a
  * decoration next to the label. */
 function DestIcon({ name, color, current }: { name: IconName; color: string; current: boolean }) {
-  const tint = current ? colors.accent : color;
-  return (
-    <View style={[styles.destIconCircle, { backgroundColor: `${tint}26` }]}>
-      <Ionicons name={name} size={17} color={tint} />
-    </View>
-  );
+  return <IconCircle name={name} color={current ? colors.accent : color} iconSize={17} style={styles.destIconCircle} />;
 }
 
 export default function GmOrb() {
@@ -534,14 +530,7 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
   },
   destRowCurrent: { borderLeftColor: colors.accent, backgroundColor: colors.accentMuted },
-  destIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
+  destIconCircle: { marginRight: spacing.md },
   destText: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   destTextCurrent: { color: colors.accent },
   destCurrentBadge: { fontSize: 10, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
