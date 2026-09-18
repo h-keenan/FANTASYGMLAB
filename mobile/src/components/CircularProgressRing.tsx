@@ -1,0 +1,87 @@
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
+
+import { colors } from '../theme';
+
+/** A confidence/value ring instead of a linear bar — pulled directly from a
+ * UI reference coridian_ shared (the same circular-percentage pattern
+ * showed up independently in an earlier brand-sheet reference too), used
+ * where one number is the headline of a section rather than one of several
+ * inline stats. */
+export default function CircularProgressRing({
+  percent,
+  size = 72,
+  strokeWidth = 7,
+  color = colors.accent,
+  label,
+  valueLabel,
+}: {
+  /** 0-100 */
+  percent: number;
+  size?: number;
+  strokeWidth?: number;
+  color?: string;
+  /** Small caption under the number, e.g. "CONFIDENCE" */
+  label?: string;
+  /** Overrides the centered "N%" text — e.g. "HIGH" */
+  valueLabel?: string;
+}) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - clamped / 100);
+  const center = size / 2;
+
+  return (
+    <View style={styles.wrap}>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke={colors.border}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke={color}
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={dashOffset}
+            // Start at 12 o'clock, not 3 o'clock (SVG circles default to 0deg = right).
+            rotation={-90}
+            originX={center}
+            originY={center}
+          />
+        </Svg>
+        <View style={[StyleSheet.absoluteFillObject, styles.centerContent]}>
+          <Text style={[styles.value, { color, fontSize: size * 0.26 }]} numberOfLines={1}>
+            {valueLabel ?? `${Math.round(clamped)}%`}
+          </Text>
+        </View>
+      </View>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { alignItems: 'center' },
+  centerContent: { alignItems: 'center', justifyContent: 'center' },
+  value: { fontWeight: '800' },
+  label: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginTop: 4,
+  },
+});

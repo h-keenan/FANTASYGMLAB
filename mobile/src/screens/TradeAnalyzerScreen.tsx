@@ -17,6 +17,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
+import CircularProgressRing from '../components/CircularProgressRing';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import {
   api,
@@ -55,6 +56,19 @@ const TONE_COLORS: Record<TradeVerdict['tone'], string> = {
   counter: colors.accent,
   fair: colors.textSecondary,
 };
+
+// modules/trade_offer_analyzer.py's only three confidence strings — mapped
+// to a ring fill so "how sure is the model" reads as a glanceable number
+// instead of just an adjective next to a wall of text.
+const CONFIDENCE_PERCENT: Record<string, number> = {
+  'high confidence': 90,
+  'moderate confidence': 60,
+  'close call': 35,
+};
+
+function confidencePercent(confidence: string): number {
+  return CONFIDENCE_PERCENT[confidence.toLowerCase()] ?? 50;
+}
 
 function playerScore(player: RankedPlayer): number {
   return typeof player.score === 'number' ? player.score : 0;
@@ -517,6 +531,29 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   );
 }
 
+function VerdictSection({
+  icon,
+  label,
+  text,
+  color,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  text: string;
+  color: string;
+}) {
+  if (!text) return null;
+  return (
+    <View style={styles.verdictSection}>
+      <View style={styles.verdictSectionLabelRow}>
+        <Ionicons name={icon} size={13} color={color} />
+        <Text style={[styles.verdictLabel, { color }]}>{label}</Text>
+      </View>
+      <Text style={styles.verdictText}>{text}</Text>
+    </View>
+  );
+}
+
 function VerdictCard({
   verdict,
   sendIds,
@@ -535,30 +572,40 @@ function VerdictCard({
   onBuildCounter: () => void;
 }) {
   const [shareOpen, setShareOpen] = useState(false);
+  const toneColor = TONE_COLORS[verdict.tone];
 
   return (
-    <View style={[styles.verdictCard, { borderLeftColor: TONE_COLORS[verdict.tone] }]}>
+    <View style={[styles.verdictCard, { borderLeftColor: toneColor }]}>
       <View style={styles.verdictHeaderRow}>
-        <Text style={[styles.verdictBand, { color: TONE_COLORS[verdict.tone] }]}>{verdict.band}</Text>
+        <Text style={[styles.verdictBand, { color: toneColor }]}>{verdict.band}</Text>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           <Text style={styles.shareButtonText}>Share</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.verdictConfidence}>{verdict.confidence}</Text>
-      <Text style={styles.verdictText}>{verdict.rationale}</Text>
-      <Text style={styles.verdictLabel}>Value</Text>
-      <Text style={styles.verdictText}>{verdict.value_summary}</Text>
-      <Text style={styles.verdictLabel}>Roster fit</Text>
-      <Text style={styles.verdictText}>{verdict.roster_summary}</Text>
-      <Text style={styles.verdictLabel}>Strategy fit</Text>
-      <Text style={styles.verdictText}>{verdict.strategy_summary}</Text>
-      <Text style={styles.verdictLabel}>Risk</Text>
-      <Text style={styles.verdictText}>{verdict.risk_summary}</Text>
+
+      <View style={styles.verdictHeroRow}>
+        <CircularProgressRing
+          percent={confidencePercent(verdict.confidence)}
+          size={64}
+          strokeWidth={6}
+          color={toneColor}
+        />
+        <Text style={styles.verdictText}>{verdict.rationale}</Text>
+      </View>
+
+      <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
+      <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={toneColor} />
+      <VerdictSection icon="compass-outline" label="Strategy fit" text={verdict.strategy_summary} color={toneColor} />
+      <VerdictSection icon="warning-outline" label="Risk" text={verdict.risk_summary} color={colors.danger} />
       {verdict.counter_guidance ? (
         <>
-          <Text style={styles.verdictLabel}>Counter guidance</Text>
-          <Text style={styles.verdictText}>{verdict.counter_guidance}</Text>
+          <VerdictSection
+            icon="swap-horizontal-outline"
+            label="Counter guidance"
+            text={verdict.counter_guidance}
+            color={colors.premium}
+          />
           {verdict.counter_action && verdict.counter_action.asset_type === 'player' ? (
             <TouchableOpacity style={styles.counterButton} onPress={onBuildCounter}>
               <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
@@ -712,15 +759,20 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
   },
   counterButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
-  verdictConfidence: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.sm },
+  verdictHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  verdictSection: { marginTop: spacing.sm },
+  verdictSectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
   verdictLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.textSecondary,
     textTransform: 'uppercase',
-    marginTop: spacing.sm,
   },
-  verdictText: { fontSize: 13, color: colors.textPrimary, lineHeight: 18 },
+  verdictText: { fontSize: 13, color: colors.textPrimary, lineHeight: 18, flex: 1 },
   searchInput: {
     borderWidth: 1,
     borderColor: colors.border,
