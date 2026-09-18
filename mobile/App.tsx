@@ -8,11 +8,13 @@ import { DensityProvider } from './src/context/DensityContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
+import { registerNotificationTapHandler } from './src/lib/pushNotifications';
 
 export default function App() {
   useEffect(() => {
     configureRevenueCat();
     void initAds();
+    return registerNotificationTapHandler();
   }, []);
 
   return (

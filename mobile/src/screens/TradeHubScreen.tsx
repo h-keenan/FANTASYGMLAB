@@ -10,6 +10,7 @@ import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import {
   api,
+  TEAM_STRATEGY_OPTIONS,
   type PresentationAsset,
   type RankedPlayer,
   type TeamStrategy,
@@ -69,13 +70,7 @@ function ideaToShareVerdict(idea: TradeIdea): TradeVerdict {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHub'>;
 
-const STRATEGIES: Array<{ value: TeamStrategy; label: string }> = [
-  { value: 'contender', label: 'Contender' },
-  { value: 'fringe_contender', label: 'Fringe Contender' },
-  { value: 'retool', label: 'Retool' },
-  { value: 'rebuild', label: 'Rebuild' },
-  { value: 'tank', label: 'Tank' },
-];
+const STRATEGIES = TEAM_STRATEGY_OPTIONS;
 
 const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
@@ -92,7 +87,8 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 export default function TradeHubScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
-  const [strategy, setStrategy] = useState<TeamStrategy>('retool');
+  const [strategy, setStrategyState] = useState<TeamStrategy>('retool');
+  const [stanceLoaded, setStanceLoaded] = useState(false);
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
   const [entitlement, setEntitlement] = useState<TradeHubEntitlement | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
@@ -127,10 +123,36 @@ export default function TradeHubScreen({ route, navigation }: Props) {
     [leagueId],
   );
 
+  // Load the caller's remembered GM stance for this league before the
+  // first ideas fetch, so a returning user doesn't see "retool" flash
+  // before jumping to their real stance (Decision Memory — see
+  // services/mobile_api_service.py's get_gm_stance).
   useEffect(() => {
+    let cancelled = false;
+    api
+      .getGmStance(leagueId)
+      .then((result) => {
+        if (!cancelled) setStrategyState(result.strategy);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setStanceLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
+
+  const setStrategy = (next: TeamStrategy) => {
+    setStrategyState(next);
+    void api.updateGmStance(leagueId, next).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (!stanceLoaded) return;
     setAdUnlocks(0);
     void load(strategy, 0);
-  }, [load, strategy]);
+  }, [load, strategy, stanceLoaded]);
 
   const onWatchAd = useCallback(async () => {
     if (watchingAd) return;
