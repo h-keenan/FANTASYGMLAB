@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
+import IconCircle from '../components/IconCircle';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -168,9 +169,10 @@ export default function PickDetailScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         <View style={styles.header}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="albums-outline" size={30} color={colors.accent} />
-          </View>
+          {/* Same icon-in-colored-disc landmark every other pick asset in the
+              app uses (Trade Analyzer, Dashboard, recap trade detail) — the
+              pick-side analog of Player Detail's round hero avatar. */}
+          <IconCircle name="albums-outline" color={colors.accent} size={72} iconSize={32} />
           <Text style={styles.heroTitle}>{pick.label ?? 'Draft pick'}</Text>
           {pick.pick_tier ? (
             <View style={styles.heroPill}>
@@ -300,16 +302,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   header: { alignItems: 'center', marginBottom: spacing.lg },
-  heroIcon: {
-    width: 64,
-    height: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surface,
-  },
   heroTitle: {
     fontSize: 20,
     fontWeight: '700',
@@ -338,23 +330,26 @@ const styles = StyleSheet.create({
   card: { padding: spacing.lg, marginBottom: spacing.sm },
   sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   sectionHeadingIcon: { marginRight: spacing.xs },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+  // SectionHeading / StatGrid mirror Player Detail's (this is the pick-side
+  // sibling of that screen), so the heading and tile styles match it too.
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  statCell: {
+    minWidth: '46%',
+    flexGrow: 1,
+    backgroundColor: colors.background,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  statCell: { width: '33.33%', paddingVertical: spacing.xs, paddingRight: spacing.sm },
   statCellLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textTertiary,
+    fontSize: 11,
+    color: colors.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
+    marginBottom: 2,
   },
-  statCellValue: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginTop: 2 },
+  statCellValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   projectionTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   projectionSummary: { flex: 1 },
   projectionVerdict: { fontSize: 15, fontWeight: '700' },

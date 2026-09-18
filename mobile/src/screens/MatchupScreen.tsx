@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -100,11 +101,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {
