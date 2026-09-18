@@ -5,14 +5,21 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { colors, motion, radii, shadows, spacing } from '../theme';
+import { colors, gradients, motion, radii, shadows, spacing } from '../theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface AnimatedCardProps extends PressableProps {
   style?: ViewStyle;
   children: React.ReactNode;
+  /** A thin accent-gradient rim + colored glow instead of the plain hairline
+   * border — reserved for the one or two most important cards on a screen
+   * (e.g. Dashboard's Top Priority card). Not meant for every card: per
+   * coridian_'s "distinct accents, but don't overdo it," this stays rare on
+   * purpose so it still reads as "this one matters" when it shows up. */
+  glow?: boolean;
 }
 
 /**
@@ -25,7 +32,7 @@ interface AnimatedCardProps extends PressableProps {
  * corner radius rather than needing a separate clipped wrapper, so it never
  * fights a caller's padding.
  */
-export default function AnimatedCard({ style, children, onPressIn, onPressOut, ...rest }: AnimatedCardProps) {
+export default function AnimatedCard({ style, children, glow, onPressIn, onPressOut, ...rest }: AnimatedCardProps) {
   const scale = useSharedValue(1);
   const shadowT = useSharedValue(0); // 0 = resting, 1 = pressed
 
@@ -36,9 +43,9 @@ export default function AnimatedCard({ style, children, onPressIn, onPressOut, .
     opacity: 0.05 - shadowT.value * 0.03,
   }));
 
-  return (
+  const pressable = (
     <AnimatedPressable
-      style={[styles.card, style, animatedStyle]}
+      style={[styles.card, glow && styles.cardGlowInner, style, animatedStyle]}
       onPressIn={(e) => {
         scale.value = withSpring(0.97, motion.pressSpring);
         shadowT.value = withSpring(1, motion.pressSpring);
@@ -54,6 +61,14 @@ export default function AnimatedCard({ style, children, onPressIn, onPressOut, .
       <Animated.View pointerEvents="none" style={[styles.highlight, highlightStyle]} />
       {children}
     </AnimatedPressable>
+  );
+
+  if (!glow) return pressable;
+
+  return (
+    <LinearGradient colors={gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.glowRim}>
+      {pressable}
+    </LinearGradient>
   );
 }
 
@@ -76,4 +91,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radii.md,
     backgroundColor: '#FFFFFF',
   },
+  glowRim: {
+    borderRadius: radii.md,
+    padding: 1.5,
+    ...shadows.orbGlow,
+  },
+  cardGlowInner: { borderWidth: 0 },
 });

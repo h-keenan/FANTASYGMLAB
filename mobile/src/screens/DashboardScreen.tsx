@@ -414,7 +414,7 @@ function TopPriorityTradeCard({
   const confidenceLevel = CONFIDENCE_LEVELS[presentation.trade_confidence_label?.toLowerCase()] ?? 1;
 
   return (
-    <AnimatedCard style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.accent } as ViewStyle])}>
+    <AnimatedCard glow style={styles.card}>
       <View style={styles.cardHeaderRow}>
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
         <Text style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</Text>
