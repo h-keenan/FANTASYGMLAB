@@ -2137,6 +2137,135 @@ def test_update_device_preferences_partial_update_only_touches_sent_fields(monke
     }
 
 
+def test_gm_stance_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/leagues/abc/gm-stance").status_code == 401
+    assert client.post("/v1/leagues/abc/gm-stance", json={"strategy": "rebuild"}).status_code == 401
+
+
+def test_get_gm_stance_defaults_to_retool_when_nothing_stored(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": "user-123", "settings": {}}]
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/leagues/abc/gm-stance", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "strategy": "retool", "is_set": False}
+
+
+def test_get_gm_stance_is_scoped_per_league(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {
+            "user_id": "user-123",
+            "settings": {"team_strategy_by_league": {"abc": "rebuild", "xyz": "contender"}},
+        }
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/leagues/abc/gm-stance", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "strategy": "rebuild", "is_set": True}
+
+
+def test_update_gm_stance_rejects_an_invalid_strategy(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/leagues/abc/gm-stance",
+            json={"strategy": "yolo"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_update_gm_stance_merges_without_clobbering_other_leagues(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {"user_id": "user-123", "settings": {"team_strategy_by_league": {"xyz": "contender"}}}
+    ]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/abc/gm-stance",
+                json={"strategy": "rebuild"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "strategy": "rebuild"}
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["team_strategy_by_league"] == {"xyz": "contender", "abc": "rebuild"}
+
+
+def test_dashboard_uses_the_stored_gm_stance(monkeypatch):
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    stance_settings_response = Mock(status_code=200)
+    stance_settings_response.json.return_value = [
+        {"user_id": "user-123", "settings": {"team_strategy_by_league": {"abc": "rebuild"}}}
+    ]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    with patch(
+        "requests.get",
+        side_effect=[auth_user_response, profile_response, stance_settings_response],
+    ):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.sleeper.get_users", return_value=[
+                        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+                        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+                    ]):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    with patch(
+                                        "modules.dashboard_engine.compose_next_move_briefing"
+                                    ) as mock_compose:
+                                        mock_compose.return_value = _fake_daily_gm_briefing(1)
+                                        response = _client(monkeypatch).get(
+                                            "/v1/leagues/abc/dashboard",
+                                            headers={"Authorization": "Bearer good-token"},
+                                        )
+
+    assert response.status_code == 200
+    assert mock_compose.call_args.kwargs["team_strategy"] == "rebuild"
+
+
 def test_dashboard_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/dashboard")

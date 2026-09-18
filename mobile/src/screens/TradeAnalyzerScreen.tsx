@@ -18,7 +18,14 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
-import { api, type DraftPickAsset, type RankedPlayer, type TeamStrategy, type TradeVerdict } from '../lib/api';
+import {
+  api,
+  TEAM_STRATEGY_OPTIONS,
+  type DraftPickAsset,
+  type RankedPlayer,
+  type TeamStrategy,
+  type TradeVerdict,
+} from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -39,13 +46,7 @@ type SearchItem =
 
 const MAX_SEARCH_RESULTS = 40;
 
-const STRATEGIES: Array<{ value: TeamStrategy; label: string }> = [
-  { value: 'contender', label: 'Contender' },
-  { value: 'fringe_contender', label: 'Fringe Contender' },
-  { value: 'retool', label: 'Retool' },
-  { value: 'rebuild', label: 'Rebuild' },
-  { value: 'tank', label: 'Tank' },
-];
+const STRATEGIES = TEAM_STRATEGY_OPTIONS;
 
 const TONE_COLORS: Record<TradeVerdict['tone'], string> = {
   accept: colors.success,
@@ -91,7 +92,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [activeSide, setActiveSide] = useState<Side>('send');
   const [assetType, setAssetType] = useState<AssetType>('players');
   const [search, setSearch] = useState('');
-  const [strategy, setStrategy] = useState<TeamStrategy>('retool');
+  const [strategy, setStrategyState] = useState<TeamStrategy>('retool');
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -104,14 +105,18 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult] = await Promise.all([
+        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult, stanceResult] = await Promise.all([
           api.getMyRoster(leagueId),
           api.getLeagueRankings(leagueId, { lens: 'Dynasty', limit: 300 }),
           api.getLeagueUsers(leagueId),
           api.getLeagueRosters(leagueId),
           api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: 'unavailable' })),
+          // Decision Memory — the caller's remembered GM stance for this
+          // league, so this picker doesn't default to "retool" every visit.
+          api.getGmStance(leagueId).catch(() => ({ ok: true as const, strategy: 'retool' as const })),
         ]);
         if (cancelled) return;
+        setStrategyState(stanceResult.strategy);
 
         let myId = '';
         if (myRoster.reason) {
@@ -375,7 +380,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             key={option.value}
             style={[styles.pill, strategy === option.value && styles.pillActive]}
             onPress={() => {
-              setStrategy(option.value);
+              setStrategyState(option.value);
+              void api.updateGmStance(leagueId, option.value).catch(() => {});
               setVerdict(null);
             }}
           >

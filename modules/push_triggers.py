@@ -52,6 +52,7 @@ PUSH_TITLE_BY_CATEGORY = {
     "watch": "Watch",
     "recap": "Recap Ready",
     "injury": "Injury Update",
+    "gm_stance_reminder": "Set Your GM Stance",
 }
 DEFAULT_LENS = "Dynasty"
 
@@ -206,6 +207,66 @@ def push_item_allowed(preferences: dict[str, dict[str, bool]], *, user_id: str, 
     if user_prefs is None:
         return True
     return bool(user_prefs.get(category, True))
+
+
+def fetch_gm_stance_leagues(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, set[str]]:
+    """user_id -> the set of league_ids that already have an explicit GM
+    stance stored (see services/mobile_api_service.py's get_gm_stance /
+    "team_strategy_by_league" key in the same user_settings blob). Used
+    only to decide whether the one-time "set your GM stance" reminder is
+    still owed for a league — never to read the stance value itself.
+    """
+
+    ids = [uid for uid in (_safe_text(u) for u in user_ids) if uid]
+    if not config.configured or not ids:
+        return {}
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{USER_SETTINGS_TABLE}",
+            headers=_headers(config),
+            params={"select": "user_id,settings", "user_id": f"in.({','.join(ids)})"},
+            timeout=15,
+        )
+    except Exception:
+        return {}
+    if response.status_code >= 400:
+        return {}
+    try:
+        rows = response.json()
+    except Exception:
+        return {}
+    result: dict[str, set[str]] = {}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, Mapping):
+            continue
+        user_id = _safe_text(row.get("user_id"))
+        if not user_id:
+            continue
+        settings = row.get("settings") if isinstance(row.get("settings"), Mapping) else {}
+        by_league = settings.get("team_strategy_by_league")
+        result[user_id] = set(by_league.keys()) if isinstance(by_league, Mapping) else set()
+    return result
+
+
+def gm_stance_reminder_push_item(
+    *, league_id: str, league_name: str, leagues_with_stance: set[str]
+) -> dict[str, Any] | None:
+    """A one-time nudge to set a GM stance for this league — never re-fires
+    once sent (dedup is the same durable push_notification_log every other
+    category uses, keyed on this item's recommendation_id) regardless of
+    whether the user ever actually sets one, matching the explicit "once,
+    if never set" product decision (not a recurring reminder).
+    """
+
+    if league_id in leagues_with_stance:
+        return None
+    return {
+        "league_id": league_id,
+        "league_name": league_name,
+        "category": "gm_stance_reminder",
+        "headline": "Tell us if you're contending, rebuilding, or retooling — it shapes your trade suggestions.",
+        "recommendation_id": f"gm_stance_reminder:{league_id}",
+    }
 
 
 def already_notified_batch(config: PushTriggerConfig, *, user_id: str, recommendation_ids: list[str]) -> set[str]:
@@ -432,6 +493,7 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
 
     usernames = fetch_sleeper_usernames(config, list(recipients.keys()))
     preferences = fetch_push_preferences(config, list(recipients.keys()))
+    gm_stance_leagues = fetch_gm_stance_leagues(config, list(recipients.keys()))
     players_cache: dict[str, tuple[pd.DataFrame, str]] = {}
 
     for user_id, tokens in recipients.items():
@@ -501,6 +563,17 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: injury status check failed ({exc})")
 
+            try:
+                stance_item = gm_stance_reminder_push_item(
+                    league_id=league_id,
+                    league_name=_safe_text(league_payload.get("name"), "Your league"),
+                    leagues_with_stance=gm_stance_leagues.get(user_id, set()),
+                )
+                if stance_item:
+                    push_items.append(stance_item)
+            except Exception as exc:
+                stats["errors"].append(f"{user_id}/{league_id}: gm stance reminder check failed ({exc})")
+
             push_items = [
                 item for item in push_items if push_item_allowed(preferences, user_id=user_id, category=item["category"])
             ]
@@ -519,7 +592,11 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     tokens,
                     title=f"{title} — {push_item['league_name']}",
                     body=push_item["headline"],
-                    data={"league_id": league_id, "category": push_item["category"]},
+                    data={
+                        "league_id": league_id,
+                        "league_name": push_item["league_name"],
+                        "category": push_item["category"],
+                    },
                 )
                 record_notification(config, user_id=user_id, recommendation_id=recommendation_id, league_id=league_id)
                 if result.get("ok"):

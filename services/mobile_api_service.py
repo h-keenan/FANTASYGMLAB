@@ -38,6 +38,8 @@ Deployment topology (Render):
   - POST /v1/trade-outcomes/{id}/answer         — record yes/no/didnt_send, or snooze with still_pending
   - GET  /v1/preferences                        — cross-device display density + last-viewed league
   - POST /v1/preferences                        — partial update to those same preferences
+  - GET  /v1/leagues/{id}/gm-stance             — the caller's remembered team strategy for this league
+  - POST /v1/leagues/{id}/gm-stance             — set/update that stance
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -101,7 +103,7 @@ from modules import (
     trade_offer_analyzer,
     waivers_ui,
 )
-from modules.team_eval import refine_team_directions, suggest_optimal_lineup
+from modules.team_eval import normalize_team_strategy, refine_team_directions, suggest_optimal_lineup
 from modules.trade_analyzer_assembly import pick_asset_from_mapping, player_asset_from_mapping
 
 
@@ -1955,6 +1957,91 @@ def update_device_preferences(
     return {"ok": True, **_device_preferences_from_settings(settings)}
 
 
+# Decision Memory v1 ("structured picks," per explicit product direction —
+# not free text): a durable per-league GM stance, reusing the TeamStrategy
+# values Trade Hub/Trade Analyzer already offer as an in-session-only picker
+# (contender/fringe_contender/retool/rebuild/tank). Stored in the same
+# user_settings blob under "team_strategy_by_league" (league_id -> strategy)
+# rather than a new table — a GM's stance genuinely differs by league, so
+# this can't be a single flat preference like ui_density.
+TEAM_STRATEGY_VALUES = {"contender", "fringe_contender", "retool", "rebuild", "tank"}
+
+
+def _fetch_gm_stance_with_set_flag(
+    config: dict, access_token: str, *, user_id: str, league_id: str
+) -> tuple[str, bool]:
+    """Best-effort read — any failure just falls back to ("retool", False),
+    the same default every strategy-consuming endpoint already used before
+    this existed. `is_set` distinguishes "the user actually chose this" from
+    "nothing chosen yet, showing the fallback" — used only by get_gm_stance
+    to power the mobile in-app "not set yet" nudge; nothing else needs it.
+    """
+
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return "retool", False
+    by_league = (current.get("settings") or {}).get("team_strategy_by_league")
+    stored = by_league.get(league_id) if isinstance(by_league, dict) else None
+    if stored is None:
+        return "retool", False
+    return normalize_team_strategy(stored), True
+
+
+def _fetch_stored_gm_stance(config: dict, access_token: str, *, user_id: str, league_id: str) -> str:
+    strategy, _ = _fetch_gm_stance_with_set_flag(config, access_token, user_id=user_id, league_id=league_id)
+    return strategy
+
+
+@app.get("/v1/leagues/{league_id}/gm-stance")
+def get_gm_stance(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """The caller's remembered team strategy for this league, so Trade Hub,
+    Trade Analyzer, and the Dashboard's trade tile don't all separately
+    default to "retool" every visit and make the user re-declare their
+    stance each time.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    strategy, is_set = _fetch_gm_stance_with_set_flag(
+        config, access_token, user_id=user_id, league_id=league_id
+    )
+    return {"ok": True, "strategy": strategy, "is_set": is_set}
+
+
+class UpdateGmStanceRequest(BaseModel):
+    strategy: str
+
+
+@app.post("/v1/leagues/{league_id}/gm-stance")
+def update_gm_stance(
+    league_id: str,
+    body: UpdateGmStanceRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    if body.strategy not in TEAM_STRATEGY_VALUES:
+        raise HTTPException(
+            status_code=422,
+            detail="strategy must be one of: " + ", ".join(TEAM_STRATEGY_VALUES),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, "strategy": "retool"}
+    settings = dict(current.get("settings") or {})
+    by_league = dict(settings.get("team_strategy_by_league") or {})
+    by_league[league_id] = body.strategy
+    settings["team_strategy_by_league"] = by_league
+    payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
+    ok, error = account_store.upsert_user_settings(config, access_token, payload)
+    if not ok:
+        return {"ok": False, "strategy": body.strategy}
+    return {"ok": True, "strategy": body.strategy}
+
+
 def _project_briefing_item(item: Any) -> dict[str, Any]:
     payload = item.to_dict()
     return {
@@ -1992,9 +2079,9 @@ def get_league_dashboard(
     modules.dashboard_engine — see that module's docstring for why it's a
     fresh composition rather than importing app.py directly (modules/ never
     imports app.py). Includes a Top Trade Opportunity tile fed by the same
-    Trade Hub engine (modules.trade_hub_engine), defaulting to the "retool"
-    strategy — the same default both the web app's dashboard and mobile's
-    own Trade Hub screen fall back to.
+    Trade Hub engine (modules.trade_hub_engine), using the caller's
+    remembered GM stance for this league (see get_gm_stance) rather than a
+    hardcoded default — falls back to "retool" only if nothing's been set.
     """
 
     if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
@@ -2037,6 +2124,9 @@ def get_league_dashboard(
     for roster in rosters:
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
 
+    team_strategy = _fetch_stored_gm_stance(
+        config, str(user.get("_access_token") or ""), user_id=user_id, league_id=league_id
+    )
     briefing = dashboard_engine.compose_next_move_briefing(
         league_id=league_id,
         roster_id=str(my_roster.get("roster_id") or ""),
@@ -2047,6 +2137,7 @@ def get_league_dashboard(
         score_field=score_field,
         entitlement=str(profile.get("entitlement") or "free"),
         rosters=rosters,
+        team_strategy=team_strategy,
     )
 
     # Team Snapshot: record comes straight off the roster we already

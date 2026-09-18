@@ -124,6 +124,12 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
     profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
     preferences_response = Mock(status_code=200)
     preferences_response.json.return_value = []
+    # league-1 already has a GM stance stored, so the one-time reminder
+    # doesn't fire and pollute this test's pushes_sent count.
+    gm_stance_response = Mock(status_code=200)
+    gm_stance_response.json.return_value = [
+        {"user_id": "u1", "settings": {"team_strategy_by_league": {"league-1": "retool"}}}
+    ]
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
     already_notified_response = Mock(status_code=200)
@@ -153,6 +159,7 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                                         push_tokens_response,
                                         profiles_response,
                                         preferences_response,
+                                        gm_stance_response,
                                         not_notified_response,
                                     ],
                                 ):
@@ -198,6 +205,7 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
                                         push_tokens_response,
                                         profiles_response,
                                         preferences_response,
+                                        gm_stance_response,
                                         already_notified_response,
                                     ],
                                 ):
@@ -240,6 +248,10 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
     profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
     preferences_response = Mock(status_code=200)
     preferences_response.json.return_value = []
+    gm_stance_response = Mock(status_code=200)
+    gm_stance_response.json.return_value = [
+        {"user_id": "u1", "settings": {"team_strategy_by_league": {"league-1": "retool"}}}
+    ]
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -270,7 +282,13 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
                             ):
                                 with patch(
                                     "requests.get",
-                                    side_effect=[push_tokens_response, profiles_response, preferences_response, not_notified_response],
+                                    side_effect=[
+                                        push_tokens_response,
+                                        profiles_response,
+                                        preferences_response,
+                                        gm_stance_response,
+                                        not_notified_response,
+                                    ],
                                 ):
                                     with patch("requests.post") as mock_post:
                                         mock_post.return_value = Mock(
@@ -357,6 +375,10 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
     profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
     preferences_response = Mock(status_code=200)
     preferences_response.json.return_value = []
+    gm_stance_response = Mock(status_code=200)
+    gm_stance_response.json.return_value = [
+        {"user_id": "u1", "settings": {"team_strategy_by_league": {"league-1": "retool"}}}
+    ]
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -378,7 +400,13 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
                             with patch("modules.push_triggers.recap_push_item", return_value=None):
                                 with patch(
                                     "requests.get",
-                                    side_effect=[push_tokens_response, profiles_response, preferences_response, not_notified_response],
+                                    side_effect=[
+                                        push_tokens_response,
+                                        profiles_response,
+                                        preferences_response,
+                                        gm_stance_response,
+                                        not_notified_response,
+                                    ],
                                 ):
                                     with patch("requests.post") as mock_post:
                                         mock_post.return_value = Mock(
@@ -552,3 +580,93 @@ def test_run_trade_outcome_followup_sweep_fails_soft_when_not_configured():
     assert stats["configured"] is False
     assert stats["pushes_sent"] == 0
     assert stats["errors"]
+
+
+def test_fetch_gm_stance_leagues_returns_the_leagues_with_a_stored_stance():
+    response = Mock(status_code=200)
+    response.json.return_value = [
+        {"user_id": "u1", "settings": {"team_strategy_by_league": {"league-1": "rebuild", "league-2": "contender"}}},
+        {"user_id": "u2", "settings": {}},
+    ]
+    with patch("requests.get", return_value=response):
+        result = push_triggers.fetch_gm_stance_leagues(_config(), ["u1", "u2"])
+    assert result == {"u1": {"league-1", "league-2"}, "u2": set()}
+
+
+def test_fetch_gm_stance_leagues_empty_when_not_configured():
+    with patch("requests.get") as mock_get:
+        result = push_triggers.fetch_gm_stance_leagues(push_triggers.PushTriggerConfig(), ["u1"])
+    assert result == {}
+    mock_get.assert_not_called()
+
+
+def test_gm_stance_reminder_push_item_fires_when_league_has_no_stance():
+    item = push_triggers.gm_stance_reminder_push_item(
+        league_id="league-1", league_name="Test League", leagues_with_stance=set()
+    )
+    assert item is not None
+    assert item["category"] == "gm_stance_reminder"
+    assert item["recommendation_id"] == "gm_stance_reminder:league-1"
+    assert item["league_name"] == "Test League"
+
+
+def test_gm_stance_reminder_push_item_none_once_a_stance_is_stored():
+    item = push_triggers.gm_stance_reminder_push_item(
+        league_id="league-1", league_name="Test League", leagues_with_stance={"league-1"}
+    )
+    assert item is None
+
+
+def test_run_push_trigger_sweep_sends_the_gm_stance_reminder_once():
+    config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 50}])
+
+    push_tokens_response = Mock(status_code=200)
+    push_tokens_response.json.return_value = [{"user_id": "u1", "expo_push_token": "ExponentPushToken[a]"}]
+    profiles_response = Mock(status_code=200)
+    profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
+    preferences_response = Mock(status_code=200)
+    preferences_response.json.return_value = []
+    # Nobody has a stance stored for league-1 yet.
+    gm_stance_response = Mock(status_code=200)
+    gm_stance_response.json.return_value = [{"user_id": "u1", "settings": {}}]
+    not_notified_response = Mock(status_code=200)
+    not_notified_response.json.return_value = []
+
+    with patch("modules.push_triggers.load_valued_players", return_value=(players_df, "dynasty_score")):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper_leagues.get_user_leagues",
+                return_value=[{"league_id": "league-1", "name": "Test League"}],
+            ):
+                with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+                    with patch(
+                        "modules.sleeper.get_rosters",
+                        return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+                    ):
+                        with patch(
+                            "modules.dashboard_engine.compose_next_move_briefing",
+                            return_value=Mock(items=[]),
+                        ):
+                            with patch("modules.push_triggers.recap_push_item", return_value=None):
+                                with patch(
+                                    "requests.get",
+                                    side_effect=[
+                                        push_tokens_response,
+                                        profiles_response,
+                                        preferences_response,
+                                        gm_stance_response,
+                                        not_notified_response,
+                                    ],
+                                ):
+                                    with patch("requests.post") as mock_post:
+                                        mock_post.return_value = Mock(
+                                            status_code=200, json=lambda: {"data": [{"status": "ok"}]}
+                                        )
+                                        stats = push_triggers.run_push_trigger_sweep(environ=config_env)
+
+    assert stats["pushes_sent"] == 1
+    push_call = mock_post.call_args_list[0]
+    assert push_call.kwargs["json"][0]["title"] == "Set Your GM Stance — Test League"
+    assert push_call.kwargs["json"][0]["data"]["category"] == "gm_stance_reminder"
+    assert push_call.kwargs["json"][0]["data"]["league_name"] == "Test League"
