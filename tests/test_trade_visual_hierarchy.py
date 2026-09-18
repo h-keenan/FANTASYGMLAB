@@ -52,8 +52,11 @@ def test_primitives_encode_direction_confidence_and_cues_without_pills():
     assert "tvl-edge--neg" in neg
     high = tvl.confidence_indicator_html("High")
     low = tvl.confidence_indicator_html("Low confidence")
-    assert high.count("is-on") == 3
-    assert low.count("is-on") == 1
+    # Confidence reads as a conic-gradient ring (mobile's CircularProgressRing
+    # paradigm), not the old three-segment bar.
+    assert "tvl-conf-ring" in high and "is-on" not in high
+    assert "--tvl-conf-pct:90" in high and ">90%<" in high
+    assert "--tvl-conf-pct:35" in low and ">35%<" in low
     assert "Low confidence" in low
     assert "dg-ui-badge" not in high
     assert "FOR" in tvl.exchange_marker_html()
@@ -136,7 +139,7 @@ def test_dashboard_metrics_are_graphical_not_caption_only():
     )
     assert "dg-gp-trade-metrics" in html
     assert "tvl-edge-mark" in html
-    assert "tvl-conf-bars" in html
+    assert "tvl-conf-ring" in html
     assert "+237 VALUE EDGE" in html
     source = (ROOT / "modules" / "compact_fantasy_assets.py").read_text(encoding="utf-8")
     assert "fetch_player_headshot_bytes" not in source
@@ -267,3 +270,50 @@ def test_hierarchy_does_not_override_awards_pqv_or_storylines():
     assert "league_recaps_ui.render_league_recaps_page(" in app
     assert "compact_assets.compact_package(" in app
     assert "confidence=_trade_display_confidence_label(headline_idea)" in app
+
+
+def test_confidence_renders_as_css_ring_with_level_mapped_fill():
+    css = tvl.TRADE_VISUAL_LANGUAGE_CSS
+    assert "conic-gradient" in css
+    assert ".tvl-conf-ring" in css
+    # The replaced three-segment bar leaves nothing behind.
+    assert ".tvl-conf-bars" not in css
+
+    high = tvl.confidence_indicator_html(toa.CONFIDENCE_HIGH)
+    moderate = tvl.confidence_indicator_html(toa.CONFIDENCE_MODERATE)
+    close = tvl.confidence_indicator_html(toa.CONFIDENCE_CLOSE)
+
+    assert tvl.confidence_ring_percent(toa.CONFIDENCE_HIGH) == 90
+    assert tvl.confidence_ring_percent(toa.CONFIDENCE_MODERATE) == 60
+    assert tvl.confidence_ring_percent(toa.CONFIDENCE_CLOSE) == 35
+
+    for html, percent, level in (
+        (high, 90, "high"),
+        (moderate, 60, "medium"),
+        (close, 35, "low"),
+    ):
+        assert f"style='--tvl-conf-pct:{percent}'" in html
+        assert f"data-tvl-conf-pct='{percent}'" in html
+        assert f"tvl-conf--{level}" in html
+        assert "tvl-conf-ring" in html
+        assert f">{percent}%<" in html
+        # Label text survives the container change.
+        assert "CONFIDENCE / " in html
+        assert "tvl-conf-label" in html
+
+    assert "High" in high
+    assert "Moderate" in moderate
+    assert "Close call" in close
+    # Pure CSS/HTML — nothing script-driven sneaks into the markdown payload.
+    assert "<script" not in high and "onclick" not in high
+
+
+def test_confidence_ring_is_tone_tokenized_not_hardcoded():
+    css = tvl.TRADE_VISUAL_LANGUAGE_CSS
+    ring_rules = [line for line in css.splitlines() if line.startswith(".tvl-conf")]
+    assert ring_rules
+    for line in ring_rules:
+        assert "#" not in line, line
+    assert "--tvl-conf-tone:var(--color-success)" in css
+    assert "--tvl-conf-tone:var(--color-warning)" in css
+    assert "--tvl-conf-tone:var(--color-information)" in css
