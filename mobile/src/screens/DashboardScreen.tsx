@@ -14,6 +14,7 @@ import {
   type DashboardEntitlementInfo,
   type DashboardItem,
   type DashboardItemCategory,
+  type InjuryImpactPlayer,
   type MatchupResponse,
   type PresentationAsset,
   type TeamRanking,
@@ -231,7 +232,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
         </View>
       ) : null}
       {teamSnapshot ? (
-        <TeamSnapshotRow snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+        <>
+          <TeamSnapshotRow
+            snapshot={teamSnapshot}
+            leagueId={leagueId}
+            leagueName={leagueName}
+            navigation={navigation}
+          />
+          <TeamHealthContextCard snapshot={teamSnapshot} />
+        </>
       ) : null}
       {matchup ? (
         <WeeklyMatchupCard
@@ -513,6 +522,62 @@ function WeeklyMatchupCard({
   );
 }
 
+/** One line of the "what's driving the flag" list — mirrors the engine's own
+ * top_injury_impact_summary wording (name (POS, TEAM) - status, impact N,
+ * freshness) that web renders, trimmed for a phone-width row. */
+function injuryImpactLine(player: InjuryImpactPlayer): string {
+  const where = [player.position, player.team].filter(Boolean).join(', ');
+  const status = player.injury_status || player.injury_level;
+  const detail = [
+    status,
+    player.roster_relevance,
+    player.impact_contribution != null ? `impact ${player.impact_contribution}` : '',
+    // Only surface freshness when it undercuts the read — "current"/"recent"
+    // updates need no caveat, the same way web only notes stale/unknown ones.
+    ['stale', 'aging', 'update unknown'].includes(player.freshness_label) ? player.freshness_label : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const who = where ? `${player.name} (${where})` : player.name;
+  return detail ? `${who} — ${detail}` : who;
+}
+
+/** The "why" behind the Health tile: which injuries, and which players are
+ * actually carrying the impact. Same already-computed fields web shows as its
+ * "Key injuries:" caption plus the injury impact note — rendered here in the
+ * bulleted label/items style TeamRosterScreen already uses for archetype
+ * strengths and risks. */
+function TeamHealthContextCard({ snapshot }: { snapshot: TeamSnapshot }) {
+  const players = snapshot.top_injury_impact_players ?? [];
+  const keyInjuries = snapshot.key_injuries_summary?.trim() ?? '';
+  const fallbackSummary = snapshot.top_injury_impact_summary?.trim() ?? '';
+  if (players.length === 0 && !keyInjuries && !fallbackSummary) return null;
+
+  return (
+    <AnimatedCard style={styles.healthCard}>
+      <View style={styles.healthHeaderRow}>
+        <Ionicons name="pulse-outline" size={15} color={colors.danger} />
+        <Text style={styles.healthLabel} numberOfLines={1}>
+          {snapshot.health_flag || 'Health context'}
+        </Text>
+      </View>
+      {keyInjuries ? <Text style={styles.healthSummary}>Key injuries: {keyInjuries}</Text> : null}
+      {players.length > 0 ? (
+        <View style={styles.detailListGroup}>
+          <Text style={styles.detailListLabel}>Driving the flag</Text>
+          {players.map((player, index) => (
+            <Text key={`${player.player_id || player.name}-${index}`} style={styles.detailListItem}>
+              {'•'} {injuryImpactLine(player)}
+            </Text>
+          ))}
+        </View>
+      ) : fallbackSummary ? (
+        <Text style={styles.detailListItem}>{fallbackSummary}</Text>
+      ) : null}
+    </AnimatedCard>
+  );
+}
+
 function TopPriorityTradeCard({
   item,
   leagueId,
@@ -730,6 +795,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   snapshotTileTappable: { borderColor: colors.accentMuted },
+  healthCard: { padding: spacing.lg, gap: spacing.sm, marginBottom: spacing.md },
+  healthHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  healthLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.danger,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    flexShrink: 1,
+  },
+  healthSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  // Matches TeamRosterScreen's archetype strengths/risks list styling.
+  detailListGroup: { gap: 2 },
+  detailListLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   snapshotValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   snapshotLabel: {
     fontSize: 10,
