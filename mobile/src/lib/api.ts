@@ -508,6 +508,7 @@ export interface QuickViewSeason {
   label: string;
   key_stats: QuickViewStatItem[];
   fantasy: QuickViewStatItem[];
+  efficiency: QuickViewStatItem[];
   usage: QuickViewStatItem[];
 }
 

@@ -55,6 +55,7 @@ class SeasonStatView:
     key_stats: tuple[StatItem, ...]
     fantasy: tuple[StatItem, ...]
     usage: tuple[StatItem, ...]
+    efficiency: tuple[StatItem, ...] = ()
 
     @property
     def label(self) -> str:
@@ -264,6 +265,43 @@ def _fantasy_stats(groups: Mapping[str, list[dict]], games: int | None) -> list[
     return output
 
 
+def _rate(numerator: object, denominator: object) -> float | None:
+    num = pd.to_numeric(pd.Series([numerator]), errors="coerce").iloc[0]
+    den = pd.to_numeric(pd.Series([denominator]), errors="coerce").iloc[0]
+    if pd.isna(num) or pd.isna(den) or den <= 0:
+        return None
+    return float(num) / float(den)
+
+
+def _efficiency_stats(row: pd.Series, games: int | None) -> list[dict]:
+    """Per-game and per-touch rate stats — season totals alone (e.g. 62
+    receptions) don't say whether that came from a bell-cow workload or a
+    committee, and coridian_ asked for exactly this: targets/carries per
+    game, plus yards per catch/carry. Computed directly from the same raw
+    counting columns build_stats_view's other sections already read, not a
+    new data source.
+    """
+
+    targets = row.get("targets")
+    receptions = row.get("receptions")
+    receiving_yards = row.get("receiving_yards")
+    rush_attempts = row.get("rush_attempts")
+    rushing_yards = row.get("rushing_yards")
+
+    candidates: list[tuple[str, float | None, str]] = [
+        ("Targets/Gm", _rate(targets, games), "Targets per game played."),
+        ("Rec/Gm", _rate(receptions, games), "Receptions per game played."),
+        ("Yards/Catch", _rate(receiving_yards, receptions), "Receiving yards per reception."),
+        ("Carries/Gm", _rate(rush_attempts, games), "Rush attempts per game played."),
+        ("Yards/Carry", _rate(rushing_yards, rush_attempts), "Rushing yards per attempt."),
+    ]
+    return [
+        {"label": label, "value": f"{value:.1f}", "note": note, "tone": "reference"}
+        for label, value, note in candidates
+        if value is not None
+    ]
+
+
 def _usage_stats(groups: Mapping[str, list[dict]]) -> list[dict]:
     by_label = {str(item.get("label")): item for item in groups.get("Usage", [])}
     return [
@@ -298,10 +336,11 @@ def build_stats_view(row: pd.Series) -> PlayerQuickViewStats:
         key_stats=_items(_key_stats(row, groups)),
         fantasy=_items(_fantasy_stats(groups, games)),
         usage=_items(_usage_stats(groups)),
+        efficiency=_items(_efficiency_stats(row, games)),
     )
     college = _items(groups.get("College Stats", []))
     has_professional_stats = bool(
-        season_view.key_stats or season_view.fantasy or season_view.usage
+        season_view.key_stats or season_view.fantasy or season_view.usage or season_view.efficiency
     )
     return PlayerQuickViewStats(
         seasons=(season_view,) if has_professional_stats else (),
@@ -1854,6 +1893,7 @@ def render_current_season(
     has_rows = bool(model.seasons) and bool(
         model.seasons[0].key_stats
         or model.seasons[0].fantasy
+        or model.seasons[0].efficiency
         or model.seasons[0].usage
     )
     if omit_empty and not has_rows:
@@ -1878,6 +1918,7 @@ def render_current_season(
         for title, items in (
             ("Professional Production", selected.key_stats),
             ("Fantasy Production", selected.fantasy),
+            ("Efficiency", selected.efficiency),
             ("Usage", selected.usage),
         ):
             if items:

@@ -1545,6 +1545,7 @@ def _season_stat_view_dict(season: player_quick_view.SeasonStatView) -> dict[str
         "label": season.label,
         "key_stats": [_stat_item_dict(item) for item in season.key_stats],
         "fantasy": [_stat_item_dict(item) for item in season.fantasy],
+        "efficiency": [_stat_item_dict(item) for item in season.efficiency],
         "usage": [_stat_item_dict(item) for item in season.usage],
     }
 

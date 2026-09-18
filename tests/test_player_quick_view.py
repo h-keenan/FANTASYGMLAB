@@ -81,6 +81,40 @@ def test_usage_is_part_of_same_selected_season_model():
     assert [(item.label, item.value) for item in season.usage] == [("Snap %", "82%")]
 
 
+def test_efficiency_computes_per_game_and_per_touch_rates():
+    season = player_quick_view.build_stats_view(_row()).seasons[0]
+    efficiency = {item.label: item.value for item in season.efficiency}
+
+    # 120 targets / 17 games, 80 receptions / 17 games, 1100 yards / 80 catches.
+    assert efficiency["Targets/Gm"] == "7.1"
+    assert efficiency["Rec/Gm"] == "4.7"
+    assert efficiency["Yards/Catch"] == "13.8"
+    # No rush_attempts/rushing_yards in the fixture — rushing rates are
+    # omitted entirely rather than showing a misleading 0.0.
+    assert "Carries/Gm" not in efficiency
+    assert "Yards/Carry" not in efficiency
+
+
+def test_efficiency_includes_rushing_rates_when_present():
+    season = player_quick_view.build_stats_view(
+        _row(position="RB", rush_attempts=200, rushing_yards=900)
+    ).seasons[0]
+    efficiency = {item.label: item.value for item in season.efficiency}
+
+    assert efficiency["Carries/Gm"] == "11.8"
+    assert efficiency["Yards/Carry"] == "4.5"
+
+
+def test_efficiency_omits_a_rate_with_a_zero_denominator():
+    season = player_quick_view.build_stats_view(_row(games_played=0)).seasons[0]
+    efficiency = {item.label: item.value for item in season.efficiency}
+
+    assert "Targets/Gm" not in efficiency
+    assert "Rec/Gm" not in efficiency
+    # Per-catch is denominated on receptions, not games, so it's unaffected.
+    assert efficiency["Yards/Catch"] == "13.8"
+
+
 def test_college_production_uses_user_facing_labels():
     model = player_quick_view.build_stats_view(
         _row(college="Texas", college_season=2023, college_receiving_yards=950)
