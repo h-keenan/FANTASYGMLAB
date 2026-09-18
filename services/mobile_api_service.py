@@ -825,6 +825,20 @@ def _as_string_list(value: Any) -> list[str]:
     return [str(item) for item in value] if isinstance(value, (list, tuple)) else []
 
 
+def _project_usage_trend(row: pd.Series) -> dict[str, Any] | None:
+    """The weekly-recency read already stored on every player row, in the
+    exact shape the web app renders it from.
+
+    rankings.recency_trend_display owns both the semantics and the display
+    gate (>= 4 usable games and a >= 5% move, see its docstring) so mobile
+    and web never disagree about when usage is "trending"; this is a pure
+    projection, not a second opinion. ``None`` when the read is too thin to
+    state, and the client simply renders nothing.
+    """
+
+    return rankings.recency_trend_display(row)
+
+
 def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
     overall_rank = row.get("canonical_overall_rank")
     if pd.isna(overall_rank):
@@ -846,6 +860,7 @@ def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
         "position_rank": _clean_json_value(position_rank),
         "rank_unavailable_reason": _clean_json_value(row.get("rank_unavailable_reason")),
         "opportunity_label": _clean_json_value(row.get("opportunity_label")),
+        "usage_trend": _project_usage_trend(row),
     }
 
 
@@ -1722,6 +1737,10 @@ def _project_player_model(row: pd.Series) -> dict[str, Any]:
     only carry the coarser age_penalty (a lens-relative adjustment) instead
     — age_score_label tells the client which one it's showing, matching
     app.py's own "Age Score" vs. "Age Lens" distinction.
+
+    usage_trend is the same weekly-recency read the web dossier now shows
+    next to Opportunity, formatted by the one shared helper in
+    modules.rankings (see _project_usage_trend) — null below its gate.
     """
 
     age_score_raw = row.get("age_score") if "age_score" in row.index else None
@@ -1741,6 +1760,7 @@ def _project_player_model(row: pd.Series) -> dict[str, Any]:
         "age_score_label": "Age Score" if age_score_native else "Age Lens",
         "opportunity_confidence": _clean_json_value(row.get("opportunity_confidence")),
         "workload_trend": _clean_json_value(row.get("workload_trend")),
+        "usage_trend": _project_usage_trend(row),
     }
 
 

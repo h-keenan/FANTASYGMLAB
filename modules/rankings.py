@@ -82,6 +82,14 @@ RECENCY_WEIGHTS = (0.4, 0.3, 0.2, 0.1)  # newest → oldest inside the window
 RECENCY_TREND_CLIP = 0.40
 RECENCY_MAX_OPP_BUMP = 700  # opportunity points; ×0.10 weight ⇒ ≤70 composite
 RECENCY_FORMULATION = "weighted4_vs_earlier_baseline"
+# Display-only gate for narrating the recency read to a human (see
+# recency_trend_display). Stricter than the blend's own |trend| > 0.02:
+# 0.66 admits the 4-usable-games confidence tier (2/3, stored rounded to
+# 0.6667) and excludes the 3-game one (0.3333), and a sub-5% usage move is
+# not a story worth putting an arrow next to.
+RECENCY_DISPLAY_MIN_CONFIDENCE = 0.66
+RECENCY_DISPLAY_MIN_TREND = 0.05
+RECENCY_DISPLAY_HIGH_CONFIDENCE = 0.99
 
 # Continuous dynasty age curves: piecewise-linear control points (age → multiplier).
 # Designed for smooth adjacent-year movement (no giant step cliffs).
@@ -658,6 +666,105 @@ def compute_recency_features(
         "recency_trend": float(round(trend, 4)),
         "recency_confidence": float(round(confidence, 4)),
         "recency_formulation": f"{RECENCY_FORMULATION}:{baseline_source}",
+    }
+
+
+def _recency_float(row: Any, key: str, default: float = 0.0) -> float:
+    """One recency column off a Series/dict row, NaN- and type-safe."""
+
+    try:
+        raw = row.get(key)
+    except AttributeError:
+        return default
+    if raw is None:
+        return default
+    try:
+        if pd.isna(raw):
+            return default
+    except (TypeError, ValueError):
+        pass
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if np.isfinite(value) else default
+
+
+def recency_trend_display(row: Any) -> Dict[str, Any] | None:
+    """Reader-facing usage-trend read off the stored recency columns.
+
+    Presentation only: this never changes ``recency_trend``/
+    ``recency_confidence`` or how valuation consumes them (see
+    ``compute_recency_features`` for the one definition) — it only decides
+    whether the already-computed read is strong enough to *narrate*, and in
+    what words.
+
+    The gate is deliberately stricter than the valuation blend's. Scoring
+    applies any ``|trend| > 0.02`` at whatever confidence it carries, because
+    a weight nudge scaled by confidence degrades gracefully; a badge telling
+    a human "his usage is trending up" does not, so display requires:
+
+    * ``recency_confidence >= RECENCY_DISPLAY_MIN_CONFIDENCE`` (0.66), i.e.
+      at least 4 usable games. ``compute_recency_features`` scores n=3 at
+      0.33 precisely to "suppress one-game-after-two spikes", so a 3-game
+      read is exactly the sample we decline to narrate.
+    * ``|recency_trend| >= RECENCY_DISPLAY_MIN_TREND`` (5% of baseline
+      usage). Below that the direction is noise to someone reading it as
+      buy-low / sell-high evidence.
+
+    Moderate-injury *negative* reads are already damped upstream to 0.35x
+    confidence, which drops them under the gate on their own — a player who
+    simply missed time never renders as a role collapse.
+
+    Returns ``None`` when the read does not clear the gate.
+    """
+
+    if row is None:
+        return None
+    sample_n = int(_recency_float(row, "recency_sample_n", 0.0))
+    trend = _recency_float(row, "recency_trend", 0.0)
+    confidence = _recency_float(row, "recency_confidence", 0.0)
+    if sample_n < RECENCY_MIN_SAMPLE:
+        return None
+    if confidence < RECENCY_DISPLAY_MIN_CONFIDENCE:
+        return None
+    if abs(trend) < RECENCY_DISPLAY_MIN_TREND:
+        return None
+
+    rising = trend > 0
+    confidence_key = "high" if confidence >= RECENCY_DISPLAY_HIGH_CONFIDENCE else "moderate"
+    trend_pct = int(round(trend * 100))
+    magnitude = abs(trend_pct)
+    label = "Usage trending up" if rising else "Usage trending down"
+    window = min(RECENCY_WINDOW, sample_n)
+    usage_rate = _recency_float(row, "recency_usage_rate", 0.0)
+    baseline_rate = _recency_float(row, "recency_baseline_rate", 0.0)
+    detail = (
+        f"Weighted last {window} games vs earlier-season baseline "
+        f"({sample_n} usable games)."
+    )
+    if usage_rate > 0 and baseline_rate > 0:
+        detail = (
+            f"Weighted last {window} games {usage_rate:.1f} vs "
+            f"{baseline_rate:.1f} baseline ({sample_n} usable games)."
+        )
+    return {
+        "direction": "up" if rising else "down",
+        "trend": float(trend),
+        "trend_pct": int(trend_pct),
+        "magnitude_pct": int(magnitude),
+        "confidence": float(confidence),
+        "confidence_key": confidence_key,
+        "confidence_label": f"{confidence_key} confidence",
+        "sample_n": int(sample_n),
+        "window": int(window),
+        "usage_rate": float(usage_rate) if usage_rate > 0 else None,
+        "baseline_rate": float(baseline_rate) if baseline_rate > 0 else None,
+        "arrow": "▲" if rising else "▼",
+        "tone": "positive" if rising else "negative",
+        "label": label,
+        "summary": f"{label} {magnitude}% ({confidence_key} confidence)",
+        "detail": detail,
     }
 
 

@@ -1959,6 +1959,119 @@ def test_quick_view_model_falls_back_to_age_lens_when_age_score_missing(monkeypa
     assert model["age_score_label"] == "Age Lens"
 
 
+def _usage_trend_frame(player_id: str, **recency):
+    row = {
+        "player_id": player_id,
+        "name": "Trend Player",
+        "position": "RB",
+        "years_exp": 3,
+        "opportunity_label": "Committee Back",
+        "workload_trend": "Rising",
+    }
+    row.update(recency)
+    return pd.DataFrame([row])
+
+
+def test_quick_view_model_exposes_the_usage_trend_read(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    frame = _usage_trend_frame(
+        "9005",
+        recency_sample_n=7,
+        recency_trend=0.22,
+        recency_confidence=1.0,
+        recency_usage_rate=17.5,
+        recency_baseline_rate=14.3,
+    )
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            response = client.get(
+                "/v1/players/9005/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    trend = response.json()["model"]["usage_trend"]
+    # Already-computed recency columns, formatted by the one shared helper —
+    # the API states the same read the web dossier shows, not a new one.
+    assert trend["direction"] == "up"
+    assert trend["trend_pct"] == 22
+    assert trend["confidence_key"] == "high"
+    assert trend["summary"] == "Usage trending up 22% (high confidence)"
+    assert trend["sample_n"] == 7
+
+
+def test_quick_view_model_sends_no_usage_trend_below_the_display_gate(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    # Three usable games is the sample the valuation blend deliberately
+    # discounts, so the client is told nothing rather than shown a weak read.
+    thin = _usage_trend_frame(
+        "9006", recency_sample_n=3, recency_trend=0.31, recency_confidence=0.3333
+    )
+    # A player with no recency columns at all must not blow up the projection.
+    bare = _usage_trend_frame("9007")
+
+    for player_id, frame in (("9006", thin), ("9007", bare)):
+        with patch("requests.get", return_value=auth_user_response):
+            with patch("modules.rankings.load_players", return_value=frame):
+                response = client.get(
+                    f"/v1/players/{player_id}/quick-view",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+        assert response.status_code == 200
+        assert response.json()["model"]["usage_trend"] is None
+
+
+def test_rankings_rows_carry_the_usage_trend_beside_opportunity_label(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+
+    frame = _fake_players_frame()
+    frame["recency_sample_n"] = [6, 3]
+    frame["recency_trend"] = [0.19, 0.30]
+    frame["recency_confidence"] = [1.0, 0.3333]
+    frame["recency_usage_rate"] = [9.1, 6.0]
+    frame["recency_baseline_rate"] = [7.6, 4.6]
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=frame):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    response = client.get(
+                        "/v1/leagues/abc/rankings?lens=Dynasty",
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    by_name = {player["name"]: player for player in response.json()["players"]}
+    strong = by_name["Star Wideout"]["usage_trend"]
+    assert strong is not None
+    assert strong["direction"] == "up"
+    assert strong["magnitude_pct"] == 19
+    assert strong["confidence_key"] == "high"
+    # Same gate as everywhere else: a 3-game read never reaches the client.
+    assert by_name["Backup Runner"]["usage_trend"] is None
+
+
 def test_weekly_stats_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/players/9001/weekly-stats")
