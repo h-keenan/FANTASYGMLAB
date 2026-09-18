@@ -19,6 +19,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
   - GET  /v1/leagues/{id}/players/{id}/rank — one player's league-adjusted rank, looked up directly
   - GET  /v1/news                        — curated NFL fantasy news (injury/role/transaction/off-field)
+  - GET  /v1/players/{id}/news           — recent news items matched to one player
   - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
   - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
@@ -927,6 +928,52 @@ def get_news(
             break
 
     return {"ok": True, "items": items}
+
+
+MAX_PLAYER_NEWS_LIMIT = 10
+
+
+@app.get("/v1/players/{player_id}/news")
+def get_player_news(
+    player_id: str,
+    limit: int = 5,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Recent news items mentioning one player — powers Player Detail's
+    "impacted by news" badge.
+
+    The generic news pool /v1/news reads from is league-independent, so
+    unlike the roster-aware Alerts/Dashboard path (news_intelligence's
+    contextual_news_alert_from_article), items here never arrive with
+    matched_player_id already resolved — there's no roster context to
+    resolve names against. Since the caller already names a specific
+    player, this matches that player's own name as a phrase against each
+    article directly instead, which sidesteps needing that index.
+    """
+
+    if not 1 <= limit <= MAX_PLAYER_NEWS_LIMIT:
+        raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_PLAYER_NEWS_LIMIT}.")
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    row_matches = players_df[players_df["player_id"] == player_id] if not players_df.empty else players_df
+    player_name = str(row_matches.iloc[0].get("name") or "").strip() if not row_matches.empty else ""
+    if not player_name:
+        return {"ok": True, "items": []}
+
+    news_cache.schedule_news_cache_refresh()
+    enriched = news_cache.enriched_news_pool()
+
+    matches = [
+        item
+        for item in enriched
+        if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS
+        and news_signal.contains_phrase(news_signal.article_text(item), player_name)
+    ]
+    matches.sort(key=my_news.news_timestamp, reverse=True)
+
+    return {"ok": True, "items": [_project_news_item(item) for item in matches[:limit]]}
 
 
 class TradeAnalyzerRequest(BaseModel):

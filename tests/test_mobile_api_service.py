@@ -1024,6 +1024,95 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
         assert "speculative" in item
 
 
+def test_player_news_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/players/9001/news")
+    assert response.status_code == 401
+
+
+def test_player_news_matches_articles_mentioning_the_player_by_name(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    players_frame = pd.DataFrame([{"player_id": "9001", "name": "Nico Collins"}])
+
+    fake_pool = [
+        {
+            "title": "Nico Collins (hamstring) questionable for Sunday",
+            "summary": "The Texans WR was limited in practice.",
+            "link": "https://example.com/collins-injury",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 2000.0,
+        },
+        # Different player entirely — must not match.
+        {
+            "title": "Team trades WR to division rival",
+            "summary": "A trade sends a wide receiver across the division.",
+            "link": "https://example.com/trade-1",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": 3000.0,
+        },
+    ]
+
+    from modules import news as news_module
+
+    news_module.clear_enriched_news_pool_cache()
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_frame):
+            with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+                with patch("modules.news.load_cached_news_pool", return_value=fake_pool):
+                    response = client.get(
+                        "/v1/players/9001/news",
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert len(body["items"]) == 1
+    assert body["items"][0]["title"] == "Nico Collins (hamstring) questionable for Sunday"
+    assert body["items"][0]["event_type"] == "injury/status"
+
+
+def test_player_news_returns_empty_for_unknown_player(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    players_frame = pd.DataFrame([{"player_id": "9001", "name": "Nico Collins"}])
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_frame):
+            response = client.get(
+                "/v1/players/does-not-exist/news",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "items": []}
+
+
+def test_player_news_rejects_bad_limit(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/players/9001/news?limit=0",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        assert response.status_code == 422
+
+        response = client.get(
+            "/v1/players/9001/news?limit=9999",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        assert response.status_code == 422
+
+
 _RECAP_LEAGUE = {
     "season": "2026",
     "settings": {"leg": 3, "last_scored_leg": 3, "playoff_week_start": 15},
