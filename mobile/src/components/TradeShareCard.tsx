@@ -199,6 +199,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: radii.sm,
   },
-  footer: { marginTop: spacing.md, alignItems: 'center' },
+  // marginTop: 'auto' (not a fixed value) so this fills whatever room is
+  // left in the fixed-height card and stays pinned to the bottom edge
+  // regardless of how many lines the rationale above actually took —
+  // a fixed margin here left a growing gap of dead space for any trade
+  // whose rationale was shorter than the max 6 lines.
+  footer: { marginTop: 'auto', alignItems: 'center' },
   footerText: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
 });
