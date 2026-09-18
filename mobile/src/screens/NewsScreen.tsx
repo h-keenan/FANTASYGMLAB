@@ -147,6 +147,7 @@ export default function NewsScreen() {
               </Text>
             ) : null}
             {item.speculative ? <Text style={styles.speculative}>Unconfirmed / speculative</Text> : null}
+            {item.source ? <Text style={styles.source}>Source: {item.source}</Text> : null}
           </AnimatedCard>
         )}
       />
@@ -195,6 +196,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+  source: {
+    fontSize: 11,
+    color: colors.textTertiary,
     marginTop: spacing.xs,
   },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
