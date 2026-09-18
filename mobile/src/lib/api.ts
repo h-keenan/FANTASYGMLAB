@@ -399,6 +399,33 @@ export interface DraftPicksResponse {
   reason: string;
 }
 
+export type TradeOutcomeAnswer = 'yes' | 'no' | 'didnt_send' | 'still_pending';
+
+export interface TradeOutcomeAssetSummary {
+  name: string;
+  position: string;
+}
+
+export interface TradeOutcomeSummary {
+  partner_team_name: string;
+  send: TradeOutcomeAssetSummary[];
+  receive: TradeOutcomeAssetSummary[];
+  value_edge_label: string;
+}
+
+export interface PendingTradeOutcome {
+  id: string;
+  league_id: string;
+  partner_team_name: string;
+  trade_summary: TradeOutcomeSummary;
+  shared_at: string;
+}
+
+export interface PendingTradeOutcomesResponse {
+  ok: true;
+  outcomes: PendingTradeOutcome[];
+}
+
 export interface RecapStory {
   story_type: string;
   title: string;
@@ -803,4 +830,28 @@ export const api = {
       return acc;
     }, {});
   },
+  recordTradeShare: (
+    leagueId: string,
+    body: {
+      partnerTeamName?: string;
+      send: Array<{ name: string; position: string }>;
+      receive: Array<{ name: string; position: string }>;
+      valueEdgeLabel?: string;
+    },
+  ) =>
+    authorizedPost<{ ok: boolean; reason: string }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-outcomes`,
+      {
+        partner_team_name: body.partnerTeamName ?? '',
+        send: body.send,
+        receive: body.receive,
+        value_edge_label: body.valueEdgeLabel ?? '',
+      },
+    ),
+  getPendingTradeOutcomes: () => authorizedFetch<PendingTradeOutcomesResponse>('/v1/trade-outcomes/pending'),
+  answerTradeOutcome: (outcomeId: string, outcome: TradeOutcomeAnswer) =>
+    authorizedPost<{ ok: boolean; reason: string }>(
+      `/v1/trade-outcomes/${encodeURIComponent(outcomeId)}/answer`,
+      { outcome },
+    ),
 };

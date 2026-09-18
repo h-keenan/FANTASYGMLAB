@@ -400,7 +400,9 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           verdict={verdict}
           sendIds={sendIds}
           receiveIds={receiveIds}
+          leagueId={leagueId}
           leagueName={leagueName}
+          partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
           onBuildCounter={applyCounterAction}
         />
       ) : null}
@@ -488,13 +490,17 @@ function VerdictCard({
   verdict,
   sendIds,
   receiveIds,
+  leagueId,
   leagueName,
+  partnerTeamName,
   onBuildCounter,
 }: {
   verdict: TradeVerdict;
   sendIds: RankedPlayer[];
   receiveIds: RankedPlayer[];
+  leagueId: string;
   leagueName: string;
+  partnerTeamName: string;
   onBuildCounter: () => void;
 }) {
   const [shareOpen, setShareOpen] = useState(false);
@@ -534,7 +540,9 @@ function VerdictCard({
       <TradeSharePreviewModal
         visible={shareOpen}
         onClose={() => setShareOpen(false)}
+        leagueId={leagueId}
         leagueName={leagueName}
+        partnerTeamName={partnerTeamName}
         verdict={verdict}
         sendPlayers={sendIds}
         receivePlayers={receiveIds}

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme';
 import type { RankedPlayer } from '../lib/api';
 import GmOrb from '../components/GmOrb';
+import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
 import { navigationRef } from './navigationRef';
 
 import { useAuth } from '../context/AuthContext';
@@ -154,6 +155,7 @@ export default function RootNavigator() {
           />
         </AppStack.Navigator>
         <GmOrb />
+        <TradeOutcomePrompt />
         </View>
       ) : (
         <AuthStack.Navigator screenOptions={{ headerShown: false }}>
