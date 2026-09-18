@@ -212,3 +212,154 @@ def test_model_is_frozen_and_has_no_cross_invocation_state():
 
     assert first != second
     assert first.seasons[0].key_stats != second.seasons[0].key_stats
+
+
+def _pool(count: int, *, position: str = "WR", eligible: bool = True):
+    """A ranking pool shaped like rankings.load_players' output: already
+    carrying the canonical eligibility annotation columns, so
+    filter_current_fantasy_players masks rather than re-validates."""
+
+    rows = []
+    for index in range(count):
+        rows.append(
+            {
+                "player_id": f"pool-{index}",
+                "name": f"Pool Player {index}",
+                "position": position,
+                "team": "NYJ",
+                "status": "Active",
+                "active": True,
+                "stats_season": 2025,
+                "games_played": 17,
+                "targets": 10 * index,
+                "receptions": 6 * index,
+                "receiving_yards": 70 * index,
+                "receiving_tds": index,
+                "fantasy_points": 10.0 * index,
+                "fantasy_points_half_ppr": 12.0 * index,
+                "fantasy_points_ppr": 14.0 * index,
+                "ppg": 1.0 * index,
+                "snap_share": 0.05 * index,
+                "is_current_fantasy_eligible": eligible,
+                "player_eligibility_reason": "active_fantasy_player",
+                "trust_enforcement": "pass",
+                "trust_evidence_confidence": 1.0,
+                "trust_block_reason": "",
+                "trust_validation_fingerprint": f"fp-{index}",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _pool_with_subject(count: int, **overrides):
+    """The fixture player appended to a pool of `count` same-position peers."""
+
+    frame = _pool(count)
+    subject = dict(frame.iloc[0])
+    subject.update(
+        {
+            "player_id": "fixture-player",
+            "name": "Fixture Player",
+            # Clear of every peer in `_pool` (whose top row is index-scaled),
+            # so the expected percentile is unambiguously the ceiling.
+            "targets": 400,
+            "receptions": 260,
+            "receiving_yards": 3200,
+            "receiving_tds": 30,
+            "fantasy_points": 380.0,
+            "fantasy_points_half_ppr": 440.0,
+            "fantasy_points_ppr": 520.0,
+            "ppg": 40.0,
+            "snap_share": 0.99,
+        }
+    )
+    subject.update(overrides)
+    return pd.concat([frame, pd.DataFrame([subject])], ignore_index=True)
+
+
+def _subject_row(players):
+    return players[players["player_id"] == "fixture-player"].iloc[0]
+
+
+def _percentiles(items):
+    return {item.label: item.percentile for item in items}
+
+
+def test_percentiles_absent_without_a_pool():
+    season = player_quick_view.build_stats_view(_row()).seasons[0]
+
+    assert all(item.percentile is None for item in season.key_stats)
+    assert all(item.percentile is None for item in season.fantasy)
+    assert all(item.percentile is None for item in season.efficiency)
+
+
+def test_percentiles_rank_the_player_inside_their_position_group():
+    players = _pool_with_subject(20)
+
+    season = player_quick_view.build_stats_view(_subject_row(players), players).seasons[0]
+    key = _percentiles(season.key_stats)
+
+    # Best receiving line in the pool -> top of the distribution.
+    assert key["Rec Yards"] == 100
+    assert key["Targets"] == 100
+    # Availability is not a performance stat, so Games is never ranked.
+    assert key["Games"] is None
+    assert _percentiles(season.fantasy)["PPR PPG"] == 100
+    # Derived rate stats are ranked as displayed, not inferred from inputs.
+    assert _percentiles(season.efficiency)["Yards/Catch"] is not None
+
+
+def test_percentile_is_mid_pack_for_a_mid_pack_line():
+    players = _pool_with_subject(20, receiving_yards=70 * 10, targets=10 * 10)
+
+    season = player_quick_view.build_stats_view(_subject_row(players), players).seasons[0]
+    rec_yards = _percentiles(season.key_stats)["Rec Yards"]
+
+    assert rec_yards is not None
+    assert 40 <= rec_yards <= 60
+
+
+def test_percentiles_omitted_when_the_position_pool_is_too_small():
+    players = _pool_with_subject(player_quick_view.PERCENTILE_MIN_POOL - 2)
+
+    season = player_quick_view.build_stats_view(_subject_row(players), players).seasons[0]
+
+    assert all(item.percentile is None for item in season.key_stats)
+    assert all(item.percentile is None for item in season.efficiency)
+
+
+def test_percentiles_use_the_shared_eligibility_filter_for_the_pool():
+    players = _pool_with_subject(20)
+    # Enough rows for a pool, but only the subject survives the canonical
+    # current-fantasy-asset filter — ineligible rows must not pad the sample
+    # up to the minimum.
+    others = players["player_id"] != "fixture-player"
+    players.loc[others, "is_current_fantasy_eligible"] = False
+
+    season = player_quick_view.build_stats_view(_subject_row(players), players).seasons[0]
+
+    assert all(item.percentile is None for item in season.key_stats)
+
+
+def test_percentiles_only_compare_within_the_same_position():
+    wr_pool = _pool_with_subject(20)
+    rb_pool = _pool(20, position="RB")
+    rb_pool["player_id"] = [f"rb-{index}" for index in range(len(rb_pool))]
+    # Every RB out-produces the whole WR pool; a cross-position pool would
+    # sink the subject's percentile, a per-position one must not move it.
+    rb_pool["receiving_yards"] = 5000
+    rb_pool["targets"] = 400
+    players = pd.concat([wr_pool, rb_pool], ignore_index=True)
+
+    season = player_quick_view.build_stats_view(_subject_row(players), players).seasons[0]
+
+    assert _percentiles(season.key_stats)["Rec Yards"] == 100
+
+
+def test_percentiles_are_omitted_for_a_player_outside_the_eligible_pool():
+    players = _pool_with_subject(20)
+    players.loc[players["player_id"] == "fixture-player", "is_current_fantasy_eligible"] = False
+
+    season = player_quick_view.build_stats_view(_subject_row(players), players).seasons[0]
+
+    assert all(item.percentile is None for item in season.key_stats)
