@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { api, type PushCategory } from '../lib/api';
 import { syncPushToken } from '../lib/pushNotifications';
+import { useOrbClearance } from '../lib/orbLayout';
 import { colors, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { useAuth } from '../context/AuthContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
@@ -32,10 +34,13 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
 ];
 
 export default function MoreScreen({ navigation }: Props) {
+  const orbClearance = useOrbClearance();
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const { density, setDensity } = useDensity();
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
   const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
+  const { deleteAccount } = useAuth();
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,8 +96,33 @@ export default function MoreScreen({ navigation }: Props) {
     }
   };
 
+  const onDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your account and all data — saved leagues, GM Targets, trade history. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            const { error } = await deleteAccount();
+            setDeleting(false);
+            if (error) {
+              Alert.alert('Could not delete account', 'Please try again in a moment.');
+            }
+            // On success there's nothing else to do here — clearing the
+            // session flips RootNavigator back to the Auth stack on its own.
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.container}>
+      <ScrollView contentContainerStyle={{ paddingBottom: orbClearance }}>
       <Text style={styles.sectionLabel}>Display</Text>
       <View style={styles.densityRow}>
         {DENSITY_OPTIONS.map((option) => {
@@ -163,6 +193,16 @@ export default function MoreScreen({ navigation }: Props) {
           <Text style={styles.chevron}>{'›'}</Text>
         </TouchableOpacity>
       ))}
+
+      <Text style={styles.sectionLabel}>Account</Text>
+      <TouchableOpacity style={styles.row} onPress={onDeleteAccount} disabled={deleting}>
+        <View style={styles.labelGroup}>
+          <Ionicons name="trash-outline" size={18} color={colors.danger} style={styles.icon} />
+          <Text style={styles.dangerLabel}>Delete account</Text>
+        </View>
+        {deleting ? <ActivityIndicator size="small" color={colors.danger} /> : null}
+      </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
@@ -192,6 +232,7 @@ const styles = StyleSheet.create({
   labelGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   icon: { marginRight: spacing.sm },
   label: { fontSize: 16, color: colors.textPrimary, flexShrink: 1 },
+  dangerLabel: { fontSize: 16, color: colors.danger, flexShrink: 1 },
   chevron: { fontSize: 20, color: colors.textSecondary },
   toggleTextGroup: { flexShrink: 1, paddingRight: spacing.md },
   toggleDescription: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },

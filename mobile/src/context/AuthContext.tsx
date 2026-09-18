@@ -18,6 +18,7 @@ interface AuthContextValue {
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signInAsGuest: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -90,6 +91,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await unregisterCurrentPushToken();
         await supabase.auth.signOut();
         await signOutRevenueCatUser();
+      },
+      deleteAccount: async () => {
+        // public.delete_user() (docs/supabase_delete_account.sql) is
+        // security definer but auth.uid()-scoped inside the function body —
+        // this can only ever delete the caller's own row, regardless of
+        // that elevated privilege. Deleting auth.users cascades to every
+        // app table referencing it (profiles, gm_targets, saved_leagues,
+        // trade_outcomes, etc.) — no separate per-table cleanup needed.
+        const { error } = await supabase.rpc('delete_user');
+        if (error) return { error: error.message };
+        await unregisterCurrentPushToken();
+        await supabase.auth.signOut();
+        await signOutRevenueCatUser();
+        return { error: null };
       },
     }),
     [session, loading],

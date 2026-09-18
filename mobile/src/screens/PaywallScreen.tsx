@@ -203,6 +203,10 @@ export default function PaywallScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('LegalPage', { pageKey: 'subscription_terms' })}
         >
           Subscription Terms
+        </Text>{' '}
+        and{' '}
+        <Text style={styles.disclosureLink} onPress={() => navigation.navigate('LegalPage', { pageKey: 'privacy' })}>
+          Privacy Policy
         </Text>
         .
       </Text>
