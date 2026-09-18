@@ -26,6 +26,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TradeCalculator'>;
 type Side = 'A' | 'B';
 
 const MAX_SEARCH_RESULTS = 40;
+const POSITION_FILTERS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 function playerScore(player: RankedPlayer): number {
   return typeof player.score === 'number' ? player.score : 0;
@@ -40,6 +41,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
   const [sideB, setSideB] = useState<RankedPlayer[]>([]);
   const [activeSide, setActiveSide] = useState<Side>('A');
   const [search, setSearch] = useState('');
+  const [positionFilter, setPositionFilter] = useState<string | null>(null);
 
   const orbClearance = useOrbClearance();
 
@@ -75,8 +77,9 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
     return rankings
       .filter((p) => !selectedIds.has(p.player_id))
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query))
+      .filter((p) => !positionFilter || (p.position ?? '').toUpperCase() === positionFilter)
       .slice(0, MAX_SEARCH_RESULTS);
-  }, [rankings, selectedIds, search]);
+  }, [rankings, selectedIds, search, positionFilter]);
 
   const totalA = useMemo(() => sideA.reduce((sum, p) => sum + playerScore(p), 0), [sideA]);
   const totalB = useMemo(() => sideB.reduce((sum, p) => sum + playerScore(p), 0), [sideB]);
@@ -147,6 +150,24 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       {sideA.length > 0 || sideB.length > 0 ? (
         <Text style={styles.deltaLabel}>{valueDirectionLabel(delta)}</Text>
       ) : null}
+
+      <View style={styles.positionRow}>
+        <TouchableOpacity
+          style={[styles.pill, positionFilter === null && styles.pillActive]}
+          onPress={() => setPositionFilter(null)}
+        >
+          <Text style={[styles.pillText, positionFilter === null && styles.pillTextActive]}>All</Text>
+        </TouchableOpacity>
+        {POSITION_FILTERS.map((position) => (
+          <TouchableOpacity
+            key={position}
+            style={[styles.pill, positionFilter === position && styles.pillActive]}
+            onPress={() => setPositionFilter(positionFilter === position ? null : position)}
+          >
+            <Text style={[styles.pillText, positionFilter === position && styles.pillTextActive]}>{position}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <TextInput
         style={styles.searchInput}
@@ -272,6 +293,18 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },
+  positionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
+  pill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  pillTextActive: { color: '#fff', fontWeight: '700' },
   searchInput: {
     borderWidth: 1,
     borderColor: colors.border,

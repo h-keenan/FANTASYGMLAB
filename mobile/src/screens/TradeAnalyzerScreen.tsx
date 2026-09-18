@@ -45,6 +45,7 @@ type SearchItem =
   | { kind: 'pick'; pick: DraftPickAsset };
 
 const MAX_SEARCH_RESULTS = 40;
+const POSITION_FILTERS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
 const STRATEGIES = TEAM_STRATEGY_OPTIONS;
 
@@ -91,6 +92,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [receivePicks, setReceivePicks] = useState<DraftPickAsset[]>([]);
   const [activeSide, setActiveSide] = useState<Side>('send');
   const [assetType, setAssetType] = useState<AssetType>('players');
+  const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [strategy, setStrategyState] = useState<TeamStrategy>('retool');
   const [analyzing, setAnalyzing] = useState(false);
@@ -205,9 +207,10 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     return searchPool
       .filter((p) => !selectedIds.has(p.player_id))
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query))
+      .filter((p) => !positionFilter || (p.position ?? '').toUpperCase() === positionFilter)
       .slice(0, MAX_SEARCH_RESULTS)
       .map((player) => ({ kind: 'player' as const, player }));
-  }, [assetType, searchPool, pickSearchPool, selectedIds, selectedPickIds, search]);
+  }, [assetType, searchPool, pickSearchPool, selectedIds, selectedPickIds, search, positionFilter]);
 
   const addPlayerToSide = (player: RankedPlayer) => {
     if (activeSide === 'send') {
@@ -346,6 +349,26 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           <Text style={[styles.pillText, assetType === 'picks' && styles.pillTextActive]}>Picks</Text>
         </TouchableOpacity>
       </View>
+
+      {assetType === 'players' ? (
+        <View style={styles.teamRow}>
+          <TouchableOpacity
+            style={[styles.pill, positionFilter === null && styles.pillActive]}
+            onPress={() => setPositionFilter(null)}
+          >
+            <Text style={[styles.pillText, positionFilter === null && styles.pillTextActive]}>All</Text>
+          </TouchableOpacity>
+          {POSITION_FILTERS.map((position) => (
+            <TouchableOpacity
+              key={position}
+              style={[styles.pill, positionFilter === position && styles.pillActive]}
+              onPress={() => setPositionFilter(positionFilter === position ? null : position)}
+            >
+              <Text style={[styles.pillText, positionFilter === position && styles.pillTextActive]}>{position}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
 
       {activeSide === 'receive' && otherTeams.length > 0 ? (
         <View style={styles.teamRow}>
