@@ -8,7 +8,7 @@ import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 
 const CARD_WIDTH = 360;
-const CARD_HEIGHT = 500;
+const CARD_HEIGHT = 540;
 const SHARE_QR_URL = 'https://fantasygmlab.com';
 const QR_SIZE = 60;
 
@@ -106,7 +106,7 @@ const TradeShareCard = forwardRef<View, {
       <View style={styles.hairline} />
 
       <Text style={styles.whyLabel}>Why this works</Text>
-      <Text style={styles.whyText} numberOfLines={3}>
+      <Text style={styles.whyText} numberOfLines={6}>
         {verdict.rationale}
       </Text>
 
@@ -199,6 +199,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: radii.sm,
   },
-  footer: { position: 'absolute', bottom: spacing.md, left: 0, right: 0, alignItems: 'center' },
+  footer: { marginTop: spacing.md, alignItems: 'center' },
   footerText: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
 });
