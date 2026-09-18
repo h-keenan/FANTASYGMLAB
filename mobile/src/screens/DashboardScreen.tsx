@@ -412,9 +412,18 @@ function TopPriorityTradeCard({
   const gain = presentation.trade_gain;
   const gainColor = gain > 0 ? colors.successBright : gain < 0 ? colors.danger : colors.textSecondary;
   const confidenceLevel = CONFIDENCE_LEVELS[presentation.trade_confidence_label?.toLowerCase()] ?? 1;
+  const routeName = DESTINATION_ROUTE[item.destination];
 
   return (
-    <AnimatedCard glow style={styles.card}>
+    <AnimatedCard
+      glow
+      style={styles.card}
+      onPress={
+        routeName
+          ? () => (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName })
+          : undefined
+      }
+    >
       <View style={styles.cardHeaderRow}>
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
         <Text style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</Text>
