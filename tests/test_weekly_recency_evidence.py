@@ -101,8 +101,11 @@ def test_aggregate_retains_weekly_without_extra_fields_bloat():
     assert len(aggregated["p1"]["weekly"]) == 2
     assert aggregated["p1"]["weekly"][0]["week"] == 1
     assert aggregated["p1"]["targets"] == 18
-    # Fantasy points still season-aggregated; weekly keeps only workload fields.
-    assert "fantasy_points_ppr" not in aggregated["p1"]["weekly"][0]
+    # Weekly rows also retain fantasy points now (Player Detail's
+    # points-by-week chart reads this per week, not just the season sum) —
+    # the raw Sleeper field name itself is never exposed, only the mapped one.
+    assert aggregated["p1"]["weekly"][0]["fantasy_points_ppr"] == 12.0
+    assert aggregated["p1"]["weekly"][1]["fantasy_points_ppr"] == 14.0
     assert "pts_ppr" not in aggregated["p1"]["weekly"][0]
 
 

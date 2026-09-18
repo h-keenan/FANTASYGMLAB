@@ -47,6 +47,7 @@ WEEKLY_RETAIN_SOURCE_FIELDS = (
     "pass_att",
     "off_snp",
     "tm_off_snp",
+    "pts_ppr",
 )
 WEEKLY_RETAIN_FIELD_MAP = {
     "gp": "games_played",
@@ -54,6 +55,7 @@ WEEKLY_RETAIN_FIELD_MAP = {
     "rec": "receptions",
     "rush_att": "rush_attempts",
     "pass_att": "pass_attempts",
+    "pts_ppr": "fantasy_points_ppr",
 }
 
 

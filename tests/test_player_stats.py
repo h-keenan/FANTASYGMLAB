@@ -51,6 +51,13 @@ class TestPlayerStatsPipeline(unittest.TestCase):
         self.assertNotIn("passing_yards", stats)
         self.assertNotIn("target_share", stats)
 
+        # Per-week rows retain fantasy points too (Player Detail's weekly
+        # points chart reads this), not just the season-level sum above.
+        weekly = stats["weekly"]
+        self.assertEqual([row["week"] for row in weekly], [1, 2])
+        self.assertEqual(weekly[0]["fantasy_points_ppr"], 18.0)
+        self.assertEqual(weekly[1]["fantasy_points_ppr"], 9.0)
+
     def test_stats_join_uses_player_id_and_preserves_missing_values(self):
         players = pd.DataFrame(
             [
