@@ -62,6 +62,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -879,11 +880,34 @@ def get_player_rank_in_league(
     return {"ok": True, "player": _project_ranking_row(matches.iloc[0], score_field)}
 
 
+_NEWS_SOURCE_DISPLAY_NAMES = {
+    "rotowire.com": "RotoWire",
+    "espn.com": "ESPN",
+    "cbssports.com": "CBS Sports",
+    "sports.yahoo.com": "Yahoo Sports",
+    "nbcsports.com": "Pro Football Talk",
+}
+
+
+def _friendly_news_source(raw_source: str) -> str:
+    """The stored `source` is the raw feed URL (modules.news_signal's own
+    source-quality classifier matches against that exact string) — this is
+    a display-only transform, never fed back into classification.
+    """
+
+    lowered = str(raw_source or "").lower()
+    for marker, display_name in _NEWS_SOURCE_DISPLAY_NAMES.items():
+        if marker in lowered:
+            return display_name
+    match = re.search(r"https?://(?:www\.)?([^/]+)", str(raw_source or ""))
+    return match.group(1) if match else str(raw_source or "")
+
+
 def _project_news_item(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "title": _clean_json_value(item.get("title")),
         "link": _clean_json_value(item.get("link")),
-        "source": _clean_json_value(item.get("source")),
+        "source": _friendly_news_source(str(item.get("source") or "")),
         "summary": _clean_json_value(my_news.build_quick_news_summary(item)),
         "published_ts": _clean_json_value(item.get("published_ts")),
         "event_type": _clean_json_value(item.get("signal_primary_event")),

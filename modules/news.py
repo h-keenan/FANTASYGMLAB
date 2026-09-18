@@ -23,6 +23,8 @@ NEWS_FEEDS = [
     "https://www.rotowire.com/rss/news.php?sport=NFL",
     "https://www.espn.com/espn/rss/nfl/news",
     "https://www.cbssports.com/rss/headlines/nfl/",
+    "https://sports.yahoo.com/nfl/rss/",
+    "https://www.nbcsports.com/profootballtalk.rss",
 ]
 
 NEWS_CACHE_PATH = "data/news_cache.json"
