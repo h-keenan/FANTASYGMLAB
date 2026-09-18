@@ -8,7 +8,14 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
-import { api, type DashboardItem, type DashboardItemCategory, type PresentationAsset, type TeamSnapshot } from '../lib/api';
+import {
+  api,
+  type DashboardItem,
+  type DashboardItemCategory,
+  type PresentationAsset,
+  type TeamRanking,
+  type TeamSnapshot,
+} from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -44,6 +51,61 @@ const DESTINATION_ROUTE: Record<string, string> = {
 
 const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
+interface LeaguePulseTile {
+  label: string;
+  value: string;
+  note: string;
+}
+
+function bestByRank(teams: TeamRanking[], rankKey: 'power_rank' | 'draft_capital_rank'): TeamRanking | null {
+  let best: TeamRanking | null = null;
+  for (const team of teams) {
+    const rank = team[rankKey];
+    if (rank == null) continue;
+    if (best == null || (best[rankKey] ?? Infinity) > rank) best = team;
+  }
+  return best;
+}
+
+/**
+ * A lighter-weight adaptation of the web app's League Pulse
+ * (app.py's build_home_league_pulse_items) using only what mobile's
+ * /team-rankings endpoint already computes — not a byte-for-byte port.
+ * "Most Active Manager" is deliberately omitted: it needs a full-season
+ * Sleeper transaction scan that doesn't exist anywhere in modules/ yet
+ * (web's own version depends on app.py-only intelligence-frame logic that
+ * was never ported to modules/ either), so it would take real new backend
+ * work rather than reusing existing data.
+ */
+function buildLeaguePulseTiles(teams: TeamRanking[]): LeaguePulseTile[] {
+  const contenders = teams.filter((t) => t.strategy === 'contender');
+  const rebuilders = teams.filter((t) => t.strategy === 'rebuild' || t.strategy === 'tank');
+  const contender = bestByRank(contenders, 'power_rank');
+  const rebuilder = bestByRank(rebuilders, 'draft_capital_rank');
+  const draftLeader = bestByRank(teams, 'draft_capital_rank');
+
+  const tiles: LeaguePulseTile[] = [
+    {
+      label: 'Biggest Contender',
+      value: contender?.team_name ?? 'No clear leader',
+      note: contender ? `Power #${contender.power_rank}` : 'No contender read available yet.',
+    },
+    {
+      label: 'Biggest Rebuilder',
+      value: rebuilder?.team_name ?? 'No clear leader',
+      note: rebuilder
+        ? `Draft Capital #${rebuilder.draft_capital_rank} · ${rebuilder.strategy_label ?? 'Rebuild'}`
+        : 'No rebuild read available yet.',
+    },
+    {
+      label: 'Draft Capital Leader',
+      value: draftLeader?.team_name ?? 'No clear leader',
+      note: draftLeader ? `Draft Capital #${draftLeader.draft_capital_rank}` : 'No draft-capital read available yet.',
+    },
+  ];
+  return tiles;
+}
+
 export default function DashboardScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
@@ -56,6 +118,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
+  const [teamRankings, setTeamRankings] = useState<TeamRanking[] | null>(null);
   const { showExplanations } = useDensity();
 
   useScreenHeaderTitle(navigation, 'Next Move', leagueName);
@@ -89,6 +152,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
           if (!cancelled) setLoading(false);
         }
       })();
+      // Independent, best-effort — League Pulse is a bonus section, not
+      // core to the briefing, so a failure here shouldn't touch loading/
+      // error state for the rest of the screen.
+      api
+        .getLeagueTeamRankings(leagueId)
+        .then((result) => {
+          if (!cancelled) setTeamRankings(result.teams);
+        })
+        .catch(() => {});
       return () => {
         cancelled = true;
       };
@@ -159,7 +231,30 @@ export default function DashboardScreen({ route, navigation }: Props) {
           />
         ))
       )}
+      {teamRankings && teamRankings.length > 0 ? <LeaguePulseSection teams={teamRankings} /> : null}
       </ScrollView>
+    </View>
+  );
+}
+
+function LeaguePulseSection({ teams }: { teams: TeamRanking[] }) {
+  const tiles = buildLeaguePulseTiles(teams);
+  return (
+    <View style={styles.pulseSection}>
+      <Text style={styles.pulseHeading}>League Pulse</Text>
+      <View style={styles.pulseGrid}>
+        {tiles.map((tile) => (
+          <View key={tile.label} style={styles.pulseTile}>
+            <Text style={styles.pulseLabel}>{tile.label.toUpperCase()}</Text>
+            <Text style={styles.pulseValue} numberOfLines={1}>
+              {tile.value}
+            </Text>
+            <Text style={styles.pulseNote} numberOfLines={1}>
+              {tile.note}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -401,6 +496,27 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16 },
+  pulseSection: { marginTop: spacing.lg },
+  pulseHeading: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 0.4,
+    marginBottom: spacing.sm,
+  },
+  pulseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  pulseTile: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    backgroundColor: colors.surfaceSolid,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  pulseLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  pulseValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: 4 },
+  pulseNote: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   checkInBanner: {
     flexDirection: 'row',
     alignItems: 'center',
