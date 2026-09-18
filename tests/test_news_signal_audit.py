@@ -209,6 +209,34 @@ def test_entity_match_blocks_ambiguous_surname_and_honors_suffix():
     assert "injury/status" in matched[0]["relevance_reason"]
 
 
+def test_entity_match_blocks_team_name_surname_collision():
+    # Real bug: a Cowboys-offense article got attributed to roster player
+    # Parker Washington purely because "Washington" appeared in the text —
+    # almost certainly a Commanders team reference, not him.
+    roster = ["Parker Washington"]
+    team_reference = [
+        _article(
+            title="Cowboys' recipe for success in Week 2",
+            summary="Dallas prepares for a divisional test against Washington.",
+            link="https://example.test/cowboys-offense",
+        )
+    ]
+    filtered = my_news.filter_news_for_players(team_reference, roster, roster_teams=["DAL"])
+    assert filtered == []
+
+    # Full name still matches normally.
+    clear = [
+        _article(
+            title="Parker Washington (hamstring) questionable for Sunday",
+            summary="Jaguars list Parker Washington as questionable.",
+            link="https://example.test/washington-q",
+        )
+    ]
+    matched = my_news.filter_news_for_players(clear, roster, roster_teams=["JAX"])
+    assert len(matched) == 1
+    assert matched[0]["matched_player"] == "Parker Washington"
+
+
 def test_stale_and_duplicate_speculative_curation():
     now = time.time()
     stale_spec = _article(

@@ -46,6 +46,15 @@ STRONG_PRIORITY_BONUS = 6
 
 NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
 
+# Surnames that are also an NFL team's city/nickname — a bare last-name match
+# against one of these is unreliable regardless of roster-teammate collisions,
+# since most mentions of "Washington" or "Houston" in an article are about the
+# team, not a player. Confirmed real bug: a Cowboys-offense article (Lamb,
+# Pickens) got attributed to roster player Parker Washington purely because
+# "Washington" appeared somewhere in the text — almost certainly a reference
+# to the Commanders, not to him.
+TEAM_NAME_SURNAME_COLLISIONS = frozenset({"washington", "houston"})
+
 CONTEXT_PHRASES: Dict[str, tuple[str, ...]] = {
     EVENT_INJURY: (
         "injury",
@@ -435,18 +444,20 @@ def enrich_news_item(item: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 def names_collide(candidate: str, article_text_blob: str, *, roster_names: Sequence[str]) -> bool:
-    """True when last-name-only matching would be ambiguous among roster names."""
+    """True when last-name-only matching would be ambiguous among roster names
+    or against an NFL team's own city/nickname (see TEAM_NAME_SURNAME_COLLISIONS)."""
 
     last = player_last_name(candidate)
     if not last:
         return False
+    has_team_name_collision = last in TEAM_NAME_SURNAME_COLLISIONS
     collisions = [
         name
         for name in roster_names
         if player_last_name(name) == last
         and normalize_player_name(name) != normalize_player_name(candidate)
     ]
-    if not collisions:
+    if not collisions and not has_team_name_collision:
         return False
     # If full normalized name of the candidate is present, not a collision hit.
     if contains_phrase(article_text_blob.lower(), normalize_player_name(candidate)):
