@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, SectionList, StyleSheet, Text, View } from 'react-native';
+import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
@@ -42,15 +43,18 @@ function positionSortKey(position: string | null): number {
 interface RankTile {
   label: string;
   value: string;
+  /** Power/Franchise link out to the full league rankings (Teams screen) —
+   * the other tiles here have no equivalent standalone screen to open. */
+  tappable?: boolean;
 }
 
 function buildRankTiles(ranking: TeamRanking): RankTile[] {
   const tiles: RankTile[] = [];
-  const push = (label: string, value: number | null) => {
-    if (value != null) tiles.push({ label, value: `#${value}` });
+  const push = (label: string, value: number | null, tappable = false) => {
+    if (value != null) tiles.push({ label, value: `#${value}`, tappable });
   };
-  push('Power', ranking.power_rank);
-  push('Franchise', ranking.franchise_rank);
+  push('Power', ranking.power_rank, true);
+  push('Franchise', ranking.franchise_rank, true);
   push('Draft Capital', ranking.draft_capital_rank);
   push('Starters', ranking.starter_rank);
   push('Bench', ranking.bench_rank);
@@ -122,11 +126,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   }, [players]);
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {
@@ -162,14 +162,27 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
               {ranking.record_label ? <Text style={styles.recordLabel}>{ranking.record_label}</Text> : null}
               {rankTiles.length > 0 ? (
                 <View style={styles.tileRow}>
-                  {rankTiles.map((tile) => (
-                    <View key={tile.label} style={styles.tile}>
-                      <Text style={styles.tileValue} numberOfLines={1}>
-                        {tile.value}
-                      </Text>
-                      <Text style={styles.tileLabel}>{tile.label}</Text>
-                    </View>
-                  ))}
+                  {rankTiles.map((tile) =>
+                    tile.tappable ? (
+                      <TouchableOpacity
+                        key={tile.label}
+                        style={[styles.tile, styles.tileTappable]}
+                        onPress={() => navigation.navigate('Teams', { leagueId, leagueName })}
+                      >
+                        <Text style={styles.tileValue} numberOfLines={1}>
+                          {tile.value}
+                        </Text>
+                        <Text style={styles.tileLabel}>{tile.label}</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View key={tile.label} style={styles.tile}>
+                        <Text style={styles.tileValue} numberOfLines={1}>
+                          {tile.value}
+                        </Text>
+                        <Text style={styles.tileLabel}>{tile.label}</Text>
+                      </View>
+                    ),
+                  )}
                 </View>
               ) : null}
               {ranking.archetype_label ? (
@@ -284,6 +297,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },
+  tileTappable: { borderColor: colors.accentMuted },
   tileValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
   tileLabel: {
     fontSize: 10,

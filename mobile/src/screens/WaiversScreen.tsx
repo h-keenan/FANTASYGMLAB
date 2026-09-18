@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PremiumLock from '../components/PremiumLock';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -164,7 +164,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
       </View>
 
       {loading ? (
-        <ActivityIndicator style={styles.loading} color={colors.accent} />
+        <BrandedSpinner style={styles.loading} />
       ) : (
         <FlatList
           data={filtered}
@@ -381,8 +381,14 @@ function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPre
         </View>
       </View>
       <View style={styles.faabRow}>
-        <Ionicons name="cash-outline" size={13} color={colors.textSecondary} />
-        <Text style={styles.faabText}>{player.faab.label}</Text>
+        <View style={styles.faabInfo}>
+          <Ionicons name="cash-outline" size={13} color={colors.textSecondary} />
+          <Text style={styles.faabText}>{player.faab.label}</Text>
+        </View>
+        <View style={styles.detailPill}>
+          <Ionicons name="information-circle-outline" size={12} color={colors.accentSoft} />
+          <Text style={styles.detailPillText}>Full breakdown</Text>
+        </View>
       </View>
     </AnimatedCard>
   );
@@ -538,13 +544,26 @@ const styles = StyleSheet.create({
   faabRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
     marginTop: spacing.sm,
     paddingTop: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
+  faabInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   faabText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
+  // "Tap for full breakdown" affordance — makes it clear this priority-add
+  // card leads to Player Quick View, not just a static reasoning label.
+  detailPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.accentMuted,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  detailPillText: { fontSize: 10, fontWeight: '700', color: colors.accentSoft, letterSpacing: 0.2 },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
