@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -42,7 +45,43 @@ export default function HomeScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [meError, setMeError] = useState<string | null>(null);
   const [leaguesError, setLeaguesError] = useState<string | null>(null);
+  const [renamingLeague, setRenamingLeague] = useState<SavedLeague | null>(null);
+  const [renameText, setRenameText] = useState('');
+  const [renameBusy, setRenameBusy] = useState(false);
   const autoNavigated = useRef(false);
+
+  // Renames only this account's saved_leagues row (RLS-scoped to
+  // auth.uid() = user_id) — never touches the Sleeper league itself, so
+  // nothing about the real league name changes for anyone else.
+  const saveLeagueRename = async () => {
+    if (!renamingLeague) return;
+    const trimmed = renameText.trim();
+    if (!trimmed) {
+      Alert.alert('Name required', 'League name cannot be empty.');
+      return;
+    }
+    setRenameBusy(true);
+    try {
+      const { error } = await supabase
+        .from('saved_leagues')
+        .update({ league_name: trimmed })
+        .eq('id', renamingLeague.id);
+      if (error) {
+        Alert.alert('Could not rename league', error.message);
+        return;
+      }
+      setLeagues((prev) =>
+        (prev ?? []).map((league) =>
+          league.id === renamingLeague.id ? { ...league, league_name: trimmed } : league,
+        ),
+      );
+      setRenamingLeague(null);
+    } catch {
+      Alert.alert('Could not rename league', 'Please try again in a moment.');
+    } finally {
+      setRenameBusy(false);
+    }
+  };
 
   // Independent requests: the backend API and Supabase are separate
   // services, so one failing (e.g. the API isn't reachable) shouldn't also
@@ -233,11 +272,57 @@ export default function HomeScreen({ navigation }: Props) {
                   <Text style={styles.defaultBadgeText}>Default</Text>
                 </View>
               ) : null}
+              <TouchableOpacity
+                hitSlop={8}
+                style={styles.renameButton}
+                onPress={() => {
+                  setRenamingLeague(item);
+                  setRenameText(item.league_name || '');
+                }}
+              >
+                <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
               <Text style={styles.chevron}>›</Text>
             </View>
           </AnimatedCard>
         )}
       />
+
+      <Modal visible={renamingLeague !== null} animationType="fade" transparent onRequestClose={() => setRenamingLeague(null)}>
+        <View style={styles.renameBackdrop}>
+          <View style={styles.renameCard}>
+            <Text style={styles.renameTitle}>Rename League</Text>
+            <Text style={styles.renameHint}>
+              Only changes what you see here — the real league name in Sleeper stays the same.
+            </Text>
+            <TextInput
+              style={styles.renameInput}
+              value={renameText}
+              onChangeText={setRenameText}
+              placeholder="League name"
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              maxLength={80}
+            />
+            <View style={styles.renameActions}>
+              <TouchableOpacity
+                style={styles.renameCancelButton}
+                onPress={() => setRenamingLeague(null)}
+                disabled={renameBusy}
+              >
+                <Text style={styles.renameCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.renameSaveButton} onPress={saveLeagueRename} disabled={renameBusy}>
+                {renameBusy ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.renameSaveText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -330,7 +415,50 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
   },
   defaultBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  renameButton: { marginLeft: spacing.sm, padding: 2 },
   chevron: { fontSize: 20, color: colors.textTertiary, marginLeft: spacing.xs },
+  renameBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  renameCard: {
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+  renameTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  renameHint: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
+  renameInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    fontSize: 15,
+    backgroundColor: colors.surface,
+    color: colors.textPrimary,
+  },
+  renameActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  renameCancelButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
+  renameCancelText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  renameSaveButton: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
+    borderRadius: radii.sm,
+    minWidth: 64,
+    alignItems: 'center',
+  },
+  renameSaveText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   empty: {
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.md,
