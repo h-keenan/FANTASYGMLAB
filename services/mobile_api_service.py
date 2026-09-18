@@ -1655,7 +1655,15 @@ def answer_trade_outcome(
 
 
 def _stat_item_dict(item: player_quick_view.StatItem) -> dict[str, Any]:
-    return {"label": item.label, "value": item.value, "note": item.note, "tone": item.tone}
+    return {
+        "label": item.label,
+        "value": item.value,
+        "note": item.note,
+        "tone": item.tone,
+        # Absent (null) whenever the position group was too small to rank
+        # against — see player_quick_view.PERCENTILE_MIN_POOL.
+        "percentile": _clean_json_value(item.percentile),
+    }
 
 
 def _season_stat_view_dict(season: player_quick_view.SeasonStatView) -> dict[str, Any]:
@@ -1738,7 +1746,9 @@ def get_player_quick_view(
         return {"ok": True, "stats": None, "bio": None, "model": None, "reason": "not_found"}
 
     row = matches.iloc[0]
-    stats = player_quick_view.build_stats_view(row)
+    # The full frame (not `matches`) is the percentile pool: build_stats_view
+    # ranks this player against their position inside it.
+    stats = player_quick_view.build_stats_view(row, players_df)
     bio = player_quick_view.build_executive_snapshot(row)
     return {
         "ok": True,

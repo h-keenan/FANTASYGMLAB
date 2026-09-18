@@ -15,6 +15,7 @@ import streamlit as st
 
 from modules import player_profile_ui
 from modules.player_awards import PlayerBadge
+from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_tier_identity import (
     PlayerTierIdentity,
     player_tier_legend_html,
@@ -44,6 +45,11 @@ class StatItem:
     value: str
     note: str
     tone: str
+    #: Position-group percentile rank (1-100) for this stat, or ``None`` when
+    #: no trustworthy comparison pool exists. "59 rush yards" is meaningless
+    #: without knowing whether that is good for the position; see
+    #: ``_stat_percentiles`` for how the pool is qualified.
+    percentile: float | None = None
 
 
 @dataclass(frozen=True)
@@ -207,9 +213,17 @@ def _items(items: list[dict]) -> tuple[StatItem, ...]:
             value=_text(item.get("value")),
             note=_text(item.get("note")),
             tone=_text(item.get("tone")) or "reference",
+            percentile=_percentile_value(item.get("percentile")),
         )
         for item in items
     )
+
+
+def _percentile_value(value: object) -> float | None:
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.isna(numeric):
+        return None
+    return float(numeric)
 
 
 def _group_items(row: pd.Series) -> dict[str, list[dict]]:
@@ -219,7 +233,171 @@ def _group_items(row: pd.Series) -> dict[str, list[dict]]:
     }
 
 
-def _key_stats(row: pd.Series, groups: Mapping[str, list[dict]]) -> list[dict]:
+#: A percentile is only shown when the position group has at least this many
+#: players carrying a real value for that column. Below it, "80th percentile"
+#: would just mean "4th of 5" — precise-looking and misleading — so the field
+#: is omitted entirely instead.
+PERCENTILE_MIN_POOL = 10
+
+#: Stat label -> candidate source columns, derived from the SAME definitions
+#: player_profile_ui uses to build the displayed items, so a percentile can
+#: never drift onto a different column than the number it sits next to.
+#: "Games" is deliberately absent: availability is not a performance stat, and
+#: a "90th percentile in games played" badge next to a replacement-level
+#: player reads as praise.
+_PERCENTILE_STAT_FIELDS: dict[str, tuple[str, ...]] = {
+    label: fields
+    for _group_label, _tone, stat_defs in player_profile_ui.PLAYER_PROFILE_STAT_GROUPS
+    for label, fields, _format_kind, _note in stat_defs
+    if label != "Games"
+}
+
+_GAMES_FIELDS = ("games", "games_played", "gp")
+
+
+def _pool_column(frame: pd.DataFrame, row: Mapping[str, object], fields: Sequence[str]) -> str:
+    """Resolve one stat to the column the displayed value actually came from."""
+
+    _value, source_field = player_profile_ui.first_player_stat_value(
+        row if isinstance(row, pd.Series) else pd.Series(dict(row)),
+        tuple(fields),
+    )
+    if source_field and source_field in frame.columns:
+        return source_field
+    return next((field for field in fields if field in frame.columns), "")
+
+
+def _pool_series(
+    frame: pd.DataFrame,
+    row: Mapping[str, object],
+    fields: Sequence[str],
+) -> pd.Series | None:
+    column = _pool_column(frame, row, fields)
+    if not column:
+        return None
+    return pd.to_numeric(frame[column], errors="coerce")
+
+
+def _positive(series: pd.Series | None) -> pd.Series | None:
+    """Denominators of zero are absence of workload, not a 0.0 rate."""
+
+    if series is None:
+        return None
+    return series.where(series > 0)
+
+
+def _stat_percentiles(
+    players_df: pd.DataFrame | None,
+    row: Mapping[str, object],
+) -> dict[str, float]:
+    """Percentile rank (1-100) of this player's stats within their position.
+
+    Two correctness gates, both deliberate:
+
+    1. The pool is ``modules.player_eligibility.filter_current_fantasy_players``
+       — the same "who counts as a current fantasy asset" definition every
+       other surface (Waivers, Trade search, the ranking board) already uses.
+       Inventing a second standard here would mean a player could be 40th
+       percentile on this screen and a different 40th percentile everywhere
+       else. Frames from ``rankings.load_players`` are already annotated, so
+       this is a mask over a precomputed column rather than a re-validation.
+    2. Any column with fewer than ``PERCENTILE_MIN_POOL`` real values inside
+       the position group is dropped (see that constant).
+
+    Ties use pandas' default ``method="average"``: two players with identical
+    yardage land on the same percentile, which is the honest answer.
+
+    Returns a mapping keyed by the *source* stat label (the label
+    player_profile_ui produced, before the display renames in
+    ``_fantasy_stats`` / ``_usage_stats``) plus the derived rate labels from
+    ``_efficiency_stats``. A player outside the eligible pool gets ``{}`` —
+    there is no meaningful peer group to rank a retired player against.
+    """
+
+    if players_df is None or not isinstance(players_df, pd.DataFrame) or players_df.empty:
+        return {}
+    if "position" not in players_df.columns or "player_id" not in players_df.columns:
+        return {}
+    position = _text(row.get("position")).upper()
+    player_id = _text(row.get("player_id"))
+    if not position or not player_id:
+        return {}
+
+    try:
+        pool = filter_current_fantasy_players(
+            players_df,
+            surface="player_quick_view_percentiles",
+        )
+    except Exception:
+        return {}
+    if pool is None or pool.empty:
+        return {}
+
+    group = pool[pool["position"].astype(str).str.upper() == position]
+    if len(group) < PERCENTILE_MIN_POOL:
+        return {}
+    located = group["player_id"].astype(str).to_numpy() == player_id
+    if not located.any():
+        return {}
+    offset = int(located.argmax())
+
+    series_by_label: dict[str, pd.Series | None] = {
+        label: _pool_series(group, row, fields)
+        for label, fields in _PERCENTILE_STAT_FIELDS.items()
+    }
+
+    # Per-game / per-touch rates are what _efficiency_stats actually renders,
+    # so they are ranked as computed rather than inferred from their inputs.
+    games = _positive(_pool_series(group, row, _GAMES_FIELDS))
+    targets = _pool_series(group, row, ("targets",))
+    receptions = _pool_series(group, row, ("receptions",))
+    receiving_yards = _pool_series(group, row, ("receiving_yards", "receiving_yds"))
+    rush_attempts = _pool_series(group, row, ("rush_attempts", "rushing_attempts", "carries"))
+    rushing_yards = _pool_series(group, row, ("rushing_yards", "rush_yards"))
+
+    def _ratio(numerator: pd.Series | None, denominator: pd.Series | None) -> pd.Series | None:
+        denom = _positive(denominator)
+        if numerator is None or denom is None:
+            return None
+        return numerator / denom
+
+    series_by_label.update(
+        {
+            "Targets/Gm": _ratio(targets, games),
+            "Rec/Gm": _ratio(receptions, games),
+            "Yards/Catch": _ratio(receiving_yards, receptions),
+            "Carries/Gm": _ratio(rush_attempts, games),
+            "Yards/Carry": _ratio(rushing_yards, rush_attempts),
+        }
+    )
+
+    percentiles: dict[str, float] = {}
+    for label, series in series_by_label.items():
+        if series is None:
+            continue
+        if int(series.notna().sum()) < PERCENTILE_MIN_POOL:
+            continue
+        ranked = series.rank(pct=True).to_numpy()
+        value = ranked[offset]
+        if pd.isna(value):
+            continue
+        percentiles[label] = float(min(100, max(1, int(round(float(value) * 100)))))
+    return percentiles
+
+
+def _with_percentile(item: Mapping[str, object], percentile: float | None) -> dict:
+    cloned = dict(item)
+    if percentile is not None:
+        cloned["percentile"] = percentile
+    return cloned
+
+
+def _key_stats(
+    row: pd.Series,
+    groups: Mapping[str, list[dict]],
+    percentiles: Mapping[str, float] | None = None,
+) -> list[dict]:
+    ranks = percentiles or {}
     by_label = {str(item.get("label")): item for item in groups.get("NFL Stats", [])}
     position = _text(row.get("position")).upper()
     order = {
@@ -231,10 +409,19 @@ def _key_stats(row: pd.Series, groups: Mapping[str, list[dict]]) -> list[dict]:
         position,
         ["Games", "Targets", "Receptions", "Rec Yards", "Rec TDs", "Rush Att", "Rush Yards", "Rush TDs", "Pass Yards", "Pass TDs"],
     )
-    return [dict(by_label[label]) for label in order if label in by_label]
+    return [
+        _with_percentile(by_label[label], ranks.get(label))
+        for label in order
+        if label in by_label
+    ]
 
 
-def _fantasy_stats(groups: Mapping[str, list[dict]], games: int | None) -> list[dict]:
+def _fantasy_stats(
+    groups: Mapping[str, list[dict]],
+    games: int | None,
+    percentiles: Mapping[str, float] | None = None,
+) -> list[dict]:
+    ranks = percentiles or {}
     by_label = {str(item.get("label")): item for item in groups.get("Fantasy Stats", [])}
     formats = [
         ("Fantasy PPR", "PPR"),
@@ -246,19 +433,19 @@ def _fantasy_stats(groups: Mapping[str, list[dict]], games: int | None) -> list[
     suffix = f" across {games} games." if games is not None else "."
     if len(present) > 1 and len(distinct_values) == 1:
         source, _label, item = present[-1]
-        collapsed = dict(item)
+        collapsed = _with_percentile(item, ranks.get(source))
         collapsed["label"] = "Fantasy Points"
         collapsed["note"] = f"Scoring totals are identical across loaded formats{suffix}"
         output = [collapsed]
     else:
         output = []
-        for _source, label, item in present:
-            cloned = dict(item)
+        for source, label, item in present:
+            cloned = _with_percentile(item, ranks.get(source))
             cloned["label"] = label
             cloned["note"] = f"{label} season total{suffix}"
             output.append(cloned)
     if "PPG" in by_label:
-        ppg = dict(by_label["PPG"])
+        ppg = _with_percentile(by_label["PPG"], ranks.get("PPG"))
         ppg["label"] = "PPR PPG"
         ppg["note"] = f"PPR points per game{suffix}"
         output.append(ppg)
@@ -273,7 +460,11 @@ def _rate(numerator: object, denominator: object) -> float | None:
     return float(num) / float(den)
 
 
-def _efficiency_stats(row: pd.Series, games: int | None) -> list[dict]:
+def _efficiency_stats(
+    row: pd.Series,
+    games: int | None,
+    percentiles: Mapping[str, float] | None = None,
+) -> list[dict]:
     """Per-game and per-touch rate stats — season totals alone (e.g. 62
     receptions) don't say whether that came from a bell-cow workload or a
     committee, and coridian_ asked for exactly this: targets/carries per
@@ -295,17 +486,25 @@ def _efficiency_stats(row: pd.Series, games: int | None) -> list[dict]:
         ("Carries/Gm", _rate(rush_attempts, games), "Rush attempts per game played."),
         ("Yards/Carry", _rate(rushing_yards, rush_attempts), "Rushing yards per attempt."),
     ]
+    ranks = percentiles or {}
     return [
-        {"label": label, "value": f"{value:.1f}", "note": note, "tone": "reference"}
+        _with_percentile(
+            {"label": label, "value": f"{value:.1f}", "note": note, "tone": "reference"},
+            ranks.get(label),
+        )
         for label, value, note in candidates
         if value is not None
     ]
 
 
-def _usage_stats(groups: Mapping[str, list[dict]]) -> list[dict]:
+def _usage_stats(
+    groups: Mapping[str, list[dict]],
+    percentiles: Mapping[str, float] | None = None,
+) -> list[dict]:
+    ranks = percentiles or {}
     by_label = {str(item.get("label")): item for item in groups.get("Usage", [])}
     return [
-        {**by_label[source], "label": label}
+        {**_with_percentile(by_label[source], ranks.get(source)), "label": label}
         for source, label in (
             ("Snap Share", "Snap %"),
             ("Route Part.", "Route %"),
@@ -317,26 +516,36 @@ def _usage_stats(groups: Mapping[str, list[dict]]) -> list[dict]:
     ]
 
 
-def build_stats_view(row: pd.Series) -> PlayerQuickViewStats:
+def build_stats_view(
+    row: pd.Series,
+    players_df: pd.DataFrame | None = None,
+) -> PlayerQuickViewStats:
     """Build the view from the one regular-season aggregate loaded today.
 
     The production loader joins exactly one ``stats_season`` record per player.
     It does not retain weekly rows or prior seasons, so this model deliberately
     exposes one season and never invents career totals.
+
+    ``players_df`` is optional and purely additive: when a caller already holds
+    the full player frame (the quick-view endpoint loads it to find this row in
+    the first place), every stat also carries its position-group percentile so
+    "59 rush yards" reads as "59 · 40th pct". Omitting it leaves every
+    ``StatItem.percentile`` as ``None`` and changes nothing else.
     """
 
     groups = _group_items(row)
     games = _integer(row.get("games_played"))
     season = _integer(row.get("stats_season"))
+    percentiles = _stat_percentiles(players_df, row)
     season_view = SeasonStatView(
         season=season,
         season_type="Regular Season",
         games=games,
         complete=None,
-        key_stats=_items(_key_stats(row, groups)),
-        fantasy=_items(_fantasy_stats(groups, games)),
-        usage=_items(_usage_stats(groups)),
-        efficiency=_items(_efficiency_stats(row, games)),
+        key_stats=_items(_key_stats(row, groups, percentiles)),
+        fantasy=_items(_fantasy_stats(groups, games, percentiles)),
+        usage=_items(_usage_stats(groups, percentiles)),
+        efficiency=_items(_efficiency_stats(row, games, percentiles)),
     )
     college = _items(groups.get("College Stats", []))
     has_professional_stats = bool(

@@ -524,6 +524,10 @@ export interface QuickViewStatItem {
   value: string;
   note: string;
   tone: string;
+  /** Percentile rank (1-100) of this stat within the player's position group,
+   * or null when the backend had too small an eligible pool to rank against
+   * (see player_quick_view.PERCENTILE_MIN_POOL). */
+  percentile?: number | null;
 }
 
 export interface QuickViewSeason {

@@ -131,25 +131,72 @@ function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
   );
 }
 
-function StatCell({ label, value }: { label: string; value: string | number | null }) {
+/** 1 -> "1st", 22 -> "22nd", 13 -> "13th". Teens are all "th" regardless of
+ * their last digit, which is the case a naive last-digit switch gets wrong. */
+function ordinal(value: number): string {
+  const rounded = Math.round(value);
+  const lastTwo = Math.abs(rounded) % 100;
+  const lastOne = Math.abs(rounded) % 10;
+  if (lastTwo >= 11 && lastTwo <= 13) return `${rounded}th`;
+  if (lastOne === 1) return `${rounded}st`;
+  if (lastOne === 2) return `${rounded}nd`;
+  if (lastOne === 3) return `${rounded}rd`;
+  return `${rounded}th`;
+}
+
+/** "59 rush yards" says nothing about whether 59 is good for the position —
+ * this is the peer-group answer the backend attaches to each stat. Absent
+ * (null/undefined) whenever the position pool was too small to rank against,
+ * in which case nothing renders rather than a made-up number. */
+function percentileLabel(percentile: number | null | undefined): string | null {
+  if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) return null;
+  return `${ordinal(percentile)} pctl`;
+}
+
+function StatCell({
+  label,
+  value,
+  percentile,
+}: {
+  label: string;
+  value: string | number | null;
+  percentile?: number | null;
+}) {
   const display = value === null || value === undefined || value === '' ? '—' : value;
+  const pctl = percentileLabel(percentile);
   return (
     <View style={styles.statCell}>
       <Text style={styles.statCellLabel} numberOfLines={1}>
         {label}
       </Text>
-      <Text style={styles.statCellValue} numberOfLines={1}>
-        {display}
-      </Text>
+      <View style={styles.statCellValueRow}>
+        <Text style={styles.statCellValue} numberOfLines={1}>
+          {display}
+        </Text>
+        {pctl ? (
+          <Text style={styles.statCellPercentile} numberOfLines={1}>
+            {pctl}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
 
-function StatGrid({ items }: { items: Array<{ label: string; value: string | number | null }> }) {
+function StatGrid({
+  items,
+}: {
+  items: Array<{ label: string; value: string | number | null; percentile?: number | null }>;
+}) {
   return (
     <View style={styles.statGrid}>
       {items.map((item, index) => (
-        <StatCell key={`${item.label}-${index}`} label={item.label} value={item.value} />
+        <StatCell
+          key={`${item.label}-${index}`}
+          label={item.label}
+          value={item.value}
+          percentile={item.percentile}
+        />
       ))}
     </View>
   );
@@ -177,7 +224,13 @@ function StatSection({
   return (
     <View style={first ? undefined : styles.subSection}>
       <SectionHeading title={title} icon={icon} />
-      <StatGrid items={items.map((item) => ({ label: item.label, value: item.value || null }))} />
+      <StatGrid
+        items={items.map((item) => ({
+          label: item.label,
+          value: item.value || null,
+          percentile: item.percentile,
+        }))}
+      />
     </View>
   );
 }
@@ -191,14 +244,28 @@ function parsePercent(value: string): number | null {
   return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : null;
 }
 
-function PercentBar({ label, percent, display }: { label: string; percent: number; display: string }) {
+function PercentBar({
+  label,
+  percent,
+  display,
+  percentile,
+}: {
+  label: string;
+  percent: number;
+  display: string;
+  percentile?: number | null;
+}) {
+  const pctl = percentileLabel(percentile);
   return (
     <View style={styles.percentRow}>
       <View style={styles.percentLabelRow}>
         <Text style={styles.percentLabel} numberOfLines={1}>
           {label}
         </Text>
-        <Text style={styles.percentValue}>{display}</Text>
+        <View style={styles.percentValueGroup}>
+          <Text style={styles.percentValue}>{display}</Text>
+          {pctl ? <Text style={styles.statCellPercentile}>{pctl}</Text> : null}
+        </View>
       </View>
       <View style={styles.percentTrack}>
         <View style={[styles.percentFill, { width: `${percent}%` }]} />
@@ -221,11 +288,19 @@ function UsageSection({ items }: { items: QuickViewStatItem[] }) {
         if (percent === null) {
           return (
             <View key={`${item.label}-${index}`} style={styles.percentFallbackRow}>
-              <StatCell label={item.label} value={item.value || null} />
+              <StatCell label={item.label} value={item.value || null} percentile={item.percentile} />
             </View>
           );
         }
-        return <PercentBar key={`${item.label}-${index}`} label={item.label} percent={percent} display={item.value} />;
+        return (
+          <PercentBar
+            key={`${item.label}-${index}`}
+            label={item.label}
+            percent={percent}
+            display={item.value}
+            percentile={item.percentile}
+          />
+        );
       })}
     </View>
   );
@@ -884,6 +959,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   statCellValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  // Suffix, not a second stat: it sits on the value's baseline and shrinks
+  // first, so the density pass that folded this tab into one card holds.
+  statCellValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+  statCellPercentile: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.accentSoft,
+    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
   percentRow: { marginBottom: spacing.sm },
   percentFallbackRow: { marginBottom: spacing.sm },
   percentLabelRow: {
@@ -893,6 +978,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   percentLabel: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
+  percentValueGroup: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
   percentValue: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
   percentTrack: {
     height: 6,
