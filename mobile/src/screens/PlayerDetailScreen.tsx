@@ -222,28 +222,38 @@ function UsageSection({ items }: { items: QuickViewStatItem[] }) {
   );
 }
 
-function TrendsSection({
-  seasons,
-  playerId,
-}: {
-  seasons: QuickViewSeason[];
-  playerId: string;
-}) {
-  const years = Array.from(new Set(seasons.map((s) => s.season).filter((s): s is number => s != null))).sort(
-    (a, b) => b - a,
-  );
-  const [selectedYear, setSelectedYear] = useState<number | null>(years[0] ?? null);
+// Mirrors services/mobile_api_service.py's MAX_WEEKLY_STATS_SEASONS_BACK —
+// the weekly-stats endpoint already serves up to 3 prior seasons on
+// request, but a single-season player (e.g. week 1 of a rookie year, or
+// just the current season in view) previously had no year list to pick
+// from at all: the picker was built from quick-view's `seasons`, which is
+// always a ONE-element tuple (the current season only — see
+// player_quick_view.py's `seasons=(season_view,)`), so it could never
+// produce more than one year and the picker silently never rendered. Build
+// the year list from the season the weekly-stats endpoint itself reports
+// as current instead, so a lightly-played current season still lets you
+// page back to last year or the year before.
+const WEEKLY_STATS_SEASONS_BACK = 3;
+
+function TrendsSection({ playerId }: { playerId: string }) {
+  // Set once from the first response and never touched again — the anchor
+  // for the year picker's window, independent of whichever year the user
+  // has since tapped over to.
+  const [defaultYear, setDefaultYear] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [weeks, setWeeks] = useState<WeeklyStatPoint[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (selectedYear === null) return;
     let cancelled = false;
     setLoading(true);
     api
-      .getPlayerWeeklyStats(playerId, selectedYear)
+      .getPlayerWeeklyStats(playerId, selectedYear ?? undefined)
       .then((result) => {
-        if (!cancelled) setWeeks(result.weeks);
+        if (cancelled) return;
+        setWeeks(result.weeks);
+        setSelectedYear((current) => current ?? result.season);
+        setDefaultYear((current) => current ?? result.season);
       })
       .catch(() => {
         if (!cancelled) setWeeks([]);
@@ -256,16 +266,20 @@ function TrendsSection({
     };
   }, [playerId, selectedYear]);
 
-  if (years.length === 0) {
+  if (!loading && defaultYear === null) {
     return <Text style={styles.notice}>No weekly trend data available for this player yet.</Text>;
   }
+
+  const yearOptions = defaultYear === null
+    ? []
+    : Array.from({ length: WEEKLY_STATS_SEASONS_BACK }, (_, index) => defaultYear - index);
 
   return (
     <View style={styles.card}>
       <SectionHeading title="Points By Week" icon="trending-up-outline" />
-      {years.length > 1 ? (
+      {yearOptions.length > 1 ? (
         <View style={styles.yearRow}>
-          {years.map((year) => (
+          {yearOptions.map((year) => (
             <TouchableOpacity
               key={year}
               style={[styles.yearPill, selectedYear === year && styles.yearPillActive]}
@@ -663,9 +677,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             </>
           ) : null}
 
-          {activeTab === 'trends' ? (
-            <TrendsSection seasons={stats?.seasons ?? []} playerId={player.player_id} />
-          ) : null}
+          {activeTab === 'trends' ? <TrendsSection playerId={player.player_id} /> : null}
 
           {activeTab === 'career' ? <CareerSection seasons={stats?.seasons ?? []} /> : null}
 
