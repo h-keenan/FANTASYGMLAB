@@ -315,6 +315,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       <View style={styles.sidesRow}>
         <TradeSide
           label="You Send"
+          dotColor={colors.danger}
           items={[
             ...sendIds.map((p) => ({ id: p.player_id, name: p.name ?? 'Unknown' })),
             ...sendPicks.map((p) => ({ id: p.pick_id, name: p.label ?? 'Draft pick' })),
@@ -325,6 +326,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         />
         <TradeSide
           label="You Receive"
+          dotColor={colors.successBright}
           items={[
             ...receiveIds.map((p) => ({ id: p.player_id, name: p.name ?? 'Unknown' })),
             ...receivePicks.map((p) => ({ id: p.pick_id, name: p.label ?? 'Draft pick' })),
@@ -582,12 +584,14 @@ function VerdictCard({
 
 function TradeSide({
   label,
+  dotColor,
   items,
   active,
   onPressHeader,
   onRemove,
 }: {
   label: string;
+  dotColor: string;
   items: SideChip[];
   active: boolean;
   onPressHeader: () => void;
@@ -595,7 +599,8 @@ function TradeSide({
 }) {
   return (
     <View style={[styles.side, active && styles.sideActive]}>
-      <TouchableOpacity onPress={onPressHeader}>
+      <TouchableOpacity style={styles.sideLabelRow} onPress={onPressHeader}>
+        <View style={[styles.sideDot, { backgroundColor: dotColor }]} />
         <Text style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</Text>
       </TouchableOpacity>
       {items.map((item) => (
@@ -634,7 +639,9 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   sideActive: { borderColor: colors.accent },
-  sideLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: spacing.sm },
+  sideLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
+  sideDot: { width: 7, height: 7, borderRadius: 3.5 },
+  sideLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
   sideLabelActive: { color: colors.accent },
   sideEmpty: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' },
   chip: {

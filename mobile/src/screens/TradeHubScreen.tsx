@@ -465,7 +465,10 @@ function TradeIdeaCard({
 
       <View style={styles.exchangeRow}>
         <View style={styles.exchangeSide}>
-          <Text style={styles.exchangeLabel}>You Send</Text>
+          <View style={styles.exchangeLabelRow}>
+            <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
+            <Text style={styles.exchangeLabel}>You Send</Text>
+          </View>
           {idea.package.send.map((asset, index) => (
             <AssetRow key={`send-${index}`} asset={asset} onPressPlayer={openPlayer} />
           ))}
@@ -476,7 +479,10 @@ function TradeIdeaCard({
           </View>
         </View>
         <View style={styles.exchangeSide}>
-          <Text style={styles.exchangeLabel}>You Receive</Text>
+          <View style={styles.exchangeLabelRow}>
+            <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
+            <Text style={styles.exchangeLabel}>You Receive</Text>
+          </View>
           {idea.package.receive.map((asset, index) => (
             <AssetRow key={`receive-${index}`} asset={asset} onPressPlayer={openPlayer} />
           ))}
@@ -636,13 +642,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  exchangeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
+  exchangeDot: { width: 6, height: 6, borderRadius: 3 },
   exchangeLabel: {
     fontSize: 10,
     fontWeight: '700',
     color: colors.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 2,
   },
   assetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
   assetAvatar: {},
