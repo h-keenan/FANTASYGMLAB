@@ -426,6 +426,32 @@ export interface DraftPickAsset {
   owner_team_name: string | null;
   pick_tier: string | null;
   projected_pick_range: string | null;
+  /** Valuation breakdown, forwarded verbatim from the server's own pick
+   * model (modules/trade_ideas._pick_value_components) — Pick Detail renders
+   * these as-is and never re-derives or approximates a value client-side.
+   * Optional because an older API build predates them. */
+  tier_bucket?: string | null;
+  base_score?: number | null;
+  /** Draft years beyond the next class — 0 for this year's and next year's
+   * picks, then 1, 2, ... The "harder the further out" axis. */
+  years_out?: number | null;
+  /** 0.88 ** years_out. */
+  future_discount?: number | null;
+  team_modifier?: number | null;
+  format_multiplier?: number | null;
+  class_strength_multiplier?: number | null;
+  prospect_strength_multiplier?: number | null;
+  slot_percentile?: number | null;
+  projected_slot_percentile?: number | null;
+  /** Round-slot distribution (early/mid/late), sums to 1. */
+  early_probability?: number | null;
+  mid_probability?: number | null;
+  late_probability?: number | null;
+  /** 0-1 — the probability mass on the most likely slot bucket. Falls as the
+   * pick moves further into the future. */
+  projection_confidence?: number | null;
+  projection_source?: string | null;
+  is_current_year_pick?: boolean | null;
 }
 
 export interface DraftPicksResponse {

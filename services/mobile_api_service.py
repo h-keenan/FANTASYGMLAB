@@ -12,7 +12,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
   - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
   - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
-  - GET  /v1/leagues/{id}/draft-picks    — every draft pick asset, for the Trade Analyzer picks browser
+  - GET  /v1/leagues/{id}/draft-picks    — every draft pick asset + its full valuation breakdown
   - GET  /v1/leagues/{id}/my-team        — your own roster's suggested starters vs. bench
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
@@ -603,7 +603,7 @@ def get_league_draft_picks(
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Every draft pick asset in the league, for the mobile Trade Analyzer's
-    Players/Picks roster browser.
+    Players/Picks roster browser and the Draft Center's Pick Detail screen.
 
     Each pick gets a stable pick_id — f"{season}:{round}:{original_roster_id}"
     — the client sends back in POST /trade-analyzer's send_pick_ids/
@@ -660,6 +660,27 @@ def get_league_draft_picks(
             "owner_team_name": _clean_json_value(pick.get("owner_team_name")),
             "pick_tier": _clean_json_value(pick.get("pick_tier")),
             "projected_pick_range": _clean_json_value(pick.get("projected_pick_range")),
+            # Full valuation breakdown, forwarded verbatim from
+            # trade_ideas._pick_value_components — the mobile Pick Detail
+            # ("PQV for a draft pick") screen shows the same multipliers and
+            # projected-range distribution the model already computed, so
+            # the client never re-derives or approximates any of it.
+            "tier_bucket": _clean_json_value(pick.get("tier_bucket")),
+            "base_score": _clean_json_value(pick.get("base_score")),
+            "years_out": _clean_json_value(pick.get("years_out")),
+            "future_discount": _clean_json_value(pick.get("future_discount")),
+            "team_modifier": _clean_json_value(pick.get("team_modifier")),
+            "format_multiplier": _clean_json_value(pick.get("format_multiplier")),
+            "class_strength_multiplier": _clean_json_value(pick.get("class_strength_multiplier")),
+            "prospect_strength_multiplier": _clean_json_value(pick.get("prospect_strength_multiplier")),
+            "slot_percentile": _clean_json_value(pick.get("slot_percentile")),
+            "projected_slot_percentile": _clean_json_value(pick.get("projected_slot_percentile")),
+            "early_probability": _clean_json_value(pick.get("early_probability")),
+            "mid_probability": _clean_json_value(pick.get("mid_probability")),
+            "late_probability": _clean_json_value(pick.get("late_probability")),
+            "projection_confidence": _clean_json_value(pick.get("projection_confidence")),
+            "projection_source": _clean_json_value(pick.get("projection_source")),
+            "is_current_year_pick": bool(pick.get("is_current_year_pick")),
         }
         for pick in picks
     ]
