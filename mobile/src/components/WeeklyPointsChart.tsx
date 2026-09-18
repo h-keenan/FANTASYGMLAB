@@ -63,7 +63,10 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
       ) : null}
       <View style={styles.labelRow}>
         {points.map((point) => (
-          <Text key={point.week} style={styles.weekLabel}>
+          <Text
+            key={point.week}
+            style={[styles.weekLabel, { left: point.x - LABEL_WIDTH / 2 }]}
+          >
             {point.week}
           </Text>
         ))}
@@ -72,6 +75,8 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
   );
 }
 
+const LABEL_WIDTH = 20;
+
 const styles = {
   empty: {
     ...typography.bodyMuted,
@@ -79,14 +84,19 @@ const styles = {
     textAlign: 'center' as const,
     paddingVertical: spacing.lg,
   },
+  // Absolutely positioned per-point at the same x the SVG drew its dot at —
+  // a flexbox space-between row assumes even spacing across the full width,
+  // which breaks down for a single point (centers the dot but left-aligns
+  // its lone label) and isn't guaranteed to line up for any point count.
   labelRow: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
+    height: 16,
     marginTop: spacing.xs,
-    paddingHorizontal: SIDE_PAD,
   },
   weekLabel: {
     ...typography.caption,
     color: colors.textTertiary,
+    position: 'absolute' as const,
+    width: LABEL_WIDTH,
+    textAlign: 'center' as const,
   },
 };
