@@ -155,18 +155,27 @@ function StatGrid({ items }: { items: Array<{ label: string; value: string | num
   );
 }
 
+/** `first` drops the top divider/margin — used when this is the leading
+ * subsection inside a shared outer card (see the Stats tab, which groups
+ * Production/Fantasy/Efficiency/Usage/College into ONE card instead of one
+ * per category: five separate cards each with their own border+padding+
+ * margin was the literal cause of "Usage is buried at the bottom... the UI
+ * is too spaced out" — same stat density, far less card chrome between
+ * categories that all describe the same season). */
 function StatSection({
   title,
   icon,
   items,
+  first,
 }: {
   title: string;
   icon: IoniconName;
   items: QuickViewStatItem[];
+  first?: boolean;
 }) {
   if (items.length === 0) return null;
   return (
-    <View style={[styles.card, styles.cardSpaced]}>
+    <View style={first ? undefined : styles.subSection}>
       <SectionHeading title={title} icon={icon} />
       <StatGrid items={items.map((item) => ({ label: item.label, value: item.value || null }))} />
     </View>
@@ -205,7 +214,7 @@ function PercentBar({ label, percent, display }: { label: string; percent: numbe
 function UsageSection({ items }: { items: QuickViewStatItem[] }) {
   if (items.length === 0) return null;
   return (
-    <View style={[styles.card, styles.cardSpaced]}>
+    <View style={styles.subSection}>
       <SectionHeading title="Usage" icon="speedometer-outline" />
       {items.map((item, index) => {
         const percent = item.value ? parsePercent(item.value) : null;
@@ -653,13 +662,15 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           {activeTab === 'stats' && season ? (
             <>
               <Text style={styles.seasonLabel}>{season.label}</Text>
-              <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} />
-              <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} />
-              <StatSection title="Efficiency" icon="calculator-outline" items={season.efficiency} />
-              <UsageSection items={season.usage} />
-              {stats?.college_available ? (
-                <StatSection title="College" icon="school-outline" items={stats.college} />
-              ) : null}
+              <View style={[styles.card, styles.cardSpaced]}>
+                <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} first />
+                <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} />
+                <StatSection title="Efficiency" icon="calculator-outline" items={season.efficiency} />
+                <UsageSection items={season.usage} />
+                {stats?.college_available ? (
+                  <StatSection title="College" icon="school-outline" items={stats.college} />
+                ) : null}
+              </View>
             </>
           ) : null}
 
@@ -768,6 +779,15 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   cardSpaced: { marginTop: spacing.lg },
+  // A subsection inside a shared card: a hairline + modest top margin reads
+  // as "next category" without the full weight of another card's
+  // border+padding+margin — see StatSection's `first` prop.
+  subSection: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   tabRow: {
     flexDirection: 'row',
     gap: spacing.sm,
