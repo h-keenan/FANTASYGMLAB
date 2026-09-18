@@ -33,6 +33,9 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/dashboard — the caller's "Next Move" briefing
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
   - GET  /v1/leagues/{id}/waivers   — roster-need-aware free-agent pool + FAAB guidance
+  - POST /v1/leagues/{id}/trade-outcomes        — record a shared trade for later "did this happen?" follow-up
+  - GET  /v1/trade-outcomes/pending             — this user's shared trades ready to be asked about
+  - POST /v1/trade-outcomes/{id}/answer         — record yes/no/didnt_send, or snooze with still_pending
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -52,6 +55,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -1293,6 +1297,177 @@ def mark_league_alert_read(
             json={"user_id": user_id, "league_id": league_id, "alert_key": alert_key},
             timeout=15,
         )
+    except Exception:
+        return {"ok": False, "reason": "not_available"}
+    if response.status_code >= 400:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+TRADE_OUTCOMES_TABLE = "trade_outcomes"
+TRADE_OUTCOME_ANSWERS = {"yes", "no", "didnt_send"}
+# Don't ask "did this happen?" the moment someone shares — give it roughly a
+# day (matches modules/push_triggers.py's own copy of this same constant;
+# the push-trigger sweep is a separate cron process so it can't import this
+# module, hence the duplicated value rather than a shared import).
+TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS = 20
+TRADE_OUTCOME_SNOOZE_HOURS = 20
+
+
+class TradeOutcomeAssetSummary(BaseModel):
+    name: str = ""
+    position: str = ""
+
+
+class RecordTradeShareRequest(BaseModel):
+    partner_team_name: str = ""
+    send: list[TradeOutcomeAssetSummary] = Field(default_factory=list)
+    receive: list[TradeOutcomeAssetSummary] = Field(default_factory=list)
+    value_edge_label: str = ""
+
+
+@app.post("/v1/leagues/{league_id}/trade-outcomes")
+def record_trade_share(
+    league_id: str,
+    body: RecordTradeShareRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Record that a trade was shared, to ask "did this happen?" later.
+
+    A snapshot, not a live reference — trade_summary is stored as-is so
+    Trade History reads what was actually shared even if valuations move
+    later (see docs/supabase_trade_outcomes.sql). Fails closed (ok: False)
+    rather than 500 if the table isn't migrated yet.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    trade_summary = {
+        "partner_team_name": body.partner_team_name.strip()[:120],
+        "send": [
+            {"name": asset.name.strip()[:80], "position": asset.position.strip()[:8]}
+            for asset in body.send[:10]
+        ],
+        "receive": [
+            {"name": asset.name.strip()[:80], "position": asset.position.strip()[:8]}
+            for asset in body.receive[:10]
+        ],
+        "value_edge_label": body.value_edge_label.strip()[:40],
+    }
+    url = auth_supabase.rest_api_url(config, TRADE_OUTCOMES_TABLE)
+    headers = auth_supabase.auth_headers(config, str(user.get("_access_token") or ""))
+    headers["Prefer"] = "return=minimal"
+    try:
+        response = requests.post(
+            url,
+            headers=headers,
+            json={
+                "user_id": user_id,
+                "league_id": league_id,
+                "partner_team_name": trade_summary["partner_team_name"],
+                "trade_summary": trade_summary,
+            },
+            timeout=15,
+        )
+    except Exception:
+        return {"ok": False, "reason": "not_available"}
+    if response.status_code >= 400:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+def _project_trade_outcome(row: dict[str, Any]) -> dict[str, Any]:
+    summary = row.get("trade_summary") if isinstance(row.get("trade_summary"), dict) else {}
+    return {
+        "id": str(row.get("id") or ""),
+        "league_id": str(row.get("league_id") or ""),
+        "partner_team_name": str(row.get("partner_team_name") or ""),
+        "trade_summary": summary,
+        "shared_at": row.get("shared_at"),
+    }
+
+
+@app.get("/v1/trade-outcomes/pending")
+def get_pending_trade_outcomes(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Shared trades old enough to ask "did this happen?" about — powers
+    both the in-app prompt and (indirectly, via the same table) the
+    follow-up push. Not yet asked (or snoozed and the snooze has expired).
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": True, "outcomes": []}
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=TRADE_OUTCOME_FOLLOWUP_DELAY_HOURS)).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
+    query = (
+        f"user_id=eq.{user_id}&outcome=eq.pending&shared_at=lte.{cutoff}"
+        f"&or=(snoozed_until.is.null,snoozed_until.lte.{now})"
+        "&select=id,league_id,partner_team_name,trade_summary,shared_at"
+        "&order=shared_at.asc&limit=10"
+    )
+    url = auth_supabase.rest_api_url(config, TRADE_OUTCOMES_TABLE, query)
+    try:
+        response = requests.get(url, headers=auth_supabase.auth_headers(config, access_token), timeout=15)
+    except Exception:
+        return {"ok": True, "outcomes": []}
+    if response.status_code >= 400:
+        return {"ok": True, "outcomes": []}
+    try:
+        rows = response.json()
+    except Exception:
+        return {"ok": True, "outcomes": []}
+    if not isinstance(rows, list):
+        return {"ok": True, "outcomes": []}
+    return {"ok": True, "outcomes": [_project_trade_outcome(row) for row in rows if isinstance(row, dict)]}
+
+
+class AnswerTradeOutcomeRequest(BaseModel):
+    outcome: str
+
+
+@app.post("/v1/trade-outcomes/{outcome_id}/answer")
+def answer_trade_outcome(
+    outcome_id: str,
+    body: AnswerTradeOutcomeRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Record the user's answer, or snooze ("still pending") ~a day.
+
+    "still_pending" never sets outcome_recorded_at — the row stays
+    `outcome='pending'` and simply won't be asked about again until the
+    snooze expires, so it keeps aging toward the push follow-up too.
+    """
+
+    answer = body.outcome.strip().lower()
+    if answer not in TRADE_OUTCOME_ANSWERS and answer != "still_pending":
+        raise HTTPException(status_code=422, detail="outcome must be yes, no, didnt_send, or still_pending.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    if answer == "still_pending":
+        patch = {
+            "snoozed_until": (
+                datetime.now(timezone.utc) + timedelta(hours=TRADE_OUTCOME_SNOOZE_HOURS)
+            ).isoformat(),
+        }
+    else:
+        patch = {"outcome": answer, "outcome_recorded_at": datetime.now(timezone.utc).isoformat()}
+
+    query = f"id=eq.{outcome_id}&user_id=eq.{user_id}"
+    url = auth_supabase.rest_api_url(config, TRADE_OUTCOMES_TABLE, query)
+    headers = auth_supabase.auth_headers(config, str(user.get("_access_token") or ""))
+    headers["Prefer"] = "return=minimal"
+    try:
+        response = requests.patch(url, headers=headers, json=patch, timeout=15)
     except Exception:
         return {"ok": False, "reason": "not_available"}
     if response.status_code >= 400:
