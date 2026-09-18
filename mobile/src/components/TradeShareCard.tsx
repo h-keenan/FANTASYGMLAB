@@ -90,13 +90,19 @@ const TradeShareCard = forwardRef<View, {
 
       <View style={styles.exchangeRow}>
         <View style={styles.exchangeSide}>
-          <Text style={styles.exchangeKicker}>YOU SEND</Text>
+          <View style={styles.exchangeKickerRow}>
+            <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
+            <Text style={styles.exchangeKicker}>YOU SEND</Text>
+          </View>
           {sendPlayers.slice(0, 3).map((player) => (
             <AssetLine key={player.player_id} player={player} />
           ))}
         </View>
         <View style={styles.exchangeSide}>
-          <Text style={styles.exchangeKicker}>YOU RECEIVE</Text>
+          <View style={styles.exchangeKickerRow}>
+            <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
+            <Text style={styles.exchangeKicker}>YOU RECEIVE</Text>
+          </View>
           {receivePlayers.slice(0, 3).map((player) => (
             <AssetLine key={player.player_id} player={player} />
           ))}
@@ -172,7 +178,9 @@ const styles = StyleSheet.create({
   gainLabel: { fontSize: 12, color: colors.textSecondary, marginTop: -2 },
   exchangeRow: { flexDirection: 'row', gap: spacing.md },
   exchangeSide: { flex: 1, gap: 6 },
-  exchangeKicker: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5, marginBottom: 2 },
+  exchangeKickerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  exchangeDot: { width: 5, height: 5, borderRadius: 2.5 },
+  exchangeKicker: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
   assetLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   assetAvatar: {},
   assetTextGroup: { flex: 1 },

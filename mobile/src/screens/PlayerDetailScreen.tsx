@@ -285,11 +285,19 @@ function TrendsSection({
   );
 }
 
+// Previous bronze (#9DA4AE) was a blue-gray, not remotely bronze-colored —
+// on a small icon at dark-mode contrast, all three tiers read as "plain
+// gray," which is exactly the "awards look bland" complaint. These are
+// closer to actual metallic gold/silver/bronze. Untiered awards (some
+// achievements have no tier — see modules/player_awards.py's tier=None
+// cases) previously fell back to colors.border, nearly invisible against
+// the card background; now a visible neutral accent instead.
 const AWARD_TIER_COLORS: Record<string, string> = {
-  gold: '#D8B85A',
-  silver: '#D7DBE2',
-  bronze: '#9DA4AE',
+  gold: '#FFD700',
+  silver: '#D9DFE6',
+  bronze: '#CD7F32',
 };
+const AWARD_UNTIERED_COLOR = colors.accentSoft;
 
 function AwardsSection({ awards }: { awards: PlayerAward[] }) {
   if (awards.length === 0) return null;
@@ -298,7 +306,7 @@ function AwardsSection({ awards }: { awards: PlayerAward[] }) {
       <SectionHeading title="Awards" icon="trophy-outline" />
       <View style={styles.awardsWrap}>
         {awards.map((award) => {
-          const tierColor = award.tier ? AWARD_TIER_COLORS[award.tier] : colors.border;
+          const tierColor = (award.tier && AWARD_TIER_COLORS[award.tier]) || AWARD_UNTIERED_COLOR;
           return (
             <View key={award.badge_id} style={[styles.awardChip, { borderLeftColor: tierColor }]}>
               <View style={[styles.awardMedal, { backgroundColor: `${tierColor}26` }]}>
