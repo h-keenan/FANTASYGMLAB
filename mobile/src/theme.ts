@@ -47,12 +47,16 @@ export const colors = {
  * rendered position as plain secondary-color text). Chip/accent only, per
  * design_tokens.py's own comment: never recolor the whole player card.
  */
+// Matched to Sleeper's own position colors (saturated, not pastel) — QB and
+// K were previously swapped hues (QB pale violet, K pale pink) against
+// Sleeper's rose-red QB / violet K, and RB/WR were noticeably more washed
+// out than Sleeper's bolder fills.
 export const positionColors: Record<string, string> = {
-  QB: '#C4B5FD',
-  RB: '#86EFAC',
-  WR: '#7DD3FC',
-  TE: '#FCD34D',
-  K: '#FDA4AF',
+  QB: '#FB7185',
+  RB: '#4ADE80',
+  WR: '#38BDF8',
+  TE: '#FB923C',
+  K: '#A78BFA',
   DEF: '#D4D4D8',
   DST: '#D4D4D8',
 };

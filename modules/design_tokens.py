@@ -74,12 +74,16 @@ DESIGN_TOKEN_CSS = """
     --color-prestige-depth: #626a75;
     --color-prestige-replacement: #ef6a6a;
 
-    /* Position identity (chip/accent only — never recolor the player card) */
-    --color-position-qb: #c4b5fd;
-    --color-position-rb: #86efac;
-    --color-position-wr: #7dd3fc;
-    --color-position-te: #fcd34d;
-    --color-position-k: #fda4af;
+    /* Position identity (chip/accent only — never recolor the player card).
+       Matched to Sleeper's own position colors (saturated, not pastel) —
+       QB and K were previously swapped hues (QB pale violet, K pale pink)
+       against Sleeper's rose-red QB / violet K, and RB/WR were noticeably
+       more washed out than Sleeper's bolder fills. */
+    --color-position-qb: #fb7185;
+    --color-position-rb: #4ade80;
+    --color-position-wr: #38bdf8;
+    --color-position-te: #fb923c;
+    --color-position-k: #a78bfa;
     --color-position-dst: #d4d4d8;
 
     /* Semantic soft surfaces */
