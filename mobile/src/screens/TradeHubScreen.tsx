@@ -386,7 +386,7 @@ function MeterRow({ label, value, level, color }: { label: string; value: string
           />
         ))}
       </View>
-      <Text style={styles.meterValue}>{value}</Text>
+      <Text style={[styles.meterValue, { color }]}>{value}</Text>
     </View>
   );
 }

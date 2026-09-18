@@ -8,6 +8,8 @@ import type { WeeklyRecap } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import RecapShareCard, { CARD_HEIGHT, CARD_WIDTH } from './RecapShareCard';
 
+const PREVIEW_SCALE = 0.82;
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -59,7 +61,9 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <Text style={styles.title}>Share this recap</Text>
           <View style={styles.previewWrap}>
-            <RecapShareCard ref={cardRef} leagueName={leagueName} recap={recap} />
+            <View style={styles.previewScaled}>
+              <RecapShareCard ref={cardRef} leagueName={leagueName} recap={recap} />
+            </View>
           </View>
           <TouchableOpacity style={styles.primaryButton} onPress={onShareImage} disabled={capturing}>
             {capturing ? (
@@ -102,9 +106,20 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  // See TradeSharePreviewModal's identical fix: a plain `transform: scale`
+  // shrinks what's drawn but not the layout box, so the wrapper is sized to
+  // the post-scale dimensions and clips the oversized box to fit, with the
+  // scale anchored top-left instead of a hand-tuned negative-margin fudge.
   previewWrap: {
-    transform: [{ scale: 0.82 }],
-    marginVertical: -45,
+    width: CARD_WIDTH * PREVIEW_SCALE,
+    height: CARD_HEIGHT * PREVIEW_SCALE,
+    overflow: 'hidden',
+  },
+  previewScaled: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    transform: [{ scale: PREVIEW_SCALE }],
+    transformOrigin: '0 0',
   },
   primaryButton: {
     flexDirection: 'row',

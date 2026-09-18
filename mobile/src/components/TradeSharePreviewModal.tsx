@@ -8,6 +8,8 @@ import { api, type RankedPlayer, type TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import TradeShareCard, { CARD_HEIGHT, CARD_WIDTH } from './TradeShareCard';
 
+const PREVIEW_SCALE = 0.82;
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -101,13 +103,15 @@ export default function TradeSharePreviewModal({
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <Text style={styles.title}>Share this trade</Text>
           <View style={styles.previewWrap}>
-            <TradeShareCard
-              ref={cardRef}
-              leagueName={leagueName}
-              verdict={verdict}
-              sendPlayers={sendPlayers}
-              receivePlayers={receivePlayers}
-            />
+            <View style={styles.previewScaled}>
+              <TradeShareCard
+                ref={cardRef}
+                leagueName={leagueName}
+                verdict={verdict}
+                sendPlayers={sendPlayers}
+                receivePlayers={receivePlayers}
+              />
+            </View>
           </View>
           <TouchableOpacity style={styles.primaryButton} onPress={onShareImage} disabled={capturing}>
             {capturing ? (
@@ -150,9 +154,25 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  // The card renders at its real CARD_WIDTH/CARD_HEIGHT (react-native-view-shot
+  // captures it full-resolution via cardRef), then gets visually shrunk to fit
+  // the modal. A bare `transform: scale` doesn't shrink the LAYOUT box though —
+  // it only shrinks what's drawn inside it — so the wrapper below is sized to
+  // the post-scale dimensions and clips the now-oversized layout box down to
+  // exactly that size, with the scale anchored at its top-left corner instead
+  // of the default center (so it shrinks into the wrapper's corner, not out
+  // past all four edges). That replaces a `marginVertical: -45` hand-tuned
+  // fudge factor that didn't quite match the real overflow.
   previewWrap: {
-    transform: [{ scale: 0.82 }],
-    marginVertical: -45,
+    width: CARD_WIDTH * PREVIEW_SCALE,
+    height: CARD_HEIGHT * PREVIEW_SCALE,
+    overflow: 'hidden',
+  },
+  previewScaled: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    transform: [{ scale: PREVIEW_SCALE }],
+    transformOrigin: '0 0',
   },
   primaryButton: {
     flexDirection: 'row',
