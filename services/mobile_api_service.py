@@ -62,6 +62,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -95,11 +96,13 @@ from modules import (
     player_eligibility,
     player_quick_view,
     player_state_authority,
+    players_refresh_flight,
     push_tokens,
     push_triggers,
     rankings,
     sleeper,
     sleeper_leagues,
+    startup_cold_path,
     trade_analyzer_fit,
     trade_hub_engine,
     trade_hub_ui,
@@ -178,6 +181,51 @@ def _bearer_token(authorization: str | None) -> str:
     return token.strip()
 
 
+def _maybe_schedule_players_refresh() -> None:
+    """Best-effort stale-while-revalidate refresh of data/players.db.
+
+    Before this, the mobile API's own load pattern (`load_players` → build
+    only if the file is missing/empty) never revalidated an existing file —
+    a player's injury_status, score, and rank could go stale indefinitely as
+    long as data/players.db existed at all. The web app already solved this
+    exact problem with modules.players_refresh_flight/startup_cold_path
+    (process-scoped single-flight, background thread, cooldown after
+    failure), so this reuses that instead of inventing a second mechanism.
+
+    Lives in require_user (every authenticated request depends on it, same
+    as /v1/news's own per-request TTL check) rather than in each of the ~15
+    individual endpoints that load PLAYERS_DB_PATH — one hook covers all of
+    them. A fresh throwaway dict is passed as "session_state" each call:
+    the real single-flight/cooldown guards are the module-level state
+    inside players_refresh_flight, not this dict — reusing one dict across
+    calls would behave like Streamlit's "only ever once per session"
+    one-shot arming, which doesn't fit a long-lived API worker that should
+    re-check every time the hourly Sleeper cache goes stale again.
+    """
+
+    # Never fire during tests: this would otherwise start a real background
+    # thread making live requests.get calls (rankings.build_players_table
+    # refreshing from Sleeper), colliding with every other test's
+    # patch("requests.get", ...) mock sequence — same PYTEST_CURRENT_TEST /
+    # DYNASTYGM_TEST_MODE gate modules.launch_analytics already uses for
+    # this exact class of problem.
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("DYNASTYGM_TEST_MODE"):
+        return
+    try:
+        if not startup_cold_path.sleeper_players_cache_stale():
+            return
+        session_state: dict[str, Any] = {startup_cold_path.PLAYERS_REFRESH_PENDING_KEY: True}
+        players_refresh_flight.schedule_deferred_players_refresh(
+            db_path=PLAYERS_DB_PATH,
+            build_players_table_fn=rankings.build_players_table,
+            session_state=session_state,
+            pending_key=startup_cold_path.PLAYERS_REFRESH_PENDING_KEY,
+            background=True,
+        )
+    except Exception:
+        pass
+
+
 def require_user(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     """Verify the caller's Supabase access token and return the auth user.
 
@@ -196,6 +244,7 @@ def require_user(authorization: str | None = Header(default=None)) -> dict[str, 
         raise HTTPException(status_code=401, detail=error or "Invalid or expired session.")
     normalized = auth_supabase.normalize_auth_user(user, access_token=token)
     normalized["_access_token"] = token
+    _maybe_schedule_players_refresh()
     return normalized
 
 
