@@ -31,6 +31,66 @@ def test_render_yaml_documents_mobile_api_service():
     assert "healthCheckPath: /health" in text.split("fantasygm-lab-mobile-api", 1)[1]
 
 
+def test_maybe_schedule_players_refresh_noop_under_pytest(monkeypatch):
+    """The guard itself: this test runs under pytest, so PYTEST_CURRENT_TEST
+    is genuinely set (not simulated) — confirms the function never even
+    reaches the staleness check, let alone schedules a real background
+    refresh that would collide with every other test's requests.get mock.
+    """
+
+    from services import mobile_api_service
+
+    checked = {"hit": False}
+    monkeypatch.setattr(
+        mobile_api_service.startup_cold_path,
+        "sleeper_players_cache_stale",
+        lambda **kwargs: checked.__setitem__("hit", True) or True,
+    )
+    mobile_api_service._maybe_schedule_players_refresh()
+    assert checked["hit"] is False
+
+
+def test_maybe_schedule_players_refresh_schedules_when_stale(monkeypatch):
+    from services import mobile_api_service
+
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("DYNASTYGM_TEST_MODE", raising=False)
+    monkeypatch.setattr(mobile_api_service.startup_cold_path, "sleeper_players_cache_stale", lambda **kwargs: True)
+    called: dict = {}
+
+    def fake_schedule(**kwargs):
+        called.update(kwargs)
+        return {"scheduled": True}
+
+    monkeypatch.setattr(mobile_api_service.players_refresh_flight, "schedule_deferred_players_refresh", fake_schedule)
+
+    mobile_api_service._maybe_schedule_players_refresh()
+
+    assert called["db_path"] == mobile_api_service.PLAYERS_DB_PATH
+    assert called["build_players_table_fn"] is mobile_api_service.rankings.build_players_table
+    assert called["background"] is True
+    assert called["session_state"][mobile_api_service.startup_cold_path.PLAYERS_REFRESH_PENDING_KEY] is True
+
+
+def test_maybe_schedule_players_refresh_noop_when_fresh(monkeypatch):
+    from services import mobile_api_service
+
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("DYNASTYGM_TEST_MODE", raising=False)
+    monkeypatch.setattr(mobile_api_service.startup_cold_path, "sleeper_players_cache_stale", lambda **kwargs: False)
+    called = {"hit": False}
+
+    def fake_schedule(**kwargs):
+        called["hit"] = True
+        return {"scheduled": False}
+
+    monkeypatch.setattr(mobile_api_service.players_refresh_flight, "schedule_deferred_players_refresh", fake_schedule)
+
+    mobile_api_service._maybe_schedule_players_refresh()
+
+    assert called["hit"] is False
+
+
 def test_health_root_and_ready(monkeypatch):
     client = _client(monkeypatch)
 
