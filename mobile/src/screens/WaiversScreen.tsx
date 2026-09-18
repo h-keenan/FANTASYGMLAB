@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
+import PremiumLock from '../components/PremiumLock';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
@@ -64,6 +65,10 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [freeAgents, setFreeAgents] = useState<WaiverPlayer[] | null>(null);
   const [priorityAdds, setPriorityAdds] = useState<WaiverPriorityAdd[]>([]);
   const [neededPositions, setNeededPositions] = useState<string[]>([]);
+  const [stashCandidates, setStashCandidates] = useState<WaiverPlayer[]>([]);
+  const [watchlistCandidates, setWatchlistCandidates] = useState<WaiverPlayer[]>([]);
+  const [faabTargets, setFaabTargets] = useState<WaiverPlayer[]>([]);
+  const [isPremium, setIsPremium] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -82,6 +87,10 @@ export default function WaiversScreen({ route, navigation }: Props) {
           setFreeAgents(result.players);
           setPriorityAdds(result.priority_adds);
           setNeededPositions(result.needed_positions);
+          setStashCandidates(result.stash_candidates);
+          setWatchlistCandidates(result.watchlist_candidates);
+          setFaabTargets(result.faab_targets);
+          setIsPremium(result.entitlement.is_premium);
           setNotice(result.reason ? reasonMessage(result.reason) : null);
         } catch (err) {
           if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load waivers.');
@@ -207,6 +216,17 @@ export default function WaiversScreen({ route, navigation }: Props) {
             />
           )}
           ListEmptyComponent={<Text style={styles.empty}>No free agents match.</Text>}
+          ListFooterComponent={
+            <SecondaryWaiverBoard
+              isPremium={isPremium}
+              stashCandidates={stashCandidates}
+              watchlistCandidates={watchlistCandidates}
+              faabTargets={faabTargets}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+            />
+          }
         />
       )}
     </View>
@@ -234,6 +254,71 @@ function toRankedPlayer(player: WaiverPlayer) {
     rank_unavailable_reason: null,
     opportunity_label: null,
   };
+}
+
+function SecondaryWaiverBoard({
+  isPremium,
+  stashCandidates,
+  watchlistCandidates,
+  faabTargets,
+  leagueId,
+  leagueName,
+  navigation,
+}: {
+  isPremium: boolean;
+  stashCandidates: WaiverPlayer[];
+  watchlistCandidates: WaiverPlayer[];
+  faabTargets: WaiverPlayer[];
+  leagueId: string;
+  leagueName: string;
+  navigation: Props['navigation'];
+}) {
+  if (!isPremium) {
+    return (
+      <View style={styles.secondaryLockWrap}>
+        <PremiumLock
+          title="Full waiver board and FAAB shortlist"
+          description="Priority Adds stay free — Premium adds stash candidates, watchlist depth, and a FAAB shortlist so you don't miss the next claim."
+        />
+      </View>
+    );
+  }
+  if (stashCandidates.length === 0 && watchlistCandidates.length === 0 && faabTargets.length === 0) {
+    return null;
+  }
+  const openPlayer = (player: WaiverPlayer) =>
+    navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName });
+  return (
+    <View style={styles.secondaryBoard}>
+      <Text style={styles.secondaryCaption}>
+        Upside stashes, watchlist depth, and a quick FAAB shortlist — check these after Priority Adds.
+      </Text>
+      {stashCandidates.length > 0 ? (
+        <View style={styles.priorityBlock}>
+          <Text style={styles.sectionLabel}>Stash Candidates</Text>
+          {stashCandidates.map((player, index) => (
+            <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
+          ))}
+        </View>
+      ) : null}
+      {watchlistCandidates.length > 0 ? (
+        <View style={styles.priorityBlock}>
+          <Text style={styles.sectionLabel}>Watchlist Depth</Text>
+          {watchlistCandidates.map((player, index) => (
+            <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
+          ))}
+        </View>
+      ) : null}
+      {faabTargets.length > 0 ? (
+        <View style={styles.priorityBlock}>
+          <Text style={styles.sectionLabel}>FAAB Shortlist</Text>
+          {faabTargets.map((player, index) => (
+            <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 function BestAvailableCard({
@@ -431,6 +516,9 @@ const styles = StyleSheet.create({
   bestAvailableScore: { fontSize: 14, fontWeight: '700', color: colors.accent },
   bestAvailableCount: { fontSize: 10, color: colors.textTertiary },
   priorityBlock: { gap: spacing.sm },
+  secondaryLockWrap: { marginTop: spacing.lg },
+  secondaryBoard: { marginTop: spacing.lg, gap: spacing.md },
+  secondaryCaption: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
   priorityCard: { padding: spacing.md, borderColor: colors.premium, borderWidth: 1 },
   priorityTopRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
   priorityLabel: {

@@ -10,12 +10,14 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import {
   api,
+  type DashboardEntitlementInfo,
   type DashboardItem,
   type DashboardItemCategory,
   type PresentationAsset,
   type TeamRanking,
   type TeamSnapshot,
 } from '../lib/api';
+import PremiumLock from '../components/PremiumLock';
 import { useOrbClearance } from '../lib/orbLayout';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -119,6 +121,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
   const [teamRankings, setTeamRankings] = useState<TeamRanking[] | null>(null);
+  const [entitlement, setEntitlement] = useState<DashboardEntitlementInfo | null>(null);
   const { showExplanations } = useDensity();
 
   useScreenHeaderTitle(navigation, 'Next Move', leagueName);
@@ -135,6 +138,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           } else {
             setItems(result.items);
             setTeamSnapshot(result.team_snapshot);
+            setEntitlement(result.entitlement ?? null);
             setQuiet(result.quiet);
             setQuietReason(result.quiet_reason ?? '');
             const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
@@ -231,7 +235,26 @@ export default function DashboardScreen({ route, navigation }: Props) {
           />
         ))
       )}
-      {teamRankings && teamRankings.length > 0 ? <LeaguePulseSection teams={teamRankings} /> : null}
+      {entitlement && !entitlement.is_premium && entitlement.hidden_count > 0 ? (
+        <View style={styles.lockWrap}>
+          <PremiumLock
+            title="More next moves"
+            description={`See ${entitlement.hidden_count} more roster, trade, waiver, and health signal${entitlement.hidden_count === 1 ? '' : 's'} so you don't miss the next best move.`}
+          />
+        </View>
+      ) : null}
+      {teamRankings && teamRankings.length > 0 ? (
+        entitlement && !entitlement.is_premium ? (
+          <View style={styles.lockWrap}>
+            <PremiumLock
+              title="Full League Pulse"
+              description="See contender, rebuilder, and draft-capital leaders across the whole league."
+            />
+          </View>
+        ) : (
+          <LeaguePulseSection teams={teamRankings} />
+        )
+      ) : null}
       </ScrollView>
     </View>
   );
@@ -496,6 +519,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16 },
+  lockWrap: { marginTop: spacing.md },
   pulseSection: { marginTop: spacing.lg },
   pulseHeading: {
     fontSize: 13,

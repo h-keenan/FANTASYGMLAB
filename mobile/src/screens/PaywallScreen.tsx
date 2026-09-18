@@ -23,11 +23,15 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 
+// Every line here corresponds to a real, server-enforced gate — see the
+// paywall audit (2026-09-18). Don't add a benefit unless something in
+// services/mobile_api_service.py actually withholds it from a Free account.
 const FEATURES = [
-  'Full dynasty & redraft player rankings, updated daily',
-  'League-specific value settings tuned to your scoring',
-  'Trade analyzer with real-time market values',
-  'Unlimited saved leagues',
+  'Your full Next Move briefing, not just the top 4',
+  'Full League Pulse — see the whole league’s contenders and rebuilders',
+  'The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist',
+  'Every Trade Hub idea, not just the first 2 (skip the ads)',
+  'GM Targets watchlist up to 50 players (Free is capped at 3)',
 ];
 
 export default function PaywallScreen({ navigation }: Props) {

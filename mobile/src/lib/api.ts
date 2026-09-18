@@ -280,6 +280,13 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
   faab: WaiverFaabGuidance;
 }
 
+// Shared shape for every endpoint that gates part of its own response by
+// Premium — see docs/paywall audit: this mirrors web's real (server-side)
+// gates, not just a UI hint.
+export interface EntitlementGateInfo {
+  is_premium: boolean;
+}
+
 export interface WaiversResponse {
   ok: true;
   players: WaiverPlayer[];
@@ -287,6 +294,13 @@ export interface WaiversResponse {
   needed_positions: string[];
   available_count?: number;
   avg_wire_score?: number;
+  // Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
+  // Shortlist) — empty for Free, populated for Premium. Matches web's
+  // modules/waivers_ui.py Premium-only gate.
+  stash_candidates: WaiverPlayer[];
+  watchlist_candidates: WaiverPlayer[];
+  faab_targets: WaiverPlayer[];
+  entitlement: EntitlementGateInfo;
   reason: string;
 }
 
@@ -597,12 +611,18 @@ export interface TeamSnapshot {
   franchise_rank: number | null;
 }
 
+export interface DashboardEntitlementInfo extends EntitlementGateInfo {
+  visible_count: number;
+  hidden_count: number;
+}
+
 export interface DashboardResponse {
   ok: true;
   items: DashboardItem[];
   quiet: boolean;
   quiet_reason?: string;
   team_snapshot: TeamSnapshot | null;
+  entitlement?: DashboardEntitlementInfo;
   reason: string;
 }
 

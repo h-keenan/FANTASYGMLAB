@@ -2094,6 +2094,97 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
     assert top_priority_items[0]["route_player_id"] == "target_rb"
 
 
+def _fake_daily_gm_briefing(count: int):
+    from modules import daily_gm_briefing
+
+    items = tuple(
+        daily_gm_briefing.DailyBriefingItem(
+            source="test",
+            source_id=f"item-{i}",
+            recommendation_id=f"rec-{i}",
+            category="watch",
+            headline=f"Headline {i}",
+            reason="",
+            supporting_context="",
+            destination="waivers",
+            league_id="abc",
+            roster_id="1",
+            valuation_lens="dynasty_score",
+            scoring_format="",
+            freshness="",
+            provenance="test",
+        )
+        for i in range(count)
+    )
+    return daily_gm_briefing.DailyGmBriefing(
+        items=items,
+        quiet=False,
+        quiet_reason="",
+        entitlement="free",
+        league_id="abc",
+        roster_id="1",
+        valuation_lens="dynasty_score",
+        scoring_format="",
+    )
+
+
+def _dashboard_request_with_mocked_briefing(monkeypatch, entitlement: str, item_count: int):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": entitlement, "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.sleeper.get_users", return_value=[
+                        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+                        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+                    ]):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    with patch(
+                                        "modules.dashboard_engine.compose_next_move_briefing",
+                                        return_value=_fake_daily_gm_briefing(item_count),
+                                    ):
+                                        return client.get(
+                                            "/v1/leagues/abc/dashboard",
+                                            headers={"Authorization": "Bearer good-token"},
+                                        )
+
+
+def test_dashboard_caps_items_at_four_for_free_users(monkeypatch):
+    response = _dashboard_request_with_mocked_briefing(monkeypatch, "free", item_count=6)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["items"]) == 4
+    assert body["entitlement"] == {"is_premium": False, "visible_count": 4, "hidden_count": 2}
+
+
+def test_dashboard_shows_all_items_for_premium_users(monkeypatch):
+    response = _dashboard_request_with_mocked_briefing(monkeypatch, "premium", item_count=6)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["items"]) == 6
+    assert body["entitlement"] == {"is_premium": True, "visible_count": 6, "hidden_count": 0}
+
+
 def test_dashboard_includes_team_snapshot(monkeypatch):
     client = _client(monkeypatch)
 
@@ -2469,6 +2560,114 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
     # league-global canonical rank.
     assert target["position_rank"] == 1
     assert target["overall_rank"] == 1
+
+
+def _waivers_secondary_board_request(monkeypatch, entitlement: str):
+    """target_rb plus 7 more free agents (8 total) — Priority Adds caps at
+    6, so at least one of the low-scored extras (young_wr, age 22) always
+    overflows into the secondary board regardless of exactly how the
+    priority ranking breaks ties."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": entitlement, "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+    extra_free_agents = [
+        {
+            "player_id": "young_wr",
+            "name": "Young Prospect",
+            "position": "WR",
+            "team": "SF",
+            "age": 22,
+            "years_exp": 1,
+            "status": "Active",
+            "injury_status": None,
+            "score": 100,
+            "dynasty_score": 100,
+            "value_score": 100,
+            "rebuild_score": 100,
+            "stats_season": 2025,
+        },
+    ] + [
+        {
+            "player_id": f"fa_{i}",
+            "name": f"Free Agent {i}",
+            "position": "WR",
+            "team": "SF",
+            "age": 28,
+            "years_exp": 6,
+            "status": "Active",
+            "injury_status": None,
+            "score": 200 + i,
+            "dynasty_score": 200 + i,
+            "value_score": 200 + i,
+            "rebuild_score": 200 + i,
+            "stats_season": 2025,
+        }
+        for i in range(6)
+    ]
+    roster_frame = pd.concat([roster_frame, pd.DataFrame(extra_free_agents)], ignore_index=True)
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=roster_frame):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            with patch(
+                                "modules.player_state_authority.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                return client.get(
+                                    "/v1/leagues/abc/waivers",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+
+def test_waivers_secondary_board_is_empty_for_free_users(monkeypatch):
+    response = _waivers_secondary_board_request(monkeypatch, "free")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stash_candidates"] == []
+    assert body["watchlist_candidates"] == []
+    assert body["faab_targets"] == []
+    assert body["entitlement"] == {"is_premium": False}
+
+
+def test_waivers_secondary_board_is_populated_for_premium_users(monkeypatch):
+    response = _waivers_secondary_board_request(monkeypatch, "premium")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["entitlement"] == {"is_premium": True}
+    # young_wr (age 22) isn't the Priority Add (target_rb outscores it), so
+    # it's the one candidate available to land in the secondary board — the
+    # age<=24 rule puts it in Stash Candidates specifically.
+    stash_ids = [p["player_id"] for p in body["stash_candidates"]]
+    assert "young_wr" in stash_ids
+    all_secondary_ids = {
+        p["player_id"]
+        for group in ("stash_candidates", "watchlist_candidates", "faab_targets")
+        for p in body[group]
+    }
+    assert "target_rb" not in all_secondary_ids
 
 
 def test_team_rankings_requires_auth(monkeypatch):
