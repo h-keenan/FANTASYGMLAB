@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme';
-import type { RankedPlayer } from '../lib/api';
+import type { DraftPickAsset, RankedPlayer } from '../lib/api';
 import GmOrb from '../components/GmOrb';
 import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
 import { navigationRef } from './navigationRef';
@@ -32,6 +32,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import TradeHubScreen from '../screens/TradeHubScreen';
 import TeamsScreen from '../screens/TeamsScreen';
 import DraftCenterScreen from '../screens/DraftCenterScreen';
+import PickDetailScreen from '../screens/PickDetailScreen';
 import MyTeamScreen from '../screens/MyTeamScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 
@@ -55,6 +56,7 @@ export type RootStackParamList = {
   TradeHub: { leagueId: string; leagueName: string };
   Teams: { leagueId: string; leagueName: string };
   DraftCenter: { leagueId: string; leagueName: string };
+  PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };
   MyTeam: { leagueId: string; leagueName: string };
   Alerts: { leagueId: string; leagueName: string };
 };
@@ -145,6 +147,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="TradeHub" component={TradeHubScreen} />
           <AppStack.Screen name="Teams" component={TeamsScreen} />
           <AppStack.Screen name="DraftCenter" component={DraftCenterScreen} />
+          <AppStack.Screen name="PickDetail" component={PickDetailScreen} />
           <AppStack.Screen name="MyTeam" component={MyTeamScreen} />
           <AppStack.Screen name="Alerts" component={AlertsScreen} />
           <AppStack.Screen name="GmTargets" component={GmTargetsScreen} />

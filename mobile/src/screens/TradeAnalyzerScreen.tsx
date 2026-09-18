@@ -511,6 +511,19 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
               </View>
             </View>
             <Text style={styles.resultScore}>{item.pick.score != null ? Math.round(item.pick.score) : '—'}</Text>
+            {/* Tapping the row still adds the pick to the package — this is
+                the escape hatch to "why is it worth that?" (the same Pick
+                Detail the Draft Center's pick list opens) without giving up
+                one-tap add. */}
+            <TouchableOpacity
+              style={styles.pickInfoButton}
+              hitSlop={8}
+              onPress={() =>
+                navigation.navigate('PickDetail', { pick: item.pick, leagueId, leagueName })
+              }
+            >
+              <Ionicons name="information-circle-outline" size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
           </TouchableOpacity>
         )
       }
@@ -791,6 +804,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   resultAvatar: { marginRight: spacing.sm },
+  pickInfoButton: { marginLeft: spacing.sm },
   pickBadge: {
     width: 36,
     height: 36,

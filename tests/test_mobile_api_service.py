@@ -638,6 +638,116 @@ def test_draft_picks_returns_real_pick_assets(monkeypatch):
         assert isinstance(pick["score"], (int, float))
 
 
+def test_draft_picks_forward_the_full_valuation_breakdown(monkeypatch):
+    """The Pick Detail ("PQV for a draft pick") screen renders the model's own
+    multipliers and projected-range distribution, so the endpoint must forward
+    them rather than dropping everything but the headline score."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_rosters, fake_users = _draft_picks_fixture_context()
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                with patch("modules.sleeper.get_users", return_value=fake_users):
+                    with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/draft-picks",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    picks = response.json()["picks"]
+    assert picks
+
+    breakdown_fields = (
+        "base_score",
+        "years_out",
+        "future_discount",
+        "team_modifier",
+        "format_multiplier",
+        "class_strength_multiplier",
+        "prospect_strength_multiplier",
+        "slot_percentile",
+        "projected_slot_percentile",
+        "early_probability",
+        "mid_probability",
+        "late_probability",
+        "projection_confidence",
+    )
+    for pick in picks:
+        for field in breakdown_fields:
+            assert isinstance(pick[field], (int, float)), f"{field} missing/non-numeric"
+        assert pick["tier_bucket"] in {"early", "mid", "late"}
+        assert pick["projection_source"] == "team_strength_model"
+        assert isinstance(pick["is_current_year_pick"], bool)
+        # Bucket probabilities are a distribution over the three round slots.
+        total = pick["early_probability"] + pick["mid_probability"] + pick["late_probability"]
+        assert total == pytest.approx(1.0, abs=1e-6)
+        assert 0.0 <= pick["projection_confidence"] <= 1.0
+
+
+def test_draft_picks_degrade_confidence_for_further_out_seasons(monkeypatch):
+    """coridian_'s literal ask — "the further in the future the pics are, it's
+    harder" — has to survive the endpoint, not just live in the model: a later
+    season's pick must discount harder and project less confidently than the
+    same round of the same original roster a year nearer.
+
+    The league fixture only ever emits two pick years (the current draft year
+    and the one after it), and `years_out` is 0 for both, so this drives a
+    league whose `season` is several years out — that makes the comparison
+    deterministic regardless of the wall-clock year the suite runs in.
+    """
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_rosters, fake_users = _draft_picks_fixture_context()
+    far_future_league = {**_TRADE_ANALYZER_LEAGUE, "season": "2035"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=far_future_league):
+            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                with patch("modules.sleeper.get_users", return_value=fake_users):
+                    with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                        with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                            with patch(
+                                "modules.player_eligibility.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/draft-picks",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    picks = response.json()["picks"]
+    assert picks
+
+    by_key: dict[tuple[str, int], list[dict]] = {}
+    for pick in picks:
+        by_key.setdefault((pick["original_roster_id"], pick["round"]), []).append(pick)
+
+    compared = 0
+    for series in by_key.values():
+        series.sort(key=lambda p: p["season"])
+        for nearer, further in zip(series, series[1:]):
+            assert further["years_out"] > nearer["years_out"]
+            assert further["future_discount"] < nearer["future_discount"]
+            assert further["projection_confidence"] <= nearer["projection_confidence"]
+            compared += 1
+    assert compared, "fixture produced no further-out pick to compare"
+
+
 def test_trade_analyzer_includes_a_real_pick_asset_when_pick_ids_given(monkeypatch):
     client = _client(monkeypatch)
 

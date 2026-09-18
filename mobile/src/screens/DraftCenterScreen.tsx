@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
-import { api, type DraftCard, type DraftPosture } from '../lib/api';
+import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -15,6 +15,8 @@ import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DraftCenter'>;
+
+type PickScope = 'mine' | 'league';
 
 const TONE_COLOR: Record<string, string> = {
   power: colors.premium,
@@ -43,6 +45,9 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [picks, setPicks] = useState<DraftPickAsset[]>([]);
+  const [myRosterId, setMyRosterId] = useState('');
+  const [pickScope, setPickScope] = useState<PickScope>('mine');
 
   useScreenHeaderTitle(navigation, 'Draft Center', leagueName);
 
@@ -51,13 +56,29 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
       let cancelled = false;
       (async () => {
         try {
-          const result = await api.getLeagueDraftCenter(leagueId);
+          // Picks and the caller's own roster are additive to the screen —
+          // neither should be able to blank out the posture/insight cards
+          // that were already here, so both degrade to "no pick browser"
+          // rather than surfacing an error.
+          const [result, picksResult, myRoster] = await Promise.all([
+            api.getLeagueDraftCenter(leagueId),
+            api
+              .getLeagueDraftPicks(leagueId)
+              .catch(() => ({ ok: true as const, picks: [] as DraftPickAsset[], reason: 'unavailable' })),
+            api.getMyRoster(leagueId).catch(() => null),
+          ]);
           if (cancelled) return;
           setPosture(result.posture);
           setPostureReason(result.posture_reason);
           setDecisionCards(result.decision_cards);
           setPartnerCards(result.partner_cards);
           setReason(result.reason);
+          setPicks(picksResult.picks);
+          const resolvedRosterId = String(myRoster?.roster?.roster_id ?? '');
+          setMyRosterId(resolvedRosterId);
+          // Nothing to scope to without a resolved roster — don't strand the
+          // user on an empty "My Picks" tab they can't fill.
+          if (!resolvedRosterId) setPickScope('league');
         } catch (err) {
           if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load Draft Center.');
         } finally {
@@ -69,6 +90,30 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
       };
     }, [leagueId]),
   );
+
+  const visiblePicks = useMemo(() => {
+    const scoped =
+      pickScope === 'mine' && myRosterId
+        ? picks.filter((pick) => pick.owner_roster_id === myRosterId)
+        : picks;
+    return [...scoped].sort(
+      (a, b) =>
+        (a.season ?? 0) - (b.season ?? 0) ||
+        (a.round ?? 0) - (b.round ?? 0) ||
+        (b.score ?? 0) - (a.score ?? 0),
+    );
+  }, [picks, pickScope, myRosterId]);
+
+  const pickSeasons = useMemo(() => {
+    const bySeason = new Map<number, DraftPickAsset[]>();
+    for (const pick of visiblePicks) {
+      const season = pick.season ?? 0;
+      const bucket = bySeason.get(season);
+      if (bucket) bucket.push(pick);
+      else bySeason.set(season, [pick]);
+    }
+    return [...bySeason.entries()].sort(([a], [b]) => a - b);
+  }, [visiblePicks]);
 
   if (loading) {
     return <BrandedSpinner style={styles.center} />;
@@ -140,6 +185,65 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           </Text>
         )}
 
+        {picks.length ? (
+          <>
+            <Text style={styles.sectionLabel}>Pick Values</Text>
+            <View style={styles.scopeRow}>
+              <TouchableOpacity
+                style={[styles.scopePill, pickScope === 'mine' && styles.scopePillActive]}
+                onPress={() => setPickScope('mine')}
+                disabled={!myRosterId}
+              >
+                <Text
+                  style={[
+                    styles.scopePillText,
+                    pickScope === 'mine' && styles.scopePillTextActive,
+                    !myRosterId && styles.scopePillTextDisabled,
+                  ]}
+                >
+                  My Picks
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.scopePill, pickScope === 'league' && styles.scopePillActive]}
+                onPress={() => setPickScope('league')}
+              >
+                <Text style={[styles.scopePillText, pickScope === 'league' && styles.scopePillTextActive]}>
+                  League
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {pickSeasons.length ? (
+              pickSeasons.map(([season, seasonPicks]) => (
+                <View key={season}>
+                  <Text style={styles.pickSeasonLabel}>{season || 'Future'}</Text>
+                  {/* A plain container, not AnimatedCard: the card here is a
+                      list shell, and its rows are what's pressable — an
+                      AnimatedCard would spring the whole season group on
+                      every row tap. */}
+                  <View style={styles.pickCard}>
+                    {seasonPicks.map((pick, index) => (
+                      <PickRow
+                        key={pick.pick_id}
+                        pick={pick}
+                        showOwner={pickScope === 'league'}
+                        first={index === 0}
+                        onPress={() => navigation.navigate('PickDetail', { pick, leagueId, leagueName })}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.notice}>
+                {pickScope === 'mine'
+                  ? "You don't hold any tracked picks in this league right now."
+                  : 'No draft pick assets available for this league yet.'}
+              </Text>
+            )}
+          </>
+        ) : null}
+
         <Text style={styles.sectionLabel}>League Draft Decision Signals</Text>
         {decisionCards.map((card) => (
           <DraftInsightCard key={card.label} card={card} />
@@ -170,6 +274,43 @@ function PostureTile({ label, value, note, first }: { label: string; value: stri
         </Text>
       ) : null}
     </View>
+  );
+}
+
+function PickRow({
+  pick,
+  showOwner,
+  first,
+  onPress,
+}: {
+  pick: DraftPickAsset;
+  showOwner: boolean;
+  first?: boolean;
+  onPress: () => void;
+}) {
+  const meta = [pick.pick_tier, pick.projected_pick_range].filter(Boolean).join(' · ');
+  const confidence = typeof pick.projection_confidence === 'number' ? pick.projection_confidence : null;
+  return (
+    <TouchableOpacity style={[styles.pickRow, first && styles.pickRowFirst]} onPress={onPress}>
+      <View style={styles.pickBadge}>
+        <Text style={styles.pickBadgeText}>R{pick.round ?? '—'}</Text>
+      </View>
+      <View style={styles.pickInfo}>
+        <Text style={styles.pickLabel} numberOfLines={1}>
+          {pick.label ?? 'Draft pick'}
+        </Text>
+        <Text style={styles.pickMeta} numberOfLines={1}>
+          {[showOwner ? pick.owner_team_name : null, meta].filter(Boolean).join(' · ') || '—'}
+        </Text>
+      </View>
+      <View style={styles.pickValueBlock}>
+        <Text style={styles.pickScore}>{pick.score != null ? Math.round(pick.score) : '—'}</Text>
+        {confidence !== null ? (
+          <Text style={styles.pickConfidence}>{Math.round(confidence * 100)}% conf</Text>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+    </TouchableOpacity>
   );
 }
 
@@ -262,6 +403,59 @@ const styles = StyleSheet.create({
   postureLabel: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
   postureNote: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   postureMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
+  scopeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  scopePill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+  },
+  scopePillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
+  scopePillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  scopePillTextActive: { color: colors.accent },
+  scopePillTextDisabled: { color: colors.textTertiary },
+  pickSeasonLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 0.4,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  pickCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  pickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
+  },
+  pickRowFirst: { borderTopWidth: 0 },
+  pickBadge: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.md,
+    backgroundColor: colors.badgeBackground,
+  },
+  pickBadgeText: { fontSize: 12, fontWeight: '800', color: colors.badgeText },
+  pickInfo: { flex: 1 },
+  pickLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  pickMeta: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
+  pickValueBlock: { alignItems: 'flex-end' },
+  pickScore: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  pickConfidence: { fontSize: 10, color: colors.textTertiary, marginTop: 1 },
   insightCard: { padding: spacing.lg, marginBottom: spacing.sm },
   insightBadge: {
     alignSelf: 'flex-start',
