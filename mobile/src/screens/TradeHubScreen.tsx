@@ -178,7 +178,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           ) : null}
         </View>
       }
-      renderItem={({ item }) => <TradeIdeaCard idea={item} leagueName={leagueName} />}
+      renderItem={({ item }) => <TradeIdeaCard idea={item} leagueId={leagueId} leagueName={leagueName} />}
       ListEmptyComponent={
         !loading && !error && !notReadyReason ? (
           <Text style={styles.empty}>
@@ -331,7 +331,15 @@ function MeterRow({ label, value, level, color }: { label: string; value: string
   );
 }
 
-function TradeIdeaCard({ idea, leagueName }: { idea: TradeIdea; leagueName: string }) {
+function TradeIdeaCard({
+  idea,
+  leagueId,
+  leagueName,
+}: {
+  idea: TradeIdea;
+  leagueId: string;
+  leagueName: string;
+}) {
   const { showExplanations } = useDensity();
   const gainColor = idea.trade_gain > 0 ? colors.success : idea.trade_gain < 0 ? colors.danger : colors.textSecondary;
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
@@ -379,7 +387,9 @@ function TradeIdeaCard({ idea, leagueName }: { idea: TradeIdea; leagueName: stri
       <TradeSharePreviewModal
         visible={shareOpen}
         onClose={() => setShareOpen(false)}
+        leagueId={leagueId}
         leagueName={leagueName}
+        partnerTeamName={idea.partner_team_name}
         verdict={ideaToShareVerdict(idea)}
         sendPlayers={shareAssetsToPlayers(idea.package.send)}
         receivePlayers={shareAssetsToPlayers(idea.package.receive)}

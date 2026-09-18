@@ -4,14 +4,16 @@ import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 
-import type { RankedPlayer, TradeVerdict } from '../lib/api';
+import { api, type RankedPlayer, type TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import TradeShareCard, { CARD_HEIGHT, CARD_WIDTH } from './TradeShareCard';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  leagueId: string;
   leagueName: string;
+  partnerTeamName?: string;
   verdict: TradeVerdict;
   sendPlayers: RankedPlayer[];
   receivePlayers: RankedPlayer[];
@@ -21,13 +23,30 @@ interface Props {
 export default function TradeSharePreviewModal({
   visible,
   onClose,
+  leagueId,
   leagueName,
+  partnerTeamName,
   verdict,
   sendPlayers,
   receivePlayers,
 }: Props) {
   const cardRef = useRef<View>(null);
   const [capturing, setCapturing] = useState(false);
+
+  // Best-effort: a share sheet dismissed without sending still gets recorded
+  // (the later "did this happen?" prompt already has a "Didn't send" answer
+  // for exactly this ambiguity — most share APIs don't reliably report
+  // completion, so recording optimistically beats not asking at all).
+  const recordShare = () => {
+    void api
+      .recordTradeShare(leagueId, {
+        partnerTeamName,
+        send: sendPlayers.map((p) => ({ name: p.name ?? 'Unknown', position: p.position ?? '' })),
+        receive: receivePlayers.map((p) => ({ name: p.name ?? 'Unknown', position: p.position ?? '' })),
+        valueEdgeLabel: verdict.band,
+      })
+      .catch(() => {});
+  };
 
   const onShareImage = async () => {
     if (!cardRef.current) return;
@@ -43,6 +62,7 @@ export default function TradeSharePreviewModal({
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share trade' });
+        recordShare();
       }
     } catch {
       // Fall through silently — the text-share fallback below still works.
@@ -70,7 +90,9 @@ export default function TradeSharePreviewModal({
       '',
       'Analyzed with FantasyGM Lab',
     ].filter(Boolean);
-    Share.share({ message: lines.join('\n') }).catch(() => {});
+    Share.share({ message: lines.join('\n') })
+      .then(recordShare)
+      .catch(() => {});
   };
 
   return (
