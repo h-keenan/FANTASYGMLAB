@@ -213,6 +213,8 @@ MAJOR_SOURCE_MARKERS = (
     "theathletic.com",
     "apnews.com",
     "reuters.com",
+    "sports.yahoo.com",
+    "nbcsports.com",
 )
 
 OFFICIAL_SOURCE_MARKERS = (

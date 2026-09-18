@@ -1017,11 +1017,25 @@ def test_news_endpoint_filters_to_actionable_signal_and_dedupes(monkeypatch):
     assert len(items) == 2
     assert items[0]["title"] == "Team trades WR to division rival"
     assert items[0]["event_type"] == "transaction"
+    assert items[0]["source"] == "ESPN"
     assert items[1]["title"] == "Star RB (knee) questionable for Sunday"
     assert items[1]["event_type"] == "injury/status"
     for item in items:
         assert "summary" in item
         assert "speculative" in item
+
+
+def test_friendly_news_source_maps_known_feed_domains(monkeypatch):
+    from services.mobile_api_service import _friendly_news_source
+
+    assert _friendly_news_source("https://www.rotowire.com/rss/news.php?sport=NFL") == "RotoWire"
+    assert _friendly_news_source("https://www.espn.com/espn/rss/nfl/news") == "ESPN"
+    assert _friendly_news_source("https://www.cbssports.com/rss/headlines/nfl/") == "CBS Sports"
+    assert _friendly_news_source("https://sports.yahoo.com/nfl/rss/") == "Yahoo Sports"
+    assert _friendly_news_source("https://www.nbcsports.com/profootballtalk.rss") == "Pro Football Talk"
+    # Unknown source falls back to the bare domain rather than a raw URL.
+    assert _friendly_news_source("https://www.example.com/some/feed.xml") == "example.com"
+    assert _friendly_news_source("") == ""
 
 
 def test_player_news_requires_auth(monkeypatch):
