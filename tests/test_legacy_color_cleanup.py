@@ -88,8 +88,9 @@ def test_component_family_binds_streamlit_widgets_to_tokens():
 
 def test_active_css_drops_known_legacy_sky_and_streamlit_blues():
     for surface in ACTIVE_CSS_SURFACES:
-        # WR's intentional semantic position color is not a legacy UI accent.
-        lowered = _lower(surface).replace('--color-position-wr: #7dd3fc;', '')
+        # WR's intentional semantic position color is not a legacy UI accent
+        # (matched to Sleeper's own saturated WR blue, not a leftover accent).
+        lowered = _lower(surface).replace('--color-position-wr: #38bdf8;', '')
         for hex_value in LEGACY_HEX:
             assert hex_value not in lowered, hex_value
         for rgb in LEGACY_RGB:
