@@ -299,6 +299,133 @@ def test_performance_story_is_team_score_not_player_performance():
         assert "player" not in title.casefold()
 
 
+def test_performance_low_story_is_the_weeks_floor_score():
+    recap = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    story = next(
+        item for item in recap["stories"] if item["story_type"] == league_recaps.STORY_PERFORMANCE_LOW
+    )
+    assert story["title"] in league_recaps.LOW_PERFORMANCE_STORY_TITLES
+    # Lowest score across both pairings in _matchups(): 91.0 vs 88.5 -> 88.5
+    # is the league floor (110.2 is not, since 88.5 < 110.2).
+    assert story["primary_team"] == "Other"
+    assert story["metric_value"] == "88.5"
+
+
+def test_matchup_close_story_is_smallest_margin():
+    recap = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    story = next(
+        item for item in recap["stories"] if item["story_type"] == league_recaps.STORY_MATCHUP_CLOSE
+    )
+    # Pair 10 margin = 148.4-110.2 = 38.2; pair 11 margin = 91.0-88.5 = 2.5.
+    assert story["metric_value"] == "2.5"
+    assert story["primary_team"] == "Quiet Club"
+    assert story["secondary_team"] == "Other"
+
+
+def test_waiver_low_story_is_cheapest_add_and_requires_two_claims():
+    single = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_waiver(bid=42)],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    types = {story["story_type"] for story in single["stories"]}
+    assert league_recaps.STORY_WAIVER_LOW not in types
+
+    multi = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_waiver(bid=42), _waiver(bid=3, tx_id="w-cheap")],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    high = next(story for story in multi["stories"] if story["story_type"] == league_recaps.STORY_WAIVER)
+    low = next(story for story in multi["stories"] if story["story_type"] == league_recaps.STORY_WAIVER_LOW)
+    assert "$42" in high["metric_value"]
+    assert "$3" in low["metric_value"]
+    assert low["title"] != high["title"]
+
+
+def test_activity_low_story_is_least_active_and_requires_a_spread():
+    recap = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_trade(), _waiver(), _waiver(bid=11)],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    types = {story["story_type"] for story in recap["stories"]}
+    assert league_recaps.STORY_ACTIVITY_LOW in types
+    low = next(story for story in recap["stories"] if story["story_type"] == league_recaps.STORY_ACTIVITY_LOW)
+    assert low["primary_team"] == "Lakefront"
+    assert low["metric_value"] == "1"
+
+    # A single active manager (test_most_active_requires_repeated_moves'
+    # fixture) has nothing to contrast against -> no "least active" story.
+    extra = _tx(
+        {
+            "transaction_id": "fa-7",
+            "type": "free_agent",
+            "status": "complete",
+            "roster_ids": [1],
+            "adds": {"p2": 1},
+            "drops": {},
+            "settings": {"waiver_bid": 1},
+            "draft_picks": [],
+        }
+    )
+    lone_manager = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_waiver(), extra],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    lone_types = {story["story_type"] for story in lone_manager["stories"]}
+    assert league_recaps.STORY_ACTIVITY_LOW not in lone_types
+
+
+def test_trade_story_includes_full_asset_lists_with_player_ids():
+    recap = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_trade()],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    trade = next(story for story in recap["stories"] if story["story_type"] == "trade")
+    # Truncated summary fields other code reads stay intact.
+    assert len(trade["players"]) <= 4
+    assert "left_assets" in trade and "right_assets" in trade
+    all_assets = trade["left_assets"] + trade["right_assets"]
+    assert all_assets
+    for asset in all_assets:
+        assert asset["kind"] == "player"
+        assert asset["player_id"]
+        assert asset["name"]
+        assert "position" in asset and "team" in asset
+
+
 def test_league_recaps_page_header_has_single_owner():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     recaps_block = app.split('if current_page == "league_recaps":', 1)[1].split(

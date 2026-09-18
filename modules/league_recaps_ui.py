@@ -129,9 +129,16 @@ def history_deep_link_label(story: Mapping[str, Any]) -> str:
     kind = _text(story.get("story_type"))
     if kind == league_recaps.STORY_TRADE:
         return "View Trade History"
-    if kind == league_recaps.STORY_WAIVER:
+    if kind in {league_recaps.STORY_WAIVER, league_recaps.STORY_WAIVER_LOW}:
         return "View waiver history"
-    if kind in {league_recaps.STORY_ACTIVITY, league_recaps.STORY_PERFORMANCE, league_recaps.STORY_MATCHUP}:
+    if kind in {
+        league_recaps.STORY_ACTIVITY,
+        league_recaps.STORY_ACTIVITY_LOW,
+        league_recaps.STORY_PERFORMANCE,
+        league_recaps.STORY_PERFORMANCE_LOW,
+        league_recaps.STORY_MATCHUP,
+        league_recaps.STORY_MATCHUP_CLOSE,
+    }:
         return "Open League History"
     return ""
 
