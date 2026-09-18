@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -3077,6 +3078,82 @@ def test_dashboard_includes_team_snapshot(monkeypatch):
     # modules.league_rankings computation get_league_team_rankings uses.
     assert snapshot["power_rank"] == 1
     assert snapshot["franchise_rank"] == 1
+    # The "why" fields ride along with the flag even on a clean roster — this
+    # frame carries no injury_status values, so they're simply empty.
+    assert snapshot["key_injuries_summary"] == ""
+    assert snapshot["top_injury_impact_summary"] == ""
+    assert snapshot["top_injury_impact_players"] == []
+
+
+def test_dashboard_team_snapshot_explains_the_health_flag(monkeypatch):
+    """health_flag's supporting context (which injuries, which players) is
+    already computed by modules.rankings.roster_injury_context and rendered on
+    web — the mobile snapshot forwards it instead of dropping it."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    injured_frame = _fake_roster_frame()
+    injured_frame["news_updated"] = time.time()
+    injured_frame.loc[injured_frame["player_id"] == "my2", "injury_status"] = "Out"
+    injured_frame.loc[injured_frame["player_id"] == "my2", "status"] = "Injured Reserve"
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {
+                        "roster_id": 1,
+                        "owner_id": "sleeper-user-1",
+                        "players": my_roster_ids,
+                        "settings": {"wins": 7, "losses": 6, "ties": 0},
+                    },
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.sleeper.get_users", return_value=[
+                        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+                        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+                    ]):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=injured_frame):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/dashboard",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    snapshot = response.json()["team_snapshot"]
+    assert snapshot is not None
+    assert snapshot["health_flag"] != "Stable"
+
+    impact_players = snapshot["top_injury_impact_players"]
+    assert impact_players, "an Out starter should surface as an injury impact driver"
+    driver = impact_players[0]
+    assert driver["name"] == "My Player 2"
+    assert driver["position"] == "RB"
+    assert driver["injury_status"] == "Out"
+    assert driver["injury_level"] == "major"
+    assert driver["impact_contribution"] > 0
+    assert driver["player_value_score"] > 0
+    assert driver["freshness_label"] == "current"
+
+    # Same two strings web renders (the "Key injuries: ..." caption and the
+    # engine's own impact summary), not a mobile-only rewording.
+    assert "My Player 2" in snapshot["key_injuries_summary"]
+    assert "My Player 2" in snapshot["top_injury_impact_summary"]
 
 
 def test_dashboard_team_snapshot_is_none_without_a_resolved_roster(monkeypatch):

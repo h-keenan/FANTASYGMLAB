@@ -839,6 +839,71 @@ def _project_usage_trend(row: pd.Series) -> dict[str, Any] | None:
     return rankings.recency_trend_display(row)
 
 
+def _project_injury_impact_player(item: Any) -> dict[str, Any]:
+    """One entry of modules.rankings.roster_injury_context's
+    `top_injury_impact_players`, trimmed to what a mobile card renders."""
+
+    if not isinstance(item, dict):
+        return {}
+    return {
+        "player_id": str(item.get("player_id") or ""),
+        "name": str(item.get("name") or "").strip(),
+        "position": str(item.get("position") or "").strip().upper(),
+        "team": str(item.get("team") or "").strip().upper(),
+        # injury_status is Sleeper's raw status string ("Questionable"),
+        # injury_level the engine's severity word ("major"/"moderate") —
+        # same split PresentationAsset already carries on the trade side.
+        "injury_status": str(item.get("injury_status") or "").strip(),
+        "injury_level": str(item.get("injury_level") or "").strip(),
+        "roster_relevance": str(item.get("roster_relevance") or "").strip(),
+        "freshness_label": str(item.get("freshness_label") or "").strip(),
+        "player_value_score": _clean_json_value(item.get("player_value_score")),
+        "impact_contribution": _clean_json_value(item.get("impact_contribution")),
+    }
+
+
+def _project_team_injury_narrative(context: Any) -> dict[str, Any]:
+    """The "why" behind a one-word health flag.
+
+    modules.rankings.roster_injury_context already computes all of this for
+    every roster; web renders it as the `Key injuries: ...` caption
+    (modules.league_workspace_ui) and injury_ui.team_injury_display_note's
+    impact summary. Mobile was forwarding only the flag itself, so this is
+    a pure "stop dropping already-computed fields" projection — no new
+    computation, no mobile-only rewording of the engine's own text.
+    """
+
+    context = injury_ui.resolve_team_injury_context(context)
+    if not isinstance(context, dict):
+        return {"key_injuries_summary": "", "top_injury_impact_summary": "", "top_injury_impact_players": []}
+
+    # Web builds key_injuries_summary from the actionable subset first
+    # (app.py's league-intelligence frame), falling back to the engine's
+    # key_injuries list (app.py's dashboard briefing path) — same order here.
+    actionable_names = [
+        str(item.get("name") or "").strip()
+        for item in (context.get("actionable_injury_players") or [])
+        if isinstance(item, dict) and str(item.get("name") or "").strip()
+    ]
+    key_injuries_summary = ", ".join(actionable_names) or ", ".join(
+        str(entry).strip() for entry in (context.get("key_injuries") or []) if str(entry).strip()
+    )
+
+    players = [
+        projected
+        for projected in (
+            _project_injury_impact_player(item)
+            for item in (context.get("top_injury_impact_players") or [])
+        )
+        if projected.get("name")
+    ]
+    return {
+        "key_injuries_summary": key_injuries_summary,
+        "top_injury_impact_summary": str(context.get("top_injury_impact_summary") or "").strip(),
+        "top_injury_impact_players": players,
+    }
+
+
 def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
     overall_rank = row.get("canonical_overall_rank")
     if pd.isna(overall_rank):
@@ -2428,6 +2493,7 @@ def get_league_dashboard(
     injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
     injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
     health_flag = injury_ui.team_injury_display_label(injury_display_context, include_uncertainty=True) or "Stable"
+    injury_narrative = _project_team_injury_narrative(injury_display_context)
     average_age = (
         float(roster_df["age"].mean())
         if not roster_df.empty and roster_df["age"].notna().any()
@@ -2452,6 +2518,13 @@ def get_league_dashboard(
         "losses": roster_settings.get("losses"),
         "ties": roster_settings.get("ties"),
         "health_flag": health_flag,
+        # The "why" behind health_flag — which injuries, and which players
+        # are actually driving it. Already computed by the same
+        # roster_injury_context call above and rendered on web; mobile used
+        # to show the bare flag word with no supporting context.
+        "key_injuries_summary": injury_narrative["key_injuries_summary"],
+        "top_injury_impact_summary": injury_narrative["top_injury_impact_summary"],
+        "top_injury_impact_players": injury_narrative["top_injury_impact_players"],
         "average_age": round(average_age, 1) if average_age is not None else None,
         "power_rank": power_rank,
         "franchise_rank": franchise_rank,

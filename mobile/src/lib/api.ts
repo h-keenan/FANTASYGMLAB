@@ -787,11 +787,33 @@ export interface DashboardItem {
   recommendation_id: string;
 }
 
+export interface InjuryImpactPlayer {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  /** Sleeper's raw status string (e.g. "Questionable"/"Out"). */
+  injury_status: string;
+  /** The engine's severity word (e.g. "major"/"moderate") — see PresentationAsset. */
+  injury_level: string;
+  /** "starter" / "weekly" / "depth" / "future asset" — how the player is used. */
+  roster_relevance: string;
+  /** "current" / "recent" / "aging" / "stale" / "update unknown". */
+  freshness_label: string;
+  player_value_score: number | null;
+  impact_contribution: number | null;
+}
+
 export interface TeamSnapshot {
   wins: number | null;
   losses: number | null;
   ties: number | null;
   health_flag: string;
+  /** The "why" behind health_flag — the same already-computed fields web
+   * renders as its "Key injuries:" caption and injury impact note. */
+  key_injuries_summary: string;
+  top_injury_impact_summary: string;
+  top_injury_impact_players: InjuryImpactPlayer[];
   average_age: number | null;
   power_rank: number | null;
   franchise_rank: number | null;
