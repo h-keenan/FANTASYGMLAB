@@ -24,6 +24,21 @@ def _client(monkeypatch):
     return TestClient(mobile_api_service.app)
 
 
+@pytest.fixture(autouse=True)
+def _clear_trade_hub_ideas_cache():
+    # _generate_trade_hub_records_cached is keyed by (league_id, roster_id,
+    # strategy, lens, time-bucket) — tests reusing the same league_id/roster
+    # combo within the same 30s wall-clock bucket would otherwise see a
+    # PRIOR test's mocked modules.trade_hub_engine.generate_trade_idea_records
+    # result instead of their own, since the cache sits between the endpoint
+    # and that mockable call.
+    from services import mobile_api_service
+
+    mobile_api_service._generate_trade_hub_records_cached.cache_clear()
+    yield
+    mobile_api_service._generate_trade_hub_records_cached.cache_clear()
+
+
 def test_render_yaml_documents_mobile_api_service():
     text = (ROOT / "render.yaml").read_text(encoding="utf-8")
     assert "fantasygm-lab-mobile-api" in text
