@@ -6363,6 +6363,13 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .dg-ranked-row--current {
         border-inline-start-color: var(--color-accent) !important;
     }
+    /* Last wins: rank 1 keeps its gold rail even when it is also your team. */
+    .dg-ranked-row--first {
+        border-inline-start-color: var(--color-premium) !important;
+    }
+    .dg-ranked-row--first .dg-ranked-rank {
+        color: var(--color-premium) !important;
+    }
     .dg-ranked-rank {
         background: var(--surface-raised) !important;
         border-radius: var(--radius-control) !important;

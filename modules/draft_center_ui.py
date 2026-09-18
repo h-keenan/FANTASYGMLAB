@@ -1833,6 +1833,7 @@ def render_draft_capital_dashboard(
                 tap_class=tap_class,
                 tap_attrs=tap_attrs,
                 top_three=bool(rank_value and rank_value <= 3),
+                first_place=bool(rank_value == 1),
             )
         )
     clicked = render_team_card_tap_grid(
