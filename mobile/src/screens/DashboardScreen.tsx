@@ -14,6 +14,7 @@ import {
   type DashboardEntitlementInfo,
   type DashboardItem,
   type DashboardItemCategory,
+  type MatchupResponse,
   type PresentationAsset,
   type TeamRanking,
   type TeamSnapshot,
@@ -130,6 +131,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
   const [teamRankings, setTeamRankings] = useState<TeamRanking[] | null>(null);
+  const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
   const [entitlement, setEntitlement] = useState<DashboardEntitlementInfo | null>(null);
   const { showExplanations } = useDensity();
 
@@ -172,6 +174,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
         .getLeagueTeamRankings(leagueId)
         .then((result) => {
           if (!cancelled) setTeamRankings(result.teams);
+        })
+        .catch(() => {});
+      // Also best-effort: the matchup card is an entry point, not the
+      // briefing itself. A bye week, a league without a current week, or a
+      // failed call simply means no card.
+      api
+        .getLeagueMatchup(leagueId)
+        .then((result) => {
+          if (!cancelled) setMatchup(result);
         })
         .catch(() => {});
       return () => {
@@ -221,6 +232,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
       ) : null}
       {teamSnapshot ? (
         <TeamSnapshotRow snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+      ) : null}
+      {matchup ? (
+        <WeeklyMatchupCard
+          matchup={matchup}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          navigation={navigation}
+        />
       ) : null}
       {quiet || !items || items.length === 0 ? (
         <View style={styles.emptyCard}>
@@ -419,6 +438,81 @@ function TeamSnapshotRow({
   );
 }
 
+/**
+ * Dashboard entry point for the weekly matchup — "who am I playing and who
+ * should I start" is the most time-sensitive thing on this screen, so it
+ * sits directly under the team snapshot rather than behind the orb only.
+ *
+ * Shows the season-value edge, NOT a points projection: the app has no
+ * weekly-projection feed (see services/mobile_api_service.py's
+ * SEASON_VALUE_BASIS_LABEL), so the number here is a season-long
+ * value/opportunity total and the card says so on its face.
+ */
+function WeeklyMatchupCard({
+  matchup,
+  leagueId,
+  leagueName,
+  navigation,
+}: {
+  matchup: MatchupResponse;
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+}) {
+  const mine = matchup.my_team;
+  const opponent = matchup.opponent;
+  const comparison = matchup.comparison;
+  if (!mine || !opponent || !comparison) return null;
+
+  const edgeColor =
+    comparison.edge === 'you'
+      ? colors.successBright
+      : comparison.edge === 'opponent'
+        ? colors.danger
+        : colors.textSecondary;
+
+  return (
+    <AnimatedCard
+      glow
+      style={styles.card}
+      onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
+    >
+      <View style={styles.cardHeaderRow}>
+        <Ionicons name="american-football" size={15} color={colors.accent} style={styles.cardIcon} />
+        <Text style={[styles.cardLabel, { color: colors.accent }]}>
+          {matchup.week != null ? `WEEK ${matchup.week} MATCHUP` : 'THIS WEEK’S MATCHUP'}
+        </Text>
+      </View>
+      <Text style={styles.cardHeadline}>vs {opponent.team_name}</Text>
+
+      <View style={styles.matchupValueRow}>
+        <View style={styles.matchupValueSide}>
+          <Text style={styles.matchupSideLabel}>YOU</Text>
+          <Text style={styles.matchupSideValue}>{Math.round(comparison.my_season_value).toLocaleString()}</Text>
+        </View>
+        <Text style={styles.matchupVersus}>VS</Text>
+        <View style={[styles.matchupValueSide, styles.matchupValueSideRight]}>
+          <Text style={styles.matchupSideLabel}>THEM</Text>
+          <Text style={styles.matchupSideValue}>{Math.round(comparison.opponent_season_value).toLocaleString()}</Text>
+        </View>
+      </View>
+
+      <Text style={[styles.matchupEdge, { color: edgeColor }]}>
+        {comparison.headline}
+        {comparison.edge === 'even'
+          ? ''
+          : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
+      </Text>
+      {/* Straight from the API, never paraphrased into something stronger. */}
+      <Text style={styles.matchupBasis}>{comparison.basis_label}</Text>
+
+      <View style={styles.destButton}>
+        <Text style={styles.destButtonText}>SEE SUGGESTED STARTERS</Text>
+      </View>
+    </AnimatedCard>
+  );
+}
+
 function TopPriorityTradeCard({
   item,
   leagueId,
@@ -600,6 +694,25 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   checkInText: { fontSize: 12, fontWeight: '600', color: colors.accent, flexShrink: 1 },
+  matchupValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+  },
+  matchupValueSide: { flex: 1 },
+  matchupValueSideRight: { alignItems: 'flex-end' },
+  matchupSideLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
+  matchupSideValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
+  matchupVersus: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: colors.textTertiary,
+    paddingHorizontal: spacing.sm,
+  },
+  matchupEdge: { fontSize: 13, fontWeight: '700', marginTop: spacing.md },
+  matchupBasis: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
   snapshotRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

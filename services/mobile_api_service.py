@@ -2454,6 +2454,32 @@ def _project_lineup_row(row: pd.Series, score_field: str) -> dict[str, Any]:
     }
 
 
+def _suggested_lineup_split(
+    valued: pd.DataFrame,
+    roster_player_ids: set[str],
+    settings: dict[str, Any],
+    score_field: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """One roster's suggested starters (slot-ordered) and bench.
+
+    The single place /my-team and /matchup both run
+    modules.team_eval.suggest_optimal_lineup and project its rows, so the
+    two surfaces can never drift into showing different "best lineup"
+    answers for the same roster.
+    """
+
+    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+
+    players = [_project_lineup_row(row, score_field) for _, row in lineup_df.iterrows()]
+    starters = [p for p in players if p["suggested_starter"]]
+    starters.sort(
+        key=lambda p: _LINEUP_SLOT_ORDER.index(p["slot"]) if p["slot"] in _LINEUP_SLOT_ORDER else len(_LINEUP_SLOT_ORDER)
+    )
+    bench = [p for p in players if not p["suggested_starter"]]
+    return starters, bench
+
+
 @app.get("/v1/leagues/{league_id}/my-team")
 def get_league_my_team(
     league_id: str,
@@ -2507,17 +2533,269 @@ def get_league_my_team(
     if not roster_player_ids:
         return {"ok": True, "starters": [], "bench": [], "reason": "empty_roster"}
 
-    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
-    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-
-    players = [_project_lineup_row(row, score_field) for _, row in lineup_df.iterrows()]
-    starters = [p for p in players if p["suggested_starter"]]
-    starters.sort(
-        key=lambda p: _LINEUP_SLOT_ORDER.index(p["slot"]) if p["slot"] in _LINEUP_SLOT_ORDER else len(_LINEUP_SLOT_ORDER)
-    )
-    bench = [p for p in players if not p["suggested_starter"]]
+    starters, bench = _suggested_lineup_split(valued, roster_player_ids, settings, score_field)
 
     return {"ok": True, "starters": starters, "bench": bench, "reason": ""}
+
+
+# The one sentence every matchup surface (API, mobile headline, tests)
+# points at for what this comparison actually measures. This app has NO
+# weekly points-projection data source — nothing in modules/ produces one —
+# so the matchup view ranks lineups by the same season-long value/
+# opportunity signal the rest of the app already computes, and says so.
+# Do not relabel this as "projected points" without a real weekly
+# projection feed behind it.
+SEASON_VALUE_BASIS = "season_value"
+SEASON_VALUE_BASIS_LABEL = "Season-long value & opportunity signal — not a weekly points projection."
+
+# Below this relative gap the two lineups are called even rather than
+# implying a real edge — a season-value total is a coarse signal, and a
+# sub-3% difference is well inside its noise.
+_MATCHUP_EVEN_THRESHOLD = 0.03
+
+
+def _matchup_starter_why(player: dict[str, Any], best_score_by_position: dict[str, float]) -> str:
+    """Why this player is a suggested starter, in season-form terms only.
+
+    Every clause comes from data that genuinely exists on the lineup row
+    (tier, opportunity/workload label, season-value rank on this roster,
+    injury tag). Deliberately says nothing about this week's opponent or
+    expected points — no opponent-defense or weekly-projection data source
+    exists in this codebase.
+    """
+
+    bits: list[str] = []
+    tier = str(player.get("tier") or "").strip()
+    if tier:
+        bits.append(f"{tier} tier")
+    opportunity = str(player.get("opportunity_label") or "").strip()
+    if opportunity:
+        bits.append(opportunity)
+
+    position = str(player.get("position") or "").strip()
+    score = player.get("score")
+    if position and isinstance(score, (int, float)) and best_score_by_position.get(position) == float(score):
+        bits.append(f"top {position} on this roster by season value")
+
+    injury = str(player.get("injury_status") or "").strip()
+    if injury:
+        bits.append(f"{injury} — confirm status before kickoff")
+
+    if not bits:
+        slot = str(player.get("slot") or "").strip() or "this"
+        return f"Best season-value option available for the {slot} slot."
+    return " · ".join(bits)
+
+
+def _matchup_side(
+    roster_id: str,
+    roster: dict[str, Any],
+    profile: dict[str, Any],
+    valued: pd.DataFrame,
+    settings: dict[str, Any],
+    score_field: str,
+) -> dict[str, Any]:
+    """One team's side of the matchup: identity, suggested starters, season-value total.
+
+    Both sides run the SAME modules.team_eval.suggest_optimal_lineup pass
+    (via _suggested_lineup_split), so the comparison is apples-to-apples.
+    That also means the opponent side is their best available lineup, not
+    necessarily the lineup they've actually set in Sleeper — stated in the
+    response as `starters_basis` so the client can say so out loud.
+    """
+
+    roster_player_ids = {str(pid) for pid in (roster.get("players") or [])}
+    starters, _bench = _suggested_lineup_split(valued, roster_player_ids, settings, score_field)
+
+    best_score_by_position: dict[str, float] = {}
+    for player in starters:
+        position = str(player.get("position") or "").strip()
+        score = player.get("score")
+        if not position or not isinstance(score, (int, float)):
+            continue
+        best_score_by_position[position] = max(best_score_by_position.get(position, float("-inf")), float(score))
+
+    for player in starters:
+        player["why"] = _matchup_starter_why(player, best_score_by_position)
+
+    season_value_total = round(
+        sum(float(p["score"]) for p in starters if isinstance(p.get("score"), (int, float))), 1
+    )
+    roster_settings = roster.get("settings") or {}
+    return {
+        "roster_id": roster_id,
+        "team_name": _clean_json_value(profile.get("team_name")) or f"Team {roster_id}",
+        "owner_name": _clean_json_value(profile.get("owner_name")),
+        "avatar_url": _clean_json_value(profile.get("avatar_url")),
+        "wins": _clean_json_value(roster_settings.get("wins")),
+        "losses": _clean_json_value(roster_settings.get("losses")),
+        "ties": _clean_json_value(roster_settings.get("ties")),
+        "starters": starters,
+        "season_value_total": season_value_total,
+        "starters_basis": "suggested_optimal_lineup",
+    }
+
+
+def _matchup_comparison(my_total: float, opponent_total: float) -> dict[str, Any]:
+    margin = round(my_total - opponent_total, 1)
+    scale = max(abs(my_total), abs(opponent_total), 1.0)
+    if abs(margin) / scale < _MATCHUP_EVEN_THRESHOLD:
+        edge = "even"
+        headline = "Too close to call on season value"
+    elif margin > 0:
+        edge = "you"
+        headline = "Your lineup carries the stronger season-long value"
+    else:
+        edge = "opponent"
+        headline = "Your opponent's lineup carries the stronger season-long value"
+    return {
+        "my_season_value": my_total,
+        "opponent_season_value": opponent_total,
+        "margin": margin,
+        "edge": edge,
+        "headline": headline,
+        "basis": SEASON_VALUE_BASIS,
+        "basis_label": SEASON_VALUE_BASIS_LABEL,
+    }
+
+
+def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "week": week,
+        "my_team": None,
+        "opponent": None,
+        "comparison": None,
+        "basis": SEASON_VALUE_BASIS,
+        "basis_label": SEASON_VALUE_BASIS_LABEL,
+        "reason": reason,
+    }
+
+
+@app.get("/v1/leagues/{league_id}/matchup")
+def get_league_matchup(
+    league_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """This week's head-to-head: your suggested starters vs. your opponent's.
+
+    Week comes from the league's own `settings.leg` (the same current-week
+    field the mobile League screen already reads), and the pairing from
+    modules.sleeper.get_matchups for that week — the live Sleeper endpoint,
+    so this works during an in-progress week, not just completed ones.
+
+    HONEST SCOPE — read before extending: this is NOT a points projection.
+    No weekly-projection feed and no opponent-defense-strength data exist
+    anywhere in this codebase, so both sides are ranked by the same
+    season-long value/opportunity signal every other surface here uses
+    (SEASON_VALUE_BASIS_LABEL), and each starter's `why` cites only real
+    season-form fields (tier, workload/opportunity label, season-value rank
+    on that roster, injury tag). A true weekly projection would be a new
+    data source, not a relabel of this one.
+
+    Not-ready states return 200 with a `reason` (same contract as /my-team
+    and the other league endpoints) rather than an HTTP error: the
+    roster-resolution reasons from `_resolve_my_roster`, plus
+    no_current_week / no_matchup_data / roster_not_in_matchups / bye_week.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return _empty_matchup(reason)
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+    try:
+        current_week = int((league_settings or {}).get("leg") or 0)
+    except (TypeError, ValueError):
+        current_week = 0
+    if current_week <= 0:
+        return _empty_matchup("no_current_week")
+
+    matchups = sleeper.get_matchups(league_id, current_week)
+    if not matchups:
+        return _empty_matchup("no_matchup_data", week=current_week)
+
+    my_roster_id = str(my_roster.get("roster_id") or "")
+    my_entry = next((m for m in matchups if str(m.get("roster_id") or "") == my_roster_id), None)
+    if my_entry is None:
+        return _empty_matchup("roster_not_in_matchups", week=current_week)
+
+    # A null matchup_id is Sleeper's own "this roster isn't paired this
+    # week" (bye / odd team count), not a missing-data error.
+    matchup_id = my_entry.get("matchup_id")
+    opponent_entry = (
+        next(
+            (
+                m
+                for m in matchups
+                if m.get("matchup_id") == matchup_id and str(m.get("roster_id") or "") != my_roster_id
+            ),
+            None,
+        )
+        if matchup_id is not None
+        else None
+    )
+    if opponent_entry is None:
+        return _empty_matchup("bye_week", week=current_week)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_matchup")
+    if players_df.empty:
+        return _empty_matchup("no_player_data", week=current_week)
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    opponent_roster_id = str(opponent_entry.get("roster_id") or "")
+    rosters_by_id = {str(r.get("roster_id") or ""): r for r in sleeper.get_rosters(league_id)}
+    opponent_roster = rosters_by_id.get(opponent_roster_id)
+    if opponent_roster is None:
+        return _empty_matchup("opponent_roster_missing", week=current_week)
+
+    profiles = sleeper.get_league_roster_profiles(league_id) or {}
+    my_side = _matchup_side(
+        my_roster_id, my_roster, profiles.get(my_roster_id) or {}, valued, settings, score_field
+    )
+    opponent_side = _matchup_side(
+        opponent_roster_id,
+        opponent_roster,
+        profiles.get(opponent_roster_id) or {},
+        valued,
+        settings,
+        score_field,
+    )
+    if not my_side["starters"] and not opponent_side["starters"]:
+        return _empty_matchup("empty_roster", week=current_week)
+
+    return {
+        "ok": True,
+        "week": current_week,
+        "my_team": my_side,
+        "opponent": opponent_side,
+        "comparison": _matchup_comparison(
+            my_side["season_value_total"], opponent_side["season_value_total"]
+        ),
+        "basis": SEASON_VALUE_BASIS,
+        "basis_label": SEASON_VALUE_BASIS_LABEL,
+        "reason": "",
+    }
 
 
 def _project_waiver_row(row: pd.Series, score_field: str) -> dict[str, Any]:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -3630,6 +3631,259 @@ def test_my_team_returns_the_real_suggested_lineup_split(monkeypatch):
     assert starters[0]["slot"] == "QB"
     bench_ids = {player["player_id"] for player in bench}
     assert "my_bench_rb" in bench_ids
+
+
+def _fake_matchup_players_frame():
+    """Two full rosters: mine (season value 2000/player) and my opponent's
+    (1000/player), so the season-value comparison has a deterministic winner.
+    """
+
+    positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "RB", "WR"]
+    rows = []
+    for prefix, score, tier, opportunity in (
+        ("mine", 2000, "Elite", "Workhorse"),
+        ("opp", 1000, "Solid", "Rotational"),
+    ):
+        for i, position in enumerate(positions, start=1):
+            rows.append(
+                {
+                    "player_id": f"{prefix}{i}",
+                    "name": f"{prefix.title()} Player {i}",
+                    "position": position,
+                    "team": "KC",
+                    "age": 26,
+                    "years_exp": 4,
+                    "status": "Active",
+                    "injury_status": None,
+                    "player_tier": tier,
+                    "opportunity_label": opportunity,
+                    "score": score,
+                    "dynasty_score": score,
+                    "value_score": score,
+                    "rebuild_score": score,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+_MATCHUP_LEAGUE = {
+    "scoring_settings": {"rec": 1.0},
+    # `leg` is Sleeper's current-week field — the endpoint reads it rather
+    # than guessing a week from the calendar.
+    "settings": {"type": 2, "leg": 5},
+    "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN", "BN"],
+    "total_rosters": 12,
+}
+
+_MATCHUP_ROSTERS = [
+    {
+        "roster_id": 1,
+        "owner_id": "sleeper-user-1",
+        "players": [f"mine{i}" for i in range(1, 10)],
+        "settings": {"wins": 3, "losses": 1, "ties": 0},
+    },
+    {
+        "roster_id": 2,
+        "owner_id": "sleeper-user-2",
+        "players": [f"opp{i}" for i in range(1, 10)],
+        "settings": {"wins": 2, "losses": 2, "ties": 0},
+    },
+]
+
+
+def _matchup_auth_mocks():
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    return [auth_user_response, profile_response]
+
+
+@contextlib.contextmanager
+def _matchup_world(matchups, league=None, rosters=None):
+    """Every Sleeper/player-data seam the matchup endpoint touches, mocked."""
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_matchup_auth_mocks()))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(
+            patch("modules.sleeper.get_rosters", return_value=rosters if rosters is not None else _MATCHUP_ROSTERS)
+        )
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=league or _MATCHUP_LEAGUE))
+        stack.enter_context(patch("modules.sleeper.get_matchups", return_value=matchups))
+        stack.enter_context(
+            patch(
+                "modules.sleeper.get_league_roster_profiles",
+                return_value={
+                    "1": {"team_name": "My Squad", "owner_name": "Me", "avatar_url": None},
+                    "2": {"team_name": "Their Squad", "owner_name": "Them", "avatar_url": None},
+                },
+            )
+        )
+        stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_matchup_players_frame()))
+        stack.enter_context(
+            patch("modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kwargs: df)
+        )
+        yield
+
+
+def test_matchup_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/leagues/abc/matchup").status_code == 401
+
+
+def test_matchup_rejects_unknown_lens(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/matchup?lens=Vibes", headers={"Authorization": "Bearer good-token"}
+        )
+
+    assert response.status_code == 422
+
+
+def test_matchup_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["my_team"] is None
+    assert body["opponent"] is None
+    assert body["comparison"] is None
+    assert body["reason"] == "no_sleeper_username_linked"
+    # The honest-framing label ships even on not-ready responses, so no
+    # client can render a matchup shell without it.
+    assert body["basis"] == "season_value"
+    assert "not a weekly points projection" in body["basis_label"]
+
+
+def test_matchup_reports_bye_week_when_roster_is_unpaired(monkeypatch):
+    client = _client(monkeypatch)
+
+    with _matchup_world([{"roster_id": 1, "matchup_id": None}, {"roster_id": 2, "matchup_id": 4}]):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["reason"] == "bye_week"
+    assert body["week"] == 5
+    assert body["my_team"] is None
+
+
+def test_matchup_reports_missing_week_when_league_has_no_leg(monkeypatch):
+    client = _client(monkeypatch)
+    league = {**_MATCHUP_LEAGUE, "settings": {"type": 2}}
+
+    with _matchup_world([], league=league):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    assert body["reason"] == "no_current_week"
+    assert body["week"] is None
+
+
+def test_matchup_reports_no_matchup_data_when_sleeper_returns_nothing(monkeypatch):
+    client = _client(monkeypatch)
+
+    with _matchup_world([]):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    assert body["reason"] == "no_matchup_data"
+    assert body["week"] == 5
+
+
+def test_matchup_returns_both_sides_and_a_season_value_comparison(monkeypatch):
+    client = _client(monkeypatch)
+
+    with _matchup_world([{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}]):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    assert body["week"] == 5
+
+    mine = body["my_team"]
+    theirs = body["opponent"]
+    assert mine["roster_id"] == "1"
+    assert mine["team_name"] == "My Squad"
+    assert mine["wins"] == 3
+    assert theirs["roster_id"] == "2"
+    assert theirs["team_name"] == "Their Squad"
+
+    # _MATCHUP_LEAGUE's roster_positions give 8 assignable starter slots
+    # (QB1 + RB2 + WR3 + TE1 + FLEX1); both fixture rosters are 9 players,
+    # so both sides fill all 8. Same suggest_optimal_lineup pass on each
+    # side — that's what makes the totals comparable at all.
+    assert len(mine["starters"]) == 8
+    assert len(theirs["starters"]) == 8
+    assert mine["starters"][0]["slot"] == "QB"
+    assert all(player["suggested_starter"] is True for player in mine["starters"])
+    assert mine["starters_basis"] == "suggested_optimal_lineup"
+
+    # Season-value totals, NOT projected points — each side's total is the
+    # sum of its own starters' lens-adjusted season scores (the Dynasty lens
+    # reweights the raw fixture scores by age/position, so this asserts the
+    # relationship rather than a frozen magic number).
+    assert mine["season_value_total"] == round(sum(p["score"] for p in mine["starters"]), 1)
+    assert theirs["season_value_total"] == round(sum(p["score"] for p in theirs["starters"]), 1)
+    # My fixture roster is 2000/player against their 1000/player.
+    assert mine["season_value_total"] > theirs["season_value_total"]
+
+    comparison = body["comparison"]
+    assert comparison["edge"] == "you"
+    assert comparison["margin"] == round(mine["season_value_total"] - theirs["season_value_total"], 1)
+    assert comparison["my_season_value"] == mine["season_value_total"]
+    assert comparison["opponent_season_value"] == theirs["season_value_total"]
+    assert comparison["basis"] == "season_value"
+    assert "not a weekly points projection" in comparison["basis_label"]
+    # Nothing in this response may present itself as a points projection.
+    assert "projected_points" not in str(body)
+
+    # The per-starter "why" is built from real season-form fields only —
+    # tier (recomputed by the valuation lens, so only the shape is asserted),
+    # workload/opportunity label, and season-value rank on that roster.
+    why = mine["starters"][0]["why"]
+    assert "tier" in why
+    assert "Workhorse" in why
+    assert "top QB on this roster by season value" in why
+    # ...and never about this week's opponent or expected points.
+    for player in mine["starters"] + theirs["starters"]:
+        assert "project" not in player["why"].lower()
+        assert "points" not in player["why"].lower()
+
+
+def test_matchup_uses_the_leagues_current_week_for_the_live_sleeper_call(monkeypatch):
+    """The whole point of reading settings.leg: the in-progress week is
+    requested from Sleeper, not a completed one."""
+
+    client = _client(monkeypatch)
+    calls: list[tuple] = []
+
+    def fake_get_matchups(league_id, round_num):
+        calls.append((league_id, round_num))
+        return [{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}]
+
+    with _matchup_world([]):
+        with patch("modules.sleeper.get_matchups", side_effect=fake_get_matchups):
+            client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    assert calls == [("abc", 5)]
 
 
 def test_trade_outcomes_requires_auth(monkeypatch):

@@ -55,6 +55,13 @@ const LEAGUE_DESTINATIONS: Destination[] = [
   // moved up next to the other "check this now" destinations.
   { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', needsLeague: true, color: colors.danger },
   { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', needsLeague: true, color: colors.success },
+  {
+    label: 'Matchup',
+    route: 'Matchup',
+    icon: 'american-football-outline',
+    needsLeague: true,
+    color: colors.success,
+  },
   { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', needsLeague: true, color: colors.success },
   { label: 'Teams', route: 'Teams', icon: 'people-circle-outline', needsLeague: true, color: colors.violet },
   { label: 'Players', route: 'Players', icon: 'people-outline', needsLeague: true, color: colors.violet },
