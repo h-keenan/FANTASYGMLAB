@@ -343,7 +343,7 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
   }
   return (
     <View style={styles.assetRow}>
-      <PlayerAvatar playerId={asset.player_id} size={32} style={styles.assetAvatar} />
+      <PlayerAvatar playerId={asset.player_id} size={32} tier={asset.tier} style={styles.assetAvatar} />
       <View style={styles.assetTextGroup}>
         <Text style={styles.assetName} numberOfLines={1}>
           {asset.name ?? 'Unknown'}

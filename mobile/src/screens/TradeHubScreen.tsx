@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import TeamAvatar from '../components/TeamAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import {
@@ -38,7 +39,7 @@ function assetToRankedPlayer(asset: PresentationAsset): RankedPlayer {
     age: asset.age ?? null,
     status: null,
     injury_status: asset.injury_status ?? null,
-    tier: null,
+    tier: asset.tier ?? null,
     score: asset.score ?? null,
     overall_rank: null,
     position_rank: null,
@@ -327,7 +328,7 @@ function AssetRow({
       activeOpacity={canOpen ? 0.7 : 1}
       onPress={() => onPressPlayer?.(asset)}
     >
-      <PlayerAvatar playerId={asset.player_id} size={36} style={styles.assetAvatar} />
+      <PlayerAvatar playerId={asset.player_id} size={36} tier={asset.tier} style={styles.assetAvatar} />
       <View style={styles.assetTextGroup}>
         <Text style={styles.assetName} numberOfLines={1}>
           {asset.name ?? 'Unknown'}
@@ -419,9 +420,13 @@ function TradeIdeaCard({
         </View>
       ) : null}
       <View style={styles.partnerRow}>
-        <View style={styles.partnerAvatar}>
-          <Text style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</Text>
-        </View>
+        {idea.partner_team_avatar_url ? (
+          <TeamAvatar avatarId={idea.partner_team_avatar_url} size={36} />
+        ) : (
+          <View style={styles.partnerAvatar}>
+            <Text style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
         <View style={styles.partnerTextGroup}>
           <Text style={styles.partnerName} numberOfLines={1}>
             {idea.partner_team_name}

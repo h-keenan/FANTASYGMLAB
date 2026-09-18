@@ -683,6 +683,7 @@ export interface PresentationAsset {
   // injury_status, which is Sleeper's raw status string (e.g. "Questionable").
   injury_level?: string;
   opportunity_explanation?: string;
+  tier?: string;
   season?: string;
   round?: string;
   pick_no?: number;
@@ -701,6 +702,7 @@ export interface TradePackage {
 
 export interface TradeIdea {
   partner_team_name: string;
+  partner_team_avatar_url: string | null;
   rationale: string;
   trade_gain: number;
   confidence_label: string;
