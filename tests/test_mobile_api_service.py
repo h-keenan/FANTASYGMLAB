@@ -1670,6 +1670,101 @@ def test_quick_view_model_falls_back_to_age_lens_when_age_score_missing(monkeypa
     assert model["age_score_label"] == "Age Lens"
 
 
+def test_weekly_stats_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/players/9001/weekly-stats")
+    assert response.status_code == 401
+
+
+def test_weekly_stats_defaults_to_current_season(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_weekly = {
+        "9001": {
+            "stats_season": 2026,
+            "weekly": [
+                {"week": 1, "fantasy_points_ppr": 18.4, "snap_share": 0.72},
+                {"week": 2, "fantasy_points_ppr": 9.1, "snap_share": 0.55},
+            ],
+        }
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.default_player_stats_season", return_value=2026):
+            with patch("modules.sleeper.get_season_player_stats", return_value=fake_weekly) as mock_stats:
+                response = client.get(
+                    "/v1/players/9001/weekly-stats",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["season"] == 2026
+    assert body["weeks"] == [
+        {"week": 1, "fantasy_points_ppr": 18.4, "snap_share": 0.72},
+        {"week": 2, "fantasy_points_ppr": 9.1, "snap_share": 0.55},
+    ]
+    mock_stats.assert_called_once_with(2026, retain_weekly=True)
+
+
+def test_weekly_stats_accepts_an_explicit_prior_season(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_weekly = {"9001": {"stats_season": 2025, "weekly": [{"week": 1, "fantasy_points_ppr": 5.0, "snap_share": 0.3}]}}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.default_player_stats_season", return_value=2026):
+            with patch("modules.sleeper.get_season_player_stats", return_value=fake_weekly) as mock_stats:
+                response = client.get(
+                    "/v1/players/9001/weekly-stats?season=2025",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    assert response.json()["season"] == 2025
+    mock_stats.assert_called_once_with(2025, retain_weekly=True)
+
+
+def test_weekly_stats_rejects_a_season_too_far_in_the_past(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.default_player_stats_season", return_value=2026):
+            response = client.get(
+                "/v1/players/9001/weekly-stats?season=2000",
+                headers={"Authorization": "Bearer good-token"},
+            )
+    assert response.status_code == 422
+
+
+def test_weekly_stats_returns_empty_for_a_player_with_no_weekly_rows(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.default_player_stats_season", return_value=2026):
+            with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                response = client.get(
+                    "/v1/players/does-not-exist/weekly-stats",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["weeks"] == []
+
+
 def test_gm_targets_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     assert client.get("/v1/leagues/abc/gm-targets").status_code == 401

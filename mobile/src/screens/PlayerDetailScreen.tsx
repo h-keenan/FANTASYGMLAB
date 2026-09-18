@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import {
   api,
   type PlayerAward,
@@ -13,6 +14,7 @@ import {
   type QuickViewSeason,
   type QuickViewStatItem,
   type QuickViewStats,
+  type WeeklyStatPoint,
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { resolvePlayerTier } from '../lib/playerTier';
@@ -20,9 +22,10 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
-type DetailTab = 'stats' | 'career' | 'model';
+type DetailTab = 'stats' | 'trends' | 'career' | 'model';
 const TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'stats', label: 'Stats' },
+  { key: 'trends', label: 'Trends' },
   { key: 'career', label: 'Career' },
   { key: 'model', label: 'Model' },
 ];
@@ -78,6 +81,118 @@ function StatSection({
     <View style={[styles.card, styles.cardSpaced]}>
       <SectionHeading title={title} icon={icon} />
       <StatGrid items={items.map((item) => ({ label: item.label, value: item.value || null }))} />
+    </View>
+  );
+}
+
+/** "72%" -> 72; anything else (blank, non-percent stats) -> null, so the
+ * caller falls back to a plain StatCell instead of drawing an empty bar. */
+function parsePercent(value: string): number | null {
+  const match = /^(\d+(?:\.\d+)?)%$/.exec(value.trim());
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(100, parsed)) : null;
+}
+
+function PercentBar({ label, percent, display }: { label: string; percent: number; display: string }) {
+  return (
+    <View style={styles.percentRow}>
+      <View style={styles.percentLabelRow}>
+        <Text style={styles.percentLabel} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text style={styles.percentValue}>{display}</Text>
+      </View>
+      <View style={styles.percentTrack}>
+        <View style={[styles.percentFill, { width: `${percent}%` }]} />
+      </View>
+    </View>
+  );
+}
+
+/** Usage stats (Snap %, Route %, Target Share, Carry Share, Opportunity)
+ * are all shares — a plain number is harder to size up at a glance than a
+ * bar, so this renders each as one instead of falling through to the
+ * generic StatGrid the other sections use. */
+function UsageSection({ items }: { items: QuickViewStatItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <View style={[styles.card, styles.cardSpaced]}>
+      <SectionHeading title="Usage" icon="speedometer-outline" />
+      {items.map((item, index) => {
+        const percent = item.value ? parsePercent(item.value) : null;
+        if (percent === null) {
+          return (
+            <View key={`${item.label}-${index}`} style={styles.percentFallbackRow}>
+              <StatCell label={item.label} value={item.value || null} />
+            </View>
+          );
+        }
+        return <PercentBar key={`${item.label}-${index}`} label={item.label} percent={percent} display={item.value} />;
+      })}
+    </View>
+  );
+}
+
+function TrendsSection({
+  seasons,
+  playerId,
+}: {
+  seasons: QuickViewSeason[];
+  playerId: string;
+}) {
+  const years = Array.from(new Set(seasons.map((s) => s.season).filter((s): s is number => s != null))).sort(
+    (a, b) => b - a,
+  );
+  const [selectedYear, setSelectedYear] = useState<number | null>(years[0] ?? null);
+  const [weeks, setWeeks] = useState<WeeklyStatPoint[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (selectedYear === null) return;
+    let cancelled = false;
+    setLoading(true);
+    api
+      .getPlayerWeeklyStats(playerId, selectedYear)
+      .then((result) => {
+        if (!cancelled) setWeeks(result.weeks);
+      })
+      .catch(() => {
+        if (!cancelled) setWeeks([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerId, selectedYear]);
+
+  if (years.length === 0) {
+    return <Text style={styles.notice}>No weekly trend data available for this player yet.</Text>;
+  }
+
+  return (
+    <View style={styles.card}>
+      <SectionHeading title="Points By Week" icon="trending-up-outline" />
+      {years.length > 1 ? (
+        <View style={styles.yearRow}>
+          {years.map((year) => (
+            <TouchableOpacity
+              key={year}
+              style={[styles.yearPill, selectedYear === year && styles.yearPillActive]}
+              onPress={() => setSelectedYear(year)}
+            >
+              <Text style={[styles.yearPillText, selectedYear === year && styles.yearPillTextActive]}>{year}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
+      {loading || weeks === null ? (
+        <ActivityIndicator style={styles.loader} color={colors.accent} />
+      ) : (
+        <WeeklyPointsChart weeks={weeks} />
+      )}
     </View>
   );
 }
@@ -150,27 +265,50 @@ function TabRow({ active, onChange }: { active: DetailTab; onChange: (tab: Detai
   );
 }
 
-function SeasonCard({ season }: { season: QuickViewSeason }) {
+function SeasonCard({
+  season,
+  expanded,
+  onToggle,
+}: {
+  season: QuickViewSeason;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   return (
     <View style={[styles.card, styles.cardSpaced]}>
-      <SectionHeading title={season.label} icon="calendar-outline" />
-      {season.key_stats.length > 0 ? (
-        <StatGrid items={season.key_stats.map((item) => ({ label: item.label, value: item.value || null }))} />
-      ) : (
-        <Text style={styles.notice}>No stats recorded for this season.</Text>
-      )}
+      <TouchableOpacity style={styles.seasonCardHeader} onPress={onToggle} activeOpacity={0.7}>
+        <SectionHeading title={season.label} icon="calendar-outline" />
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
+      </TouchableOpacity>
+      {expanded ? (
+        season.key_stats.length > 0 ? (
+          <StatGrid items={season.key_stats.map((item) => ({ label: item.label, value: item.value || null }))} />
+        ) : (
+          <Text style={styles.notice}>No stats recorded for this season.</Text>
+        )
+      ) : null}
     </View>
   );
 }
 
+// Every past season used to render fully expanded at once — with several
+// years of history that's a wall of stat grids to scroll past just to
+// compare two seasons. Only the most recent stays open by default; older
+// ones collapse to just their header until tapped.
 function CareerSection({ seasons }: { seasons: QuickViewSeason[] }) {
+  const [expandedIndex, setExpandedIndex] = useState(0);
   if (seasons.length === 0) {
     return <Text style={styles.notice}>No season history available for this player yet.</Text>;
   }
   return (
     <>
       {seasons.map((season, index) => (
-        <SeasonCard key={`${season.season ?? 'season'}-${season.season_type}-${index}`} season={season} />
+        <SeasonCard
+          key={`${season.season ?? 'season'}-${season.season_type}-${index}`}
+          season={season}
+          expanded={expandedIndex === index}
+          onToggle={() => setExpandedIndex(expandedIndex === index ? -1 : index)}
+        />
       ))}
     </>
   );
@@ -400,11 +538,15 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
               <Text style={styles.seasonLabel}>{season.label}</Text>
               <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} />
               <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} />
-              <StatSection title="Usage" icon="speedometer-outline" items={season.usage} />
+              <UsageSection items={season.usage} />
               {stats?.college_available ? (
                 <StatSection title="College" icon="school-outline" items={stats.college} />
               ) : null}
             </>
+          ) : null}
+
+          {activeTab === 'trends' ? (
+            <TrendsSection seasons={stats?.seasons ?? []} playerId={player.player_id} />
           ) : null}
 
           {activeTab === 'career' ? <CareerSection seasons={stats?.seasons ?? []} /> : null}
@@ -544,6 +686,44 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   statCellValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  percentRow: { marginBottom: spacing.sm },
+  percentFallbackRow: { marginBottom: spacing.sm },
+  percentLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  percentLabel: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
+  percentValue: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+  percentTrack: {
+    height: 6,
+    borderRadius: radii.pill,
+    backgroundColor: colors.background,
+    overflow: 'hidden',
+  },
+  percentFill: {
+    height: '100%',
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
+  },
+  seasonCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  yearRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
+  yearPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceSolid,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  yearPillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  yearPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  yearPillTextActive: { color: '#fff' },
   notice: {
     marginTop: spacing.md,
     fontSize: 12,

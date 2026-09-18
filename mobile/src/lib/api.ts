@@ -540,6 +540,18 @@ export interface QuickViewModel {
   workload_trend: string | null;
 }
 
+export interface WeeklyStatPoint {
+  week: number;
+  fantasy_points_ppr: number | null;
+  snap_share: number | null;
+}
+
+export interface WeeklyStatsResponse {
+  ok: true;
+  season: number;
+  weeks: WeeklyStatPoint[];
+}
+
 export interface QuickViewResponse {
   ok: true;
   stats: QuickViewStats | null;
@@ -808,6 +820,10 @@ export const api = {
     authorizedFetch<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
   getPlayerAwards: (playerId: string) =>
     authorizedFetch<PlayerAwardsResponse>(`/v1/players/${encodeURIComponent(playerId)}/awards`),
+  getPlayerWeeklyStats: (playerId: string, season?: number) => {
+    const query = season != null ? `?season=${encodeURIComponent(String(season))}` : '';
+    return authorizedFetch<WeeklyStatsResponse>(`/v1/players/${encodeURIComponent(playerId)}/weekly-stats${query}`);
+  },
   getGmTargets: (leagueId: string) =>
     authorizedFetch<GmTargetsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`),
   addGmTarget: (leagueId: string, playerId: string, sourceSurface = 'gm_targets') =>

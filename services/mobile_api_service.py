@@ -24,6 +24,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
+  - GET  /v1/players/{id}/weekly-stats   — per-week fantasy points + snap share for one season
   - GET  /v1/players/{id}/awards         — verified fantasy-performance badges (career history)
   - GET  /v1/leagues/{id}/gm-targets           — the caller's watchlist in this league
   - POST /v1/leagues/{id}/gm-targets           — add a player to the watchlist (cap-enforced)
@@ -1622,6 +1623,51 @@ def get_player_quick_view(
         "bio": dataclasses.asdict(bio),
         "model": _project_player_model(row),
         "reason": "",
+    }
+
+
+MAX_WEEKLY_STATS_SEASONS_BACK = 3
+
+
+@app.get("/v1/players/{player_id}/weekly-stats")
+def get_player_weekly_stats(
+    player_id: str,
+    season: int | None = None,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Per-week fantasy points + snap share for one player in one season —
+    powers Player Detail's points-by-week chart and snap% bar. Defaults to
+    the current season; older seasons are fetched on demand rather than
+    eagerly, since modules.sleeper only retains weekly rows for whichever
+    season(s) a caller has actually asked to keep (see
+    get_season_player_stats's `retain_weekly`).
+    """
+
+    target_season = int(season) if season is not None else sleeper.default_player_stats_season()
+    oldest_allowed = sleeper.default_player_stats_season() - MAX_WEEKLY_STATS_SEASONS_BACK
+    if target_season < oldest_allowed or target_season > sleeper.default_player_stats_season():
+        raise HTTPException(
+            status_code=422,
+            detail=f"season must be between {oldest_allowed} and {sleeper.default_player_stats_season()}.",
+        )
+
+    season_stats = sleeper.get_season_player_stats(target_season, retain_weekly=True)
+    player_stats = season_stats.get(str(player_id))
+    weeks = player_stats.get("weekly") if isinstance(player_stats, dict) else None
+    if not weeks:
+        return {"ok": True, "season": target_season, "weeks": []}
+
+    return {
+        "ok": True,
+        "season": target_season,
+        "weeks": [
+            {
+                "week": int(row.get("week") or 0),
+                "fantasy_points_ppr": _clean_json_value(row.get("fantasy_points_ppr")),
+                "snap_share": _clean_json_value(row.get("snap_share")),
+            }
+            for row in weeks
+        ],
     }
 
 
