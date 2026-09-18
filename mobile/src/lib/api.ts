@@ -771,6 +771,14 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?${params.toString()}`,
     );
   },
+  getPlayerRankInLeague: (leagueId: string, playerId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<{ ok: true; player: RankedPlayer | null }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/players/${encodeURIComponent(playerId)}/rank${query ? `?${query}` : ''}`,
+    );
+  },
   getLeagueWaivers: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

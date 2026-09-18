@@ -26,7 +26,12 @@ export const ORB_SCRIM_BASE_HEIGHT = 112;
  * was tested on and wrong everywhere else, the same mistake the orb's own
  * inset clamp made once already (see PR #513's history).
  */
-export function useOrbClearance(extraBreathingRoom: number = spacing.md): number {
+// Widened from spacing.md after coridian_ still saw the orb's scrim
+// overlapping the last card on Trade Hub and Player Detail on a real device
+// — the prior margin (12pt) left almost no buffer above the scrim's opaque
+// zone. Doubling it is a safe, unconditional improvement regardless of
+// whatever device-specific rounding ate the old margin.
+export function useOrbClearance(extraBreathingRoom: number = spacing.xl): number {
   const rawInsets = useSafeAreaInsets();
   const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), ORB_INSET_CEILING);
   return ORB_SCRIM_BASE_HEIGHT + safeBottom + extraBreathingRoom;

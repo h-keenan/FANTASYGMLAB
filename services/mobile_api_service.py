@@ -17,6 +17,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
+  - GET  /v1/leagues/{id}/players/{id}/rank — one player's league-adjusted rank, looked up directly
   - GET  /v1/news                        — curated NFL fantasy news (injury/role/transaction/off-field)
   - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
   - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
@@ -823,6 +824,57 @@ def get_league_rankings(
     ranked = ranked.sort_values(score_field, ascending=False).head(limit)
     players = [_project_ranking_row(row, score_field) for _, row in ranked.iterrows()]
     return {"ok": True, "players": players}
+
+
+@app.get("/v1/leagues/{league_id}/players/{player_id}/rank")
+def get_player_rank_in_league(
+    league_id: str,
+    player_id: str,
+    lens: str = "Dynasty",
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """One player's league-adjusted rank, looked up directly instead of
+    truncated out of a top-N /rankings list. Player Detail calls this itself
+    so Overall/Position Rank are always populated regardless of which screen
+    navigated here — several callers (Waivers, MyTeam, Trade Hub) only ever
+    have a lean player shape with no rank fields to pass along.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_rankings"
+    )
+    if players_df.empty:
+        return {"ok": True, "player": None}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+    scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
+    ranked = canonical_player_ranking.attach_canonical_ranks(
+        valued,
+        scoring_format=scoring_context.scoring_format,
+        score_field=score_field,
+        context=scoring_context,
+    )
+
+    matches = ranked[ranked["player_id"] == player_id]
+    if matches.empty:
+        return {"ok": True, "player": None}
+    return {"ok": True, "player": _project_ranking_row(matches.iloc[0], score_field)}
 
 
 def _project_news_item(item: dict[str, Any]) -> dict[str, Any]:
