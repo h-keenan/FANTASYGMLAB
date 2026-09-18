@@ -7,6 +7,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
+import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -20,10 +21,14 @@ const STORY_META: Record<
   { icon: React.ComponentProps<typeof Ionicons>['name']; color: string }
 > = {
   performance: { icon: 'trophy', color: colors.premium },
+  performance_low: { icon: 'trending-down', color: colors.premium },
   matchup: { icon: 'flame', color: colors.danger },
+  matchup_close: { icon: 'pulse', color: colors.danger },
   waiver: { icon: 'cash-outline', color: colors.success },
+  waiver_low: { icon: 'pricetag-outline', color: colors.success },
   trade: { icon: 'swap-horizontal', color: colors.accent },
   activity: { icon: 'repeat', color: colors.violet },
+  activity_low: { icon: 'moon-outline', color: colors.violet },
   roster_riser: { icon: 'trending-up', color: colors.accent },
 };
 const DEFAULT_STORY_META = { icon: 'newspaper-outline' as const, color: colors.textSecondary };
@@ -38,6 +43,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [tradeStory, setTradeStory] = useState<RecapStory | null>(null);
 
   useScreenHeaderTitle(navigation, 'Recap', leagueName);
 
@@ -138,7 +144,13 @@ export default function RecapScreen({ route, navigation }: Props) {
       {recap.incomplete ? (
         <Text style={styles.incompleteNotice}>{recap.empty_reason || 'Not enough historical data yet.'}</Text>
       ) : (
-        recap.stories.map((story, index) => <StoryCard key={`${story.story_type}-${index}`} story={story} />)
+        recap.stories.map((story, index) => (
+          <StoryCard
+            key={`${story.story_type}-${index}`}
+            story={story}
+            onPress={story.story_type === 'trade' ? () => setTradeStory(story) : undefined}
+          />
+        ))
       )}
       </ScrollView>
       )}
@@ -148,17 +160,19 @@ export default function RecapScreen({ route, navigation }: Props) {
         leagueName={leagueName}
         recap={recap}
       />
+      <RecapTradeDetailModal visible={tradeStory != null} onClose={() => setTradeStory(null)} story={tradeStory} />
     </View>
   );
 }
 
-function StoryCard({ story }: { story: RecapStory }) {
+function StoryCard({ story, onPress }: { story: RecapStory; onPress?: () => void }) {
   const meta = STORY_META[story.story_type] ?? DEFAULT_STORY_META;
-  const isMatchup = story.story_type === 'matchup';
+  const isMatchup = story.story_type === 'matchup' || story.story_type === 'matchup_close';
   const isTrade = story.story_type === 'trade';
 
   return (
     <AnimatedCard style={styles.storyCard}>
+      <TouchableOpacity onPress={onPress} disabled={!onPress} activeOpacity={0.75}>
       <View style={styles.storyHeaderRow}>
         <IconCircle name={meta.icon} color={meta.color} size={40} />
         <View style={styles.storyTextGroup}>
@@ -175,6 +189,7 @@ function StoryCard({ story }: { story: RecapStory }) {
             <Text style={styles.metricLabel}>{story.metric_label.toUpperCase()}</Text>
           </View>
         ) : null}
+        {onPress ? <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} /> : null}
       </View>
 
       {isMatchup ? (
@@ -208,6 +223,7 @@ function StoryCard({ story }: { story: RecapStory }) {
       <Text style={styles.storySummary} numberOfLines={3}>
         {story.summary}
       </Text>
+      </TouchableOpacity>
     </AnimatedCard>
   );
 }

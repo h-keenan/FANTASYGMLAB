@@ -46,10 +46,14 @@ LEAGUE_RECAPS_CSS = """
     padding:0 0 0 var(--space-sm);
 }
 .dg-recap-story--performance{border-left-color:var(--color-prestige-elite)}
+.dg-recap-story--performance_low{border-left-color:var(--color-prestige-elite)}
 .dg-recap-story--trade{border-left-color:var(--color-accent)}
 .dg-recap-story--waiver{border-left-color:var(--color-success)}
+.dg-recap-story--waiver_low{border-left-color:var(--color-success)}
 .dg-recap-story--matchup{border-left-color:var(--color-information)}
+.dg-recap-story--matchup_close{border-left-color:var(--color-information)}
 .dg-recap-story--activity{border-left-color:var(--color-warning)}
+.dg-recap-story--activity_low{border-left-color:var(--color-warning)}
 .dg-recap-story-kicker{
     align-items:center;
     display:flex;

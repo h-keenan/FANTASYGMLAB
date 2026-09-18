@@ -21,16 +21,26 @@ SESSION_CACHE_KEY = "_league_recap_cache"
 NOTICE_KEY = "_league_recap_notice"
 
 STORY_PERFORMANCE = "performance"
+STORY_PERFORMANCE_LOW = "performance_low"
 STORY_MATCHUP = "matchup"
+STORY_MATCHUP_CLOSE = "matchup_close"
 STORY_WAIVER = "waiver"
+STORY_WAIVER_LOW = "waiver_low"
 STORY_TRADE = "trade"
 STORY_ACTIVITY = "activity"
+STORY_ACTIVITY_LOW = "activity_low"
 STORY_RISER = "roster_riser"
 
 PERFORMANCE_STORY_TITLES = (
     "Highest team score",
     "Scoreboard leader",
     "Week's scoring leader",
+)
+
+LOW_PERFORMANCE_STORY_TITLES = (
+    "Week's low score",
+    "Scoreboard cellar",
+    "The week's toughest scoreline",
 )
 
 PERIOD_WEEK = "week"
@@ -390,6 +400,52 @@ def _performance_story(
     )
 
 
+def _performance_low_story(
+    paired: Sequence[Mapping[str, Any]],
+    identities: Mapping[int, Mapping[str, str]],
+    *,
+    week: int,
+    fingerprint: str,
+) -> dict[str, Any] | None:
+    """Lowest recorded score of the week — the loser side of every pairing is
+    always <= its winner (pair_matchups defines winner_points as the max of
+    the two), so the league-wide floor is simply the smallest loser_points
+    across all pairings.
+    """
+
+    if not paired:
+        return None
+    bottom = min(
+        paired,
+        key=lambda row: (_float(row.get("loser_points"), 0.0), _int(row.get("matchup_id"), 0)),
+    )
+    points = _float(bottom.get("loser_points"), 0.0)
+    roster_id = _int(bottom.get("loser_roster_id"), 0)
+    team = _text(bottom.get("loser_name")) or _team_name(identities.get(roster_id))
+    if team == "Unknown team":
+        return None
+    title = _pick_template(fingerprint, LOW_PERFORMANCE_STORY_TITLES)
+    summary = _pick_template(
+        fingerprint + "pl",
+        (
+            f"{team} posted just {points:.1f} points in Week {week}.",
+            f"{team} had the week's lowest score at {points:.1f}.",
+            f"The toughest scoring week belonged to {team}: {points:.1f}.",
+        ),
+    )
+    return _story(
+        story_type=STORY_PERFORMANCE_LOW,
+        title=title,
+        summary=summary,
+        glyph="insights",
+        primary_team=team,
+        metric_label="Points",
+        metric_value=f"{points:.1f}",
+        history_week=week,
+        extra={"matchup_id": bottom.get("matchup_id")},
+    )
+
+
 def _matchup_story(
     paired: Sequence[Mapping[str, Any]],
     identities: Mapping[int, Mapping[str, str]],
@@ -463,6 +519,52 @@ def _matchup_story(
     )
 
 
+def _matchup_close_story(
+    paired: Sequence[Mapping[str, Any]],
+    identities: Mapping[int, Mapping[str, str]],
+    *,
+    week: int,
+    fingerprint: str,
+) -> dict[str, Any] | None:
+    """Closest margin of the week — the opposite extreme of _matchup_story's
+    biggest blowout/upset. Deliberately independent of power-rank upsets:
+    a close game is notable on margin alone, not on whether it was expected.
+    """
+
+    if not paired:
+        return None
+    row = min(
+        paired,
+        key=lambda item: (_float(item.get("margin"), 0.0), _int(item.get("matchup_id"), 0)),
+    )
+    winner = _text(row.get("winner_name")) or _team_name(
+        identities.get(_int(row.get("winner_roster_id"), 0))
+    )
+    loser = _text(row.get("loser_name")) or _team_name(
+        identities.get(_int(row.get("loser_roster_id"), 0))
+    )
+    if winner == "Unknown team" or loser == "Unknown team":
+        return None
+    title = _pick_template(fingerprint, ("Closest matchup", "Down to the wire", "Nail-biter of the week"))
+    summary = (
+        f"{winner} edged {loser} {_float(row.get('winner_points'), 0.0):.1f}–"
+        f"{_float(row.get('loser_points'), 0.0):.1f} "
+        f"(margin {_float(row.get('margin'), 0.0):.1f})."
+    )
+    return _story(
+        story_type=STORY_MATCHUP_CLOSE,
+        title=title,
+        summary=summary,
+        glyph="league",
+        primary_team=winner,
+        secondary_team=loser,
+        metric_label="Margin",
+        metric_value=f"{_float(row.get('margin'), 0.0):.1f}",
+        history_week=week,
+        extra={"matchup_kind": "close", "matchup_id": row.get("matchup_id")},
+    )
+
+
 def _week_transactions(
     transactions: Sequence[Mapping[str, Any]],
     *,
@@ -475,12 +577,9 @@ def _week_transactions(
     ]
 
 
-def _waiver_story(
+def _scored_waiver_claims(
     transactions: Sequence[Mapping[str, Any]],
-    *,
-    week: int,
-    fingerprint: str,
-) -> dict[str, Any] | None:
+) -> list[tuple[int, dict[str, Any], dict[str, Any], str]]:
     claims = [
         item
         for item in transactions
@@ -497,6 +596,16 @@ def _waiver_story(
                 continue
             bid = _int(spent, 0) if spent is not None else -1
             scored.append((bid, dict(item), dict(side), names[0]))
+    return scored
+
+
+def _waiver_story(
+    transactions: Sequence[Mapping[str, Any]],
+    *,
+    week: int,
+    fingerprint: str,
+) -> dict[str, Any] | None:
+    scored = _scored_waiver_claims(transactions)
     if not scored:
         return None
     has_faab = any(bid >= 0 for bid, *_ in scored)
@@ -513,6 +622,45 @@ def _waiver_story(
     summary = f"{team} spent ${bid} FAAB to add {player}."
     return _story(
         story_type=STORY_WAIVER,
+        title=title,
+        summary=summary,
+        glyph="waiver",
+        primary_team=team,
+        players=(player,),
+        metric_label="FAAB",
+        metric_value=f"${bid}",
+        history_filter=history.FILTER_WAIVERS,
+        history_week=week,
+        source_event_ids=(_text(item.get("transaction_id")),),
+    )
+
+
+def _waiver_low_story(
+    transactions: Sequence[Mapping[str, Any]],
+    *,
+    week: int,
+    fingerprint: str,
+) -> dict[str, Any] | None:
+    """Cheapest FAAB add of the week — only shown when at least two claims
+    carried a FAAB bid, so this never just repeats _waiver_story's single
+    claim under a different title.
+    """
+
+    scored = _scored_waiver_claims(transactions)
+    faab_rows = [row for row in scored if row[0] >= 0]
+    if len(faab_rows) < 2:
+        return None
+    bid, item, side, player = min(
+        faab_rows,
+        key=lambda row: (row[0], str(row[1].get("transaction_id") or "")),
+    )
+    team = _team_name(side)
+    if team == "Unknown team":
+        return None
+    title = _pick_template(fingerprint, ("Cheapest add", "Bargain of the week", "Smallest FAAB spend"))
+    summary = f"{team} added {player} for just ${bid} FAAB."
+    return _story(
+        story_type=STORY_WAIVER_LOW,
         title=title,
         summary=summary,
         glyph="waiver",
@@ -561,6 +709,42 @@ def _trade_lenses(item: Mapping[str, Any]) -> tuple[list[dict[str, str]], str]:
     elif has_current:
         editorial = "Current market snapshot"
     return lenses, editorial
+
+
+def _trade_asset_view(asset: Mapping[str, Any]) -> dict[str, Any]:
+    """Slim, mobile-facing view of one trade asset — full detail (player_id
+    included) for the expanded trade-detail modal, separate from the
+    name-only, truncated `players`/summary strings other code already reads.
+    """
+
+    if not isinstance(asset, Mapping):
+        return {}
+    kind = _text(asset.get("kind"), "player")
+    view: dict[str, Any] = {
+        "kind": kind,
+        "name": _text(asset.get("name") or asset.get("label")),
+    }
+    if kind == "pick":
+        view["label"] = _text(asset.get("label") or asset.get("name"))
+        season = _text(asset.get("season"))
+        if season:
+            view["season"] = season
+        round_num = _int(asset.get("round"), 0)
+        if round_num:
+            view["round"] = round_num
+    else:
+        view["player_id"] = _text(asset.get("player_id"))
+        view["position"] = _text(asset.get("position"))
+        view["team"] = _text(asset.get("team"))
+    return view
+
+
+def _trade_side_assets(side: Mapping[str, Any]) -> list[dict[str, Any]]:
+    return [
+        _trade_asset_view(asset)
+        for asset in side.get("receives") or []
+        if isinstance(asset, Mapping)
+    ]
 
 
 def _trade_story(
@@ -612,6 +796,11 @@ def _trade_story(
             "historical_value_available": any(
                 lens.get("lens") == VALUE_LENS_AT_TRADE for lens in lenses
             ),
+            # Full, untruncated asset lists (with player_id) for the mobile
+            # tap-through detail view — additive alongside the `players`
+            # field above, which stays truncated to 2-per-side for the card.
+            "left_assets": _trade_side_assets(left),
+            "right_assets": _trade_side_assets(right),
         },
     )
 
@@ -650,6 +839,57 @@ def _activity_story(
     summary = f"{team} completed {count} roster moves in Week {week}."
     return _story(
         story_type=STORY_ACTIVITY,
+        title=title,
+        summary=summary,
+        glyph="insights",
+        primary_team=team,
+        metric_label="Moves",
+        metric_value=str(count),
+        history_filter=history.FILTER_ALL,
+        history_week=week,
+        source_event_ids=tuple(item for item in event_ids if item),
+    )
+
+
+def _activity_low_story(
+    transactions: Sequence[Mapping[str, Any]],
+    *,
+    week: int,
+    fingerprint: str,
+) -> dict[str, Any] | None:
+    """Least active manager of the week — only shown when at least two
+    managers transacted and their move counts actually differ, so this
+    never just restates _activity_story's single busiest manager.
+    """
+
+    counts: Counter[int] = Counter()
+    names: dict[int, str] = {}
+    event_ids: list[str] = []
+    for item in transactions:
+        event_ids.append(_text(item.get("transaction_id")))
+        for side in item.get("sides") or []:
+            if not isinstance(side, Mapping):
+                continue
+            roster_id = _int(side.get("roster_id"), 0)
+            if not roster_id:
+                continue
+            counts[roster_id] += 1
+            names[roster_id] = _team_name(side)
+    if len(counts) < 2:
+        return None
+    roster_id, count = min(counts.items(), key=lambda kv: (kv[1], kv[0]))
+    if count == max(counts.values()):
+        return None
+    team = names.get(roster_id, "Unknown team")
+    if team == "Unknown team":
+        return None
+    title = _pick_template(
+        fingerprint,
+        ("Quietest front office", "Least active manager", "Laying low this week"),
+    )
+    summary = f"{team} made just {count} roster move{'s' if count != 1 else ''} in Week {week}."
+    return _story(
+        story_type=STORY_ACTIVITY_LOW,
         title=title,
         summary=summary,
         glyph="insights",
@@ -716,6 +956,7 @@ def build_weekly_recap(
     stories: list[dict[str, Any]] = []
     for builder in (
         lambda: _performance_story(paired, identities, week=week, fingerprint=fingerprint),
+        lambda: _performance_low_story(paired, identities, week=week, fingerprint=fingerprint),
         lambda: _matchup_story(
             paired,
             identities,
@@ -723,9 +964,12 @@ def build_weekly_recap(
             fingerprint=fingerprint,
             power_ranks=power_ranks,
         ),
+        lambda: _matchup_close_story(paired, identities, week=week, fingerprint=fingerprint),
         lambda: _waiver_story(week_txs, week=week, fingerprint=fingerprint),
+        lambda: _waiver_low_story(week_txs, week=week, fingerprint=fingerprint),
         lambda: _trade_story(week_txs, week=week, fingerprint=fingerprint),
         lambda: _activity_story(week_txs, week=week, fingerprint=fingerprint),
+        lambda: _activity_low_story(week_txs, week=week, fingerprint=fingerprint),
         lambda: _riser_story(movement, week=week),
     ):
         story = builder()

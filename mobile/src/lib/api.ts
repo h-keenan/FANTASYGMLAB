@@ -461,6 +461,23 @@ export interface PendingTradeOutcomesResponse {
   outcomes: PendingTradeOutcome[];
 }
 
+export interface RecapTradeAsset {
+  kind: 'player' | 'pick';
+  name: string;
+  player_id?: string;
+  position?: string;
+  team?: string;
+  label?: string;
+  season?: string;
+  round?: number;
+}
+
+export interface RecapValueLens {
+  lens: string;
+  label: string;
+  note: string;
+}
+
 export interface RecapStory {
   story_type: string;
   title: string;
@@ -473,6 +490,15 @@ export interface RecapStory {
   metric_value: string;
   history_week: number;
   confidence: string;
+  source_event_ids?: string[];
+  // Trade stories only (modules/league_recaps.py's _trade_story extra):
+  // full, untruncated asset lists (with player_id) for the tap-through
+  // trade detail view, plus the value-lens summary shown alongside it.
+  left_assets?: RecapTradeAsset[];
+  right_assets?: RecapTradeAsset[];
+  value_lenses?: RecapValueLens[];
+  editorial_label?: string;
+  historical_value_available?: boolean;
 }
 
 export interface WeeklyRecap {
