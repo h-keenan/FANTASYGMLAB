@@ -202,6 +202,57 @@ export interface MyTeamResponse {
   reason: string;
 }
 
+/**
+ * A suggested starter on the weekly matchup screen.
+ *
+ * `score` here is the same season-long value/opportunity signal the rest of
+ * the app uses — deliberately NOT a weekly points projection. This codebase
+ * has no weekly-projection feed and no opponent-defense-strength data, so
+ * nothing on this type may be renamed to imply either (see
+ * SEASON_VALUE_BASIS_LABEL in services/mobile_api_service.py).
+ */
+export interface MatchupStarter extends LineupPlayer {
+  /** Season-form reasoning: tier, workload/opportunity label, season-value rank, injury tag. */
+  why: string;
+}
+
+export interface MatchupSide {
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  starters: MatchupStarter[];
+  /** Sum of this side's suggested starters' season-value scores. Not points. */
+  season_value_total: number;
+  /** Always the best-available lineup, for both sides — not necessarily the lineup Sleeper has set. */
+  starters_basis: 'suggested_optimal_lineup';
+}
+
+export interface MatchupComparison {
+  my_season_value: number;
+  opponent_season_value: number;
+  margin: number;
+  edge: 'you' | 'opponent' | 'even';
+  headline: string;
+  basis: 'season_value';
+  basis_label: string;
+}
+
+export interface MatchupResponse {
+  ok: true;
+  /** Sleeper's current week (league settings.leg) — null when the league hasn't started one. */
+  week: number | null;
+  my_team: MatchupSide | null;
+  opponent: MatchupSide | null;
+  comparison: MatchupComparison | null;
+  basis: 'season_value';
+  basis_label: string;
+  reason: string;
+}
+
 export interface PlayerSummary {
   full_name: string | null;
   first_name: string | null;
@@ -832,6 +883,14 @@ export const api = {
     const query = params.toString();
     return authorizedFetch<MyTeamResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/my-team${query ? `?${query}` : ''}`,
+    );
+  },
+  getLeagueMatchup: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<MatchupResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/matchup${query ? `?${query}` : ''}`,
     );
   },
   getLeagueRankings: (leagueId: string, options?: { lens?: ValuationLens; limit?: number }) => {
