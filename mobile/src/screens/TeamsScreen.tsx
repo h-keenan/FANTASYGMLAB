@@ -69,10 +69,16 @@ export default function TeamsScreen({ route, navigation }: Props) {
               archetypeLabel: ranking?.archetype_label ?? null,
             };
           });
+          // Pure Power Rank order — no longer pins the caller's own team
+          // first, since that made a rank-4 team appear above rank-1 with
+          // no explanation. The "You" badge + glow accent below is how a
+          // user finds their own row now instead of it always being #1 in
+          // the list regardless of rank.
           rows.sort((a, b) => {
-            if (a.isMine !== b.isMine) return Number(b.isMine) - Number(a.isMine);
-            if (a.powerRank != null && b.powerRank != null) return a.powerRank - b.powerRank;
-            return 0;
+            if (a.powerRank == null && b.powerRank == null) return 0;
+            if (a.powerRank == null) return 1;
+            if (b.powerRank == null) return -1;
+            return a.powerRank - b.powerRank;
           });
           setTeams(rows);
         } catch (err) {
@@ -115,7 +121,8 @@ export default function TeamsScreen({ route, navigation }: Props) {
       keyExtractor={(item) => String(item.rosterId)}
       renderItem={({ item }) => (
         <AnimatedCard
-          style={StyleSheet.flatten([styles.card, item.isMine && styles.cardMine])}
+          glow={item.isMine}
+          style={styles.card}
           onPress={() =>
             navigation.navigate('TeamRoster', {
               ownerName: item.teamName,
@@ -178,7 +185,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   card: { padding: spacing.lg },
-  cardMine: { borderWidth: 2, borderColor: colors.accent },
   row: { flexDirection: 'row', alignItems: 'center' },
   avatar: { marginRight: spacing.sm },
   ownerGroup: { flex: 1, marginRight: spacing.sm },
