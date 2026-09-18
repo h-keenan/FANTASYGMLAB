@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from './src/context/AuthContext';
 import { DensityProvider } from './src/context/DensityContext';
+import { GmStanceProvider } from './src/context/GmStanceContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
@@ -21,9 +22,11 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <DensityProvider>
-          <AuthProvider>
-            <RootNavigator />
-          </AuthProvider>
+          <GmStanceProvider>
+            <AuthProvider>
+              <RootNavigator />
+            </AuthProvider>
+          </GmStanceProvider>
         </DensityProvider>
         <StatusBar style="light" />
       </SafeAreaProvider>

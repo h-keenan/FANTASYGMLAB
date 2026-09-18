@@ -13,6 +13,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -24,9 +25,9 @@ import {
   TEAM_STRATEGY_OPTIONS,
   type DraftPickAsset,
   type RankedPlayer,
-  type TeamStrategy,
   type TradeVerdict,
 } from '../lib/api';
+import { useGmStance } from '../context/GmStanceContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -108,7 +109,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [assetType, setAssetType] = useState<AssetType>('players');
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [strategy, setStrategyState] = useState<TeamStrategy>('retool');
+  const { strategy, setStrategy } = useGmStance(leagueId);
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -118,21 +119,21 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   useScreenHeaderTitle(navigation, 'Trade Analyzer', leagueName);
 
   useEffect(() => {
+    navigation.setOptions({ headerRight: () => <GmStanceHeaderButton leagueId={leagueId} /> });
+  }, [navigation, leagueId]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult, stanceResult] = await Promise.all([
+        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult] = await Promise.all([
           api.getMyRoster(leagueId),
           api.getLeagueRankings(leagueId, { lens: 'Dynasty', limit: 300 }),
           api.getLeagueUsers(leagueId),
           api.getLeagueRosters(leagueId),
           api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: 'unavailable' })),
-          // Decision Memory — the caller's remembered GM stance for this
-          // league, so this picker doesn't default to "retool" every visit.
-          api.getGmStance(leagueId).catch(() => ({ ok: true as const, strategy: 'retool' as const })),
         ]);
         if (cancelled) return;
-        setStrategyState(stanceResult.strategy);
 
         let myId = '';
         if (myRoster.reason) {
@@ -419,8 +420,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             key={option.value}
             style={[styles.pill, strategy === option.value && styles.pillActive]}
             onPress={() => {
-              setStrategyState(option.value);
-              void api.updateGmStance(leagueId, option.value).catch(() => {});
+              setStrategy(option.value);
               setVerdict(null);
             }}
           >

@@ -5,10 +5,12 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import TeamAvatar from '../components/TeamAvatar';
-import { api, TEAM_STRATEGY_OPTIONS, type DashboardItem, type TeamStrategy } from '../lib/api';
+import { useGmStance } from '../context/GmStanceContext';
+import { api, TEAM_STRATEGY_OPTIONS, type DashboardItem } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -50,10 +52,18 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [recapReady, setRecapReady] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [gmStance, setGmStance] = useState<TeamStrategy | null>(null);
-  const [gmStanceIsSet, setGmStanceIsSet] = useState(true);
+  const {
+    strategy: gmStance,
+    isSet: gmStanceIsSet,
+    setStrategy: setGmStance,
+    loaded: gmStanceLoaded,
+  } = useGmStance(leagueId);
 
   useScreenHeaderTitle(navigation, 'League Overview', leagueName);
+
+  useEffect(() => {
+    navigation.setOptions({ headerRight: () => <GmStanceHeaderButton leagueId={leagueId} /> });
+  }, [navigation, leagueId]);
 
   useEffect(() => {
     void setLastLeague({ leagueId, leagueName });
@@ -65,20 +75,15 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
       async function load() {
         try {
-          const [leagueResult, dashboardResult, myRosterResult, profilesResult, recapResult, stanceResult] =
+          const [leagueResult, dashboardResult, myRosterResult, profilesResult, recapResult] =
             await Promise.all([
               api.getLeague(leagueId).catch(() => null),
               api.getLeagueDashboard(leagueId).catch(() => null),
               api.getMyRoster(leagueId).catch(() => null),
               api.getLeagueTeamProfiles(leagueId).catch(() => null),
               api.getLeagueRecap(leagueId).catch(() => null),
-              api.getGmStance(leagueId).catch(() => null),
             ]);
           if (cancelled) return;
-          if (stanceResult) {
-            setGmStance(stanceResult.strategy);
-            setGmStanceIsSet(stanceResult.is_set ?? true);
-          }
 
           if (leagueResult?.league) {
             const league = leagueResult.league;
@@ -219,7 +224,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
         </AnimatedCard>
       ) : null}
 
-      {gmStance ? (
+      {gmStanceLoaded ? (
         <View style={[styles.stanceCard, !gmStanceIsSet && styles.stanceCardUnset]}>
           <Text style={styles.stanceLabel}>YOUR GM STANCE</Text>
           <Text style={styles.stanceHint}>
@@ -235,11 +240,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
                   styles.pill,
                   gmStanceIsSet && gmStance === option.value && styles.pillActive,
                 ]}
-                onPress={() => {
-                  setGmStance(option.value);
-                  setGmStanceIsSet(true);
-                  void api.updateGmStance(leagueId, option.value).catch(() => {});
-                }}
+                onPress={() => setGmStance(option.value)}
               >
                 <Text
                   style={[

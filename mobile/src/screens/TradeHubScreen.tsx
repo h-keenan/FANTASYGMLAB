@@ -4,13 +4,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import TeamAvatar from '../components/TeamAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import {
-  api,
   TEAM_STRATEGY_OPTIONS,
   type PresentationAsset,
   type RankedPlayer,
@@ -19,8 +19,10 @@ import {
   type TradeIdea,
   type TradeVerdict,
 } from '../lib/api';
+import { api } from '../lib/api';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useDensity } from '../context/DensityContext';
+import { useGmStance } from '../context/GmStanceContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -110,8 +112,7 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 export default function TradeHubScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
-  const [strategy, setStrategyState] = useState<TeamStrategy>('retool');
-  const [stanceLoaded, setStanceLoaded] = useState(false);
+  const { strategy, setStrategy, loaded: stanceLoaded } = useGmStance(leagueId);
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
   const [entitlement, setEntitlement] = useState<TradeHubEntitlement | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
@@ -121,6 +122,10 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const [watchingAd, setWatchingAd] = useState(false);
 
   useScreenHeaderTitle(navigation, 'Trade Hub', leagueName);
+
+  useEffect(() => {
+    navigation.setOptions({ headerRight: () => <GmStanceHeaderButton leagueId={leagueId} /> });
+  }, [navigation, leagueId]);
 
   const load = useCallback(
     async (nextStrategy: TeamStrategy, nextAdUnlocks: number) => {
@@ -145,31 +150,6 @@ export default function TradeHubScreen({ route, navigation }: Props) {
     },
     [leagueId],
   );
-
-  // Load the caller's remembered GM stance for this league before the
-  // first ideas fetch, so a returning user doesn't see "retool" flash
-  // before jumping to their real stance (Decision Memory — see
-  // services/mobile_api_service.py's get_gm_stance).
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getGmStance(leagueId)
-      .then((result) => {
-        if (!cancelled) setStrategyState(result.strategy);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setStanceLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
-
-  const setStrategy = (next: TeamStrategy) => {
-    setStrategyState(next);
-    void api.updateGmStance(leagueId, next).catch(() => {});
-  };
 
   useEffect(() => {
     if (!stanceLoaded) return;
