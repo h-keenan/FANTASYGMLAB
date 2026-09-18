@@ -801,6 +801,8 @@ export const api = {
     );
   },
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
+  getPlayerNews: (playerId: string, limit = 5) =>
+    authorizedFetch<NewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?limit=${limit}`),
   getLeagueRecap: (leagueId: string, options?: { week?: number }) => {
     const params = new URLSearchParams();
     if (options?.week != null) params.set('week', String(options.week));

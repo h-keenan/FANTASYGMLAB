@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -8,6 +18,7 @@ import PositionBadge from '../components/PositionBadge';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import {
   api,
+  type NewsItem,
   type PlayerAward,
   type QuickViewBio,
   type QuickViewModel,
@@ -33,6 +44,83 @@ const TABS: Array<{ key: DetailTab; label: string }> = [
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerDetail'>;
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// Same event taxonomy NewsScreen badges with — tone here maps to "good /
+// bad / neutral" per coridian_'s ask rather than News's own icon set:
+// speculative always reads as "pending" regardless of event type, since an
+// unconfirmed injury or trade rumor isn't yet a confirmed positive/negative.
+const NEWS_IMPACT_COLOR: Record<string, string> = {
+  'injury/status': colors.danger,
+  transaction: colors.textSecondary,
+  'role/depth chart': colors.success,
+  'off-field/drama': colors.danger,
+};
+
+const NEWS_IMPACT_LABEL: Record<string, string> = {
+  'injury/status': 'Injury News',
+  transaction: 'Transaction',
+  'role/depth chart': 'Role Change',
+  'off-field/drama': 'Off-Field News',
+};
+
+function NewsImpactBadge({ items, onPress }: { items: NewsItem[]; onPress: () => void }) {
+  if (items.length === 0) return null;
+  const top = items[0];
+  const pending = top.speculative;
+  const color = pending ? colors.premium : NEWS_IMPACT_COLOR[top.event_type ?? ''] ?? colors.textSecondary;
+  const label = pending ? 'Pending' : NEWS_IMPACT_LABEL[top.event_type ?? ''] ?? 'In The News';
+  return (
+    <TouchableOpacity
+      style={[styles.newsImpactBadge, { borderColor: color, backgroundColor: `${color}1F` }]}
+      onPress={onPress}
+    >
+      <Ionicons name="newspaper-outline" size={13} color={color} />
+      <Text style={[styles.newsImpactText, { color }]}>{label}</Text>
+      <Ionicons name="chevron-forward" size={13} color={color} />
+    </TouchableOpacity>
+  );
+}
+
+function NewsImpactModal({
+  visible,
+  items,
+  onClose,
+}: {
+  visible: boolean;
+  items: NewsItem[];
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalHeaderRow}>
+            <Text style={styles.modalTitle}>In The News</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalScroll}>
+            {items.map((item, index) => (
+              <TouchableOpacity
+                key={item.link ?? `${item.title}-${index}`}
+                style={styles.modalArticle}
+                onPress={() => {
+                  if (item.link) void Linking.openURL(item.link);
+                }}
+              >
+                {item.speculative ? <Text style={styles.modalSpeculative}>Unconfirmed / speculative</Text> : null}
+                <Text style={styles.modalArticleTitle}>{item.title}</Text>
+                {item.summary ? <Text style={styles.modalArticleSummary}>{item.summary}</Text> : null}
+                {item.source ? <Text style={styles.modalArticleSource}>Source: {item.source}</Text> : null}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
   return (
@@ -368,8 +456,25 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     position_rank: player.position_rank,
     rank_unavailable_reason: player.rank_unavailable_reason,
   });
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [newsModalOpen, setNewsModalOpen] = useState(false);
 
   useScreenHeaderTitle(navigation, player.name ?? 'Player');
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPlayerNews(player.player_id)
+      .then((result) => {
+        if (!cancelled) setNewsItems(result.items);
+      })
+      .catch(() => {
+        // Best-effort enrichment — no badge shows if this fails.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [player.player_id]);
 
   useEffect(() => {
     // Several callers (Waivers, MyTeam, Trade Hub) only ever have a lean
@@ -481,6 +586,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const tierIdentity = resolvePlayerTier(player.tier);
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <View style={styles.header}>
         <PlayerAvatar playerId={player.player_id} size={88} tier={player.tier} style={styles.heroAvatar} />
@@ -494,6 +600,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             <Text style={[styles.tierText, { color: tierIdentity.color }]}>{tierIdentity.shortLabel}</Text>
           </View>
         ) : null}
+        <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
         {watching !== null ? (
           <TouchableOpacity
             style={[styles.watchButton, watching && styles.watchButtonActive]}
@@ -567,6 +674,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         </>
       )}
     </ScrollView>
+    <NewsImpactModal visible={newsModalOpen} items={newsItems} onClose={() => setNewsModalOpen(false)} />
+    </>
   );
 }
 
@@ -597,6 +706,53 @@ const styles = StyleSheet.create({
   watchButtonActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   watchButtonText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   watchButtonTextActive: { color: '#fff' },
+  newsImpactBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  newsImpactText: { fontSize: 12, fontWeight: '700' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: '75%',
+    padding: spacing.lg,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  modalScroll: { flexGrow: 0 },
+  modalArticle: {
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  modalArticleTitle: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 4 },
+  modalArticleSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginBottom: 4 },
+  modalArticleSource: { fontSize: 11, color: colors.textTertiary },
+  modalSpeculative: {
+    fontSize: 11,
+    color: colors.premium,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
