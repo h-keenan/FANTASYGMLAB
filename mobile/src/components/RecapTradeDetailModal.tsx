@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { RecapStory, RecapTradeAsset } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
+import IconCircle from './IconCircle';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 
@@ -80,9 +81,7 @@ function AssetRow({ asset }: { asset: RecapTradeAsset }) {
   if (asset.kind === 'pick') {
     return (
       <View style={styles.assetRow}>
-        <View style={styles.pickBadge}>
-          <Ionicons name="albums-outline" size={16} color={colors.accent} />
-        </View>
+        <IconCircle name="albums-outline" color={colors.accent} size={32} iconSize={16} />
         <Text style={styles.assetName} numberOfLines={1}>
           {asset.label || asset.name}
         </Text>
@@ -154,14 +153,6 @@ const styles = StyleSheet.create({
   assetName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
   assetMeta: { fontSize: 11, color: colors.textSecondary },
-  pickBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.accentMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   editorial: {
     fontSize: 12,
     fontWeight: '600',
