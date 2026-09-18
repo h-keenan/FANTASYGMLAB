@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
+import IconCircle from '../components/IconCircle';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, TEAM_STRATEGY_OPTIONS, type DashboardItem, type TeamStrategy } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
@@ -212,9 +213,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           style={styles.stripCard}
           onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
         >
-          <View style={styles.recapIconDisc}>
-            <Ionicons name="newspaper-outline" size={18} color={colors.accent} />
-          </View>
+          <IconCircle name="newspaper-outline" color={colors.accent} size={36} />
           <Text style={styles.stripTextGroup2}>Week {recapReady} recap ready</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </AnimatedCard>
@@ -301,14 +300,6 @@ const styles = StyleSheet.create({
   youBadgeText: { color: colors.background, fontSize: 10, fontWeight: '700' },
   stripValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   stripValueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
-  recapIconDisc: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.accentMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   stripTextGroup2: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   error: { color: colors.danger, textAlign: 'center' },
   stanceCard: {

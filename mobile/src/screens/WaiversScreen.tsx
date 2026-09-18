@@ -212,6 +212,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
             <WaiverCard
               player={item}
               rank={index + 1}
+              topOfBoard={index === 0 && !search.trim()}
               onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(item), leagueId, leagueName })}
             />
           )}
@@ -390,10 +391,16 @@ function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPre
 function WaiverCard({
   player,
   rank,
+  topOfBoard = false,
   onPress,
 }: {
   player: WaiverPlayer;
   rank: number;
+  /** Top of the All Free Agents board (a position filter still yields a
+   * real #1 at that position; a search query doesn't) — gets the gold #1
+   * rank badge (same premium hue as Teams' #1 power rank). Off for the
+   * secondary Stash/Watchlist/FAAB lists, which each restart at 1. */
+  topOfBoard?: boolean;
   onPress: () => void;
 }) {
   const injuryColor = injuryPillColor(player.injury_status);
@@ -405,8 +412,8 @@ function WaiverCard({
       <View style={styles.cardTopRow}>
         <View style={styles.avatarWrap}>
           <PlayerAvatar playerId={player.player_id} size={44} tier={player.tier} />
-          <View style={styles.rankBadge}>
-            <Text style={styles.rankText}>{rank}</Text>
+          <View style={[styles.rankBadge, topOfBoard && styles.rankBadgeFirst]}>
+            <Text style={[styles.rankText, topOfBoard && styles.rankTextFirst]}>{rank}</Text>
           </View>
         </View>
         <View style={styles.nameColumn}>
@@ -565,6 +572,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rankText: { color: colors.badgeText, fontSize: 10, fontWeight: '700' },
+  // #1 on the wire gets the premium/gold treatment (mirrors Teams' top
+  // power rank) so the single best add reads at a glance in a long list.
+  rankBadgeFirst: { backgroundColor: colors.premium },
+  rankTextFirst: { color: colors.background },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
 
+import IconCircle from '../components/IconCircle';
 import { api, type PushCategory } from '../lib/api';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -13,7 +13,7 @@ import { useDensity, type UiDensity } from '../context/DensityContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 
-const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = [
+const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: React.ComponentProps<typeof IconCircle>['name'] }> = [
   { pageKey: 'about_disclaimer', label: 'About / Disclaimer', icon: 'information-circle-outline' },
   { pageKey: 'terms', label: 'Terms of Use', icon: 'document-text-outline' },
   { pageKey: 'privacy', label: 'Privacy Policy', icon: 'shield-checkmark-outline' },
@@ -145,7 +145,7 @@ export default function MoreScreen({ navigation }: Props) {
       <Text style={styles.sectionLabel}>Notifications</Text>
       <TouchableOpacity style={styles.row} onPress={onSendTestPush} disabled={sendingTestPush}>
         <View style={styles.labelGroup}>
-          <Ionicons name="notifications-outline" size={18} color={colors.accent} style={styles.icon} />
+          <IconCircle name="notifications-outline" color={colors.accent} style={styles.icon} />
           <Text style={styles.label}>Send test notification</Text>
         </View>
         {sendingTestPush ? <ActivityIndicator size="small" color={colors.accent} /> : <Text style={styles.chevron}>{'›'}</Text>}
@@ -173,7 +173,7 @@ export default function MoreScreen({ navigation }: Props) {
       <Text style={styles.sectionLabel}>About</Text>
       <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('HowWeEvaluate')}>
         <View style={styles.labelGroup}>
-          <Ionicons name="school-outline" size={18} color={colors.accent} style={styles.icon} />
+          <IconCircle name="school-outline" color={colors.violet} style={styles.icon} />
           <Text style={styles.label}>How We Evaluate</Text>
         </View>
         <Text style={styles.chevron}>{'›'}</Text>
@@ -187,7 +187,7 @@ export default function MoreScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('LegalPage', { pageKey: item.pageKey })}
         >
           <View style={styles.labelGroup}>
-            <Ionicons name={item.icon} size={18} color={colors.accent} style={styles.icon} />
+            <IconCircle name={item.icon} color={colors.textSecondary} style={styles.icon} />
             <Text style={styles.label}>{item.label}</Text>
           </View>
           <Text style={styles.chevron}>{'›'}</Text>
@@ -197,7 +197,7 @@ export default function MoreScreen({ navigation }: Props) {
       <Text style={styles.sectionLabel}>Account</Text>
       <TouchableOpacity style={styles.row} onPress={onDeleteAccount} disabled={deleting}>
         <View style={styles.labelGroup}>
-          <Ionicons name="trash-outline" size={18} color={colors.danger} style={styles.icon} />
+          <IconCircle name="trash-outline" color={colors.danger} style={styles.icon} />
           <Text style={styles.dangerLabel}>Delete account</Text>
         </View>
         {deleting ? <ActivityIndicator size="small" color={colors.danger} /> : null}
@@ -230,7 +230,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   labelGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  icon: { marginRight: spacing.sm },
+  // Icon-in-colored-circle per row (same disc GM Orb's destination sheet
+  // uses) — More is the app's other menu-like list, so it gets the same
+  // scannable landmark per row. Sections keep distinct tints (accent for
+  // actions, violet for learning, neutral for legal, danger for delete)
+  // rather than one accent everywhere.
+  icon: { marginRight: spacing.md },
   label: { fontSize: 16, color: colors.textPrimary, flexShrink: 1 },
   dangerLabel: { fontSize: 16, color: colors.danger, flexShrink: 1 },
   chevron: { fontSize: 20, color: colors.textSecondary },

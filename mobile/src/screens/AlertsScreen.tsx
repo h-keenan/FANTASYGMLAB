@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
+import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -159,9 +160,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
           recapReadyWeek != null ? (
             <TouchableOpacity onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}>
               <AnimatedCard style={styles.recapCard}>
-                <View style={styles.recapIconDisc}>
-                  <Ionicons name="newspaper-outline" size={18} color={colors.accent} />
-                </View>
+                <IconCircle name="newspaper-outline" color={colors.accent} size={36} style={styles.recapIconDisc} />
                 <View style={styles.recapTextGroup}>
                   <Text style={styles.recapTitle}>Week {recapReadyWeek} League Recap is ready</Text>
                   <Text style={styles.recapSubtitle}>Tap to see this week's storylines</Text>
@@ -274,15 +273,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.accentMuted,
   },
-  recapIconDisc: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.badgeBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
+  recapIconDisc: { marginRight: spacing.sm },
   recapTextGroup: { flex: 1 },
   recapTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   recapSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },

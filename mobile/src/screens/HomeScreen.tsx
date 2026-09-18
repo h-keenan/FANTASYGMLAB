@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GlassPanel from '../components/GlassPanel';
+import IconCircle from '../components/IconCircle';
 import { api, type MeResponse } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { getLastLeague } from '../lib/lastLeague';
@@ -238,9 +239,7 @@ export default function HomeScreen({ navigation }: Props) {
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity style={styles.quickActionSecondary} onPress={() => navigation.navigate('News')}>
-                <View style={styles.quickActionIconCircle}>
-                  <Ionicons name="globe-outline" size={18} color={colors.violet} />
-                </View>
+                <IconCircle name="globe-outline" color={colors.violet} iconSize={18} style={styles.quickActionIconCircle} />
                 <Text style={styles.quickActionSecondaryLabel}>News</Text>
               </TouchableOpacity>
             </View>
@@ -387,15 +386,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   quickActionSecondaryLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  quickActionIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: `${colors.violet}26`,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
+  quickActionIconCircle: { marginBottom: 2 },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
