@@ -30,15 +30,12 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-edge--pos .tvl-edge-mark>span{margin-inline-start:calc(100% - var(--tvl-edge-magnitude,36%))}
 .tvl-edge--neg .tvl-edge-mark>span{margin-inline-start:0}
 .tvl-edge--even .tvl-edge-mark>span{margin-inline-start:40%;width:20%}
-.tvl-conf{align-items:flex-end;display:inline-flex;gap:var(--space-xs);max-width:100%}
-.tvl-conf-bars{align-items:flex-end;display:inline-flex;gap:2px;height:.75rem}
-.tvl-conf-bars>span{background:var(--color-border-strong);display:block;width:4px}
-.tvl-conf-bars>span:nth-child(1){height:.4rem}
-.tvl-conf-bars>span:nth-child(2){height:.55rem}
-.tvl-conf-bars>span:nth-child(3){height:.75rem}
-.tvl-conf-bars>span.is-on{background:var(--color-information)}
-.tvl-conf--high .tvl-conf-bars>span.is-on{background:var(--color-success)}
-.tvl-conf--low .tvl-conf-bars>span.is-on{background:var(--color-warning)}
+.tvl-conf{--tvl-conf-tone:var(--color-information);align-items:center;display:inline-flex;gap:var(--space-xs);max-width:100%}
+.tvl-conf--high{--tvl-conf-tone:var(--color-success)}
+.tvl-conf--low{--tvl-conf-tone:var(--color-warning)}
+.tvl-conf-ring{background:conic-gradient(var(--tvl-conf-tone) calc(var(--tvl-conf-pct,60) * 1%),var(--color-border) 0);border-radius:50%;display:grid;flex:0 0 auto;height:2.5rem;place-items:center;position:relative;width:2.5rem}
+.tvl-conf-ring::after{background:var(--surface-1);border-radius:50%;content:'';inset:.34rem;position:absolute}
+.tvl-conf-ring-value{color:var(--tvl-conf-tone);font:var(--font-weight-display) var(--font-size-badge)/1 var(--font-family-sans);font-variant-numeric:tabular-nums;position:relative;z-index:1}
 .tvl-conf-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .tvl-cue{align-items:start;border-inline-start:var(--border-width-semantic) solid var(--color-information);display:grid;gap:0 var(--space-xs);grid-template-columns:.45rem minmax(0,1fr);max-width:100%;padding-inline-start:var(--space-xs)}
 .tvl-cue-mark{background:var(--color-information);border-radius:0;height:.45rem;margin-top:.35rem;width:.45rem}
@@ -121,6 +118,10 @@ def confidence_level(label: object) -> str:
         return "high"
     if text.startswith("low") or "low confidence" in text:
         return "low"
+    # "Close call" (CONFIDENCE_CLOSE) is the lowest-confidence verdict the
+    # analyzer emits; it reads as low confidence, not medium.
+    if text.startswith("close") or "close call" in text:
+        return "low"
     return "medium"
 
 
@@ -131,6 +132,17 @@ def confidence_filled_segments(label: object) -> int:
     if level == "low":
         return 1
     return 2
+
+
+def confidence_ring_percent(label: object) -> int:
+    """Ring fill for a confidence label, matching the mobile ring mapping."""
+
+    level = confidence_level(label)
+    if level == "high":
+        return 90
+    if level == "low":
+        return 35
+    return 60
 
 
 def exchange_marker_html(*, extra_class: str = "") -> str:
@@ -175,19 +187,18 @@ def confidence_indicator_html(label: object, *, extra_class: str = "") -> str:
     if not raw:
         return ""
     level = confidence_level(raw)
-    filled = confidence_filled_segments(raw)
+    percent = confidence_ring_percent(raw)
     accessible = raw if "confidence" in raw.casefold() or "close" in raw.casefold() else f"{raw} confidence"
-    bars = "".join(
-        "<span class='is-on'></span>" if index < filled else "<span></span>"
-        for index in range(3)
-    )
     classes = f"tvl-conf tvl-conf--{level}"
     if extra_class:
         classes += f" {extra_class}"
     visible = accessible.replace(" confidence", "").replace("Confidence", "").strip() or accessible
     return (
-        f"<div class='{classes}' data-tvl-conf='{level}' title='{escape(accessible, quote=True)}'>"
-        f"<span class='tvl-conf-bars' aria-hidden='true'>{bars}</span>"
+        f"<div class='{classes}' data-tvl-conf='{level}' data-tvl-conf-pct='{percent}' "
+        f"style='--tvl-conf-pct:{percent}' title='{escape(accessible, quote=True)}'>"
+        f"<span class='tvl-conf-ring' aria-hidden='true'>"
+        f"<span class='tvl-conf-ring-value'>{percent}%</span>"
+        "</span>"
         f"<span class='tvl-conf-label'>CONFIDENCE / {escape(visible)}</span>"
         f"<span class='tvl-sr'>{escape(accessible)}</span>"
         "</div>"
