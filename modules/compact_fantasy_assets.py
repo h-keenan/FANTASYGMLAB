@@ -157,6 +157,7 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
         "injury_status": _text(asset.get("injury_status")),
         "injury_level": _text(asset.get("injury_level")),
         "opportunity_explanation": _text(asset.get("opportunity_explanation")),
+        "tier": _text(asset.get("player_tier")),
     }
 
 

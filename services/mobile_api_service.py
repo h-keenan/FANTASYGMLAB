@@ -2734,6 +2734,21 @@ def get_trade_hub_ideas(
         trade_hub_engine.project_trade_idea_card(record, is_headline=(index == 0)).to_dict()
         for index, record in enumerate(ranked_records)
     ]
+    # Trade Hub's own idea-generation engine never carries a roster_id
+    # through to the projected card, only the partner's display name — so
+    # this resolves an avatar by matching that name against the same
+    # roster-profile lookup /v1/leagues/{id}/team-profiles already uses,
+    # rather than threading a new field through modules.trade_ideas's deep
+    # (and heavily-tested) idea pipeline. Best-effort: a name mismatch just
+    # leaves the client's initial-letter fallback in place.
+    avatar_by_team_name = {
+        str(profile.get("team_name") or "").strip().lower(): profile.get("avatar_url")
+        for profile in sleeper.get_league_roster_profiles(league_id).values()
+    }
+    for card in ranked:
+        card["partner_team_avatar_url"] = avatar_by_team_name.get(
+            str(card.get("partner_team_name") or "").strip().lower()
+        )
     approved_count = len(ranked)
     ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
     effective_limit = (
