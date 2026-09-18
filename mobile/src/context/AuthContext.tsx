@@ -7,9 +7,12 @@ import React, {
   useState,
 } from 'react';
 
+import { api } from '../lib/api';
 import { identifyRevenueCatUser, signOutRevenueCatUser } from '../lib/revenuecat';
+import { syncLastLeagueFromServer } from '../lib/lastLeague';
 import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotifications';
 import { supabase } from '../lib/supabase';
+import { useDensity } from './DensityContext';
 
 interface AuthContextValue {
   session: Session | null;
@@ -26,9 +29,31 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const { syncDensityFromServer } = useDensity();
 
   useEffect(() => {
     let isMounted = true;
+
+    // Cross-device display density + last-viewed league (see
+    // docs/roadmap notes on cross-platform persistence): fetched once per
+    // sign-in, applied to this device's local caches. Best-effort — a
+    // failure here just means this device keeps whatever it already had
+    // locally, never a crash or a blocked sign-in.
+    const syncDevicePreferences = async () => {
+      try {
+        const result = await api.getDevicePreferences();
+        if (!result.ok) return;
+        syncDensityFromServer(result.ui_density);
+        if (result.last_league) {
+          await syncLastLeagueFromServer({
+            leagueId: result.last_league.league_id,
+            leagueName: result.last_league.league_name,
+          });
+        }
+      } catch {
+        // Best-effort.
+      }
+    };
 
     supabase.auth.getSession().then(({ data }) => {
       if (!isMounted) return;
@@ -37,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.session) {
         void identifyRevenueCatUser(data.session.user.id);
         void syncPushToken();
+        void syncDevicePreferences();
       }
     });
 
@@ -46,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (nextSession) {
           void identifyRevenueCatUser(nextSession.user.id);
           void syncPushToken();
+          void syncDevicePreferences();
         }
       },
     );

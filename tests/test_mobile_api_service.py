@@ -2011,6 +2011,132 @@ def test_push_preferences_require_auth(monkeypatch):
     assert client.post("/v1/push/preferences", json={"category": "watch", "enabled": True}).status_code == 401
 
 
+def test_device_preferences_require_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/preferences").status_code == 401
+    assert client.post("/v1/preferences", json={"ui_density": "compact"}).status_code == 401
+
+
+def test_get_device_preferences_defaults_to_guided_with_no_league(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": "user-123", "settings": {}}]
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/preferences", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "ui_density": "guided", "last_league": None}
+
+
+def test_get_device_preferences_reflects_stored_values(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {
+            "user_id": "user-123",
+            "settings": {
+                "ui_density": "compact",
+                "last_league_id": "abc",
+                "last_league_name": "Dynasty Warriors",
+            },
+        }
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/preferences", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "ui_density": "compact",
+        "last_league": {"league_id": "abc", "league_name": "Dynasty Warriors"},
+    }
+
+
+def test_update_device_preferences_rejects_an_invalid_density(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/preferences",
+            json={"ui_density": "extra_compact"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_update_device_preferences_merges_without_clobbering_push_categories(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {"user_id": "user-123", "settings": {"push_categories": {"watch": False}}}
+    ]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/preferences",
+                json={"ui_density": "compact", "last_league_id": "abc", "last_league_name": "Dynasty Warriors"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "ui_density": "compact",
+        "last_league": {"league_id": "abc", "league_name": "Dynasty Warriors"},
+    }
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["push_categories"] == {"watch": False}
+    assert upserted_settings["ui_density"] == "compact"
+    assert upserted_settings["last_league_id"] == "abc"
+
+
+def test_update_device_preferences_partial_update_only_touches_sent_fields(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {
+            "user_id": "user-123",
+            "settings": {"ui_density": "compact", "last_league_id": "abc", "last_league_name": "Dynasty Warriors"},
+        }
+    ]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response):
+            response = client.post(
+                "/v1/preferences",
+                json={"last_league_id": "xyz", "last_league_name": "New League"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    # ui_density wasn't sent in this request, so the previously-stored value survives.
+    assert response.json() == {
+        "ok": True,
+        "ui_density": "compact",
+        "last_league": {"league_id": "xyz", "league_name": "New League"},
+    }
+
+
 def test_dashboard_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/dashboard")
