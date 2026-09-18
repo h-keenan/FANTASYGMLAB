@@ -28,7 +28,7 @@ import {
   type WeeklyStatPoint,
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
-import { resolvePlayerTier } from '../lib/playerTier';
+import { contrastTextColor, resolvePlayerTier } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -604,8 +604,10 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           {player.team ? <Text style={styles.meta}>{player.team}</Text> : null}
         </View>
         {player.tier ? (
-          <View style={[styles.tierBadge, { backgroundColor: `${tierIdentity.color}29`, borderColor: tierIdentity.color }]}>
-            <Text style={[styles.tierText, { color: tierIdentity.color }]}>{tierIdentity.shortLabel}</Text>
+          <View style={[styles.tierBadge, { backgroundColor: tierIdentity.color }]}>
+            <Text style={[styles.tierText, { color: contrastTextColor(tierIdentity.color) }]}>
+              {tierIdentity.shortLabel}
+            </Text>
           </View>
         ) : null}
         <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
@@ -697,12 +699,11 @@ const styles = StyleSheet.create({
   meta: { fontSize: 14, color: colors.textSecondary },
   tierBadge: {
     marginTop: spacing.sm,
-    backgroundColor: colors.badgeBackground,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radii.pill,
   },
-  tierText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
+  tierText: { fontSize: 12, fontWeight: '700' },
   watchButton: {
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,

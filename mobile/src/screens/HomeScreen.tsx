@@ -238,7 +238,9 @@ export default function HomeScreen({ navigation }: Props) {
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity style={styles.quickActionSecondary} onPress={() => navigation.navigate('News')}>
-                <Ionicons name="globe-outline" size={20} color={colors.textPrimary} />
+                <View style={styles.quickActionIconCircle}>
+                  <Ionicons name="globe-outline" size={18} color={colors.violet} />
+                </View>
                 <Text style={styles.quickActionSecondaryLabel}>News</Text>
               </TouchableOpacity>
             </View>
@@ -385,6 +387,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   quickActionSecondaryLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  quickActionIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: `${colors.violet}26`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
