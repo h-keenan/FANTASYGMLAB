@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import TeamAvatar from '../components/TeamAvatar';
 import { api } from '../lib/api';
@@ -97,11 +98,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {

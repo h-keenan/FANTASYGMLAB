@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
@@ -67,11 +68,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   }, [leagueId, selectedWeek]);
 
   if (loading && !recap) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {

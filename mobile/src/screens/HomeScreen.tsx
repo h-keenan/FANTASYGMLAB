@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import BrandedSpinner from '../components/BrandedSpinner';
 import GlassPanel from '../components/GlassPanel';
 import IconCircle from '../components/IconCircle';
 import { api, type MeResponse } from '../lib/api';
@@ -153,11 +154,7 @@ export default function HomeScreen({ navigation }: Props) {
   }, [leagues, navigation]);
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
+    return <BrandedSpinner style={styles.center} />;
   }
 
   const defaultLeague = leagues?.find((league) => league.is_default) ?? leagues?.[0] ?? null;

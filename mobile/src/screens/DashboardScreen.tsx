@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -180,11 +181,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {
@@ -222,7 +219,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
           </Text>
         </View>
       ) : null}
-      {teamSnapshot ? <TeamSnapshotRow snapshot={teamSnapshot} /> : null}
+      {teamSnapshot ? (
+        <TeamSnapshotRow snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+      ) : null}
       {quiet || !items || items.length === 0 ? (
         <View style={styles.emptyCard}>
           <Ionicons name="checkmark-done-outline" size={22} color={colors.success} />
@@ -367,28 +366,55 @@ function NewBadge() {
   );
 }
 
-function TeamSnapshotRow({ snapshot }: { snapshot: TeamSnapshot }) {
+function TeamSnapshotRow({
+  snapshot,
+  leagueId,
+  leagueName,
+  navigation,
+}: {
+  snapshot: TeamSnapshot;
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+}) {
   const record =
     snapshot.wins != null && snapshot.losses != null
       ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
       : '—';
-  const tiles = [
+  const tiles: { label: string; value: string; tappable?: boolean }[] = [
     { label: 'Record', value: record },
     { label: 'Health', value: snapshot.health_flag || 'Stable' },
     { label: 'Avg Age', value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—' },
   ];
-  if (snapshot.power_rank != null) tiles.push({ label: 'Power', value: `#${snapshot.power_rank}` });
-  if (snapshot.franchise_rank != null) tiles.push({ label: 'Franchise', value: `#${snapshot.franchise_rank}` });
+  // Power/Franchise link out to the full league rankings (Teams screen) —
+  // the other tiles here have no equivalent standalone screen to open.
+  if (snapshot.power_rank != null) tiles.push({ label: 'Power', value: `#${snapshot.power_rank}`, tappable: true });
+  if (snapshot.franchise_rank != null) {
+    tiles.push({ label: 'Franchise', value: `#${snapshot.franchise_rank}`, tappable: true });
+  }
   return (
     <View style={styles.snapshotRow}>
-      {tiles.map((tile) => (
-        <View key={tile.label} style={styles.snapshotTile}>
-          <Text style={styles.snapshotValue} numberOfLines={1}>
-            {tile.value}
-          </Text>
-          <Text style={styles.snapshotLabel}>{tile.label}</Text>
-        </View>
-      ))}
+      {tiles.map((tile) =>
+        tile.tappable ? (
+          <TouchableOpacity
+            key={tile.label}
+            style={[styles.snapshotTile, styles.snapshotTileTappable]}
+            onPress={() => navigation.navigate('Teams', { leagueId, leagueName })}
+          >
+            <Text style={styles.snapshotValue} numberOfLines={1}>
+              {tile.value}
+            </Text>
+            <Text style={styles.snapshotLabel}>{tile.label}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View key={tile.label} style={styles.snapshotTile}>
+            <Text style={styles.snapshotValue} numberOfLines={1}>
+              {tile.value}
+            </Text>
+            <Text style={styles.snapshotLabel}>{tile.label}</Text>
+          </View>
+        ),
+      )}
     </View>
   );
 }
@@ -590,6 +616,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },
+  snapshotTileTappable: { borderColor: colors.accentMuted },
   snapshotValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   snapshotLabel: {
     fontSize: 10,

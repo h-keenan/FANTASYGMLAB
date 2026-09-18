@@ -13,6 +13,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
+import BrandedSpinner from '../components/BrandedSpinner';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -295,11 +296,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   };
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
-    );
+    return <BrandedSpinner style={styles.center} />;
   }
 
   if (error) {
