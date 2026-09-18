@@ -18,6 +18,7 @@ import {
   type TradeVerdict,
 } from '../lib/api';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
+import { useDensity } from '../context/DensityContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
@@ -331,6 +332,7 @@ function MeterRow({ label, value, level, color }: { label: string; value: string
 }
 
 function TradeIdeaCard({ idea, leagueName }: { idea: TradeIdea; leagueName: string }) {
+  const { showExplanations } = useDensity();
   const gainColor = idea.trade_gain > 0 ? colors.success : idea.trade_gain < 0 ? colors.danger : colors.textSecondary;
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
@@ -403,10 +405,14 @@ function TradeIdeaCard({ idea, leagueName }: { idea: TradeIdea; leagueName: stri
         </View>
       </View>
 
-      <Text style={styles.rationaleLabel}>Why this works</Text>
-      <Text style={styles.rationale} numberOfLines={3}>
-        {idea.rationale}
-      </Text>
+      {showExplanations && idea.rationale ? (
+        <>
+          <Text style={styles.rationaleLabel}>Why this works</Text>
+          <Text style={styles.rationale} numberOfLines={3}>
+            {idea.rationale}
+          </Text>
+        </>
+      ) : null}
 
       <View style={styles.footerRow}>
         <MeterRow label="CONFIDENCE" value={idea.confidence_label} level={confidenceLevel} color={colors.accent} />
