@@ -190,7 +190,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
                     hitSlop={4}
                   >
                     {item.matched_player_id ? (
-                      <PlayerAvatar playerId={item.matched_player_id} size={18} style={styles.playerBadgeAvatar} />
+                      <PlayerAvatar playerId={item.matched_player_id} size={28} style={styles.playerBadgeAvatar} />
                     ) : null}
                     <Text style={styles.playerBadgeText}>{item.matched_player}</Text>
                   </TouchableOpacity>
@@ -240,6 +240,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
               </Text>
             ) : null}
             {item.speculative ? <Text style={styles.speculative}>Unconfirmed / speculative</Text> : null}
+            {item.source ? <Text style={styles.source}>Source: {item.source}</Text> : null}
           </AnimatedCard>
         )}
       />
@@ -305,11 +306,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.badgeBackground,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: radii.pill,
   },
   playerBadgeAvatar: { marginRight: spacing.xs },
-  playerBadgeText: { color: colors.badgeText, fontSize: 11, fontWeight: '700' },
+  playerBadgeText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
   relationshipPill: { borderRadius: radii.pill, paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
   relationshipPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
   badge: {
@@ -331,6 +332,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+  source: {
+    fontSize: 11,
+    color: colors.textTertiary,
     marginTop: spacing.xs,
   },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },

@@ -40,29 +40,48 @@ interface Destination {
   route: string;
   icon: IconName;
   needsLeague?: boolean;
+  // Grouped by function rather than each getting its own unique hue — one
+  // color per family (nav/roster/trade/scouting/urgent) reads as "this
+  // section has an identity" without turning the menu into a rainbow, per
+  // coridian_'s "distinct colors but don't overdo it" direction.
+  color: string;
 }
 
 const LEAGUE_DESTINATIONS: Destination[] = [
-  { label: 'League Overview', route: 'LeagueDetail', icon: 'grid-outline', needsLeague: true },
-  { label: 'Next Move', route: 'Dashboard', icon: 'flash-outline', needsLeague: true },
-  { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', needsLeague: true },
-  { label: 'Teams', route: 'Teams', icon: 'people-circle-outline', needsLeague: true },
-  { label: 'Players', route: 'Players', icon: 'people-outline', needsLeague: true },
-  { label: 'GM Targets', route: 'GmTargets', icon: 'bookmark-outline', needsLeague: true },
-  { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', needsLeague: true },
-  { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', needsLeague: true },
-  { label: 'Trade Analyzer', route: 'TradeAnalyzer', icon: 'git-compare-outline', needsLeague: true },
-  { label: 'Trade Calculator', route: 'TradeCalculator', icon: 'calculator-outline', needsLeague: true },
-  { label: 'Draft Center', route: 'DraftCenter', icon: 'albums-outline', needsLeague: true },
-  { label: 'Recap', route: 'Recap', icon: 'newspaper-outline', needsLeague: true },
-  { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', needsLeague: true },
+  { label: 'League Overview', route: 'LeagueDetail', icon: 'grid-outline', needsLeague: true, color: colors.accent },
+  { label: 'Next Move', route: 'Dashboard', icon: 'flash-outline', needsLeague: true, color: colors.accent },
+  // Alerts was buried last in the list despite being time-sensitive —
+  // moved up next to the other "check this now" destinations.
+  { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', needsLeague: true, color: colors.danger },
+  { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', needsLeague: true, color: colors.success },
+  { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', needsLeague: true, color: colors.success },
+  { label: 'Teams', route: 'Teams', icon: 'people-circle-outline', needsLeague: true, color: colors.violet },
+  { label: 'Players', route: 'Players', icon: 'people-outline', needsLeague: true, color: colors.violet },
+  { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', needsLeague: true, color: colors.premium },
+  {
+    label: 'Trade Analyzer',
+    route: 'TradeAnalyzer',
+    icon: 'git-compare-outline',
+    needsLeague: true,
+    color: colors.premium,
+  },
+  {
+    label: 'Trade Calculator',
+    route: 'TradeCalculator',
+    icon: 'calculator-outline',
+    needsLeague: true,
+    color: colors.premium,
+  },
+  { label: 'GM Targets', route: 'GmTargets', icon: 'bookmark-outline', needsLeague: true, color: colors.premium },
+  { label: 'Draft Center', route: 'DraftCenter', icon: 'albums-outline', needsLeague: true, color: colors.premium },
+  { label: 'Recap', route: 'Recap', icon: 'newspaper-outline', needsLeague: true, color: colors.violet },
 ];
 
 const GENERAL_DESTINATIONS: Destination[] = [
-  { label: 'Home', route: 'Home', icon: 'home-outline' },
-  { label: 'News', route: 'News', icon: 'globe-outline' },
-  { label: 'Premium', route: 'Paywall', icon: 'star-outline' },
-  { label: 'More', route: 'More', icon: 'ellipsis-horizontal-outline' },
+  { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent },
+  { label: 'News', route: 'News', icon: 'globe-outline', color: colors.violet },
+  { label: 'Premium', route: 'Paywall', icon: 'star-outline', color: colors.premium },
+  { label: 'More', route: 'More', icon: 'ellipsis-horizontal-outline', color: colors.textSecondary },
 ];
 
 interface SavedLeagueRow {
@@ -318,7 +337,7 @@ export default function GmOrb() {
                       <Ionicons
                         name={destination.icon}
                         size={20}
-                        color={isCurrent ? colors.accent : colors.textSecondary}
+                        color={isCurrent ? colors.accent : destination.color}
                         style={styles.destIcon}
                       />
                       <Text style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
@@ -377,7 +396,7 @@ export default function GmOrb() {
                   <Ionicons
                     name={destination.icon}
                     size={20}
-                    color={isCurrent ? colors.accent : colors.textSecondary}
+                    color={isCurrent ? colors.accent : destination.color}
                     style={styles.destIcon}
                   />
                   <Text style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
