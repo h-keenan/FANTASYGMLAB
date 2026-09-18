@@ -57,6 +57,8 @@ interface LeaguePulseTile {
   label: string;
   value: string;
   note: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  color: string;
 }
 
 function bestByRank(teams: TeamRanking[], rankKey: 'power_rank' | 'draft_capital_rank'): TeamRanking | null {
@@ -91,6 +93,8 @@ function buildLeaguePulseTiles(teams: TeamRanking[]): LeaguePulseTile[] {
       label: 'Biggest Contender',
       value: contender?.team_name ?? 'No clear leader',
       note: contender ? `Power #${contender.power_rank}` : 'No contender read available yet.',
+      icon: 'flame',
+      color: colors.accent,
     },
     {
       label: 'Biggest Rebuilder',
@@ -98,11 +102,15 @@ function buildLeaguePulseTiles(teams: TeamRanking[]): LeaguePulseTile[] {
       note: rebuilder
         ? `Draft Capital #${rebuilder.draft_capital_rank} · ${rebuilder.strategy_label ?? 'Rebuild'}`
         : 'No rebuild read available yet.',
+      icon: 'construct',
+      color: colors.premium,
     },
     {
       label: 'Draft Capital Leader',
       value: draftLeader?.team_name ?? 'No clear leader',
       note: draftLeader ? `Draft Capital #${draftLeader.draft_capital_rank}` : 'No draft-capital read available yet.',
+      icon: 'layers',
+      color: colors.success,
     },
   ];
   return tiles;
@@ -267,8 +275,11 @@ function LeaguePulseSection({ teams }: { teams: TeamRanking[] }) {
       <Text style={styles.pulseHeading}>League Pulse</Text>
       <View style={styles.pulseGrid}>
         {tiles.map((tile) => (
-          <View key={tile.label} style={styles.pulseTile}>
-            <Text style={styles.pulseLabel}>{tile.label.toUpperCase()}</Text>
+          <View key={tile.label} style={[styles.pulseTile, { borderLeftColor: tile.color }]}>
+            <View style={styles.pulseLabelRow}>
+              <Ionicons name={tile.icon} size={12} color={tile.color} />
+              <Text style={[styles.pulseLabel, { color: tile.color }]}>{tile.label.toUpperCase()}</Text>
+            </View>
             <Text style={styles.pulseValue} numberOfLines={1}>
               {tile.value}
             </Text>
@@ -536,9 +547,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
+    borderLeftWidth: 3,
     padding: spacing.md,
   },
-  pulseLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  pulseLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  pulseLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
   pulseValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: 4 },
   pulseNote: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   checkInBanner: {
