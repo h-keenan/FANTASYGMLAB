@@ -3,10 +3,10 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
@@ -99,12 +99,12 @@ export default function PaywallScreen({ navigation }: Props) {
   if (purchased) {
     return (
       <View style={styles.center}>
-        <Text style={styles.successTitle}>You're on Premium</Text>
-        <Text style={styles.successSubtitle}>
+        <AppText style={styles.successTitle}>You're on Premium</AppText>
+        <AppText style={styles.successSubtitle}>
           It may take a moment to reflect everywhere in the app.
-        </Text>
+        </AppText>
         <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.primaryButtonText}>Done</Text>
+          <AppText style={styles.primaryButtonText}>Done</AppText>
         </TouchableOpacity>
       </View>
     );
@@ -117,17 +117,17 @@ export default function PaywallScreen({ navigation }: Props) {
       showsVerticalScrollIndicator={false}
     >
       <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={8}>
-        <Text style={styles.closeButtonText}>Close</Text>
+        <AppText style={styles.closeButtonText}>Close</AppText>
       </TouchableOpacity>
 
-      <Text style={styles.title}>FantasyGM Lab Premium</Text>
-      <Text style={styles.subtitle}>Founder Beta pricing — locked in for as long as you stay subscribed.</Text>
+      <AppText style={styles.title}>FantasyGM Lab Premium</AppText>
+      <AppText style={styles.subtitle}>Founder Beta pricing — locked in for as long as you stay subscribed.</AppText>
 
       <View style={styles.features}>
         {FEATURES.map((feature) => (
           <View key={feature} style={styles.featureRow}>
             <Ionicons name="checkmark-circle" size={18} color={colors.success} style={styles.featureIcon} />
-            <Text style={styles.featureText}>{feature}</Text>
+            <AppText style={styles.featureText}>{feature}</AppText>
           </View>
         ))}
       </View>
@@ -135,9 +135,9 @@ export default function PaywallScreen({ navigation }: Props) {
       {loading ? (
         <ActivityIndicator style={styles.loadingIndicator} color={colors.accent} />
       ) : loadError ? (
-        <Text style={styles.error}>{loadError}</Text>
+        <AppText style={styles.error}>{loadError}</AppText>
       ) : packages.length === 0 ? (
-        <Text style={styles.error}>No subscription plans are available right now.</Text>
+        <AppText style={styles.error}>No subscription plans are available right now.</AppText>
       ) : (
         <View style={styles.packages}>
           {packages.map((pack) => {
@@ -154,14 +154,14 @@ export default function PaywallScreen({ navigation }: Props) {
               >
                 <View style={styles.packageRow}>
                   <View style={styles.packageLabelGroup}>
-                    <Text style={styles.packageTitle}>{pack.product.title || pack.identifier}</Text>
+                    <AppText style={styles.packageTitle}>{pack.product.title || pack.identifier}</AppText>
                     {isAnnual ? (
                       <View style={styles.bestValueBadge}>
-                        <Text style={styles.bestValueBadgeText}>Best value</Text>
+                        <AppText style={styles.bestValueBadgeText}>Best value</AppText>
                       </View>
                     ) : null}
                   </View>
-                  <Text style={styles.packagePrice}>{pack.product.priceString}</Text>
+                  <AppText style={styles.packagePrice}>{pack.product.priceString}</AppText>
                 </View>
               </AnimatedCard>
             );
@@ -169,7 +169,7 @@ export default function PaywallScreen({ navigation }: Props) {
         </View>
       )}
 
-      {purchaseError ? <Text style={styles.error}>{purchaseError}</Text> : null}
+      {purchaseError ? <AppText style={styles.error}>{purchaseError}</AppText> : null}
 
       <TouchableOpacity
         style={[styles.primaryButton, (!selected || purchasing) && styles.primaryButtonDisabled]}
@@ -179,37 +179,37 @@ export default function PaywallScreen({ navigation }: Props) {
         {purchasing ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.primaryButtonText}>Continue</Text>
+          <AppText style={styles.primaryButtonText}>Continue</AppText>
         )}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={onRestore} disabled={restoring} style={styles.restoreButton}>
-        <Text style={styles.restoreButtonText}>
+        <AppText style={styles.restoreButtonText}>
           {restoring ? 'Restoring…' : 'Restore purchases'}
-        </Text>
+        </AppText>
       </TouchableOpacity>
 
-      <Text style={styles.disclosure}>
+      <AppText style={styles.disclosure}>
         Payment is charged to your account at confirmation of purchase. Your subscription
         automatically renews unless auto-renew is turned off at least 24 hours before the end of
         the current period. Manage or cancel anytime in your device's account settings. By
         continuing, you agree to our{' '}
-        <Text style={styles.disclosureLink} onPress={() => navigation.navigate('LegalPage', { pageKey: 'terms' })}>
+        <AppText style={styles.disclosureLink} onPress={() => navigation.navigate('LegalPage', { pageKey: 'terms' })}>
           Terms of Use
-        </Text>{' '}
+        </AppText>{' '}
         and{' '}
-        <Text
+        <AppText
           style={styles.disclosureLink}
           onPress={() => navigation.navigate('LegalPage', { pageKey: 'subscription_terms' })}
         >
           Subscription Terms
-        </Text>{' '}
+        </AppText>{' '}
         and{' '}
-        <Text style={styles.disclosureLink} onPress={() => navigation.navigate('LegalPage', { pageKey: 'privacy' })}>
+        <AppText style={styles.disclosureLink} onPress={() => navigation.navigate('LegalPage', { pageKey: 'privacy' })}>
           Privacy Policy
-        </Text>
+        </AppText>
         .
-      </Text>
+      </AppText>
     </ScrollView>
   );
 }

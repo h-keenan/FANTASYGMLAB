@@ -1,5 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/inter';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -12,15 +21,39 @@ import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
 import { registerNotificationTapHandler } from './src/lib/pushNotifications';
 
+// Holds the native splash up past its default auto-hide — AppText (every
+// screen's Text) needs these weight files registered with the native font
+// manager before first paint, or the very first frame renders in the OS
+// fallback font and visibly reflows into Inter a moment later.
+void SplashScreen.preventAutoHideAsync();
+
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded) {
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
   useEffect(() => {
     configureRevenueCat();
     void initAds();
     return registerNotificationTapHandler();
   }, []);
 
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <DensityProvider>
           <GmStanceProvider>

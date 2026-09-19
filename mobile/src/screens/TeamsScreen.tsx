@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -104,7 +105,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -135,21 +136,21 @@ export default function TeamsScreen({ route, navigation }: Props) {
             <TeamAvatar avatarId={item.avatarId} size={36} style={styles.avatar} />
             <View style={styles.ownerGroup}>
               <View style={styles.nameRow}>
-                <Text style={styles.owner} numberOfLines={1}>
+                <AppText style={styles.owner} numberOfLines={1}>
                   {item.teamName}
-                </Text>
+                </AppText>
                 {item.isMine ? (
                   <View style={styles.mineBadge}>
-                    <Text style={styles.mineBadgeText}>You</Text>
+                    <AppText style={styles.mineBadgeText}>You</AppText>
                   </View>
                 ) : null}
               </View>
-              {item.recordLabel ? <Text style={styles.record}>{item.recordLabel}</Text> : null}
+              {item.recordLabel ? <AppText style={styles.record}>{item.recordLabel}</AppText> : null}
               {item.archetypeLabel ? (
                 <View style={styles.archetypeBadge}>
-                  <Text style={styles.archetypeBadgeText} numberOfLines={1}>
+                  <AppText style={styles.archetypeBadgeText} numberOfLines={1}>
                     {item.archetypeLabel}
-                  </Text>
+                  </AppText>
                 </View>
               ) : null}
             </View>
@@ -158,15 +159,15 @@ export default function TeamsScreen({ route, navigation }: Props) {
                 {item.powerRank === 1 ? (
                   <Ionicons name="trophy" size={13} color={colors.premium} style={styles.rankTrophy} />
                 ) : (
-                  <Text style={styles.rankLabel}>POWER</Text>
+                  <AppText style={styles.rankLabel}>POWER</AppText>
                 )}
-                <Text style={[styles.rankValue, item.powerRank === 1 && styles.rankValueFirst]}>
+                <AppText style={[styles.rankValue, item.powerRank === 1 && styles.rankValueFirst]}>
                   #{item.powerRank}
-                </Text>
+                </AppText>
               </View>
             ) : (
               <View style={styles.countPill}>
-                <Text style={styles.count}>{item.playerIds.length}</Text>
+                <AppText style={styles.count}>{item.playerIds.length}</AppText>
               </View>
             )}
           </View>

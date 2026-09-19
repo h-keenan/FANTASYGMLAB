@@ -3,11 +3,11 @@ import {
   FlatList,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -74,7 +74,7 @@ function UsageTrendPill({ trend }: { trend: UsageTrend }) {
       ]}
     >
       <Ionicons name={rising ? 'arrow-up' : 'arrow-down'} size={9} color={tint} />
-      <Text style={[styles.trendPillText, { color: tint }]}>{trend.magnitude_pct}%</Text>
+      <AppText style={[styles.trendPillText, { color: tint }]}>{trend.magnitude_pct}%</AppText>
     </View>
   );
 }
@@ -142,7 +142,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
             style={[styles.pill, lens === option && styles.pillActive]}
             onPress={() => setLens(option)}
           >
-            <Text style={[styles.pillText, lens === option && styles.pillTextActive]}>{option}</Text>
+            <AppText style={[styles.pillText, lens === option && styles.pillTextActive]}>{option}</AppText>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -153,7 +153,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
             style={[styles.pill, position === option && styles.pillActive]}
             onPress={() => setPosition(option)}
           >
-            <Text style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</Text>
+            <AppText style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</AppText>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -164,7 +164,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
             style={[styles.pill, ageFilter === option && styles.pillActive]}
             onPress={() => setAgeFilter(option)}
           >
-            <Text style={[styles.pillText, ageFilter === option && styles.pillTextActive]}>{option}</Text>
+            <AppText style={[styles.pillText, ageFilter === option && styles.pillTextActive]}>{option}</AppText>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -175,7 +175,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
             style={[styles.pill, statusFilter === option && styles.pillActive]}
             onPress={() => setStatusFilter(option)}
           >
-            <Text style={[styles.pillText, statusFilter === option && styles.pillTextActive]}>{option}</Text>
+            <AppText style={[styles.pillText, statusFilter === option && styles.pillTextActive]}>{option}</AppText>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -186,12 +186,12 @@ export default function PlayersScreen({ route, navigation }: Props) {
             style={[styles.pill, availabilityFilter === option && styles.pillActive]}
             onPress={() => setAvailabilityFilter(option)}
           >
-            <Text style={[styles.pillText, availabilityFilter === option && styles.pillTextActive]}>{option}</Text>
+            <AppText style={[styles.pillText, availabilityFilter === option && styles.pillTextActive]}>{option}</AppText>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       {loading ? (
         <BrandedSpinner style={styles.loading} />
@@ -207,25 +207,25 @@ export default function PlayersScreen({ route, navigation }: Props) {
             >
               <PlayerAvatar playerId={item.player_id} size={40} tier={item.tier} style={styles.avatar} />
               <View style={styles.rankBadge}>
-                <Text style={styles.rankText}>{item.overall_rank ?? '—'}</Text>
+                <AppText style={styles.rankText}>{item.overall_rank ?? '—'}</AppText>
               </View>
               <View style={styles.nameColumn}>
-                <Text style={styles.name} numberOfLines={1}>
+                <AppText style={styles.name} numberOfLines={1}>
                   {item.name ?? 'Unknown'}
-                </Text>
+                </AppText>
                 <View style={styles.metaRow}>
                   <PositionBadge position={item.position} />
-                  <Text style={styles.meta} numberOfLines={1}>
+                  <AppText style={styles.meta} numberOfLines={1}>
                     {[item.team, item.opportunity_label].filter(Boolean).join(' · ')}
-                  </Text>
+                  </AppText>
                   {item.usage_trend ? <UsageTrendPill trend={item.usage_trend} /> : null}
                   <TierBadge storedTier={item.tier} />
                 </View>
               </View>
-              <Text style={styles.score}>{item.score != null ? Math.round(item.score) : '—'}</Text>
+              <AppText style={styles.score}>{item.score != null ? Math.round(item.score) : '—'}</AppText>
             </AnimatedCard>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No players match.</Text>}
+          ListEmptyComponent={<AppText style={styles.empty}>No players match.</AppText>}
         />
       )}
     </View>

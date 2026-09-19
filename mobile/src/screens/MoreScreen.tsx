@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import IconCircle from '../components/IconCircle';
@@ -130,7 +131,7 @@ export default function MoreScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: orbClearance }}>
-      <Text style={styles.sectionLabel}>Display</Text>
+      <AppText style={styles.sectionLabel}>Display</AppText>
       <View style={styles.densityRow}>
         {DENSITY_OPTIONS.map((option) => {
           const active = density === option.value;
@@ -140,22 +141,22 @@ export default function MoreScreen({ navigation }: Props) {
               style={[styles.densityOption, active && styles.densityOptionActive]}
               onPress={() => setDensity(option.value)}
             >
-              <Text style={[styles.densityOptionLabel, active && styles.densityOptionLabelActive]}>
+              <AppText style={[styles.densityOptionLabel, active && styles.densityOptionLabelActive]}>
                 {option.label}
-              </Text>
-              <Text style={styles.densityOptionDescription}>{option.description}</Text>
+              </AppText>
+              <AppText style={styles.densityOptionDescription}>{option.description}</AppText>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      <Text style={styles.sectionLabel}>Notifications</Text>
+      <AppText style={styles.sectionLabel}>Notifications</AppText>
       <TouchableOpacity style={styles.row} onPress={onSendTestPush} disabled={sendingTestPush}>
         <View style={styles.labelGroup}>
           <IconCircle name="notifications-outline" color={colors.accent} style={styles.icon} />
-          <Text style={styles.label}>Send test notification</Text>
+          <AppText style={styles.label}>Send test notification</AppText>
         </View>
-        {sendingTestPush ? <ActivityIndicator size="small" color={colors.accent} /> : <Text style={styles.chevron}>{'›'}</Text>}
+        {sendingTestPush ? <ActivityIndicator size="small" color={colors.accent} /> : <AppText style={styles.chevron}>{'›'}</AppText>}
       </TouchableOpacity>
 
       {pushCategories
@@ -163,8 +164,8 @@ export default function MoreScreen({ navigation }: Props) {
             <View key={item.value} style={styles.row}>
               <View style={styles.labelGroup}>
                 <View style={styles.toggleTextGroup}>
-                  <Text style={styles.label}>{item.label}</Text>
-                  <Text style={styles.toggleDescription}>{item.description}</Text>
+                  <AppText style={styles.label}>{item.label}</AppText>
+                  <AppText style={styles.toggleDescription}>{item.description}</AppText>
                 </View>
               </View>
               <Switch
@@ -177,28 +178,28 @@ export default function MoreScreen({ navigation }: Props) {
           ))
         : null}
 
-      <Text style={styles.sectionLabel}>About</Text>
+      <AppText style={styles.sectionLabel}>About</AppText>
       <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('HowWeEvaluate')}>
         <View style={styles.labelGroup}>
           <IconCircle name="school-outline" color={colors.violet} style={styles.icon} />
-          <Text style={styles.label}>How We Evaluate</Text>
+          <AppText style={styles.label}>How We Evaluate</AppText>
         </View>
-        <Text style={styles.chevron}>{'›'}</Text>
+        <AppText style={styles.chevron}>{'›'}</AppText>
       </TouchableOpacity>
 
       {showcaseAvailable ? (
         <>
-          <Text style={styles.sectionLabel}>Developer</Text>
+          <AppText style={styles.sectionLabel}>Developer</AppText>
           <View style={styles.row}>
             <View style={styles.labelGroup}>
               <IconCircle name="videocam-outline" color={colors.premium} style={styles.icon} />
               <View style={styles.toggleTextGroup}>
-                <Text style={styles.label}>Showcase mode</Text>
-                <Text style={styles.toggleDescription}>
+                <AppText style={styles.label}>Showcase mode</AppText>
+                <AppText style={styles.toggleDescription}>
                   Replaces every team name, league name, owner name and username with
                   stand-ins so screen recordings stay anonymous. Player and football data
                   are untouched.
-                </Text>
+                </AppText>
               </View>
             </View>
             <Switch
@@ -210,7 +211,7 @@ export default function MoreScreen({ navigation }: Props) {
         </>
       ) : null}
 
-      <Text style={styles.sectionLabel}>Legal</Text>
+      <AppText style={styles.sectionLabel}>Legal</AppText>
       {LEGAL_ITEMS.map((item) => (
         <TouchableOpacity
           key={item.pageKey}
@@ -219,17 +220,17 @@ export default function MoreScreen({ navigation }: Props) {
         >
           <View style={styles.labelGroup}>
             <IconCircle name={item.icon} color={colors.textSecondary} style={styles.icon} />
-            <Text style={styles.label}>{item.label}</Text>
+            <AppText style={styles.label}>{item.label}</AppText>
           </View>
-          <Text style={styles.chevron}>{'›'}</Text>
+          <AppText style={styles.chevron}>{'›'}</AppText>
         </TouchableOpacity>
       ))}
 
-      <Text style={styles.sectionLabel}>Account</Text>
+      <AppText style={styles.sectionLabel}>Account</AppText>
       <TouchableOpacity style={styles.row} onPress={onDeleteAccount} disabled={deleting}>
         <View style={styles.labelGroup}>
           <IconCircle name="trash-outline" color={colors.danger} style={styles.icon} />
-          <Text style={styles.dangerLabel}>Delete account</Text>
+          <AppText style={styles.dangerLabel}>Delete account</AppText>
         </View>
         {deleting ? <ActivityIndicator size="small" color={colors.danger} /> : null}
       </TouchableOpacity>

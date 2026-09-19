@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -59,18 +60,18 @@ function MultiplierRow({
   return (
     <View style={styles.driverRow}>
       <View style={styles.driverText}>
-        <Text style={styles.driverLabel}>{label}</Text>
-        <Text style={styles.driverNote}>{note}</Text>
+        <AppText style={styles.driverLabel}>{label}</AppText>
+        <AppText style={styles.driverNote}>{note}</AppText>
       </View>
       <View style={styles.driverValueBlock}>
-        <Text style={[styles.driverValue, { color }]}>
+        <AppText style={[styles.driverValue, { color }]}>
           {multiplier === null ? '—' : `×${multiplier.toFixed(2)}`}
-        </Text>
+        </AppText>
         {multiplier !== null && !neutral ? (
-          <Text style={[styles.driverDelta, { color }]}>
+          <AppText style={[styles.driverDelta, { color }]}>
             {delta > 0 ? '+' : ''}
             {Math.round(delta * 100)}%
-          </Text>
+          </AppText>
         ) : null}
       </View>
     </View>
@@ -80,11 +81,11 @@ function MultiplierRow({
 function BucketBar({ label, percent, color }: { label: string; percent: number; color: string }) {
   return (
     <View style={styles.bucketRow}>
-      <Text style={styles.bucketLabel}>{label}</Text>
+      <AppText style={styles.bucketLabel}>{label}</AppText>
       <View style={styles.bucketTrack}>
         <View style={[styles.bucketFill, { width: `${Math.max(2, percent)}%`, backgroundColor: color }]} />
       </View>
-      <Text style={styles.bucketPercent}>{Math.round(percent)}%</Text>
+      <AppText style={styles.bucketPercent}>{Math.round(percent)}%</AppText>
     </View>
   );
 }
@@ -93,7 +94,7 @@ function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
   return (
     <View style={styles.sectionHeadingRow}>
       <Ionicons name={icon} size={15} color={colors.accent} style={styles.sectionHeadingIcon} />
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <AppText style={styles.sectionTitle}>{title}</AppText>
     </View>
   );
 }
@@ -102,12 +103,12 @@ function StatCell({ label, value }: { label: string; value: string | number | nu
   const display = value === null || value === undefined || value === '' ? '—' : value;
   return (
     <View style={styles.statCell}>
-      <Text style={styles.statCellLabel} numberOfLines={1}>
+      <AppText style={styles.statCellLabel} numberOfLines={1}>
         {label}
-      </Text>
-      <Text style={styles.statCellValue} numberOfLines={1}>
+      </AppText>
+      <AppText style={styles.statCellValue} numberOfLines={1}>
         {display}
-      </Text>
+      </AppText>
     </View>
   );
 }
@@ -173,16 +174,16 @@ export default function PickDetailScreen({ route, navigation }: Props) {
               app uses (Trade Analyzer, Dashboard, recap trade detail) — the
               pick-side analog of Player Detail's round hero avatar. */}
           <IconCircle name="albums-outline" color={colors.accent} size={72} iconSize={32} />
-          <Text style={styles.heroTitle}>{pick.label ?? 'Draft pick'}</Text>
+          <AppText style={styles.heroTitle}>{pick.label ?? 'Draft pick'}</AppText>
           {pick.pick_tier ? (
             <View style={styles.heroPill}>
-              <Text style={styles.heroPillText}>{pick.pick_tier}</Text>
+              <AppText style={styles.heroPillText}>{pick.pick_tier}</AppText>
             </View>
           ) : null}
-          <Text style={styles.heroScore}>{score === null ? '—' : Math.round(score)}</Text>
-          <Text style={styles.heroScoreLabel}>Estimated value</Text>
+          <AppText style={styles.heroScore}>{score === null ? '—' : Math.round(score)}</AppText>
+          <AppText style={styles.heroScoreLabel}>Estimated value</AppText>
           {pick.projected_pick_range ? (
-            <Text style={styles.heroRange}>Projects as {pick.projected_pick_range}</Text>
+            <AppText style={styles.heroRange}>Projects as {pick.projected_pick_range}</AppText>
           ) : null}
         </View>
 
@@ -213,22 +214,22 @@ export default function PickDetailScreen({ route, navigation }: Props) {
                   valueLabel={confidencePct === null ? '—' : `${Math.round(confidencePct)}%`}
                 />
                 <View style={styles.projectionSummary}>
-                  <Text style={[styles.projectionVerdict, { color: identity.color }]}>
+                  <AppText style={[styles.projectionVerdict, { color: identity.color }]}>
                     {identity.word} confidence
-                  </Text>
-                  <Text style={styles.projectionRange}>{pick.projected_pick_range ?? '—'}</Text>
+                  </AppText>
+                  <AppText style={styles.projectionRange}>{pick.projected_pick_range ?? '—'}</AppText>
                   {projectedSlot !== null ? (
-                    <Text style={styles.projectionMeta}>
+                    <AppText style={styles.projectionMeta}>
                       Projected slot percentile {Math.round(projectedSlot * 100)}
                       {' · higher = earlier in the round'}
-                    </Text>
+                    </AppText>
                   ) : null}
                 </View>
               </View>
 
               {hasBuckets ? (
                 <View style={styles.buckets}>
-                  <Text style={styles.bucketsCaption}>Where this pick likely lands in its round</Text>
+                  <AppText style={styles.bucketsCaption}>Where this pick likely lands in its round</AppText>
                   {BUCKETS.map((bucket) => (
                     <BucketBar
                       key={bucket.key}
@@ -242,15 +243,15 @@ export default function PickDetailScreen({ route, navigation }: Props) {
 
               <View style={styles.horizonRow}>
                 <Ionicons name="hourglass-outline" size={14} color={colors.textTertiary} />
-                <Text style={styles.horizonText}>{horizonCopy(yearsOut, futureDiscount)}</Text>
+                <AppText style={styles.horizonText}>{horizonCopy(yearsOut, futureDiscount)}</AppText>
               </View>
             </AnimatedCard>
 
             <AnimatedCard style={styles.card}>
               <SectionHeading title="Value Drivers" icon="analytics-outline" />
               <View style={styles.baseRow}>
-                <Text style={styles.baseLabel}>Base round value</Text>
-                <Text style={styles.baseValue}>{baseScore === null ? '—' : Math.round(baseScore)}</Text>
+                <AppText style={styles.baseLabel}>Base round value</AppText>
+                <AppText style={styles.baseValue}>{baseScore === null ? '—' : Math.round(baseScore)}</AppText>
               </View>
               <MultiplierRow
                 label="Future discount"
@@ -282,15 +283,15 @@ export default function PickDetailScreen({ route, navigation }: Props) {
                 note="Named prospects available in this range"
               />
               <View style={styles.resultRow}>
-                <Text style={styles.resultLabel}>Estimated value</Text>
-                <Text style={styles.resultValue}>{score === null ? '—' : Math.round(score)}</Text>
+                <AppText style={styles.resultLabel}>Estimated value</AppText>
+                <AppText style={styles.resultValue}>{score === null ? '—' : Math.round(score)}</AppText>
               </View>
             </AnimatedCard>
           </>
         ) : (
-          <Text style={styles.notice}>
+          <AppText style={styles.notice}>
             The valuation breakdown for this pick isn't available — update the app to see it.
-          </Text>
+          </AppText>
         )}
       </ScrollView>
     </View>

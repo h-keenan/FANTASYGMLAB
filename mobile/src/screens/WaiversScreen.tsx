@@ -2,11 +2,11 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -132,14 +132,14 @@ export default function WaiversScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <GridBackground />
-      <Text style={styles.disclaimer}>
+      <AppText style={styles.disclaimer}>
         Free agents ranked for your roster — ordered by fit for {neededPositions.length > 0
           ? `your needs at ${neededPositions.join(', ')}`
           : 'your team'}, not just raw value.
-      </Text>
+      </AppText>
 
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
+      {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <View style={styles.filterRow}>
         <TextInput
@@ -158,7 +158,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
             style={[styles.pill, position === option && styles.pillActive]}
             onPress={() => setPosition(option)}
           >
-            <Text style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</Text>
+            <AppText style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</AppText>
           </TouchableOpacity>
         ))}
       </View>
@@ -174,7 +174,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               <View>
                 {bestAvailable.length > 0 ? (
                   <View style={styles.bestAvailableBlock}>
-                    <Text style={styles.sectionLabel}>Best Available</Text>
+                    <AppText style={styles.sectionLabel}>Best Available</AppText>
                     <View style={styles.bestAvailableRow}>
                       {bestAvailable.map(({ position: pos, player, count }) => (
                         <BestAvailableCard
@@ -192,7 +192,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 ) : null}
                 {priorityAdds.length > 0 ? (
                   <View style={styles.priorityBlock}>
-                    <Text style={styles.sectionLabel}>Priority Adds</Text>
+                    <AppText style={styles.sectionLabel}>Priority Adds</AppText>
                     {priorityAdds.map((player) => (
                       <PriorityAddCard
                         key={player.player_id}
@@ -202,7 +202,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                     ))}
                   </View>
                 ) : null}
-                <Text style={styles.sectionLabel}>All Free Agents</Text>
+                <AppText style={styles.sectionLabel}>All Free Agents</AppText>
               </View>
             ) : null
           }
@@ -216,7 +216,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(item), leagueId, leagueName })}
             />
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No free agents match.</Text>}
+          ListEmptyComponent={<AppText style={styles.empty}>No free agents match.</AppText>}
           ListFooterComponent={
             <SecondaryWaiverBoard
               isPremium={isPremium}
@@ -291,12 +291,12 @@ function SecondaryWaiverBoard({
     navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName });
   return (
     <View style={styles.secondaryBoard}>
-      <Text style={styles.secondaryCaption}>
+      <AppText style={styles.secondaryCaption}>
         Upside stashes, watchlist depth, and a quick FAAB shortlist — check these after Priority Adds.
-      </Text>
+      </AppText>
       {stashCandidates.length > 0 ? (
         <View style={styles.priorityBlock}>
-          <Text style={styles.sectionLabel}>Stash Candidates</Text>
+          <AppText style={styles.sectionLabel}>Stash Candidates</AppText>
           {stashCandidates.map((player, index) => (
             <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
           ))}
@@ -304,7 +304,7 @@ function SecondaryWaiverBoard({
       ) : null}
       {watchlistCandidates.length > 0 ? (
         <View style={styles.priorityBlock}>
-          <Text style={styles.sectionLabel}>Watchlist Depth</Text>
+          <AppText style={styles.sectionLabel}>Watchlist Depth</AppText>
           {watchlistCandidates.map((player, index) => (
             <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
           ))}
@@ -312,7 +312,7 @@ function SecondaryWaiverBoard({
       ) : null}
       {faabTargets.length > 0 ? (
         <View style={styles.priorityBlock}>
-          <Text style={styles.sectionLabel}>FAAB Shortlist</Text>
+          <AppText style={styles.sectionLabel}>FAAB Shortlist</AppText>
           {faabTargets.map((player, index) => (
             <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
           ))}
@@ -336,14 +336,14 @@ function BestAvailableCard({
   return (
     <AnimatedCard style={styles.bestAvailableCard} onPress={onPress}>
       <View style={styles.bestAvailablePosBadge}>
-        <Text style={styles.bestAvailablePosText}>{position}</Text>
+        <AppText style={styles.bestAvailablePosText}>{position}</AppText>
       </View>
       <PlayerAvatar playerId={player.player_id} size={36} tier={player.tier} style={styles.avatarWrap} />
-      <Text style={styles.bestAvailableName} numberOfLines={1}>
+      <AppText style={styles.bestAvailableName} numberOfLines={1}>
         {player.name ?? 'Unknown'}
-      </Text>
-      <Text style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</Text>
-      <Text style={styles.bestAvailableCount}>{count} active</Text>
+      </AppText>
+      <AppText style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+      <AppText style={styles.bestAvailableCount}>{count} active</AppText>
     </AnimatedCard>
   );
 }
@@ -354,40 +354,40 @@ function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPre
     <AnimatedCard style={styles.priorityCard} onPress={onPress}>
       <View style={styles.priorityTopRow}>
         <Ionicons name="swap-horizontal-outline" size={14} color={colors.premium} />
-        <Text style={styles.priorityLabel}>{player.recommendation_label}</Text>
+        <AppText style={styles.priorityLabel}>{player.recommendation_label}</AppText>
       </View>
       <View style={styles.cardTopRow}>
         <PlayerAvatar playerId={player.player_id} size={44} tier={player.tier} style={styles.avatarWrap} />
         <View style={styles.nameColumn}>
-          <Text style={styles.name} numberOfLines={1}>
+          <AppText style={styles.name} numberOfLines={1}>
             {player.name ?? 'Unknown'}
-          </Text>
+          </AppText>
           <View style={styles.metaRow}>
             <PositionBadge position={player.position} />
-            <Text style={styles.meta} numberOfLines={1}>{player.team}</Text>
+            <AppText style={styles.meta} numberOfLines={1}>{player.team}</AppText>
           </View>
           {player.injury_replacement_fit ? (
-            <Text style={styles.injuryFitText}>{player.injury_replacement_note}</Text>
+            <AppText style={styles.injuryFitText}>{player.injury_replacement_note}</AppText>
           ) : injuryColor ? (
             <View style={styles.injuryRow}>
               <Ionicons name="medkit-outline" size={11} color={injuryColor} />
-              <Text style={[styles.injuryText, { color: injuryColor }]}>{player.injury_status}</Text>
+              <AppText style={[styles.injuryText, { color: injuryColor }]}>{player.injury_status}</AppText>
             </View>
           ) : null}
         </View>
         <View style={styles.valueColumn}>
-          <Text style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</Text>
+          <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
           <TierBadge storedTier={player.tier} />
         </View>
       </View>
       <View style={styles.faabRow}>
         <View style={styles.faabInfo}>
           <Ionicons name="cash-outline" size={13} color={colors.textSecondary} />
-          <Text style={styles.faabText}>{player.faab.label}</Text>
+          <AppText style={styles.faabText}>{player.faab.label}</AppText>
         </View>
         <View style={styles.detailPill}>
           <Ionicons name="information-circle-outline" size={12} color={colors.accentSoft} />
-          <Text style={styles.detailPillText}>Full breakdown</Text>
+          <AppText style={styles.detailPillText}>Full breakdown</AppText>
         </View>
       </View>
     </AnimatedCard>
@@ -419,36 +419,36 @@ function WaiverCard({
         <View style={styles.avatarWrap}>
           <PlayerAvatar playerId={player.player_id} size={44} tier={player.tier} />
           <View style={[styles.rankBadge, topOfBoard && styles.rankBadgeFirst]}>
-            <Text style={[styles.rankText, topOfBoard && styles.rankTextFirst]}>{rank}</Text>
+            <AppText style={[styles.rankText, topOfBoard && styles.rankTextFirst]}>{rank}</AppText>
           </View>
         </View>
         <View style={styles.nameColumn}>
-          <Text style={styles.name} numberOfLines={1}>
+          <AppText style={styles.name} numberOfLines={1}>
             {player.name ?? 'Unknown'}
-          </Text>
+          </AppText>
           <View style={styles.metaRow}>
             <PositionBadge position={player.position} />
-            <Text style={styles.meta} numberOfLines={1}>{player.team}</Text>
+            <AppText style={styles.meta} numberOfLines={1}>{player.team}</AppText>
             {player.position_rank ? (
               <View style={styles.positionRankPill}>
-                <Text style={styles.positionRankText}>
+                <AppText style={styles.positionRankText}>
                   {player.position}{player.position_rank}
-                </Text>
+                </AppText>
               </View>
             ) : null}
           </View>
           {player.injury_replacement_fit ? (
-            <Text style={styles.injuryFitText} numberOfLines={1}>{player.injury_replacement_note}</Text>
+            <AppText style={styles.injuryFitText} numberOfLines={1}>{player.injury_replacement_note}</AppText>
           ) : injuryColor ? (
             <View style={styles.injuryRow}>
               <Ionicons name="medkit-outline" size={11} color={injuryColor} />
-              <Text style={[styles.injuryText, { color: injuryColor }]}>{player.injury_status}</Text>
+              <AppText style={[styles.injuryText, { color: injuryColor }]}>{player.injury_status}</AppText>
             </View>
           ) : null}
         </View>
         <View style={styles.valueColumn}>
-          <Text style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</Text>
-          <Text style={styles.valueLabel}>VALUE</Text>
+          <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+          <AppText style={styles.valueLabel}>VALUE</AppText>
           <TierBadge storedTier={player.tier} />
         </View>
       </View>

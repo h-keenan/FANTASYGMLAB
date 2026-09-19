@@ -5,11 +5,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -309,7 +309,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -317,19 +317,19 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   if (notReadyReason) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notReadyText}>
+        <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't verify your roster in this league."}
-        </Text>
+        </AppText>
       </View>
     );
   }
 
   const header = (
     <View>
-      <Text style={styles.disclaimer}>
+      <AppText style={styles.disclaimer}>
         The real accept / decline / counter verdict for {leagueName} — weighs asset value, starting
         lineup impact, roster needs, age, draft capital, and injury risk.
-      </Text>
+      </AppText>
 
       <View style={styles.sidesRow}>
         <TradeSide
@@ -361,13 +361,13 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           style={[styles.pill, assetType === 'players' && styles.pillActive]}
           onPress={() => setAssetType('players')}
         >
-          <Text style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</Text>
+          <AppText style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</AppText>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.pill, assetType === 'picks' && styles.pillActive]}
           onPress={() => setAssetType('picks')}
         >
-          <Text style={[styles.pillText, assetType === 'picks' && styles.pillTextActive]}>Picks</Text>
+          <AppText style={[styles.pillText, assetType === 'picks' && styles.pillTextActive]}>Picks</AppText>
         </TouchableOpacity>
       </View>
 
@@ -377,7 +377,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             style={[styles.pill, positionFilter === null && styles.pillActive]}
             onPress={() => setPositionFilter(null)}
           >
-            <Text style={[styles.pillText, positionFilter === null && styles.pillTextActive]}>All</Text>
+            <AppText style={[styles.pillText, positionFilter === null && styles.pillTextActive]}>All</AppText>
           </TouchableOpacity>
           {POSITION_FILTERS.map((position) => (
             <TouchableOpacity
@@ -385,7 +385,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
               style={[styles.pill, positionFilter === position && styles.pillActive]}
               onPress={() => setPositionFilter(positionFilter === position ? null : position)}
             >
-              <Text style={[styles.pillText, positionFilter === position && styles.pillTextActive]}>{position}</Text>
+              <AppText style={[styles.pillText, positionFilter === position && styles.pillTextActive]}>{position}</AppText>
             </TouchableOpacity>
           ))}
         </View>
@@ -397,9 +397,9 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             style={[styles.pill, selectedTeamId === ALL_TEAMS_ID && styles.pillActive]}
             onPress={() => setSelectedTeamId(ALL_TEAMS_ID)}
           >
-            <Text style={[styles.pillText, selectedTeamId === ALL_TEAMS_ID && styles.pillTextActive]}>
+            <AppText style={[styles.pillText, selectedTeamId === ALL_TEAMS_ID && styles.pillTextActive]}>
               All Teams
-            </Text>
+            </AppText>
           </TouchableOpacity>
           {otherTeams.map((team) => (
             <TouchableOpacity
@@ -407,12 +407,12 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
               style={[styles.pill, selectedTeamId === team.rosterId && styles.pillActive]}
               onPress={() => setSelectedTeamId(team.rosterId)}
             >
-              <Text
+              <AppText
                 style={[styles.pillText, selectedTeamId === team.rosterId && styles.pillTextActive]}
                 numberOfLines={1}
               >
                 {team.ownerName}
-              </Text>
+              </AppText>
             </TouchableOpacity>
           ))}
         </View>
@@ -423,10 +423,10 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         onPress={analyze}
         disabled={analyzing || !hasAnyAssets}
       >
-        {analyzing ? <ActivityIndicator color="#fff" /> : <Text style={styles.analyzeButtonText}>Analyze Trade</Text>}
+        {analyzing ? <ActivityIndicator color="#fff" /> : <AppText style={styles.analyzeButtonText}>Analyze Trade</AppText>}
       </TouchableOpacity>
 
-      {analyzeError ? <Text style={styles.error}>{analyzeError}</Text> : null}
+      {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
       {verdict ? (
         <VerdictCard
           verdict={verdict}
@@ -474,16 +474,16 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           <TouchableOpacity style={styles.resultRow} onPress={() => addPlayerToSide(item.player)}>
             <PlayerAvatar playerId={item.player.player_id} size={36} tier={item.player.tier} style={styles.resultAvatar} />
             <View style={styles.resultInfo}>
-              <Text style={styles.resultName} numberOfLines={1}>
+              <AppText style={styles.resultName} numberOfLines={1}>
                 {item.player.name ?? 'Unknown'}
-              </Text>
+              </AppText>
               <View style={styles.resultMetaRow}>
                 <PositionBadge position={item.player.position} />
-                <Text style={styles.resultMeta}>{item.player.team}</Text>
+                <AppText style={styles.resultMeta}>{item.player.team}</AppText>
                 <TierBadge storedTier={item.player.tier} />
               </View>
             </View>
-            <Text style={styles.resultScore}>{Math.round(playerScore(item.player))}</Text>
+            <AppText style={styles.resultScore}>{Math.round(playerScore(item.player))}</AppText>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.resultRow} onPress={() => addPickToSide(item.pick)}>
@@ -491,16 +491,16 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
               <Ionicons name="albums-outline" size={18} color={colors.accent} />
             </View>
             <View style={styles.resultInfo}>
-              <Text style={styles.resultName} numberOfLines={1}>
+              <AppText style={styles.resultName} numberOfLines={1}>
                 {item.pick.label ?? 'Draft pick'}
-              </Text>
+              </AppText>
               <View style={styles.resultMetaRow}>
-                <Text style={styles.resultMeta}>
+                <AppText style={styles.resultMeta}>
                   {[item.pick.pick_tier, item.pick.projected_pick_range].filter(Boolean).join(' · ')}
-                </Text>
+                </AppText>
               </View>
             </View>
-            <Text style={styles.resultScore}>{item.pick.score != null ? Math.round(item.pick.score) : '—'}</Text>
+            <AppText style={styles.resultScore}>{item.pick.score != null ? Math.round(item.pick.score) : '—'}</AppText>
             {/* Tapping the row still adds the pick to the package — this is
                 the escape hatch to "why is it worth that?" (the same Pick
                 Detail the Draft Center's pick list opens) without giving up
@@ -518,13 +518,13 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         )
       }
       ListEmptyComponent={
-        <Text style={styles.empty}>
+        <AppText style={styles.empty}>
           {assetType === 'players' && activeSide === 'send' && myRosterIds.size === 0
             ? 'No roster players found.'
             : search
               ? `No matching ${assetType === 'picks' ? 'picks' : 'players'}.`
               : 'Start typing to search.'}
-        </Text>
+        </AppText>
       }
       />
     </KeyboardAvoidingView>
@@ -547,9 +547,9 @@ function VerdictSection({
     <View style={styles.verdictSection}>
       <View style={styles.verdictSectionLabelRow}>
         <Ionicons name={icon} size={13} color={color} />
-        <Text style={[styles.verdictLabel, { color }]}>{label}</Text>
+        <AppText style={[styles.verdictLabel, { color }]}>{label}</AppText>
       </View>
-      <Text style={styles.verdictText}>{text}</Text>
+      <AppText style={styles.verdictText}>{text}</AppText>
     </View>
   );
 }
@@ -577,10 +577,10 @@ function VerdictCard({
   return (
     <View style={[styles.verdictCard, { borderLeftColor: toneColor }]}>
       <View style={styles.verdictHeaderRow}>
-        <Text style={[styles.verdictBand, { color: toneColor }]}>{verdict.band}</Text>
+        <AppText style={[styles.verdictBand, { color: toneColor }]}>{verdict.band}</AppText>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
-          <Text style={styles.shareButtonText}>Share</Text>
+          <AppText style={styles.shareButtonText}>Share</AppText>
         </TouchableOpacity>
       </View>
 
@@ -597,12 +597,12 @@ function VerdictCard({
             strokeWidth={6}
             color={toneColor}
           />
-          <Text style={styles.verdictRingCaption} numberOfLines={1}>
+          <AppText style={styles.verdictRingCaption} numberOfLines={1}>
             {verdict.confidence}
-          </Text>
+          </AppText>
         </View>
       </View>
-      <Text style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</Text>
+      <AppText style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</AppText>
 
       <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
       <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={toneColor} />
@@ -619,7 +619,7 @@ function VerdictCard({
           {verdict.counter_action && verdict.counter_action.asset_type === 'player' ? (
             <TouchableOpacity style={styles.counterButton} onPress={onBuildCounter}>
               <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
-              <Text style={styles.counterButtonText}>Build the counter</Text>
+              <AppText style={styles.counterButtonText}>Build the counter</AppText>
             </TouchableOpacity>
           ) : null}
         </>
@@ -662,17 +662,17 @@ function TradeSide({
     >
       <View style={styles.sideLabelRow}>
         <View style={[styles.sideDot, { backgroundColor: dotColor }]} />
-        <Text style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</Text>
+        <AppText style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</AppText>
       </View>
       {items.map((item) => (
         <TouchableOpacity key={item.id} style={styles.chip} onPress={() => onRemove(item.id)}>
-          <Text style={styles.chipText} numberOfLines={1}>
+          <AppText style={styles.chipText} numberOfLines={1}>
             {item.name}
-          </Text>
-          <Text style={styles.chipRemove}>{'×'}</Text>
+          </AppText>
+          <AppText style={styles.chipRemove}>{'×'}</AppText>
         </TouchableOpacity>
       ))}
-      {items.length === 0 ? <Text style={styles.sideEmpty}>Tap to add</Text> : null}
+      {items.length === 0 ? <AppText style={styles.sideEmpty}>Tap to add</AppText> : null}
     </TouchableOpacity>
   );
 }

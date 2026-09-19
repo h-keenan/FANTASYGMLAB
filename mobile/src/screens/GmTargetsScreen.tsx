@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -82,12 +83,12 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <GridBackground />
-      <Text style={styles.disclaimer}>
+      <AppText style={styles.disclaimer}>
         Players you're watching — considering buying, selling, adding, or just keeping an eye on in{' '}
         {leagueName}.
-      </Text>
+      </AppText>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <FlatList
         data={sorted}
@@ -95,9 +96,9 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
         ListEmptyComponent={
-          <Text style={styles.empty}>
+          <AppText style={styles.empty}>
             No targets yet. Open a player and tap "Add to GM Targets" to start watching them.
-          </Text>
+          </AppText>
         }
         renderItem={({ item }) => (
           <AnimatedCard
@@ -110,34 +111,34 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
           >
             <PlayerAvatar playerId={item.target.player_id} size={40} tier={item.player?.tier} style={styles.avatar} />
             <View style={styles.nameColumn}>
-              <Text style={styles.name} numberOfLines={1}>
+              <AppText style={styles.name} numberOfLines={1}>
                 {item.player?.name ?? `Player ${item.target.player_id}`}
-              </Text>
+              </AppText>
               <View style={styles.metaRow}>
                 {item.player ? (
                   <>
                     <PositionBadge position={item.player.position} />
-                    <Text style={styles.meta} numberOfLines={1}>
+                    <AppText style={styles.meta} numberOfLines={1}>
                       {item.player.team}
-                    </Text>
+                    </AppText>
                     <TierBadge storedTier={item.player.tier} />
                   </>
                 ) : (
-                  <Text style={styles.meta} numberOfLines={1}>
+                  <AppText style={styles.meta} numberOfLines={1}>
                     Not on the current rankings board
-                  </Text>
+                  </AppText>
                 )}
               </View>
             </View>
-            <Text style={styles.score}>
+            <AppText style={styles.score}>
               {item.player?.score != null ? Math.round(item.player.score) : '—'}
-            </Text>
+            </AppText>
             <TouchableOpacity
               style={styles.removeButton}
               onPress={() => removeTarget(item.target.player_id)}
               hitSlop={8}
             >
-              <Text style={styles.removeButtonText}>Remove</Text>
+              <AppText style={styles.removeButtonText}>Remove</AppText>
             </TouchableOpacity>
           </AnimatedCard>
         )}

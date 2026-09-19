@@ -7,11 +7,11 @@ import {
   Modal,
   RefreshControl,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -284,16 +284,16 @@ export default function HomeScreen({ navigation }: Props) {
                 <View style={styles.brandRow}>
                   <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
                   <View>
-                    <Text style={styles.brandName}>FantasyGM Lab</Text>
-                    <Text style={styles.email}>
+                    <AppText style={styles.brandName}>FantasyGM Lab</AppText>
+                    <AppText style={styles.email}>
                       {session?.user.is_anonymous
                         ? 'Guest'
                         : maskShowcaseText('email', session?.user.email)}
-                    </Text>
+                    </AppText>
                   </View>
                 </View>
                 <TouchableOpacity onPress={() => void signOut()} hitSlop={8}>
-                  <Text style={styles.signOut}>Sign out</Text>
+                  <AppText style={styles.signOut}>Sign out</AppText>
                 </TouchableOpacity>
               </View>
               {me ? (
@@ -305,7 +305,7 @@ export default function HomeScreen({ navigation }: Props) {
                     me.entitlement === 'premium' && styles.entitlementPillPremium,
                   ]}
                 >
-                  <Text
+                  <AppText
                     style={[
                       styles.entitlementText,
                       me.entitlement === 'premium' && styles.entitlementTextPremium,
@@ -316,16 +316,16 @@ export default function HomeScreen({ navigation }: Props) {
                       : me.entitlement === 'premium'
                         ? 'Premium'
                         : 'Free — Upgrade'}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               ) : null}
             </GlassPanel>
 
             {meError ? (
-              <Text style={styles.error}>Couldn't load your account: {meError}</Text>
+              <AppText style={styles.error}>Couldn't load your account: {meError}</AppText>
             ) : null}
             {leaguesError ? (
-              <Text style={styles.error}>Couldn't load your leagues: {leaguesError}</Text>
+              <AppText style={styles.error}>Couldn't load your leagues: {leaguesError}</AppText>
             ) : null}
 
             <View style={styles.quickActions}>
@@ -341,21 +341,21 @@ export default function HomeScreen({ navigation }: Props) {
                 >
                   <View style={styles.quickActionPrimaryRow}>
                     <Ionicons name="grid-outline" size={16} color={colors.accentSoft} />
-                    <Text style={styles.quickActionPrimaryLabel}>Continue in</Text>
+                    <AppText style={styles.quickActionPrimaryLabel}>Continue in</AppText>
                   </View>
-                  <Text style={styles.quickActionPrimaryValue} numberOfLines={1}>
+                  <AppText style={styles.quickActionPrimaryValue} numberOfLines={1}>
                     {defaultLeague.league_name || defaultLeague.league_id}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity style={styles.quickActionSecondary} onPress={() => navigation.navigate('News')}>
                 <IconCircle name="globe-outline" color={colors.violet} iconSize={18} style={styles.quickActionIconCircle} />
-                <Text style={styles.quickActionSecondaryLabel}>News</Text>
+                <AppText style={styles.quickActionSecondaryLabel}>News</AppText>
               </TouchableOpacity>
             </View>
 
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your leagues</Text>
+              <AppText style={styles.sectionTitle}>Your leagues</AppText>
               {atLeagueCap ? null : (
                 <TouchableOpacity
                   style={styles.addLeagueButton}
@@ -366,7 +366,7 @@ export default function HomeScreen({ navigation }: Props) {
                   hitSlop={8}
                 >
                   <Ionicons name="add" size={16} color={colors.accent} />
-                  <Text style={styles.addLeagueLabel}>Add league</Text>
+                  <AppText style={styles.addLeagueLabel}>Add league</AppText>
                 </TouchableOpacity>
               )}
             </View>
@@ -385,11 +385,11 @@ export default function HomeScreen({ navigation }: Props) {
           </>
         }
         ListEmptyComponent={
-          <Text style={styles.empty}>
+          <AppText style={styles.empty}>
             {leaguesError
               ? 'Could not check your saved leagues — pull to retry.'
               : 'No leagues saved yet. Tap “Add league” and enter your Sleeper username to get started.'}
-          </Text>
+          </AppText>
         }
         renderItem={({ item }) => (
           <AnimatedCard
@@ -402,12 +402,12 @@ export default function HomeScreen({ navigation }: Props) {
             }
           >
             <View style={styles.leagueRow}>
-              <Text style={styles.leagueName} numberOfLines={1}>
+              <AppText style={styles.leagueName} numberOfLines={1}>
                 {item.league_name || item.league_id}
-              </Text>
+              </AppText>
               {item.is_default ? (
                 <View style={styles.defaultBadge}>
-                  <Text style={styles.defaultBadgeText}>Default</Text>
+                  <AppText style={styles.defaultBadgeText}>Default</AppText>
                 </View>
               ) : null}
               {/* Hidden while showcase mode is on: the name shown here is a
@@ -425,7 +425,7 @@ export default function HomeScreen({ navigation }: Props) {
                   <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
-              <Text style={styles.chevron}>›</Text>
+              <AppText style={styles.chevron}>›</AppText>
             </View>
           </AnimatedCard>
         )}
@@ -434,10 +434,10 @@ export default function HomeScreen({ navigation }: Props) {
       <Modal visible={addOpen} animationType="fade" transparent onRequestClose={closeAddLeague}>
         <View style={styles.renameBackdrop}>
           <View style={styles.renameCard}>
-            <Text style={styles.renameTitle}>Add a league</Text>
-            <Text style={styles.renameHint}>
+            <AppText style={styles.renameTitle}>Add a league</AppText>
+            <AppText style={styles.renameHint}>
               Enter your Sleeper username to pick from your leagues — or paste a league ID directly.
-            </Text>
+            </AppText>
             <TextInput
               style={styles.renameInput}
               value={addQuery}
@@ -457,11 +457,11 @@ export default function HomeScreen({ navigation }: Props) {
                 <PremiumLock title="League limit reached" description={addCapMessage} />
               </View>
             ) : null}
-            {addMessage ? <Text style={styles.addError}>{addMessage}</Text> : null}
+            {addMessage ? <AppText style={styles.addError}>{addMessage}</AppText> : null}
 
             {addOptions && addOptions.length > 0 ? (
               <View style={styles.addOptions}>
-                <Text style={styles.addOptionsLabel}>Tap a league to save it</Text>
+                <AppText style={styles.addOptionsLabel}>Tap a league to save it</AppText>
                 <FlatList
                   data={addOptions}
                   keyExtractor={(item) => item.league_id}
@@ -480,16 +480,16 @@ export default function HomeScreen({ navigation }: Props) {
                       }
                     >
                       <View style={styles.addOptionText}>
-                        <Text style={styles.addOptionName} numberOfLines={1}>
+                        <AppText style={styles.addOptionName} numberOfLines={1}>
                           {item.name || item.league_id}
-                        </Text>
-                        <Text style={styles.addOptionMeta}>
+                        </AppText>
+                        <AppText style={styles.addOptionMeta}>
                           {[item.season, item.total_rosters ? `${item.total_rosters} teams` : '']
                             .filter(Boolean)
                             .join(' · ')}
-                        </Text>
+                        </AppText>
                       </View>
-                      <Text style={styles.chevron}>›</Text>
+                      <AppText style={styles.chevron}>›</AppText>
                     </TouchableOpacity>
                   )}
                 />
@@ -502,7 +502,7 @@ export default function HomeScreen({ navigation }: Props) {
                 onPress={closeAddLeague}
                 disabled={addBusy}
               >
-                <Text style={styles.renameCancelText}>Cancel</Text>
+                <AppText style={styles.renameCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.renameSaveButton}
@@ -512,7 +512,7 @@ export default function HomeScreen({ navigation }: Props) {
                 {addBusy ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.renameSaveText}>Find leagues</Text>
+                  <AppText style={styles.renameSaveText}>Find leagues</AppText>
                 )}
               </TouchableOpacity>
             </View>
@@ -523,10 +523,10 @@ export default function HomeScreen({ navigation }: Props) {
       <Modal visible={renamingLeague !== null} animationType="fade" transparent onRequestClose={() => setRenamingLeague(null)}>
         <View style={styles.renameBackdrop}>
           <View style={styles.renameCard}>
-            <Text style={styles.renameTitle}>Rename League</Text>
-            <Text style={styles.renameHint}>
+            <AppText style={styles.renameTitle}>Rename League</AppText>
+            <AppText style={styles.renameHint}>
               Only changes what you see here — the real league name in Sleeper stays the same.
-            </Text>
+            </AppText>
             <TextInput
               style={styles.renameInput}
               value={renameText}
@@ -542,13 +542,13 @@ export default function HomeScreen({ navigation }: Props) {
                 onPress={() => setRenamingLeague(null)}
                 disabled={renameBusy}
               >
-                <Text style={styles.renameCancelText}>Cancel</Text>
+                <AppText style={styles.renameCancelText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={styles.renameSaveButton} onPress={saveLeagueRename} disabled={renameBusy}>
                 {renameBusy ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.renameSaveText}>Save</Text>
+                  <AppText style={styles.renameSaveText}>Save</AppText>
                 )}
               </TouchableOpacity>
             </View>

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from './AppText';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,7 +60,7 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>Share this recap</Text>
+          <AppText style={styles.title}>Share this recap</AppText>
           <View style={styles.previewWrap}>
             <View style={styles.previewScaled}>
               <RecapShareCard ref={cardRef} leagueName={leagueName} recap={recap} />
@@ -71,15 +72,15 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
             ) : (
               <>
                 <Ionicons name="image-outline" size={16} color="#fff" />
-                <Text style={styles.primaryButtonText}>Share image</Text>
+                <AppText style={styles.primaryButtonText}>Share image</AppText>
               </>
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButton} onPress={onShareText}>
-            <Text style={styles.secondaryButtonText}>Share as text instead</Text>
+            <AppText style={styles.secondaryButtonText}>Share as text instead</AppText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Cancel</Text>
+            <AppText style={styles.closeButtonText}>Cancel</AppText>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

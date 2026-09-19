@@ -6,11 +6,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
+import AppText from './AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -321,10 +321,10 @@ export default function GmOrb() {
 
       {SHOW_ORB_DEBUG_OVERLAY && (
         <View pointerEvents="none" style={[styles.debugOverlay, { top: rawInsets.top + 4 }]}>
-          <Text style={styles.debugOverlayText}>
+          <AppText style={styles.debugOverlayText}>
             win:{Math.round(Dimensions.get('window').height)} rawBottom:{Math.round(rawInsets.bottom)}{' '}
             clampedBottom:{Math.round(insets.bottom)} orbBottomOffset:{Math.round(insets.bottom + spacing.md)}
-          </Text>
+          </AppText>
         </View>
       )}
 
@@ -338,13 +338,13 @@ export default function GmOrb() {
           <Pressable style={styles.sheetHandleRow} onPress={closeSheet}>
             <View style={styles.sheetHandle} />
           </Pressable>
-          <Text style={styles.sheetKicker}>FantasyGM Lab</Text>
-          <Text style={styles.sheetTitle}>Where to go</Text>
+          <AppText style={styles.sheetKicker}>FantasyGM Lab</AppText>
+          <AppText style={styles.sheetTitle}>Where to go</AppText>
 
           <ScrollView contentContainerStyle={styles.sheetContent}>
             {league ? (
               <>
-                <Text style={styles.sectionLabel}>{league.leagueName}</Text>
+                <AppText style={styles.sectionLabel}>{league.leagueName}</AppText>
                 {LEAGUE_DESTINATIONS.map((destination) => {
                   const isCurrent = destination.route === currentRouteName;
                   return (
@@ -354,18 +354,18 @@ export default function GmOrb() {
                       onPress={() => go(destination)}
                     >
                       <DestIcon name={destination.icon} color={destination.color} current={isCurrent} />
-                      <Text style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
+                      <AppText style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
                         {destination.label}
-                      </Text>
+                      </AppText>
                       {destination.route === 'Alerts' && unreadAlertCount > 0 ? (
                         <View style={styles.unreadCountBadge}>
-                          <Text style={styles.unreadCountBadgeText}>
+                          <AppText style={styles.unreadCountBadgeText}>
                             {unreadAlertCount > 9 ? '9+' : unreadAlertCount}
-                          </Text>
+                          </AppText>
                         </View>
                       ) : null}
                       {isCurrent ? (
-                        <Text style={styles.destCurrentBadge}>CURRENT</Text>
+                        <AppText style={styles.destCurrentBadge}>CURRENT</AppText>
                       ) : (
                         <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
                       )}
@@ -374,14 +374,14 @@ export default function GmOrb() {
                 })}
               </>
             ) : (
-              <Text style={styles.sectionNote}>
+              <AppText style={styles.sectionNote}>
                 Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
-              </Text>
+              </AppText>
             )}
 
             {savedLeagues.length > 1 ? (
               <>
-                <Text style={styles.sectionLabel}>Switch League</Text>
+                <AppText style={styles.sectionLabel}>Switch League</AppText>
                 {savedLeagues.map((row) => (
                   <TouchableOpacity key={row.id} style={styles.row} onPress={() => switchToLeague(row)}>
                     <Ionicons
@@ -390,15 +390,15 @@ export default function GmOrb() {
                       color={row.league_id === league?.leagueId ? colors.accent : colors.textTertiary}
                       style={styles.rowIcon}
                     />
-                    <Text style={styles.rowText} numberOfLines={1}>
+                    <AppText style={styles.rowText} numberOfLines={1}>
                       {row.league_name || row.league_id}
-                    </Text>
+                    </AppText>
                   </TouchableOpacity>
                 ))}
               </>
             ) : null}
 
-            <Text style={styles.sectionLabel}>General</Text>
+            <AppText style={styles.sectionLabel}>General</AppText>
             {GENERAL_DESTINATIONS.map((destination) => {
               const isCurrent = destination.route === currentRouteName;
               return (
@@ -408,11 +408,11 @@ export default function GmOrb() {
                   onPress={() => go(destination)}
                 >
                   <DestIcon name={destination.icon} color={destination.color} current={isCurrent} />
-                  <Text style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
+                  <AppText style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
                     {destination.label}
-                  </Text>
+                  </AppText>
                   {isCurrent ? (
-                    <Text style={styles.destCurrentBadge}>CURRENT</Text>
+                    <AppText style={styles.destCurrentBadge}>CURRENT</AppText>
                   ) : (
                     <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
                   )}

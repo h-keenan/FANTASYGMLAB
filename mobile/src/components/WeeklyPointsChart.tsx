@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { LayoutChangeEvent, Text, View } from 'react-native';
+import { LayoutChangeEvent, View } from 'react-native';
+import AppText from './AppText';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import type { WeeklyStatPoint } from '../lib/api';
@@ -35,7 +36,7 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
 
   const played = weeks.filter((week) => week.fantasy_points_ppr != null);
   if (played.length === 0) {
-    return <Text style={styles.empty}>No weekly points recorded for this season yet.</Text>;
+    return <AppText style={styles.empty}>No weekly points recorded for this season yet.</AppText>;
   }
 
   const values = played.map((week) => week.fantasy_points_ppr as number);
@@ -82,12 +83,12 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
       ) : null}
       <View style={styles.labelRow}>
         {points.map((point) => (
-          <Text
+          <AppText
             key={point.week}
             style={[styles.weekLabel, { left: point.x - LABEL_WIDTH / 2 }]}
           >
             {point.week}
-          </Text>
+          </AppText>
         ))}
       </View>
     </View>

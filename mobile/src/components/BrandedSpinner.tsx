@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import AppText from './AppText';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -43,7 +44,7 @@ export default function BrandedSpinner({
   return (
     <View style={[styles.container, style]}>
       <Animated.Image source={require('../../assets/icon.png')} style={[styles.mark, markStyle]} />
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? <AppText style={styles.label}>{label}</AppText> : null}
     </View>
   );
 }

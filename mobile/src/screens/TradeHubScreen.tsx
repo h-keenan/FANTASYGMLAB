@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -228,15 +229,15 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
       ListHeaderComponent={
         <View>
-          <Text style={styles.disclaimer} numberOfLines={1}>
+          <AppText style={styles.disclaimer} numberOfLines={1}>
             Real ideas from the same engine and Trust checks as the web app's Trade Hub.
-          </Text>
+          </AppText>
           {loading ? <ActivityIndicator style={styles.loading} color={colors.accent} /> : null}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <AppText style={styles.error}>{error}</AppText> : null}
           {notReadyReason ? (
-            <Text style={styles.notReadyText}>
+            <AppText style={styles.notReadyText}>
               {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build Trade Hub ideas for this league."}
-            </Text>
+            </AppText>
           ) : null}
         </View>
       }
@@ -245,9 +246,9 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       )}
       ListEmptyComponent={
         !loading && !error && !notReadyReason ? (
-          <Text style={styles.empty}>
+          <AppText style={styles.empty}>
             No trade idea clears the bar for this strategy right now — check back after rosters move.
-          </Text>
+          </AppText>
         ) : null
       }
       ListFooterComponent={
@@ -282,13 +283,13 @@ function TradeHubGateCard({
       <View style={styles.gateIconDisc}>
         <Ionicons name="lock-closed" size={20} color={colors.premium} />
       </View>
-      <Text style={styles.gateTitle}>
+      <AppText style={styles.gateTitle}>
         {entitlement.hidden_count} more {entitlement.hidden_count === 1 ? 'idea' : 'ideas'} on this board
-      </Text>
-      <Text style={styles.gateBody}>
+      </AppText>
+      <AppText style={styles.gateBody}>
         Free shows the top {entitlement.free_limit}. Watch a quick ad to reveal {entitlement.ad_bonus_per_unlock}{' '}
         more, or go Pro to unlock the full board.
-      </Text>
+      </AppText>
       <View style={styles.gateButtonRow}>
         {canWatchMoreAds ? (
           <TouchableOpacity style={styles.gateSecondaryButton} onPress={onWatchAd} disabled={watchingAd}>
@@ -297,15 +298,15 @@ function TradeHubGateCard({
             ) : (
               <>
                 <Ionicons name="play-circle-outline" size={16} color={colors.textPrimary} />
-                <Text style={styles.gateSecondaryButtonText}>
+                <AppText style={styles.gateSecondaryButtonText}>
                   Watch ad for +{entitlement.ad_bonus_per_unlock}
-                </Text>
+                </AppText>
               </>
             )}
           </TouchableOpacity>
         ) : null}
         <TouchableOpacity style={styles.gatePrimaryButton} onPress={onUpgrade}>
-          <Text style={styles.gatePrimaryButtonText}>Upgrade to Pro</Text>
+          <AppText style={styles.gatePrimaryButtonText}>Upgrade to Pro</AppText>
         </TouchableOpacity>
       </View>
     </AnimatedCard>
@@ -331,15 +332,15 @@ function AssetRow({
         onPress={() => onPressPick?.(asset)}
       >
         <View style={styles.pickDisc}>
-          <Text style={styles.pickPlateText}>{asset.round ? `R${asset.round}` : 'PICK'}</Text>
+          <AppText style={styles.pickPlateText}>{asset.round ? `R${asset.round}` : 'PICK'}</AppText>
         </View>
         <View style={styles.assetTextGroup}>
-          <Text style={styles.assetName} numberOfLines={1}>
+          <AppText style={styles.assetName} numberOfLines={1}>
             {asset.label || 'Draft pick'}
-          </Text>
-          <Text style={styles.assetMeta} numberOfLines={1}>
+          </AppText>
+          <AppText style={styles.assetMeta} numberOfLines={1}>
             {asset.projected_range || 'Draft pick'}
-          </Text>
+          </AppText>
         </View>
         {canOpenPick ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
       </TouchableOpacity>
@@ -356,24 +357,24 @@ function AssetRow({
     >
       <PlayerAvatar playerId={asset.player_id} size={36} tier={asset.tier} style={styles.assetAvatar} />
       <View style={styles.assetTextGroup}>
-        <Text style={styles.assetName} numberOfLines={1}>
+        <AppText style={styles.assetName} numberOfLines={1}>
           {asset.name ?? 'Unknown'}
-        </Text>
+        </AppText>
         <View style={styles.assetMetaRow}>
           <PositionBadge position={asset.position} />
-          <Text style={styles.assetMeta} numberOfLines={1}>
+          <AppText style={styles.assetMeta} numberOfLines={1}>
             {metaLine}
-          </Text>
+          </AppText>
         </View>
         {asset.role ? (
-          <Text style={styles.assetRole} numberOfLines={1}>
+          <AppText style={styles.assetRole} numberOfLines={1}>
             {asset.role}
-          </Text>
+          </AppText>
         ) : null}
         {asset.injury_status ? (
-          <Text style={styles.assetInjury} numberOfLines={1}>
+          <AppText style={styles.assetInjury} numberOfLines={1}>
             {asset.injury_status}
-          </Text>
+          </AppText>
         ) : null}
       </View>
       {canOpen ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
@@ -413,9 +414,9 @@ function CategoryBadge({ category }: { category: string }) {
   const color = categoryColor(category);
   return (
     <View style={[styles.categoryBadge, { backgroundColor: `${color}26`, borderColor: `${color}80` }]}>
-      <Text style={[styles.categoryBadgeText, { color }]} numberOfLines={1}>
+      <AppText style={[styles.categoryBadgeText, { color }]} numberOfLines={1}>
         {category.toUpperCase()}
-      </Text>
+      </AppText>
     </View>
   );
 }
@@ -423,7 +424,7 @@ function CategoryBadge({ category }: { category: string }) {
 function MeterRow({ label, value, level, color }: { label: string; value: string; level: number; color: string }) {
   return (
     <View style={styles.meter}>
-      <Text style={styles.meterLabel}>{label}</Text>
+      <AppText style={styles.meterLabel}>{label}</AppText>
       <View style={styles.meterSegments}>
         {[1, 2, 3].map((segment) => (
           <View
@@ -432,7 +433,7 @@ function MeterRow({ label, value, level, color }: { label: string; value: string
           />
         ))}
       </View>
-      <Text style={[styles.meterValue, { color }]}>{value}</Text>
+      <AppText style={[styles.meterValue, { color }]}>{value}</AppText>
     </View>
   );
 }
@@ -460,18 +461,18 @@ function RationaleDetailModal({
       <Pressable style={styles.rationaleBackdrop} onPress={onClose}>
         <Pressable style={styles.rationaleSheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.rationaleSheetHeader}>
-            <Text style={styles.rationaleSheetTitle} numberOfLines={1}>
+            <AppText style={styles.rationaleSheetTitle} numberOfLines={1}>
               Why this works
-            </Text>
+            </AppText>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.rationaleSheetPartner} numberOfLines={1}>
+          <AppText style={styles.rationaleSheetPartner} numberOfLines={1}>
             vs. {partnerTeamName}
-          </Text>
+          </AppText>
           <ScrollView style={styles.rationaleSheetBody}>
-            <Text style={styles.rationaleSheetText}>{rationale}</Text>
+            <AppText style={styles.rationaleSheetText}>{rationale}</AppText>
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -516,13 +517,13 @@ function TradeIdeaCard({
           <TeamAvatar avatarId={idea.partner_team_avatar_url} size={36} />
         ) : (
           <View style={styles.partnerAvatar}>
-            <Text style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</Text>
+            <AppText style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</AppText>
           </View>
         )}
         <View style={styles.partnerTextGroup}>
-          <Text style={styles.partnerName} numberOfLines={1}>
+          <AppText style={styles.partnerName} numberOfLines={1}>
             {idea.partner_team_name}
-          </Text>
+          </AppText>
         </View>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
@@ -538,7 +539,7 @@ function TradeIdeaCard({
         <TradeValueHero delta={idea.trade_gain} size="sm" />
         {idea.value_edge_band ? (
           <View style={[styles.valueEdgeChip, { borderColor: bandColor }]}>
-            <Text style={[styles.valueEdgeText, { color: bandColor }]}>{idea.value_edge_band}</Text>
+            <AppText style={[styles.valueEdgeText, { color: bandColor }]}>{idea.value_edge_band}</AppText>
           </View>
         ) : null}
       </View>
@@ -558,7 +559,7 @@ function TradeIdeaCard({
         <View style={styles.exchangeSide}>
           <View style={styles.exchangeLabelRow}>
             <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
-            <Text style={styles.exchangeLabel}>You Send</Text>
+            <AppText style={styles.exchangeLabel}>You Send</AppText>
           </View>
           {idea.package.send.map((asset, index) => (
             <AssetRow key={`send-${index}`} asset={asset} onPressPlayer={openPlayer} onPressPick={openPick} />
@@ -572,7 +573,7 @@ function TradeIdeaCard({
         <View style={styles.exchangeSide}>
           <View style={styles.exchangeLabelRow}>
             <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
-            <Text style={styles.exchangeLabel}>You Receive</Text>
+            <AppText style={styles.exchangeLabel}>You Receive</AppText>
           </View>
           {idea.package.receive.map((asset, index) => (
             <AssetRow key={`receive-${index}`} asset={asset} onPressPlayer={openPlayer} onPressPick={openPick} />
@@ -582,11 +583,11 @@ function TradeIdeaCard({
 
       {showExplanations && idea.rationale ? (
         <TouchableOpacity activeOpacity={0.7} onPress={() => setRationaleOpen(true)}>
-          <Text style={styles.rationaleLabel}>Why this works</Text>
-          <Text style={styles.rationale} numberOfLines={3}>
+          <AppText style={styles.rationaleLabel}>Why this works</AppText>
+          <AppText style={styles.rationale} numberOfLines={3}>
             {idea.rationale}
-          </Text>
-          <Text style={styles.rationaleExpandHint}>Read full explanation</Text>
+          </AppText>
+          <AppText style={styles.rationaleExpandHint}>Read full explanation</AppText>
         </TouchableOpacity>
       ) : null}
 

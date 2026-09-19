@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { TEAM_STRATEGY_OPTIONS } from '../lib/api';
@@ -29,20 +30,20 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
   return (
     <>
       <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
-        <Text style={styles.buttonText} numberOfLines={1}>
+        <AppText style={styles.buttonText} numberOfLines={1}>
           {isSet ? current?.label ?? 'Stance' : 'Auto'}
-        </Text>
+        </AppText>
         <Ionicons name="chevron-down" size={12} color={colors.accent} />
       </TouchableOpacity>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.title}>GM Stance</Text>
-            <Text style={styles.subtitle}>
+            <AppText style={styles.title}>GM Stance</AppText>
+            <AppText style={styles.subtitle}>
               {isSet
                 ? "How should this league's advice be framed? Remembered for this league — it shapes Trade Hub, Trade Analyzer, and Dashboard suggestions."
                 : `Not set yet — we're reading this league as ${current?.label ?? 'Retool'} until you pick one.`}
-            </Text>
+            </AppText>
             {TEAM_STRATEGY_OPTIONS.map((option) => {
               const active = isSet && option.value === strategy;
               return (
@@ -54,7 +55,7 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
                     setOpen(false);
                   }}
                 >
-                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</Text>
+                  <AppText style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</AppText>
                   {active ? <Ionicons name="checkmark-circle" size={18} color={colors.accent} /> : null}
                 </TouchableOpacity>
               );
@@ -71,8 +72,8 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
               }}
             >
               <View style={styles.resetTextGroup}>
-                <Text style={[styles.optionText, !isSet && styles.optionTextActive]}>Reset to Auto</Text>
-                <Text style={styles.resetHint}>Forget my pick and let the app choose.</Text>
+                <AppText style={[styles.optionText, !isSet && styles.optionTextActive]}>Reset to Auto</AppText>
+                <AppText style={styles.resetHint}>Forget my pick and let the app choose.</AppText>
               </View>
               {!isSet ? <Ionicons name="checkmark-circle" size={18} color={colors.accent} /> : null}
             </TouchableOpacity>

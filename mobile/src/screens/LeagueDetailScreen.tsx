@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -135,7 +136,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -154,13 +155,13 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
         onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}
       >
         <LinearGradient colors={gradients.hero} style={styles.heroCard}>
-          <Text style={styles.heroKicker}>TODAY'S GAME PLAN</Text>
-          <Text style={styles.heroHeadline}>{heroHeadline}</Text>
-          <Text style={styles.heroSubtitle} numberOfLines={1}>
+          <AppText style={styles.heroKicker}>TODAY'S GAME PLAN</AppText>
+          <AppText style={styles.heroHeadline}>{heroHeadline}</AppText>
+          <AppText style={styles.heroSubtitle} numberOfLines={1}>
             {heroSubtitle}
-          </Text>
+          </AppText>
           <View style={styles.heroButton}>
-            <Text style={styles.heroButtonText}>View Plan</Text>
+            <AppText style={styles.heroButtonText}>View Plan</AppText>
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -168,9 +169,9 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       {summary ? (
         <View style={styles.contextRow}>
           <Ionicons name="calendar-outline" size={13} color={colors.textTertiary} />
-          <Text style={styles.contextText}>
+          <AppText style={styles.contextText}>
             {summary.season} · Week {summary.week} · {summary.teamCount} teams · {summary.scoring}
-          </Text>
+          </AppText>
         </View>
       ) : null}
 
@@ -190,16 +191,16 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           <TeamAvatar avatarId={myTeam.avatarId} size={36} style={styles.stripAvatar} />
           <View style={styles.stripTextGroup}>
             <View style={styles.stripNameRow}>
-              <Text style={styles.stripName} numberOfLines={1}>
+              <AppText style={styles.stripName} numberOfLines={1}>
                 {myTeam.teamName}
-              </Text>
+              </AppText>
               <View style={styles.youBadge}>
-                <Text style={styles.youBadgeText}>You</Text>
+                <AppText style={styles.youBadgeText}>You</AppText>
               </View>
             </View>
           </View>
-          <Text style={styles.stripValue}>{myTeam.playerCount}</Text>
-          <Text style={styles.stripValueLabel}>PLAYERS</Text>
+          <AppText style={styles.stripValue}>{myTeam.playerCount}</AppText>
+          <AppText style={styles.stripValueLabel}>PLAYERS</AppText>
         </AnimatedCard>
       ) : null}
 
@@ -209,7 +210,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
         >
           <IconCircle name="newspaper-outline" color={colors.accent} size={36} />
-          <Text style={styles.stripTextGroup2}>Week {recapReady} recap ready</Text>
+          <AppText style={styles.stripTextGroup2}>Week {recapReady} recap ready</AppText>
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </AnimatedCard>
       ) : null}

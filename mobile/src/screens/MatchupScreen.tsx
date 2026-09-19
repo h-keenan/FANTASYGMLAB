@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -107,7 +108,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -116,9 +117,9 @@ export default function MatchupScreen({ route, navigation }: Props) {
     const reason = matchup?.reason ?? '';
     return (
       <View style={styles.center}>
-        <Text style={styles.notice}>
+        <AppText style={styles.notice}>
           {NOT_READY_MESSAGES[reason] ?? "Couldn't build this week's matchup for this league."}
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -134,50 +135,50 @@ export default function MatchupScreen({ route, navigation }: Props) {
         <AnimatedCard glow style={styles.headlineCard}>
           <View style={styles.weekRow}>
             <Ionicons name="american-football-outline" size={14} color={colors.accent} />
-            <Text style={styles.weekLabel}>{week != null ? `WEEK ${week}` : 'THIS WEEK'}</Text>
+            <AppText style={styles.weekLabel}>{week != null ? `WEEK ${week}` : 'THIS WEEK'}</AppText>
           </View>
 
           <View style={styles.versusRow}>
             <View style={styles.versusSide}>
-              <Text style={styles.versusTeam} numberOfLines={2}>
+              <AppText style={styles.versusTeam} numberOfLines={2}>
                 {mine.team_name}
-              </Text>
-              <Text style={styles.versusRecord}>{recordLabel(mine)}</Text>
-              <Text style={[styles.versusValue, { color: EDGE_COLOR[comparison.edge === 'you' ? 'you' : 'even'] }]}>
+              </AppText>
+              <AppText style={styles.versusRecord}>{recordLabel(mine)}</AppText>
+              <AppText style={[styles.versusValue, { color: EDGE_COLOR[comparison.edge === 'you' ? 'you' : 'even'] }]}>
                 {Math.round(comparison.my_season_value).toLocaleString()}
-              </Text>
+              </AppText>
             </View>
-            <Text style={styles.versusDivider}>VS</Text>
+            <AppText style={styles.versusDivider}>VS</AppText>
             <View style={styles.versusSide}>
-              <Text style={styles.versusTeam} numberOfLines={2}>
+              <AppText style={styles.versusTeam} numberOfLines={2}>
                 {opponent.team_name}
-              </Text>
-              <Text style={styles.versusRecord}>{recordLabel(opponent)}</Text>
-              <Text
+              </AppText>
+              <AppText style={styles.versusRecord}>{recordLabel(opponent)}</AppText>
+              <AppText
                 style={[styles.versusValue, { color: EDGE_COLOR[comparison.edge === 'opponent' ? 'you' : 'even'] }]}
               >
                 {Math.round(comparison.opponent_season_value).toLocaleString()}
-              </Text>
+              </AppText>
             </View>
           </View>
 
           <ValueSplitBar comparison={comparison} />
 
-          <Text style={[styles.edgeHeadline, { color: EDGE_COLOR[comparison.edge] }]}>
+          <AppText style={[styles.edgeHeadline, { color: EDGE_COLOR[comparison.edge] }]}>
             {comparison.headline}
             {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
-          </Text>
+          </AppText>
           {/* Rendered straight from the API so this line can never drift
               into claiming more than the data behind it. */}
-          <Text style={styles.basisLabel}>{comparison.basis_label}</Text>
+          <AppText style={styles.basisLabel}>{comparison.basis_label}</AppText>
         </AnimatedCard>
 
-        <Text style={styles.disclaimer}>
+        <AppText style={styles.disclaimer}>
           Starters on both sides are each roster's best available lineup by season-long value — the same
           optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. It
           isn't necessarily the lineup they've set in Sleeper, and it doesn't account for this week's opponent
           defenses or weather.
-        </Text>
+        </AppText>
 
         <StarterSection title="Your suggested starters" side={mine} onPressPlayer={openPlayer} accent={colors.accent} />
         <StarterSection
@@ -216,15 +217,15 @@ function StarterSection({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionLabel} numberOfLines={1}>
+        <AppText style={styles.sectionLabel} numberOfLines={1}>
           {title.toUpperCase()}
-        </Text>
-        <Text style={[styles.sectionTotal, { color: accent }]}>
+        </AppText>
+        <AppText style={[styles.sectionTotal, { color: accent }]}>
           {Math.round(side.season_value_total).toLocaleString()} SEASON VALUE
-        </Text>
+        </AppText>
       </View>
       {side.starters.length === 0 ? (
-        <Text style={styles.emptySection}>No startable players on this roster right now.</Text>
+        <AppText style={styles.emptySection}>No startable players on this roster right now.</AppText>
       ) : (
         side.starters.map((player) => (
           <StarterRow key={`${side.roster_id}-${player.player_id}`} player={player} onPress={() => onPressPlayer(player)} />
@@ -239,32 +240,32 @@ function StarterRow({ player, onPress }: { player: MatchupStarter; onPress: () =
     <AnimatedCard style={styles.card} onPress={onPress}>
       <View style={styles.cardTopRow}>
         <View style={styles.slotBadge}>
-          <Text style={styles.slotText}>{player.slot ?? player.position ?? '—'}</Text>
+          <AppText style={styles.slotText}>{player.slot ?? player.position ?? '—'}</AppText>
         </View>
         <PlayerAvatar playerId={player.player_id} size={40} tier={player.tier} style={styles.avatar} />
         <View style={styles.nameColumn}>
-          <Text style={styles.name} numberOfLines={1}>
+          <AppText style={styles.name} numberOfLines={1}>
             {player.name ?? 'Unknown player'}
-          </Text>
+          </AppText>
           <View style={styles.metaRow}>
             <PositionBadge position={player.position} />
             <TierBadge storedTier={player.tier} />
-            <Text style={styles.meta} numberOfLines={1}>
+            <AppText style={styles.meta} numberOfLines={1}>
               {player.team ?? '—'}
-            </Text>
+            </AppText>
           </View>
         </View>
         {player.injury_label ? (
           <View style={[styles.injuryPill, player.ruled_out && styles.injuryPillOut]}>
-            <Text style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>
+            <AppText style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>
               {player.injury_label}
-            </Text>
+            </AppText>
           </View>
         ) : null}
       </View>
-      <Text style={styles.why} numberOfLines={3}>
+      <AppText style={styles.why} numberOfLines={3}>
         {player.why}
-      </Text>
+      </AppText>
     </AnimatedCard>
   );
 }

@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 import Svg, { Circle } from 'react-native-svg';
 
 import { colors } from '../theme';
@@ -67,12 +68,12 @@ export default function CircularProgressRing({
           />
         </Svg>
         <View style={[StyleSheet.absoluteFillObject, styles.centerContent]}>
-          <Text style={[styles.value, { color, fontSize: size * valueFontScale }]} numberOfLines={1}>
+          <AppText style={[styles.value, { color, fontSize: size * valueFontScale }]} numberOfLines={1}>
             {valueLabel ?? `${Math.round(clamped)}%`}
-          </Text>
+          </AppText>
         </View>
       </View>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? <AppText style={styles.label}>{label}</AppText> : null}
     </View>
   );
 }

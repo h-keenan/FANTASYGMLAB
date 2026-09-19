@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Linking, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import AppText from '../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -91,12 +92,12 @@ export default function NewsScreen() {
   return (
     <View style={styles.container}>
       <GridBackground />
-      <Text style={styles.disclaimer}>
+      <AppText style={styles.disclaimer}>
         General NFL news — injury, role, transaction, and off-field signal only. Not filtered to
         your specific rosters yet.
-      </Text>
+      </AppText>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <SectionList
         sections={sections}
@@ -106,11 +107,11 @@ export default function NewsScreen() {
         stickySectionHeadersEnabled={false}
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{section.title}</Text>
+            <AppText style={styles.sectionHeaderText}>{section.title}</AppText>
           </View>
         )}
         ListEmptyComponent={
-          !loading ? <Text style={styles.empty}>No fantasy-relevant news right now.</Text> : null
+          !loading ? <AppText style={styles.empty}>No fantasy-relevant news right now.</AppText> : null
         }
         renderItem={({ item }) => (
           <AnimatedCard
@@ -133,21 +134,21 @@ export default function NewsScreen() {
                     color="#fff"
                     style={styles.badgeIcon}
                   />
-                  <Text style={styles.badgeText}>{item.event_type}</Text>
+                  <AppText style={styles.badgeText}>{item.event_type}</AppText>
                 </View>
               ) : null}
-              <Text style={styles.time}>{relativeTime(item.published_ts)}</Text>
+              <AppText style={styles.time}>{relativeTime(item.published_ts)}</AppText>
             </View>
-            <Text style={styles.title} numberOfLines={2}>
+            <AppText style={styles.title} numberOfLines={2}>
               {item.title}
-            </Text>
+            </AppText>
             {item.summary ? (
-              <Text style={styles.summary} numberOfLines={3}>
+              <AppText style={styles.summary} numberOfLines={3}>
                 {item.summary}
-              </Text>
+              </AppText>
             ) : null}
-            {item.speculative ? <Text style={styles.speculative}>Unconfirmed / speculative</Text> : null}
-            {item.source ? <Text style={styles.source}>Source: {item.source}</Text> : null}
+            {item.speculative ? <AppText style={styles.speculative}>Unconfirmed / speculative</AppText> : null}
+            {item.source ? <AppText style={styles.source}>Source: {item.source}</AppText> : null}
           </AnimatedCard>
         )}
       />

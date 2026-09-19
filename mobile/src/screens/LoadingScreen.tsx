@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
+import AppText from '../components/AppText';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -33,11 +34,11 @@ export default function LoadingScreen({ status = 'Loading…' }: { status?: stri
   return (
     <View style={styles.container}>
       <Animated.Image source={require('../../assets/icon.png')} style={[styles.mark, markStyle]} />
-      <Text style={styles.title}>FantasyGM Lab</Text>
+      <AppText style={styles.title}>FantasyGM Lab</AppText>
       <View style={styles.badge}>
-        <Text style={styles.badgeText}>FOUNDER BETA</Text>
+        <AppText style={styles.badgeText}>FOUNDER BETA</AppText>
       </View>
-      <Text style={styles.status}>{status}</Text>
+      <AppText style={styles.status}>{status}</AppText>
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -132,7 +133,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -151,15 +152,15 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
           sections.length === 0 ? styles.emptyContainer : [styles.listContent, { paddingBottom: orbClearance }]
         }
         ListEmptyComponent={
-          <Text style={styles.empty}>
+          <AppText style={styles.empty}>
             No player data available for this roster (Sleeper doesn't have
             records for these player ids, or the roster is empty).
-          </Text>
+          </AppText>
         }
         ListHeaderComponent={
           ranking ? (
             <View style={styles.headerGroup}>
-              {ranking.record_label ? <Text style={styles.recordLabel}>{ranking.record_label}</Text> : null}
+              {ranking.record_label ? <AppText style={styles.recordLabel}>{ranking.record_label}</AppText> : null}
               {rankTiles.length > 0 ? (
                 <View style={styles.tileRow}>
                   {rankTiles.map((tile) =>
@@ -169,17 +170,17 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
                         style={[styles.tile, styles.tileTappable]}
                         onPress={() => navigation.navigate('Teams', { leagueId, leagueName })}
                       >
-                        <Text style={styles.tileValue} numberOfLines={1}>
+                        <AppText style={styles.tileValue} numberOfLines={1}>
                           {tile.value}
-                        </Text>
-                        <Text style={styles.tileLabel}>{tile.label}</Text>
+                        </AppText>
+                        <AppText style={styles.tileLabel}>{tile.label}</AppText>
                       </TouchableOpacity>
                     ) : (
                       <View key={tile.label} style={styles.tile}>
-                        <Text style={styles.tileValue} numberOfLines={1}>
+                        <AppText style={styles.tileValue} numberOfLines={1}>
                           {tile.value}
-                        </Text>
-                        <Text style={styles.tileLabel}>{tile.label}</Text>
+                        </AppText>
+                        <AppText style={styles.tileLabel}>{tile.label}</AppText>
                       </View>
                     ),
                   )}
@@ -188,15 +189,15 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
               {ranking.archetype_label ? (
                 <AnimatedCard style={styles.archetypeCard}>
                   <View style={styles.archetypeHeaderRow}>
-                    <Text style={styles.archetypeLabel}>{ranking.archetype_label}</Text>
+                    <AppText style={styles.archetypeLabel}>{ranking.archetype_label}</AppText>
                     {ranking.strategy_label ? (
                       <View style={styles.strategyPill}>
-                        <Text style={styles.strategyPillText}>{ranking.strategy_label}</Text>
+                        <AppText style={styles.strategyPillText}>{ranking.strategy_label}</AppText>
                       </View>
                     ) : null}
                   </View>
                   {ranking.archetype_explanation ? (
-                    <Text style={styles.archetypeExplanation}>{ranking.archetype_explanation}</Text>
+                    <AppText style={styles.archetypeExplanation}>{ranking.archetype_explanation}</AppText>
                   ) : null}
                   {ranking.archetype_strengths.length > 0 ? (
                     <ArchetypeDetailList label="Strengths" items={ranking.archetype_strengths} color={colors.success} />
@@ -213,13 +214,13 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
                   ) : null}
                 </AnimatedCard>
               ) : null}
-              {sections.length > 0 ? <Text style={styles.sectionIntro}>Roster Core</Text> : null}
+              {sections.length > 0 ? <AppText style={styles.sectionIntro}>Roster Core</AppText> : null}
             </View>
           ) : null
         }
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{section.title}</Text>
+            <AppText style={styles.sectionHeaderText}>{section.title}</AppText>
           </View>
         )}
         renderItem={({ item }) => (
@@ -229,21 +230,21 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
           >
             <PlayerAvatar playerId={item.player_id} size={40} tier={item.tier} style={styles.avatar} />
             <View style={styles.nameColumn}>
-              <Text style={styles.name} numberOfLines={1}>
+              <AppText style={styles.name} numberOfLines={1}>
                 {item.name ?? 'Unknown player'}
-              </Text>
-              <Text style={styles.meta}>
+              </AppText>
+              <AppText style={styles.meta}>
                 {[item.team, item.opportunity_label ?? item.status].filter(Boolean).join(' · ') || '—'}
-              </Text>
+              </AppText>
             </View>
             {item.overall_rank != null ? (
               <View style={styles.rankPill}>
-                <Text style={styles.rankValue}>#{item.overall_rank}</Text>
+                <AppText style={styles.rankValue}>#{item.overall_rank}</AppText>
               </View>
             ) : null}
             {item.injury_status ? (
               <View style={styles.injuryPill}>
-                <Text style={styles.injuryText}>{item.injury_status}</Text>
+                <AppText style={styles.injuryText}>{item.injury_status}</AppText>
               </View>
             ) : null}
           </AnimatedCard>
@@ -256,11 +257,11 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 function ArchetypeDetailList({ label, items, color }: { label: string; items: string[]; color: string }) {
   return (
     <View style={styles.detailListGroup}>
-      <Text style={[styles.detailListLabel, { color }]}>{label}</Text>
+      <AppText style={[styles.detailListLabel, { color }]}>{label}</AppText>
       {items.map((item, index) => (
-        <Text key={`${label}-${index}`} style={styles.detailListItem}>
+        <AppText key={`${label}-${index}`} style={styles.detailListItem}>
           {'•'} {item}
-        </Text>
+        </AppText>
       ))}
     </View>
   );

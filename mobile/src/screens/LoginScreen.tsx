@@ -5,11 +5,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
@@ -78,10 +78,10 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
-        <Text style={styles.title}>FantasyGM Lab</Text>
-        <Text style={styles.subtitle}>
+        <AppText style={styles.title}>FantasyGM Lab</AppText>
+        <AppText style={styles.subtitle}>
           {mode === 'signIn' ? 'Sign in to your account' : 'Create an account'}
-        </Text>
+        </AppText>
 
         {appleAvailable ? (
           <AppleAuthentication.AppleAuthenticationButton
@@ -102,7 +102,7 @@ export default function LoginScreen() {
             {google.submitting ? (
               <ActivityIndicator color={colors.textPrimary} />
             ) : (
-              <Text style={styles.socialButtonText}>Continue with Google</Text>
+              <AppText style={styles.socialButtonText}>Continue with Google</AppText>
             )}
           </TouchableOpacity>
         ) : null}
@@ -110,7 +110,7 @@ export default function LoginScreen() {
         {appleAvailable || google.available ? (
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
+            <AppText style={styles.dividerText}>or</AppText>
             <View style={styles.dividerLine} />
           </View>
         ) : null}
@@ -133,8 +133,8 @@ export default function LoginScreen() {
           onChangeText={setPassword}
         />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+        {error ? <AppText style={styles.error}>{error}</AppText> : null}
+        {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
 
         <TouchableOpacity
           style={[styles.button, (submitting || !email || !password) && styles.buttonDisabled]}
@@ -144,20 +144,20 @@ export default function LoginScreen() {
           {submitting ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>
+            <AppText style={styles.buttonText}>
               {mode === 'signIn' ? 'Sign in' : 'Sign up'}
-            </Text>
+            </AppText>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
         >
-          <Text style={styles.switchMode}>
+          <AppText style={styles.switchMode}>
             {mode === 'signIn'
               ? "Don't have an account? Sign up"
               : 'Already have an account? Sign in'}
-          </Text>
+          </AppText>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onGuestPress} disabled={guestSubmitting} style={styles.guestButton}>
@@ -165,10 +165,10 @@ export default function LoginScreen() {
             <ActivityIndicator color={colors.textSecondary} />
           ) : (
             <>
-              <Text style={styles.guestButtonText}>Continue as Guest</Text>
-              <Text style={styles.guestCaption}>
+              <AppText style={styles.guestButtonText}>Continue as Guest</AppText>
+              <AppText style={styles.guestCaption}>
                 No account needed — a guest session can't be recovered if you lose this device.
-              </Text>
+              </AppText>
             </>
           )}
         </TouchableOpacity>

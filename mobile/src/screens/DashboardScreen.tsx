@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View, type ViewStyle } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -199,7 +200,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -207,9 +208,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
   if (notReadyReason) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notReadyText}>
+        <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build your Next Move briefing for this league."}
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -218,17 +219,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-      <Text style={styles.disclaimer}>
+      <AppText style={styles.disclaimer}>
         The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and
         waiver signals the web app's Dashboard uses.
-      </Text>
+      </AppText>
       {!isFirstVisit && newRecommendationIds.size > 0 ? (
         <View style={styles.checkInBanner}>
           <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
-          <Text style={styles.checkInText}>
+          <AppText style={styles.checkInText}>
             Since your last check-in: {newRecommendationIds.size} new{' '}
             {newRecommendationIds.size === 1 ? 'item' : 'items'} below
-          </Text>
+          </AppText>
         </View>
       ) : null}
       {teamSnapshot ? (
@@ -253,9 +254,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
       {quiet || !items || items.length === 0 ? (
         <View style={styles.emptyCard}>
           <Ionicons name="checkmark-done-outline" size={22} color={colors.success} />
-          <Text style={styles.emptyText}>
+          <AppText style={styles.emptyText}>
             {quietReason || 'Nothing urgent right now — your roster looks steady.'}
-          </Text>
+          </AppText>
         </View>
       ) : (
         items.map((item, index) => (
@@ -299,20 +300,20 @@ function LeaguePulseSection({ teams }: { teams: TeamRanking[] }) {
   const tiles = buildLeaguePulseTiles(teams);
   return (
     <View style={styles.pulseSection}>
-      <Text style={styles.pulseHeading}>League Pulse</Text>
+      <AppText style={styles.pulseHeading}>League Pulse</AppText>
       <View style={styles.pulseGrid}>
         {tiles.map((tile) => (
           <View key={tile.label} style={[styles.pulseTile, { borderLeftColor: tile.color }]}>
             <View style={styles.pulseLabelRow}>
               <Ionicons name={tile.icon} size={12} color={tile.color} />
-              <Text style={[styles.pulseLabel, { color: tile.color }]}>{tile.label.toUpperCase()}</Text>
+              <AppText style={[styles.pulseLabel, { color: tile.color }]}>{tile.label.toUpperCase()}</AppText>
             </View>
-            <Text style={styles.pulseValue} numberOfLines={1}>
+            <AppText style={styles.pulseValue} numberOfLines={1}>
               {tile.value}
-            </Text>
-            <Text style={styles.pulseNote} numberOfLines={1}>
+            </AppText>
+            <AppText style={styles.pulseNote} numberOfLines={1}>
               {tile.note}
-            </Text>
+            </AppText>
           </View>
         ))}
       </View>
@@ -350,7 +351,7 @@ function DestinationButton({
         (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName });
       }}
     >
-      <Text style={styles.destButtonText}>{label.toUpperCase()}</Text>
+      <AppText style={styles.destButtonText}>{label.toUpperCase()}</AppText>
     </TouchableOpacity>
   );
 }
@@ -362,9 +363,9 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
         <View style={styles.pickDisc}>
           <Ionicons name="ticket-outline" size={16} color={colors.premium} />
         </View>
-        <Text style={styles.assetName} numberOfLines={1}>
+        <AppText style={styles.assetName} numberOfLines={1}>
           {asset.label || 'Draft pick'}
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -372,14 +373,14 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
     <View style={styles.assetRow}>
       <PlayerAvatar playerId={asset.player_id} size={32} tier={asset.tier} style={styles.assetAvatar} />
       <View style={styles.assetTextGroup}>
-        <Text style={styles.assetName} numberOfLines={1}>
+        <AppText style={styles.assetName} numberOfLines={1}>
           {asset.name ?? 'Unknown'}
-        </Text>
+        </AppText>
         <View style={styles.assetMetaRow}>
           <PositionBadge position={asset.position} />
-          <Text style={styles.assetMeta} numberOfLines={1}>
+          <AppText style={styles.assetMeta} numberOfLines={1}>
             {asset.team}
-          </Text>
+          </AppText>
         </View>
       </View>
     </View>
@@ -389,7 +390,7 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
 function NewBadge() {
   return (
     <View style={styles.newBadge}>
-      <Text style={styles.newBadgeText}>NEW</Text>
+      <AppText style={styles.newBadgeText}>NEW</AppText>
     </View>
   );
 }
@@ -429,17 +430,17 @@ function TeamSnapshotRow({
             style={[styles.snapshotTile, styles.snapshotTileTappable]}
             onPress={() => navigation.navigate('Teams', { leagueId, leagueName })}
           >
-            <Text style={styles.snapshotValue} numberOfLines={1}>
+            <AppText style={styles.snapshotValue} numberOfLines={1}>
               {tile.value}
-            </Text>
-            <Text style={styles.snapshotLabel}>{tile.label}</Text>
+            </AppText>
+            <AppText style={styles.snapshotLabel}>{tile.label}</AppText>
           </TouchableOpacity>
         ) : (
           <View key={tile.label} style={styles.snapshotTile}>
-            <Text style={styles.snapshotValue} numberOfLines={1}>
+            <AppText style={styles.snapshotValue} numberOfLines={1}>
               {tile.value}
-            </Text>
-            <Text style={styles.snapshotLabel}>{tile.label}</Text>
+            </AppText>
+            <AppText style={styles.snapshotLabel}>{tile.label}</AppText>
           </View>
         ),
       )}
@@ -488,35 +489,35 @@ function WeeklyMatchupCard({
     >
       <View style={styles.cardHeaderRow}>
         <Ionicons name="american-football" size={15} color={colors.accent} style={styles.cardIcon} />
-        <Text style={[styles.cardLabel, { color: colors.accent }]}>
+        <AppText style={[styles.cardLabel, { color: colors.accent }]}>
           {matchup.week != null ? `WEEK ${matchup.week} MATCHUP` : 'THIS WEEK’S MATCHUP'}
-        </Text>
+        </AppText>
       </View>
-      <Text style={styles.cardHeadline}>vs {opponent.team_name}</Text>
+      <AppText style={styles.cardHeadline}>vs {opponent.team_name}</AppText>
 
       <View style={styles.matchupValueRow}>
         <View style={styles.matchupValueSide}>
-          <Text style={styles.matchupSideLabel}>YOU</Text>
-          <Text style={styles.matchupSideValue}>{Math.round(comparison.my_season_value).toLocaleString()}</Text>
+          <AppText style={styles.matchupSideLabel}>YOU</AppText>
+          <AppText style={styles.matchupSideValue}>{Math.round(comparison.my_season_value).toLocaleString()}</AppText>
         </View>
-        <Text style={styles.matchupVersus}>VS</Text>
+        <AppText style={styles.matchupVersus}>VS</AppText>
         <View style={[styles.matchupValueSide, styles.matchupValueSideRight]}>
-          <Text style={styles.matchupSideLabel}>THEM</Text>
-          <Text style={styles.matchupSideValue}>{Math.round(comparison.opponent_season_value).toLocaleString()}</Text>
+          <AppText style={styles.matchupSideLabel}>THEM</AppText>
+          <AppText style={styles.matchupSideValue}>{Math.round(comparison.opponent_season_value).toLocaleString()}</AppText>
         </View>
       </View>
 
-      <Text style={[styles.matchupEdge, { color: edgeColor }]}>
+      <AppText style={[styles.matchupEdge, { color: edgeColor }]}>
         {comparison.headline}
         {comparison.edge === 'even'
           ? ''
           : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
-      </Text>
+      </AppText>
       {/* Straight from the API, never paraphrased into something stronger. */}
-      <Text style={styles.matchupBasis}>{comparison.basis_label}</Text>
+      <AppText style={styles.matchupBasis}>{comparison.basis_label}</AppText>
 
       <View style={styles.destButton}>
-        <Text style={styles.destButtonText}>SEE SUGGESTED STARTERS</Text>
+        <AppText style={styles.destButtonText}>SEE SUGGESTED STARTERS</AppText>
       </View>
     </AnimatedCard>
   );
@@ -557,22 +558,22 @@ function TeamHealthContextCard({ snapshot }: { snapshot: TeamSnapshot }) {
     <AnimatedCard style={styles.healthCard}>
       <View style={styles.healthHeaderRow}>
         <Ionicons name="pulse-outline" size={15} color={colors.danger} />
-        <Text style={styles.healthLabel} numberOfLines={1}>
+        <AppText style={styles.healthLabel} numberOfLines={1}>
           {snapshot.health_flag || 'Health context'}
-        </Text>
+        </AppText>
       </View>
-      {keyInjuries ? <Text style={styles.healthSummary}>Key injuries: {keyInjuries}</Text> : null}
+      {keyInjuries ? <AppText style={styles.healthSummary}>Key injuries: {keyInjuries}</AppText> : null}
       {players.length > 0 ? (
         <View style={styles.detailListGroup}>
-          <Text style={styles.detailListLabel}>Driving the flag</Text>
+          <AppText style={styles.detailListLabel}>Driving the flag</AppText>
           {players.map((player, index) => (
-            <Text key={`${player.player_id || player.name}-${index}`} style={styles.detailListItem}>
+            <AppText key={`${player.player_id || player.name}-${index}`} style={styles.detailListItem}>
               {'•'} {injuryImpactLine(player)}
-            </Text>
+            </AppText>
           ))}
         </View>
       ) : fallbackSummary ? (
-        <Text style={styles.detailListItem}>{fallbackSummary}</Text>
+        <AppText style={styles.detailListItem}>{fallbackSummary}</AppText>
       ) : null}
     </AnimatedCard>
   );
@@ -611,19 +612,19 @@ function TopPriorityTradeCard({
     >
       <View style={styles.cardHeaderRow}>
         <Ionicons name="flash" size={15} color={colors.accent} style={styles.cardIcon} />
-        <Text style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</Text>
+        <AppText style={[styles.cardLabel, { color: colors.accent }]}>TOP PRIORITY</AppText>
         {isNew ? <NewBadge /> : null}
         <View style={styles.tradeBadge}>
           <Ionicons name="swap-horizontal" size={12} color={colors.textSecondary} />
-          <Text style={styles.tradeBadgeText}>TRADE</Text>
+          <AppText style={styles.tradeBadgeText}>TRADE</AppText>
         </View>
       </View>
-      <Text style={styles.cardHeadline}>{presentation.partner_team_name}</Text>
+      <AppText style={styles.cardHeadline}>{presentation.partner_team_name}</AppText>
 
       <View style={styles.sideBlock}>
         <View style={[styles.sideBar, { backgroundColor: colors.danger }]} />
         <View style={styles.sideContent}>
-          <Text style={styles.sideLabel}>YOU GIVE</Text>
+          <AppText style={styles.sideLabel}>YOU GIVE</AppText>
           {presentation.trade_package.send.map((asset, index) => (
             <TradeAssetRow key={`send-${index}`} asset={asset} />
           ))}
@@ -632,7 +633,7 @@ function TopPriorityTradeCard({
       <View style={styles.sideBlock}>
         <View style={[styles.sideBar, { backgroundColor: colors.successBright }]} />
         <View style={styles.sideContent}>
-          <Text style={styles.sideLabel}>YOU GET</Text>
+          <AppText style={styles.sideLabel}>YOU GET</AppText>
           {presentation.trade_package.receive.map((asset, index) => (
             <TradeAssetRow key={`receive-${index}`} asset={asset} />
           ))}
@@ -640,16 +641,16 @@ function TopPriorityTradeCard({
       </View>
 
       <View style={styles.valueRow}>
-        <Text style={styles.valueLabel}>
+        <AppText style={styles.valueLabel}>
           TRADE VALUE / {presentation.trade_market_realism_label.toUpperCase()}
-        </Text>
-        <Text style={[styles.valueNumber, { color: gainColor }]}>
+        </AppText>
+        <AppText style={[styles.valueNumber, { color: gainColor }]}>
           {gain > 0 ? '+' : ''}
           {gain}
-        </Text>
+        </AppText>
       </View>
       <View style={styles.meterRow}>
-        <Text style={styles.meterLabel}>CONFIDENCE</Text>
+        <AppText style={styles.meterLabel}>CONFIDENCE</AppText>
         <View style={styles.meterSegments}>
           {[1, 2, 3].map((segment) => (
             <View
@@ -661,10 +662,10 @@ function TopPriorityTradeCard({
             />
           ))}
         </View>
-        <Text style={styles.meterValue}>{presentation.trade_confidence_label}</Text>
+        <AppText style={styles.meterValue}>{presentation.trade_confidence_label}</AppText>
       </View>
 
-      {showExplanations && item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
+      {showExplanations && item.reason ? <AppText style={styles.cardReason}>{item.reason}</AppText> : null}
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
     </AnimatedCard>
   );
@@ -702,11 +703,11 @@ function BriefingCard({
     <AnimatedCard style={StyleSheet.flatten([styles.card, { borderLeftColor: meta.color } as ViewStyle])}>
       <View style={styles.cardHeaderRow}>
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
-        <Text style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
+        <AppText style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</AppText>
         {isNew ? <NewBadge /> : null}
       </View>
-      <Text style={styles.cardHeadline}>{item.headline}</Text>
-      {showExplanations && item.reason ? <Text style={styles.cardReason}>{item.reason}</Text> : null}
+      <AppText style={styles.cardHeadline}>{item.headline}</AppText>
+      {showExplanations && item.reason ? <AppText style={styles.cardReason}>{item.reason}</AppText> : null}
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
     </AnimatedCard>
   );
