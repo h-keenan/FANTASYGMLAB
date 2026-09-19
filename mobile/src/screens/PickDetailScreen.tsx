@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   bucketTrack: {
     flex: 1,
     height: 8,
-    backgroundColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
     borderRadius: radii.pill,
     overflow: 'hidden',
   },

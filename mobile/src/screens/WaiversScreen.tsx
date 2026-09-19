@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   positionRankPill: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 1,
