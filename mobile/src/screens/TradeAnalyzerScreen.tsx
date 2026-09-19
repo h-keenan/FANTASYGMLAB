@@ -21,6 +21,7 @@ import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
 import CircularProgressRing from '../components/CircularProgressRing';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
+import TradeValueHero from '../components/TradeValueHero';
 import {
   api,
   TEAM_STRATEGY_OPTIONS,
@@ -594,15 +595,25 @@ function VerdictCard({
         </TouchableOpacity>
       </View>
 
+      {/* Quick visual: the same big color-coded value-change number the share
+          PNG leads with, so the verdict reads at a glance without tapping
+          Share. Rationale moved below the strip — it was cramped into the
+          remaining width beside the ring before. */}
       <View style={styles.verdictHeroRow}>
-        <CircularProgressRing
-          percent={confidencePercent(verdict.confidence)}
-          size={64}
-          strokeWidth={6}
-          color={toneColor}
-        />
-        <Text style={styles.verdictText}>{verdict.rationale}</Text>
+        <TradeValueHero delta={verdict.value_delta} size="lg" style={styles.verdictValueHero} />
+        <View style={styles.verdictRingGroup}>
+          <CircularProgressRing
+            percent={confidencePercent(verdict.confidence)}
+            size={64}
+            strokeWidth={6}
+            color={toneColor}
+          />
+          <Text style={styles.verdictRingCaption} numberOfLines={1}>
+            {verdict.confidence}
+          </Text>
+        </View>
       </View>
+      <Text style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</Text>
 
       <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
       <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={toneColor} />
@@ -772,8 +783,17 @@ const styles = StyleSheet.create({
   verdictHeroRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.md,
     marginBottom: spacing.sm,
+  },
+  verdictValueHero: { flex: 1 },
+  verdictRingGroup: { alignItems: 'center', gap: 4 },
+  verdictRingCaption: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'capitalize',
   },
   verdictSection: { marginTop: spacing.sm },
   verdictSectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
@@ -783,6 +803,9 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   verdictText: { fontSize: 13, color: colors.textPrimary, lineHeight: 18, flex: 1 },
+  // The rationale is a full-width block under the hero strip now, not a
+  // flex child sharing a row with the confidence ring.
+  verdictRationale: { flex: 0 },
   searchInput: {
     borderWidth: 1,
     borderColor: colors.border,
