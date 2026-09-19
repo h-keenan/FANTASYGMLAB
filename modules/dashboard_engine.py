@@ -317,10 +317,23 @@ def compose_next_move_briefing(
     entitlement: str = "free",
     rosters: list[dict] | None = None,
     team_strategy: str = "retool",
+    trade_idea_records: list[dict[str, Any]] | None = None,
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
-    fed by tiles computed fresh from this roster's live context."""
+    fed by tiles computed fresh from this roster's live context.
+
+    `trade_idea_records` is an optional pre-computed result of
+    trade_hub_engine.generate_trade_idea_records for this exact
+    (league_id, roster_id, team_strategy) — the mobile API passes its own
+    cached copy (shared with the Trade Hub endpoint, since both ask the
+    identical question) rather than letting this function recompute the
+    same expensive search a second time. Omitting it (the default, and
+    what every existing test/caller does) falls back to computing it fresh
+    from the players_df/rosters already passed in, keeping this function
+    pure and independently testable without needing to fake out live
+    Sleeper/disk calls for a cache it doesn't otherwise know about.
+    """
 
     roster_df = players_df[players_df["player_id"].astype(str).isin(roster_player_ids)].copy()
     lineup_df = suggest_optimal_lineup(roster_df, league_settings, score_field=score_field)
@@ -354,14 +367,18 @@ def compose_next_move_briefing(
     except (TypeError, ValueError):
         my_roster_id = None
     if my_roster_id is not None and rosters:
-        records = trade_hub_engine.generate_trade_idea_records(
-            league_id=league_id,
-            my_roster_id=my_roster_id,
-            players_df=players_df,
-            rosters=rosters,
-            league_settings=league_settings,
-            score_field=score_field,
-            team_strategy=team_strategy,
+        records = (
+            trade_idea_records
+            if trade_idea_records is not None
+            else trade_hub_engine.generate_trade_idea_records(
+                league_id=league_id,
+                my_roster_id=my_roster_id,
+                players_df=players_df,
+                rosters=rosters,
+                league_settings=league_settings,
+                score_field=score_field,
+                team_strategy=team_strategy,
+            )
         )
         ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
         headline_idea = ranked_records[0] if ranked_records else None

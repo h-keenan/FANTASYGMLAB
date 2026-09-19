@@ -28,17 +28,18 @@ def _client(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _clear_trade_hub_ideas_cache():
-    # _generate_trade_hub_records_cached is keyed by (league_id, roster_id,
-    # strategy, lens, time-bucket) — tests reusing the same league_id/roster
-    # combo within the same 30s wall-clock bucket would otherwise see a
-    # PRIOR test's mocked modules.trade_hub_engine.generate_trade_idea_records
-    # result instead of their own, since the cache sits between the endpoint
-    # and that mockable call.
-    from services import mobile_api_service
+    # trade_hub_engine._generate_trade_idea_records_cached is keyed by
+    # (league_id, roster_id, strategy, lens, players_db_path, time-bucket) —
+    # tests reusing the same league_id/roster combo within the same 30s
+    # wall-clock bucket would otherwise see a PRIOR test's mocked
+    # modules.trade_hub_engine.generate_trade_idea_records result instead of
+    # their own, since the cache sits between the caller (both the Trade Hub
+    # endpoint and Dashboard's trade tile) and that mockable call.
+    from modules import trade_hub_engine
 
-    mobile_api_service._generate_trade_hub_records_cached.cache_clear()
+    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
     yield
-    mobile_api_service._generate_trade_hub_records_cached.cache_clear()
+    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
 
 
 def test_render_yaml_documents_mobile_api_service():
@@ -2953,6 +2954,73 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
     categories = [item["category"] for item in body["items"]]
     assert top_priority_items, f"expected a top_priority tile, got categories: {categories}"
     assert top_priority_items[0]["route_player_id"] == "target_rb"
+
+
+def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch):
+    # Dashboard's trade tile and the Trade Hub endpoint ask the identical
+    # (league, roster, strategy, lens) question — this pins that they hit
+    # ONE cached search (trade_hub_engine.generate_trade_idea_records_cached)
+    # instead of each independently recomputing it.
+    client = _client(monkeypatch)
+    from modules import trade_hub_engine
+
+    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    call_count = {"n": 0}
+    real_generate = trade_hub_engine.generate_trade_idea_records
+
+    def counting_generate(*args, **kwargs):
+        call_count["n"] += 1
+        return real_generate(*args, **kwargs)
+
+    # Function-level auth/profile mocks (not a finite requests.get side_effect
+    # list) since this test makes two full authenticated requests.
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch(
+            "services.mobile_api_service.auth_supabase.fetch_auth_user",
+            return_value=({"id": "user-123", "email": "gm@example.com"}, ""),
+        ))
+        stack.enter_context(patch(
+            "services.mobile_api_service._fetch_profile_fields",
+            return_value={"entitlement": "free", "sleeper_username": "gm_dynasty"},
+        ))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch(
+            "modules.sleeper.get_rosters",
+            return_value=[
+                {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+            ],
+        ))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE))
+        stack.enter_context(patch("modules.sleeper.get_users", return_value=[
+            {"user_id": "sleeper-user-1", "display_name": "GM One"},
+            {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+        ]))
+        stack.enter_context(patch("modules.sleeper.get_traded_picks", return_value=[]))
+        stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_roster_frame()))
+        stack.enter_context(patch(
+            "modules.player_eligibility.filter_current_fantasy_players",
+            side_effect=lambda df, **kwargs: df,
+        ))
+        stack.enter_context(patch.object(
+            trade_hub_engine, "generate_trade_idea_records", side_effect=counting_generate
+        ))
+        dashboard_response = client.get(
+            "/v1/leagues/abc/dashboard",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        trade_hub_response = client.get(
+            "/v1/leagues/abc/trade-hub?strategy=retool&lens=Dynasty",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert dashboard_response.status_code == 200
+    assert trade_hub_response.status_code == 200
+    assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
+
+    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
 
 
 def _fake_daily_gm_briefing(count: int):
