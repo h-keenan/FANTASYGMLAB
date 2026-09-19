@@ -5,7 +5,9 @@ Deployment topology (Render):
   - Entrypoint: uvicorn services.mobile_api_service:app --host 0.0.0.0 --port $PORT
   - GET  /health              — process liveness (no Supabase dependency)
   - GET  /ready               — Supabase config readiness (no secret values)
-  - GET  /v1/me               — authenticated user + entitlement
+  - GET  /v1/me               — authenticated user + entitlement + saved-league cap
+  - GET  /v1/sleeper/leagues?username=x  — the Sleeper leagues behind a username (add-league picker)
+  - POST /v1/leagues/save                — save a Sleeper league to the account (cap-enforced)
   - GET  /v1/leagues/{id}                — Sleeper league metadata
   - GET  /v1/leagues/{id}/users          — Sleeper league members
   - GET  /v1/leagues/{id}/rosters        — Sleeper league rosters
@@ -102,6 +104,7 @@ from modules import (
     push_tokens,
     push_triggers,
     rankings,
+    saved_leagues,
     sleeper,
     sleeper_leagues,
     startup_cold_path,
@@ -313,6 +316,144 @@ def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
             # default, not necessarily this user's real plan. See
             # _fetch_profile_fields.
             "profile_status": profile["status"],
+            # How many leagues this plan may keep saved (modules.saved_leagues).
+            # Sent so the client can show the Premium wall *before* someone
+            # types a username and gets refused, without hardcoding the
+            # number in two places.
+            "league_cap": saved_leagues.max_leagues_for_entitlement(profile["entitlement"]),
+        },
+    }
+
+
+@app.get("/v1/sleeper/leagues")
+def lookup_sleeper_leagues(
+    username: str = "",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """The Sleeper leagues behind a username, for the add-league picker.
+
+    Read-only Sleeper lookup (modules.sleeper_leagues, the same function
+    web's onboarding import uses) — saves nothing. Falls back to the
+    caller's linked `profiles.sleeper_username` when none is supplied so
+    the app can pre-populate the picker.
+    """
+
+    clean = str(username or "").strip()
+    if not clean:
+        config = auth_supabase.get_supabase_config()
+        user_id = str(user.get("id") or "")
+        if user_id:
+            profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
+            clean = profile.get("sleeper_username") or ""
+    if not clean:
+        return {"ok": False, "status": "empty_username", "leagues": [], "username": "", "message": sleeper_leagues.league_lookup_customer_message("empty_username")}
+
+    result = sleeper_leagues.lookup_user_leagues(clean)
+    return {
+        "ok": result.status == "ok",
+        "status": result.status,
+        "username": clean,
+        "leagues": [
+            {
+                "league_id": str(league.get("league_id") or ""),
+                "name": str(league.get("name") or ""),
+                "season": str(league.get("season") or ""),
+                "total_rosters": int(league.get("total_rosters") or 0),
+            }
+            for league in result.leagues
+            if str(league.get("league_id") or "")
+        ],
+        "message": sleeper_leagues.league_lookup_customer_message(result.status),
+    }
+
+
+class SaveLeagueRequest(BaseModel):
+    league_id: str
+    sleeper_username: str = ""
+    league_name: str = ""
+    make_default: bool = False
+
+
+@app.post("/v1/leagues/save")
+def save_league(
+    payload: SaveLeagueRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Save a Sleeper league to the caller's account (cap-enforced).
+
+    Same `saved_leagues` rows, same cap, and same entitlement source as the
+    web app's "Save league" button — modules.saved_leagues is the single
+    authority, so the limit can't be sidestepped by switching surfaces.
+    Free keeps MAX_LEAGUES_FREE; Premium keeps MAX_LEAGUES_PREMIUM.
+
+    Re-saving a league already on the account is an update, never a refusal
+    (it refreshes name/roster/default), matching the web persist path.
+    """
+
+    league_id = saved_leagues.normalize_league_id(payload.league_id)
+    if not league_id:
+        raise HTTPException(status_code=422, detail="league_id is required.")
+
+    # Verify against Sleeper before writing: a typo'd or private league id
+    # would otherwise become a permanent dead row on the user's Home screen.
+    league = sleeper.get_league(league_id)
+    if not league:
+        return {"ok": False, "reason": "league_not_found", "cap": 0}
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available", "cap": 0}
+
+    profile = _fetch_profile_fields(config, user_id, access_token)
+    cap = saved_leagues.max_leagues_for_entitlement(profile.get("entitlement"))
+
+    existing, error = account_store.fetch_rows(
+        config,
+        access_token,
+        saved_leagues.LEAGUES_TABLE,
+        user_id=user_id,
+        extra_query="select=league_id",
+    )
+    if error:
+        # Fail closed, same as add_gm_target: the write below targets the
+        # same Supabase that just refused to be read, so an optimistic
+        # "allow" would almost certainly fail anyway — and silently
+        # un-capped.
+        return {"ok": False, "reason": "not_available", "cap": cap}
+    if saved_leagues.is_at_cap(existing, league_id=league_id, cap=cap):
+        return {"ok": False, "reason": "at_cap", "cap": cap}
+
+    username = str(payload.sleeper_username or "").strip() or profile.get("sleeper_username", "")
+    roster_id = sleeper.get_user_roster_id(league_id, username) if username else None
+    league_name = str(payload.league_name or "").strip() or str(league.get("name") or "")
+    # First league saved becomes the default so Home has something to open.
+    is_default = bool(payload.make_default) or not saved_leagues.saved_league_ids(existing)
+
+    ok, _write_error = account_store.upsert_saved_league(
+        config,
+        access_token,
+        account_store.build_saved_league_payload(
+            user_id=user_id,
+            sleeper_username=username,
+            league_id=league_id,
+            league_name=league_name,
+            roster_id=roster_id,
+            team_id=roster_id,
+            is_default=is_default,
+        ),
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available", "cap": cap}
+    return {
+        "ok": True,
+        "reason": "",
+        "cap": cap,
+        "league": {
+            "league_id": league_id,
+            "league_name": league_name,
+            "is_default": is_default,
         },
     }
 

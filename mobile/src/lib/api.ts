@@ -75,6 +75,41 @@ export interface MeResponse {
     // "error" means `entitlement` above is a fail-closed default because the
     // profile lookup itself failed — not necessarily this user's real plan.
     profile_status: 'ok' | 'error';
+    // Saved leagues this plan allows (modules/saved_leagues.py). Server-sent
+    // rather than hardcoded here so the cap lives in exactly one place.
+    league_cap: number;
+  };
+}
+
+/** One Sleeper league behind a username, for the add-league picker. */
+export interface SleeperLeagueOption {
+  league_id: string;
+  name: string;
+  season: string;
+  total_rosters: number;
+}
+
+export interface SleeperLeagueLookupResponse {
+  ok: boolean;
+  // Mirrors modules/sleeper_leagues.py's LeagueLookupStatus.
+  status: 'ok' | 'empty_username' | 'user_not_found' | 'no_leagues' | 'unavailable';
+  username: string;
+  leagues: SleeperLeagueOption[];
+  // Customer-safe copy for a non-"ok" status — show it verbatim.
+  message: string;
+}
+
+export type SaveLeagueReason = '' | 'at_cap' | 'league_not_found' | 'not_available';
+
+export interface SaveLeagueResponse {
+  ok: boolean;
+  reason: SaveLeagueReason;
+  // How many leagues this account's plan may keep (see MeResponse.league_cap).
+  cap: number;
+  league?: {
+    league_id: string;
+    league_name: string;
+    is_default: boolean;
   };
 }
 
@@ -1003,6 +1038,24 @@ export const api = {
     const query = season != null ? `?season=${encodeURIComponent(String(season))}` : '';
     return authorizedFetch<WeeklyStatsResponse>(`/v1/players/${encodeURIComponent(playerId)}/weekly-stats${query}`);
   },
+  lookupSleeperLeagues: (username: string) => {
+    const query = username ? `?username=${encodeURIComponent(username)}` : '';
+    return authorizedFetch<SleeperLeagueLookupResponse>(`/v1/sleeper/leagues${query}`);
+  },
+  // Cap-enforced server-side (free vs. premium) — check `reason === 'at_cap'`
+  // and route to the paywall rather than treating it as a failure.
+  saveLeague: (input: {
+    leagueId: string;
+    sleeperUsername?: string;
+    leagueName?: string;
+    makeDefault?: boolean;
+  }) =>
+    authorizedPost<SaveLeagueResponse>('/v1/leagues/save', {
+      league_id: input.leagueId,
+      sleeper_username: input.sleeperUsername ?? '',
+      league_name: input.leagueName ?? '',
+      make_default: input.makeDefault ?? false,
+    }),
   getGmTargets: (leagueId: string) =>
     authorizedFetch<GmTargetsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`),
   addGmTarget: (leagueId: string, playerId: string, sourceSurface = 'gm_targets') =>
