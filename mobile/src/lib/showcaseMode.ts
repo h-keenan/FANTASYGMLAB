@@ -19,15 +19,11 @@
  */
 
 /**
- * TODO(coridian_): add the real dev/founder account emails here. This list
- * is intentionally empty — with no entries, showcase mode is unavailable to
- * everyone and the More row never renders. Emails are compared
- * case-insensitively after trimming. Keep this to accounts you control:
- * anyone signed in with a listed email can flip the toggle.
- *
- * e.g. export const SHOWCASE_MODE_EMAILS: string[] = ['you@example.com'];
+ * Dev/founder account emails allowed to use showcase mode. Emails are
+ * compared case-insensitively after trimming. Keep this to accounts you
+ * control: anyone signed in with a listed email can flip the toggle.
  */
-export const SHOWCASE_MODE_EMAILS: string[] = [];
+export const SHOWCASE_MODE_EMAILS: string[] = ['keenanhf@outlook.com'];
 
 /** True when the signed-in account may use showcase mode at all. */
 export function isShowcaseModeAvailable(email: string | null | undefined): boolean {
