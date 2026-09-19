@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     overflow: 'hidden',
     marginTop: spacing.md,
-    backgroundColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
   },
   splitFill: { height: '100%' },
   edgeHeadline: { fontSize: 14, fontWeight: '700', marginTop: spacing.md },

@@ -686,12 +686,15 @@ const styles = StyleSheet.create({
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   sidesRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  // The side panel is a drop target, so it needs a visible edge even when
+  // inactive — a `surface` fill alone is only 1.09 against `background`.
+  // The 2pt width is unchanged between states; only the color swaps.
   side: {
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radii.md,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: colors.border,
     padding: spacing.md,
     minHeight: 80,
   },
@@ -705,7 +708,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.background,
+    // Nested inside `side` (a `surface` panel): step *up* the ramp rather
+    // than down, so the chip reads as a raised token instead of a hole
+    // punched in the panel at near-identical luminance.
+    backgroundColor: colors.backgroundElevated,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,

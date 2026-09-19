@@ -13,13 +13,35 @@ import { Platform } from 'react-native';
  * still uses as-is).
  */
 
+/**
+ * Dark surface ramp — three steppable solid tiers (background < surface <
+ * backgroundElevated) plus two line weights (border < borderStrong). The
+ * brand-sheet values (`background` #0D1117 canvas, `surface` #151B22 card)
+ * are fixed points; the tiers above them were previously bunched so tightly
+ * that the whole app read as one muddy blue-gray (and `border` was the
+ * *literal same hex* as `backgroundElevated`, so any bordered element on an
+ * elevated background had a zero-contrast edge).
+ *
+ * Relative contrast between neighbours, after widening:
+ *   surface -> backgroundElevated  1.26
+ *   backgroundElevated -> border   1.19
+ *   border -> borderStrong         1.28
+ * `border` deliberately sits *above* `backgroundElevated` so a rim reads on
+ * all three surfaces (1.64 on background, 1.50 on surface, 1.19 on
+ * elevated) — in dark mode a rim catches light, it doesn't cut a groove.
+ * Hue stays 213-217deg throughout, desaturating slightly as it lightens so
+ * the top of the ramp doesn't skew blue.
+ *
+ * `border` is a *line* token: for solid chip/track/disc fills use
+ * `backgroundElevated`, never `border`.
+ */
 export const colors = {
   background: '#0D1117',
-  backgroundElevated: '#1E2631',
+  backgroundElevated: '#242E3B',
   surface: '#151B22',
   surfaceSolid: '#151B22',
-  border: '#1E2631',
-  borderStrong: '#2A3441',
+  border: '#2E3A4A',
+  borderStrong: '#3C4A5C',
   hairline: 'rgba(255,255,255,0.08)',
   textPrimary: '#F2F4F7',
   textSecondary: '#A6B0BB',

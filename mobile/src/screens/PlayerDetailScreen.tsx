@@ -1028,7 +1028,10 @@ const styles = StyleSheet.create({
   statCell: {
     minWidth: '46%',
     flexGrow: 1,
-    backgroundColor: colors.background,
+    // Borderless cell inside a `surface` card — it has to carry its own
+    // separation, so it steps up the ramp instead of down (`background`
+    // here was only 1.09 against the card, i.e. no visible cell at all).
+    backgroundColor: colors.backgroundElevated,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -1065,7 +1068,7 @@ const styles = StyleSheet.create({
   percentTrack: {
     height: 6,
     borderRadius: radii.pill,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundElevated,
     overflow: 'hidden',
   },
   percentFill: {
