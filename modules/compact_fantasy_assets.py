@@ -130,6 +130,12 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
             or asset.get("pick_tier")
             or asset.get("tier_bucket")
         )
+        original_roster_id = _text(asset.get("original_roster_id"))
+        # Same derivation as services/mobile_api_service.py's /draft-picks
+        # endpoint (`pick_id = f"{season}:{round}:{original_roster_id}"`) —
+        # trade-idea pick assets never carried a pick_id of their own, so
+        # PickDetailScreen had nothing to key off of when tapped from here.
+        pick_id = f"{season}:{round_no}:{original_roster_id}" if season and round_no and original_roster_id else ""
         return {
             "asset_type": "pick",
             "label": label or "Draft pick",
@@ -140,6 +146,27 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
             "projected_range": projected,
             "score": asset.get("score", asset.get("value_score")),
             "owner_team_name": _text(asset.get("owner_team_name")),
+            "pick_id": pick_id,
+            "original_roster_id": original_roster_id,
+            "owner_roster_id": _text(asset.get("owner_roster_id")),
+            "original_team_name": _text(asset.get("original_team_name")),
+            "pick_tier": _text(asset.get("pick_tier")),
+            "tier_bucket": _text(asset.get("tier_bucket")),
+            "base_score": asset.get("base_score"),
+            "years_out": asset.get("years_out"),
+            "future_discount": asset.get("future_discount"),
+            "team_modifier": asset.get("team_modifier"),
+            "format_multiplier": asset.get("format_multiplier"),
+            "class_strength_multiplier": asset.get("class_strength_multiplier"),
+            "prospect_strength_multiplier": asset.get("prospect_strength_multiplier"),
+            "slot_percentile": asset.get("slot_percentile"),
+            "projected_slot_percentile": asset.get("projected_slot_percentile"),
+            "early_probability": asset.get("early_probability"),
+            "mid_probability": asset.get("mid_probability"),
+            "late_probability": asset.get("late_probability"),
+            "projection_confidence": asset.get("projection_confidence"),
+            "projection_source": _text(asset.get("projection_source")),
+            "is_current_year_pick": asset.get("is_current_year_pick"),
         }
     name = _text(asset.get("name") or asset.get("label"), "Player")
     role = _text(asset.get("opportunity_label") or asset.get("role") or asset.get("roster_relevance"))

@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -12,12 +13,14 @@ import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueHero from '../components/TradeValueHero';
 import {
+  type DraftPickAsset,
   type PresentationAsset,
   type RankedPlayer,
   type TeamStrategy,
   type TradeHubEntitlement,
   type TradeIdea,
   type TradeVerdict,
+  type ValuationLens,
 } from '../lib/api';
 import { api } from '../lib/api';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
@@ -47,6 +50,45 @@ function assetToRankedPlayer(asset: PresentationAsset): RankedPlayer {
     position_rank: null,
     rank_unavailable_reason: null,
     opportunity_label: asset.opportunity_explanation ?? null,
+  };
+}
+
+/** Trade Hub's AI-generated pick assets are the same PresentationAsset shape
+ * Trade Analyzer's asset picker and Draft Center already turn into a tappable
+ * PickDetail — they were just missing the identity/valuation fields until
+ * modules/compact_fantasy_assets.py's presentation_asset() started including
+ * them (pick_id, owner/original roster ids, the full multiplier breakdown).
+ * PickDetailScreen degrades gracefully when the multiplier fields are absent
+ * (its own `hasBreakdown` check), so a partial asset still renders fine. */
+function assetToDraftPick(asset: PresentationAsset): DraftPickAsset {
+  return {
+    pick_id: asset.pick_id ?? '',
+    label: asset.label ?? null,
+    score: asset.score ?? null,
+    season: asset.season ? Number(asset.season) : null,
+    round: asset.round ? Number(asset.round) : null,
+    original_roster_id: asset.original_roster_id ?? '',
+    owner_roster_id: asset.owner_roster_id ?? '',
+    original_team_name: asset.original_team_name ?? null,
+    owner_team_name: asset.owner_team_name ?? null,
+    pick_tier: asset.pick_tier ?? null,
+    projected_pick_range: asset.projected_range ?? null,
+    tier_bucket: asset.tier_bucket ?? null,
+    base_score: asset.base_score ?? null,
+    years_out: asset.years_out ?? null,
+    future_discount: asset.future_discount ?? null,
+    team_modifier: asset.team_modifier ?? null,
+    format_multiplier: asset.format_multiplier ?? null,
+    class_strength_multiplier: asset.class_strength_multiplier ?? null,
+    prospect_strength_multiplier: asset.prospect_strength_multiplier ?? null,
+    slot_percentile: asset.slot_percentile ?? null,
+    projected_slot_percentile: asset.projected_slot_percentile ?? null,
+    early_probability: asset.early_probability ?? null,
+    mid_probability: asset.mid_probability ?? null,
+    late_probability: asset.late_probability ?? null,
+    projection_confidence: asset.projection_confidence ?? null,
+    projection_source: asset.projection_source ?? null,
+    is_current_year_pick: asset.is_current_year_pick ?? null,
   };
 }
 
@@ -120,19 +162,27 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [adUnlocks, setAdUnlocks] = useState(0);
   const [watchingAd, setWatchingAd] = useState(false);
+  const [lens, setLens] = useState<ValuationLens>('Dynasty');
 
   useScreenHeaderTitle(navigation, 'Trade Hub', leagueName);
 
   useEffect(() => {
-    navigation.setOptions({ headerRight: () => <GmStanceHeaderButton leagueId={leagueId} /> });
-  }, [navigation, leagueId]);
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton lens={lens} onChange={setLens} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, lens]);
 
   const load = useCallback(
-    async (nextStrategy: TeamStrategy, nextAdUnlocks: number) => {
+    async (nextStrategy: TeamStrategy, nextAdUnlocks: number, nextLens: ValuationLens) => {
       setLoading(true);
       setError(null);
       try {
-        const result = await api.getTradeHubIdeas(leagueId, nextStrategy, nextAdUnlocks);
+        const result = await api.getTradeHubIdeas(leagueId, nextStrategy, nextAdUnlocks, nextLens);
         if (result.reason) {
           setNotReadyReason(result.reason);
           setIdeas(null);
@@ -154,8 +204,8 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   useEffect(() => {
     if (!stanceLoaded) return;
     setAdUnlocks(0);
-    void load(strategy, 0);
-  }, [load, strategy, stanceLoaded]);
+    void load(strategy, 0, lens);
+  }, [load, strategy, stanceLoaded, lens]);
 
   const onWatchAd = useCallback(async () => {
     if (watchingAd) return;
@@ -165,8 +215,8 @@ export default function TradeHubScreen({ route, navigation }: Props) {
     if (!earned) return;
     const next = adUnlocks + 1;
     setAdUnlocks(next);
-    void load(strategy, next);
-  }, [adUnlocks, load, strategy, watchingAd]);
+    void load(strategy, next, lens);
+  }, [adUnlocks, load, strategy, watchingAd, lens]);
 
   return (
     <View style={styles.root}>
@@ -265,13 +315,21 @@ function TradeHubGateCard({
 function AssetRow({
   asset,
   onPressPlayer,
+  onPressPick,
 }: {
   asset: PresentationAsset;
   onPressPlayer?: (asset: PresentationAsset) => void;
+  onPressPick?: (asset: PresentationAsset) => void;
 }) {
   if (asset.asset_type === 'pick') {
+    const canOpenPick = Boolean(onPressPick && asset.pick_id);
     return (
-      <View style={styles.assetRow}>
+      <TouchableOpacity
+        style={styles.assetRow}
+        disabled={!canOpenPick}
+        activeOpacity={canOpenPick ? 0.7 : 1}
+        onPress={() => onPressPick?.(asset)}
+      >
         <View style={styles.pickDisc}>
           <Text style={styles.pickPlateText}>{asset.round ? `R${asset.round}` : 'PICK'}</Text>
         </View>
@@ -283,7 +341,8 @@ function AssetRow({
             {asset.projected_range || 'Draft pick'}
           </Text>
         </View>
-      </View>
+        {canOpenPick ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
+      </TouchableOpacity>
     );
   }
   const metaLine = [asset.team, asset.age != null ? `Age ${asset.age}` : null].filter(Boolean).join(' · ');
@@ -378,6 +437,48 @@ function MeterRow({ label, value, level, color }: { label: string; value: string
   );
 }
 
+/**
+ * The card's own rationale is clipped to 3 lines to keep the feed scannable
+ * (see `styles.rationale`'s `numberOfLines={3}`) — this is the tap target
+ * that surfaces the untruncated text, following the same backdrop-Pressable
+ * shell RecapTradeDetailModal.tsx uses for "truncated on the card, full text
+ * in a modal."
+ */
+function RationaleDetailModal({
+  visible,
+  onClose,
+  partnerTeamName,
+  rationale,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  partnerTeamName: string;
+  rationale: string;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.rationaleBackdrop} onPress={onClose}>
+        <Pressable style={styles.rationaleSheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.rationaleSheetHeader}>
+            <Text style={styles.rationaleSheetTitle} numberOfLines={1}>
+              Why this works
+            </Text>
+            <TouchableOpacity onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.rationaleSheetPartner} numberOfLines={1}>
+            vs. {partnerTeamName}
+          </Text>
+          <ScrollView style={styles.rationaleSheetBody}>
+            <Text style={styles.rationaleSheetText}>{rationale}</Text>
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function TradeIdeaCard({
   idea,
   leagueId,
@@ -393,8 +494,11 @@ function TradeIdeaCard({
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
+  const [rationaleOpen, setRationaleOpen] = useState(false);
   const openPlayer = (asset: PresentationAsset) =>
     navigation.navigate('PlayerDetail', { player: assetToRankedPlayer(asset), leagueId, leagueName });
+  const openPick = (asset: PresentationAsset) =>
+    navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
 
   const bandColor = VALUE_EDGE_BAND_COLOR[idea.value_edge_band] ?? colors.textSecondary;
 
@@ -457,7 +561,7 @@ function TradeIdeaCard({
             <Text style={styles.exchangeLabel}>You Send</Text>
           </View>
           {idea.package.send.map((asset, index) => (
-            <AssetRow key={`send-${index}`} asset={asset} onPressPlayer={openPlayer} />
+            <AssetRow key={`send-${index}`} asset={asset} onPressPlayer={openPlayer} onPressPick={openPick} />
           ))}
         </View>
         <View style={styles.exchangeGutter}>
@@ -471,19 +575,27 @@ function TradeIdeaCard({
             <Text style={styles.exchangeLabel}>You Receive</Text>
           </View>
           {idea.package.receive.map((asset, index) => (
-            <AssetRow key={`receive-${index}`} asset={asset} onPressPlayer={openPlayer} />
+            <AssetRow key={`receive-${index}`} asset={asset} onPressPlayer={openPlayer} onPressPick={openPick} />
           ))}
         </View>
       </View>
 
       {showExplanations && idea.rationale ? (
-        <>
+        <TouchableOpacity activeOpacity={0.7} onPress={() => setRationaleOpen(true)}>
           <Text style={styles.rationaleLabel}>Why this works</Text>
           <Text style={styles.rationale} numberOfLines={3}>
             {idea.rationale}
           </Text>
-        </>
+          <Text style={styles.rationaleExpandHint}>Read full explanation</Text>
+        </TouchableOpacity>
       ) : null}
+
+      <RationaleDetailModal
+        visible={rationaleOpen}
+        onClose={() => setRationaleOpen(false)}
+        partnerTeamName={idea.partner_team_name}
+        rationale={idea.rationale ?? ''}
+      />
 
       <View style={styles.footerRow}>
         <MeterRow label="CONFIDENCE" value={idea.confidence_label} level={confidenceLevel} color={colors.accent} />
@@ -494,6 +606,7 @@ function TradeIdeaCard({
 }
 
 const styles = StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   gateCard: { alignItems: 'center', padding: spacing.lg, marginTop: spacing.xs },
   gateIconDisc: {
     width: 44,
@@ -643,6 +756,44 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   rationale: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingHorizontal: spacing.md },
+  rationaleExpandHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.accentSoft,
+    paddingHorizontal: spacing.md,
+    marginTop: 4,
+  },
+  rationaleBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  rationaleSheet: {
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '70%',
+  },
+  rationaleSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rationaleSheetTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
+  rationaleSheetPartner: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    marginTop: 2,
+    marginBottom: spacing.sm,
+  },
+  rationaleSheetBody: { flexGrow: 0 },
+  rationaleSheetText: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
   footerRow: {
     flexDirection: 'row',
     marginTop: spacing.md,

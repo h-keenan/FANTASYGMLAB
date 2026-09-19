@@ -913,6 +913,31 @@ export interface PresentationAsset {
   round?: string;
   pick_no?: number;
   projected_range?: string;
+  // Pick identity/valuation fields — present when asset_type is 'pick',
+  // mirroring DraftPickAsset so a trade idea's pick can open the same
+  // PickDetailScreen the Draft Center and Trade Analyzer picker use.
+  pick_id?: string;
+  original_roster_id?: string;
+  owner_roster_id?: string;
+  original_team_name?: string;
+  owner_team_name?: string;
+  pick_tier?: string;
+  tier_bucket?: string;
+  base_score?: number | null;
+  years_out?: number | null;
+  future_discount?: number | null;
+  team_modifier?: number | null;
+  format_multiplier?: number | null;
+  class_strength_multiplier?: number | null;
+  prospect_strength_multiplier?: number | null;
+  slot_percentile?: number | null;
+  projected_slot_percentile?: number | null;
+  early_probability?: number | null;
+  mid_probability?: number | null;
+  late_probability?: number | null;
+  projection_confidence?: number | null;
+  projection_source?: string | null;
+  is_current_year_pick?: boolean | null;
 }
 
 export interface TradePackage {
@@ -1053,9 +1078,14 @@ export const api = {
   },
   getLeagueDashboard: (leagueId: string) =>
     authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
-  getTradeHubIdeas: (leagueId: string, strategy: TeamStrategy = 'retool', adUnlocks = 0) =>
+  getTradeHubIdeas: (
+    leagueId: string,
+    strategy: TeamStrategy = 'retool',
+    adUnlocks = 0,
+    lens: ValuationLens = 'Dynasty',
+  ) =>
     authorizedFetch<TradeHubResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${strategy}&ad_unlocks=${adUnlocks}`,
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${strategy}&ad_unlocks=${adUnlocks}&lens=${encodeURIComponent(lens)}`,
     ),
   getLeagueAlerts: (leagueId: string, limit = 12) =>
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),

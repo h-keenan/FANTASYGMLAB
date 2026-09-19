@@ -844,10 +844,10 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             <>
               <Text style={styles.seasonLabel}>{season.label}</Text>
               <View style={[styles.card, styles.cardSpaced]}>
-                <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} first />
-                <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} />
-                <StatSection title="Efficiency" icon="calculator-outline" items={season.efficiency} />
+                <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} first />
+                <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} />
                 <UsageSection items={season.usage} />
+                <StatSection title="Efficiency" icon="calculator-outline" items={season.efficiency} />
                 {stats?.college_available ? (
                   <StatSection title="College" icon="school-outline" items={stats.college} />
                 ) : null}
