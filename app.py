@@ -56,6 +56,7 @@ from modules import dense_list_primitives
 from modules import executive_table_ui
 from modules.trades import trade_gain
 from modules.sleeper import (
+    default_player_stats_season,
     get_draft,
     get_draft_picks,
     get_league,
@@ -155,6 +156,7 @@ from modules import player_history
 from modules import player_awards
 from modules import player_quick_view
 from modules import player_quick_view_bridge
+from modules import weekly_points_chart
 from modules import canonical_recommendation_narrative
 from modules import trade_hub_ui
 from modules import trade_detail_navigation
@@ -3958,6 +3960,92 @@ def build_player_roster_needs_context(
     }
 
 
+@st.cache_data(ttl=15 * 60, show_spinner=False)
+def _cached_player_weekly_points(
+    player_id: str,
+    season: int,
+    allow_fetch: bool,
+) -> tuple[weekly_points_chart.WeekPoint, ...]:
+    """Per-player weekly PPR points, cached so reruns never re-parse the
+    multi-megabyte season aggregate for the same player."""
+
+    return weekly_points_chart.load_weekly_points(player_id, season, allow_fetch=allow_fetch)
+
+
+def _set_pqv_weekly_season(state_key: str, season: int) -> None:
+    st.session_state[state_key] = int(season)
+
+
+def _render_pqv_weekly_points(*, player_id: str, player_name: str = "") -> bool:
+    """Points By Week — the web counterpart of mobile's Player Detail chart.
+
+    Same weekly rows modules.sleeper already retains next to the season
+    totals. The default season reads the cache only, so opening the dossier
+    never waits on provider calls; switching to an older season is the one
+    deliberate on-demand rebuild (prior-season aggregates are cached without
+    weekly rows), matching what the mobile weekly-stats endpoint does.
+    """
+
+    identifier = _safe_text(player_id).strip()
+    if not identifier:
+        return False
+
+    default_season = default_player_stats_season()
+    seasons = weekly_points_chart.season_options(default_season)
+    state_key = f"pqv_weekly_season_{identifier}"
+    selected_season = _safe_positive_int(st.session_state.get(state_key), 0)
+    if selected_season not in seasons:
+        selected_season = default_season
+
+    st.markdown(
+        player_quick_view.dossier_section_heading_html(
+            "Points By Week",
+            "Weekly PPR output across the selected season.",
+        ),
+        unsafe_allow_html=True,
+    )
+
+    if len(seasons) > 1:
+        with st.container(key=f"pqv_weekly_season_rail_{identifier}"):
+            season_cols = st.columns(len(seasons), gap="small")
+            for column, season in zip(season_cols, seasons):
+                with column:
+                    st.button(
+                        str(season),
+                        key=f"{state_key}_{season}",
+                        type="primary" if season == selected_season else "secondary",
+                        use_container_width=True,
+                        help=f"Show {season} weekly points",
+                        on_click=_set_pqv_weekly_season,
+                        args=(state_key, season),
+                    )
+
+    allow_fetch = selected_season != default_season
+    if allow_fetch:
+        with st.spinner(f"Loading {selected_season} weekly points…"):
+            weeks = _cached_player_weekly_points(identifier, selected_season, True)
+    else:
+        weeks = _cached_player_weekly_points(identifier, selected_season, False)
+
+    if not weeks:
+        st.markdown(
+            weekly_points_chart.weekly_points_empty_html(selected_season),
+            unsafe_allow_html=True,
+        )
+        return False
+
+    st.markdown(
+        weekly_points_chart.weekly_points_chart_html(
+            weeks,
+            season=selected_season,
+            chart_key=f"{identifier}-{selected_season}",
+            player_name=player_name,
+        ),
+        unsafe_allow_html=True,
+    )
+    return True
+
+
 def render_player_quick_view_content(
     *,
     player_row: pd.Series,
@@ -4818,6 +4906,9 @@ def render_player_quick_view_content(
                         )
                     )
                 player_quick_view.render_current_season(quick_view_stats, omit_empty=True)
+                # Trend sits with the season aggregate it decomposes: the
+                # season card is one PPG number, this is the shape behind it.
+                _render_pqv_weekly_points(player_id=player_id, player_name=clean_name)
                 player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
                 interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
     elif detail_choice == "CAREER":

@@ -233,6 +233,36 @@ def season_stats_cache_has_weekly(season: int | None = None) -> bool:
     return False
 
 
+def cached_season_player_weekly(player_id: str, season: int | None = None) -> List[Dict[str, Any]]:
+    """Weekly rows already on disk for one player+season — never fetches.
+
+    The read side of ``get_season_player_stats``'s ``retain_weekly`` output,
+    for callers that must not block a render on an 18-week rebuild. Empty
+    list whenever the cache is missing, unreadable, or was written without
+    weekly retention (prior seasons are).
+    """
+
+    identifier = str(player_id or "").strip()
+    if not identifier:
+        return []
+    selected = int(season or default_player_stats_season())
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
+    if not os.path.exists(cache_path):
+        return []
+    try:
+        with open(cache_path, "r", encoding="utf-8") as handle:
+            cached = json.load(handle)
+    except Exception:
+        return []
+    if not isinstance(cached, dict):
+        return []
+    record = cached.get(identifier)
+    weekly = record.get("weekly") if isinstance(record, dict) else None
+    if not isinstance(weekly, list):
+        return []
+    return [row for row in weekly if isinstance(row, dict)]
+
+
 def get_season_player_stats(
     season: int | None = None,
     *,
