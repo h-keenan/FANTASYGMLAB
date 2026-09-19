@@ -4208,6 +4208,10 @@ def test_my_team_returns_the_real_suggested_lineup_split(monkeypatch):
     body = response.json()
     assert body["ok"] is True
     assert body["reason"] == ""
+    # Lets the mobile My Team screen find "my row" in a separately-fetched
+    # /team-rankings response to build its Team Analytics section — this
+    # endpoint previously returned no identity for the caller's own roster.
+    assert body["roster_id"] == "1"
 
     # Real modules.team_eval.suggest_optimal_lineup output, not a mocked
     # result. The fixture roster has 1 QB, 4 RB, 4 WR, 1 TE (10 players);

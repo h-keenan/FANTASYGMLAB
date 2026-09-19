@@ -2869,7 +2869,13 @@ def get_league_my_team(
 
     starters, bench = _suggested_lineup_split(valued, roster_player_ids, settings, score_field)
 
-    return {"ok": True, "starters": starters, "bench": bench, "reason": ""}
+    return {
+        "ok": True,
+        "starters": starters,
+        "bench": bench,
+        "reason": "",
+        "roster_id": str(my_roster.get("roster_id") or ""),
+    }
 
 
 # The one sentence every matchup surface (API, mobile headline, tests)
