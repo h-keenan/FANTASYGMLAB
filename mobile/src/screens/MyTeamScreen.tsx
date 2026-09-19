@@ -159,9 +159,12 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
           </Text>
         </View>
       </View>
-      {player.injury_status ? (
-        <View style={styles.injuryPill}>
-          <Text style={styles.injuryText}>{player.injury_status}</Text>
+      {/* injury_label, not injury_status: IR/PUP/season-ending arrives on
+          `status` with `injury_status` blank, and an injury_status-driven
+          pill hides exactly those players. See LineupPlayer.injury_label. */}
+      {player.injury_label ? (
+        <View style={[styles.injuryPill, player.ruled_out && styles.injuryPillOut]}>
+          <Text style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>{player.injury_label}</Text>
         </View>
       ) : null}
     </AnimatedCard>
@@ -213,6 +216,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   injuryText: { fontSize: 11, fontWeight: '700', color: colors.danger },
+  // Ruled out (Out/IR/PUP) — a solid pill, because this player is only in
+  // the suggested lineup when nothing available could fill the slot.
+  injuryPillOut: { backgroundColor: colors.danger },
+  injuryTextOut: { color: colors.badgeText },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
 });

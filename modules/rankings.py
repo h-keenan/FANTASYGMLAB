@@ -2062,6 +2062,67 @@ def _injury_level_cached(status: str, injury_status: str) -> str:
     return "healthy"
 
 
+def _has_out_token(text: str) -> bool:
+    """True when `text` contains "out" as a whole word.
+
+    Token-level, not substring: "Doubtful" must not read as ruled out, and
+    neither must any future status string that merely spells "out" inside a
+    longer word.
+    """
+
+    return "out" in str(text or "").lower().replace("-", " ").replace("/", " ").split()
+
+
+def is_ruled_out(status: str, injury_status: str = "") -> bool:
+    """True when a player is confirmed unavailable, not merely uncertain.
+
+    Built on injury_level() so the app keeps ONE injury vocabulary rather
+    than growing a second, rival classification:
+
+    - "major" (IR / PUP / NFI / season-ending) is always ruled out.
+    - injury_level groups a flat "Out" with "Doubtful" as "moderate", but
+      only the first is an actual ruling — so a literal "Out" token in
+      either status field is ruled out, and "Doubtful" is not.
+    - "Questionable" / "Probable" / "Doubtful" stay startable: they are
+      genuinely uncertain, and auto-benching them would take a real
+      judgement call away from the GM.
+
+    This is the availability question ("can they play at all this week?"),
+    deliberately separate from the value question every score column
+    answers.
+    """
+
+    level = injury_level(status, injury_status)
+    if level == "major":
+        return True
+    if level != "moderate":
+        return False
+    return _has_out_token(status) or _has_out_token(injury_status)
+
+
+def injury_display_label(status: str, injury_status: str = "") -> str:
+    """The short injury tag to show next to a player's name ("" when healthy).
+
+    Prefers Sleeper's own weekly tag (`injury_status`, e.g. "Questionable"),
+    falls back to a non-Active roster `status` (e.g. "Injured Reserve" —
+    which is where season-ending unavailability lives, with `injury_status`
+    often blank), and only then to the engine's severity word. Gated on
+    injury_level() so a healthy player never gets a tag from a junk value
+    like "None".
+    """
+
+    level = injury_level(status, injury_status)
+    if level == "healthy":
+        return ""
+    tag = str(injury_status or "").strip()
+    if tag:
+        return tag
+    raw_status = str(status or "").strip()
+    if raw_status and raw_status.lower() != "active":
+        return raw_status
+    return level.title()
+
+
 def injury_multiplier(status: str, injury_status: str = "") -> float:
     level = injury_level(status, injury_status)
     if level == "major":
@@ -2472,6 +2533,12 @@ def summarize_team_injuries(
         and "player_id" in lineup_source.columns
     ):
         starter_mask = lineup_source["suggested_starter"].fillna(False).astype(bool)
+        if "displaced_by_injury" in lineup_source.columns:
+            # A player the lineup benched ONLY because he is ruled out still
+            # counts as an injured starter here: the injury cost this roster a
+            # starting-caliber player, and suggest_optimal_lineup quietly
+            # routing around him must not make the team read as healthier.
+            starter_mask = starter_mask | lineup_source["displaced_by_injury"].fillna(False).astype(bool)
         starter_rows = lineup_source.loc[starter_mask, ["player_id"]]
         if "position" in lineup_source.columns:
             starter_rows = lineup_source.loc[starter_mask, ["player_id", "position"]]

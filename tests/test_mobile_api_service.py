@@ -4149,7 +4149,7 @@ def _matchup_auth_mocks():
 
 
 @contextlib.contextmanager
-def _matchup_world(matchups, league=None, rosters=None):
+def _matchup_world(matchups, league=None, rosters=None, players=None):
     """Every Sleeper/player-data seam the matchup endpoint touches, mocked."""
 
     with contextlib.ExitStack() as stack:
@@ -4169,7 +4169,12 @@ def _matchup_world(matchups, league=None, rosters=None):
                 },
             )
         )
-        stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_matchup_players_frame()))
+        stack.enter_context(
+            patch(
+                "modules.rankings.load_players",
+                return_value=players if players is not None else _fake_matchup_players_frame(),
+            )
+        )
         stack.enter_context(
             patch("modules.player_eligibility.filter_current_fantasy_players", side_effect=lambda df, **kwargs: df)
         )
@@ -4315,6 +4320,100 @@ def test_matchup_returns_both_sides_and_a_season_value_comparison(monkeypatch):
     for player in mine["starters"] + theirs["starters"]:
         assert "project" not in player["why"].lower()
         assert "points" not in player["why"].lower()
+
+
+def _matchup_frame_with(player_id, **overrides):
+    """The standard matchup fixture frame with one player's fields changed."""
+
+    frame = _fake_matchup_players_frame()
+    for column, value in overrides.items():
+        frame.loc[frame["player_id"] == player_id, column] = value
+    return frame
+
+
+def test_matchup_benches_a_player_who_is_ruled_out(monkeypatch):
+    """Reported bug: a WR confirmed "Out" on Sleeper was still the suggested
+    starter, because the lineup ranked purely on season value. He is the
+    highest-value WR on the roster here and must still lose the slot."""
+
+    client = _client(monkeypatch)
+    # mine4 is a WR; the roster has 9 players for 8 startable slots, so
+    # exactly one player is benched — and it has to be this one.
+    frame = _matchup_frame_with(
+        "mine4", injury_status="Out", score=9000, dynasty_score=9000, value_score=9000, rebuild_score=9000
+    )
+
+    with _matchup_world([{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}], players=frame):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    mine = response.json()["my_team"]
+    assert len(mine["starters"]) == 8
+    assert "mine4" not in {player["player_id"] for player in mine["starters"]}
+    # Nobody who did make the lineup is carrying an unflagged injury.
+    assert all(player["ruled_out"] is False for player in mine["starters"])
+    assert all(player["injury_label"] == "" for player in mine["starters"])
+
+
+def test_matchup_benches_season_ending_status_even_with_no_injury_status_tag(monkeypatch):
+    """IR/PUP unavailability arrives on Sleeper's `status`, with
+    `injury_status` blank — the case an injury_status-only read misses."""
+
+    client = _client(monkeypatch)
+    frame = _matchup_frame_with(
+        "opp4", status="Injured Reserve", score=9000, dynasty_score=9000, value_score=9000, rebuild_score=9000
+    )
+
+    with _matchup_world([{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}], players=frame):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    theirs = response.json()["opponent"]
+    assert "opp4" not in {player["player_id"] for player in theirs["starters"]}
+
+
+def test_matchup_flags_a_ruled_out_starter_when_no_alternative_exists(monkeypatch):
+    """Availability is a preference, not a hard filter: with no other TE on
+    the roster the Out player still fills the slot, and the response says so
+    in both the pill field and the reasoning line — never silently."""
+
+    client = _client(monkeypatch)
+    # mine7 is the roster's only TE.
+    frame = _matchup_frame_with("mine7", injury_status="Out")
+
+    with _matchup_world([{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}], players=frame):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    mine = response.json()["my_team"]
+    te = next(player for player in mine["starters"] if player["player_id"] == "mine7")
+    assert te["slot"] == "TE"
+    assert te["ruled_out"] is True
+    # injury_label is what the client renders as the pill — it must be
+    # populated for every starter who actually has an injury status.
+    assert te["injury_label"] == "Out"
+    assert "ruled out" in te["why"]
+    assert "no available alternative" in te["why"]
+
+
+def test_matchup_starters_all_carry_a_renderable_injury_field(monkeypatch):
+    """The inconsistency behind the report: some starters showed an injury
+    pill and others didn't. Every starter carries the same two fields, so a
+    client can never be selectively blind to one player's status."""
+
+    client = _client(monkeypatch)
+    frame = _matchup_frame_with("mine2", injury_status="Questionable")
+
+    with _matchup_world([{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}], players=frame):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    for player in body["my_team"]["starters"] + body["opponent"]["starters"]:
+        assert isinstance(player["injury_label"], str)
+        assert isinstance(player["ruled_out"], bool)
+
+    questionable = next(p for p in body["my_team"]["starters"] if p["player_id"] == "mine2")
+    # Questionable is uncertainty, not a ruling: he still starts, tagged.
+    assert questionable["injury_label"] == "Questionable"
+    assert questionable["ruled_out"] is False
+    assert "confirm status before kickoff" in questionable["why"]
 
 
 def test_matchup_uses_the_leagues_current_week_for_the_live_sleeper_call(monkeypatch):

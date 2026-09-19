@@ -228,6 +228,18 @@ export interface LineupPlayer {
   age: number | null;
   status: string | null;
   injury_status: string | null;
+  /**
+   * The injury tag to render — '' when healthy.
+   *
+   * Render THIS, never `injury_status` on its own: a weekly tag arrives on
+   * `injury_status` ("Questionable"), but IR/PUP/season-ending arrives on
+   * `status` with `injury_status` blank, so an `injury_status`-driven pill
+   * silently hides the most unavailable players. The server resolves both
+   * into one label (modules.rankings.injury_display_label).
+   */
+  injury_label: string;
+  /** Confirmed unavailable (Out/IR/PUP) — only ever a starter when no available alternative exists. */
+  ruled_out: boolean;
   tier: string | null;
   score: number | null;
   slot: string | null;
