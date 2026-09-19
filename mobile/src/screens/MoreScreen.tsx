@@ -6,10 +6,12 @@ import IconCircle from '../components/IconCircle';
 import { api, type PushCategory } from '../lib/api';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
+import { isShowcaseModeAvailable } from '../lib/showcaseMode';
 import { colors, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useAuth } from '../context/AuthContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
+import { useShowcaseMode } from '../context/ShowcaseModeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 
@@ -39,8 +41,13 @@ export default function MoreScreen({ navigation }: Props) {
   const { density, setDensity } = useDensity();
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
   const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
-  const { deleteAccount } = useAuth();
+  const { deleteAccount, session } = useAuth();
   const [deleting, setDeleting] = useState(false);
+  const { showcaseMode, setShowcaseMode } = useShowcaseMode();
+  // Dev/founder accounts only (lib/showcaseMode.ts allowlist) — the row
+  // doesn't exist for anyone else, so there's nothing for a normal user to
+  // stumble into.
+  const showcaseAvailable = isShowcaseModeAvailable(session?.user?.email);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +185,30 @@ export default function MoreScreen({ navigation }: Props) {
         </View>
         <Text style={styles.chevron}>{'›'}</Text>
       </TouchableOpacity>
+
+      {showcaseAvailable ? (
+        <>
+          <Text style={styles.sectionLabel}>Developer</Text>
+          <View style={styles.row}>
+            <View style={styles.labelGroup}>
+              <IconCircle name="videocam-outline" color={colors.premium} style={styles.icon} />
+              <View style={styles.toggleTextGroup}>
+                <Text style={styles.label}>Showcase mode</Text>
+                <Text style={styles.toggleDescription}>
+                  Replaces every team name, league name, owner name and username with
+                  stand-ins so screen recordings stay anonymous. Player and football data
+                  are untouched.
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={showcaseMode}
+              onValueChange={setShowcaseMode}
+              trackColor={{ true: colors.premium, false: colors.border }}
+            />
+          </View>
+        </>
+      ) : null}
 
       <Text style={styles.sectionLabel}>Legal</Text>
       {LEGAL_ITEMS.map((item) => (

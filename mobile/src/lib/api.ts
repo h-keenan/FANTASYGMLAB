@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { env } from './env';
+import { maskShowcaseFields, setShowcaseModeEnabled } from './showcaseMode';
 
 /**
  * Client for services/mobile_api_service.py. Every call attaches the current
@@ -50,7 +51,11 @@ async function authorizedRequest<T>(
     throw new ApiError(response.status, message);
   }
 
-  return body as T;
+  // Single choke point for showcase mode (lib/showcaseMode.ts): every
+  // successful response leaves through here, so masking identity fields at
+  // this line covers every screen at once. A no-op unless a dev has the
+  // toggle on — it returns the same reference back when the flag is off.
+  return maskShowcaseFields(body as T);
 }
 
 function authorizedFetch<T>(path: string): Promise<T> {
@@ -907,6 +912,11 @@ export interface TradeHubResponse {
 const MAX_PLAYER_IDS_PER_REQUEST = 300;
 
 export const api = {
+  /**
+   * Arms/disarms showcase-mode masking of every response this client
+   * returns. Called by ShowcaseModeProvider — nothing else should touch it.
+   */
+  setShowcaseModeEnabled,
   getMe: () => authorizedFetch<MeResponse>('/v1/me'),
   getLeague: (leagueId: string) =>
     authorizedFetch<LeagueResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}`),

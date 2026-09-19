@@ -24,8 +24,10 @@ import GlassPanel from '../components/GlassPanel';
 import IconCircle from '../components/IconCircle';
 import { api, type MeResponse } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import { getLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
+import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { colors, gradients, radii, spacing, typography } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -42,6 +44,7 @@ interface SavedLeague {
 export default function HomeScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { session, signOut } = useAuth();
+  const { showcaseMode } = useShowcaseMode();
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
   const [leagues, setLeagues] = useState<SavedLeague[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,7 +117,9 @@ export default function HomeScreen({ navigation }: Props) {
       if (leaguesResult.value.error) {
         setLeaguesError(leaguesResult.value.error.message);
       } else {
-        setLeagues((leaguesResult.value.data as SavedLeague[]) ?? []);
+        // Saved leagues come straight from Supabase, not the API client, so
+        // they miss authorizedRequest's showcase masking — apply it here.
+        setLeagues(maskShowcaseFields((leaguesResult.value.data as SavedLeague[]) ?? []));
       }
     } else {
       setLeaguesError('Could not load your saved leagues.');
@@ -176,7 +181,11 @@ export default function HomeScreen({ navigation }: Props) {
                   <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
                   <View>
                     <Text style={styles.brandName}>FantasyGM Lab</Text>
-                    <Text style={styles.email}>{session?.user.is_anonymous ? 'Guest' : session?.user.email}</Text>
+                    <Text style={styles.email}>
+                      {session?.user.is_anonymous
+                        ? 'Guest'
+                        : maskShowcaseText('email', session?.user.email)}
+                    </Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={() => void signOut()} hitSlop={8}>
@@ -270,16 +279,21 @@ export default function HomeScreen({ navigation }: Props) {
                   <Text style={styles.defaultBadgeText}>Default</Text>
                 </View>
               ) : null}
-              <TouchableOpacity
-                hitSlop={8}
-                style={styles.renameButton}
-                onPress={() => {
-                  setRenamingLeague(item);
-                  setRenameText(item.league_name || '');
-                }}
-              >
-                <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
+              {/* Hidden while showcase mode is on: the name shown here is a
+                  stand-in, and rename prefills from it — saving would write
+                  the fake name back into saved_leagues for real. */}
+              {showcaseMode ? null : (
+                <TouchableOpacity
+                  hitSlop={8}
+                  style={styles.renameButton}
+                  onPress={() => {
+                    setRenamingLeague(item);
+                    setRenameText(item.league_name || '');
+                  }}
+                >
+                  <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
               <Text style={styles.chevron}>›</Text>
             </View>
           </AnimatedCard>

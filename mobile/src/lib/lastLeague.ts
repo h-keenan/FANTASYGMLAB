@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { api } from './api';
+import { isShowcaseModeEnabled } from './showcaseMode';
 
 const KEY = 'fgl:last-league';
 
@@ -34,6 +35,10 @@ export async function setLastLeague(league: LastLeague): Promise<void> {
   } catch {
     // Best-effort — not worth surfacing to the user.
   }
+  // In showcase mode the name in hand is a stand-in (lib/showcaseMode.ts),
+  // so writing it durably would push a fake league name to this account's
+  // other devices and the web app. Local cache only while recording.
+  if (isShowcaseModeEnabled()) return;
   // Also durable (via the same user_settings blob display density uses) so
   // a reinstall or a second device picks up where this one left off, not
   // just this device's own AsyncStorage.
