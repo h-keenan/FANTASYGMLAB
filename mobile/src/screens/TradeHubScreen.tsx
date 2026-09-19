@@ -10,6 +10,7 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import TeamAvatar from '../components/TeamAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
+import TradeValueHero from '../components/TradeValueHero';
 import {
   TEAM_STRATEGY_OPTIONS,
   type PresentationAsset,
@@ -403,7 +404,6 @@ function TradeIdeaCard({
   navigation: Props['navigation'];
 }) {
   const { showExplanations } = useDensity();
-  const gainColor = idea.trade_gain > 0 ? colors.success : idea.trade_gain < 0 ? colors.danger : colors.textSecondary;
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
@@ -437,22 +437,21 @@ function TradeIdeaCard({
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
         </TouchableOpacity>
-        <View style={[styles.gainPill, { backgroundColor: `${gainColor}26` }]}>
-          <Text style={[styles.gainLabel, { color: gainColor }]}>
-            {idea.trade_gain > 0 ? '+' : ''}
-            {idea.trade_gain}
-          </Text>
-        </View>
       </View>
 
-      {idea.value_edge_band ? (
-        <View style={styles.valueEdgeRow}>
-          <Text style={styles.valueEdgeLabel}>TRADE VALUE</Text>
+      {/* Quick visual: the gain used to be a 14pt pill tucked beside the
+          partner name, with the band on its own line below. Both now share
+          one row led by the share card's big color-coded number, so a
+          scrolling feed still gives each idea one scannable headline value
+          without costing an extra row of height. */}
+      <View style={styles.valueEdgeRow}>
+        <TradeValueHero delta={idea.trade_gain} size="sm" />
+        {idea.value_edge_band ? (
           <View style={[styles.valueEdgeChip, { borderColor: bandColor }]}>
             <Text style={[styles.valueEdgeText, { color: bandColor }]}>{idea.value_edge_band}</Text>
           </View>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
 
       <TradeSharePreviewModal
         visible={shareOpen}
@@ -585,12 +584,12 @@ const styles = StyleSheet.create({
   },
   valueEdgeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xs,
+    paddingBottom: spacing.sm,
   },
-  valueEdgeLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   valueEdgeChip: {
     borderWidth: 1,
     borderRadius: radii.pill,
@@ -626,10 +625,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.xs,
   },
-  gainPill: { borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  gainLabel: { fontSize: 14, fontWeight: '700' },
   exchangeRow: { flexDirection: 'row', paddingHorizontal: spacing.md, gap: spacing.sm },
   exchangeSide: { flex: 1, gap: spacing.xs },
   exchangeGutter: { width: 28, alignItems: 'center', paddingTop: spacing.lg },
