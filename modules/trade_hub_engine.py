@@ -19,11 +19,17 @@ roster-player-map builder) that wraps modules.trust_enforcement.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Mapping
 
 import pandas as pd
 
+from modules import league_value_settings
+from modules import player_eligibility
+from modules import rankings
+from modules import sleeper
 from modules import trade_hub_ui
 from modules import trade_ideas as trade_ideas_module
 from modules import trade_trust
@@ -400,6 +406,81 @@ def generate_trade_idea_records(
         rosters=rosters,
     )
     return list(enforced)
+
+
+# Idea generation re-applies the valuation lens across the whole players
+# table and searches every roster for partner fits — real work, redone from
+# scratch on every call even though a given (league, roster, strategy,
+# lens) combo can't change faster than the underlying Sleeper roster data
+# does. Same live-time-bucket idiom modules.sleeper uses for its own
+# endpoint caches. Lives here (not in services/mobile_api_service.py, where
+# it first shipped) so modules.dashboard_engine's Top Trade Opportunity
+# tile — which calls this exact function with the exact same arguments to
+# pull one headline idea — shares the same cache instead of independently
+# recomputing the identical search Trade Hub may have just cached moments
+# earlier for the same user.
+TRADE_HUB_IDEAS_TTL_SECONDS = 30
+
+
+def _trade_hub_ideas_cache_bucket() -> int:
+    return int(time.time() // TRADE_HUB_IDEAS_TTL_SECONDS)
+
+
+@lru_cache(maxsize=256)
+def _generate_trade_idea_records_cached(
+    league_id: str,
+    roster_id: int,
+    strategy: str,
+    lens: str,
+    players_db_path: str,
+    _bucket: int,
+) -> list[dict[str, Any]]:
+    league = sleeper.get_league(league_id)
+    if not league:
+        return []
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(players_db_path)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(players_db_path)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="trade_hub_ideas_cache"
+    )
+    if players_df.empty:
+        return []
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+    rosters = sleeper.get_rosters(league_id)
+    return generate_trade_idea_records(
+        league_id=league_id,
+        my_roster_id=roster_id,
+        players_df=valued,
+        rosters=rosters,
+        league_settings=settings,
+        score_field=score_field,
+        team_strategy=strategy,
+    )
+
+
+def generate_trade_idea_records_cached(
+    *,
+    league_id: str,
+    roster_id: int,
+    strategy: str,
+    lens: str,
+    players_db_path: str,
+) -> list[dict[str, Any]]:
+    """Cached front door for `generate_trade_idea_records` — resolves its
+    own players_df/settings/rosters from just (league_id, lens) rather than
+    accepting them as arguments, so two different callers (Trade Hub's own
+    endpoint, Dashboard's trade tile) asking about the same league/roster/
+    strategy/lens combo within the same 30s window hit one cache entry
+    instead of each re-running the full search independently."""
+
+    return _generate_trade_idea_records_cached(
+        league_id, roster_id, strategy, lens, players_db_path, _trade_hub_ideas_cache_bucket()
+    )
 
 
 def generate_trade_ideas(

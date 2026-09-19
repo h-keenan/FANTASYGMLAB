@@ -66,9 +66,7 @@ import dataclasses
 import hashlib
 import os
 import re
-import time
 from datetime import datetime, timedelta, timezone
-from functools import lru_cache
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -2616,6 +2614,22 @@ def get_league_dashboard(
     team_strategy = _fetch_stored_gm_stance(
         config, str(user.get("_access_token") or ""), user_id=user_id, league_id=league_id
     )
+    # Shares the exact same cached search Trade Hub's own endpoint uses
+    # (trade_hub_engine.generate_trade_idea_records_cached) for this tile,
+    # rather than letting compose_next_move_briefing recompute the identical
+    # (league, roster, strategy, lens) search a user may have just triggered
+    # moments earlier by opening Trade Hub.
+    trade_idea_records = None
+    try:
+        trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
+            league_id=league_id,
+            roster_id=int(my_roster.get("roster_id")),
+            strategy=team_strategy,
+            lens=lens,
+            players_db_path=PLAYERS_DB_PATH,
+        )
+    except (TypeError, ValueError):
+        pass
     briefing = dashboard_engine.compose_next_move_briefing(
         league_id=league_id,
         roster_id=str(my_roster.get("roster_id") or ""),
@@ -2627,6 +2641,7 @@ def get_league_dashboard(
         entitlement=str(profile.get("entitlement") or "free"),
         rosters=rosters,
         team_strategy=team_strategy,
+        trade_idea_records=trade_idea_records,
     )
 
     # Team Snapshot: record comes straight off the roster we already
@@ -3330,60 +3345,6 @@ def get_league_waivers(
 AD_BONUS_IDEAS_PER_UNLOCK = 2
 MAX_AD_UNLOCKS = 3
 
-# Idea generation re-applies the valuation lens across the whole players
-# table and searches every roster for partner fits — real work, redone from
-# scratch on every request even though a given (league, roster, strategy,
-# lens) combo can't change faster than the underlying Sleeper roster data
-# does. Same live-time-bucket idiom as modules.sleeper's
-# _live_league_cache_bucket(): the bucket in the cache key expires each
-# entry on its own after TRADE_HUB_IDEAS_TTL_SECONDS, so this never serves
-# ideas staler than that even though nothing ever explicitly invalidates it.
-# Safe to cache the raw dicts returned here — downstream code
-# (order_trade_hub_visible_ideas, project_trade_idea_card) only reads them
-# and builds new dicts via .to_dict(), never mutates them in place.
-TRADE_HUB_IDEAS_TTL_SECONDS = 30
-
-
-def _trade_hub_ideas_cache_bucket() -> int:
-    return int(time.time() // TRADE_HUB_IDEAS_TTL_SECONDS)
-
-
-@lru_cache(maxsize=256)
-def _generate_trade_hub_records_cached(
-    league_id: str,
-    roster_id: int,
-    strategy: str,
-    lens: str,
-    _bucket: int,
-) -> list[dict[str, Any]]:
-    league = sleeper.get_league(league_id)
-    if not league:
-        return []
-    settings = league_value_settings.detect_league_value_settings_from_payload(league)
-
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_trade_hub"
-    )
-    if players_df.empty:
-        return []
-
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
-    score_field = league_value_settings.valuation_score_field(lens)
-    rosters = sleeper.get_rosters(league_id)
-    return trade_hub_engine.generate_trade_idea_records(
-        league_id=league_id,
-        my_roster_id=roster_id,
-        players_df=valued,
-        rosters=rosters,
-        league_settings=settings,
-        score_field=score_field,
-        team_strategy=strategy,
-    )
-
-
 @app.get("/v1/leagues/{league_id}/trade-hub")
 def get_trade_hub_ideas(
     league_id: str,
@@ -3430,8 +3391,12 @@ def get_trade_hub_ideas(
     if roster_id is None:
         return {"ok": True, "ideas": [], "reason": "empty_roster"}
 
-    records = _generate_trade_hub_records_cached(
-        league_id, int(roster_id), strategy, lens, _trade_hub_ideas_cache_bucket()
+    records = trade_hub_engine.generate_trade_idea_records_cached(
+        league_id=league_id,
+        roster_id=int(roster_id),
+        strategy=strategy,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
     )
 
     is_premium = str(profile.get("entitlement") or "free") == "premium"
