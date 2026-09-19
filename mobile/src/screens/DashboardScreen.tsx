@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
+import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import {
@@ -22,6 +23,7 @@ import {
   type TeamSnapshot,
 } from '../lib/api';
 import PremiumLock from '../components/PremiumLock';
+import TrajectoryArcs from '../components/TrajectoryArcs';
 import { useOrbClearance } from '../lib/orbLayout';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -223,6 +225,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
         The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and
         waiver signals the web app's Dashboard uses.
       </AppText>
+      <QuickActionsGrid leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
       {!isFirstVisit && newRecommendationIds.size > 0 ? (
         <View style={styles.checkInBanner}>
           <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
@@ -253,7 +256,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       ) : null}
       {quiet || !items || items.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Ionicons name="checkmark-done-outline" size={22} color={colors.success} />
+          <TrajectoryArcs width={120} height={82} />
           <AppText style={styles.emptyText}>
             {quietReason || 'Nothing urgent right now — your roster looks steady.'}
           </AppText>
@@ -328,6 +331,55 @@ const NOT_READY_MESSAGES: Record<string, string> = {
   not_a_member_of_league: "You don't appear to own a team in this league.",
   empty_roster: "This roster doesn't have any players yet.",
 };
+
+// Same icon/color per destination GmOrb's own menu already uses (Trade Hub
+// 'shuffle-outline'/premium, Players 'people-outline'/violet, Waivers
+// 'swap-horizontal-outline'/success, Draft Center 'albums-outline'/premium)
+// — IconCircle's own docstring is "a list of rows scans by color before it
+// scans by label," which only holds if the same destination always gets
+// the same color everywhere, not a fresh one invented per screen.
+const QUICK_ACTIONS: Array<{
+  label: string;
+  route: 'TradeHub' | 'Players' | 'Waivers' | 'DraftCenter';
+  icon: React.ComponentProps<typeof IconCircle>['name'];
+  color: string;
+}> = [
+  { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', color: colors.premium },
+  { label: 'Rankings', route: 'Players', icon: 'people-outline', color: colors.violet },
+  { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
+  { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
+];
+
+/** The concept sheet's Dashboard panel leads with a 2x2 "Quick Actions"
+ * shortcut grid (Trade Hub/Rankings/Waivers/Draft Picks) above the daily
+ * briefing feed — this app's Dashboard had no equivalent shortcut row at
+ * all, only the deeper GM Orb menu and per-tile destination buttons. */
+function QuickActionsGrid({
+  leagueId,
+  leagueName,
+  navigation,
+}: {
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+}) {
+  return (
+    <View style={styles.quickActionsGrid}>
+      {QUICK_ACTIONS.map((action) => (
+        <TouchableOpacity
+          key={action.route}
+          style={styles.quickActionCell}
+          onPress={() => navigation.navigate(action.route, { leagueId, leagueName })}
+        >
+          <IconCircle name={action.icon} color={action.color} size={40} />
+          <AppText style={styles.quickActionLabel} numberOfLines={1}>
+            {action.label}
+          </AppText>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
 
 function DestinationButton({
   item,
@@ -725,6 +777,20 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16 },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.lg,
+    marginHorizontal: -spacing.xs,
+  },
+  quickActionCell: {
+    width: '25%',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+  },
+  quickActionLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
   lockWrap: { marginTop: spacing.md },
   pulseSection: { marginTop: spacing.lg },
   pulseHeading: {
