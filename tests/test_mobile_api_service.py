@@ -124,6 +124,32 @@ def test_health_root_and_ready(monkeypatch):
     assert ready.json()["status"] == "ready"
 
 
+def test_health_triggers_players_refresh_check_without_auth(monkeypatch):
+    # /health needs no Authorization header, unlike every endpoint behind
+    # require_user — it's the only route the keep-alive cron actually pings
+    # (.github/workflows/keep-alive.yml), so it's also the only reliable,
+    # traffic-independent place to catch a stale players cache when no real
+    # user has hit an authenticated endpoint in the last hour.
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("DYNASTYGM_TEST_MODE", raising=False)
+    monkeypatch.setattr(mobile_api_service.startup_cold_path, "sleeper_players_cache_stale", lambda **kwargs: True)
+    called: dict = {}
+
+    def fake_schedule(**kwargs):
+        called.update(kwargs)
+        return {"scheduled": True}
+
+    monkeypatch.setattr(mobile_api_service.players_refresh_flight, "schedule_deferred_players_refresh", fake_schedule)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert called["db_path"] == mobile_api_service.PLAYERS_DB_PATH
+
+
 def test_ready_reports_not_ready_without_supabase_config(monkeypatch):
     pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
