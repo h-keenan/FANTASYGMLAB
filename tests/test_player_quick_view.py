@@ -363,3 +363,88 @@ def test_percentiles_are_omitted_for_a_player_outside_the_eligible_pool():
     season = player_quick_view.build_stats_view(_subject_row(players), players).seasons[0]
 
     assert all(item.percentile is None for item in season.key_stats)
+
+
+def _rated_pool(count: int, **subject_overrides):
+    """`_pool_with_subject` plus the composite score the overall rating ranks
+    on, ascending across the pool so the subject's expected slot is exact."""
+
+    players = _pool_with_subject(count, **subject_overrides)
+    players["value_score"] = [float(index) for index in range(len(players))]
+    return players
+
+
+def test_overall_rating_is_absent_without_a_pool():
+    assert player_quick_view.build_stats_view(_row()).overall_rating is None
+
+
+def test_overall_rating_tops_out_for_the_best_score_in_the_position():
+    players = _rated_pool(20)
+    # The subject is appended last, so the ascending scores leave them on top.
+    stats = player_quick_view.build_stats_view(_subject_row(players), players)
+
+    assert stats.overall_rating == player_quick_view.OVERALL_RATING_MAX
+
+
+def test_overall_rating_is_mid_scale_for_a_mid_pack_score():
+    players = _rated_pool(20)
+    subject = players["player_id"] == "fixture-player"
+    # Drop the subject into the middle of the ascending value_score ladder.
+    players.loc[subject, "value_score"] = 10.5
+
+    rating = player_quick_view.build_stats_view(_subject_row(players), players).overall_rating
+
+    assert rating is not None
+    assert 40 <= rating <= 60
+
+
+def test_overall_rating_ranks_within_the_position_not_across_positions():
+    wr = _rated_pool(20)
+    rb = _pool(20, position="RB")
+    rb["player_id"] = [f"rb-{index}" for index in range(len(rb))]
+    # Every RB outscores the whole WR pool; a cross-position pool would sink
+    # the subject's rating, a position-relative one must not move it.
+    rb["value_score"] = 9999.0
+    players = pd.concat([wr, rb], ignore_index=True)
+
+    stats = player_quick_view.build_stats_view(_subject_row(players), players)
+
+    assert stats.overall_rating == player_quick_view.OVERALL_RATING_MAX
+
+
+def test_overall_rating_is_omitted_when_the_position_pool_is_too_small():
+    players = _rated_pool(player_quick_view.PERCENTILE_MIN_POOL - 2)
+
+    assert player_quick_view.build_stats_view(_subject_row(players), players).overall_rating is None
+
+
+def test_overall_rating_is_omitted_when_too_few_players_carry_a_score():
+    players = _rated_pool(20)
+    scored = players["player_id"].isin({"fixture-player", "pool-0", "pool-1"})
+    players.loc[~scored, "value_score"] = None
+
+    assert player_quick_view.build_stats_view(_subject_row(players), players).overall_rating is None
+
+
+def test_overall_rating_uses_the_shared_eligibility_filter_for_the_pool():
+    players = _rated_pool(20)
+    others = players["player_id"] != "fixture-player"
+    players.loc[others, "is_current_fantasy_eligible"] = False
+
+    assert player_quick_view.build_stats_view(_subject_row(players), players).overall_rating is None
+
+
+def test_overall_rating_falls_back_to_the_score_column():
+    players = _rated_pool(20)
+    players["score"] = players["value_score"]
+    players = players.drop(columns=["value_score"])
+
+    stats = player_quick_view.build_stats_view(_subject_row(players), players)
+
+    assert stats.overall_rating == player_quick_view.OVERALL_RATING_MAX
+
+
+def test_overall_rating_is_omitted_when_no_score_column_exists():
+    players = _pool_with_subject(20)
+
+    assert player_quick_view.build_stats_view(_subject_row(players), players).overall_rating is None

@@ -78,6 +78,11 @@ class PlayerQuickViewStats:
     college_available: bool
     career_totals_available: bool = False
     position: str = ""
+    #: 0-99 headline rating — the player's ``value_score`` percentile within
+    #: their position, on the scale a 2K "OVR" badge uses. ``None`` when the
+    #: position pool is too thin to rank against, exactly like
+    #: ``StatItem.percentile``; see ``_overall_rating``.
+    overall_rating: int | None = None
 
 
 @dataclass(frozen=True)
@@ -240,6 +245,19 @@ def _group_items(row: pd.Series) -> dict[str, list[dict]]:
 #: is omitted entirely instead.
 PERCENTILE_MIN_POOL = 10
 
+#: Top of the overall-rating scale. 99 (not 100) because the number is read
+#: as an NBA 2K "OVR" badge, and a 100 would read as a different, unbounded
+#: scale. The floor is 1 for the same reason a percentile's is: a rated
+#: player is never a 0.
+OVERALL_RATING_MAX = 99
+
+#: Columns the overall rating ranks on, in preference order. rankings.py
+#: writes ``value_score`` and ``dynasty_score`` from the same composite
+#: ``score`` in one pass (see compose_composite_score), so these are the same
+#: number under three names — the fallback chain exists only so a frame
+#: assembled by a lighter path still rates.
+_OVERALL_SCORE_FIELDS = ("value_score", "dynasty_score", "score")
+
 #: Stat label -> candidate source columns, derived from the SAME definitions
 #: player_profile_ui uses to build the displayed items, so a percentile can
 #: never drift onto a different column than the number it sits next to.
@@ -287,6 +305,87 @@ def _positive(series: pd.Series | None) -> pd.Series | None:
     return series.where(series > 0)
 
 
+def _position_pool(
+    players_df: pd.DataFrame | None,
+    row: Mapping[str, object],
+) -> tuple[pd.DataFrame, int] | None:
+    """This player's position group inside the canonical eligible pool.
+
+    The one place the "who is this player ranked against" question is
+    answered, so every percentile on this screen — the per-stat ones and the
+    headline overall rating — shares a single peer group. Returns the group
+    frame plus the player's row offset inside it, or ``None`` when no
+    trustworthy comparison exists (see ``_stat_percentiles`` for the two
+    gates and why they are drawn where they are).
+    """
+
+    if players_df is None or not isinstance(players_df, pd.DataFrame) or players_df.empty:
+        return None
+    if "position" not in players_df.columns or "player_id" not in players_df.columns:
+        return None
+    position = _text(row.get("position")).upper()
+    player_id = _text(row.get("player_id"))
+    if not position or not player_id:
+        return None
+
+    try:
+        pool = filter_current_fantasy_players(
+            players_df,
+            surface="player_quick_view_percentiles",
+        )
+    except Exception:
+        return None
+    if pool is None or pool.empty:
+        return None
+
+    group = pool[pool["position"].astype(str).str.upper() == position]
+    if len(group) < PERCENTILE_MIN_POOL:
+        return None
+    located = group["player_id"].astype(str).to_numpy() == player_id
+    if not located.any():
+        return None
+    return group, int(located.argmax())
+
+
+def _overall_rating(
+    players_df: pd.DataFrame | None,
+    row: Mapping[str, object],
+) -> int | None:
+    """One 0-99 headline number for "how good is this player", 2K-style.
+
+    Deliberately *not* a new valuation: it is the player's percentile on the
+    exact same ``value_score`` the ranking board, trade engine and Snapshot
+    grid already show, re-expressed on the 0-99 scale people read instantly.
+    Rank and score answer "where do you sit" and "what are you worth";
+    neither answers "out of 99, how good is this" at a glance, which is the
+    whole point of the badge.
+
+    Same pool, same position-relative framing and same
+    ``PERCENTILE_MIN_POOL`` gate as the per-stat percentiles (``None`` below
+    it), so the hero ring can never disagree with the numbers on the Stats
+    tab — a 99 overall next to a page of 30th-percentile stats would be the
+    app arguing with itself.
+    """
+
+    located = _position_pool(players_df, row)
+    if located is None:
+        return None
+    group, offset = located
+
+    column = next((field for field in _OVERALL_SCORE_FIELDS if field in group.columns), "")
+    if not column:
+        return None
+    series = pd.to_numeric(group[column], errors="coerce")
+    if int(series.notna().sum()) < PERCENTILE_MIN_POOL:
+        return None
+    value = series.rank(pct=True).to_numpy()[offset]
+    if pd.isna(value):
+        return None
+    return int(
+        min(OVERALL_RATING_MAX, max(1, int(round(float(value) * OVERALL_RATING_MAX))))
+    )
+
+
 def _stat_percentiles(
     players_df: pd.DataFrame | None,
     row: Mapping[str, object],
@@ -315,32 +414,10 @@ def _stat_percentiles(
     there is no meaningful peer group to rank a retired player against.
     """
 
-    if players_df is None or not isinstance(players_df, pd.DataFrame) or players_df.empty:
+    located = _position_pool(players_df, row)
+    if located is None:
         return {}
-    if "position" not in players_df.columns or "player_id" not in players_df.columns:
-        return {}
-    position = _text(row.get("position")).upper()
-    player_id = _text(row.get("player_id"))
-    if not position or not player_id:
-        return {}
-
-    try:
-        pool = filter_current_fantasy_players(
-            players_df,
-            surface="player_quick_view_percentiles",
-        )
-    except Exception:
-        return {}
-    if pool is None or pool.empty:
-        return {}
-
-    group = pool[pool["position"].astype(str).str.upper() == position]
-    if len(group) < PERCENTILE_MIN_POOL:
-        return {}
-    located = group["player_id"].astype(str).to_numpy() == player_id
-    if not located.any():
-        return {}
-    offset = int(located.argmax())
+    group, offset = located
 
     series_by_label: dict[str, pd.Series | None] = {
         label: _pool_series(group, row, fields)
@@ -530,8 +607,10 @@ def build_stats_view(
     ``players_df`` is optional and purely additive: when a caller already holds
     the full player frame (the quick-view endpoint loads it to find this row in
     the first place), every stat also carries its position-group percentile so
-    "59 rush yards" reads as "59 · 40th pct". Omitting it leaves every
-    ``StatItem.percentile`` as ``None`` and changes nothing else.
+    "59 rush yards" reads as "59 · 40th pct", and the view carries the 0-99
+    ``overall_rating`` summarizing the same pool. Omitting it leaves every
+    ``StatItem.percentile`` and ``overall_rating`` as ``None`` and changes
+    nothing else.
     """
 
     groups = _group_items(row)
@@ -557,6 +636,7 @@ def build_stats_view(
         college=college,
         college_available=bool(college),
         position=_text(row.get("position")),
+        overall_rating=_overall_rating(players_df, row),
     )
 
 

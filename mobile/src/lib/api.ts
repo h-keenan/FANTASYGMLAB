@@ -671,6 +671,13 @@ export interface QuickViewStats {
   college_available: boolean;
   career_totals_available: boolean;
   position: string;
+  /** 0-99 headline rating, NBA 2K "OVR" style: the player's value_score
+   * percentile inside their position group, re-expressed on the scale
+   * people read at a glance. Null when the position pool was too thin to
+   * rank against — the same gate the per-stat percentiles use
+   * (player_quick_view.PERCENTILE_MIN_POOL), so nothing renders rather than
+   * a made-up number. */
+  overall_rating: number | null;
 }
 
 export interface QuickViewBio {

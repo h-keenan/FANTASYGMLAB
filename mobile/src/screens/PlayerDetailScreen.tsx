@@ -13,6 +13,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
+import CircularProgressRing from '../components/CircularProgressRing';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
@@ -758,12 +759,35 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
   const season = stats?.seasons[0];
   const tierIdentity = resolvePlayerTier(player.tier);
+  // The 2K-style headline: one 0-99 read on the same value_score the
+  // Snapshot grid below already shows, percentiled inside the player's
+  // position by the same backend machinery as the per-stat percentiles on
+  // the Stats tab. Null (too thin a pool to rank against) renders nothing —
+  // the header just falls back to the centered avatar it had before.
+  const rawOverall = stats?.overall_rating;
+  const overallRating =
+    rawOverall === null || rawOverall === undefined || !Number.isFinite(rawOverall)
+      ? null
+      : rawOverall;
 
   return (
     <>
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <View style={styles.header}>
-        <PlayerAvatar playerId={player.player_id} size={88} tier={player.tier} style={styles.heroAvatar} />
+        <View style={styles.heroIdentityRow}>
+          <PlayerAvatar playerId={player.player_id} size={88} tier={player.tier} />
+          {overallRating !== null ? (
+            <CircularProgressRing
+              percent={overallRating}
+              size={84}
+              strokeWidth={8}
+              valueLabel={String(overallRating)}
+              valueFontScale={0.38}
+              color={percentileColor(overallRating)}
+              label="Overall"
+            />
+          ) : null}
+        </View>
         <Text style={styles.name}>{player.name ?? 'Unknown player'}</Text>
         <View style={styles.heroMetaRow}>
           <PositionBadge position={player.position} size="md" />
@@ -859,7 +883,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   header: { alignItems: 'center', marginBottom: spacing.xl },
-  heroAvatar: { marginBottom: spacing.md },
+  heroIdentityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+    marginBottom: spacing.md,
+  },
   name: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
   meta: { fontSize: 14, color: colors.textSecondary },

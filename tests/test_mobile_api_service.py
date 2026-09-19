@@ -1889,6 +1889,94 @@ def test_quick_view_returns_real_season_stats_and_bio(monkeypatch):
     assert body["model"]["age_score_label"] == "Age Lens"
 
 
+def _rated_quick_view_frame(pool_size=20):
+    """A quick-view frame wide enough to rate against: an eligible WR pool
+    carrying the composite value_score the overall rating ranks on, with the
+    subject (9001) on top of it."""
+
+    rows = []
+    for index in range(pool_size):
+        rows.append(
+            {
+                "player_id": f"pool-{index}",
+                "name": f"Pool Player {index}",
+                "position": "WR",
+                "team": "NYJ",
+                "status": "Active",
+                "active": True,
+                "years_exp": 3,
+                "stats_season": 2026,
+                "games_played": 17,
+                "targets": 5 * index,
+                "receptions": 3 * index,
+                "receiving_yards": 40 * index,
+                "value_score": float(index),
+                "is_current_fantasy_eligible": True,
+                "player_eligibility_reason": "active_fantasy_player",
+                "trust_enforcement": "pass",
+                "trust_evidence_confidence": 1.0,
+                "trust_block_reason": "",
+                "trust_validation_fingerprint": f"fp-{index}",
+            }
+        )
+    subject = dict(rows[0])
+    subject.update(
+        {
+            "player_id": "9001",
+            "name": "Star Wideout",
+            "targets": 80,
+            "receptions": 60,
+            "receiving_yards": 900,
+            "value_score": 999.0,
+            "trust_validation_fingerprint": "fp-subject",
+        }
+    )
+    return pd.DataFrame([*rows, subject])
+
+
+def test_quick_view_sends_the_overall_rating_for_a_real_pool(monkeypatch):
+    from modules import player_quick_view
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_rated_quick_view_frame()):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    # Best value_score in the position pool -> top of the 0-99 scale. Real
+    # player_quick_view engine, not a mocked rating.
+    assert response.json()["stats"]["overall_rating"] == player_quick_view.OVERALL_RATING_MAX
+
+
+def test_quick_view_omits_the_overall_rating_when_the_pool_is_too_thin(monkeypatch):
+    from modules import player_quick_view
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    thin = _rated_quick_view_frame(player_quick_view.PERCENTILE_MIN_POOL - 2)
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=thin):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    # The field is always present in the payload; null means "no honest
+    # answer", never "zero".
+    assert response.json()["stats"]["overall_rating"] is None
+
+
 def test_quick_view_reports_no_seasons_when_stats_unavailable(monkeypatch):
     client = _client(monkeypatch)
 

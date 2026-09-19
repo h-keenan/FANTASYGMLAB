@@ -16,6 +16,7 @@ export default function CircularProgressRing({
   color = colors.accent,
   label,
   valueLabel,
+  valueFontScale = 0.26,
 }: {
   /** 0-100 */
   percent: number;
@@ -26,6 +27,10 @@ export default function CircularProgressRing({
   label?: string;
   /** Overrides the centered "N%" text — e.g. "HIGH" */
   valueLabel?: string;
+  /** Centered text size as a fraction of `size`. The default is tuned for a
+   * three-character "87%"; a short plain number (a 0-99 rating) can carry a
+   * bigger scale without crowding the stroke. */
+  valueFontScale?: number;
 }) {
   const clamped = Math.max(0, Math.min(100, percent));
   const radius = (size - strokeWidth) / 2;
@@ -62,7 +67,7 @@ export default function CircularProgressRing({
           />
         </Svg>
         <View style={[StyleSheet.absoluteFillObject, styles.centerContent]}>
-          <Text style={[styles.value, { color, fontSize: size * 0.26 }]} numberOfLines={1}>
+          <Text style={[styles.value, { color, fontSize: size * valueFontScale }]} numberOfLines={1}>
             {valueLabel ?? `${Math.round(clamped)}%`}
           </Text>
         </View>

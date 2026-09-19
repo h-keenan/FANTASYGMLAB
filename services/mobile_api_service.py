@@ -1938,6 +1938,10 @@ def _quick_view_stats_dict(stats: player_quick_view.PlayerQuickViewStats) -> dic
         "college_available": stats.college_available,
         "career_totals_available": stats.career_totals_available,
         "position": stats.position,
+        # 0-99 headline rating (the player's value_score percentile inside
+        # their position). Absent (null) under the same pool gate as the
+        # per-stat percentiles — see player_quick_view.PERCENTILE_MIN_POOL.
+        "overall_rating": _clean_json_value(stats.overall_rating),
     }
 
 
