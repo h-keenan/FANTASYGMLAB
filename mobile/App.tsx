@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { DensityProvider } from './src/context/DensityContext';
 import { GmStanceProvider } from './src/context/GmStanceContext';
+import { ShowcaseModeProvider } from './src/context/ShowcaseModeContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
@@ -23,9 +24,13 @@ export default function App() {
       <SafeAreaProvider>
         <DensityProvider>
           <GmStanceProvider>
-            <AuthProvider>
-              <RootNavigator />
-            </AuthProvider>
+            {/* Outside AuthProvider so the masking flag is armed from
+                storage before the first authorized request goes out. */}
+            <ShowcaseModeProvider>
+              <AuthProvider>
+                <RootNavigator />
+              </AuthProvider>
+            </ShowcaseModeProvider>
           </GmStanceProvider>
         </DensityProvider>
         <StatusBar style="light" />

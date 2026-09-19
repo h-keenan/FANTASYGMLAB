@@ -31,6 +31,7 @@ import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { ORB_INSET_CEILING, ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
+import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { colors, motion, radii, shadows, spacing } from '../theme';
 
@@ -202,7 +203,9 @@ export default function GmOrb() {
       .from('saved_leagues')
       .select('id, league_id, league_name')
       .then(({ data }) => {
-        if (!cancelled && data) setSavedLeagues(data as SavedLeagueRow[]);
+        // Straight from Supabase, so authorizedRequest's showcase masking
+        // never sees these — mask the league switcher's names here too.
+        if (!cancelled && data) setSavedLeagues(maskShowcaseFields(data as SavedLeagueRow[]));
       });
     return () => {
       cancelled = true;
