@@ -35,11 +35,13 @@ def _clear_trade_hub_ideas_cache():
     # modules.trade_hub_engine.generate_trade_idea_records result instead of
     # their own, since the cache sits between the caller (both the Trade Hub
     # endpoint and Dashboard's trade tile) and that mockable call.
-    from modules import trade_hub_engine
+    from modules import league_rankings, trade_hub_engine
 
     trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
+    league_rankings._build_league_rankings_frame_cached.cache_clear()
     yield
     trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
+    league_rankings._build_league_rankings_frame_cached.cache_clear()
 
 
 def test_render_yaml_documents_mobile_api_service():
@@ -3164,6 +3166,72 @@ def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch):
     assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
 
     trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
+
+
+def test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame(monkeypatch):
+    # Dashboard's power/franchise rank lookup and the Team Rankings screen
+    # ask the identical (league, lens) question — this pins that they hit
+    # ONE cached frame (league_rankings.build_league_rankings_frame_cached)
+    # instead of each independently rerunning the full league-wide ranking
+    # pass.
+    client = _client(monkeypatch)
+    from modules import league_rankings, trade_hub_engine
+
+    league_rankings._build_league_rankings_frame_cached.cache_clear()
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    call_count = {"n": 0}
+    real_build = league_rankings.build_league_rankings_frame
+
+    def counting_build(*args, **kwargs):
+        call_count["n"] += 1
+        return real_build(*args, **kwargs)
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch(
+            "services.mobile_api_service.auth_supabase.fetch_auth_user",
+            return_value=({"id": "user-123", "email": "gm@example.com"}, ""),
+        ))
+        stack.enter_context(patch(
+            "services.mobile_api_service._fetch_profile_fields",
+            return_value={"entitlement": "free", "sleeper_username": "gm_dynasty"},
+        ))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch(
+            "modules.sleeper.get_rosters",
+            return_value=[
+                {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+            ],
+        ))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE))
+        stack.enter_context(patch("modules.sleeper.get_users", return_value=[
+            {"user_id": "sleeper-user-1", "display_name": "GM One"},
+            {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+        ]))
+        stack.enter_context(patch("modules.sleeper.get_traded_picks", return_value=[]))
+        stack.enter_context(patch("modules.sleeper.get_league_roster_profiles", return_value={}))
+        stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_roster_frame()))
+        stack.enter_context(patch(
+            "modules.player_eligibility.filter_current_fantasy_players",
+            side_effect=lambda df, **kwargs: df,
+        ))
+        stack.enter_context(patch.object(trade_hub_engine, "generate_trade_idea_records", return_value=[]))
+        stack.enter_context(patch.object(league_rankings, "build_league_rankings_frame", side_effect=counting_build))
+        dashboard_response = client.get(
+            "/v1/leagues/abc/dashboard",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        team_rankings_response = client.get(
+            "/v1/leagues/abc/team-rankings?lens=Dynasty",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert dashboard_response.status_code == 200
+    assert team_rankings_response.status_code == 200
+    assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
+
+    league_rankings._build_league_rankings_frame_cached.cache_clear()
 
 
 def _fake_daily_gm_briefing(count: int):
