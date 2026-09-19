@@ -782,6 +782,8 @@ def _pick_asset(pick: Dict[str, Any], score_multiplier: float = 1.0) -> Dict[str
         "late_probability": pick.get("late_probability"),
         "projection_confidence": pick.get("projection_confidence"),
         "projection_source": pick.get("projection_source"),
+        "years_out": pick.get("years_out"),
+        "is_current_year_pick": pick.get("is_current_year_pick"),
     }
 
 

@@ -2212,10 +2212,10 @@ def render_current_season(
             unsafe_allow_html=True,
         )
         for title, items in (
-            ("Professional Production", selected.key_stats),
             ("Fantasy Production", selected.fantasy),
-            ("Efficiency", selected.efficiency),
+            ("Professional Production", selected.key_stats),
             ("Usage", selected.usage),
+            ("Efficiency", selected.efficiency),
         ):
             if items:
                 rendered.append(title)

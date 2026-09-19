@@ -655,11 +655,15 @@ function TradeSide({
   onRemove: (id: string) => void;
 }) {
   return (
-    <View style={[styles.side, active && styles.sideActive]}>
-      <TouchableOpacity style={styles.sideLabelRow} onPress={onPressHeader}>
+    <TouchableOpacity
+      style={[styles.side, active && styles.sideActive]}
+      onPress={onPressHeader}
+      activeOpacity={0.85}
+    >
+      <View style={styles.sideLabelRow}>
         <View style={[styles.sideDot, { backgroundColor: dotColor }]} />
         <Text style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</Text>
-      </TouchableOpacity>
+      </View>
       {items.map((item) => (
         <TouchableOpacity key={item.id} style={styles.chip} onPress={() => onRemove(item.id)}>
           <Text style={styles.chipText} numberOfLines={1}>
@@ -669,7 +673,7 @@ function TradeSide({
         </TouchableOpacity>
       ))}
       {items.length === 0 ? <Text style={styles.sideEmpty}>Tap to add</Text> : null}
-    </View>
+    </TouchableOpacity>
   );
 }
 
