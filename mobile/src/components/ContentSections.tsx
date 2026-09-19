@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 
 import { colors, spacing } from '../theme';
 
@@ -17,16 +18,16 @@ export default function ContentSections({ sections }: { sections: ContentSection
     <>
       {sections.map((section) => (
         <View key={section.title} style={styles.section}>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
+          <AppText style={styles.sectionTitle}>{section.title}</AppText>
           {section.paragraphs.map((paragraph) => (
-            <Text key={paragraph} style={styles.paragraph}>
+            <AppText key={paragraph} style={styles.paragraph}>
               {paragraph}
-            </Text>
+            </AppText>
           ))}
           {section.bullets.map((bullet) => (
             <View key={bullet} style={styles.bulletRow}>
-              <Text style={styles.bulletMark}>{'•'}</Text>
-              <Text style={styles.bulletText}>{bullet}</Text>
+              <AppText style={styles.bulletMark}>{'•'}</AppText>
+              <AppText style={styles.bulletText}>{bullet}</AppText>
             </View>
           ))}
         </View>

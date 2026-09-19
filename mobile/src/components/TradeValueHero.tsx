@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import AppText from './AppText';
 
 import { colors } from '../theme';
 
@@ -48,14 +49,14 @@ export default function TradeValueHero({
 
   return (
     <View style={style} accessible accessibilityLabel={`${label}: ${value}`}>
-      <Text
+      <AppText
         style={[styles.value, { color: tone, fontSize: metrics.value, letterSpacing: metrics.tracking }]}
         numberOfLines={1}
         adjustsFontSizeToFit
       >
         {value}
-      </Text>
-      <Text style={[styles.label, { fontSize: metrics.label }]}>{label}</Text>
+      </AppText>
+      <AppText style={[styles.label, { fontSize: metrics.label }]}>{label}</AppText>
     </View>
   );
 }

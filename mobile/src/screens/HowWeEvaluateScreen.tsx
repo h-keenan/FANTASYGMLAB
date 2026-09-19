@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
+import AppText from '../components/AppText';
 
 import ContentSections, { type ContentSection } from '../components/ContentSections';
 import methodologyContent from '../data/methodologyContent.json';
@@ -20,8 +21,8 @@ export default function HowWeEvaluateScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-      <Text style={styles.kicker}>{CONTENT.kicker}</Text>
-      <Text style={styles.note}>{CONTENT.note}</Text>
+      <AppText style={styles.kicker}>{CONTENT.kicker}</AppText>
+      <AppText style={styles.note}>{CONTENT.note}</AppText>
       <ContentSections sections={CONTENT.sections} />
     </ScrollView>
   );

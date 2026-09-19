@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 import QRCode from 'react-native-qrcode-svg';
 
 import type { RankedPlayer, TradeVerdict } from '../lib/api';
@@ -24,14 +25,14 @@ function AssetLine({ player }: { player: RankedPlayer }) {
     <View style={styles.assetLine}>
       <PlayerAvatar playerId={player.player_id} size={32} tier={player.tier} style={styles.assetAvatar} />
       <View style={styles.assetTextGroup}>
-        <Text style={styles.assetName} numberOfLines={1}>
+        <AppText style={styles.assetName} numberOfLines={1}>
           {player.name ?? 'Unknown'}
-        </Text>
+        </AppText>
         <View style={styles.assetMetaRow}>
           <PositionBadge position={player.position} />
-          <Text style={styles.assetMeta} numberOfLines={1}>
+          <AppText style={styles.assetMeta} numberOfLines={1}>
             {player.team}
-          </Text>
+          </AppText>
         </View>
       </View>
     </View>
@@ -63,28 +64,28 @@ const TradeShareCard = forwardRef<View, {
         <View style={styles.brandRow}>
           <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
           <View>
-            <Text style={styles.brandWord}>
-              FANTASY<Text style={styles.brandWordAccent}>GM</Text> LAB
-            </Text>
+            <AppText style={styles.brandWord}>
+              FANTASY<AppText style={styles.brandWordAccent}>GM</AppText> LAB
+            </AppText>
           </View>
         </View>
-        <Text style={styles.leagueName} numberOfLines={1}>
+        <AppText style={styles.leagueName} numberOfLines={1}>
           {leagueName.toUpperCase()}
-        </Text>
+        </AppText>
       </View>
 
       <View style={styles.hairline} />
 
-      <Text style={[styles.headline, { color: meta.color }]}>{meta.headline}</Text>
+      <AppText style={[styles.headline, { color: meta.color }]}>{meta.headline}</AppText>
       <View style={styles.bandRow}>
         <View style={[styles.bandChip, { backgroundColor: `${meta.color}26` }]}>
-          <Text style={[styles.bandChipText, { color: meta.color }]}>{verdict.band}</Text>
+          <AppText style={[styles.bandChipText, { color: meta.color }]}>{verdict.band}</AppText>
         </View>
-        <Text style={styles.confidenceText}>{verdict.confidence} confidence</Text>
+        <AppText style={styles.confidenceText}>{verdict.confidence} confidence</AppText>
       </View>
 
-      <Text style={[styles.gainValue, { color: gainColor }]}>{gainLabel}</Text>
-      <Text style={styles.gainLabel}>Value Change</Text>
+      <AppText style={[styles.gainValue, { color: gainColor }]}>{gainLabel}</AppText>
+      <AppText style={styles.gainLabel}>Value Change</AppText>
 
       <View style={styles.hairline} />
 
@@ -92,7 +93,7 @@ const TradeShareCard = forwardRef<View, {
         <View style={styles.exchangeSide}>
           <View style={styles.exchangeKickerRow}>
             <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
-            <Text style={styles.exchangeKicker}>YOU SEND</Text>
+            <AppText style={styles.exchangeKicker}>YOU SEND</AppText>
           </View>
           {sendPlayers.slice(0, 3).map((player) => (
             <AssetLine key={player.player_id} player={player} />
@@ -101,7 +102,7 @@ const TradeShareCard = forwardRef<View, {
         <View style={styles.exchangeSide}>
           <View style={styles.exchangeKickerRow}>
             <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
-            <Text style={styles.exchangeKicker}>YOU RECEIVE</Text>
+            <AppText style={styles.exchangeKicker}>YOU RECEIVE</AppText>
           </View>
           {receivePlayers.slice(0, 3).map((player) => (
             <AssetLine key={player.player_id} player={player} />
@@ -111,16 +112,16 @@ const TradeShareCard = forwardRef<View, {
 
       <View style={styles.hairline} />
 
-      <Text style={styles.whyLabel}>Why this works</Text>
-      <Text style={styles.whyText} numberOfLines={6}>
+      <AppText style={styles.whyLabel}>Why this works</AppText>
+      <AppText style={styles.whyText} numberOfLines={6}>
         {verdict.rationale}
-      </Text>
+      </AppText>
 
       <View style={styles.qrRow}>
         <View style={styles.qrTextGroup}>
-          <Text style={styles.qrKicker}>SCAN TO TRY</Text>
-          <Text style={styles.qrTitle}>FantasyGM Lab</Text>
-          <Text style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</Text>
+          <AppText style={styles.qrKicker}>SCAN TO TRY</AppText>
+          <AppText style={styles.qrTitle}>FantasyGM Lab</AppText>
+          <AppText style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</AppText>
         </View>
         <View style={styles.qrWrap}>
           <QRCode
@@ -138,11 +139,11 @@ const TradeShareCard = forwardRef<View, {
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          <Text style={{ color: colors.accent }}>PLAN. </Text>
-          <Text style={{ color: colors.premium }}>PROJECT. </Text>
-          <Text style={{ color: colors.danger }}>WIN.</Text>
-        </Text>
+        <AppText style={styles.footerText}>
+          <AppText style={{ color: colors.accent }}>PLAN. </AppText>
+          <AppText style={{ color: colors.premium }}>PROJECT. </AppText>
+          <AppText style={{ color: colors.danger }}>WIN.</AppText>
+        </AppText>
       </View>
     </View>
   );

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { ValuationLens } from '../lib/api';
@@ -34,18 +35,18 @@ export default function EvaluationLensHeaderButton({
   return (
     <>
       <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
-        <Text style={styles.buttonText} numberOfLines={1}>
+        <AppText style={styles.buttonText} numberOfLines={1}>
           {current?.label ?? 'Dynasty'}
-        </Text>
+        </AppText>
         <Ionicons name="chevron-down" size={12} color={colors.premium} />
       </TouchableOpacity>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.title}>Evaluation Lens</Text>
-            <Text style={styles.subtitle}>
+            <AppText style={styles.title}>Evaluation Lens</AppText>
+            <AppText style={styles.subtitle}>
               Which score field decides value in these trades — a second axis from GM Stance, not a replacement for it.
-            </Text>
+            </AppText>
             {LENS_OPTIONS.map((option) => {
               const active = option.value === lens;
               return (
@@ -58,8 +59,8 @@ export default function EvaluationLensHeaderButton({
                   }}
                 >
                   <View style={styles.optionTextGroup}>
-                    <Text style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</Text>
-                    <Text style={styles.optionHint}>{option.hint}</Text>
+                    <AppText style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</AppText>
+                    <AppText style={styles.optionHint}>{option.hint}</AppText>
                   </View>
                   {active ? <Ionicons name="checkmark-circle" size={18} color={colors.premium} /> : null}
                 </TouchableOpacity>

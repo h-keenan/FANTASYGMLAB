@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from './AppText';
 
 import { api, type PendingTradeOutcome, type TradeOutcomeAnswer } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
@@ -65,13 +66,13 @@ export default function TradeOutcomePrompt() {
     <Modal visible transparent animationType="fade">
       <Pressable style={styles.backdrop}>
         <View style={styles.sheet}>
-          <Text style={styles.title}>Did this trade happen?</Text>
-          <Text style={styles.subtitle}>You shared a trade with {partner}</Text>
+          <AppText style={styles.title}>Did this trade happen?</AppText>
+          <AppText style={styles.subtitle}>You shared a trade with {partner}</AppText>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>You sent</Text>
-            <Text style={styles.summaryValue}>{sendNames}</Text>
-            <Text style={styles.summaryLabel}>You received</Text>
-            <Text style={styles.summaryValue}>{receiveNames}</Text>
+            <AppText style={styles.summaryLabel}>You sent</AppText>
+            <AppText style={styles.summaryValue}>{sendNames}</AppText>
+            <AppText style={styles.summaryLabel}>You received</AppText>
+            <AppText style={styles.summaryValue}>{receiveNames}</AppText>
           </View>
 
           {answering ? (
@@ -80,10 +81,10 @@ export default function TradeOutcomePrompt() {
             <>
               <View style={styles.row}>
                 <TouchableOpacity style={[styles.button, styles.yesButton]} onPress={() => void answer('yes')}>
-                  <Text style={styles.yesButtonText}>Yes, it happened</Text>
+                  <AppText style={styles.yesButtonText}>Yes, it happened</AppText>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.button, styles.noButton]} onPress={() => void answer('no')}>
-                  <Text style={styles.noButtonText}>No</Text>
+                  <AppText style={styles.noButtonText}>No</AppText>
                 </TouchableOpacity>
               </View>
               <View style={styles.row}>
@@ -91,13 +92,13 @@ export default function TradeOutcomePrompt() {
                   style={[styles.button, styles.secondaryButton]}
                   onPress={() => void answer('still_pending')}
                 >
-                  <Text style={styles.secondaryButtonText}>Still pending</Text>
+                  <AppText style={styles.secondaryButtonText}>Still pending</AppText>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.button, styles.secondaryButton]}
                   onPress={() => void answer('didnt_send')}
                 >
-                  <Text style={styles.secondaryButtonText}>Didn't send</Text>
+                  <AppText style={styles.secondaryButtonText}>Didn't send</AppText>
                 </TouchableOpacity>
               </View>
             </>

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -93,7 +94,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -101,7 +102,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   if (notice) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notice}>{notice}</Text>
+        <AppText style={styles.notice}>{notice}</AppText>
       </View>
     );
   }
@@ -110,12 +111,12 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-        <Text style={styles.disclaimer}>
+        <AppText style={styles.disclaimer}>
           Your suggested starting lineup for {leagueName} — the same optimal-lineup logic the web
           app's Dashboard and My Team pages use.
-        </Text>
+        </AppText>
 
-        <Text style={styles.sectionLabel}>Starters</Text>
+        <AppText style={styles.sectionLabel}>Starters</AppText>
         {starters.map((player) => (
           <LineupRow
             key={player.player_id}
@@ -124,9 +125,9 @@ export default function MyTeamScreen({ route, navigation }: Props) {
           />
         ))}
 
-        <Text style={styles.sectionLabel}>Bench</Text>
+        <AppText style={styles.sectionLabel}>Bench</AppText>
         {bench.length === 0 ? (
-          <Text style={styles.emptyBench}>No bench players.</Text>
+          <AppText style={styles.emptyBench}>No bench players.</AppText>
         ) : (
           bench.map((player) => (
             <LineupRow
@@ -145,18 +146,18 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
   return (
     <AnimatedCard style={styles.card} onPress={onPress}>
       <View style={styles.slotBadge}>
-        <Text style={styles.slotText}>{player.slot === 'BENCH' ? player.position ?? '—' : player.slot}</Text>
+        <AppText style={styles.slotText}>{player.slot === 'BENCH' ? player.position ?? '—' : player.slot}</AppText>
       </View>
       <PlayerAvatar playerId={player.player_id} size={40} tier={player.tier} style={styles.avatar} />
       <View style={styles.nameColumn}>
-        <Text style={styles.name} numberOfLines={1}>
+        <AppText style={styles.name} numberOfLines={1}>
           {player.name ?? 'Unknown player'}
-        </Text>
+        </AppText>
         <View style={styles.metaRow}>
           <PositionBadge position={player.position} />
-          <Text style={styles.meta} numberOfLines={1}>
+          <AppText style={styles.meta} numberOfLines={1}>
             {[player.team, player.opportunity_label].filter(Boolean).join(' · ') || '—'}
-          </Text>
+          </AppText>
         </View>
       </View>
       {/* injury_label, not injury_status: IR/PUP/season-ending arrives on
@@ -164,7 +165,7 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
           pill hides exactly those players. See LineupPlayer.injury_label. */}
       {player.injury_label ? (
         <View style={[styles.injuryPill, player.ruled_out && styles.injuryPillOut]}>
-          <Text style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>{player.injury_label}</Text>
+          <AppText style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>{player.injury_label}</AppText>
         </View>
       ) : null}
     </AnimatedCard>

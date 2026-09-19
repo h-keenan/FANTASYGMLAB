@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -30,14 +31,14 @@ function StoryLine({ story }: { story: RecapStory }) {
         <Ionicons name={meta.icon} size={14} color={meta.color} />
       </View>
       <View style={styles.storyTextGroup}>
-        <Text style={styles.storyTitle} numberOfLines={1}>
+        <AppText style={styles.storyTitle} numberOfLines={1}>
           {story.title}
-        </Text>
+        </AppText>
         {story.metric_value ? (
-          <Text style={[styles.storyMetric, { color: meta.color }]} numberOfLines={1}>
+          <AppText style={[styles.storyMetric, { color: meta.color }]} numberOfLines={1}>
             {story.metric_value}
             {story.metric_label ? ` ${story.metric_label}` : ''}
-          </Text>
+          </AppText>
         ) : null}
       </View>
     </View>
@@ -58,19 +59,19 @@ const RecapShareCard = forwardRef<View, { leagueName: string; recap: WeeklyRecap
         <View style={styles.headerRow}>
           <View style={styles.brandRow}>
             <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
-            <Text style={styles.brandWord}>
-              FANTASY<Text style={styles.brandWordAccent}>GM</Text> LAB
-            </Text>
+            <AppText style={styles.brandWord}>
+              FANTASY<AppText style={styles.brandWordAccent}>GM</AppText> LAB
+            </AppText>
           </View>
-          <Text style={styles.leagueName} numberOfLines={1}>
+          <AppText style={styles.leagueName} numberOfLines={1}>
             {leagueName.toUpperCase()}
-          </Text>
+          </AppText>
         </View>
 
         <View style={styles.hairline} />
 
-        <Text style={styles.kicker}>LEAGUE MEMORY · WEEK {recap.week}</Text>
-        <Text style={styles.headline}>{recap.headline}</Text>
+        <AppText style={styles.kicker}>LEAGUE MEMORY · WEEK {recap.week}</AppText>
+        <AppText style={styles.headline}>{recap.headline}</AppText>
 
         <View style={styles.hairline} />
 
@@ -82,9 +83,9 @@ const RecapShareCard = forwardRef<View, { leagueName: string; recap: WeeklyRecap
 
         <View style={styles.qrRow}>
           <View style={styles.qrTextGroup}>
-            <Text style={styles.qrKicker}>SCAN TO TRY</Text>
-            <Text style={styles.qrTitle}>FantasyGM Lab</Text>
-            <Text style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</Text>
+            <AppText style={styles.qrKicker}>SCAN TO TRY</AppText>
+            <AppText style={styles.qrTitle}>FantasyGM Lab</AppText>
+            <AppText style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</AppText>
           </View>
           <View style={styles.qrWrap}>
             <QRCode
@@ -102,11 +103,11 @@ const RecapShareCard = forwardRef<View, { leagueName: string; recap: WeeklyRecap
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            <Text style={{ color: colors.accent }}>PLAN. </Text>
-            <Text style={{ color: colors.premium }}>PROJECT. </Text>
-            <Text style={{ color: colors.danger }}>WIN.</Text>
-          </Text>
+          <AppText style={styles.footerText}>
+            <AppText style={{ color: colors.accent }}>PLAN. </AppText>
+            <AppText style={{ color: colors.premium }}>PROJECT. </AppText>
+            <AppText style={{ color: colors.danger }}>WIN.</AppText>
+          </AppText>
         </View>
       </View>
     );

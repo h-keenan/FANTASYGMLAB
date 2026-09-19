@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 
 import { positionColor, radii, spacing } from '../theme';
 
@@ -24,9 +25,9 @@ export default function PositionBadge({
         { backgroundColor: `${color}26`, borderColor: `${color}80` },
       ]}
     >
-      <Text style={[styles.text, size === 'md' && styles.textMd, { color }]} numberOfLines={1}>
+      <AppText style={[styles.text, size === 'md' && styles.textMd, { color }]} numberOfLines={1}>
         {position.toUpperCase()}
-      </Text>
+      </AppText>
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,11 +30,11 @@ export default function PremiumLock({ title, description }: Props) {
         <Ionicons name="lock-closed" size={18} color={colors.premium} />
       </View>
       <View style={styles.textGroup}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
+        <AppText style={styles.title}>{title}</AppText>
+        <AppText style={styles.description}>{description}</AppText>
       </View>
       <View style={styles.cta}>
-        <Text style={styles.ctaText}>Upgrade</Text>
+        <AppText style={styles.ctaText}>Upgrade</AppText>
         <Ionicons name="chevron-forward" size={14} color={colors.premium} />
       </View>
     </AnimatedCard>

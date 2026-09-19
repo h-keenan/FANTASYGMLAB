@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 
 import { colors } from '../theme';
 
@@ -12,13 +13,13 @@ import { colors } from '../theme';
 export default function ScreenHeaderTitle({ screen, league }: { screen: string; league?: string }) {
   return (
     <View style={styles.container}>
-      <Text style={styles.screen} numberOfLines={1}>
+      <AppText style={styles.screen} numberOfLines={1}>
         {screen}
-      </Text>
+      </AppText>
       {league ? (
-        <Text style={styles.league} numberOfLines={1}>
+        <AppText style={styles.league} numberOfLines={1}>
           {league.toUpperCase()}
-        </Text>
+        </AppText>
       ) : null}
     </View>
   );

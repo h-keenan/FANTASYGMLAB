@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ContentSections, { type ContentSection } from '../components/ContentSections';
@@ -31,19 +32,19 @@ export default function LegalPageScreen({ route, navigation }: Props) {
   if (!page) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>This page isn't available.</Text>
+        <AppText style={styles.error}>This page isn't available.</AppText>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-      <Text style={styles.kicker}>{page.kicker}</Text>
-      <Text style={styles.note}>{page.note}</Text>
+      <AppText style={styles.kicker}>{page.kicker}</AppText>
+      <AppText style={styles.note}>{page.note}</AppText>
 
       <ContentSections sections={page.sections} />
 
-      <Text style={styles.lastUpdated}>Last updated {LAST_UPDATED}</Text>
+      <AppText style={styles.lastUpdated}>Last updated {LAST_UPDATED}</AppText>
     </ScrollView>
   );
 }

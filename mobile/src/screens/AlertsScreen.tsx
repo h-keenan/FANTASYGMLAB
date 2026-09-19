@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Linking, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -134,9 +135,9 @@ export default function AlertsScreen({ route, navigation }: Props) {
   if (notReadyReason) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notReadyText}>
+        <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't load alerts for this league."}
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -144,12 +145,12 @@ export default function AlertsScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <GridBackground />
-      <Text style={styles.disclaimer}>
+      <AppText style={styles.disclaimer}>
         Recent news about players on your roster in {leagueName} — injury, role, transaction, and
         off-field signal only.
-      </Text>
+      </AppText>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <FlatList
         data={items}
@@ -162,8 +163,8 @@ export default function AlertsScreen({ route, navigation }: Props) {
               <AnimatedCard style={styles.recapCard}>
                 <IconCircle name="newspaper-outline" color={colors.accent} size={36} style={styles.recapIconDisc} />
                 <View style={styles.recapTextGroup}>
-                  <Text style={styles.recapTitle}>Week {recapReadyWeek} League Recap is ready</Text>
-                  <Text style={styles.recapSubtitle}>Tap to see this week's storylines</Text>
+                  <AppText style={styles.recapTitle}>Week {recapReadyWeek} League Recap is ready</AppText>
+                  <AppText style={styles.recapSubtitle}>Tap to see this week's storylines</AppText>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
               </AnimatedCard>
@@ -171,7 +172,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
           ) : null
         }
         ListEmptyComponent={
-          !loading ? <Text style={styles.empty}>No relevant news for your roster right now.</Text> : null
+          !loading ? <AppText style={styles.empty}>No relevant news for your roster right now.</AppText> : null
         }
         renderItem={({ item }) => (
           <AnimatedCard
@@ -191,7 +192,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
                     {item.matched_player_id ? (
                       <PlayerAvatar playerId={item.matched_player_id} size={28} style={styles.playerBadgeAvatar} />
                     ) : null}
-                    <Text style={styles.playerBadgeText}>{item.matched_player}</Text>
+                    <AppText style={styles.playerBadgeText}>{item.matched_player}</AppText>
                   </TouchableOpacity>
                 ) : null}
                 {item.roster_relationship ? (
@@ -201,18 +202,18 @@ export default function AlertsScreen({ route, navigation }: Props) {
                       { backgroundColor: `${ROSTER_RELATIONSHIP_COLOR[item.roster_relationship]}26` },
                     ]}
                   >
-                    <Text
+                    <AppText
                       style={[
                         styles.relationshipPillText,
                         { color: ROSTER_RELATIONSHIP_COLOR[item.roster_relationship] },
                       ]}
                     >
                       {ROSTER_RELATIONSHIP_LABEL[item.roster_relationship]}
-                    </Text>
+                    </AppText>
                   </View>
                 ) : null}
               </View>
-              <Text style={styles.time}>{relativeTime(item.published_ts)}</Text>
+              <AppText style={styles.time}>{relativeTime(item.published_ts)}</AppText>
             </View>
             {item.event_type ? (
               <View
@@ -227,19 +228,19 @@ export default function AlertsScreen({ route, navigation }: Props) {
                   color="#fff"
                   style={styles.badgeIcon}
                 />
-                <Text style={styles.badgeText}>{item.event_type}</Text>
+                <AppText style={styles.badgeText}>{item.event_type}</AppText>
               </View>
             ) : null}
-            <Text style={[styles.title, item.read && styles.titleRead]} numberOfLines={2}>
+            <AppText style={[styles.title, item.read && styles.titleRead]} numberOfLines={2}>
               {item.title}
-            </Text>
+            </AppText>
             {item.summary ? (
-              <Text style={styles.summary} numberOfLines={3}>
+              <AppText style={styles.summary} numberOfLines={3}>
                 {item.summary}
-              </Text>
+              </AppText>
             ) : null}
-            {item.speculative ? <Text style={styles.speculative}>Unconfirmed / speculative</Text> : null}
-            {item.source ? <Text style={styles.source}>Source: {item.source}</Text> : null}
+            {item.speculative ? <AppText style={styles.speculative}>Unconfirmed / speculative</AppText> : null}
+            {item.source ? <AppText style={styles.source}>Source: {item.source}</AppText> : null}
           </AnimatedCard>
         )}
       />

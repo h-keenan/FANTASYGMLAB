@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -80,7 +81,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -96,7 +97,7 @@ export default function RecapScreen({ route, navigation }: Props) {
               style={[styles.weekPill, active && styles.weekPillActive]}
               onPress={() => setSelectedWeek(weekNum)}
             >
-              <Text style={[styles.weekPillText, active && styles.weekPillTextActive]}>Wk {weekNum}</Text>
+              <AppText style={[styles.weekPillText, active && styles.weekPillTextActive]}>Wk {weekNum}</AppText>
             </TouchableOpacity>
           );
         })}
@@ -108,9 +109,9 @@ export default function RecapScreen({ route, navigation }: Props) {
       <View style={styles.root}>
         {weekPicker}
         <View style={styles.center}>
-          <Text style={styles.notReadyText}>
+          <AppText style={styles.notReadyText}>
             No recap is ready yet — check back after this week's matchups finish scoring.
-          </Text>
+          </AppText>
         </View>
       </View>
     );
@@ -128,18 +129,18 @@ export default function RecapScreen({ route, navigation }: Props) {
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <View style={styles.headerRow}>
         <View style={styles.headerTextGroup}>
-          <Text style={styles.kicker}>LEAGUE MEMORY</Text>
-          <Text style={styles.headline}>{recap.headline}</Text>
+          <AppText style={styles.kicker}>LEAGUE MEMORY</AppText>
+          <AppText style={styles.headline}>{recap.headline}</AppText>
         </View>
         {!recap.incomplete ? (
           <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
             <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.shareButtonText}>Share</Text>
+            <AppText style={styles.shareButtonText}>Share</AppText>
           </TouchableOpacity>
         ) : null}
       </View>
       {recap.incomplete ? (
-        <Text style={styles.incompleteNotice}>{recap.empty_reason || 'Not enough historical data yet.'}</Text>
+        <AppText style={styles.incompleteNotice}>{recap.empty_reason || 'Not enough historical data yet.'}</AppText>
       ) : (
         recap.stories.map((story, index) => (
           <StoryCard
@@ -173,17 +174,17 @@ function StoryCard({ story, onPress }: { story: RecapStory; onPress?: () => void
       <View style={styles.storyHeaderRow}>
         <IconCircle name={meta.icon} color={meta.color} size={40} />
         <View style={styles.storyTextGroup}>
-          <Text style={[styles.storyKicker, { color: meta.color }]}>
+          <AppText style={[styles.storyKicker, { color: meta.color }]}>
             {story.story_type.replace(/_/g, ' ').toUpperCase()}
-          </Text>
-          <Text style={styles.storyTitle} numberOfLines={1}>
+          </AppText>
+          <AppText style={styles.storyTitle} numberOfLines={1}>
             {story.title}
-          </Text>
+          </AppText>
         </View>
         {story.metric_label ? (
           <View style={styles.metricGroup}>
-            <Text style={[styles.metricValue, { color: meta.color }]}>{story.metric_value}</Text>
-            <Text style={styles.metricLabel}>{story.metric_label.toUpperCase()}</Text>
+            <AppText style={[styles.metricValue, { color: meta.color }]}>{story.metric_value}</AppText>
+            <AppText style={styles.metricLabel}>{story.metric_label.toUpperCase()}</AppText>
           </View>
         ) : null}
         {onPress ? <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} /> : null}
@@ -191,35 +192,35 @@ function StoryCard({ story, onPress }: { story: RecapStory; onPress?: () => void
 
       {isMatchup ? (
         <View style={styles.matchupRow}>
-          <Text style={styles.matchupTeam} numberOfLines={1}>
+          <AppText style={styles.matchupTeam} numberOfLines={1}>
             {story.primary_team}
-          </Text>
-          <Text style={styles.matchupVs}>vs</Text>
-          <Text style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
+          </AppText>
+          <AppText style={styles.matchupVs}>vs</AppText>
+          <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
             {story.secondary_team}
-          </Text>
+          </AppText>
         </View>
       ) : null}
 
       {isTrade && story.secondary_team ? (
         <View style={styles.tradeRow}>
           <View style={styles.tradeChip}>
-            <Text style={styles.tradeChipText} numberOfLines={1}>
+            <AppText style={styles.tradeChipText} numberOfLines={1}>
               {story.primary_team}
-            </Text>
+            </AppText>
           </View>
           <Ionicons name="swap-horizontal" size={14} color={colors.textTertiary} />
           <View style={styles.tradeChip}>
-            <Text style={styles.tradeChipText} numberOfLines={1}>
+            <AppText style={styles.tradeChipText} numberOfLines={1}>
               {story.secondary_team}
-            </Text>
+            </AppText>
           </View>
         </View>
       ) : null}
 
-      <Text style={styles.storySummary} numberOfLines={3}>
+      <AppText style={styles.storySummary} numberOfLines={3}>
         {story.summary}
-      </Text>
+      </AppText>
       </TouchableOpacity>
     </AnimatedCard>
   );

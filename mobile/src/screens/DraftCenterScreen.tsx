@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -122,7 +123,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -130,9 +131,9 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   if (reason) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notReadyText}>
+        <AppText style={styles.notReadyText}>
           Draft Center isn't ready for this league yet — try again in a bit.
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -141,7 +142,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-        <Text style={styles.sectionLabel}>Your Draft Posture</Text>
+        <AppText style={styles.sectionLabel}>Your Draft Posture</AppText>
         {posture ? (
           <>
             <View style={styles.tileRow}>
@@ -167,34 +168,34 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
               style={StyleSheet.flatten([styles.postureCard, { borderColor: TONE_COLOR[posture.tone] ?? DEFAULT_TONE_COLOR }])}
             >
               <View style={[styles.posturePill, { backgroundColor: TONE_COLOR[posture.tone] ?? DEFAULT_TONE_COLOR }]}>
-                <Text
+                <AppText
                   style={[styles.postureLabel, { color: contrastTextColor(TONE_COLOR[posture.tone] ?? DEFAULT_TONE_COLOR) }]}
                 >
                   {posture.label}
-                </Text>
+                </AppText>
               </View>
-              <Text style={styles.postureNote}>{posture.note}</Text>
-              <Text style={styles.postureMeta}>
+              <AppText style={styles.postureNote}>{posture.note}</AppText>
+              <AppText style={styles.postureMeta}>
                 {posture.first_rounders ?? 0} tracked first-rounders · {posture.pick_count ?? 0} total picks
-              </Text>
+              </AppText>
             </AnimatedCard>
           </>
         ) : (
-          <Text style={styles.notice}>
+          <AppText style={styles.notice}>
             {POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now."}
-          </Text>
+          </AppText>
         )}
 
         {picks.length ? (
           <>
-            <Text style={styles.sectionLabel}>Pick Values</Text>
+            <AppText style={styles.sectionLabel}>Pick Values</AppText>
             <View style={styles.scopeRow}>
               <TouchableOpacity
                 style={[styles.scopePill, pickScope === 'mine' && styles.scopePillActive]}
                 onPress={() => setPickScope('mine')}
                 disabled={!myRosterId}
               >
-                <Text
+                <AppText
                   style={[
                     styles.scopePillText,
                     pickScope === 'mine' && styles.scopePillTextActive,
@@ -202,21 +203,21 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
                   ]}
                 >
                   My Picks
-                </Text>
+                </AppText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.scopePill, pickScope === 'league' && styles.scopePillActive]}
                 onPress={() => setPickScope('league')}
               >
-                <Text style={[styles.scopePillText, pickScope === 'league' && styles.scopePillTextActive]}>
+                <AppText style={[styles.scopePillText, pickScope === 'league' && styles.scopePillTextActive]}>
                   League
-                </Text>
+                </AppText>
               </TouchableOpacity>
             </View>
             {pickSeasons.length ? (
               pickSeasons.map(([season, seasonPicks]) => (
                 <View key={season}>
-                  <Text style={styles.pickSeasonLabel}>{season || 'Future'}</Text>
+                  <AppText style={styles.pickSeasonLabel}>{season || 'Future'}</AppText>
                   {/* A plain container, not AnimatedCard: the card here is a
                       list shell, and its rows are what's pressable — an
                       AnimatedCard would spring the whole season group on
@@ -235,21 +236,21 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
                 </View>
               ))
             ) : (
-              <Text style={styles.notice}>
+              <AppText style={styles.notice}>
                 {pickScope === 'mine'
                   ? "You don't hold any tracked picks in this league right now."
                   : 'No draft pick assets available for this league yet.'}
-              </Text>
+              </AppText>
             )}
           </>
         ) : null}
 
-        <Text style={styles.sectionLabel}>League Draft Decision Signals</Text>
+        <AppText style={styles.sectionLabel}>League Draft Decision Signals</AppText>
         {decisionCards.map((card) => (
           <DraftInsightCard key={card.label} card={card} />
         ))}
 
-        <Text style={styles.sectionLabel}>Draft Partner Discovery</Text>
+        <AppText style={styles.sectionLabel}>Draft Partner Discovery</AppText>
         {partnerCards.map((card) => (
           <DraftInsightCard key={card.label} card={card} />
         ))}
@@ -263,15 +264,15 @@ function PostureTile({ label, value, note, first }: { label: string; value: stri
     <View style={[styles.tile, first && styles.tileFirst]}>
       <View style={styles.tileValueRow}>
         {first ? <Ionicons name="trophy" size={13} color={colors.premium} /> : null}
-        <Text style={[styles.tileValue, first && styles.tileValueFirst]} numberOfLines={1}>
+        <AppText style={[styles.tileValue, first && styles.tileValueFirst]} numberOfLines={1}>
           {value}
-        </Text>
+        </AppText>
       </View>
-      <Text style={styles.tileLabel}>{label}</Text>
+      <AppText style={styles.tileLabel}>{label}</AppText>
       {note ? (
-        <Text style={styles.tileNote} numberOfLines={2}>
+        <AppText style={styles.tileNote} numberOfLines={2}>
           {note}
-        </Text>
+        </AppText>
       ) : null}
     </View>
   );
@@ -293,20 +294,20 @@ function PickRow({
   return (
     <TouchableOpacity style={[styles.pickRow, first && styles.pickRowFirst]} onPress={onPress}>
       <View style={styles.pickBadge}>
-        <Text style={styles.pickBadgeText}>R{pick.round ?? '—'}</Text>
+        <AppText style={styles.pickBadgeText}>R{pick.round ?? '—'}</AppText>
       </View>
       <View style={styles.pickInfo}>
-        <Text style={styles.pickLabel} numberOfLines={1}>
+        <AppText style={styles.pickLabel} numberOfLines={1}>
           {pick.label ?? 'Draft pick'}
-        </Text>
-        <Text style={styles.pickMeta} numberOfLines={1}>
+        </AppText>
+        <AppText style={styles.pickMeta} numberOfLines={1}>
           {[showOwner ? pick.owner_team_name : null, meta].filter(Boolean).join(' · ') || '—'}
-        </Text>
+        </AppText>
       </View>
       <View style={styles.pickValueBlock}>
-        <Text style={styles.pickScore}>{pick.score != null ? Math.round(pick.score) : '—'}</Text>
+        <AppText style={styles.pickScore}>{pick.score != null ? Math.round(pick.score) : '—'}</AppText>
         {confidence !== null ? (
-          <Text style={styles.pickConfidence}>{Math.round(confidence * 100)}% conf</Text>
+          <AppText style={styles.pickConfidence}>{Math.round(confidence * 100)}% conf</AppText>
         ) : null}
       </View>
       <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
@@ -319,13 +320,13 @@ function DraftInsightCard({ card }: { card: DraftCard }) {
   return (
     <AnimatedCard style={styles.insightCard}>
       <View style={[styles.insightBadge, { backgroundColor: `${toneColor}26` }]}>
-        <Text style={[styles.insightBadgeText, { color: toneColor }]}>{card.label}</Text>
+        <AppText style={[styles.insightBadgeText, { color: toneColor }]}>{card.label}</AppText>
       </View>
-      <Text style={styles.insightTitle}>{card.title}</Text>
+      <AppText style={styles.insightTitle}>{card.title}</AppText>
       {card.items.map((item, index) => (
         <View key={`${card.label}-${index}`} style={styles.insightItemRow}>
-          <Text style={styles.insightItemMark}>{'•'}</Text>
-          <Text style={styles.insightItemText}>{item}</Text>
+          <AppText style={styles.insightItemMark}>{'•'}</AppText>
+          <AppText style={styles.insightItemText}>{item}</AppText>
         </View>
       ))}
     </AnimatedCard>

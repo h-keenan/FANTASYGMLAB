@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { RecapStory, RecapTradeAsset } from '../lib/api';
@@ -32,14 +33,14 @@ export default function RecapTradeDetailModal({ visible, onClose, story }: Props
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.headerRow}>
-            <Text style={styles.title} numberOfLines={1}>
+            <AppText style={styles.title} numberOfLines={1}>
               {story.title || 'Trade detail'}
-            </Text>
+            </AppText>
             <Pressable onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={20} color={colors.textSecondary} />
             </Pressable>
           </View>
-          {story.summary ? <Text style={styles.summary}>{story.summary}</Text> : null}
+          {story.summary ? <AppText style={styles.summary}>{story.summary}</AppText> : null}
           <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
             <TeamAssetColumn teamName={story.primary_team} assets={leftAssets} />
             <View style={styles.divider}>
@@ -47,12 +48,12 @@ export default function RecapTradeDetailModal({ visible, onClose, story }: Props
             </View>
             <TeamAssetColumn teamName={story.secondary_team} assets={rightAssets} />
             {story.editorial_label ? (
-              <Text style={styles.editorial}>{story.editorial_label}</Text>
+              <AppText style={styles.editorial}>{story.editorial_label}</AppText>
             ) : null}
             {(story.value_lenses ?? []).map((lens, index) => (
               <View key={`${lens.lens}-${index}`} style={styles.lensRow}>
-                <Text style={styles.lensLabel}>{lens.label}</Text>
-                <Text style={styles.lensNote}>{lens.note}</Text>
+                <AppText style={styles.lensLabel}>{lens.label}</AppText>
+                <AppText style={styles.lensNote}>{lens.note}</AppText>
               </View>
             ))}
           </ScrollView>
@@ -65,11 +66,11 @@ export default function RecapTradeDetailModal({ visible, onClose, story }: Props
 function TeamAssetColumn({ teamName, assets }: { teamName: string; assets: RecapTradeAsset[] }) {
   return (
     <View style={styles.column}>
-      <Text style={styles.columnTeam} numberOfLines={1}>
+      <AppText style={styles.columnTeam} numberOfLines={1}>
         {teamName || 'Unknown team'}
-      </Text>
+      </AppText>
       {assets.length === 0 ? (
-        <Text style={styles.emptyNote}>No assets recorded</Text>
+        <AppText style={styles.emptyNote}>No assets recorded</AppText>
       ) : (
         assets.map((asset, index) => <AssetRow key={`${asset.name}-${index}`} asset={asset} />)
       )}
@@ -82,9 +83,9 @@ function AssetRow({ asset }: { asset: RecapTradeAsset }) {
     return (
       <View style={styles.assetRow}>
         <IconCircle name="albums-outline" color={colors.accent} size={32} iconSize={16} />
-        <Text style={styles.assetName} numberOfLines={1}>
+        <AppText style={styles.assetName} numberOfLines={1}>
           {asset.label || asset.name}
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -92,12 +93,12 @@ function AssetRow({ asset }: { asset: RecapTradeAsset }) {
     <View style={styles.assetRow}>
       <PlayerAvatar playerId={asset.player_id} size={32} />
       <View style={styles.assetInfo}>
-        <Text style={styles.assetName} numberOfLines={1}>
+        <AppText style={styles.assetName} numberOfLines={1}>
           {asset.name}
-        </Text>
+        </AppText>
         <View style={styles.assetMetaRow}>
           <PositionBadge position={asset.position} />
-          {asset.team ? <Text style={styles.assetMeta}>{asset.team}</Text> : null}
+          {asset.team ? <AppText style={styles.assetMeta}>{asset.team}</AppText> : null}
         </View>
       </View>
     </View>

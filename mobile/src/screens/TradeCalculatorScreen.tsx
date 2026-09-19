@@ -4,11 +4,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -108,7 +108,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <AppText style={styles.error}>{error}</AppText>
       </View>
     );
   }
@@ -119,10 +119,10 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <GridBackground />
-      <Text style={styles.disclaimer}>
+      <AppText style={styles.disclaimer}>
         Raw asset value only — {leagueName}'s {'“'}Dynasty{'”'} valuations. Doesn't yet
         weigh roster fit or strategy, unlike the full web Trade Analyzer.
-      </Text>
+      </AppText>
 
       <View style={styles.sidesRow}>
         <TradeSide
@@ -144,7 +144,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       </View>
 
       {sideA.length > 0 || sideB.length > 0 ? (
-        <Text style={styles.deltaLabel}>{valueDirectionLabel(delta)}</Text>
+        <AppText style={styles.deltaLabel}>{valueDirectionLabel(delta)}</AppText>
       ) : null}
 
       <View style={styles.positionRow}>
@@ -152,7 +152,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
           style={[styles.pill, positionFilter === null && styles.pillActive]}
           onPress={() => setPositionFilter(null)}
         >
-          <Text style={[styles.pillText, positionFilter === null && styles.pillTextActive]}>All</Text>
+          <AppText style={[styles.pillText, positionFilter === null && styles.pillTextActive]}>All</AppText>
         </TouchableOpacity>
         {POSITION_FILTERS.map((position) => (
           <TouchableOpacity
@@ -160,7 +160,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
             style={[styles.pill, positionFilter === position && styles.pillActive]}
             onPress={() => setPositionFilter(positionFilter === position ? null : position)}
           >
-            <Text style={[styles.pillText, positionFilter === position && styles.pillTextActive]}>{position}</Text>
+            <AppText style={[styles.pillText, positionFilter === position && styles.pillTextActive]}>{position}</AppText>
           </TouchableOpacity>
         ))}
       </View>
@@ -183,21 +183,21 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
           <TouchableOpacity style={styles.resultRow} onPress={() => addToActiveSide(item)}>
             <PlayerAvatar playerId={item.player_id} size={36} tier={item.tier} style={styles.resultAvatar} />
             <View style={styles.resultInfo}>
-              <Text style={styles.resultName} numberOfLines={1}>
+              <AppText style={styles.resultName} numberOfLines={1}>
                 {item.name ?? 'Unknown'}
-              </Text>
+              </AppText>
               <View style={styles.resultMetaRow}>
                 <PositionBadge position={item.position} />
-                <Text style={styles.resultMeta}>{item.team}</Text>
+                <AppText style={styles.resultMeta}>{item.team}</AppText>
               </View>
             </View>
-            <Text style={styles.resultScore}>{Math.round(playerScore(item))}</Text>
+            <AppText style={styles.resultScore}>{Math.round(playerScore(item))}</AppText>
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <Text style={styles.empty}>
+          <AppText style={styles.empty}>
             {search ? 'No matching players.' : 'Start typing to search players.'}
-          </Text>
+          </AppText>
         }
       />
     </KeyboardAvoidingView>
@@ -222,8 +222,8 @@ function TradeSide({
   return (
     <View style={[styles.side, active && styles.sideActive]}>
       <TouchableOpacity onPress={onPressHeader}>
-        <Text style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</Text>
-        <Text style={styles.sideTotal}>{Math.round(total)}</Text>
+        <AppText style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</AppText>
+        <AppText style={styles.sideTotal}>{Math.round(total)}</AppText>
       </TouchableOpacity>
       {players.map((player) => (
         <TouchableOpacity
@@ -231,10 +231,10 @@ function TradeSide({
           style={styles.chip}
           onPress={() => onRemove(player.player_id)}
         >
-          <Text style={styles.chipText} numberOfLines={1}>
+          <AppText style={styles.chipText} numberOfLines={1}>
             {player.name ?? 'Unknown'}
-          </Text>
-          <Text style={styles.chipRemove}>{'×'}</Text>
+          </AppText>
+          <AppText style={styles.chipRemove}>{'×'}</AppText>
         </TouchableOpacity>
       ))}
     </View>

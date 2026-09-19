@@ -6,10 +6,10 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -77,7 +77,7 @@ function NewsImpactBadge({ items, onPress }: { items: NewsItem[]; onPress: () =>
       onPress={onPress}
     >
       <Ionicons name="newspaper-outline" size={13} color={color} />
-      <Text style={[styles.newsImpactText, { color }]}>{label}</Text>
+      <AppText style={[styles.newsImpactText, { color }]}>{label}</AppText>
       <Ionicons name="chevron-forward" size={13} color={color} />
     </TouchableOpacity>
   );
@@ -97,7 +97,7 @@ function NewsImpactModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
           <View style={styles.modalHeaderRow}>
-            <Text style={styles.modalTitle}>In The News</Text>
+            <AppText style={styles.modalTitle}>In The News</AppText>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -111,10 +111,10 @@ function NewsImpactModal({
                   if (item.link) void Linking.openURL(item.link);
                 }}
               >
-                {item.speculative ? <Text style={styles.modalSpeculative}>Unconfirmed / speculative</Text> : null}
-                <Text style={styles.modalArticleTitle}>{item.title}</Text>
-                {item.summary ? <Text style={styles.modalArticleSummary}>{item.summary}</Text> : null}
-                {item.source ? <Text style={styles.modalArticleSource}>Source: {item.source}</Text> : null}
+                {item.speculative ? <AppText style={styles.modalSpeculative}>Unconfirmed / speculative</AppText> : null}
+                <AppText style={styles.modalArticleTitle}>{item.title}</AppText>
+                {item.summary ? <AppText style={styles.modalArticleSummary}>{item.summary}</AppText> : null}
+                {item.source ? <AppText style={styles.modalArticleSource}>Source: {item.source}</AppText> : null}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -128,7 +128,7 @@ function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
   return (
     <View style={styles.sectionHeadingRow}>
       <Ionicons name={icon} size={15} color={colors.accent} style={styles.sectionHeadingIcon} />
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <AppText style={styles.sectionTitle}>{title}</AppText>
     </View>
   );
 }
@@ -198,20 +198,20 @@ function StatCell({
   const pctl = percentileLabel(percentile);
   return (
     <View style={styles.statCell}>
-      <Text style={styles.statCellLabel} numberOfLines={1}>
+      <AppText style={styles.statCellLabel} numberOfLines={1}>
         {label}
-      </Text>
+      </AppText>
       <View style={styles.statCellValueRow}>
-        <Text style={styles.statCellValue} numberOfLines={1}>
+        <AppText style={styles.statCellValue} numberOfLines={1}>
           {display}
-        </Text>
+        </AppText>
         {pctl ? (
-          <Text
+          <AppText
             style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}
             numberOfLines={1}
           >
             {pctl}
-          </Text>
+          </AppText>
         ) : null}
       </View>
     </View>
@@ -294,15 +294,15 @@ function PercentBar({
   return (
     <View style={styles.percentRow}>
       <View style={styles.percentLabelRow}>
-        <Text style={styles.percentLabel} numberOfLines={1}>
+        <AppText style={styles.percentLabel} numberOfLines={1}>
           {label}
-        </Text>
+        </AppText>
         <View style={styles.percentValueGroup}>
-          <Text style={styles.percentValue}>{display}</Text>
+          <AppText style={styles.percentValue}>{display}</AppText>
           {pctl ? (
-            <Text style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}>
+            <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}>
               {pctl}
-            </Text>
+            </AppText>
           ) : null}
         </View>
       </View>
@@ -390,7 +390,7 @@ function TrendsSection({ playerId }: { playerId: string }) {
   }, [playerId, selectedYear]);
 
   if (!loading && defaultYear === null) {
-    return <Text style={styles.notice}>No weekly trend data available for this player yet.</Text>;
+    return <AppText style={styles.notice}>No weekly trend data available for this player yet.</AppText>;
   }
 
   const yearOptions = defaultYear === null
@@ -408,7 +408,7 @@ function TrendsSection({ playerId }: { playerId: string }) {
               style={[styles.yearPill, selectedYear === year && styles.yearPillActive]}
               onPress={() => setSelectedYear(year)}
             >
-              <Text style={[styles.yearPillText, selectedYear === year && styles.yearPillTextActive]}>{year}</Text>
+              <AppText style={[styles.yearPillText, selectedYear === year && styles.yearPillTextActive]}>{year}</AppText>
             </TouchableOpacity>
           ))}
         </View>
@@ -450,8 +450,8 @@ function AwardsSection({ awards }: { awards: PlayerAward[] }) {
                 <Ionicons name="medal" size={18} color={tierColor} />
               </View>
               <View style={styles.awardChipTextGroup}>
-                <Text style={[styles.awardChipLabel, { color: tierColor }]}>{award.short_label}</Text>
-                {award.season ? <Text style={styles.awardChipSeason}>{award.season}</Text> : null}
+                <AppText style={[styles.awardChipLabel, { color: tierColor }]}>{award.short_label}</AppText>
+                {award.season ? <AppText style={styles.awardChipSeason}>{award.season}</AppText> : null}
               </View>
             </View>
           );
@@ -491,7 +491,7 @@ function TabRow({ active, onChange }: { active: DetailTab; onChange: (tab: Detai
           style={[styles.tabPill, active === tab.key && styles.tabPillActive]}
           onPress={() => onChange(tab.key)}
         >
-          <Text style={[styles.tabPillText, active === tab.key && styles.tabPillTextActive]}>{tab.label}</Text>
+          <AppText style={[styles.tabPillText, active === tab.key && styles.tabPillTextActive]}>{tab.label}</AppText>
         </TouchableOpacity>
       ))}
     </View>
@@ -517,7 +517,7 @@ function SeasonCard({
         season.key_stats.length > 0 ? (
           <StatGrid items={season.key_stats.map((item) => ({ label: item.label, value: item.value || null }))} />
         ) : (
-          <Text style={styles.notice}>No stats recorded for this season.</Text>
+          <AppText style={styles.notice}>No stats recorded for this season.</AppText>
         )
       ) : null}
     </View>
@@ -531,7 +531,7 @@ function SeasonCard({
 function CareerSection({ seasons }: { seasons: QuickViewSeason[] }) {
   const [expandedIndex, setExpandedIndex] = useState(0);
   if (seasons.length === 0) {
-    return <Text style={styles.notice}>No season history available for this player yet.</Text>;
+    return <AppText style={styles.notice}>No season history available for this player yet.</AppText>;
   }
   return (
     <>
@@ -569,13 +569,13 @@ function UsageTrendChip({ trend }: { trend: UsageTrend }) {
   return (
     <View style={[styles.usageTrendChip, { backgroundColor: tintMuted, borderColor: tint }]}>
       <Ionicons name={rising ? 'arrow-up' : 'arrow-down'} size={12} color={tint} />
-      <Text style={[styles.usageTrendValue, { color: tint }]}>
+      <AppText style={[styles.usageTrendValue, { color: tint }]}>
         {trend.trend_pct > 0 ? '+' : ''}
         {trend.trend_pct}%
-      </Text>
-      <Text style={styles.usageTrendLabel} numberOfLines={1}>
+      </AppText>
+      <AppText style={styles.usageTrendLabel} numberOfLines={1}>
         {trend.label.toLowerCase()} · {trend.confidence_label}
-      </Text>
+      </AppText>
     </View>
   );
 }
@@ -602,13 +602,13 @@ function ModelSection({ model }: { model: QuickViewModel }) {
       {model.workload_trend ? (
         <View style={styles.trendRow}>
           <Ionicons name="trending-up-outline" size={14} color={trendColor} />
-          <Text style={[styles.trendText, { color: trendColor }]}>Workload trend: {model.workload_trend}</Text>
+          <AppText style={[styles.trendText, { color: trendColor }]}>Workload trend: {model.workload_trend}</AppText>
         </View>
       ) : null}
       {model.usage_trend ? (
         <View style={styles.usageTrendBlock}>
           <UsageTrendChip trend={model.usage_trend} />
-          <Text style={styles.usageTrendDetail}>{model.usage_trend.detail}</Text>
+          <AppText style={styles.usageTrendDetail}>{model.usage_trend.detail}</AppText>
         </View>
       ) : null}
     </View>
@@ -788,16 +788,16 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             />
           ) : null}
         </View>
-        <Text style={styles.name}>{player.name ?? 'Unknown player'}</Text>
+        <AppText style={styles.name}>{player.name ?? 'Unknown player'}</AppText>
         <View style={styles.heroMetaRow}>
           <PositionBadge position={player.position} size="md" />
-          {player.team ? <Text style={styles.meta}>{player.team}</Text> : null}
+          {player.team ? <AppText style={styles.meta}>{player.team}</AppText> : null}
         </View>
         {player.tier ? (
           <View style={[styles.tierBadge, { backgroundColor: tierIdentity.color }]}>
-            <Text style={[styles.tierText, { color: contrastTextColor(tierIdentity.color) }]}>
+            <AppText style={[styles.tierText, { color: contrastTextColor(tierIdentity.color) }]}>
               {tierIdentity.shortLabel}
-            </Text>
+            </AppText>
           </View>
         ) : null}
         <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
@@ -807,9 +807,9 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             onPress={toggleWatch}
             disabled={watchBusy}
           >
-            <Text style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
+            <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
               {watching ? '★ Watching' : '☆ Add to GM Targets'}
-            </Text>
+            </AppText>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -829,7 +829,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       </View>
 
       {rank.rank_unavailable_reason ? (
-        <Text style={styles.notice}>{rank.rank_unavailable_reason}</Text>
+        <AppText style={styles.notice}>{rank.rank_unavailable_reason}</AppText>
       ) : null}
 
       {loading ? (
@@ -842,7 +842,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
           {activeTab === 'stats' && season ? (
             <>
-              <Text style={styles.seasonLabel}>{season.label}</Text>
+              <AppText style={styles.seasonLabel}>{season.label}</AppText>
               <View style={[styles.card, styles.cardSpaced]}>
                 <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} first />
                 <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} />
@@ -863,13 +863,13 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             model ? (
               <ModelSection model={model} />
             ) : (
-              <Text style={styles.notice}>No model breakdown available for this player yet.</Text>
+              <AppText style={styles.notice}>No model breakdown available for this player yet.</AppText>
             )
           ) : null}
 
           {bio ? <BioSection bio={bio} /> : null}
           {!season && !model && !stats?.college_available && !bio && awards.length === 0 ? (
-            <Text style={styles.notice}>No additional stats available for this player yet.</Text>
+            <AppText style={styles.notice}>No additional stats available for this player yet.</AppText>
           ) : null}
         </>
       )}

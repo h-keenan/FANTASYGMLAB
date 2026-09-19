@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import AppText from './AppText';
 
 import { resolvePlayerTier } from '../lib/playerTier';
 import { radii, spacing } from '../theme';
@@ -22,9 +23,9 @@ export default function TierBadge({
         { backgroundColor: `${tier.color}26`, borderColor: `${tier.color}80` },
       ]}
     >
-      <Text style={[styles.text, size === 'md' && styles.textMd, { color: tier.color }]} numberOfLines={1}>
+      <AppText style={[styles.text, size === 'md' && styles.textMd, { color: tier.color }]} numberOfLines={1}>
         {label}
-      </Text>
+      </AppText>
     </View>
   );
 }
