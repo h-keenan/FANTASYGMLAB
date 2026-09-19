@@ -2,7 +2,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
 
-from modules import account_store, account_ui, auth_supabase
+from modules import account_store, account_ui, auth_supabase, premium, saved_leagues
 
 
 class _StreamlitContext:
@@ -988,3 +988,164 @@ class TestSupabaseAccounts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSavedLeagueCap(unittest.TestCase):
+    """Free keeps one league; Premium keeps many — enforced on every surface.
+
+    modules.saved_leagues is the single authority: the web "Save league"
+    button and the mobile API's POST /v1/leagues/save both read the cap from
+    it, so a Free account can't get a second league by switching apps.
+    """
+
+    config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+
+    def _saved_rows_response(self, rows):
+        response = Mock(status_code=200)
+        response.json.return_value = rows
+        return response
+
+    def _save(self, *, entitlement, existing_rows, league_id="league-2"):
+        profile_write = Mock(status_code=201)
+        profile_write.json.return_value = []
+        league_write = Mock(status_code=201)
+        league_write.json.return_value = []
+        clear_default = Mock(status_code=204)
+        clear_default.json.return_value = []
+        with patch.object(
+            account_store.requests, "get", return_value=self._saved_rows_response(existing_rows)
+        ), patch.object(
+            account_store.requests, "post", side_effect=[profile_write, league_write]
+        ) as post, patch.object(
+            account_store.requests, "patch", return_value=clear_default
+        ):
+            saved, error = account_ui.save_current_context(
+                config=self.config,
+                access_token="access-token",
+                user_id="user-1",
+                email="gm@example.com",
+                username="gm_dynasty",
+                selected_league_id=league_id,
+                selected_league_name="Second League",
+                my_roster_id=3,
+                entitlement=entitlement,
+            )
+        return saved, error, post
+
+    def test_free_account_cannot_save_a_second_league(self):
+        saved, error, post = self._save(
+            entitlement=premium.FREE,
+            existing_rows=[{"league_id": "league-1"}],
+        )
+
+        self.assertFalse(saved)
+        self.assertTrue(saved_leagues.is_cap_message(error))
+        self.assertIn("Premium", error)
+        # Profile still upserts; the league write is the part that's refused.
+        self.assertEqual(post.call_count, 1)
+        self.assertNotIn("saved_leagues", post.call_args.args[0])
+
+    def test_free_account_can_save_its_first_league(self):
+        saved, error, post = self._save(entitlement=premium.FREE, existing_rows=[])
+
+        self.assertTrue(saved, error)
+        self.assertEqual(post.call_count, 2)
+        self.assertIn("/saved_leagues", post.call_args.args[0])
+
+    def test_premium_account_can_save_more_than_one_league(self):
+        saved, error, post = self._save(
+            entitlement=premium.PREMIUM,
+            existing_rows=[{"league_id": "league-1"}],
+        )
+
+        self.assertTrue(saved, error)
+        self.assertEqual(post.call_count, 2)
+
+    def test_resaving_the_current_league_is_never_capped(self):
+        """app._persist_supabase_account_context re-saves the active league on
+        every view — a Free account at cap must keep refreshing its own row."""
+
+        saved, error, post = self._save(
+            entitlement=premium.FREE,
+            existing_rows=[{"league_id": "league-1"}],
+            league_id="league-1",
+        )
+
+        self.assertTrue(saved, error)
+        self.assertEqual(post.call_count, 2)
+
+    def test_unreadable_league_count_fails_closed_with_a_safe_error(self):
+        unreadable = Mock(status_code=500)
+        unreadable.json.return_value = {"message": "permission denied for table saved_leagues"}
+        profile_write = Mock(status_code=201)
+        profile_write.json.return_value = []
+        with patch.object(account_store.requests, "get", return_value=unreadable), patch.object(
+            account_store.requests, "post", return_value=profile_write
+        ) as post:
+            saved, error = account_ui.save_current_context(
+                config=self.config,
+                access_token="access-token",
+                user_id="user-1",
+                username="gm_dynasty",
+                selected_league_id="league-2",
+                entitlement=premium.FREE,
+            )
+
+        self.assertFalse(saved)
+        self.assertFalse(saved_leagues.is_cap_message(error))
+        self.assertEqual(post.call_count, 1)
+
+    def test_cap_values_per_entitlement(self):
+        self.assertEqual(
+            saved_leagues.max_leagues_for_entitlement(premium.FREE),
+            saved_leagues.MAX_LEAGUES_FREE,
+        )
+        self.assertEqual(
+            saved_leagues.max_leagues_for_entitlement(premium.PREMIUM),
+            saved_leagues.MAX_LEAGUES_PREMIUM,
+        )
+        # Unknown/absent entitlement must never grant the larger cap.
+        self.assertEqual(
+            saved_leagues.max_leagues_for_entitlement(""),
+            saved_leagues.MAX_LEAGUES_FREE,
+        )
+        self.assertEqual(saved_leagues.MAX_LEAGUES_FREE, 1)
+        self.assertGreater(saved_leagues.MAX_LEAGUES_PREMIUM, saved_leagues.MAX_LEAGUES_FREE)
+
+    def test_cap_resolves_from_the_session_entitlement_chain(self):
+        free_session = {
+            "auth_session": {"user_id": "user-1", "access_token": "tok"},
+            "auth_user": {"id": "user-1"},
+            "account_profile": {"entitlement": premium.FREE},
+        }
+        premium_session = dict(free_session)
+        premium_session["account_profile"] = {"entitlement": premium.PREMIUM}
+
+        self.assertEqual(
+            saved_leagues.max_leagues_for_session(free_session),
+            saved_leagues.MAX_LEAGUES_FREE,
+        )
+        self.assertEqual(
+            saved_leagues.max_leagues_for_session(premium_session),
+            saved_leagues.MAX_LEAGUES_PREMIUM,
+        )
+
+    def test_is_at_cap_counts_only_distinct_other_leagues(self):
+        rows = [{"league_id": "league-1"}, {"league_id": "league-1"}, {"league_id": ""}]
+
+        self.assertFalse(saved_leagues.is_at_cap(rows, league_id="league-1", cap=1))
+        self.assertTrue(saved_leagues.is_at_cap(rows, league_id="league-2", cap=1))
+        self.assertFalse(saved_leagues.is_at_cap(rows, league_id="league-2", cap=2))
+        self.assertFalse(saved_leagues.is_at_cap([], league_id="league-1", cap=1))
+
+    def test_both_surfaces_enforce_the_same_cap_authority(self):
+        """A limit enforced on one surface only is not a limit — both the web
+        save path and the mobile endpoint must route through this module."""
+
+        root = Path(__file__).resolve().parents[1]
+        web = (root / "modules" / "account_ui.py").read_text(encoding="utf-8")
+        mobile = (root / "services" / "mobile_api_service.py").read_text(encoding="utf-8")
+
+        for source in (web, mobile):
+            self.assertIn("saved_leagues.is_at_cap", source)
+        self.assertIn('"reason": "at_cap"', mobile)

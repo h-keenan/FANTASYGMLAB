@@ -4362,3 +4362,263 @@ def test_answer_trade_outcome_still_pending_only_snoozes(monkeypatch):
     assert "snoozed_until" in call_kwargs["json"]
     assert "outcome" not in call_kwargs["json"]
     assert "outcome_recorded_at" not in call_kwargs["json"]
+
+
+def test_save_league_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.post("/v1/leagues/save", json={"league_id": "123"}).status_code == 401
+    assert client.get("/v1/sleeper/leagues?username=gm").status_code == 401
+
+
+def test_me_reports_the_saved_league_cap_for_the_plan(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import saved_leagues
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    free_profile = Mock(status_code=200)
+    free_profile.json.return_value = [{"entitlement": "free"}]
+    premium_profile = Mock(status_code=200)
+    premium_profile.json.return_value = [{"entitlement": "premium"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, free_profile]):
+        free = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+    with patch("requests.get", side_effect=[auth_user_response, premium_profile]):
+        paid = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+
+    # The client renders the league wall from this number, so it has to be
+    # the server's cap — never a constant duplicated in the app.
+    assert free.json()["user"]["league_cap"] == saved_leagues.MAX_LEAGUES_FREE
+    assert paid.json()["user"]["league_cap"] == saved_leagues.MAX_LEAGUES_PREMIUM
+
+
+def test_save_league_rejects_empty_league_id(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/leagues/save",
+            json={"league_id": "   "},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_save_league_rejects_a_league_sleeper_does_not_have(monkeypatch):
+    """A typo'd id must not become a permanent dead row on Home."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={}):
+            with patch("requests.post") as mock_post:
+                response = client.post(
+                    "/v1/leagues/save",
+                    json={"league_id": "999999999999999999"},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    assert response.json()["reason"] == "league_not_found"
+    mock_post.assert_not_called()
+
+
+def test_save_league_enforces_the_free_tier_cap(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import saved_leagues
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = [{"league_id": "already-saved"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, existing_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "new-league", "name": "Second"}):
+            with patch("requests.post") as mock_post:
+                response = client.post(
+                    "/v1/leagues/save",
+                    json={"league_id": "new-league"},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert body["reason"] == "at_cap"
+    assert body["cap"] == saved_leagues.MAX_LEAGUES_FREE
+    # Refused means refused: nothing is written on the way out.
+    mock_post.assert_not_called()
+
+
+def test_save_league_lets_premium_past_the_free_cap(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = [{"league_id": "already-saved"}]
+    write_response = Mock(status_code=201)
+    write_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, existing_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "new-league", "name": "Second"}):
+            with patch("modules.sleeper.get_user_roster_id", return_value=4):
+                with patch("requests.post", return_value=write_response) as mock_post:
+                    response = client.post(
+                        "/v1/leagues/save",
+                        json={"league_id": "new-league"},
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    written = mock_post.call_args.kwargs["json"]
+    assert written["user_id"] == "user-123"
+    assert written["league_id"] == "new-league"
+    assert written["league_name"] == "Second"
+    assert written["roster_id"] == "4"
+    # Not the account's first league, so it must not steal the default.
+    assert written["is_default"] is False
+
+
+def test_save_league_makes_a_first_league_the_default(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = []
+    clear_default_response = Mock(status_code=204)
+    write_response = Mock(status_code=201)
+    write_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, existing_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "first", "name": "Dynasty"}):
+            with patch("requests.patch", return_value=clear_default_response):
+                with patch("requests.post", return_value=write_response) as mock_post:
+                    response = client.post(
+                        "/v1/leagues/save",
+                        json={"league_id": "first", "sleeper_username": "gm_dynasty"},
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["league"] == {"league_id": "first", "league_name": "Dynasty", "is_default": True}
+    assert mock_post.call_args.kwargs["json"]["sleeper_username"] == "gm_dynasty"
+
+
+def test_save_league_allows_resaving_a_league_already_on_the_account(monkeypatch):
+    """Re-saving refreshes name/roster/default — an update, not a new league,
+    so a Free account at cap must not be blocked from it."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = [{"league_id": "already-saved"}]
+    write_response = Mock(status_code=201)
+    write_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, existing_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "already-saved", "name": "Dynasty"}):
+            with patch("requests.post", return_value=write_response):
+                response = client.post(
+                    "/v1/leagues/save",
+                    json={"league_id": "already-saved"},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+
+def test_save_league_fails_closed_when_the_saved_league_count_is_unreadable(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+    error_response = Mock(status_code=500)
+    error_response.json.return_value = {"message": "boom"}
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response, error_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "new", "name": "Dynasty"}):
+            with patch("requests.post") as mock_post:
+                response = client.post(
+                    "/v1/leagues/save",
+                    json={"league_id": "new"},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.json() == {"ok": False, "reason": "not_available", "cap": 1}
+    mock_post.assert_not_called()
+
+
+def test_lookup_sleeper_leagues_returns_the_picker_options(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import sleeper_leagues
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    lookup = sleeper_leagues.LeagueLookupResult(
+        [{"league_id": "abc", "name": "Dynasty", "season": "2026", "total_rosters": 12}],
+        "ok",
+    )
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup) as mock_lookup:
+            response = client.get(
+                "/v1/sleeper/leagues?username=gm_dynasty",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["username"] == "gm_dynasty"
+    assert body["leagues"] == [
+        {"league_id": "abc", "name": "Dynasty", "season": "2026", "total_rosters": 12},
+    ]
+    mock_lookup.assert_called_once_with("gm_dynasty")
+
+
+def test_lookup_sleeper_leagues_falls_back_to_the_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import sleeper_leagues
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "linked_gm"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch(
+            "modules.sleeper_leagues.lookup_user_leagues",
+            return_value=sleeper_leagues.LeagueLookupResult([], "no_leagues"),
+        ) as mock_lookup:
+            response = client.get("/v1/sleeper/leagues", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert body["status"] == "no_leagues"
+    assert body["message"]
+    mock_lookup.assert_called_once_with("linked_gm")

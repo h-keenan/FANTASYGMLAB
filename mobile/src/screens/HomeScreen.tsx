@@ -22,7 +22,8 @@ import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GlassPanel from '../components/GlassPanel';
 import IconCircle from '../components/IconCircle';
-import { api, type MeResponse } from '../lib/api';
+import PremiumLock from '../components/PremiumLock';
+import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import { getLastLeague } from '../lib/lastLeague';
@@ -53,7 +54,37 @@ export default function HomeScreen({ navigation }: Props) {
   const [renamingLeague, setRenamingLeague] = useState<SavedLeague | null>(null);
   const [renameText, setRenameText] = useState('');
   const [renameBusy, setRenameBusy] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
+  const [addOptions, setAddOptions] = useState<SleeperLeagueOption[] | null>(null);
+  const [addMessage, setAddMessage] = useState<string | null>(null);
+  // Set only when the server refuses a save with reason "at_cap" — the copy
+  // is derived from the cap the server sent, never a hardcoded number.
+  const [addCapMessage, setAddCapMessage] = useState<string | null>(null);
   const autoNavigated = useRef(false);
+
+  // The cap is the server's (GET /v1/me -> league_cap, from
+  // modules/saved_leagues.py), so mobile never carries its own copy of the
+  // free/premium split. Missing/zero means "not known yet" — never treat an
+  // unknown cap as a wall, or a slow /v1/me would look like a paywall.
+  const leagueCap = me?.league_cap ?? 0;
+  // profile_status "error" means `entitlement` is a fail-closed default, not
+  // a known plan — never show a paying user an upgrade wall because a
+  // profile read blipped. The server still enforces the cap on save.
+  const atLeagueCap =
+    leagueCap > 0 &&
+    me?.profile_status === 'ok' &&
+    me?.entitlement !== 'premium' &&
+    (leagues?.length ?? 0) >= leagueCap;
+
+  const closeAddLeague = () => {
+    setAddOpen(false);
+    setAddQuery('');
+    setAddOptions(null);
+    setAddMessage(null);
+    setAddCapMessage(null);
+  };
 
   // Renames only this account's saved_leagues row (RLS-scoped to
   // auth.uid() = user_id) — never touches the Sleeper league itself, so
@@ -127,6 +158,79 @@ export default function HomeScreen({ navigation }: Props) {
 
     setLoading(false);
   }, []);
+
+  // Sleeper league ids are long numeric strings, usernames never are — so a
+  // purely numeric entry skips the username lookup and saves directly.
+  const looksLikeLeagueId = (value: string) => /^\d{6,}$/.test(value);
+
+  const saveLeague = async (input: { leagueId: string; leagueName?: string; username?: string }) => {
+    setAddBusy(true);
+    setAddMessage(null);
+    setAddCapMessage(null);
+    try {
+      const result = await api.saveLeague({
+        leagueId: input.leagueId,
+        leagueName: input.leagueName ?? '',
+        sleeperUsername: input.username ?? '',
+      });
+      if (result.ok) {
+        closeAddLeague();
+        await load();
+        return;
+      }
+      if (result.reason === 'at_cap') {
+        // Not an error state: the plan's league limit. Swap the picker for
+        // the same upgrade card every other withheld-content surface uses.
+        setAddOptions(null);
+        setAddCapMessage(
+          result.cap === 1
+            ? 'Your plan keeps 1 saved league. Upgrade to Premium to manage all of your leagues here.'
+            : `Your plan keeps ${result.cap} saved leagues. Upgrade to Premium to manage all of your leagues here.`,
+        );
+        return;
+      }
+      setAddMessage(
+        result.reason === 'league_not_found'
+          ? "That league isn't on Sleeper — check the league ID and try again."
+          : 'Could not save that league right now. Please try again in a moment.',
+      );
+    } catch (error) {
+      setAddMessage(
+        error instanceof ApiError ? error.message : 'Could not reach the FantasyGM Lab API.',
+      );
+    } finally {
+      setAddBusy(false);
+    }
+  };
+
+  const findLeagues = async () => {
+    const trimmed = addQuery.trim();
+    if (!trimmed) {
+      setAddMessage('Enter your Sleeper username, or a league ID.');
+      return;
+    }
+    if (looksLikeLeagueId(trimmed)) {
+      await saveLeague({ leagueId: trimmed });
+      return;
+    }
+    setAddBusy(true);
+    setAddMessage(null);
+    setAddCapMessage(null);
+    try {
+      const result = await api.lookupSleeperLeagues(trimmed);
+      setAddOptions(result.leagues);
+      if (!result.ok || result.leagues.length === 0) {
+        setAddMessage(result.message || 'No leagues found for that Sleeper username.');
+      }
+    } catch (error) {
+      setAddOptions(null);
+      setAddMessage(
+        error instanceof ApiError ? error.message : 'Could not reach the FantasyGM Lab API.',
+      );
+    } finally {
+      setAddBusy(false);
+    }
+  };
 
   // useFocusEffect (not a plain mount effect) so returning here after a
   // Premium purchase (Paywall -> goBack) or an entitlement change made
@@ -250,14 +354,41 @@ export default function HomeScreen({ navigation }: Props) {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>Your leagues</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Your leagues</Text>
+              {atLeagueCap ? null : (
+                <TouchableOpacity
+                  style={styles.addLeagueButton}
+                  onPress={() => {
+                    setAddQuery(me?.sleeper_username ?? '');
+                    setAddOpen(true);
+                  }}
+                  hitSlop={8}
+                >
+                  <Ionicons name="add" size={16} color={colors.accent} />
+                  <Text style={styles.addLeagueLabel}>Add league</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {atLeagueCap ? (
+              <View style={styles.capLock}>
+                <PremiumLock
+                  title="Add another league"
+                  description={
+                    leagueCap === 1
+                      ? 'Free accounts keep 1 saved league. Upgrade to manage all of your leagues here.'
+                      : `Your plan keeps ${leagueCap} saved leagues. Upgrade to manage all of your leagues here.`
+                  }
+                />
+              </View>
+            ) : null}
           </>
         }
         ListEmptyComponent={
           <Text style={styles.empty}>
             {leaguesError
               ? 'Could not check your saved leagues — pull to retry.'
-              : "No leagues saved yet. Add one from the web app first — this app reads the same saved leagues as your FantasyGM Lab account."}
+              : 'No leagues saved yet. Tap “Add league” and enter your Sleeper username to get started.'}
           </Text>
         }
         renderItem={({ item }) => (
@@ -299,6 +430,95 @@ export default function HomeScreen({ navigation }: Props) {
           </AnimatedCard>
         )}
       />
+
+      <Modal visible={addOpen} animationType="fade" transparent onRequestClose={closeAddLeague}>
+        <View style={styles.renameBackdrop}>
+          <View style={styles.renameCard}>
+            <Text style={styles.renameTitle}>Add a league</Text>
+            <Text style={styles.renameHint}>
+              Enter your Sleeper username to pick from your leagues — or paste a league ID directly.
+            </Text>
+            <TextInput
+              style={styles.renameInput}
+              value={addQuery}
+              onChangeText={setAddQuery}
+              placeholder="Sleeper username or league ID"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!addBusy}
+              onSubmitEditing={() => void findLeagues()}
+              returnKeyType="search"
+              maxLength={64}
+            />
+
+            {addCapMessage ? (
+              <View style={styles.capLockInModal}>
+                <PremiumLock title="League limit reached" description={addCapMessage} />
+              </View>
+            ) : null}
+            {addMessage ? <Text style={styles.addError}>{addMessage}</Text> : null}
+
+            {addOptions && addOptions.length > 0 ? (
+              <View style={styles.addOptions}>
+                <Text style={styles.addOptionsLabel}>Tap a league to save it</Text>
+                <FlatList
+                  data={addOptions}
+                  keyExtractor={(item) => item.league_id}
+                  style={styles.addOptionsList}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.addOptionRow}
+                      disabled={addBusy}
+                      onPress={() =>
+                        void saveLeague({
+                          leagueId: item.league_id,
+                          leagueName: item.name,
+                          username: addQuery.trim(),
+                        })
+                      }
+                    >
+                      <View style={styles.addOptionText}>
+                        <Text style={styles.addOptionName} numberOfLines={1}>
+                          {item.name || item.league_id}
+                        </Text>
+                        <Text style={styles.addOptionMeta}>
+                          {[item.season, item.total_rosters ? `${item.total_rosters} teams` : '']
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Text>
+                      </View>
+                      <Text style={styles.chevron}>›</Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            ) : null}
+
+            <View style={styles.renameActions}>
+              <TouchableOpacity
+                style={styles.renameCancelButton}
+                onPress={closeAddLeague}
+                disabled={addBusy}
+              >
+                <Text style={styles.renameCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.renameSaveButton}
+                onPress={() => void findLeagues()}
+                disabled={addBusy}
+              >
+                {addBusy ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.renameSaveText}>Find leagues</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={renamingLeague !== null} animationType="fade" transparent onRequestClose={() => setRenamingLeague(null)}>
         <View style={styles.renameBackdrop}>
@@ -398,6 +618,12 @@ const styles = StyleSheet.create({
   },
   quickActionSecondaryLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   quickActionIconCircle: { marginBottom: 2 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: spacing.sm,
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
@@ -407,6 +633,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     marginBottom: spacing.sm,
   },
+  addLeagueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accentMuted,
+  },
+  addLeagueLabel: { fontSize: 12, fontWeight: '700', color: colors.accent },
+  capLock: { marginBottom: spacing.sm },
+  capLockInModal: { marginTop: spacing.md },
+  addError: { fontSize: 12, color: colors.danger, marginTop: spacing.sm, lineHeight: 16 },
+  addOptions: { marginTop: spacing.md },
+  addOptionsLabel: {
+    ...typography.kicker,
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xs,
+  },
+  // Bounded so a manager with a dozen leagues still sees the action row
+  // below the list instead of a modal that runs off the screen.
+  addOptionsList: { maxHeight: 220 },
+  addOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  addOptionText: { flex: 1, marginRight: spacing.sm },
+  addOptionName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  addOptionMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   listContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl * 3,

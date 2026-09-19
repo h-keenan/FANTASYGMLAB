@@ -12,6 +12,7 @@ from modules import account_store
 from modules import auth_restore_lifecycle
 from modules import auth_storage_handshake
 from modules import auth_supabase
+from modules import saved_leagues
 from modules import startup_coordinator
 from modules import startup_critical_path
 from modules import user_preferences
@@ -988,6 +989,34 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
     return actions
 
 
+SAVED_LEAGUE_CAP_NOTICE_KEY = "account_saved_league_cap_notice"
+
+
+def _render_saved_league_cap_notice() -> None:
+    """Show a refused save as the Premium wall it is, with the upgrade path.
+
+    One-shot: popped as it renders so the notice follows the click that
+    caused it rather than sticking to the panel for the rest of the session.
+    """
+
+    message = _safe_text(st.session_state.pop(SAVED_LEAGUE_CAP_NOTICE_KEY, ""))
+    if not message:
+        return
+    from modules import premium_conversion
+
+    st.warning(message)
+    st.button(
+        premium_conversion.PRIMARY_CTA,
+        key="account_saved_league_cap_upgrade",
+        use_container_width=True,
+        on_click=lambda: premium_conversion.begin_upgrade_flow(
+            feature="saved_leagues",
+            title="Save more leagues",
+            surface="account_panel",
+        ),
+    )
+
+
 def render_account_panel(
     *,
     config: dict,
@@ -1032,8 +1061,14 @@ def render_account_panel(
                 if saved:
                     st.success("Saved.")
                     st.session_state.pop("account_saved_leagues_cache", None)
+                elif saved_leagues.is_cap_message(error):
+                    # Hitting the plan's league limit is a Premium wall, not a
+                    # failure — say what happened and offer the way out
+                    # instead of a dead-end "try again".
+                    st.session_state[SAVED_LEAGUE_CAP_NOTICE_KEY] = error
                 else:
                     st.warning("Could not save this league right now. Please try again.")
+        _render_saved_league_cap_notice()
         with button_cols[1]:
             if st.button("Log out", key="account_logout", use_container_width=True):
                 error = complete_sign_out(st.session_state, config=config)
@@ -1584,7 +1619,24 @@ def save_current_context(
     selected_league_id: str = "",
     selected_league_name: str = "",
     my_roster_id=None,
+    entitlement: str = "",
 ) -> tuple[bool, str]:
+    """Persist profile + the current league, subject to the plan's league cap.
+
+    The cap (modules.saved_leagues) is the same one the mobile API enforces
+    on POST /v1/leagues/save — Free keeps MAX_LEAGUES_FREE, Premium keeps
+    MAX_LEAGUES_PREMIUM. Enforced here rather than in
+    account_store.upsert_saved_league so the storage layer stays a dumb
+    writer, and because this is the one place the web app adds a league.
+
+    Re-saving a league already on the account is never refused: the
+    automatic context persist (app._persist_supabase_account_context) runs
+    on every league view and must keep refreshing name/roster/default.
+
+    `entitlement` is normally resolved from the live session; callers pass
+    it explicitly only when they already hold it (or in tests).
+    """
+
     if not user_id:
         return False, "No logged-in account found."
     profile_payload = account_store.build_profile_payload(
@@ -1601,6 +1653,28 @@ def save_current_context(
         return False, profile_error
     if not username or not selected_league_id:
         return True, ""
+
+    cap = (
+        saved_leagues.max_leagues_for_entitlement(entitlement)
+        if _safe_text(entitlement)
+        else saved_leagues.max_leagues_for_session(st.session_state)
+    )
+    existing_rows, existing_error = account_store.fetch_rows(
+        config,
+        access_token,
+        saved_leagues.LEAGUES_TABLE,
+        user_id=user_id,
+        extra_query="select=league_id",
+    )
+    if existing_error:
+        # Fail closed, matching the mobile endpoint and GM Targets: the
+        # upsert below targets the same Supabase that just refused to be
+        # read, so allowing it here would mostly trade a clear error for a
+        # failed write — and would silently un-cap the plan.
+        return False, account_store.customer_safe_error(existing_error, context="Saved leagues")
+    if saved_leagues.is_at_cap(existing_rows, league_id=selected_league_id, cap=cap):
+        return False, saved_leagues.cap_message(cap)
+
     league_payload = account_store.build_saved_league_payload(
         user_id=user_id,
         sleeper_username=username,
