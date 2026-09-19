@@ -456,14 +456,14 @@ export interface GmStanceResponse {
   strategy: TeamStrategy;
   /** False when nothing has been chosen yet and `strategy` is just the
    * "retool" fallback — lets the UI nudge for a real pick instead of
-   * treating the default as an explicit one. Absent on the POST response,
-   * where a successful update is always an explicit choice. */
+   * treating the default as an explicit one. The POST reports it too, so
+   * "Reset to Auto" (which clears the stored stance) can be told apart
+   * from setting one; older API builds omit it on the POST. */
   is_set?: boolean;
 }
 
-// Shared across every screen with a strategy picker (Trade Hub, Trade
-// Analyzer, League Detail's GM Stance card) so the options/labels can
-// never drift between them.
+// Single source for the stance options/labels. Rendered only by
+// GmStanceHeaderButton now — the one stance control every screen shares.
 export const TEAM_STRATEGY_OPTIONS: Array<{ value: TeamStrategy; label: string }> = [
   { value: 'contender', label: 'Contender' },
   { value: 'fringe_contender', label: 'Fringe Contender' },
@@ -1109,7 +1109,10 @@ export const api = {
     ),
   getGmStance: (leagueId: string) =>
     authorizedFetch<GmStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-stance`),
-  updateGmStance: (leagueId: string, strategy: TeamStrategy) =>
+  /** Pass `null` to clear the stored stance ("Reset to Auto") — a later
+   * getGmStance then reports is_set=false and the app is back on the
+   * auto-picked default. */
+  updateGmStance: (leagueId: string, strategy: TeamStrategy | null) =>
     authorizedPost<GmStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-stance`, { strategy }),
   postTradeAnalyzer: (
     leagueId: string,
