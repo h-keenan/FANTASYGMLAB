@@ -154,6 +154,36 @@ function percentileLabel(percentile: number | null | undefined): string | null {
   return `${ordinal(percentile)} pctl`;
 }
 
+/** Reads the percentile's color off a red -> gold -> green ramp so "9th" and
+ * "91st" don't arrive in the same flat blue. Anchored on the existing palette
+ * (danger at 0, premium at 50, successBright at 100) and interpolated
+ * channel-wise rather than bucketed into three flat bands, so neighbouring
+ * stats stay distinguishable instead of snapping at a cutoff. Anything
+ * unrankable keeps the old accentSoft. */
+function mixHex(from: string, to: string, t: number): string {
+  const parse = (hex: string) => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+  const [r1, g1, b1] = parse(from);
+  const [r2, g2, b2] = parse(to);
+  const channel = (a: number, b: number) =>
+    Math.round(a + (b - a) * t)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${channel(r1, r2)}${channel(g1, g2)}${channel(b1, b2)}`;
+}
+
+function percentileColor(percentile: number | null | undefined): string {
+  if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) {
+    return colors.accentSoft;
+  }
+  const clamped = Math.max(0, Math.min(100, percentile));
+  if (clamped <= 50) return mixHex(colors.danger, colors.premium, clamped / 50);
+  return mixHex(colors.premium, colors.successBright, (clamped - 50) / 50);
+}
+
 function StatCell({
   label,
   value,
@@ -175,7 +205,10 @@ function StatCell({
           {display}
         </Text>
         {pctl ? (
-          <Text style={styles.statCellPercentile} numberOfLines={1}>
+          <Text
+            style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}
+            numberOfLines={1}
+          >
             {pctl}
           </Text>
         ) : null}
@@ -265,7 +298,11 @@ function PercentBar({
         </Text>
         <View style={styles.percentValueGroup}>
           <Text style={styles.percentValue}>{display}</Text>
-          {pctl ? <Text style={styles.statCellPercentile}>{pctl}</Text> : null}
+          {pctl ? (
+            <Text style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}>
+              {pctl}
+            </Text>
+          ) : null}
         </View>
       </View>
       <View style={styles.percentTrack}>
