@@ -1,5 +1,33 @@
 """Token-backed presentation for the canonical Player Quick View dossier."""
 
+# Points By Week (modules/weekly_points_chart.py builds the SVG). Lives
+# here so the Player Quick View keeps one owned stylesheet — see
+# tests/test_app_css_architecture.py's route-owned CSS contract.
+WEEKLY_POINTS_CHART_CSS = """
+.wpc{display:grid;gap:var(--space-2xs);margin:0 0 var(--space-sm);max-width:44rem;min-width:0}
+.wpc-figure{display:block;margin:0;min-width:0;width:100%}
+.wpc-svg{display:block;height:auto;overflow:visible;width:100%}
+.wpc-area{stroke:none}
+.wpc-grad-top{stop-color:var(--color-accent);stop-opacity:.34}
+.wpc-grad-bottom{stop-color:var(--color-accent);stop-opacity:0}
+.wpc-line{fill:none;stroke:var(--color-accent-strong);stroke-linecap:round;stroke-linejoin:round;stroke-width:2}
+.wpc-dot{fill:var(--color-accent-strong);stroke:var(--color-surface-primary);stroke-width:2}
+.wpc-dot--peak{fill:var(--color-accent)}
+.wpc-baseline{stroke:var(--color-border-strong);stroke-width:1}
+.wpc-grid{stroke:var(--color-border);stroke-dasharray:3 4;stroke-width:1}
+.wpc-axis-label{fill:var(--color-text-muted);font-size:11px;letter-spacing:var(--letter-spacing-badge);text-anchor:end}
+.wpc-week-label{fill:var(--color-text-muted);font-size:11px;text-anchor:middle}
+.wpc-peak-label{fill:var(--color-text-primary);font-size:12px;font-variant-numeric:tabular-nums;text-anchor:middle}
+.wpc-caption{color:var(--color-text-secondary);font-size:var(--font-size-caption);line-height:var(--line-height-caption);overflow-wrap:anywhere}
+.wpc-caption strong{color:var(--color-text-primary);font-variant-numeric:tabular-nums;font-weight:var(--font-weight-body)}
+.wpc-empty{border-left:var(--border-width-semantic) solid var(--color-border-strong);color:var(--color-text-secondary);font-size:var(--font-size-body);margin:0 0 var(--space-sm);max-width:44rem;padding-left:var(--space-sm)}
+div[class*="st-key-pqv_weekly_season_rail"]{margin:0 0 var(--space-xs);max-width:22rem}
+div[class*="st-key-pqv_weekly_season_rail"] [data-testid="stHorizontalBlock"]{gap:var(--space-xs)!important}
+div[class*="st-key-pqv_weekly_season_rail"] [data-testid="stButton"] button,div[class*="st-key-pqv_weekly_season_rail"] button[data-testid^="stBaseButton"]{background:var(--color-surface-raised)!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:0!important;color:var(--color-text-secondary)!important;font-size:var(--font-size-badge)!important;letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min)!important;padding-inline:var(--space-sm)!important}
+div[class*="st-key-pqv_weekly_season_rail"] button[kind="primary"],div[class*="st-key-pqv_weekly_season_rail"] button[data-testid="stBaseButton-primary"]{border-color:var(--border-accent)!important;color:var(--color-text-primary)!important}
+@media (prefers-reduced-motion: reduce){.wpc *{animation:none!important;transition:none!important}}
+"""
+
 PLAYER_QUICK_VIEW_CSS = """
 .player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(0,1fr) !important;justify-content:start;max-width:none;min-height:0}
 .pqv-workspace{display:grid;gap:var(--space-sm);max-width:54rem;min-width:0;width:100%}
@@ -254,4 +282,4 @@ div[class*="st-key-pqv_actions_strip"] [data-testid="stHorizontalBlock"]>div{fle
 div[class*="st-key-pqv_detail_model_"]{grid-template-columns:minmax(0,1fr)}
 }
 @media (prefers-reduced-motion: reduce){.player-dossier-snapshot *,.player-dossier-executive *,.player-dossier-career *,.player-dossier-recommendation-context *,.pqv-why-recommendation *,.pqv-accolades *{animation:none !important;transition:none !important}}
-"""
+""" + WEEKLY_POINTS_CHART_CSS
