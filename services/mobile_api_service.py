@@ -525,8 +525,12 @@ def get_league_team_rankings(
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
-    settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
+    # Player-data availability gate, kept for the specific "no_player_data"
+    # reason mobile screens key off of — the same check
+    # build_league_rankings_frame_cached repeats internally (cheaply, since
+    # rankings.load_players is itself cached) before building the frame it
+    # returns below.
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
@@ -536,11 +540,8 @@ def get_league_team_rankings(
     if players_df.empty:
         return {"ok": True, "teams": [], "reason": "no_player_data"}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
-    score_field = league_value_settings.valuation_score_field(lens)
-
-    rankings_frame = league_rankings.build_league_rankings_frame(
-        valued, league_id, score_field=score_field, league_settings=settings
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     if rankings_frame.empty:
         return {"ok": True, "teams": [], "reason": "no_rankings_data"}
@@ -2648,6 +2649,16 @@ def get_league_dashboard(
         )
     except (TypeError, ValueError):
         pass
+
+    # Computed once and threaded into compose_next_move_briefing below (as
+    # an optional override, same pattern as trade_idea_records) *and* reused
+    # here for Team Snapshot — this used to be two full suggest_optimal_lineup
+    # passes over the identical roster on every dashboard load, one inside
+    # compose_next_move_briefing and one recomputed right after it returned.
+    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+    injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+
     briefing = dashboard_engine.compose_next_move_briefing(
         league_id=league_id,
         roster_id=str(my_roster.get("roster_id") or ""),
@@ -2660,22 +2671,17 @@ def get_league_dashboard(
         rosters=rosters,
         team_strategy=team_strategy,
         trade_idea_records=trade_idea_records,
+        roster_df=roster_df,
+        lineup_df=lineup_df,
+        injury_context=injury_context,
     )
 
     # Team Snapshot: record comes straight off the roster we already
-    # fetched, health/average age reuse the same roster_df + injury
-    # pipeline dashboard_engine.compose_next_move_briefing already runs
-    # internally (recomputed here rather than threaded through
-    # DailyGmBriefing, which modules.push_triggers also constructs and
-    # shouldn't need to change shape for a mobile-only display field).
-    # Power/franchise rank now reuse modules.league_rankings (ported out of
-    # app.py's add_league_detail_ranks/build_league_display_frame in PR
-    # #520 for get_league_team_rankings) — the same league-wide frame that
-    # endpoint already computes on demand, so this is no longer the
-    # separate follow-up it once was.
-    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
-    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-    injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+    # fetched; health/average age reuse the roster_df/lineup_df/injury_context
+    # computed once above. Power/franchise rank reuse modules.league_rankings
+    # (ported out of app.py's add_league_detail_ranks/build_league_display_frame
+    # in PR #520 for get_league_team_rankings) — the same league-wide frame
+    # that endpoint already computes on demand.
     injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
     health_flag = injury_ui.team_injury_display_label(injury_display_context, include_uncertainty=True) or "Stable"
     injury_narrative = _project_team_injury_narrative(injury_display_context)
@@ -2687,8 +2693,8 @@ def get_league_dashboard(
 
     power_rank = None
     franchise_rank = None
-    rankings_frame = league_rankings.build_league_rankings_frame(
-        valued, league_id, score_field=score_field, league_settings=settings
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     if not rankings_frame.empty:
         my_roster_id = str(my_roster.get("roster_id") or "")

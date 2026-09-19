@@ -318,6 +318,9 @@ def compose_next_move_briefing(
     rosters: list[dict] | None = None,
     team_strategy: str = "retool",
     trade_idea_records: list[dict[str, Any]] | None = None,
+    roster_df: pd.DataFrame | None = None,
+    lineup_df: pd.DataFrame | None = None,
+    injury_context: dict[str, Any] | None = None,
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
@@ -333,11 +336,23 @@ def compose_next_move_briefing(
     from the players_df/rosters already passed in, keeping this function
     pure and independently testable without needing to fake out live
     Sleeper/disk calls for a cache it doesn't otherwise know about.
+
+    `roster_df`/`lineup_df`/`injury_context` are the same kind of optional
+    override: the mobile API's dashboard endpoint needs this exact
+    roster/lineup/injury pass a second time for its own team_snapshot
+    display fields, and previously recomputed it from scratch (a second
+    suggest_optimal_lineup call) rather than threading it through — this
+    lets the caller compute it once and pass it to both. All three default
+    to None and are computed fresh here when omitted, same purity
+    guarantee as trade_idea_records above.
     """
 
-    roster_df = players_df[players_df["player_id"].astype(str).isin(roster_player_ids)].copy()
-    lineup_df = suggest_optimal_lineup(roster_df, league_settings, score_field=score_field)
-    injury_context = roster_injury_context(roster_df, lineup_df)
+    if roster_df is None:
+        roster_df = players_df[players_df["player_id"].astype(str).isin(roster_player_ids)].copy()
+    if lineup_df is None:
+        lineup_df = suggest_optimal_lineup(roster_df, league_settings, score_field=score_field)
+    if injury_context is None:
+        injury_context = roster_injury_context(roster_df, lineup_df)
     injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
     team_needs_assessment = build_team_needs_assessment(
         roster_df, None, league_settings, lineup_df=lineup_df, score_field=score_field

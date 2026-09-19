@@ -13,12 +13,14 @@ function so a caller only needs a league_id and a valued players frame.
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
+from functools import lru_cache
 from typing import Any
 
 import pandas as pd
 
-from modules import trade_ideas
+from modules import league_value_settings, player_eligibility, rankings, sleeper, trade_ideas
 from modules.league_value_settings import _safe_float, _safe_positive_int
 from modules.team_eval import build_league_summary, normalize_team_strategy, team_strategy_label
 
@@ -254,6 +256,68 @@ def build_league_rankings_frame(
 
     df_display = build_league_display_frame(df_summary, draft_capital_summary, include_picks=True)
     return add_league_detail_ranks(df_display)
+
+
+# This is a full league-wide Power/Franchise/Draft Capital Rank pass — real
+# work, and (like trade_hub_engine's generate_trade_idea_records_cached)
+# redone from scratch on every call even though a given (league, lens)
+# combo can't change faster than the underlying Sleeper roster data does.
+# get_league_dashboard and get_league_team_rankings both ask this exact
+# question for the same league within seconds of each other on a typical
+# session (open Dashboard, tap into Team Rankings) with zero sharing before
+# this cache existed. Same live-time-bucket idiom modules.sleeper and
+# trade_hub_engine already use for their own caches.
+LEAGUE_RANKINGS_FRAME_TTL_SECONDS = 30
+
+
+def _league_rankings_frame_cache_bucket() -> int:
+    return int(time.time() // LEAGUE_RANKINGS_FRAME_TTL_SECONDS)
+
+
+@lru_cache(maxsize=256)
+def _build_league_rankings_frame_cached(
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+    _bucket: int,
+) -> pd.DataFrame:
+    league = sleeper.get_league(league_id)
+    if not league:
+        return pd.DataFrame()
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(players_db_path)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(players_db_path)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="league_rankings_frame_cache"
+    )
+    if players_df.empty:
+        return pd.DataFrame()
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+    return build_league_rankings_frame(valued, league_id, score_field=score_field, league_settings=settings)
+
+
+def build_league_rankings_frame_cached(
+    *,
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+) -> pd.DataFrame:
+    """Cached front door for `build_league_rankings_frame` — resolves its
+    own players_df/settings from just (league_id, lens) rather than
+    accepting them as arguments, so two different callers (the dashboard's
+    power/franchise rank lookup, the team-rankings screen) asking about the
+    same league/lens combo within the same 30s window hit one cache entry
+    instead of each re-running the full league-wide ranking pass
+    independently. Returns a copy so a caller mutating the frame (e.g.
+    adding display-only columns) never corrupts the cached entry."""
+
+    return _build_league_rankings_frame_cached(
+        league_id, lens, players_db_path, _league_rankings_frame_cache_bucket()
+    ).copy()
 
 
 def draft_year_columns(df: pd.DataFrame) -> list[str]:
