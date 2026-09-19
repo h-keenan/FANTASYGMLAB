@@ -44,7 +44,7 @@ Deployment topology (Render):
   - GET  /v1/preferences                        — cross-device display density + last-viewed league
   - POST /v1/preferences                        — partial update to those same preferences
   - GET  /v1/leagues/{id}/gm-stance             — the caller's remembered team strategy for this league
-  - POST /v1/leagues/{id}/gm-stance             — set/update that stance
+  - POST /v1/leagues/{id}/gm-stance             — set/update that stance (null strategy clears it)
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -2499,7 +2499,13 @@ def get_gm_stance(league_id: str, user: dict[str, Any] = Depends(require_user)) 
 
 
 class UpdateGmStanceRequest(BaseModel):
-    strategy: str
+    # `null` (or an omitted field) clears the stance instead of setting one,
+    # so a later GET reports is_set=False again and the app goes back to the
+    # auto-picked "retool" fallback plus its "pick one" nudge. coridian_:
+    # "there is no auto function to put it back to auto picked" — once a
+    # stance was chosen there was no way out of it short of editing the
+    # stored settings blob by hand.
+    strategy: str | None = None
 
 
 @app.post("/v1/leagues/{league_id}/gm-stance")
@@ -2508,7 +2514,8 @@ def update_gm_stance(
     body: UpdateGmStanceRequest,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    if body.strategy not in TEAM_STRATEGY_VALUES:
+    clearing = body.strategy is None
+    if not clearing and body.strategy not in TEAM_STRATEGY_VALUES:
         raise HTTPException(
             status_code=422,
             detail="strategy must be one of: " + ", ".join(TEAM_STRATEGY_VALUES),
@@ -2519,16 +2526,23 @@ def update_gm_stance(
     user_id = str(user.get("id") or "")
     current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
     if error:
-        return {"ok": False, "strategy": "retool"}
+        return {"ok": False, "strategy": "retool", "is_set": False}
     settings = dict(current.get("settings") or {})
     by_league = dict(settings.get("team_strategy_by_league") or {})
-    by_league[league_id] = body.strategy
+    if clearing:
+        # Drop the key entirely rather than storing a null: _fetch_gm_stance_
+        # with_set_flag treats a missing key as "never chosen", and leaving a
+        # null behind would only be equivalent by accident.
+        by_league.pop(league_id, None)
+    else:
+        by_league[league_id] = body.strategy
     settings["team_strategy_by_league"] = by_league
+    resolved = "retool" if clearing else str(body.strategy)
     payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
     ok, error = account_store.upsert_user_settings(config, access_token, payload)
     if not ok:
-        return {"ok": False, "strategy": body.strategy}
-    return {"ok": True, "strategy": body.strategy}
+        return {"ok": False, "strategy": resolved, "is_set": not clearing}
+    return {"ok": True, "strategy": resolved, "is_set": not clearing}
 
 
 def _project_briefing_item(item: Any) -> dict[str, Any]:

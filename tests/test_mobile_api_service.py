@@ -2819,9 +2819,64 @@ def test_update_gm_stance_merges_without_clobbering_other_leagues(monkeypatch):
             )
 
     assert response.status_code == 200
-    assert response.json() == {"ok": True, "strategy": "rebuild"}
+    assert response.json() == {"ok": True, "strategy": "rebuild", "is_set": True}
     upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
     assert upserted_settings["team_strategy_by_league"] == {"xyz": "contender", "abc": "rebuild"}
+
+
+def test_update_gm_stance_with_a_null_strategy_clears_only_that_league(monkeypatch):
+    """"Reset to Auto" — a null strategy drops the league's stored key so a
+    later GET reports is_set=False again, without disturbing other leagues.
+    """
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [
+        {
+            "user_id": "user-123",
+            "settings": {"team_strategy_by_league": {"abc": "tank", "xyz": "contender"}},
+        }
+    ]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/abc/gm-stance",
+                json={"strategy": None},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "strategy": "retool", "is_set": False}
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["team_strategy_by_league"] == {"xyz": "contender"}
+
+
+def test_update_gm_stance_clearing_an_unset_league_is_a_no_op(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": "user-123", "settings": {}}]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/abc/gm-stance",
+                json={"strategy": None},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "strategy": "retool", "is_set": False}
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["team_strategy_by_league"] == {}
 
 
 def test_dashboard_uses_the_stored_gm_stance(monkeypatch):

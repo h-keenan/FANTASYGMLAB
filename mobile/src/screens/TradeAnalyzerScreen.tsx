@@ -23,7 +23,6 @@ import CircularProgressRing from '../components/CircularProgressRing';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import {
   api,
-  TEAM_STRATEGY_OPTIONS,
   type DraftPickAsset,
   type RankedPlayer,
   type TradeVerdict,
@@ -49,8 +48,6 @@ type SearchItem =
 
 const MAX_SEARCH_RESULTS = 40;
 const POSITION_FILTERS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
-
-const STRATEGIES = TEAM_STRATEGY_OPTIONS;
 
 const TONE_COLORS: Record<TradeVerdict['tone'], string> = {
   accept: colors.success,
@@ -110,7 +107,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [assetType, setAssetType] = useState<AssetType>('players');
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const { strategy, setStrategy } = useGmStance(leagueId);
+  // Read-only here: stance is changed from the header button only.
+  const { strategy } = useGmStance(leagueId);
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -122,6 +120,14 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   useEffect(() => {
     navigation.setOptions({ headerRight: () => <GmStanceHeaderButton leagueId={leagueId} /> });
   }, [navigation, leagueId]);
+
+  // A verdict is analyzed under one stance, so it goes stale the moment the
+  // stance changes. The removed in-page strategy pills cleared it inline;
+  // the header button can change stance from anywhere, so watch the value
+  // instead. (No-op on first render — `verdict` starts null.)
+  useEffect(() => {
+    setVerdict(null);
+  }, [strategy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -411,23 +417,6 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
-      <View style={styles.strategyRow}>
-        {STRATEGIES.map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            style={[styles.pill, strategy === option.value && styles.pillActive]}
-            onPress={() => {
-              setStrategy(option.value);
-              setVerdict(null);
-            }}
-          >
-            <Text style={[styles.pillText, strategy === option.value && styles.pillTextActive]}>
-              {option.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       <TouchableOpacity
         style={[styles.analyzeButton, !hasAnyAssets && styles.analyzeButtonDisabled]}
         onPress={analyze}
@@ -715,7 +704,6 @@ const styles = StyleSheet.create({
   chipRemove: { fontSize: 14, color: colors.textSecondary, fontWeight: '700' },
   assetTypeRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
   teamRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  strategyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   pill: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,

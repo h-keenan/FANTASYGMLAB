@@ -11,7 +11,6 @@ import TeamAvatar from '../components/TeamAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import {
-  TEAM_STRATEGY_OPTIONS,
   type PresentationAsset,
   type RankedPlayer,
   type TeamStrategy,
@@ -95,8 +94,6 @@ function ideaToShareVerdict(idea: TradeIdea): TradeVerdict {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHub'>;
 
-const STRATEGIES = TEAM_STRATEGY_OPTIONS;
-
 const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
 
@@ -112,7 +109,9 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 export default function TradeHubScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const { leagueId, leagueName } = route.params;
-  const { strategy, setStrategy, loaded: stanceLoaded } = useGmStance(leagueId);
+  // Read-only here: the header's GmStanceHeaderButton is the only place
+  // stance is changed, and a change there re-runs `load` through this.
+  const { strategy, loaded: stanceLoaded } = useGmStance(leagueId);
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
   const [entitlement, setEntitlement] = useState<TradeHubEntitlement | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
@@ -178,19 +177,6 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
       ListHeaderComponent={
         <View>
-          <View style={styles.strategyRow}>
-            {STRATEGIES.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[styles.pill, strategy === option.value && styles.pillActive]}
-                onPress={() => setStrategy(option.value)}
-              >
-                <Text style={[styles.pillText, strategy === option.value && styles.pillTextActive]}>
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
           <Text style={styles.disclaimer} numberOfLines={1}>
             Real ideas from the same engine and Trust checks as the web app's Trade Hub.
           </Text>
@@ -553,18 +539,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 11, color: colors.textTertiary, marginBottom: spacing.md },
-  strategyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  pillActive: { backgroundColor: colors.accent, borderColor: colors.accent, borderWidth: 1.5 },
-  pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pillTextActive: { color: '#fff', fontWeight: '700' },
   loading: { marginVertical: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginTop: spacing.lg },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20, marginTop: spacing.xl },

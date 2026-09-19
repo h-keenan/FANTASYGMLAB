@@ -13,9 +13,16 @@ import { colors, radii, spacing } from '../theme';
  * only as in-page pills on some screens and nowhere on others. Reads/writes
  * through GmStanceContext, so a change here is instantly visible on every
  * other screen already showing this league's stance.
+ *
+ * Now the *only* stance control: the in-page pill rows those three screens
+ * still carried were left behind when this was added, and each wrote to the
+ * same shared context, so League Overview showed two live copies of the
+ * same control at once ("glitchy" per coridian_'s screenshot). It also owns
+ * both halves of the unset state — the "not set yet" nudge the removed
+ * League Overview card used to show, and "Reset to Auto" to get back to it.
  */
 export default function GmStanceHeaderButton({ leagueId }: { leagueId: string }) {
-  const { strategy, setStrategy } = useGmStance(leagueId);
+  const { strategy, isSet, setStrategy, clearStrategy } = useGmStance(leagueId);
   const [open, setOpen] = useState(false);
   const current = TEAM_STRATEGY_OPTIONS.find((option) => option.value === strategy);
 
@@ -23,7 +30,7 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
     <>
       <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
         <Text style={styles.buttonText} numberOfLines={1}>
-          {current?.label ?? 'Stance'}
+          {isSet ? current?.label ?? 'Stance' : 'Auto'}
         </Text>
         <Ionicons name="chevron-down" size={12} color={colors.accent} />
       </TouchableOpacity>
@@ -31,24 +38,44 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.title}>GM Stance</Text>
-            <Text style={styles.subtitle}>How should this league's advice be framed?</Text>
-            {TEAM_STRATEGY_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={styles.optionRow}
-                onPress={() => {
-                  setStrategy(option.value);
-                  setOpen(false);
-                }}
-              >
-                <Text style={[styles.optionText, option.value === strategy && styles.optionTextActive]}>
-                  {option.label}
-                </Text>
-                {option.value === strategy ? (
-                  <Ionicons name="checkmark-circle" size={18} color={colors.accent} />
-                ) : null}
-              </TouchableOpacity>
-            ))}
+            <Text style={styles.subtitle}>
+              {isSet
+                ? "How should this league's advice be framed? Remembered for this league — it shapes Trade Hub, Trade Analyzer, and Dashboard suggestions."
+                : `Not set yet — we're reading this league as ${current?.label ?? 'Retool'} until you pick one.`}
+            </Text>
+            {TEAM_STRATEGY_OPTIONS.map((option) => {
+              const active = isSet && option.value === strategy;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.optionRow}
+                  onPress={() => {
+                    setStrategy(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</Text>
+                  {active ? <Ionicons name="checkmark-circle" size={18} color={colors.accent} /> : null}
+                </TouchableOpacity>
+              );
+            })}
+            {/* coridian_: "there is no auto function to put it back to auto
+                picked" — once a stance was chosen there was no way back to
+                the unset state, so the nudge to pick one could never return. */}
+            <View style={styles.divider} />
+            <TouchableOpacity
+              style={styles.optionRow}
+              onPress={() => {
+                if (isSet) clearStrategy();
+                setOpen(false);
+              }}
+            >
+              <View style={styles.resetTextGroup}>
+                <Text style={[styles.optionText, !isSet && styles.optionTextActive]}>Reset to Auto</Text>
+                <Text style={styles.resetHint}>Forget my pick and let the app choose.</Text>
+              </View>
+              {!isSet ? <Ionicons name="checkmark-circle" size={18} color={colors.accent} /> : null}
+            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -93,4 +120,12 @@ const styles = StyleSheet.create({
   },
   optionText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   optionTextActive: { color: colors.accent },
+  divider: {
+    height: 1,
+    backgroundColor: colors.borderStrong,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  resetTextGroup: { flexShrink: 1, paddingRight: spacing.sm },
+  resetHint: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
 });

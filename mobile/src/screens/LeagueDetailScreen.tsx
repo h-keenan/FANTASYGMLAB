@@ -10,8 +10,7 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import TeamAvatar from '../components/TeamAvatar';
-import { useGmStance } from '../context/GmStanceContext';
-import { api, TEAM_STRATEGY_OPTIONS, type DashboardItem } from '../lib/api';
+import { api, type DashboardItem } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -53,12 +52,6 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [recapReady, setRecapReady] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const {
-    strategy: gmStance,
-    isSet: gmStanceIsSet,
-    setStrategy: setGmStance,
-    loaded: gmStanceLoaded,
-  } = useGmStance(leagueId);
 
   useScreenHeaderTitle(navigation, 'League Overview', leagueName);
 
@@ -220,38 +213,6 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </AnimatedCard>
       ) : null}
-
-      {gmStanceLoaded ? (
-        <View style={[styles.stanceCard, !gmStanceIsSet && styles.stanceCardUnset]}>
-          <Text style={styles.stanceLabel}>YOUR GM STANCE</Text>
-          <Text style={styles.stanceHint}>
-            {gmStanceIsSet
-              ? 'Remembered for this league — shapes Trade Hub and Dashboard trade suggestions.'
-              : "Not set yet — pick one so Trade Hub and Dashboard suggestions match how you're playing this league."}
-          </Text>
-          <View style={styles.stanceRow}>
-            {TEAM_STRATEGY_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.pill,
-                  gmStanceIsSet && gmStance === option.value && styles.pillActive,
-                ]}
-                onPress={() => setGmStance(option.value)}
-              >
-                <Text
-                  style={[
-                    styles.pillText,
-                    gmStanceIsSet && gmStance === option.value && styles.pillTextActive,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      ) : null}
       </ScrollView>
     </View>
   );
@@ -300,28 +261,4 @@ const styles = StyleSheet.create({
   stripValueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
   stripTextGroup2: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   error: { color: colors.danger, textAlign: 'center' },
-  stanceCard: {
-    backgroundColor: colors.surfaceSolid,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
-  stanceCardUnset: {
-    borderColor: colors.accent,
-  },
-  stanceLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.4 },
-  stanceHint: { fontSize: 12, color: colors.textTertiary, marginTop: 2, marginBottom: spacing.sm },
-  stanceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pillTextActive: { color: '#fff', fontWeight: '700' },
 });

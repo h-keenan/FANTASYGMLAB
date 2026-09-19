@@ -7,6 +7,11 @@ interface StanceEntry {
   isSet: boolean;
 }
 
+/** What the app shows while nothing has been chosen — the same fallback
+ * `services/mobile_api_service.py` returns alongside `is_set: false`, and
+ * what "Reset to Auto" hands back to. */
+export const AUTO_STRATEGY: TeamStrategy = 'retool';
+
 interface GmStanceContextValue {
   /** Undefined until a first load resolves for this league. */
   getStance: (leagueId: string) => StanceEntry | undefined;
@@ -16,6 +21,9 @@ interface GmStanceContextValue {
   /** Optimistic local update + best-effort persist, mirrored to every
    * screen reading this league's stance through the context. */
   setStance: (leagueId: string, strategy: TeamStrategy) => void;
+  /** "Reset to Auto": forget the explicit choice so this league is back on
+   * the auto-picked fallback (isSet=false), locally and server-side. */
+  clearStance: (leagueId: string) => void;
 }
 
 const GmStanceContext = createContext<GmStanceContextValue | undefined>(undefined);
@@ -55,7 +63,7 @@ export function GmStanceProvider({ children }: { children: React.ReactNode }) {
         return entry;
       })
       .catch(() => {
-        const fallback: StanceEntry = { strategy: 'retool', isSet: false };
+        const fallback: StanceEntry = { strategy: AUTO_STRATEGY, isSet: false };
         setStances((prev) => ({ ...prev, [leagueId]: fallback }));
         return fallback;
       })
@@ -71,9 +79,14 @@ export function GmStanceProvider({ children }: { children: React.ReactNode }) {
     void api.updateGmStance(leagueId, strategy).catch(() => {});
   }, []);
 
+  const clearStance = useCallback((leagueId: string) => {
+    setStances((prev) => ({ ...prev, [leagueId]: { strategy: AUTO_STRATEGY, isSet: false } }));
+    void api.updateGmStance(leagueId, null).catch(() => {});
+  }, []);
+
   const value = useMemo<GmStanceContextValue>(
-    () => ({ getStance, loadStance, setStance }),
-    [getStance, loadStance, setStance],
+    () => ({ getStance, loadStance, setStance, clearStance }),
+    [getStance, loadStance, setStance, clearStance],
   );
 
   return <GmStanceContext.Provider value={value}>{children}</GmStanceContext.Provider>;
@@ -98,9 +111,10 @@ export function useGmStance(leagueId: string) {
   }, [context, leagueId]);
 
   return {
-    strategy: entry?.strategy ?? 'retool',
+    strategy: entry?.strategy ?? AUTO_STRATEGY,
     isSet: entry?.isSet ?? true,
     loaded: entry !== undefined,
     setStrategy: useCallback((next: TeamStrategy) => context.setStance(leagueId, next), [context, leagueId]),
+    clearStrategy: useCallback(() => context.clearStance(leagueId), [context, leagueId]),
   };
 }
