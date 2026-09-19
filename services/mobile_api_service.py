@@ -2714,14 +2714,33 @@ _LINEUP_SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K"
 
 
 def _project_lineup_row(row: pd.Series, score_field: str) -> dict[str, Any]:
+    """One lineup row for the client.
+
+    injury_label, not raw injury_status, is what a client renders as the
+    injury tag: unavailability lives in EITHER Sleeper field — a weekly
+    "Questionable"/"Out" arrives on `injury_status`, while IR/PUP/
+    season-ending arrives on `status` with `injury_status` often blank — so
+    a pill driven by injury_status alone silently drops exactly the players
+    who are most unavailable. modules.rankings.injury_display_label is the
+    one place that resolution lives (the web dossier reads the same
+    injury_level severity behind it).
+    """
+
+    status = _clean_json_value(row.get("status"))
+    injury_status = _clean_json_value(row.get("injury_status"))
     return {
         "player_id": _clean_json_value(row.get("player_id")),
         "name": _clean_json_value(row.get("name")),
         "position": _clean_json_value(row.get("position")),
         "team": _clean_json_value(row.get("team")),
         "age": _clean_json_value(row.get("age")),
-        "status": _clean_json_value(row.get("status")),
-        "injury_status": _clean_json_value(row.get("injury_status")),
+        "status": status,
+        "injury_status": injury_status,
+        "injury_label": rankings.injury_display_label(str(status or ""), str(injury_status or "")),
+        # The lineup builder's own availability call, so the client flags a
+        # ruled-out starter (only ever slotted when nothing healthy could
+        # fill the slot) instead of presenting him as a clean start.
+        "ruled_out": bool(row.get("ruled_out")),
         "tier": _clean_json_value(row.get("player_tier")),
         "score": _clean_json_value(row.get(score_field)),
         "slot": _clean_json_value(row.get("slot")),
@@ -2853,9 +2872,15 @@ def _matchup_starter_why(player: dict[str, Any], best_score_by_position: dict[st
     if position and isinstance(score, (int, float)) and best_score_by_position.get(position) == float(score):
         bits.append(f"top {position} on this roster by season value")
 
-    injury = str(player.get("injury_status") or "").strip()
+    # injury_label (not raw injury_status) so an IR/PUP/season-ending
+    # starter reads as injured here too — see _project_lineup_row.
+    injury = str(player.get("injury_label") or "").strip()
     if injury:
-        bits.append(f"{injury} — confirm status before kickoff")
+        if player.get("ruled_out"):
+            slot = str(player.get("slot") or "").strip() or "this"
+            bits.append(f"{injury} — ruled out, and no available alternative for the {slot} slot")
+        else:
+            bits.append(f"{injury} — confirm status before kickoff")
 
     if not bits:
         slot = str(player.get("slot") or "").strip() or "this"

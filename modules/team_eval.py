@@ -96,6 +96,29 @@ def _lineup_slots(lineup_settings: Optional[Dict[str, Any]] = None) -> Dict[str,
     return slots
 
 
+def _ruled_out_flags(df: pd.DataFrame) -> List[bool]:
+    """Per-row "confirmed unavailable this week" flags for a roster frame.
+
+    Uses modules.rankings.is_ruled_out (and therefore injury_level) so the
+    lineup builder shares the codebase's single injury vocabulary instead of
+    re-deriving severity from raw status strings. A frame without the status
+    columns — several callers build score-only frames — reads as all
+    available, i.e. exactly the pre-existing behaviour.
+    """
+
+    from modules.rankings import is_ruled_out  # local: avoids an import cycle at module load
+
+    n = len(df)
+    statuses = df["status"].tolist() if "status" in df.columns else [None] * n
+    injuries = df["injury_status"].tolist() if "injury_status" in df.columns else [None] * n
+
+    def _text(value) -> str:
+        # A missing cell surfaces as None or NaN; both mean "no status".
+        return "" if value is None or (isinstance(value, float) and pd.isna(value)) else str(value)
+
+    return [is_ruled_out(_text(status), _text(injury)) for status, injury in zip(statuses, injuries)]
+
+
 def _bench_score_limit(lineup_settings: Optional[Dict[str, Any]] = None) -> int:
     if not lineup_settings:
         return MAX_BENCH_PLAYERS
@@ -259,7 +282,9 @@ def suggest_optimal_lineup(
     score_field: Optional[str] = None,
 ) -> pd.DataFrame:
     if df_team.empty:
-        return df_team.assign(slot="BENCH", suggested_starter=False)
+        return df_team.assign(
+            slot="BENCH", suggested_starter=False, ruled_out=False, displaced_by_injury=False
+        )
 
     df = df_team.copy()
     resolved_field = str(score_field or "").strip()
@@ -275,74 +300,71 @@ def suggest_optimal_lineup(
     else:
         df["sort_score"] = 0
     df = df.sort_values("sort_score", ascending=False).reset_index(drop=True)
+    df["ruled_out"] = _ruled_out_flags(df)
 
     slots = _lineup_slots(lineup_settings)
+    positions = df["position"].tolist()
 
-    used_idx = set()
+    def assign_slots(order: List[int]) -> Dict[int, str]:
+        """Fill every slot from `order`, best-first. Pure function of the order."""
 
-    def pick_for_pos(pos, limit):
-        idxs = df.index[df["position"] == pos].tolist()
-        chosen = []
-        for i in idxs:
-            if len(chosen) >= limit:
-                break
-            if i not in used_idx:
-                chosen.append(i)
+        used_idx: set = set()
+        assigned: Dict[int, str] = {}
+
+        def take(eligible: List[str], slot_name: str, limit: int) -> None:
+            taken = 0
+            for i in order:
+                if taken >= limit:
+                    break
+                if i in used_idx or positions[i] not in eligible:
+                    continue
                 used_idx.add(i)
-        return chosen
+                assigned[i] = slot_name
+                taken += 1
 
-    qb_idx = pick_for_pos("QB", slots["QB"])
-    rb_idx = pick_for_pos("RB", slots["RB"])
-    wr_idx = pick_for_pos("WR", slots["WR"])
-    te_idx = pick_for_pos("TE", slots["TE"])
-    k_idx = pick_for_pos("K", slots["K"])
+        take(["QB"], "QB", slots["QB"])
+        take(["RB"], "RB", slots["RB"])
+        take(["WR"], "WR", slots["WR"])
+        take(["TE"], "TE", slots["TE"])
+        take(["K"], "K", slots["K"])
+        take(["RB", "WR", "TE"], "FLEX", slots["FLEX"])
+        take(["QB", "RB", "WR", "TE"], "SUPER_FLEX", slots.get("SUPER_FLEX", 0))
+        take(["RB", "WR"], "WR/RB", slots["WR/RB"])
+        return assigned
 
-    flex_candidates = [
-        i
-        for i in df.index
-        if df.loc[i, "position"] in ["RB", "WR", "TE"] and i not in used_idx
-    ]
-    flex_idx = []
-    for i in flex_candidates:
-        if len(flex_idx) >= slots["FLEX"]:
-            break
-        flex_idx.append(i)
-        used_idx.add(i)
+    value_order = df.index.tolist()  # already season-value descending
+    ruled_out = df["ruled_out"].tolist()
 
-    superflex_candidates = [
-        i
-        for i in df.index
-        if df.loc[i, "position"] in ["QB", "RB", "WR", "TE"] and i not in used_idx
-    ]
-    superflex_idx = []
-    for i in superflex_candidates:
-        if len(superflex_idx) >= slots.get("SUPER_FLEX", 0):
-            break
-        superflex_idx.append(i)
-        used_idx.add(i)
+    if any(ruled_out):
+        # Fill order, not row order: players confirmed unavailable this week
+        # sink below every available player, so any healthy alternative at the
+        # same position wins the slot first. A ruled-out player is only ever
+        # slotted when nothing else can fill that slot at all — the lineup
+        # stays complete, and his row says `ruled_out` so the surface can flag
+        # him instead of presenting a clean start. Season value still decides
+        # everything within each group: this is an availability gate, not a
+        # re-ranking.
+        selection_order = df.sort_values(
+            ["ruled_out", "sort_score"], ascending=[True, False], kind="stable"
+        ).index.tolist()
+        assigned = assign_slots(selection_order)
+        # Who the injury actually cost a starting spot: he would have started
+        # on value alone. Injury/health summaries count these as injured
+        # starters — routing around a ruled-out player must not make the
+        # roster read as healthier than it is.
+        value_assigned = assign_slots(value_order)
+        displaced = [
+            bool(ruled_out[i]) and i in value_assigned and i not in assigned
+            for i in df.index
+        ]
+    else:
+        # Healthy roster: identical to the pre-availability behaviour, and no
+        # second pass (this runs once per roster per lineup call).
+        assigned = assign_slots(value_order)
+        displaced = [False] * len(df)
 
-    wrrb_candidates = [
-        i
-        for i in df.index
-        if df.loc[i, "position"] in ["RB", "WR"] and i not in used_idx
-    ]
-    wrrb_idx = []
-    for i in wrrb_candidates:
-        if len(wrrb_idx) >= slots["WR/RB"]:
-            break
-        wrrb_idx.append(i)
-        used_idx.add(i)
-
-    df["slot"] = "BENCH"
-    df.loc[qb_idx, "slot"] = "QB"
-    df.loc[rb_idx, "slot"] = "RB"
-    df.loc[wr_idx, "slot"] = "WR"
-    df.loc[te_idx, "slot"] = "TE"
-    df.loc[flex_idx, "slot"] = "FLEX"
-    df.loc[superflex_idx, "slot"] = "SUPER_FLEX"
-    df.loc[wrrb_idx, "slot"] = "WR/RB"
-    df.loc[k_idx, "slot"] = "K"
-
+    df["slot"] = [assigned.get(i, "BENCH") for i in df.index]
+    df["displaced_by_injury"] = displaced
     df["suggested_starter"] = df["slot"] != "BENCH"
     return df
 

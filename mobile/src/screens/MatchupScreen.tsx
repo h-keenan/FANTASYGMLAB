@@ -254,9 +254,11 @@ function StarterRow({ player, onPress }: { player: MatchupStarter; onPress: () =
             </Text>
           </View>
         </View>
-        {player.injury_status ? (
-          <View style={styles.injuryPill}>
-            <Text style={styles.injuryText}>{player.injury_status}</Text>
+        {player.injury_label ? (
+          <View style={[styles.injuryPill, player.ruled_out && styles.injuryPillOut]}>
+            <Text style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>
+              {player.injury_label}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -348,6 +350,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   injuryText: { fontSize: 11, fontWeight: '700', color: colors.danger },
+  // A ruled-out starter is only here because nothing available could fill
+  // the slot — a solid pill so it can't read as an ordinary injury note.
+  injuryPillOut: { backgroundColor: colors.danger },
+  injuryTextOut: { color: colors.badgeText },
   why: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: spacing.sm },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
