@@ -26,6 +26,7 @@ import PremiumLock from '../components/PremiumLock';
 import TeamAvatar from '../components/TeamAvatar';
 import TrajectoryArcs from '../components/TrajectoryArcs';
 import { useOrbClearance } from '../lib/orbLayout';
+import { getCachedDashboard, setCachedDashboard } from '../lib/dashboardCache';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
@@ -146,6 +147,20 @@ export default function DashboardScreen({ route, navigation }: Props) {
     useCallback(() => {
       let cancelled = false;
       (async () => {
+        // Perceived-performance floor: paint the last-known-good briefing
+        // immediately (if one exists) instead of a blank spinner while the
+        // live request — real per-request computation server-side — is
+        // still in flight. The fetch below always still runs and replaces
+        // this the moment it resolves; this never substitutes for it.
+        const cached = await getCachedDashboard(leagueId);
+        if (!cancelled && cached && !cached.reason) {
+          setItems(cached.items);
+          setTeamSnapshot(cached.team_snapshot);
+          setEntitlement(cached.entitlement ?? null);
+          setQuiet(cached.quiet);
+          setQuietReason(cached.quiet_reason ?? '');
+          setLoading(false);
+        }
         try {
           const result = await api.getLeagueDashboard(leagueId);
           if (cancelled) return;
@@ -157,6 +172,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
             setEntitlement(result.entitlement ?? null);
             setQuiet(result.quiet);
             setQuietReason(result.quiet_reason ?? '');
+            void setCachedDashboard(leagueId, result);
             const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
               leagueId,
               result.items.map((item) => item.recommendation_id),
