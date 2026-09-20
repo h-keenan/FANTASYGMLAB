@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -120,6 +121,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <GridBackground />
+      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenHero title="TRADE CALCULATOR" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         Raw asset value only — {leagueName}'s {'“'}Dynasty{'”'} valuations. Doesn't yet

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -151,6 +152,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.list} contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}>
+      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenHero title="LEAGUE OVERVIEW" subtitle={leagueName} />
       <TouchableOpacity
         activeOpacity={0.9}

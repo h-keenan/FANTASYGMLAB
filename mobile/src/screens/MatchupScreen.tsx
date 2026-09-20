@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import ScreenHero from '../components/ScreenHero';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -134,6 +135,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <ScreenHero title="MATCHUP" subtitle={leagueName} />
         <AnimatedCard glow style={styles.headlineCard}>
           <View style={styles.weekRow}>

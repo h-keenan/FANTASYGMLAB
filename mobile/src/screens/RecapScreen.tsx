@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -128,6 +129,7 @@ export default function RecapScreen({ route, navigation }: Props) {
         </View>
       ) : (
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenHero title="RECAP" subtitle={leagueName} />
       <View style={styles.headerRow}>
         <View style={styles.headerTextGroup}>
