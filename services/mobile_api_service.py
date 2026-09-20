@@ -2784,6 +2784,10 @@ def get_league_dashboard(
         "key_injuries_summary": injury_narrative["key_injuries_summary"],
         "top_injury_impact_summary": injury_narrative["top_injury_impact_summary"],
         "top_injury_impact_players": injury_narrative["top_injury_impact_players"],
+        # The real count driving health_flag — modules.rankings.summarize_team_injuries
+        # already computes this exact number; top_injury_impact_players above is
+        # trimmed to a couple of cards and undercounts if used as a total.
+        "injured_starters": _clean_json_value(injury_display_context.get("injured_starters")),
         "average_age": round(average_age, 1) if average_age is not None else None,
         "power_rank": power_rank,
         "franchise_rank": franchise_rank,

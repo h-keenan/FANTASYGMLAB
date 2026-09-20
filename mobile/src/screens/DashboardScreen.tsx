@@ -462,40 +462,55 @@ function TeamSnapshotRow({
     snapshot.wins != null && snapshot.losses != null
       ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
       : '—';
-  const tiles: { label: string; value: string; tappable?: boolean }[] = [
+  const injuredCount = snapshot.injured_starters;
+  // Power/Franchise/Injuries link out to a fuller view — Injuries opens the
+  // same health context card just below rather than a separate screen,
+  // since that's where the "why" already lives.
+  const tiles: { label: string; value: string; tappable?: boolean; tone?: 'danger' }[] = [
     { label: 'Record', value: record },
-    { label: 'Health', value: snapshot.health_flag || 'Stable' },
-    { label: 'Avg Age', value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—' },
   ];
-  // Power/Franchise link out to the full league rankings (Teams screen) —
-  // the other tiles here have no equivalent standalone screen to open.
   if (snapshot.power_rank != null) tiles.push({ label: 'Power', value: `#${snapshot.power_rank}`, tappable: true });
   if (snapshot.franchise_rank != null) {
     tiles.push({ label: 'Franchise', value: `#${snapshot.franchise_rank}`, tappable: true });
   }
+  tiles.push({ label: 'Avg Age', value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—' });
+  tiles.push({
+    label: 'Injuries',
+    value: injuredCount != null ? String(injuredCount) : '—',
+    tone: injuredCount != null && injuredCount > 0 ? 'danger' : undefined,
+  });
   return (
-    <View style={styles.snapshotRow}>
-      {tiles.map((tile) =>
-        tile.tappable ? (
-          <TouchableOpacity
-            key={tile.label}
-            style={[styles.snapshotTile, styles.snapshotTileTappable]}
-            onPress={() => navigation.navigate('Teams', { leagueId, leagueName })}
-          >
-            <AppText style={styles.snapshotValue} numberOfLines={1}>
-              {tile.value}
-            </AppText>
-            <AppText style={styles.snapshotLabel}>{tile.label}</AppText>
-          </TouchableOpacity>
-        ) : (
-          <View key={tile.label} style={styles.snapshotTile}>
-            <AppText style={styles.snapshotValue} numberOfLines={1}>
-              {tile.value}
-            </AppText>
-            <AppText style={styles.snapshotLabel}>{tile.label}</AppText>
-          </View>
-        ),
-      )}
+    <View style={styles.snapshotSection}>
+      <View style={styles.snapshotHeaderRow}>
+        <Ionicons name="stats-chart" size={14} color={colors.accent} />
+        <AppText style={styles.snapshotHeaderText}>LEAGUE SNAPSHOT</AppText>
+      </View>
+      <View style={styles.snapshotRow}>
+        {tiles.map((tile) =>
+          tile.tappable ? (
+            <TouchableOpacity
+              key={tile.label}
+              style={[styles.snapshotTile, styles.snapshotTileTappable]}
+              onPress={() => navigation.navigate('Teams', { leagueId, leagueName })}
+            >
+              <AppText style={styles.snapshotValue} numberOfLines={1}>
+                {tile.value}
+              </AppText>
+              <AppText style={styles.snapshotLabel}>{tile.label}</AppText>
+            </TouchableOpacity>
+          ) : (
+            <View key={tile.label} style={styles.snapshotTile}>
+              <AppText
+                style={[styles.snapshotValue, tile.tone === 'danger' && styles.snapshotValueDanger]}
+                numberOfLines={1}
+              >
+                {tile.value}
+              </AppText>
+              <AppText style={styles.snapshotLabel}>{tile.label}</AppText>
+            </View>
+          ),
+        )}
+      </View>
     </View>
   );
 }
@@ -845,11 +860,19 @@ const styles = StyleSheet.create({
   },
   matchupEdge: { fontSize: 13, fontWeight: '700', marginTop: spacing.md },
   matchupBasis: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
+  snapshotSection: { marginBottom: spacing.md },
+  snapshotHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
+  snapshotHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   snapshotRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginBottom: spacing.md,
   },
   snapshotTile: {
     flexBasis: '30%',
@@ -885,6 +908,7 @@ const styles = StyleSheet.create({
   },
   detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   snapshotValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  snapshotValueDanger: { color: colors.danger },
   snapshotLabel: {
     fontSize: 10,
     fontWeight: '700',
