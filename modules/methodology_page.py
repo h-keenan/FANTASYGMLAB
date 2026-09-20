@@ -39,39 +39,68 @@ LEAGUE_INTRO = (
     "extra room to stash young skill players."
 )
 
+#: Every skill-player value is a weighted composite of six fixed inputs —
+#: percentages below are the actual production weights, copied here as
+#: static text rather than imported, since this module must stay free of a
+#: valuation-engine dependency (see module docstring). Keep these in sync by
+#: hand if the underlying weighting changes.
 FACTORS = (
     (
-        "Market context",
-        "Dynasty market prices are a major input. They reflect how the player is "
-        "currently valued in dynasty formats, not a private forecast.",
+        "Market context (44%)",
+        "Dynasty market prices are the largest single input. They reflect how the "
+        "player is currently valued in dynasty formats, not a private forecast.",
     ),
     (
-        "Age and career stage",
-        "Younger players and longer remaining windows are treated differently from "
-        "veterans, especially at running back. Current points do not erase an aging curve.",
+        "Age and career stage (18%)",
+        "A position-specific age curve, not a flat penalty — running backs decline "
+        "earliest and fastest, quarterbacks and tight ends hold value longest. "
+        "Current points do not erase an aging curve.",
     ),
     (
-        "Production",
+        "Production (12%)",
         "Scoring over a meaningful sample is part of the evaluation. A hot week or "
         "a quiet week is not enough on its own, and missing stats are not treated "
         "as secret market confirmation.",
     ),
     (
-        "Role and opportunity",
-        "Depth-chart role, usage, and related workload signals matter. A backup "
-        "with elite talent is not valued like a locked-in starter.",
+        "Positional scarcity (10%)",
+        "Players are compared with others at the same position, weighted by how "
+        "replaceable that position is — tight end and running back count for more "
+        "than a raw point total would suggest; kickers count for far less.",
     ),
     (
-        "Positional scarcity",
-        "Players are compared with others at the same position. Harder-to-replace "
-        "production at a thin position counts more than raw points in a vacuum.",
+        "Opportunity (10%)",
+        "Workload and target/touch share signals — evidence of usage, not just a "
+        "role label.",
     ),
     (
-        "Availability",
+        "Role (6%)",
+        "Depth-chart role on its own. A backup with elite talent is not valued "
+        "like a locked-in starter.",
+    ),
+    (
+        "Availability (applied on top, not a weight)",
         "Injury and inactive status can reduce near-term usefulness. Dynasty value "
         "is not zeroed out for a typical injury, but current-season usefulness can "
         "be discounted more sharply.",
     ),
+)
+
+#: The age band shown on Player Detail ("Enters Prime" / "In Prime" / "Past
+#: Prime") comes directly from the same age curve behind the 18% weight
+#: above — the range where that curve stays within 90% of its own peak for
+#: the position. Numbers copied here as static text for the same reason
+#: FACTORS is (see its comment); keep in sync by hand if the underlying age
+#: curve changes.
+PRIME_WINDOW_NOTE = (
+    "Every player's age band on Player Detail — \"Enters Prime,\" \"In Prime,\" or "
+    "\"Past Prime\" — comes directly from the same age curve used in the weighting "
+    "above, not a separate projection. It marks the age range where that curve "
+    "stays within 90% of its own peak for the position: roughly 20-24 for running "
+    "backs, 20-26 for receivers, 21-28 for tight ends, and 21-32 for quarterbacks, "
+    "matching how much longer those positions typically stay productive. It is "
+    "descriptive, not predictive — it does not forecast a specific player's "
+    "career, only where they sit against their position's typical shape."
 )
 
 PRODUCTION_VS_DYNASTY = (
@@ -255,6 +284,10 @@ def methodology_page_html() -> str:
         "<section class='methodology-section' aria-labelledby='methodology-production'>"
         "<h2 id='methodology-production' class='methodology-heading'>Production vs dynasty value</h2>"
         f"<p class='methodology-copy'>{escape(PRODUCTION_VS_DYNASTY)}</p>"
+        "</section>"
+        "<section class='methodology-section' aria-labelledby='methodology-prime-window'>"
+        "<h2 id='methodology-prime-window' class='methodology-heading'>Prime window</h2>"
+        f"<p class='methodology-copy'>{escape(PRIME_WINDOW_NOTE)}</p>"
         "</section>"
         "<section class='methodology-section' aria-labelledby='methodology-strategy'>"
         "<h2 id='methodology-strategy' class='methodology-heading'>Team strategy matters</h2>"

@@ -15,18 +15,26 @@
       "title": "What we weigh",
       "paragraphs": [],
       "bullets": [
-        "Market context: Dynasty market prices are a major input. They reflect how the player is currently valued in dynasty formats, not a private forecast.",
-        "Age and career stage: Younger players and longer remaining windows are treated differently from veterans, especially at running back. Current points do not erase an aging curve.",
-        "Production: Scoring over a meaningful sample is part of the evaluation. A hot week or a quiet week is not enough on its own, and missing stats are not treated as secret market confirmation.",
-        "Role and opportunity: Depth-chart role, usage, and related workload signals matter. A backup with elite talent is not valued like a locked-in starter.",
-        "Positional scarcity: Players are compared with others at the same position. Harder-to-replace production at a thin position counts more than raw points in a vacuum.",
-        "Availability: Injury and inactive status can reduce near-term usefulness. Dynasty value is not zeroed out for a typical injury, but current-season usefulness can be discounted more sharply."
+        "Market context (44%): Dynasty market prices are the largest single input. They reflect how the player is currently valued in dynasty formats, not a private forecast.",
+        "Age and career stage (18%): A position-specific age curve, not a flat penalty \u2014 running backs decline earliest and fastest, quarterbacks and tight ends hold value longest. Current points do not erase an aging curve.",
+        "Production (12%): Scoring over a meaningful sample is part of the evaluation. A hot week or a quiet week is not enough on its own, and missing stats are not treated as secret market confirmation.",
+        "Positional scarcity (10%): Players are compared with others at the same position, weighted by how replaceable that position is \u2014 tight end and running back count for more than a raw point total would suggest; kickers count for far less.",
+        "Opportunity (10%): Workload and target/touch share signals \u2014 evidence of usage, not just a role label.",
+        "Role (6%): Depth-chart role on its own. A backup with elite talent is not valued like a locked-in starter.",
+        "Availability (applied on top, not a weight): Injury and inactive status can reduce near-term usefulness. Dynasty value is not zeroed out for a typical injury, but current-season usefulness can be discounted more sharply."
       ]
     },
     {
       "title": "Production vs. dynasty value",
       "paragraphs": [
         "Season scoring is one ingredient, not the whole recipe. Dynasty value also weighs age, remaining window, role, scarcity, and how the market already prices the player. That is why a high-scoring veteran can rank behind a younger player with a longer runway, and why this year's points per game should not be read as a finished dynasty ranking."
+      ],
+      "bullets": []
+    },
+    {
+      "title": "Prime window",
+      "paragraphs": [
+        "Every player's age band on Player Detail \u2014 \"Enters Prime,\" \"In Prime,\" or \"Past Prime\" \u2014 comes directly from the same age curve used in the weighting above, not a separate projection. It marks the age range where that curve stays within 90% of its own peak for the position: roughly 20-24 for running backs, 20-26 for receivers, 21-28 for tight ends, and 21-32 for quarterbacks, matching how much longer those positions typically stay productive. It is descriptive, not predictive \u2014 it does not forecast a specific player's career, only where they sit against their position's typical shape."
       ],
       "bullets": []
     },
@@ -53,7 +61,7 @@
     {
       "title": "Draft picks",
       "paragraphs": [
-        "Draft picks are valued as future assets, not as named prospects. Round matters most. Expected range — early, middle, or late in the round — is estimated from the original team's current standing, and later-year picks are treated with more uncertainty. Superflex and 2QB formats raise early-round pick value. Tight-end premium can lift early picks slightly. Larger dynasty leagues make picks a bit more important. Rebuild-oriented teams treat picks as more valuable; contenders treat them as a little cheaper. In redraft, picks are discounted heavily. A pick is not a guarantee of a specific player."
+        "Draft picks are valued as future assets, not as named prospects. Round matters most. Expected range \u2014 early, middle, or late in the round \u2014 is estimated from the original team's current standing, and later-year picks are treated with more uncertainty. Superflex and 2QB formats raise early-round pick value. Tight-end premium can lift early picks slightly. Larger dynasty leagues make picks a bit more important. Rebuild-oriented teams treat picks as more valuable; contenders treat them as a little cheaper. In redraft, picks are discounted heavily. A pick is not a guarantee of a specific player."
       ],
       "bullets": []
     },
@@ -66,7 +74,7 @@
         "Roster fit and positional need on your team",
         "Whether the other manager has a reason to do the deal",
         "Whether the headline players and picks look fair enough to be taken seriously",
-        "Team direction — contending versus collecting future value",
+        "Team direction \u2014 contending versus collecting future value",
         "Protected or core players that should not be shopped casually",
         "Whether current player-status evidence is strong enough to show the idea"
       ]
@@ -86,17 +94,17 @@
         "It does not claim perfect accuracy, complete injury news, or up-to-the-minute reporting.",
         "It is not gambling, betting, or financial advice.",
         "It does not replace league rules, film study, or your judgment.",
-        "A ranking, a value, and a trade recommendation are related tools — not identical answers."
+        "A ranking, a value, and a trade recommendation are related tools \u2014 not identical answers."
       ]
     },
     {
       "title": "Frequently asked",
       "paragraphs": [],
       "bullets": [
-        "Why might two leagues show different values for the same player? — Scoring, quarterback format, tight-end premium, starter counts, league size, and taxi or bench depth all change how positions are priced. Values are rebuilt for the active league's settings.",
-        "Why might two managers in the same league see different trade ideas? — Each roster has a different mix of needs, direction, protected players, and partners. A win-now team and a rebuilding team should not get the same shopping list.",
-        "If a player is scoring a lot, why isn't that the ranking? — Production is included, but age, role, scarcity, and market context still matter. Dynasty value is about the remaining asset, not only this season's box score.",
-        "Can a recommendation disappear even if the values look close? — Yes. Guardrails can withhold or qualify ideas when player identity, ownership, or current status cannot be trusted, or when a package would move a protected core piece without a clear upgrade."
+        "Why might two leagues show different values for the same player? \u2014 Scoring, quarterback format, tight-end premium, starter counts, league size, and taxi or bench depth all change how positions are priced. Values are rebuilt for the active league's settings.",
+        "Why might two managers in the same league see different trade ideas? \u2014 Each roster has a different mix of needs, direction, protected players, and partners. A win-now team and a rebuilding team should not get the same shopping list.",
+        "If a player is scoring a lot, why isn't that the ranking? \u2014 Production is included, but age, role, scarcity, and market context still matter. Dynasty value is about the remaining asset, not only this season's box score.",
+        "Can a recommendation disappear even if the values look close? \u2014 Yes. Guardrails can withhold or qualify ideas when player identity, ownership, or current status cannot be trusted, or when a package would move a protected core piece without a clear upgrade."
       ]
     }
   ]
