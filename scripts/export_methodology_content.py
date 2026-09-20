@@ -57,6 +57,11 @@ def build_export() -> dict:
                 [],
             ),
             _section(
+                "Prime window",
+                [methodology_page.PRIME_WINDOW_NOTE],
+                [],
+            ),
+            _section(
                 "Team strategy",
                 [methodology_page.STRATEGY_INTRO],
                 [f"{label}: {body}" for label, body in methodology_page.STRATEGY_ITEMS],
