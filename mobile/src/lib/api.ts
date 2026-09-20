@@ -20,7 +20,7 @@ export class ApiError extends Error {
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: 'GET' | 'POST' | 'DELETE'; jsonBody?: unknown },
+  init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown },
 ): Promise<T> {
   const { data, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !data.session) {
@@ -68,6 +68,10 @@ function authorizedPost<T>(path: string, jsonBody: unknown): Promise<T> {
 
 function authorizedDelete<T>(path: string): Promise<T> {
   return authorizedRequest<T>(path, { method: 'DELETE' });
+}
+
+function authorizedPatch<T>(path: string, jsonBody: unknown): Promise<T> {
+  return authorizedRequest<T>(path, { method: 'PATCH', jsonBody });
 }
 
 export interface MeResponse {
@@ -811,6 +815,7 @@ export interface GmTarget {
   player_id: string;
   source_surface: string;
   created_at: string | null;
+  untouchable: boolean;
 }
 
 export interface GmTargetsResponse {
@@ -818,7 +823,7 @@ export interface GmTargetsResponse {
   targets: GmTarget[];
 }
 
-export type GmTargetMutationReason = '' | 'at_cap' | 'not_available';
+export type GmTargetMutationReason = '' | 'at_cap' | 'not_available' | 'not_found';
 
 export interface GmTargetMutationResponse {
   ok: boolean;
@@ -993,6 +998,10 @@ export interface TradeIdea {
   // Favorable / Fair / Slight Overpay / Major Overpay — a presentation
   // bucket derived from trade_gain, not a new/different number.
   value_edge_band: string;
+  // player_ids from package.receive that are on the caller's GM Targets
+  // watchlist — lets the card call out "lands your target" without a
+  // second lookup, since package.receive already has the matching name.
+  landed_gm_target_player_ids: string[];
 }
 
 export interface TradeHubEntitlement {
@@ -1154,6 +1163,11 @@ export const api = {
   removeGmTarget: (leagueId: string, playerId: string) =>
     authorizedDelete<GmTargetMutationResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}`,
+    ),
+  setGmTargetUntouchable: (leagueId: string, playerId: string, untouchable: boolean) =>
+    authorizedPatch<GmTargetMutationResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}/untouchable`,
+      { untouchable },
     ),
   registerPushToken: (expoPushToken: string, platform: string, deviceName = '') =>
     authorizedPost<PushMutationResponse>('/v1/push/register', {

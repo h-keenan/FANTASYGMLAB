@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -71,6 +72,25 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
     [leagueId, load],
   );
 
+  const toggleUntouchable = useCallback(
+    async (playerId: string, next: boolean) => {
+      setRows((prev) =>
+        prev.map((row) =>
+          row.target.player_id === playerId ? { ...row, target: { ...row.target, untouchable: next } } : row,
+        ),
+      );
+      try {
+        const result = await api.setGmTargetUntouchable(leagueId, playerId, next);
+        if (!result.ok) {
+          void load();
+        }
+      } catch {
+        void load();
+      }
+    },
+    [leagueId, load],
+  );
+
   const sorted = useMemo(
     () => [...rows].sort((a, b) => (b.target.created_at ?? '').localeCompare(a.target.created_at ?? '')),
     [rows],
@@ -102,7 +122,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
         }
         renderItem={({ item }) => (
           <AnimatedCard
-            style={styles.card}
+            style={StyleSheet.flatten([styles.card, item.target.untouchable ? styles.cardUntouchable : null])}
             onPress={() =>
               item.player
                 ? navigation.navigate('PlayerDetail', { player: item.player, leagueId, leagueName })
@@ -129,10 +149,25 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
                   </AppText>
                 )}
               </View>
+              {item.target.untouchable ? (
+                <AppText style={styles.untouchableLabel}>Untouchable — never offered in a trade</AppText>
+              ) : null}
             </View>
             <AppText style={styles.score}>
               {item.player?.score != null ? Math.round(item.player.score) : '—'}
             </AppText>
+            <TouchableOpacity
+              style={[styles.iconButton, item.target.untouchable ? styles.iconButtonActive : null]}
+              onPress={() => toggleUntouchable(item.target.player_id, !item.target.untouchable)}
+              hitSlop={8}
+              accessibilityLabel={item.target.untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
+            >
+              <Ionicons
+                name={item.target.untouchable ? 'lock-closed' : 'lock-open-outline'}
+                size={16}
+                color={item.target.untouchable ? colors.premium : colors.textSecondary}
+              />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.removeButton}
               onPress={() => removeTarget(item.target.player_id)}
@@ -159,12 +194,25 @@ const styles = StyleSheet.create({
   },
   listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
   card: { flexDirection: 'row', alignItems: 'center', padding: spacing.md },
+  cardUntouchable: { borderLeftWidth: 4, borderLeftColor: colors.premium },
   avatar: { marginRight: spacing.sm },
   nameColumn: { flex: 1, marginRight: spacing.sm },
   name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
-  score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginRight: spacing.md },
+  untouchableLabel: { fontSize: 11, fontWeight: '600', color: colors.premium, marginTop: 3 },
+  score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginRight: spacing.sm },
+  iconButton: {
+    width: 30,
+    height: 30,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  iconButtonActive: { borderColor: colors.premium, backgroundColor: colors.premiumMuted },
   removeButton: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,

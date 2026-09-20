@@ -2454,7 +2454,12 @@ def test_get_gm_targets_returns_watchlist(monkeypatch):
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     targets_response = Mock(status_code=200)
     targets_response.json.return_value = [
-        {"player_id": "9001", "source_surface": "player_quick_view", "created_at": "2026-09-01T00:00:00Z"},
+        {
+            "player_id": "9001",
+            "source_surface": "player_quick_view",
+            "created_at": "2026-09-01T00:00:00Z",
+            "untouchable": True,
+        },
     ]
 
     with patch("requests.get", side_effect=[auth_user_response, targets_response]):
@@ -2464,7 +2469,12 @@ def test_get_gm_targets_returns_watchlist(monkeypatch):
     body = response.json()
     assert body["ok"] is True
     assert body["targets"] == [
-        {"player_id": "9001", "source_surface": "player_quick_view", "created_at": "2026-09-01T00:00:00Z"},
+        {
+            "player_id": "9001",
+            "source_surface": "player_quick_view",
+            "created_at": "2026-09-01T00:00:00Z",
+            "untouchable": True,
+        },
     ]
 
 
@@ -2574,6 +2584,59 @@ def test_remove_gm_target_deletes_row(monkeypatch):
     assert "user_id=eq.user-123" in requested_url
     assert "league_id=eq.abc" in requested_url
     assert "player_id=eq.9001" in requested_url
+
+
+def test_set_gm_target_untouchable_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.patch("/v1/leagues/abc/gm-targets/9001/untouchable", json={"untouchable": True})
+    assert response.status_code == 401
+
+
+def test_set_gm_target_untouchable_rejects_a_player_not_already_targeted(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, existing_response]):
+        response = client.patch(
+            "/v1/leagues/abc/gm-targets/9001/untouchable",
+            json={"untouchable": True},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "reason": "not_found"}
+
+
+def test_set_gm_target_untouchable_upserts_the_flag_on_an_existing_target(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = [{"player_id": "9001"}]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, existing_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.patch(
+                "/v1/leagues/abc/gm-targets/9001/untouchable",
+                json={"untouchable": True},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    sent_payload = mock_post.call_args.kwargs["json"]
+    assert sent_payload == {
+        "user_id": "user-123",
+        "league_id": "abc",
+        "player_id": "9001",
+        "untouchable": True,
+    }
 
 
 def test_player_awards_requires_auth(monkeypatch):
@@ -3795,10 +3858,14 @@ def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monke
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
     fake_cards = [_fake_idea_record(f"Rival {i}", gain=10 - i) for i in range(4)]
+    gm_targets_response = Mock(status_code=200)
+    gm_targets_response.json.return_value = []
 
     # Two full requests, each: require_user's auth check + one profile fetch
-    # shared between entitlement and _resolve_my_roster (no double-fetch).
-    responses = [auth_user_response, profile_response] * 2
+    # shared between entitlement and _resolve_my_roster (no double-fetch),
+    # plus the GM Targets lookup that feeds untouchable/landed-target state
+    # into idea generation.
+    responses = [auth_user_response, profile_response, gm_targets_response] * 2
     with patch("requests.get", side_effect=responses):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(

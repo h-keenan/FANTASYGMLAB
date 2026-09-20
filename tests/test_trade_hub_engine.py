@@ -133,6 +133,105 @@ def test_generate_trade_ideas_calls_engine_with_expected_arguments_and_projects_
     assert card["package"]["receive"]
 
 
+def test_generate_trade_idea_records_resolves_untouchable_ids_to_names_and_blocks_them():
+    """GM Targets' untouchable flag is player_id-keyed; the engine's own
+    protection list (modules.trade_ideas.build_trade_ideas) is name-keyed —
+    this confirms the resolution happens and both the search and the Trust
+    enforcement pass receive it."""
+
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
+    )
+    fake_idea = {
+        "partner_team_name": "Rival GM",
+        "rationale": "x",
+        "trade_gain": 10,
+        "trade_confidence_label": "High",
+        "market_realism_label": "Realistic",
+        "reasoning_tags": [],
+        "send_assets": [],
+        "receive_assets": [{"asset_type": "player", "player_id": "opp-rb", "name": "opp-rb"}],
+    }
+
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch(
+                "modules.trade_ideas.build_trade_ideas", return_value=[fake_idea]
+            ) as mock_build:
+                with patch.object(
+                    trade_hub_engine,
+                    "enforce_generated_trade_ideas",
+                    side_effect=lambda ideas, **kwargs: ideas,
+                ) as mock_enforce:
+                    trade_hub_engine.generate_trade_idea_records(
+                        league_id="league-1",
+                        my_roster_id=1,
+                        players_df=players_df,
+                        rosters=_rosters(),
+                        league_settings=SETTINGS,
+                        score_field="dynasty_score",
+                        team_strategy="contender",
+                        untouchable_player_ids=("my-rb",),
+                    )
+
+    assert mock_build.call_args.kwargs["untouchable_names"] == ["my-rb"]
+    assert mock_enforce.call_args.kwargs["untouchables"] == ("my-rb",)
+
+
+def test_generate_trade_idea_records_tags_ideas_that_land_a_gm_target():
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
+    )
+    landing_idea = {
+        "partner_team_name": "Rival GM",
+        "rationale": "x",
+        "trade_gain": 10,
+        "trade_confidence_label": "High",
+        "market_realism_label": "Realistic",
+        "reasoning_tags": [],
+        "send_assets": [],
+        "receive_assets": [{"asset_type": "player", "player_id": "opp-rb", "name": "opp-rb"}],
+    }
+    other_idea = {
+        "partner_team_name": "Other GM",
+        "rationale": "x",
+        "trade_gain": 5,
+        "trade_confidence_label": "Low",
+        "market_realism_label": "Thin",
+        "reasoning_tags": [],
+        "send_assets": [],
+        "receive_assets": [{"asset_type": "player", "player_id": "opp-wr", "name": "opp-wr"}],
+    }
+
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch(
+                "modules.trade_ideas.build_trade_ideas",
+                return_value=[landing_idea, other_idea],
+            ):
+                with patch.object(
+                    trade_hub_engine,
+                    "enforce_generated_trade_ideas",
+                    side_effect=lambda ideas, **kwargs: ideas,
+                ):
+                    records = trade_hub_engine.generate_trade_idea_records(
+                        league_id="league-1",
+                        my_roster_id=1,
+                        players_df=players_df,
+                        rosters=_rosters(),
+                        league_settings=SETTINGS,
+                        score_field="dynasty_score",
+                        team_strategy="contender",
+                        gm_target_player_ids=("opp-rb",),
+                    )
+
+    assert records[0]["landed_gm_target_player_ids"] == ["opp-rb"]
+    assert records[1]["landed_gm_target_player_ids"] == []
+
+    card = trade_hub_engine.project_trade_idea_card(records[0])
+    assert card.landed_gm_target_player_ids == ("opp-rb",)
+
+
 def test_generate_trade_ideas_runs_the_real_search_engine_without_crashing():
     players_df = pd.DataFrame(
         [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]

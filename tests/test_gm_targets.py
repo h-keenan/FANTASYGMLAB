@@ -102,6 +102,60 @@ def test_add_target_idempotent_and_cached():
     assert gt.is_targeted(session, league_id="L1", player_id="6794")
 
 
+def test_set_untouchable_requires_the_target_to_already_exist():
+    session = _premium_session()
+    env = {gt.EXPERIMENT_ENV_KEY: "1"}
+
+    with (
+        patch.object(gt, "experiment_enabled", return_value=True),
+        patch.object(gt.account_store, "fetch_rows", return_value=([], "")),
+        patch.object(gt.auth_supabase, "is_configured", return_value=True),
+    ):
+        result = gt.set_untouchable(
+            session, league_id="L1", player_id="6794", untouchable=True, environ=env
+        )
+    assert result["ok"] is False
+    assert "Add this player" in result["error"]
+
+
+def test_set_untouchable_upserts_and_updates_cache():
+    session = _premium_session()
+    env = {gt.EXPERIMENT_ENV_KEY: "1"}
+    writes: list[dict] = []
+
+    def fake_upsert(config, token, table, payload, *, on_conflict):
+        writes.append(payload)
+        return True, ""
+
+    with (
+        patch.object(gt, "experiment_enabled", return_value=True),
+        patch.object(gt.account_store, "upsert_row", side_effect=fake_upsert),
+        patch.object(
+            gt.account_store,
+            "fetch_rows",
+            return_value=([{"user_id": session["auth_user"]["id"], "league_id": "L1", "player_id": "6794"}], ""),
+        ),
+        patch.object(gt.auth_supabase, "is_configured", return_value=True),
+        patch.object(
+            gt, "_resolve_config", return_value={"enabled": True, "url": "x", "anon_key": "y"}
+        ),
+    ):
+        result = gt.set_untouchable(
+            session, league_id="L1", player_id="6794", untouchable=True, environ=env
+        )
+
+    assert result["ok"] is True
+    assert writes == [
+        {
+            "user_id": session["auth_user"]["id"],
+            "league_id": "L1",
+            "player_id": "6794",
+            "untouchable": True,
+        }
+    ]
+    assert gt.cached_untouchable_ids(session, league_id="L1") == frozenset({"6794"})
+
+
 def test_remove_target_updates_cache_without_deleting_history():
     session = _premium_session()
     env = {gt.EXPERIMENT_ENV_KEY: "1"}
@@ -451,6 +505,14 @@ def test_migration_sql_rls_and_identity_contract():
     assert "on delete cascade" in sql.casefold()
     assert "to anon" not in sql
     assert "for update" not in sql.casefold()
+
+
+def test_untouchable_migration_sql_adds_column_and_update_policy():
+    sql = (ROOT / "docs" / "supabase_gm_targets_untouchable.sql").read_text(encoding="utf-8")
+    assert "add column if not exists untouchable boolean not null default false" in sql.casefold()
+    assert "for update" in sql.casefold()
+    assert "auth.uid() = user_id" in sql
+    assert "to anon" not in sql
 
 
 def test_ui_and_contract_docs_exist():
