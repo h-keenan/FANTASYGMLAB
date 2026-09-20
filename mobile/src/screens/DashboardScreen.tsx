@@ -24,6 +24,7 @@ import {
 } from '../lib/api';
 import PremiumLock from '../components/PremiumLock';
 import ScreenHero from '../components/ScreenHero';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import TeamAvatar from '../components/TeamAvatar';
 import TrajectoryArcs from '../components/TrajectoryArcs';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -239,6 +240,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenHero title="NEXT MOVE" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and

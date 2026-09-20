@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import ScreenHero from '../components/ScreenHero';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
@@ -231,6 +232,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
       ListHeaderComponent={
         <View>
+          <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
           <ScreenHero title="TRADE HUB" subtitle={leagueName} />
           <AppText style={styles.disclaimer} numberOfLines={1}>
             Real ideas from the same engine and Trust checks as the web app's Trade Hub.

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import ScreenHero from '../components/ScreenHero';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PremiumLock from '../components/PremiumLock';
@@ -134,6 +135,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <GridBackground />
+      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenHero title="WAIVERS" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         Free agents ranked for your roster — ordered by fit for {neededPositions.length > 0

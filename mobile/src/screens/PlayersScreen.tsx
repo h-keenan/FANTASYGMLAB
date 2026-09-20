@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -128,6 +129,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <GridBackground />
+      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenHero title="PLAYERS" subtitle={leagueName} />
       <TextInput
         style={styles.searchInput}
