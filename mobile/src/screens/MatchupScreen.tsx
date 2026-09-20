@@ -10,6 +10,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import TeamAvatar from '../components/TeamAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type MatchupComparison, type MatchupResponse, type MatchupSide, type MatchupStarter } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -140,6 +141,11 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
           <View style={styles.versusRow}>
             <View style={styles.versusSide}>
+              <TeamAvatar
+                avatarId={mine.avatar_url}
+                size={48}
+                style={StyleSheet.flatten([styles.versusAvatar, { borderColor: colors.accent }])}
+              />
               <AppText style={styles.versusTeam} numberOfLines={2}>
                 {mine.team_name}
               </AppText>
@@ -150,6 +156,11 @@ export default function MatchupScreen({ route, navigation }: Props) {
             </View>
             <AppText style={styles.versusDivider}>VS</AppText>
             <View style={styles.versusSide}>
+              <TeamAvatar
+                avatarId={opponent.avatar_url}
+                size={48}
+                style={StyleSheet.flatten([styles.versusAvatar, { borderColor: colors.danger }])}
+              />
               <AppText style={styles.versusTeam} numberOfLines={2}>
                 {opponent.team_name}
               </AppText>
@@ -286,6 +297,7 @@ const styles = StyleSheet.create({
   weekLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, color: colors.accent },
   versusRow: { flexDirection: 'row', alignItems: 'flex-start' },
   versusSide: { flex: 1 },
+  versusAvatar: { borderWidth: 2, marginBottom: spacing.xs },
   versusTeam: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   versusRecord: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
   versusValue: { fontSize: 22, fontWeight: '800', marginTop: spacing.xs },
