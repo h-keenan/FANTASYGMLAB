@@ -1961,7 +1961,7 @@ def _quick_view_stats_dict(stats: player_quick_view.PlayerQuickViewStats) -> dic
     }
 
 
-def _project_player_model(row: pd.Series) -> dict[str, Any]:
+def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None) -> dict[str, Any]:
     """The web dossier's "Model" grid — market/opportunity/scarcity/role/age/
     confidence/workload-trend — ported from app.py's player-card assembly
     (~app.py:4098-4110). Every field here is a plain column already present
@@ -1976,6 +1976,11 @@ def _project_player_model(row: pd.Series) -> dict[str, Any]:
     usage_trend is the same weekly-recency read the web dossier now shows
     next to Opportunity, formatted by the one shared helper in
     modules.rankings (see _project_usage_trend) — null below its gate.
+
+    decision_fit_narrative is the one new field here — a natural-language
+    "why" sentence naming this player's real strongest/weakest composite
+    inputs (modules.player_quick_view.decision_fit_narrative), not a new
+    computation over the numbers already in this same dict.
     """
 
     age_score_raw = row.get("age_score") if "age_score" in row.index else None
@@ -1996,6 +2001,7 @@ def _project_player_model(row: pd.Series) -> dict[str, Any]:
         "opportunity_confidence": _clean_json_value(row.get("opportunity_confidence")),
         "workload_trend": _clean_json_value(row.get("workload_trend")),
         "usage_trend": _project_usage_trend(row),
+        "decision_fit_narrative": player_quick_view.decision_fit_narrative(players_df, row),
     }
 
 
@@ -2030,7 +2036,7 @@ def get_player_quick_view(
         "ok": True,
         "stats": _quick_view_stats_dict(stats),
         "bio": dataclasses.asdict(bio),
-        "model": _project_player_model(row),
+        "model": _project_player_model(row, players_df),
         "reason": "",
     }
 

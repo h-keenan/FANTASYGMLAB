@@ -752,6 +752,11 @@ export interface QuickViewModel {
   opportunity_confidence: number | null;
   workload_trend: string | null;
   usage_trend: UsageTrend | null;
+  // One real sentence naming this player's strongest/weakest composite
+  // value-score inputs (percentile-based, see modules.player_quick_view.
+  // decision_fit_narrative) — null when the position pool is too thin to
+  // support a meaningful comparison.
+  decision_fit_narrative: string | null;
 }
 
 export interface WeeklyStatPoint {

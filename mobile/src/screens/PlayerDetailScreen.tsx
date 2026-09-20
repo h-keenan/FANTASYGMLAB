@@ -631,6 +631,9 @@ function ModelSection({ model }: { model: QuickViewModel }) {
   return (
     <View style={styles.card}>
       <SectionHeading title="Model Breakdown" icon="analytics-outline" />
+      {model.decision_fit_narrative ? (
+        <AppText style={styles.decisionFitNarrative}>{model.decision_fit_narrative}</AppText>
+      ) : null}
       <StatGrid
         items={[
           { label: 'Market', value: model.market_score != null ? Math.round(model.market_score) : null },
@@ -1112,6 +1115,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
+  },
+  decisionFitNarrative: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
   },
   trendText: { fontSize: 12, fontWeight: '600' },
   usageTrendBlock: { marginTop: spacing.sm, gap: spacing.xs },
