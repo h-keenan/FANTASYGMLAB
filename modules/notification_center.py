@@ -13,6 +13,8 @@ from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
 import streamlit as st
 
+from modules import account_store
+from modules import auth_supabase
 from modules import brand_identity
 from modules import canonical_recommendation_narrative
 from modules.player_identity import normalize_player_id
@@ -55,6 +57,9 @@ ACTIVITY_INBOX_READY_KEY = "activity_inbox_ready_league"
 NOTIFICATION_READ_IDS_KEY = "notification_center_read_ids"
 NOTIFICATION_DISMISSED_IDS_KEY = "notification_center_dismissed_ids"
 NOTIFICATION_ACCOUNT_SCOPE_KEY = "notification_center_account_scope"
+NOTIFICATION_READ_STATE_TABLE = "notification_read_state"
+NOTIFICATION_DURABLE_HYDRATED_KEY = "notification_center_durable_hydrated_scope"
+NOTIFICATION_DURABLE_UNAVAILABLE_KEY = "notification_center_durable_unavailable"
 URGENT_DELIVERY_STATE_KEY = "notification_center_urgent_delivery_state"
 URGENT_DELIVERY_PENDING_KEY = "notification_center_urgent_delivery_pending"
 MAX_INBOX_ITEMS = 6
@@ -293,6 +298,139 @@ def attention_aliases(row: Mapping[str, Any] | None) -> tuple[str, ...]:
     return alert_presentation.attention_aliases(row)
 
 
+def _resolve_durable_config(config: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    if isinstance(config, Mapping) and config:
+        return dict(config)
+    try:
+        return auth_supabase.get_supabase_config(secrets=st.secrets)
+    except Exception:
+        return {}
+
+
+def _mark_durable_unavailable(session: MutableMapping[str, Any]) -> None:
+    session[NOTIFICATION_DURABLE_UNAVAILABLE_KEY] = True
+
+
+def _persist_notification_read_state(
+    session: Mapping[str, Any],
+    notification_id: str,
+    *,
+    league_id: str,
+    dismissed: bool | None = None,
+    config: Mapping[str, Any] | None = None,
+) -> None:
+    """Best-effort durable write-through — never raises, never blocks a UI action.
+
+    `dismissed=None` (the mark-read path) omits that column from the upsert
+    payload entirely, so it can't regress an already-dismissed row back to
+    false; dismiss_notification passes dismissed=True explicitly.
+    """
+
+    if bool(session.get(NOTIFICATION_DURABLE_UNAVAILABLE_KEY)):
+        return
+    league_key = _text(league_id)
+    if not league_key:
+        return
+    try:
+        user_id = auth_supabase.current_user_id(dict(session))
+        access_token = auth_supabase.current_access_token(dict(session))
+    except Exception:
+        return
+    if not user_id or not access_token:
+        return
+    resolved = _resolve_durable_config(config)
+    if not auth_supabase.is_configured(resolved):
+        return
+    payload: dict[str, Any] = {
+        "user_id": user_id,
+        "league_id": league_key,
+        "notification_id": notification_id,
+    }
+    if dismissed is not None:
+        payload["dismissed"] = bool(dismissed)
+    try:
+        ok, error = account_store.upsert_row(
+            resolved,
+            access_token,
+            NOTIFICATION_READ_STATE_TABLE,
+            payload,
+            on_conflict="user_id,league_id,notification_id",
+        )
+    except Exception:
+        return
+    if not ok and isinstance(session, MutableMapping):
+        if "does not exist" in error.casefold() or "schema cache" in error.casefold():
+            _mark_durable_unavailable(session)
+
+
+def hydrate_durable_read_state(
+    session: MutableMapping[str, Any],
+    *,
+    league_id: str,
+    config: Mapping[str, Any] | None = None,
+) -> bool:
+    """Merge durable read/dismiss rows into this session's in-memory stores.
+
+    Additive only — never clears anything already marked this session. Runs
+    at most once per (account, league) per session (see
+    NOTIFICATION_DURABLE_HYDRATED_KEY), so it never turns is_notification_read
+    / is_notification_dismissed into a per-check network call.
+    """
+
+    league_key = _text(league_id)
+    if not league_key:
+        return False
+    scope = _read_scope(session, league_id=league_key)
+    if _text(session.get(NOTIFICATION_DURABLE_HYDRATED_KEY)) == scope:
+        return True
+    if bool(session.get(NOTIFICATION_DURABLE_UNAVAILABLE_KEY)):
+        return False
+
+    user_id = auth_supabase.current_user_id(dict(session))
+    access_token = auth_supabase.current_access_token(dict(session))
+    resolved = _resolve_durable_config(config)
+    if not auth_supabase.is_configured(resolved) or not user_id or not access_token:
+        return False
+
+    rows, error = account_store.fetch_rows(
+        resolved,
+        access_token,
+        NOTIFICATION_READ_STATE_TABLE,
+        user_id=user_id,
+        extra_query=f"league_id=eq.{league_key}&select=notification_id,dismissed",
+        timing_label="notification_read_state_hydrate",
+        timeout=8,
+    )
+    if error:
+        if "does not exist" in error.casefold() or "schema cache" in error.casefold():
+            _mark_durable_unavailable(session)
+        return False
+
+    session[NOTIFICATION_DURABLE_HYDRATED_KEY] = scope
+    if not rows:
+        return True
+
+    read_store = _read_id_store(session)
+    read_ids = set(read_store.get(scope) or [])
+    dismissed_raw = session.get(NOTIFICATION_DISMISSED_IDS_KEY)
+    dismissed_store = dict(dismissed_raw) if isinstance(dismissed_raw, Mapping) else {}
+    dismissed_ids = set(dismissed_store.get(scope) or [])
+
+    for row in rows:
+        note_id = _text(row.get("notification_id")) if isinstance(row, Mapping) else ""
+        if not note_id:
+            continue
+        read_ids.add(note_id)
+        if isinstance(row, Mapping) and bool(row.get("dismissed")):
+            dismissed_ids.add(note_id)
+
+    read_store[scope] = list(read_ids)
+    session[NOTIFICATION_READ_IDS_KEY] = read_store
+    dismissed_store[scope] = list(dismissed_ids)[-200:]
+    session[NOTIFICATION_DISMISSED_IDS_KEY] = dismissed_store
+    return True
+
+
 def mark_alert_read(
     session: MutableMapping[str, Any],
     row: Mapping[str, Any] | str,
@@ -334,6 +472,7 @@ def mark_notification_read(
     store[scope] = existing
     session[NOTIFICATION_READ_IDS_KEY] = store
     session[NOTIFICATION_ACCOUNT_SCOPE_KEY] = _account_scope(session)
+    _persist_notification_read_state(session, note_id, league_id=league_id or _text(session.get("selected_league_id")))
 
 
 def dismiss_notification(
@@ -355,6 +494,9 @@ def dismiss_notification(
         existing.append(note_id)
     store[scope] = existing[-200:]
     session[NOTIFICATION_DISMISSED_IDS_KEY] = store
+    _persist_notification_read_state(
+        session, note_id, league_id=league_id or _text(session.get("selected_league_id")), dismissed=True
+    )
     mark_notification_read(session, note_id, league_id=league_id)
 
 
@@ -997,6 +1139,14 @@ def publish_activity_inventory(
             league_id=league_id,
             config=supabase_config,
         )
+    except Exception:
+        pass
+
+    # Cross-device read/dismiss state: hydrate before this inventory pass
+    # filters out dismissed items below (see is_notification_dismissed use
+    # in this function). Additive, at most once per (account, league).
+    try:
+        hydrate_durable_read_state(session, league_id=league_id, config=supabase_config)
     except Exception:
         pass
 

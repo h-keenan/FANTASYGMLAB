@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Baseline | `3630b3c9c987b8ab214993a63bcadf6e8f89d59c` |
-| Scope | In-app activity inbox composition, deep-link routing, session read state |
-| Explicit non-changes | Football logic, valuations, rankings, recommendation generation/scoring/ordering, Trust, auth rules, entitlements rules, Stripe, Supabase schema, Sleeper semantics, caching contracts, business rules, push/email/SMS/APNs/FCM |
+| Scope | In-app activity inbox composition, deep-link routing, session read state (durable for signed-in accounts, session-only for guests) |
+| Explicit non-changes | Football logic, valuations, rankings, recommendation generation/scoring/ordering, Trust, auth rules, entitlements rules, Stripe, Sleeper semantics, caching contracts, business rules, push/email/SMS/APNs/FCM |
 
 ## Architecture
 
@@ -78,11 +78,12 @@ Empty / quiet inbox is valid when no league activity exists.
 
 ## Read / unread
 
-- Session-local map keyed by `account_scope|league_id`
+- Session-local map keyed by `account_scope|league_id` — always the source of truth `is_notification_read`/`is_notification_dismissed` check; this in-session shape is unchanged
 - Opening an item marks that id read; others unchanged
 - Account logout / switch clears via `clear_notification_session_state`
 - League switch clears inventory snapshot (no prior-league flash); read map is league-scoped
-- **Limitation:** unread is not durable across browser sessions (no Supabase schema added)
+- **Durable for signed-in accounts** (`docs/supabase_notification_read_state.sql`, roadmap P1): `mark_notification_read`/`dismiss_notification` best-effort write through to Supabase (identity + one `dismissed` flag, RLS `auth.uid()=user_id`); `hydrate_durable_read_state` merges those rows into the session map once per (account, league) per session, called from `publish_activity_inventory` alongside Decision Memory's own hydrate. Guests/signed-out sessions stay session-only by design — no anon policy exists.
+- Every read/write is fail-soft: a missing migration, unauthenticated session, or Supabase outage silently falls back to the pre-existing session-only behavior, never a crash or a blocked action
 
 ## Briefing vs Notification
 
@@ -97,12 +98,13 @@ Empty / quiet inbox is valid when no league activity exists.
 
 - Inbox compose is O(n) over cached records (n ≤ 8)
 - `publish_activity_inventory` runs inside Dashboard route body — **not** before first-usable paint
+- `hydrate_durable_read_state` adds one indexed Supabase select per (account, league) per session — not per notification, not per rerun (guarded by `NOTIFICATION_DURABLE_HYDRATED_KEY`)
 - Cold path with empty snapshot shows product-only / quiet copy without network or Trust work
 - No new protobuf CSS on the global cold path beyond existing command-header styles
 
 ## Known limitations
 
 1. Back from a notification handoff returns to Dashboard (Alerts live in the command bar popover; Streamlit cannot force-open the popover).
-2. Unread state is session-local only.
+2. Unread state durability requires `docs/supabase_notification_read_state.sql` applied; guests remain session-local by design.
 3. League Intelligence news feed is not a separate source — only Dashboard inventory tiles.
 4. Free vs Premium football truth is identical; Free already receives a shorter Dashboard inventory before publish.
