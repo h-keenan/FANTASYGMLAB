@@ -3543,6 +3543,7 @@ def test_dashboard_includes_team_snapshot(monkeypatch):
     assert snapshot["key_injuries_summary"] == ""
     assert snapshot["top_injury_impact_summary"] == ""
     assert snapshot["top_injury_impact_players"] == []
+    assert snapshot["injured_starters"] == 0
 
 
 def test_dashboard_team_snapshot_explains_the_health_flag(monkeypatch):
@@ -3614,6 +3615,9 @@ def test_dashboard_team_snapshot_explains_the_health_flag(monkeypatch):
     # engine's own impact summary), not a mobile-only rewording.
     assert "My Player 2" in snapshot["key_injuries_summary"]
     assert "My Player 2" in snapshot["top_injury_impact_summary"]
+    # The real total (not top_injury_impact_players' trimmed length) —
+    # powers the League Snapshot "Injuries" tile.
+    assert snapshot["injured_starters"] >= 1
 
 
 def test_dashboard_team_snapshot_is_none_without_a_resolved_roster(monkeypatch):

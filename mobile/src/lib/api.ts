@@ -897,6 +897,9 @@ export interface TeamSnapshot {
   key_injuries_summary: string;
   top_injury_impact_summary: string;
   top_injury_impact_players: InjuryImpactPlayer[];
+  /** The real total driving health_flag — top_injury_impact_players above
+   * is trimmed to a couple of cards, so its .length undercounts. */
+  injured_starters: number | null;
   average_age: number | null;
   power_rank: number | null;
   franchise_rank: number | null;
