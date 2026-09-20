@@ -14,12 +14,14 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import CircularProgressRing from '../components/CircularProgressRing';
+import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import {
   api,
   type CareerSeason,
+  type LineupPlayer,
   type NewsItem,
   type PlayerAward,
   type QuickViewBio,
@@ -176,6 +178,51 @@ function mixHex(from: string, to: string, t: number): string {
   return `#${channel(r1, r2)}${channel(g1, g2)}${channel(b1, b2)}`;
 }
 
+/** Real, not fabricated: the same percentile the badge text already shows,
+ * just given a direction — at/above the 50th percentile reads as a trend
+ * up, below it a trend down. Never a week-over-week delta (this app has no
+ * such series for most stats); the concept sheet's "trend arrows on stat
+ * tiles" is satisfied here by direction-of-percentile, not invented change. */
+function percentileTrendIcon(percentile: number | null | undefined): IoniconName | null {
+  if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) return null;
+  return percentile >= 50 ? 'caret-up' : 'caret-down';
+}
+
+/** Real start/sit read, not a new computation — the same
+ * suggest_optimal_lineup pass My Team and Matchup already run against the
+ * caller's own roster, just looked up for this one player. Omitted
+ * entirely (not a guess) when the player isn't found on the caller's
+ * roster at all — a free agent or an opponent's player has no "should you
+ * start them" answer on this account. */
+interface RosterRecommendation {
+  isStarter: boolean;
+  player: LineupPlayer;
+}
+
+function findRosterRecommendation(
+  starters: LineupPlayer[],
+  bench: LineupPlayer[],
+  playerId: string,
+): RosterRecommendation | null {
+  const starter = starters.find((p) => p.player_id === playerId);
+  if (starter) return { isStarter: true, player: starter };
+  const benched = bench.find((p) => p.player_id === playerId);
+  if (benched) return { isStarter: false, player: benched };
+  return null;
+}
+
+function rosterRecommendationDetail(rec: RosterRecommendation): string {
+  if (rec.isStarter) {
+    const slot = rec.player.slot ? ` at ${rec.player.slot}` : '';
+    return `Suggested starter${slot} on your roster${
+      rec.player.opportunity_label ? ` — ${rec.player.opportunity_label}` : ''
+    }`;
+  }
+  return `Not in your suggested starting lineup this week${
+    rec.player.injury_label ? ` — ${rec.player.injury_label}` : ''
+  }`;
+}
+
 function percentileColor(percentile: number | null | undefined): string {
   if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) {
     return colors.accentSoft;
@@ -223,12 +270,12 @@ function StatCell({
           {display}
         </AppText>
         {pctl ? (
-          <AppText
-            style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}
-            numberOfLines={1}
-          >
-            {pctl}
-          </AppText>
+          <View style={styles.statCellPercentileRow}>
+            <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile)} />
+            <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile) }]} numberOfLines={1}>
+              {pctl}
+            </AppText>
+          </View>
         ) : null}
       </View>
     </View>
@@ -317,9 +364,10 @@ function PercentBar({
         <View style={styles.percentValueGroup}>
           <AppText style={styles.percentValue}>{display}</AppText>
           {pctl ? (
-            <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}>
-              {pctl}
-            </AppText>
+            <View style={styles.statCellPercentileRow}>
+              <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile)} />
+              <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}>{pctl}</AppText>
+            </View>
           ) : null}
         </View>
       </View>
@@ -640,6 +688,53 @@ function UsageTrendChip({ trend }: { trend: UsageTrend }) {
   );
 }
 
+/** Two real signals already computed server-side — model.workload_trend
+ * (role direction) and model.usage_trend (weekly-recency read, with its own
+ * confidence label) — restyled as the concept sheet's icon/title/subtitle
+ * insight chips instead of the plain text line this data used to render as
+ * on the Model tab only. Never invents a third chip to fill the row. */
+function InsightChipsRow({ model }: { model: QuickViewModel }) {
+  const trendKey = (model.workload_trend ?? '').toLowerCase();
+  const trendColor = WORKLOAD_TREND_COLOR[trendKey] ?? colors.textSecondary;
+  const trendUp = trendKey === 'rising' || trendKey === 'climbing' || trendKey === 'increasing';
+  const chips: Array<{ icon: IoniconName; color: string; title: string; detail: string }> = [];
+  if (model.workload_trend) {
+    chips.push({
+      icon: trendUp ? 'trending-up' : 'trending-down',
+      color: trendColor,
+      title: `Role trending ${trendUp ? 'up' : 'down'}`,
+      detail: model.workload_trend,
+    });
+  }
+  if (model.usage_trend) {
+    const rising = model.usage_trend.direction === 'up';
+    chips.push({
+      icon: rising ? 'flame' : 'alert-circle-outline',
+      color: rising ? colors.success : colors.danger,
+      title: model.usage_trend.label,
+      detail: model.usage_trend.detail,
+    });
+  }
+  if (chips.length === 0) return null;
+  return (
+    <View style={styles.insightChipsRow}>
+      {chips.map((chip, index) => (
+        <View key={index} style={styles.insightChip}>
+          <IconCircle name={chip.icon} color={chip.color} size={30} iconSize={15} />
+          <View style={styles.insightChipTextGroup}>
+            <AppText style={styles.insightChipTitle} numberOfLines={1}>
+              {chip.title}
+            </AppText>
+            <AppText style={styles.insightChipDetail} numberOfLines={2}>
+              {chip.detail}
+            </AppText>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function ModelSection({ model }: { model: QuickViewModel }) {
   const trendKey = (model.workload_trend ?? '').toLowerCase();
   const trendColor = WORKLOAD_TREND_COLOR[trendKey] ?? colors.textSecondary;
@@ -680,7 +775,7 @@ function ModelSection({ model }: { model: QuickViewModel }) {
 
 export default function PlayerDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
-  const { player, leagueId } = route.params;
+  const { player, leagueId, leagueName } = route.params;
   const [stats, setStats] = useState<QuickViewStats | null>(null);
   const [model, setModel] = useState<QuickViewModel | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
@@ -691,6 +786,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const [watchBusy, setWatchBusy] = useState(false);
   const [untouchable, setUntouchable] = useState(false);
   const [untouchableBusy, setUntouchableBusy] = useState(false);
+  const [rosterRec, setRosterRec] = useState<RosterRecommendation | null>(null);
   const [rank, setRank] = useState({
     overall_rank: player.overall_rank,
     position_rank: player.position_rank,
@@ -782,6 +878,23 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     let cancelled = false;
     api
+      .getLeagueMyTeam(leagueId)
+      .then((result) => {
+        if (cancelled || result.reason) return;
+        setRosterRec(findRosterRecommendation(result.starters, result.bench, player.player_id));
+      })
+      .catch(() => {
+        // Best-effort enrichment — omitting the card is the correct
+        // fallback, never a guessed status.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId, player.player_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
       .getGmTargets(leagueId)
       .then((result) => {
         if (cancelled) return;
@@ -866,8 +979,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           {overallRating !== null ? (
             <CircularProgressRing
               percent={overallRating}
-              size={84}
-              strokeWidth={8}
+              size={100}
+              strokeWidth={9}
               valueLabel={String(overallRating)}
               valueFontScale={0.38}
               color={percentileColor(overallRating)}
@@ -906,6 +1019,34 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             </AppText>
           </View>
         ) : null}
+        {rosterRec ? (
+          <View
+            style={[
+              styles.rosterRecCard,
+              { borderColor: rosterRec.isStarter ? colors.success : colors.textTertiary },
+            ]}
+          >
+            <View
+              style={[
+                styles.rosterRecBadge,
+                { backgroundColor: rosterRec.isStarter ? colors.success : colors.backgroundElevated },
+              ]}
+            >
+              <AppText
+                style={[
+                  styles.rosterRecBadgeText,
+                  { color: rosterRec.isStarter ? colors.background : colors.textSecondary },
+                ]}
+              >
+                {rosterRec.isStarter ? 'STARTER' : 'BENCH'}
+              </AppText>
+            </View>
+            <View style={styles.rosterRecTextGroup}>
+              <AppText style={styles.rosterRecTitle}>Roster Recommendation</AppText>
+              <AppText style={styles.rosterRecDetail}>{rosterRecommendationDetail(rosterRec)}</AppText>
+            </View>
+          </View>
+        ) : null}
         <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
         {watching !== null ? (
           <View style={styles.watchRow}>
@@ -932,6 +1073,13 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
                 />
               </TouchableOpacity>
             ) : null}
+            <TouchableOpacity
+              style={styles.compareButton}
+              onPress={() => navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
+            >
+              <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
+              <AppText style={styles.compareButtonText}>Compare</AppText>
+            </TouchableOpacity>
           </View>
         ) : null}
       </View>
@@ -974,6 +1122,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
                   <StatSection title="College" icon="school-outline" items={stats.college} />
                 ) : null}
               </View>
+              {model ? <InsightChipsRow model={model} /> : null}
             </>
           ) : null}
 
@@ -1050,6 +1199,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   untouchableButtonActive: { backgroundColor: colors.premium, borderColor: colors.premium },
+  compareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  compareButtonText: { fontSize: 13, fontWeight: '600', color: colors.accent },
+  rosterRecCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+  },
+  rosterRecBadge: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radii.pill },
+  rosterRecBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
+  rosterRecTextGroup: { flex: 1 },
+  rosterRecTitle: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
+  rosterRecDetail: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
   newsImpactBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1103,6 +1279,21 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   cardSpaced: { marginTop: spacing.lg },
+  insightChipsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  insightChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  insightChipTextGroup: { flex: 1 },
+  insightChipTitle: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
+  insightChipDetail: { fontSize: 10, color: colors.textSecondary, marginTop: 1, lineHeight: 13 },
   // A subsection inside a shared card: a hairline + modest top margin reads
   // as "next category" without the full weight of another card's
   // border+padding+margin — see StatSection's `first` prop.
@@ -1222,6 +1413,7 @@ const styles = StyleSheet.create({
   // Suffix, not a second stat: it sits on the value's baseline and shrinks
   // first, so the density pass that folded this tab into one card holds.
   statCellValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+  statCellPercentileRow: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 1 },
   statCellPercentile: {
     fontSize: 10,
     fontWeight: '600',
