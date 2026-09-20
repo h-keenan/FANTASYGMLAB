@@ -10,6 +10,7 @@ import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import TeamAvatar from '../components/TeamAvatar';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -231,6 +232,9 @@ function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueS
           />
           <AppText style={styles.analyticsRingCaption}>TEAM VALUE</AppText>
         </View>
+        {team.avatar_url ? (
+          <TeamAvatar avatarId={team.avatar_url} size={40} style={styles.analyticsTeamAvatar} />
+        ) : null}
         <View style={styles.analyticsHeaderText}>
           {outlook ? (
             <View style={styles.outlookBadge}>
@@ -303,6 +307,10 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
           <AppText style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>{player.injury_label}</AppText>
         </View>
       ) : null}
+      <View style={styles.valueColumn}>
+        <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <AppText style={styles.valueLabel}>VALUE</AppText>
+      </View>
     </AnimatedCard>
   );
 }
@@ -336,6 +344,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginTop: spacing.xs,
   },
+  analyticsTeamAvatar: { borderWidth: 2, borderColor: colors.accent },
   analyticsHeaderText: { flex: 1, gap: spacing.xs },
   outlookBadge: {
     alignSelf: 'flex-start',
@@ -419,6 +428,9 @@ const styles = StyleSheet.create({
   // the suggested lineup when nothing available could fill the slot.
   injuryPillOut: { backgroundColor: colors.danger },
   injuryTextOut: { color: colors.badgeText },
+  valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm },
+  valueNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
 });
