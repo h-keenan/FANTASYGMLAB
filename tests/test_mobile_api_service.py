@@ -2106,6 +2106,36 @@ def test_quick_view_model_projects_real_score_columns(monkeypatch):
     assert model["age_score_label"] == "Age Score"
     assert model["opportunity_confidence"] == 78
     assert model["workload_trend"] == "Rising"
+    # A pool of one player is far below PERCENTILE_MIN_POOL — no real peer
+    # comparison exists, so the narrative must not invent one.
+    assert model["decision_fit_narrative"] is None
+
+
+def test_quick_view_model_sends_a_real_decision_fit_narrative_for_a_real_pool(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    frame = _rated_quick_view_frame()
+    for column in ("market_score", "scarcity_score", "opportunity_score", "role_score"):
+        frame[column] = frame["value_score"]
+    subject = frame["player_id"] == "9001"
+    frame.loc[subject, "market_score"] = 1000.0
+    frame.loc[subject, "scarcity_score"] = -1.0
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    narrative = response.json()["model"]["decision_fit_narrative"]
+    assert narrative is not None
+    assert "Market value" in narrative
+    assert "biggest driver" in narrative
 
 
 def test_quick_view_model_falls_back_to_age_lens_when_age_score_missing(monkeypatch):

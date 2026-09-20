@@ -480,3 +480,76 @@ def test_overall_rating_is_omitted_when_no_score_column_exists():
     players = _pool_with_subject(20)
 
     assert player_quick_view.build_stats_view(_subject_row(players), players).overall_rating is None
+
+
+def _decision_fit_pool(count: int, **subject_overrides):
+    """A pool carrying the four composite value-score inputs the decision-fit
+    narrative percentiles, ascending across the pool so the subject's
+    injected values land at an exact, predictable rank."""
+
+    players = _pool_with_subject(count, **subject_overrides)
+    for column in ("market_score", "scarcity_score", "opportunity_score", "role_score"):
+        players.loc[players["player_id"] != "fixture-player", column] = [
+            float(index) for index in range(count)
+        ]
+    return players
+
+
+def test_decision_fit_narrative_names_the_strongest_and_weakest_real_factors():
+    players = _decision_fit_pool(
+        20,
+        market_score=1000.0,  # tops the pool -> strongest
+        scarcity_score=-1.0,  # bottom of the pool -> weakest
+        opportunity_score=10.0,
+        role_score=10.0,
+    )
+
+    narrative = player_quick_view.decision_fit_narrative(players, _subject_row(players))
+
+    assert narrative is not None
+    assert "Market value (100th percentile at WR) is the biggest driver" in narrative
+    assert "Positional scarcity (5th) is the softest input." in narrative
+
+
+def test_decision_fit_narrative_omits_the_weakness_clause_without_a_real_weak_spot():
+    # Every factor near the top of the pool — no percentile drops low enough
+    # to cross _DECISION_FIT_WEAKNESS_CEILING, so there is nothing honest to
+    # call a "softest input."
+    players = _decision_fit_pool(
+        20,
+        market_score=1000.0,
+        scarcity_score=999.0,
+        opportunity_score=998.0,
+        role_score=997.0,
+    )
+
+    narrative = player_quick_view.decision_fit_narrative(players, _subject_row(players))
+
+    assert narrative is not None
+    assert "softest input" not in narrative
+
+
+def test_decision_fit_narrative_none_without_enough_resolved_factors():
+    # Only one of the four composite columns exists at all — a real,
+    # well-populated percentile, but _DECISION_FIT_MIN_FACTORS still refuses
+    # a sentence built on a single factor.
+    players = _pool_with_subject(20, market_score=1000.0)
+    players.loc[players["player_id"] != "fixture-player", "market_score"] = [
+        float(index) for index in range(20)
+    ]
+
+    assert player_quick_view.decision_fit_narrative(players, _subject_row(players)) is None
+
+
+def test_decision_fit_narrative_none_below_the_percentile_pool_minimum():
+    players = _decision_fit_pool(
+        player_quick_view.PERCENTILE_MIN_POOL - 2,
+        market_score=1000.0,
+        scarcity_score=1.0,
+    )
+
+    assert player_quick_view.decision_fit_narrative(players, _subject_row(players)) is None
+
+
+def test_decision_fit_narrative_none_without_a_position_pool():
+    assert player_quick_view.decision_fit_narrative(None, _row()) is None

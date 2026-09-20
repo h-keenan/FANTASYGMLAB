@@ -501,6 +501,77 @@ def _stat_percentiles(
     return percentiles
 
 
+#: Composite value-score inputs to narrate, in the exact order the "How We
+#: Evaluate" weights (modules.methodology_page) present them — market first
+#: (the dominant weight), then scarcity/opportunity, then role. Age is
+#: deliberately excluded: age_penalty is a signed delta (age_curve - market),
+#: not a higher-is-better score like the other four, so it can't share this
+#: percentile-and-band treatment without a separate, differently-signed path.
+_DECISION_FIT_FACTORS: tuple[tuple[str, str], ...] = (
+    ("market value", "market_score"),
+    ("positional scarcity", "scarcity_score"),
+    ("opportunity", "opportunity_score"),
+    ("role", "role_score"),
+)
+
+_DECISION_FIT_MIN_FACTORS = 2
+_DECISION_FIT_WEAKNESS_CEILING = 40
+
+
+def _ordinal(value: int) -> str:
+    if 10 <= value % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
+    return f"{value}{suffix}"
+
+
+def decision_fit_narrative(
+    players_df: pd.DataFrame | None,
+    row: Mapping[str, object],
+) -> str | None:
+    """One sentence naming the real driver(s) behind this player's value.
+
+    Percentiles only — same pool, same PERCENTILE_MIN_POOL gate, same
+    rank(pct=True) machinery as _stat_percentiles, just applied to the
+    composite score inputs instead of raw stats. Never invents a factor:
+    fewer than _DECISION_FIT_MIN_FACTORS resolving (missing columns, thin
+    pool) returns None rather than a sentence built on partial signal.
+    """
+
+    located = _position_pool(players_df, row)
+    if located is None:
+        return None
+    group, offset = located
+    position = _text(row.get("position")).upper()
+
+    resolved: list[tuple[str, int]] = []
+    for label, column in _DECISION_FIT_FACTORS:
+        if column not in group.columns:
+            continue
+        series = pd.to_numeric(group[column], errors="coerce")
+        if int(series.notna().sum()) < PERCENTILE_MIN_POOL:
+            continue
+        value = series.rank(pct=True).to_numpy()[offset]
+        if pd.isna(value):
+            continue
+        resolved.append((label, int(min(100, max(1, round(float(value) * 100))))))
+
+    if len(resolved) < _DECISION_FIT_MIN_FACTORS:
+        return None
+
+    strongest_label, strongest_pctile = max(resolved, key=lambda item: item[1])
+    weakest_label, weakest_pctile = min(resolved, key=lambda item: item[1])
+
+    sentence = (
+        f"{strongest_label.capitalize()} ({_ordinal(strongest_pctile)} percentile at {position}) "
+        "is the biggest driver of this valuation."
+    )
+    if weakest_label != strongest_label and weakest_pctile <= _DECISION_FIT_WEAKNESS_CEILING:
+        sentence += f" {weakest_label.capitalize()} ({_ordinal(weakest_pctile)}) is the softest input."
+    return sentence
+
+
 def _with_percentile(item: Mapping[str, object], percentile: float | None) -> dict:
     cloned = dict(item)
     if percentile is not None:
