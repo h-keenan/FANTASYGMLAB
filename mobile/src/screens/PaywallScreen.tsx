@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
@@ -111,6 +112,8 @@ export default function PaywallScreen({ navigation }: Props) {
   }
 
   return (
+    <View style={styles.root}>
+    <GridBackground />
     <ScrollView
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
@@ -211,10 +214,12 @@ export default function PaywallScreen({ navigation }: Props) {
         .
       </AppText>
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   center: {
