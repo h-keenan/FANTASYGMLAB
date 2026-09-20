@@ -1,27 +1,43 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { colors } from '../theme';
+import { colors, gradients } from '../theme';
 
 const CELL = 72;
 
 /**
- * The web app's ops-grid texture (modules/interface_reimagining_styles.py's
- * `.stApp` rule): a 72x72 logical-px line grid over the background, present
- * on every screen there. Ported as the same technique (tile size, hairline
- * width) rather than eyeballed — this is the single most identifiable "does
- * it feel like the same app" signal the web app has that mobile was
- * missing entirely.
+ * The app's shared screen backdrop: three layers, back to front.
+ *
+ * 1. A navy-to-black wash (the same `gradients.hero` pair already used on
+ *    Login/Home) instead of a flat `colors.background` fill — before this,
+ *    only the pre-login screens had any depth to their background and every
+ *    in-league screen behind it read as flat near-black, the single biggest
+ *    gap against the concept sheet's atmospheric navy-glow look.
+ * 2. A soft cyan glow bloom anchored top-center, echoing the concept
+ *    sheet's corner-glow treatment — kept faint on purpose (this app's
+ *    established rule is distinct accents, not overdone ones).
+ * 3. The web app's ops-grid hairline texture (modules/interface_reimagining_styles.py's
+ *    `.stApp` rule), unchanged from before.
  */
 export default function GridBackground() {
   return (
     <Svg pointerEvents="none" style={StyleSheet.absoluteFillObject}>
       <Defs>
+        <LinearGradient id="screenWash" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={gradients.hero[0]} stopOpacity={1} />
+          <Stop offset="1" stopColor={gradients.hero[1]} stopOpacity={1} />
+        </LinearGradient>
+        <RadialGradient id="glowBloom" cx="0.5" cy="0" r="0.65">
+          <Stop offset="0" stopColor={colors.accent} stopOpacity={0.12} />
+          <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
+        </RadialGradient>
         <Pattern id="opsGrid" width={CELL} height={CELL} patternUnits="userSpaceOnUse">
           <Path d={`M ${CELL} 0 L 0 0 0 ${CELL}`} fill="none" stroke={colors.hairline} strokeWidth={1} />
         </Pattern>
       </Defs>
+      <Rect x={0} y={0} width="100%" height="100%" fill="url(#screenWash)" />
+      <Rect x={0} y={0} width="100%" height="100%" fill="url(#glowBloom)" />
       <Rect x={0} y={0} width="100%" height="100%" fill="url(#opsGrid)" />
     </Svg>
   );

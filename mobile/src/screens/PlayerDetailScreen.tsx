@@ -14,6 +14,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import CircularProgressRing from '../components/CircularProgressRing';
+import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -1051,6 +1052,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
   return (
     <>
+    <View style={styles.root}>
+    <GridBackground />
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
       <View style={styles.header}>
         <View style={styles.heroIdentityRow}>
@@ -1226,12 +1229,14 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         </>
       )}
     </ScrollView>
+    </View>
     <NewsImpactModal visible={newsModalOpen} items={newsItems} onClose={() => setNewsModalOpen(false)} />
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   header: { alignItems: 'center', marginBottom: spacing.xl },

@@ -1,6 +1,7 @@
 import React from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
+import GridBackground from '../components/GridBackground';
 
 import ContentSections, { type ContentSection } from '../components/ContentSections';
 import methodologyContent from '../data/methodologyContent.json';
@@ -20,15 +21,19 @@ export default function HowWeEvaluateScreen() {
   const orbClearance = useOrbClearance();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-      <AppText style={styles.kicker}>{CONTENT.kicker}</AppText>
-      <AppText style={styles.note}>{CONTENT.note}</AppText>
-      <ContentSections sections={CONTENT.sections} />
-    </ScrollView>
+    <View style={styles.root}>
+      <GridBackground />
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+        <AppText style={styles.kicker}>{CONTENT.kicker}</AppText>
+        <AppText style={styles.note}>{CONTENT.note}</AppText>
+        <ContentSections sections={CONTENT.sections} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
   kicker: {

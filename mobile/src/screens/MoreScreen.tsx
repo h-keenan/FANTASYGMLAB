@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import IconCircle from '../components/IconCircle';
@@ -130,6 +131,7 @@ export default function MoreScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <GridBackground />
       <ScrollView contentContainerStyle={{ paddingBottom: orbClearance }}>
       <AppText style={styles.sectionLabel}>Display</AppText>
       <View style={styles.densityRow}>
