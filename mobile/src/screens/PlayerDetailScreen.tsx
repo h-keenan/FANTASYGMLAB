@@ -28,6 +28,7 @@ import {
   type QuickViewModel,
   type QuickViewStatItem,
   type QuickViewStats,
+  type ScheduleWeek,
   type UsageTrend,
   type WeeklyStatPoint,
 } from '../lib/api';
@@ -37,10 +38,11 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { colors, radii, spacing } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
-type DetailTab = 'stats' | 'trends' | 'career' | 'model';
+type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model';
 const TABS: Array<{ key: DetailTab; label: string }> = [
   { key: 'stats', label: 'Stats' },
   { key: 'trends', label: 'Trends' },
+  { key: 'schedule', label: 'Schedule' },
   { key: 'career', label: 'Career' },
   { key: 'model', label: 'Model' },
 ];
@@ -640,6 +642,83 @@ function CareerSection({ playerId }: { playerId: string }) {
   );
 }
 
+/** One real game row: week, opponent, home/away, and whatever the market
+ * has actually published for it — a final score once played, otherwise
+ * the real spread/total (never estimated) or a plain "not posted yet"
+ * note when the market hasn't priced that week yet. */
+function ScheduleRow({ week }: { week: ScheduleWeek }) {
+  const spreadText =
+    week.spread_line != null
+      ? week.spread_line < 0
+        ? `Favored by ${Math.abs(week.spread_line).toFixed(1)}`
+        : week.spread_line > 0
+          ? `Underdog by ${week.spread_line.toFixed(1)}`
+          : 'Even'
+      : null;
+  return (
+    <View style={styles.scheduleRow}>
+      <View style={styles.scheduleWeekCol}>
+        <AppText style={styles.scheduleWeekLabel}>WK {week.week}</AppText>
+      </View>
+      <View style={styles.scheduleOpponentCol}>
+        <AppText style={styles.scheduleOpponent} numberOfLines={1}>
+          {week.is_home ? 'vs' : '@'} {week.opponent}
+        </AppText>
+        {week.played ? (
+          <AppText style={styles.scheduleDetail}>
+            Final: {week.team_score != null ? Math.round(week.team_score) : '—'}-
+            {week.opponent_score != null ? Math.round(week.opponent_score) : '—'}
+          </AppText>
+        ) : spreadText || week.total_line != null ? (
+          <AppText style={styles.scheduleDetail}>
+            {spreadText}
+            {spreadText && week.total_line != null ? ' · ' : ''}
+            {week.total_line != null ? `O/U ${week.total_line}` : ''}
+          </AppText>
+        ) : (
+          <AppText style={styles.scheduleDetailMuted}>Line not posted yet</AppText>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function ScheduleSection({ playerId }: { playerId: string }) {
+  const [weeks, setWeeks] = useState<ScheduleWeek[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPlayerSchedule(playerId)
+      .then((result) => {
+        if (!cancelled) setWeeks(result.weeks);
+      })
+      .catch(() => {
+        if (!cancelled) setWeeks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerId]);
+
+  if (weeks === null) {
+    return <ActivityIndicator style={styles.loader} color={colors.accent} />;
+  }
+  if (weeks.length === 0) {
+    return <AppText style={styles.notice}>No schedule available for this player's team yet.</AppText>;
+  }
+  return (
+    <View style={styles.card}>
+      <AppText style={styles.scheduleDisclaimer}>
+        Real opponent and market lines — never used to adjust this player's value or rankings.
+      </AppText>
+      {weeks.map((week) => (
+        <ScheduleRow key={week.week} week={week} />
+      ))}
+    </View>
+  );
+}
+
 /** Same opportunity_label real string Waivers/My Team already show (never
  * a new value computed here) — colored by the same good/caution/bad read
  * those screens imply through context, so it reads as an "insight chip"
@@ -1128,6 +1207,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
           {activeTab === 'trends' ? <TrendsSection playerId={player.player_id} /> : null}
 
+          {activeTab === 'schedule' ? <ScheduleSection playerId={player.player_id} /> : null}
+
           {activeTab === 'career' ? <CareerSection playerId={player.player_id} /> : null}
 
           {activeTab === 'model' ? (
@@ -1467,4 +1548,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loader: { marginTop: spacing.xl },
+  scheduleDisclaimer: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    lineHeight: 15,
+    marginBottom: spacing.sm,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  scheduleWeekCol: { width: 52 },
+  scheduleWeekLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  scheduleOpponentCol: { flex: 1 },
+  scheduleOpponent: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  scheduleDetail: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+  scheduleDetailMuted: { fontSize: 12, color: colors.textTertiary, marginTop: 1, fontStyle: 'italic' },
 });

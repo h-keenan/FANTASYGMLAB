@@ -789,6 +789,32 @@ export interface CareerResponse {
   seasons: CareerSeason[];
 }
 
+/**
+ * One real NFL game for this player's team — opponent, home/away, and the
+ * published Vegas market's own spread/total (see modules.nfl_schedule's
+ * docstring). spread_line is from this team's own perspective (negative =
+ * this team favored). Context only: never a scoring input anywhere in the
+ * app, and both line fields are null once the market hasn't published that
+ * far out yet — never estimated client-side.
+ */
+export interface ScheduleWeek {
+  week: number;
+  opponent: string;
+  is_home: boolean;
+  spread_line: number | null;
+  total_line: number | null;
+  played: boolean;
+  team_score: number | null;
+  opponent_score: number | null;
+}
+
+export interface ScheduleResponse {
+  ok: true;
+  team: string | null;
+  season?: number;
+  weeks: ScheduleWeek[];
+}
+
 export interface QuickViewResponse {
   ok: true;
   stats: QuickViewStats | null;
@@ -1140,6 +1166,8 @@ export const api = {
   },
   getPlayerCareer: (playerId: string) =>
     authorizedFetch<CareerResponse>(`/v1/players/${encodeURIComponent(playerId)}/career`),
+  getPlayerSchedule: (playerId: string) =>
+    authorizedFetch<ScheduleResponse>(`/v1/players/${encodeURIComponent(playerId)}/schedule`),
   lookupSleeperLeagues: (username: string) => {
     const query = username ? `?username=${encodeURIComponent(username)}` : '';
     return authorizedFetch<SleeperLeagueLookupResponse>(`/v1/sleeper/leagues${query}`);
