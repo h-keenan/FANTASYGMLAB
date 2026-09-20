@@ -592,6 +592,21 @@ function CareerSection({ playerId }: { playerId: string }) {
   );
 }
 
+/** Same opportunity_label real string Waivers/My Team already show (never
+ * a new value computed here) — colored by the same good/caution/bad read
+ * those screens imply through context, so it reads as an "insight chip"
+ * at a glance instead of plain gray label text. */
+function opportunityChipColor(label: string | null | undefined): string {
+  const normalized = (label ?? '').toLowerCase();
+  if (!normalized) return colors.textSecondary;
+  if (normalized.includes('elite') || normalized.includes('strong')) return colors.success;
+  if (normalized.includes('risk') || normalized.includes('committee') || normalized.includes('backup')) {
+    return colors.premium;
+  }
+  if (normalized.includes('out') || normalized.includes('buried')) return colors.danger;
+  return colors.textSecondary;
+}
+
 const WORKLOAD_TREND_COLOR: Record<string, string> = {
   rising: colors.success,
   climbing: colors.success,
@@ -881,6 +896,13 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           >
             <AppText style={[styles.primeWindowText, { color: primeWindowColor(stats.prime_window.status) }]}>
               {primeWindowLabel(stats.prime_window)}
+            </AppText>
+          </View>
+        ) : null}
+        {player.opportunity_label ? (
+          <View style={[styles.primeWindowBadge, { borderColor: opportunityChipColor(player.opportunity_label) }]}>
+            <AppText style={[styles.primeWindowText, { color: opportunityChipColor(player.opportunity_label) }]}>
+              {player.opportunity_label}
             </AppText>
           </View>
         ) : null}
