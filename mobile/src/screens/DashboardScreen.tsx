@@ -23,6 +23,7 @@ import {
   type TeamSnapshot,
 } from '../lib/api';
 import PremiumLock from '../components/PremiumLock';
+import TeamAvatar from '../components/TeamAvatar';
 import TrajectoryArcs from '../components/TrajectoryArcs';
 import { useOrbClearance } from '../lib/orbLayout';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
@@ -221,6 +222,12 @@ export default function DashboardScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+      <View style={styles.heroBlock}>
+        <AppText style={styles.heroTitle}>NEXT MOVE</AppText>
+        <AppText style={styles.heroSubtitle} numberOfLines={1}>
+          {leagueName.toUpperCase()}
+        </AppText>
+      </View>
       <AppText style={styles.disclaimer}>
         The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and
         waiver signals the web app's Dashboard uses.
@@ -368,10 +375,10 @@ function QuickActionsGrid({
       {QUICK_ACTIONS.map((action) => (
         <TouchableOpacity
           key={action.route}
-          style={styles.quickActionCell}
+          style={[styles.quickActionCell, { borderColor: `${action.color}55` }]}
           onPress={() => navigation.navigate(action.route, { leagueId, leagueName })}
         >
-          <IconCircle name={action.icon} color={action.color} size={40} />
+          <IconCircle name={action.icon} color={action.color} size={36} />
           <AppText style={styles.quickActionLabel} numberOfLines={1}>
             {action.label}
           </AppText>
@@ -564,11 +571,21 @@ function WeeklyMatchupCard({
 
       <View style={styles.matchupValueRow}>
         <View style={styles.matchupValueSide}>
+          <TeamAvatar
+            avatarId={mine.avatar_url}
+            size={40}
+            style={StyleSheet.flatten([styles.matchupAvatar, { borderColor: colors.accent }])}
+          />
           <AppText style={styles.matchupSideLabel}>YOU</AppText>
           <AppText style={styles.matchupSideValue}>{Math.round(comparison.my_season_value).toLocaleString()}</AppText>
         </View>
         <AppText style={styles.matchupVersus}>VS</AppText>
         <View style={[styles.matchupValueSide, styles.matchupValueSideRight]}>
+          <TeamAvatar
+            avatarId={opponent.avatar_url}
+            size={40}
+            style={StyleSheet.flatten([styles.matchupAvatar, { borderColor: colors.danger }])}
+          />
           <AppText style={styles.matchupSideLabel}>THEM</AppText>
           <AppText style={styles.matchupSideValue}>{Math.round(comparison.opponent_season_value).toLocaleString()}</AppText>
         </View>
@@ -791,19 +808,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: spacing.xl,
   },
-  disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16 },
+  heroBlock: { alignItems: 'center', marginBottom: spacing.md },
+  heroTitle: {
+    fontSize: 30,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  heroSubtitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 1.4,
+    marginTop: 2,
+  },
+  disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16, textAlign: 'center' },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: spacing.lg,
-    marginHorizontal: -spacing.xs,
+    gap: spacing.sm,
   },
   quickActionCell: {
-    width: '25%',
+    flexBasis: '22%',
+    flexGrow: 1,
     alignItems: 'center',
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.sm,
     gap: spacing.xs,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
   },
   quickActionLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
   lockWrap: { marginTop: spacing.md },
@@ -849,6 +885,7 @@ const styles = StyleSheet.create({
   },
   matchupValueSide: { flex: 1 },
   matchupValueSideRight: { alignItems: 'flex-end' },
+  matchupAvatar: { borderWidth: 2, marginBottom: spacing.xs },
   matchupSideLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
   matchupSideValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
   matchupVersus: {
