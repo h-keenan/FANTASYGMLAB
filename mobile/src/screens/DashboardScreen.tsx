@@ -551,7 +551,7 @@ function WeeklyMatchupCard({
   return (
     <AnimatedCard
       glow
-      style={styles.card}
+      style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.accent } as ViewStyle])}
       onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
     >
       <View style={styles.cardHeaderRow}>
@@ -622,7 +622,7 @@ function TeamHealthContextCard({ snapshot }: { snapshot: TeamSnapshot }) {
   if (players.length === 0 && !keyInjuries && !fallbackSummary) return null;
 
   return (
-    <AnimatedCard style={styles.healthCard}>
+    <AnimatedCard style={StyleSheet.flatten([styles.healthCard, styles.healthCardBorder])}>
       <View style={styles.healthHeaderRow}>
         <Ionicons name="pulse-outline" size={15} color={colors.danger} />
         <AppText style={styles.healthLabel} numberOfLines={1}>
@@ -670,7 +670,7 @@ function TopPriorityTradeCard({
   return (
     <AnimatedCard
       glow
-      style={styles.card}
+      style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.accent } as ViewStyle])}
       onPress={
         routeName
           ? () => (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName })
@@ -886,6 +886,11 @@ const styles = StyleSheet.create({
   },
   snapshotTileTappable: { borderColor: colors.accentMuted },
   healthCard: { padding: spacing.lg, gap: spacing.sm, marginBottom: spacing.md },
+  // Same left-border accent language BriefingCard/TopPriorityTradeCard/
+  // WeeklyMatchupCard use — this card was the one surface on Dashboard still
+  // rendering as a flat, unaccented block despite being the "injury/watch"
+  // category everywhere else on the screen colors red.
+  healthCardBorder: { borderLeftWidth: 4, borderLeftColor: colors.danger },
   healthHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   healthLabel: {
     fontSize: 11,
