@@ -127,6 +127,22 @@ def test_health_root_and_ready(monkeypatch):
     assert ready.json()["status"] == "ready"
 
 
+def test_gzip_middleware_compresses_large_responses(monkeypatch):
+    # Full-league JSON payloads (rankings, draft-picks, trade-hub) are
+    # pandas-derived and can run into the hundreds of KB uncompressed, all
+    # served to mobile clients over cellular networks — verifies the
+    # middleware is actually wired up, not just importable.
+    from starlette.middleware.gzip import GZipMiddleware
+
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    assert any(m.cls is GZipMiddleware for m in mobile_api_service.app.user_middleware)
+
+    response = client.get("/health", headers={"Accept-Encoding": "gzip"})
+    assert response.status_code == 200
+
+
 def test_health_triggers_players_refresh_check_without_auth(monkeypatch):
     # /health needs no Authorization header, unlike every endpoint behind
     # require_user — it's the only route the keep-alive cron actually pings
