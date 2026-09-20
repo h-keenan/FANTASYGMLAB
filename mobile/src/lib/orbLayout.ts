@@ -7,7 +7,6 @@ import { spacing } from '../theme';
 // instead of imported from GmOrb.tsx to avoid a screen-to-component import
 // cycle; GmOrb.tsx imports these back so the two can never drift apart.
 export const ORB_SIZE = 48;
-export const ORB_INSET_CEILING = 100;
 
 // GmOrb also renders a LinearGradient scrim behind the orb, absolutely
 // positioned at the screen bottom with height `ORB_SCRIM_BASE_HEIGHT +
@@ -22,9 +21,12 @@ export const ORB_SCRIM_BASE_HEIGHT = 112;
  * Minimum bottom padding a scrollable screen needs so its last item neither
  * renders behind GmOrb nor lands inside its scrim gradient. Depends on
  * insets.bottom, which varies by device, so this has to be a hook rather than
- * a fixed constant — a hardcoded number would be right on whichever phone it
- * was tested on and wrong everywhere else, the same mistake the orb's own
- * inset clamp made once already (see PR #513's history).
+ * a fixed constant.
+ *
+ * No ceiling on insets.bottom here (there used to be one — see GmOrb.tsx's
+ * own history comment for why it was removed): a device with a legitimately
+ * larger inset than some hardcoded cap deserves that much real clearance,
+ * not a quietly truncated one.
  */
 // Widened from spacing.md after coridian_ still saw the orb's scrim
 // overlapping the last card on Trade Hub and Player Detail on a real device
@@ -32,7 +34,7 @@ export const ORB_SCRIM_BASE_HEIGHT = 112;
 // zone. Doubling it is a safe, unconditional improvement regardless of
 // whatever device-specific rounding ate the old margin.
 export function useOrbClearance(extraBreathingRoom: number = spacing.xl): number {
-  const rawInsets = useSafeAreaInsets();
-  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), ORB_INSET_CEILING);
+  const insets = useSafeAreaInsets();
+  const safeBottom = Math.max(insets.bottom, 0);
   return ORB_SCRIM_BASE_HEIGHT + safeBottom + extraBreathingRoom;
 }
