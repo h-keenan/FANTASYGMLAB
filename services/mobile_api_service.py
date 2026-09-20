@@ -72,6 +72,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
 import pandas as pd
@@ -126,6 +127,12 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+# Full-league JSON payloads (rankings, draft-picks, trade-hub) are pandas-derived
+# and can run into the hundreds of KB uncompressed — this app is consumed
+# entirely over mobile networks, where that's real latency, not just bytes.
+# 1KB minimum so tiny responses (health checks, single-player lookups)
+# aren't paying gzip's per-request CPU cost for no bandwidth benefit.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 @app.exception_handler(HTTPException)
