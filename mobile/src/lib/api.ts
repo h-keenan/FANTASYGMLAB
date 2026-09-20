@@ -762,6 +762,24 @@ export interface WeeklyStatsResponse {
   weeks: WeeklyStatPoint[];
 }
 
+export interface CareerKeyStat {
+  label: string;
+  value: string;
+}
+
+export interface CareerSeason {
+  season: number;
+  age: number | null;
+  games: number | null;
+  current_season: boolean;
+  key_stats: CareerKeyStat[];
+}
+
+export interface CareerResponse {
+  ok: true;
+  seasons: CareerSeason[];
+}
+
 export interface QuickViewResponse {
   ok: true;
   stats: QuickViewStats | null;
@@ -1103,6 +1121,8 @@ export const api = {
     const query = season != null ? `?season=${encodeURIComponent(String(season))}` : '';
     return authorizedFetch<WeeklyStatsResponse>(`/v1/players/${encodeURIComponent(playerId)}/weekly-stats${query}`);
   },
+  getPlayerCareer: (playerId: string) =>
+    authorizedFetch<CareerResponse>(`/v1/players/${encodeURIComponent(playerId)}/career`),
   lookupSleeperLeagues: (username: string) => {
     const query = username ? `?username=${encodeURIComponent(username)}` : '';
     return authorizedFetch<SleeperLeagueLookupResponse>(`/v1/sleeper/leagues${query}`);

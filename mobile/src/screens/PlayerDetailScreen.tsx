@@ -19,11 +19,11 @@ import PositionBadge from '../components/PositionBadge';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import {
   api,
+  type CareerSeason,
   type NewsItem,
   type PlayerAward,
   type QuickViewBio,
   type QuickViewModel,
-  type QuickViewSeason,
   type QuickViewStatItem,
   type QuickViewStats,
   type UsageTrend,
@@ -515,19 +515,20 @@ function TabRow({ active, onChange }: { active: DetailTab; onChange: (tab: Detai
   );
 }
 
-function SeasonCard({
+function CareerSeasonCard({
   season,
   expanded,
   onToggle,
 }: {
-  season: QuickViewSeason;
+  season: CareerSeason;
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const label = `${season.season} ${season.current_season ? 'Regular Season (in progress)' : 'Regular Season'}`;
   return (
     <View style={[styles.card, styles.cardSpaced]}>
       <TouchableOpacity style={styles.seasonCardHeader} onPress={onToggle} activeOpacity={0.7}>
-        <SectionHeading title={season.label} icon="calendar-outline" />
+        <SectionHeading title={label} icon="calendar-outline" />
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
       </TouchableOpacity>
       {expanded ? (
@@ -541,20 +542,47 @@ function SeasonCard({
   );
 }
 
+// Player Quick View's own `stats.seasons` is a single-current-season tuple
+// by design (see player_quick_view.py's docstring) — the same limitation
+// TrendsSection above already worked around for the points-by-week chart.
+// This fetches the real multi-season resume from its own endpoint instead
+// of reusing quick-view's stats, so a veteran's prior years actually show
+// up here rather than only ever rendering the current season.
+//
 // Every past season used to render fully expanded at once — with several
 // years of history that's a wall of stat grids to scroll past just to
 // compare two seasons. Only the most recent stays open by default; older
 // ones collapse to just their header until tapped.
-function CareerSection({ seasons }: { seasons: QuickViewSeason[] }) {
+function CareerSection({ playerId }: { playerId: string }) {
+  const [seasons, setSeasons] = useState<CareerSeason[] | null>(null);
   const [expandedIndex, setExpandedIndex] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPlayerCareer(playerId)
+      .then((result) => {
+        if (!cancelled) setSeasons(result.seasons);
+      })
+      .catch(() => {
+        if (!cancelled) setSeasons([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerId]);
+
+  if (seasons === null) {
+    return <ActivityIndicator style={styles.loader} color={colors.accent} />;
+  }
   if (seasons.length === 0) {
     return <AppText style={styles.notice}>No season history available for this player yet.</AppText>;
   }
   return (
     <>
       {seasons.map((season, index) => (
-        <SeasonCard
-          key={`${season.season ?? 'season'}-${season.season_type}-${index}`}
+        <CareerSeasonCard
+          key={season.season}
           season={season}
           expanded={expandedIndex === index}
           onToggle={() => setExpandedIndex(expandedIndex === index ? -1 : index)}
@@ -886,7 +914,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
           {activeTab === 'trends' ? <TrendsSection playerId={player.player_id} /> : null}
 
-          {activeTab === 'career' ? <CareerSection seasons={stats?.seasons ?? []} /> : null}
+          {activeTab === 'career' ? <CareerSection playerId={player.player_id} /> : null}
 
           {activeTab === 'model' ? (
             model ? (
