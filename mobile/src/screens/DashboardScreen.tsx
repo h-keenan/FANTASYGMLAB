@@ -23,6 +23,7 @@ import {
   type TeamSnapshot,
 } from '../lib/api';
 import PremiumLock from '../components/PremiumLock';
+import ScreenHero from '../components/ScreenHero';
 import TeamAvatar from '../components/TeamAvatar';
 import TrajectoryArcs from '../components/TrajectoryArcs';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -238,12 +239,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-      <View style={styles.heroBlock}>
-        <AppText style={styles.heroTitle}>NEXT MOVE</AppText>
-        <AppText style={styles.heroSubtitle} numberOfLines={1}>
-          {leagueName.toUpperCase()}
-        </AppText>
-      </View>
+      <ScreenHero title="NEXT MOVE" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and
         waiver signals the web app's Dashboard uses.
@@ -823,21 +819,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.background,
     padding: spacing.xl,
-  },
-  heroBlock: { alignItems: 'center', marginBottom: spacing.md },
-  heroTitle: {
-    fontSize: 30,
-    fontWeight: '800',
-    fontStyle: 'italic',
-    color: colors.textPrimary,
-    letterSpacing: 0.5,
-  },
-  heroSubtitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    letterSpacing: 1.4,
-    marginTop: 2,
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16, textAlign: 'center' },
   quickActionsGrid: {

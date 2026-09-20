@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import ScreenHero from '../components/ScreenHero';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -326,6 +327,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
 
   const header = (
     <View>
+      <ScreenHero title="TRADE ANALYZER" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         The real accept / decline / counter verdict for {leagueName} — weighs asset value, starting
         lineup impact, roster needs, age, draft capital, and injury risk.

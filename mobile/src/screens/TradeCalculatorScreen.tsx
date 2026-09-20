@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
+import ScreenHero from '../components/ScreenHero';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -119,6 +120,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <GridBackground />
+      <ScreenHero title="TRADE CALCULATOR" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         Raw asset value only — {leagueName}'s {'“'}Dynasty{'”'} valuations. Doesn't yet
         weigh roster fit or strategy, unlike the full web Trade Analyzer.

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Linking, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
+import ScreenHero from '../components/ScreenHero';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -146,6 +147,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
   return (
     <View style={styles.container}>
       <GridBackground />
+      <ScreenHero title="ALERTS" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         Recent news about players on your roster in {leagueName} — injury, role, transaction, and
         off-field signal only.

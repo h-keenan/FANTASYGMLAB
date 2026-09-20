@@ -6,6 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import ScreenHero from '../components/ScreenHero';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -133,6 +134,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+        <ScreenHero title="MATCHUP" subtitle={leagueName} />
         <AnimatedCard glow style={styles.headlineCard}>
           <View style={styles.weekRow}>
             <Ionicons name="american-football-outline" size={14} color={colors.accent} />

@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import ScreenHero from '../components/ScreenHero';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
@@ -154,6 +155,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+        <ScreenHero title="MY TEAM" subtitle={leagueName} />
         <AppText style={styles.disclaimer}>
           Your suggested starting lineup for {leagueName} — the same optimal-lineup logic the web
           app's Dashboard and My Team pages use.
