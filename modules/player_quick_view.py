@@ -265,6 +265,39 @@ OVERALL_RATING_MAX = 99
 #: assembled by a lighter path still rates.
 _OVERALL_SCORE_FIELDS = ("value_score", "dynasty_score", "score")
 
+#: Percentile -> overall-rating control points (piecewise-linear), same
+#: pattern as modules.rankings.AGE_CURVE_CONTROL_POINTS. A flat
+#: percentile*99 mapping put a mid-pack committee back (~88th percentile of
+#: EVERY rosterable player at the position, including backups and deep
+#: bench) at "88 overall" — a number that reads as a clear above-average
+#: starter on the NBA 2K scale this badge borrows, when the player is
+#: actually a middling RB2 in real terms. Real sports-game ratings aren't
+#: linear either: most rostered players cluster in the 60s-70s, and only
+#: genuine difference-makers clear 85+. These breakpoints compress the
+#: bulk of the pool down and reserve the top of the scale for players who
+#: are actually near the best at their position, without touching the
+#: underlying value_score or the comparison pool itself.
+_OVERALL_RATING_CURVE: tuple[tuple[float, float], ...] = (
+    (0.0, 40.0),
+    (0.50, 65.0),
+    (0.75, 75.0),
+    (0.90, 85.0),
+    (0.97, 92.0),
+    (1.0, float(OVERALL_RATING_MAX)),
+)
+
+
+def _overall_rating_from_percentile(percentile: float) -> int:
+    points = _OVERALL_RATING_CURVE
+    clamped = min(1.0, max(0.0, percentile))
+    rating = points[-1][1]
+    for (p_a, r_a), (p_b, r_b) in zip(points, points[1:]):
+        if p_a <= clamped <= p_b:
+            frac = 0.0 if p_b == p_a else (clamped - p_a) / (p_b - p_a)
+            rating = r_a + frac * (r_b - r_a)
+            break
+    return int(min(OVERALL_RATING_MAX, max(1, round(rating))))
+
 #: Stat label -> candidate source columns, derived from the SAME definitions
 #: player_profile_ui uses to build the displayed items, so a percentile can
 #: never drift onto a different column than the number it sits next to.
@@ -388,9 +421,7 @@ def _overall_rating(
     value = series.rank(pct=True).to_numpy()[offset]
     if pd.isna(value):
         return None
-    return int(
-        min(OVERALL_RATING_MAX, max(1, int(round(float(value) * OVERALL_RATING_MAX))))
-    )
+    return _overall_rating_from_percentile(float(value))
 
 
 def _stat_percentiles(
