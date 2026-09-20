@@ -33,6 +33,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/gm-targets           — the caller's watchlist in this league
   - POST /v1/leagues/{id}/gm-targets           — add a player to the watchlist (cap-enforced)
   - DELETE /v1/leagues/{id}/gm-targets/{pid}   — remove a player from the watchlist
+  - PATCH /v1/leagues/{id}/gm-targets/{pid}/untouchable — mark/unmark an existing target untouchable
   - POST /v1/push/register    — upsert the caller's Expo push token
   - POST /v1/push/unregister  — remove one of the caller's tokens (sign-out)
   - POST /v1/push/test        — send a test push to all of the caller's tokens
@@ -2143,6 +2144,7 @@ def _project_gm_target(row: dict[str, Any]) -> dict[str, Any]:
         "player_id": gm_targets.normalize_player_id(row.get("player_id")),
         "source_surface": str(row.get("source_surface") or ""),
         "created_at": row.get("created_at"),
+        "untouchable": bool(row.get("untouchable")),
     }
 
 
@@ -2156,6 +2158,35 @@ def _fetch_gm_target_rows(
         user_id=user_id,
         extra_query=f"league_id=eq.{league_id}&select={select}&order=created_at.desc",
     )
+
+
+def _fetch_gm_target_player_ids(
+    config: dict[str, Any], user_id: str, access_token: str, league_id: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """(all target player_ids, untouchable-only player_ids) for trade idea generation.
+
+    Fails soft to (empty, empty) — a GM Targets outage must never block Trade
+    Hub or the Dashboard trade tile from generating ideas.
+    """
+
+    if not user_id:
+        return (), ()
+    rows, error = _fetch_gm_target_rows(
+        config, user_id, access_token, league_id, select="player_id,untouchable"
+    )
+    if error:
+        return (), ()
+    all_ids = tuple(
+        sorted({gm_targets.normalize_player_id(row.get("player_id")) for row in rows if row.get("player_id")})
+    )
+    untouchable_ids = tuple(
+        sorted(
+            gm_targets.normalize_player_id(row.get("player_id"))
+            for row in rows
+            if row.get("player_id") and bool(row.get("untouchable"))
+        )
+    )
+    return all_ids, untouchable_ids
 
 
 @app.get("/v1/leagues/{league_id}/gm-targets")
@@ -2177,7 +2208,11 @@ def get_gm_targets(league_id: str, user: dict[str, Any] = Depends(require_user))
         return {"ok": True, "targets": []}
 
     rows, error = _fetch_gm_target_rows(
-        config, user_id, access_token, league_id, select="player_id,source_surface,created_at"
+        config,
+        user_id,
+        access_token,
+        league_id,
+        select="player_id,source_surface,created_at,untouchable",
     )
     if error:
         return {"ok": True, "targets": []}
@@ -2250,6 +2285,60 @@ def remove_gm_target(
         access_token,
         gm_targets.TARGETS_TABLE,
         query=f"user_id=eq.{user_id}&league_id=eq.{league_id}&player_id=eq.{pid}",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+class SetGmTargetUntouchableRequest(BaseModel):
+    untouchable: bool
+
+
+@app.patch("/v1/leagues/{league_id}/gm-targets/{player_id}/untouchable")
+def set_gm_target_untouchable(
+    league_id: str,
+    player_id: str,
+    payload: SetGmTargetUntouchableRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Mark/unmark an existing GM Target as untouchable.
+
+    Requires the row to already exist (add it first) — never creates a
+    target. An untouchable target is hard-blocked from every outgoing trade
+    package the automated Trade Hub engine generates (see
+    modules.trade_hub_engine.generate_trade_idea_records), the same
+    protection a team's own core starters already get.
+    """
+
+    pid = gm_targets.normalize_player_id(player_id)
+    if not pid:
+        raise HTTPException(status_code=422, detail="player_id is required.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+
+    existing, error = _fetch_gm_target_rows(
+        config, user_id, access_token, league_id, select="player_id"
+    )
+    if error:
+        return {"ok": False, "reason": "not_available"}
+    existing_ids = {gm_targets.normalize_player_id(row.get("player_id")) for row in existing}
+    if pid not in existing_ids:
+        return {"ok": False, "reason": "not_found"}
+
+    ok, error = account_store.upsert_row(
+        config,
+        access_token,
+        gm_targets.TARGETS_TABLE,
+        {
+            "user_id": user_id,
+            "league_id": league_id,
+            "player_id": pid,
+            "untouchable": bool(payload.untouchable),
+        },
+        on_conflict="user_id,league_id,player_id",
     )
     if not ok:
         return {"ok": False, "reason": "not_available"}
@@ -2706,6 +2795,9 @@ def get_league_dashboard(
     # rather than letting compose_next_move_briefing recompute the identical
     # (league, roster, strategy, lens) search a user may have just triggered
     # moments earlier by opening Trade Hub.
+    gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
     trade_idea_records = None
     try:
         trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
@@ -2714,6 +2806,8 @@ def get_league_dashboard(
             strategy=team_strategy,
             lens=lens,
             players_db_path=PLAYERS_DB_PATH,
+            untouchable_player_ids=gm_untouchable_ids,
+            gm_target_player_ids=gm_target_ids,
         )
     except (TypeError, ValueError):
         pass
@@ -3518,12 +3612,17 @@ def get_trade_hub_ideas(
     if roster_id is None:
         return {"ok": True, "ideas": [], "reason": "empty_roster"}
 
+    gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
     records = trade_hub_engine.generate_trade_idea_records_cached(
         league_id=league_id,
         roster_id=int(roster_id),
         strategy=strategy,
         lens=lens,
         players_db_path=PLAYERS_DB_PATH,
+        untouchable_player_ids=gm_untouchable_ids,
+        gm_target_player_ids=gm_target_ids,
     )
 
     is_premium = str(profile.get("entitlement") or "free") == "premium"

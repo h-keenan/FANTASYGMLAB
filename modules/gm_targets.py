@@ -160,7 +160,10 @@ def normalize_player_id(value: object) -> str:
 
 @dataclass(frozen=True)
 class GmTarget:
-    """Preference row — identity only; football fields are enriched at display."""
+    """Preference row — identity plus one user-set flag; football fields are
+    enriched at display. `untouchable` is the one exception to "identity
+    only": a user-set instruction the trade engine reads directly (never
+    invented or inferred from valuation)."""
 
     user_id: str
     league_id: str
@@ -168,6 +171,7 @@ class GmTarget:
     source_surface: str = ""
     created_at: str = ""
     created_ts: float = 0.0
+    untouchable: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -177,6 +181,7 @@ class GmTarget:
             "source_surface": self.source_surface,
             "created_at": self.created_at,
             "created_ts": self.created_ts,
+            "untouchable": self.untouchable,
         }
 
 
@@ -218,6 +223,7 @@ def row_to_target(row: Mapping[str, Any] | None) -> GmTarget | None:
         source_surface=_safe_text(row.get("source_surface")),
         created_at=created_at,
         created_ts=_parse_created_ts(created_at) or float(row.get("created_ts") or 0.0),
+        untouchable=bool(row.get("untouchable")),
     )
 
 
@@ -249,6 +255,30 @@ def cached_target_ids(
             normalize_player_id(item) for item in raw if normalize_player_id(item)
         )
     return frozenset()
+
+
+def cached_untouchable_ids(
+    session: Mapping[str, Any] | None,
+    *,
+    league_id: str,
+) -> frozenset[str]:
+    """Subset of cached_target_ids the user has marked untouchable.
+
+    Feeds the trade engine's hard "never send this away" guardrail
+    (modules.trade_ideas._is_core_or_protected_starter via the `protected`
+    override on _player_asset) — never valuation, never inference.
+    """
+
+    if not isinstance(session, Mapping):
+        return frozenset()
+    if _safe_text(session.get(SESSION_CACHE_LEAGUE_KEY)) != _safe_text(league_id):
+        return frozenset()
+    raw = session.get(SESSION_CACHE_ROWS_KEY) or []
+    return frozenset(
+        target.player_id
+        for target in (row_to_target(row if isinstance(row, Mapping) else None) for row in raw)
+        if target is not None and target.untouchable
+    )
 
 
 def is_targeted(
@@ -308,7 +338,7 @@ def fetch_targets_for_league(
             user_id=user_id,
             extra_query=(
                 f"league_id=eq.{league_key}"
-                "&select=user_id,league_id,player_id,source_surface,created_at"
+                "&select=user_id,league_id,player_id,source_surface,created_at,untouchable"
                 "&order=created_at.desc"
             ),
             timing_label="gm_targets_list_fetch",
@@ -444,6 +474,91 @@ def add_target(
         )
     except Exception:
         pass
+    return result
+
+
+def set_untouchable(
+    session: MutableMapping[str, Any],
+    *,
+    league_id: str,
+    player_id: str,
+    untouchable: bool,
+    config: Mapping[str, Any] | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Toggle the untouchable flag on an existing target row.
+
+    Requires the row to already exist (add_target first) — this never
+    creates a target, matching the add/remove-only shape the rest of this
+    module uses. Uses the upsert-on-conflict write path (an actual UPDATE
+    under the hood), which needs docs/supabase_gm_targets_untouchable.sql's
+    UPDATE RLS policy applied.
+    """
+
+    result = {"ok": False, "error": ""}
+    if not should_sync_durable(session, environ=environ):
+        result["error"] = "GM Targets is not available on this plan."
+        return result
+
+    league_key = _safe_text(league_id)
+    pid = normalize_player_id(player_id)
+    if not league_key or not pid:
+        result["error"] = "Could not update that player target."
+        return result
+
+    existing = fetch_targets_for_league(
+        session, league_id=league_key, config=config, environ=environ
+    )
+    current = next((t for t in existing if t.player_id == pid), None)
+    if current is None:
+        result["error"] = "Add this player to GM Targets before marking it untouchable."
+        return result
+
+    user_id = auth_supabase.current_user_id(session)
+    access_token = auth_supabase.current_access_token(session)
+    if not user_id or not access_token:
+        result["error"] = "Sign in to manage GM Targets."
+        return result
+
+    resolved = _resolve_config(config)
+    payload = {
+        "user_id": user_id,
+        "league_id": league_key,
+        "player_id": pid,
+        "untouchable": bool(untouchable),
+    }
+    with performance.time_block("gm_targets_set_untouchable", category="supabase"):
+        ok, error = account_store.upsert_row(
+            resolved,
+            access_token,
+            TARGETS_TABLE,
+            payload,
+            on_conflict="user_id,league_id,player_id",
+        )
+    if not ok:
+        if "does not exist" in error.casefold() or "schema cache" in error.casefold():
+            _mark_unavailable(session, error)
+        result["error"] = account_store.customer_safe_error(error, context="GM Targets")
+        return result
+
+    merged = [
+        (
+            GmTarget(
+                user_id=t.user_id,
+                league_id=t.league_id,
+                player_id=t.player_id,
+                source_surface=t.source_surface,
+                created_at=t.created_at,
+                created_ts=t.created_ts,
+                untouchable=bool(untouchable),
+            )
+            if t.player_id == pid
+            else t
+        )
+        for t in existing
+    ]
+    _cache_targets(session, league_id=league_key, targets=merged)
+    result["ok"] = True
     return result
 
 

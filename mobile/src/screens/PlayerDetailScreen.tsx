@@ -671,6 +671,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
+  const [untouchable, setUntouchable] = useState(false);
+  const [untouchableBusy, setUntouchableBusy] = useState(false);
   const [rank, setRank] = useState({
     overall_rank: player.overall_rank,
     position_rank: player.position_rank,
@@ -765,7 +767,9 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       .getGmTargets(leagueId)
       .then((result) => {
         if (cancelled) return;
-        setWatching(result.targets.some((target) => target.player_id === player.player_id));
+        const target = result.targets.find((t) => t.player_id === player.player_id);
+        setWatching(Boolean(target));
+        setUntouchable(Boolean(target?.untouchable));
       })
       .catch(() => {
         if (!cancelled) setWatching(null);
@@ -782,6 +786,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       if (watching) {
         await api.removeGmTarget(leagueId, player.player_id);
         setWatching(false);
+        setUntouchable(false);
       } else {
         const result = await api.addGmTarget(leagueId, player.player_id, 'player_detail');
         if (result.ok) {
@@ -799,6 +804,25 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       Alert.alert('Could not update GM Targets', 'Please try again in a moment.');
     } finally {
       setWatchBusy(false);
+    }
+  };
+
+  const toggleUntouchable = async () => {
+    if (untouchableBusy) return;
+    const next = !untouchable;
+    setUntouchableBusy(true);
+    setUntouchable(next);
+    try {
+      const result = await api.setGmTargetUntouchable(leagueId, player.player_id, next);
+      if (!result.ok) {
+        setUntouchable(!next);
+        Alert.alert('Could not update untouchable', 'Please try again in a moment.');
+      }
+    } catch {
+      setUntouchable(!next);
+      Alert.alert('Could not update untouchable', 'Please try again in a moment.');
+    } finally {
+      setUntouchableBusy(false);
     }
   };
 
@@ -859,15 +883,31 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         ) : null}
         <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
         {watching !== null ? (
-          <TouchableOpacity
-            style={[styles.watchButton, watching && styles.watchButtonActive]}
-            onPress={toggleWatch}
-            disabled={watchBusy}
-          >
-            <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
-              {watching ? '★ Watching' : '☆ Add to GM Targets'}
-            </AppText>
-          </TouchableOpacity>
+          <View style={styles.watchRow}>
+            <TouchableOpacity
+              style={[styles.watchButton, watching && styles.watchButtonActive]}
+              onPress={toggleWatch}
+              disabled={watchBusy}
+            >
+              <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
+                {watching ? '★ Watching' : '☆ Add to GM Targets'}
+              </AppText>
+            </TouchableOpacity>
+            {watching ? (
+              <TouchableOpacity
+                style={[styles.untouchableButton, untouchable && styles.untouchableButtonActive]}
+                onPress={toggleUntouchable}
+                disabled={untouchableBusy}
+                accessibilityLabel={untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
+              >
+                <Ionicons
+                  name={untouchable ? 'lock-closed' : 'lock-open-outline'}
+                  size={16}
+                  color={untouchable ? colors.background : colors.textSecondary}
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
       </View>
 
@@ -964,8 +1004,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   primeWindowText: { fontSize: 12, fontWeight: '700' },
+  watchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   watchButton: {
-    marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radii.pill,
@@ -975,6 +1015,16 @@ const styles = StyleSheet.create({
   watchButtonActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   watchButtonText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   watchButtonTextActive: { color: '#fff' },
+  untouchableButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  untouchableButtonActive: { backgroundColor: colors.premium, borderColor: colors.premium },
   newsImpactBadge: {
     flexDirection: 'row',
     alignItems: 'center',

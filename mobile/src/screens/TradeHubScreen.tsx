@@ -505,11 +505,23 @@ function TradeIdeaCard({
 
   const categoryAccent = categoryColor(idea.category);
 
+  const landedTargetNames = (idea.landed_gm_target_player_ids ?? [])
+    .map((playerId) => idea.package.receive.find((asset) => asset.player_id === playerId)?.name)
+    .filter((name): name is string => Boolean(name));
+
   return (
     <AnimatedCard style={{ ...styles.card, borderLeftWidth: 3, borderLeftColor: categoryAccent }}>
       {idea.category ? (
         <View style={styles.categoryRow}>
           <CategoryBadge category={idea.category} />
+        </View>
+      ) : null}
+      {landedTargetNames.length > 0 ? (
+        <View style={styles.landedTargetRow}>
+          <Ionicons name="locate" size={13} color={colors.premium} />
+          <AppText style={styles.landedTargetText} numberOfLines={1}>
+            Lands your target: {landedTargetNames.join(', ')}
+          </AppText>
         </View>
       ) : null}
       <View style={styles.partnerRow}>
@@ -658,6 +670,14 @@ const styles = StyleSheet.create({
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl, lineHeight: 20 },
   card: { padding: 0, marginBottom: spacing.md },
   categoryRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  landedTargetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+  },
+  landedTargetText: { fontSize: 11, fontWeight: '600', color: colors.premium, flexShrink: 1 },
   categoryBadge: {
     alignSelf: 'flex-start',
     borderRadius: radii.sm,

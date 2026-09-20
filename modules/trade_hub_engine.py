@@ -293,6 +293,7 @@ class TradeIdeaCard:
     package: dict[str, Any]
     category: str
     value_edge_band: str
+    landed_gm_target_player_ids: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -305,6 +306,7 @@ class TradeIdeaCard:
             "package": self.package,
             "category": self.category,
             "value_edge_band": self.value_edge_band,
+            "landed_gm_target_player_ids": list(self.landed_gm_target_player_ids),
         }
 
 
@@ -334,7 +336,38 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         package=package,
         category=category,
         value_edge_band=trade_visual_language.trade_value_band(edge_label),
+        landed_gm_target_player_ids=tuple(
+            str(pid) for pid in (idea.get("landed_gm_target_player_ids") or ())
+        ),
     )
+
+
+def _tag_landed_gm_targets(
+    ideas: list[dict[str, Any]],
+    *,
+    gm_target_player_ids: frozenset[str],
+) -> list[dict[str, Any]]:
+    """Mark ideas that would land the user a GM Target (receive side only).
+
+    Presentation-only tag — never changes ranking, score, or which ideas are
+    generated. Comes from the same durable GM Targets watchlist the mobile
+    GM Targets screen reads (modules.gm_targets), not an invented signal.
+    """
+
+    if not gm_target_player_ids:
+        return ideas
+    for idea in ideas:
+        landed = sorted(
+            {
+                str(asset.get("player_id"))
+                for asset in idea.get("receive_assets") or ()
+                if isinstance(asset, dict)
+                and str(asset.get("asset_type") or "") == "player"
+                and str(asset.get("player_id") or "") in gm_target_player_ids
+            }
+        )
+        idea["landed_gm_target_player_ids"] = landed
+    return ideas
 
 
 def generate_trade_idea_records(
@@ -347,10 +380,20 @@ def generate_trade_idea_records(
     score_field: str,
     team_strategy: str = "retool",
     max_ideas: int = MAX_TRADE_IDEAS,
+    untouchable_player_ids: tuple[str, ...] = (),
+    gm_target_player_ids: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_ui already work with (trade_confidence_label,
     send_assets/receive_assets, fit_grade, hub_* reason fields, etc.).
+
+    `untouchable_player_ids` hard-blocks those players from every outgoing
+    (send) package — sourced from the caller's GM Targets untouchable flag,
+    resolved here to names because modules.trade_ideas.build_trade_ideas'
+    protection list is name-keyed (matches the web app's own untouchables
+    contract). `gm_target_player_ids` never changes what's generated — it
+    only tags ideas that would land one of those players (see
+    _tag_landed_gm_targets) so the UI can call it out.
 
     `generate_trade_ideas` narrows these to TradeIdeaCard for the mobile
     Trade Hub card UI; callers that need the raw engine fields — ranking via
@@ -380,13 +423,19 @@ def generate_trade_idea_records(
         for roster_id, player_ids in roster_owner_items
     ]
 
+    untouchable_ids = {str(pid) for pid in untouchable_player_ids if str(pid)}
+    untouchable_names: list[str] = []
+    if untouchable_ids and "player_id" in strategy_df.columns and "name" in strategy_df.columns:
+        matches = strategy_df[strategy_df["player_id"].astype(str).isin(untouchable_ids)]
+        untouchable_names = [str(name) for name in matches["name"].tolist() if str(name)]
+
     raw_ideas = trade_ideas_module.build_trade_ideas(
         df_players=strategy_df,
         league_id=league_id,
         df_summary=df_summary,
         my_roster_id=my_roster_id,
         trade_block_names=[],
-        untouchable_names=[],
+        untouchable_names=untouchable_names,
         role_map={},
         max_ideas=max_ideas,
         score_field=score_field,
@@ -404,8 +453,13 @@ def generate_trade_idea_records(
         df_summary=df_summary,
         my_roster_id=my_roster_id,
         rosters=rosters,
+        untouchables=tuple(untouchable_names),
     )
-    return list(enforced)
+    tagged = _tag_landed_gm_targets(
+        list(enforced),
+        gm_target_player_ids=frozenset(str(pid) for pid in gm_target_player_ids if str(pid)),
+    )
+    return tagged
 
 
 # Idea generation re-applies the valuation lens across the whole players
@@ -433,6 +487,8 @@ def _generate_trade_idea_records_cached(
     strategy: str,
     lens: str,
     players_db_path: str,
+    untouchable_player_ids: tuple[str, ...],
+    gm_target_player_ids: tuple[str, ...],
     _bucket: int,
 ) -> list[dict[str, Any]]:
     league = sleeper.get_league(league_id)
@@ -457,6 +513,8 @@ def _generate_trade_idea_records_cached(
         my_roster_id=roster_id,
         players_df=valued,
         rosters=rosters,
+        untouchable_player_ids=untouchable_player_ids,
+        gm_target_player_ids=gm_target_player_ids,
         league_settings=settings,
         score_field=score_field,
         team_strategy=strategy,
@@ -470,16 +528,30 @@ def generate_trade_idea_records_cached(
     strategy: str,
     lens: str,
     players_db_path: str,
+    untouchable_player_ids: tuple[str, ...] = (),
+    gm_target_player_ids: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
     """Cached front door for `generate_trade_idea_records` — resolves its
     own players_df/settings/rosters from just (league_id, lens) rather than
     accepting them as arguments, so two different callers (Trade Hub's own
     endpoint, Dashboard's trade tile) asking about the same league/roster/
     strategy/lens combo within the same 30s window hit one cache entry
-    instead of each re-running the full search independently."""
+    instead of each re-running the full search independently.
+
+    `untouchable_player_ids`/`gm_target_player_ids` are per-user GM Targets
+    state, so they're part of the cache key (sorted for a stable key
+    regardless of input order) — two users sharing a roster with different
+    GM Targets never see each other's untouchable/target tagging."""
 
     return _generate_trade_idea_records_cached(
-        league_id, roster_id, strategy, lens, players_db_path, _trade_hub_ideas_cache_bucket()
+        league_id,
+        roster_id,
+        strategy,
+        lens,
+        players_db_path,
+        tuple(sorted({str(pid) for pid in untouchable_player_ids if str(pid)})),
+        tuple(sorted({str(pid) for pid in gm_target_player_ids if str(pid)})),
+        _trade_hub_ideas_cache_bucket(),
     )
 
 

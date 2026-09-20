@@ -23,15 +23,30 @@ priority, waiver priority, Trust, confidence, or notification importance.
 ```
 PQV / workspace Add|Remove
   → modules/gm_targets.py (preference CRUD + session ID cache)
-  → Supabase gm_targets (user_id, league_id, player_id)
+  → Supabase gm_targets (user_id, league_id, player_id, untouchable)
 Display enrichment (read-only):
   → canonical ranks (#141/#143)
   → shared roster ownership map
   → existing recommendation narrative / activity inventory
   → existing DecisionChangeEvent (material change indicator)
+Trade Hub feedback loop (explicit user instruction, not inferred from being watched):
+  → untouchable=true → modules.trade_hub_engine.generate_trade_idea_records
+    resolves it to the same name-keyed protection list
+    modules.trade_ideas.build_trade_ideas already uses for a team's own
+    core/protected starters — hard-blocked from every outgoing package
+  → any target (untouchable or not) appearing in an idea's receive side
+    → idea tagged landed_gm_target_player_ids (presentation only, never
+      changes which ideas are generated or their ranking/score)
 ```
 
 No `gm_target_recommendation_score`. No football cache invalidation on add/remove.
+`untouchable` is the one field that changes trade-engine *output* — and only
+because the user explicitly set it, the same category of override the web
+app's own long-standing `profile["untouchables"]` list already is. Being
+watched (an entry existing at all) still never increases value, ranking, or
+score — that's still enforced by never reading target membership as a
+ranking input anywhere in modules/rankings.py or modules/trade_ideas.py's
+scoring path.
 
 ## Schema
 
@@ -46,16 +61,19 @@ Migration: `docs/supabase_gm_targets.sql` (manual Ops apply — never from Strea
 | `player_id` | Stable Sleeper id (normalized string) |
 | `source_surface` | Optional provenance (`player_quick_view`, …) |
 | `created_at` | Default `now()` |
+| `untouchable` | `boolean not null default false` — added by `docs/supabase_gm_targets_untouchable.sql` |
 | PK | `(user_id, league_id, player_id)` |
 
 Do **not** store name, team, ranks, values, recommendations, or ownership.
+`untouchable` is the one exception — a user-set instruction, not a
+football/valuation fact.
 
 ## RLS
 
 | Op | Policy |
 | --- | --- |
 | SELECT / INSERT / DELETE | `auth.uid() = user_id` to `authenticated` |
-| UPDATE | Not required in v1 |
+| UPDATE | `auth.uid() = user_id` to `authenticated` — added alongside `untouchable` so toggling an existing row's flag (via upsert-on-conflict) has a policy to satisfy |
 | anon | **None** |
 
 Client-provided `user_id` is still constrained by RLS.
@@ -146,7 +164,7 @@ Future alerting may subscribe to independently material canonical events — doc
 
 | Topic | Behavior |
 | --- | --- |
-| Stored | `user_id`, `league_id`, `player_id`, optional `source_surface`, `created_at` |
+| Stored | `user_id`, `league_id`, `player_id`, optional `source_surface`, `created_at`, `untouchable` |
 | Cap | 50/league; customer message at cap; no silent eviction |
 | Retention | Until user removes, account deletion cascade, or future explicit policy |
 | Logout | Session cache only |
@@ -161,10 +179,14 @@ Future alerting may subscribe to independently material canonical events — doc
 ## Ops activation
 
 1. Run `docs/supabase_gm_targets.sql` in Supabase SQL Editor.
-2. Set Render `DYNASTYGM_EXPERIMENTAL_GM_TARGETS=1`.
-3. Confirm Premium can add/remove and open GM Targets.
-4. Confirm Free sees discovery only on the GM Targets destination.
-5. Confirm kill switch off hides UI and stops writes.
+2. Run `docs/supabase_gm_targets_untouchable.sql` (adds `untouchable` + its UPDATE policy).
+3. Set Render `DYNASTYGM_EXPERIMENTAL_GM_TARGETS=1`.
+4. Confirm Premium can add/remove and open GM Targets.
+5. Confirm Free sees discovery only on the GM Targets destination.
+6. Confirm kill switch off hides UI and stops writes.
+7. Confirm marking a target untouchable keeps it out of every "You Send"
+   package Trade Hub generates, and that landing a (non-untouchable) target
+   on the receive side shows the "Lands your target" tag.
 
 ## Rollback boundary
 
