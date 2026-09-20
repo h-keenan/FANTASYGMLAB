@@ -185,6 +185,23 @@ function percentileColor(percentile: number | null | undefined): string {
   return mixHex(colors.premium, colors.successBright, (clamped - 50) / 50);
 }
 
+// Derived from modules.rankings.AGE_CURVE_CONTROL_POINTS server-side — the
+// same age curve already discounting this player's dynasty value, not a
+// separately invented projection. See QuickViewStats.prime_window.
+function primeWindowLabel(window: QuickViewStats['prime_window']): string | null {
+  if (!window) return null;
+  const range = `${Math.round(window.start_age)}–${Math.round(window.end_age)}`;
+  if (window.status === 'before') return `Enters Prime · ${range}`;
+  if (window.status === 'after') return `Past Prime · ${range}`;
+  return `In Prime · ${range}`;
+}
+
+function primeWindowColor(status: 'before' | 'in' | 'after'): string {
+  if (status === 'in') return colors.successBright;
+  if (status === 'before') return colors.accentSoft;
+  return colors.textTertiary;
+}
+
 function StatCell({
   label,
   value,
@@ -800,6 +817,18 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             </AppText>
           </View>
         ) : null}
+        {stats?.prime_window ? (
+          <View
+            style={[
+              styles.primeWindowBadge,
+              { borderColor: primeWindowColor(stats.prime_window.status) },
+            ]}
+          >
+            <AppText style={[styles.primeWindowText, { color: primeWindowColor(stats.prime_window.status) }]}>
+              {primeWindowLabel(stats.prime_window)}
+            </AppText>
+          </View>
+        ) : null}
         <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
         {watching !== null ? (
           <TouchableOpacity
@@ -899,6 +928,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
   },
   tierText: { fontSize: 12, fontWeight: '700' },
+  primeWindowBadge: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  primeWindowText: { fontSize: 12, fontWeight: '700' },
   watchButton: {
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,

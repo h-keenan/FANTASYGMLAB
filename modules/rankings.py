@@ -965,6 +965,63 @@ def age_multiplier_series(positions: Sequence[Any], ages: Sequence[Any]) -> pd.S
     return pd.Series(out, index=position_series.index, dtype=float)
 
 
+# A "prime window" derived directly from AGE_CURVE_CONTROL_POINTS — the same
+# curve already discounting every player's dynasty value by age — rather
+# than a separately invented number. Every curve above starts at its own
+# peak multiplier and is non-increasing from there, so "prime" is defined as
+# the age range where the multiplier stays within this fraction of that
+# position's peak: the first control point (the peak/plateau) through the
+# age where the curve first drops below the threshold, linearly interpolated
+# for a smooth boundary rather than snapping to the nearest tabulated age.
+PRIME_WINDOW_THRESHOLD = 0.90
+
+
+def prime_window_for_position(position: str) -> tuple[float, float] | None:
+    """(start_age, end_age) of the position's prime window, or None for an
+    unrecognized position. See PRIME_WINDOW_THRESHOLD for the definition."""
+
+    points = AGE_CURVE_CONTROL_POINTS.get(str(position or "").upper())
+    if not points:
+        return None
+    peak = max(mult for _, mult in points)
+    threshold = peak * PRIME_WINDOW_THRESHOLD
+    start_age = points[0][0]
+    end_age = points[-1][0]
+    for (age_a, mult_a), (age_b, mult_b) in zip(points, points[1:]):
+        if mult_a >= threshold and mult_b < threshold:
+            frac = (mult_a - threshold) / (mult_a - mult_b)
+            end_age = age_a + frac * (age_b - age_a)
+            break
+        if mult_b >= threshold:
+            end_age = age_b
+    return round(start_age, 1), round(end_age, 1)
+
+
+def prime_window_status(position: str, age) -> dict[str, Any] | None:
+    """start_age/end_age plus where this specific player's current age sits
+    relative to their position's prime window ('before'/'in'/'after').
+    Returns None when the position is unrecognized or age is missing/invalid
+    — never a guessed status."""
+
+    window = prime_window_for_position(position)
+    if window is None:
+        return None
+    try:
+        age_value = float(age)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(age_value):
+        return None
+    start_age, end_age = window
+    if age_value < start_age:
+        status = "before"
+    elif age_value > end_age:
+        status = "after"
+    else:
+        status = "in"
+    return {"start_age": start_age, "end_age": end_age, "status": status}
+
+
 def _safe_rate(total, games) -> float | None:
     try:
         games_value = float(games)

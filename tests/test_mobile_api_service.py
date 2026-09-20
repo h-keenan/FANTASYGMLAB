@@ -1979,6 +1979,54 @@ def test_quick_view_omits_the_overall_rating_when_the_pool_is_too_thin(monkeypat
     assert response.json()["stats"]["overall_rating"] is None
 
 
+def test_quick_view_sends_a_real_prime_window_for_the_players_position_and_age(monkeypatch):
+    from modules import rankings
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    frame = _rated_quick_view_frame()
+    frame.loc[frame["player_id"] == "9001", "age"] = 32  # well past a WR's prime window
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=frame):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    # Real modules.rankings.prime_window_status output, not a mocked value —
+    # a 32-year-old WR is past the position's prime window.
+    expected_start, expected_end = rankings.prime_window_for_position("WR")
+    assert response.json()["stats"]["prime_window"] == {
+        "start_age": expected_start,
+        "end_age": expected_end,
+        "status": "after",
+    }
+
+
+def test_quick_view_omits_the_prime_window_when_age_is_missing(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    # _rated_quick_view_frame's rows carry no `age` column at all — never
+    # guess a window without a real age to place on the curve.
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_rated_quick_view_frame()):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["stats"]["prime_window"] is None
+
+
 def test_quick_view_reports_no_seasons_when_stats_unavailable(monkeypatch):
     client = _client(monkeypatch)
 
