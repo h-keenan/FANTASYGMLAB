@@ -28,6 +28,7 @@ Deployment topology (Render):
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
   - GET  /v1/players/{id}/weekly-stats   — per-week fantasy points + snap share for one season
+  - GET  /v1/players/{id}/career         — every verified season on record, not just current
   - GET  /v1/players/{id}/awards         — verified fantasy-performance badges (career history)
   - GET  /v1/leagues/{id}/gm-targets           — the caller's watchlist in this league
   - POST /v1/leagues/{id}/gm-targets           — add a player to the watchlist (cap-enforced)
@@ -97,6 +98,7 @@ from modules import (
     news_signal,
     player_awards,
     player_eligibility,
+    player_history,
     player_quick_view,
     player_state_authority,
     players_refresh_flight,
@@ -2068,6 +2070,60 @@ def get_player_weekly_stats(
                 "snap_share": _clean_json_value(row.get("snap_share")),
             }
             for row in weeks
+        ],
+    }
+
+
+@app.get("/v1/players/{player_id}/career")
+def get_player_career(
+    player_id: str,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Every verified season this player has a cached Sleeper aggregate for
+    — not just the current one. Player Quick View's own `stats.seasons`
+    (GET /v1/players/{id}/quick-view) is deliberately a single-current-
+    season tuple (see player_quick_view.py's docstring), the same
+    limitation get_player_weekly_stats above already worked around for the
+    Trends tab. This reuses modules.player_history.load_cached_career_resume
+    — the same multi-season reader the web app's own Career tab already
+    calls — instead of quick-view's engine.
+    """
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    matches = players_df[players_df["player_id"] == player_id]
+    if matches.empty:
+        return {"ok": True, "seasons": []}
+
+    position_lookup: dict[str, str] = {}
+    if "player_id" in players_df.columns:
+        ids = players_df["player_id"].astype(str)
+        positions = (
+            players_df["position"].fillna("").astype(str)
+            if "position" in players_df.columns
+            else pd.Series("", index=players_df.index)
+        )
+        position_lookup = dict(zip(ids.tolist(), positions.tolist()))
+
+    resume = player_history.load_cached_career_resume(
+        player_id=player_id,
+        current_row=matches.iloc[0].to_dict(),
+        position_lookup=position_lookup,
+    )
+    return {
+        "ok": True,
+        "seasons": [
+            {
+                "season": season.season,
+                "age": season.age,
+                "games": season.games,
+                "current_season": season.current_season,
+                "key_stats": [
+                    {"label": label, "value": value} for label, value in season.key_stats
+                ],
+            }
+            for season in resume.seasons
         ],
     }
 

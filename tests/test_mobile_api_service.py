@@ -2301,6 +2301,97 @@ def test_weekly_stats_returns_empty_for_a_player_with_no_weekly_rows(monkeypatch
     assert body["weeks"] == []
 
 
+def test_career_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/players/9001/career")
+    assert response.status_code == 401
+
+
+def test_career_returns_every_verified_season_not_just_current(monkeypatch):
+    # PlayerQuickView's own stats.seasons is a single-current-season tuple by
+    # design — this endpoint exists specifically to surface prior seasons a
+    # veteran actually has cached stats for (the Career tab bug this pins).
+    from modules import player_history
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame(
+        [{"player_id": "9001", "name": "Test Runner", "position": "RB", "team": "KC"}]
+    )
+    fake_resume = player_history.CareerResume(
+        seasons=(
+            player_history.HistoricalSeason(
+                season=2026,
+                age=24,
+                games=2,
+                fantasy_points=30.0,
+                fantasy_ppg=15.0,
+                position_finish=None,
+                key_stats=(("Rush Yards", "208"),),
+                achievements=(),
+                current_season=True,
+            ),
+            player_history.HistoricalSeason(
+                season=2025,
+                age=23,
+                games=17,
+                fantasy_points=280.0,
+                fantasy_ppg=16.5,
+                position_finish=None,
+                key_stats=(("Rush Yards", "1,223"),),
+                achievements=(),
+                current_season=False,
+            ),
+        ),
+        achievements=(),
+        source_note="test",
+        historical_cache_loaded=True,
+    )
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            with patch(
+                "modules.player_history.load_cached_career_resume", return_value=fake_resume
+            ) as mock_resume:
+                response = client.get(
+                    "/v1/players/9001/career",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert [s["season"] for s in body["seasons"]] == [2026, 2025]
+    assert body["seasons"][0]["current_season"] is True
+    assert body["seasons"][1]["current_season"] is False
+    assert body["seasons"][1]["key_stats"] == [{"label": "Rush Yards", "value": "1,223"}]
+    mock_resume.assert_called_once()
+    assert mock_resume.call_args.kwargs["player_id"] == "9001"
+    assert mock_resume.call_args.kwargs["position_lookup"] == {"9001": "RB"}
+
+
+def test_career_returns_empty_seasons_for_an_unknown_player(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame([{"player_id": "9001", "name": "Test Runner", "position": "RB"}])
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            response = client.get(
+                "/v1/players/does-not-exist/career",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "seasons": []}
+
+
 def test_gm_targets_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     assert client.get("/v1/leagues/abc/gm-targets").status_code == 401
