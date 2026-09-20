@@ -691,6 +691,11 @@ export interface QuickViewStats {
    * (player_quick_view.PERCENTILE_MIN_POOL), so nothing renders rather than
    * a made-up number. */
   overall_rating: number | null;
+  /** This position's dynasty prime-age window (derived from the same age
+   * curve that already discounts every player's value — not a separately
+   * invented projection) plus where this player's current age sits
+   * relative to it. Null for an unrecognized position or missing age. */
+  prime_window: { start_age: number; end_age: number; status: 'before' | 'in' | 'after' } | null;
 }
 
 export interface QuickViewBio {

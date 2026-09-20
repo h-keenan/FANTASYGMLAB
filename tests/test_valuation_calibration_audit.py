@@ -107,6 +107,46 @@ def test_age_multiplier_continuous_and_position_aware():
     assert all(rb_curve[i] >= rb_curve[i + 1] for i in range(len(rb_curve) - 1))
 
 
+def test_prime_window_derived_from_real_age_curve_not_invented():
+    # Every position's window must fall inside its own tabulated age range
+    # and start at (or before) its peak-multiplier age — the window is a
+    # threshold band read off AGE_CURVE_CONTROL_POINTS, not a separate guess.
+    for pos in POSITIONS:
+        points = rankings.AGE_CURVE_CONTROL_POINTS[pos]
+        window = rankings.prime_window_for_position(pos)
+        assert window is not None
+        start_age, end_age = window
+        assert points[0][0] <= start_age < end_age <= points[-1][0]
+
+    # RB (short, early prime) window must be narrower and earlier than QB's
+    # (long prime) — matches real dynasty consensus the underlying curve
+    # already encodes (see test_age_multiplier_continuous_and_position_aware).
+    rb_start, rb_end = rankings.prime_window_for_position("RB")
+    qb_start, qb_end = rankings.prime_window_for_position("QB")
+    assert (rb_end - rb_start) < (qb_end - qb_start)
+    assert rb_end < qb_end
+
+    assert rankings.prime_window_for_position("NOT_A_POSITION") is None
+
+
+def test_prime_window_status_reflects_this_players_own_age():
+    rb_start, rb_end = rankings.prime_window_for_position("RB")
+
+    before = rankings.prime_window_status("RB", rb_start - 1)
+    assert before == {"start_age": rb_start, "end_age": rb_end, "status": "before"}
+
+    in_window = rankings.prime_window_status("RB", (rb_start + rb_end) / 2)
+    assert in_window["status"] == "in"
+
+    after = rankings.prime_window_status("RB", rb_end + 1)
+    assert after["status"] == "after"
+
+    # Missing/invalid age or an unrecognized position never guesses a status.
+    assert rankings.prime_window_status("RB", None) is None
+    assert rankings.prime_window_status("RB", float("nan")) is None
+    assert rankings.prime_window_status("NOT_A_POSITION", 25) is None
+
+
 def test_age_curve_adjacent_steps_bounded():
     """Adjacent integer ages should not jump more than the continuous-curve bound."""
 

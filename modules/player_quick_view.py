@@ -16,6 +16,7 @@ import streamlit as st
 from modules import player_profile_ui
 from modules.player_awards import PlayerBadge
 from modules.player_eligibility import filter_current_fantasy_players
+from modules.rankings import prime_window_status
 from modules.player_tier_identity import (
     PlayerTierIdentity,
     player_tier_legend_html,
@@ -83,6 +84,12 @@ class PlayerQuickViewStats:
     #: position pool is too thin to rank against, exactly like
     #: ``StatItem.percentile``; see ``_overall_rating``.
     overall_rating: int | None = None
+    #: Position's dynasty prime-age window (start_age, end_age, status for
+    #: THIS player) — derived from modules.rankings.AGE_CURVE_CONTROL_POINTS,
+    #: the same age curve already discounting every player's dynasty value,
+    #: not a separately invented projection. ``None`` when position/age is
+    #: missing or unrecognized. See modules.rankings.prime_window_status.
+    prime_window: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -637,6 +644,7 @@ def build_stats_view(
         college_available=bool(college),
         position=_text(row.get("position")),
         overall_rating=_overall_rating(players_df, row),
+        prime_window=prime_window_status(row.get("position"), row.get("age")),
     )
 
 

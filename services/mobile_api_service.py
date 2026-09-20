@@ -1950,6 +1950,11 @@ def _quick_view_stats_dict(stats: player_quick_view.PlayerQuickViewStats) -> dic
         # their position). Absent (null) under the same pool gate as the
         # per-stat percentiles — see player_quick_view.PERCENTILE_MIN_POOL.
         "overall_rating": _clean_json_value(stats.overall_rating),
+        # Position's dynasty prime-age window plus this player's status
+        # relative to it (before/in/after) — see
+        # modules.rankings.prime_window_status. Null for an unrecognized
+        # position or missing age, never a guessed window.
+        "prime_window": stats.prime_window,
     }
 
 
