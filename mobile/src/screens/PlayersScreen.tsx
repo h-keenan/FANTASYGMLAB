@@ -12,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import EmptyState from '../components/EmptyState';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -225,7 +226,13 @@ export default function PlayersScreen({ route, navigation }: Props) {
               <AppText style={styles.score}>{item.score != null ? Math.round(item.score) : '—'}</AppText>
             </AnimatedCard>
           )}
-          ListEmptyComponent={<AppText style={styles.empty}>No players match.</AppText>}
+          ListEmptyComponent={
+            <EmptyState
+              icon="search-outline"
+              title="No players match"
+              subtitle="Try a different search term or filter combination."
+            />
+          }
         />
       )}
     </View>

@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
@@ -246,9 +247,11 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       )}
       ListEmptyComponent={
         !loading && !error && !notReadyReason ? (
-          <AppText style={styles.empty}>
-            No trade idea clears the bar for this strategy right now — check back after rosters move.
-          </AppText>
+          <EmptyState
+            icon="shuffle-outline"
+            title="No trades yet"
+            subtitle="No trade idea clears the bar for this strategy right now — check back after rosters move."
+          />
         ) : null
       }
       ListFooterComponent={
