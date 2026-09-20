@@ -29,6 +29,7 @@ Deployment topology (Render):
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
   - GET  /v1/players/{id}/weekly-stats   — per-week fantasy points + snap share for one season
   - GET  /v1/players/{id}/career         — every verified season on record, not just current
+  - GET  /v1/players/{id}/schedule       — real opponent/home-away/Vegas lines per week (context only)
   - GET  /v1/players/{id}/awards         — verified fantasy-performance badges (career history)
   - GET  /v1/leagues/{id}/gm-targets           — the caller's watchlist in this league
   - POST /v1/leagues/{id}/gm-targets           — add a player to the watchlist (cap-enforced)
@@ -97,6 +98,7 @@ from modules import (
     my_news,
     news as news_cache,
     news_signal,
+    nfl_schedule,
     player_awards,
     player_eligibility,
     player_history,
@@ -2084,6 +2086,35 @@ def get_player_weekly_stats(
             for row in weeks
         ],
     }
+
+
+@app.get("/v1/players/{player_id}/schedule")
+def get_player_schedule(
+    player_id: str,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """This player's team's real regular-season schedule — opponent, home/
+    away, and the published Vegas spread/total for each week (see
+    modules.nfl_schedule's own docstring for the data source and why this
+    is context only, never a scoring input). Empty when the player has no
+    resolvable team (free agent / retired) or the schedule fetch fails —
+    fails soft, same as every other enrichment endpoint here.
+    """
+
+    players_df = rankings.load_players(PLAYERS_DB_PATH)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+    matches = players_df[players_df["player_id"] == player_id]
+    if matches.empty:
+        return {"ok": True, "team": None, "weeks": []}
+
+    team = _clean_json_value(matches.iloc[0].get("team"))
+    if not team:
+        return {"ok": True, "team": None, "weeks": []}
+
+    season = sleeper.default_player_stats_season()
+    weeks = nfl_schedule.team_schedule(str(team), season)
+    return {"ok": True, "team": str(team), "season": season, "weeks": weeks}
 
 
 @app.get("/v1/players/{player_id}/career")

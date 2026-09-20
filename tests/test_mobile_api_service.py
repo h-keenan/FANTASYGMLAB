@@ -2379,6 +2379,90 @@ def test_weekly_stats_returns_empty_for_a_player_with_no_weekly_rows(monkeypatch
     assert body["weeks"] == []
 
 
+def test_schedule_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/players/9001/schedule")
+    assert response.status_code == 401
+
+
+def test_schedule_returns_the_players_real_team_schedule(monkeypatch):
+    from modules import nfl_schedule
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame(
+        [{"player_id": "9001", "name": "Test Runner", "position": "RB", "team": "KC"}]
+    )
+    fake_weeks = [
+        {
+            "week": 1,
+            "opponent": "BUF",
+            "is_home": True,
+            "spread_line": -2.5,
+            "total_line": 47.5,
+            "played": True,
+            "team_score": 24.0,
+            "opponent_score": 20.0,
+        }
+    ]
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            with patch.object(nfl_schedule, "team_schedule", return_value=fake_weeks) as mock_schedule:
+                response = client.get(
+                    "/v1/players/9001/schedule",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["team"] == "KC"
+    assert body["weeks"] == fake_weeks
+    assert mock_schedule.call_args.args[0] == "KC"
+
+
+def test_schedule_returns_empty_for_a_player_with_no_team(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame([{"player_id": "9002", "name": "Free Agent", "position": "RB", "team": ""}])
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            response = client.get(
+                "/v1/players/9002/schedule",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "team": None, "weeks": []}
+
+
+def test_schedule_returns_empty_for_an_unknown_player(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame([{"player_id": "9001", "name": "Test Runner", "position": "RB", "team": "KC"}])
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            response = client.get(
+                "/v1/players/does-not-exist/schedule",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "team": None, "weeks": []}
+
+
 def test_career_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/players/9001/career")
