@@ -252,6 +252,7 @@ export interface MyTeamResponse {
   starters: LineupPlayer[];
   bench: LineupPlayer[];
   reason: string;
+  roster_id?: string;
 }
 
 /**
