@@ -181,10 +181,46 @@ def _normalize_news_text(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", _plain_news_text(value).lower())
 
 
+def _split_sentences(text: str) -> List[str]:
+    """Good-enough sentence split for a news snippet — doesn't need to be
+    linguistically perfect, just needs to isolate the sentence that actually
+    names the player from the surrounding paragraph."""
+
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+
+
+def _name_terms(player_name: str) -> List[str]:
+    name = player_name.strip()
+    if not name:
+        return []
+    terms = [name]
+    parts = name.split()
+    if len(parts) > 1:
+        terms.append(parts[-1])  # last name alone still counts as a real mention
+    return terms
+
+
+def _sentence_mentioning_player(text: str, player_name: str) -> str:
+    terms = [t.lower() for t in _name_terms(player_name)]
+    if not terms:
+        return ""
+    for sentence in _split_sentences(text):
+        lowered = sentence.lower()
+        if any(term in lowered for term in terms):
+            return sentence
+    return ""
+
+
 def build_quick_news_summary(item: Dict[str, Any], max_chars: int = 220) -> str:
     """
     Return a clean, short summary for display.
     RSS feeds, especially Google News, often put source links in summary fields.
+
+    When this item is matched to a specific roster player, prefer the actual
+    sentence (from whichever field really contains it) that names them over
+    whichever candidate field just happens to come first — a summary that
+    never mentions the player it's supposedly about reads as generic filler,
+    even when the text itself is real.
     """
     title = _plain_news_text(item.get("title"))
     link = str(item.get("link") or "")
@@ -199,6 +235,17 @@ def build_quick_news_summary(item: Dict[str, Any], max_chars: int = 220) -> str:
     link_norm = _normalize_news_text(link)
     source = _plain_news_text(item.get("source"))
     source_norm = _normalize_news_text(source)
+
+    matched_player_name = _plain_news_text(item.get("matched_player"))
+    if matched_player_name:
+        combined = " ".join(_plain_news_text(candidate) for candidate in candidates if candidate)
+        sentence = _sentence_mentioning_player(combined, matched_player_name)
+        sentence_norm = _normalize_news_text(sentence)
+        if sentence and sentence_norm not in {title_norm, link_norm, source_norm}:
+            if len(sentence) > max_chars:
+                cutoff = sentence[: max_chars + 1].rsplit(" ", 1)[0].rstrip(".,;:")
+                sentence = f"{cutoff}..."
+            return sentence
 
     for candidate in candidates:
         raw_candidate = str(candidate or "")
