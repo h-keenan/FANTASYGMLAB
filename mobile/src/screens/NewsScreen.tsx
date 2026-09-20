@@ -115,7 +115,10 @@ export default function NewsScreen() {
         }
         renderItem={({ item }) => (
           <AnimatedCard
-            style={styles.card}
+            style={StyleSheet.flatten([
+              styles.card,
+              { borderLeftWidth: 3, borderLeftColor: EVENT_BADGE_COLORS[item.event_type ?? ''] ?? colors.border },
+            ])}
             onPress={() => {
               if (item.link) void Linking.openURL(item.link);
             }}
