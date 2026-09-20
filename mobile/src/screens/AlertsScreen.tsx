@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -172,7 +173,13 @@ export default function AlertsScreen({ route, navigation }: Props) {
           ) : null
         }
         ListEmptyComponent={
-          !loading ? <AppText style={styles.empty}>No relevant news for your roster right now.</AppText> : null
+          !loading ? (
+            <EmptyState
+              icon="checkmark-circle-outline"
+              title="All quiet"
+              subtitle="No relevant news for your roster right now."
+            />
+          ) : null
         }
         renderItem={({ item }) => (
           <AnimatedCard

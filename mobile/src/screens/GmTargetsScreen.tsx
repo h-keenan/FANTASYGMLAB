@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AnimatedCard from '../components/AnimatedCard';
+import EmptyState from '../components/EmptyState';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -116,9 +117,11 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
         ListEmptyComponent={
-          <AppText style={styles.empty}>
-            No targets yet. Open a player and tap "Add to GM Targets" to start watching them.
-          </AppText>
+          <EmptyState
+            icon="star-outline"
+            title="No targets yet"
+            subtitle='Open a player and tap "Add to GM Targets" to start watching them.'
+          />
         }
         renderItem={({ item }) => (
           <AnimatedCard

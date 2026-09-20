@@ -12,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import EmptyState from '../components/EmptyState';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PremiumLock from '../components/PremiumLock';
@@ -216,7 +217,13 @@ export default function WaiversScreen({ route, navigation }: Props) {
               onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(item), leagueId, leagueName })}
             />
           )}
-          ListEmptyComponent={<AppText style={styles.empty}>No free agents match.</AppText>}
+          ListEmptyComponent={
+            <EmptyState
+              icon="search-outline"
+              title="No free agents match"
+              subtitle="Try a different search term or position filter."
+            />
+          }
           ListFooterComponent={
             <SecondaryWaiverBoard
               isPremium={isPremium}
