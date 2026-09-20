@@ -29,7 +29,7 @@ import IconCircle from './IconCircle';
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
-import { ORB_INSET_CEILING, ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
+import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
@@ -280,19 +280,18 @@ export default function GmOrb() {
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
+  // This used to clamp bottom to a 100pt ceiling, on the theory that a
+  // reported "orb sits mid-screen" bug meant some device was inflating the
+  // inset. Measured rawInsets.bottom on a real iPhone (34), an iOS simulator
+  // (34), and an Android emulator (48) — never inflated. The actual bug was
+  // content sliding underneath a correctly-positioned orb (see
+  // useOrbClearance in lib/orbLayout.ts), and coridian_ confirmed that was
+  // the same bug from the very first report, not a second one — so the
+  // clamp was removed rather than kept "just in case." Left in place, it was
+  // a latent bug of its own: the first device with a legitimately larger
+  // inset than 100 would get its orb quietly pulled toward the edge.
   const rawInsets = useSafeAreaInsets();
-  // Purely precautionary — no evidence this has ever actually fired. This
-  // was originally written to defend against an inflated bottom inset,
-  // which was the leading theory for a reported bug where the orb appeared
-  // to sit mid-screen. That bug turned out to be content sliding underneath
-  // a correctly-positioned orb (see useOrbClearance in lib/orbLayout.ts),
-  // not the orb itself moving — confirmed by measuring rawInsets.bottom on
-  // a real iPhone (34), an iOS simulator (34), and an Android emulator (48),
-  // none of them inflated. If you're reading this because you found an
-  // inset-inflation bug on some device, that would be new evidence this
-  // clamp doesn't currently have — nothing observed so far justifies it.
-  const safeBottom = Math.min(Math.max(rawInsets.bottom, 0), ORB_INSET_CEILING);
-  const insets = { ...rawInsets, bottom: safeBottom };
+  const insets = { ...rawInsets, bottom: Math.max(rawInsets.bottom, 0) };
   const league = open ? currentLeagueContext() : null;
   const currentRouteName = open && navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -466,7 +465,7 @@ export default function GmOrb() {
         <View pointerEvents="none" style={[styles.debugOverlay, { top: rawInsets.top + 4 }]}>
           <AppText style={styles.debugOverlayText}>
             win:{Math.round(Dimensions.get('window').height)} rawBottom:{Math.round(rawInsets.bottom)}{' '}
-            clampedBottom:{Math.round(insets.bottom)} orbBottomOffset:{Math.round(insets.bottom + spacing.md)}
+            orbBottomOffset:{Math.round(insets.bottom + spacing.md)}
           </AppText>
         </View>
       )}
