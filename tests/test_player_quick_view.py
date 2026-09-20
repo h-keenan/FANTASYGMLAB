@@ -394,8 +394,40 @@ def test_overall_rating_is_mid_scale_for_a_mid_pack_score():
 
     rating = player_quick_view.build_stats_view(_subject_row(players), players).overall_rating
 
+    # A flat percentile*99 mapping put this in the 40s-50s; the curve in
+    # _OVERALL_RATING_CURVE deliberately reads a genuinely mid-pack player
+    # (60th percentile here) higher than that — see the curve's own comment
+    # for why a linear mapping made ordinary players look worse than real
+    # sports-game ratings ever do, while inflating everyone above the median.
     assert rating is not None
-    assert 40 <= rating <= 60
+    assert 60 <= rating <= 75
+
+
+def test_overall_rating_curve_compresses_the_pack_and_reserves_the_top():
+    curve = player_quick_view._overall_rating_from_percentile
+
+    # Endpoints anchor exactly where the old linear mapping did.
+    assert curve(0.0) == 40
+    assert curve(1.0) == player_quick_view.OVERALL_RATING_MAX
+
+    # A committee/bench-tier player near the 88th percentile of the WHOLE
+    # rosterable pool (coridian_'s real complaint: this used to read "88",
+    # a clear-starter number, for a "Committee Back") now lands well below
+    # the number a genuine above-average starter gets.
+    mid_pack = curve(0.886)
+    clear_starter = curve(0.95)
+    elite = curve(0.99)
+    assert mid_pack < clear_starter < elite
+    assert mid_pack <= 85
+
+    # Monotonic across the full range — never dips as percentile rises.
+    samples = [i / 100 for i in range(0, 101, 5)]
+    ratings = [curve(p) for p in samples]
+    assert all(ratings[i] <= ratings[i + 1] for i in range(len(ratings) - 1))
+
+    # Out-of-range input clamps rather than extrapolating past the scale.
+    assert curve(-0.5) == curve(0.0)
+    assert curve(1.5) == curve(1.0)
 
 
 def test_overall_rating_ranks_within_the_position_not_across_positions():
