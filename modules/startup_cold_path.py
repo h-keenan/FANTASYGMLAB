@@ -14,6 +14,7 @@ from typing import Any, Callable, MutableMapping
 
 from modules import performance
 from modules import runtime_trace
+from modules import sleeper as sleeper_module
 
 
 FOOTBALL_CONTEXT_READY_KEY = "_football_context_ready"
@@ -193,7 +194,7 @@ def load_persisted_players(
 def sleeper_players_cache_stale(
     *,
     cache_path: str = "data/sleeper_players.json",
-    ttl_seconds: float = 60 * 60,
+    ttl_seconds: float = sleeper_module.PLAYERS_CACHE_TTL_SECONDS,
 ) -> bool:
     if not os.path.exists(cache_path):
         return True

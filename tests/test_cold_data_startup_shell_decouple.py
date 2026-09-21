@@ -114,3 +114,23 @@ def test_app_ensure_players_defaults_to_no_network_refresh():
     ):
         app.ensure_players()
     assert ensure.call_args.kwargs.get("allow_network_refresh") is False
+
+
+def test_sleeper_players_cache_ttl_is_a_few_minutes_not_an_hour():
+    """Pins the 2026-09-21 gameday-staleness fix: a live injury ruling
+    should reach the app in minutes, not up to an hour — see
+    modules.sleeper.PLAYERS_CACHE_TTL_SECONDS's own comment for the
+    incident (Nico Collins still showing as a starter after being ruled
+    Out) this traces back to."""
+
+    from modules import sleeper
+
+    assert sleeper.PLAYERS_CACHE_TTL_SECONDS <= 10 * 60
+    # startup_cold_path's own default must track the same constant rather
+    # than a second hardcoded literal that could silently drift out of sync.
+    import inspect
+
+    default_ttl = inspect.signature(startup_cold_path.sleeper_players_cache_stale).parameters[
+        "ttl_seconds"
+    ].default
+    assert default_ttl == sleeper.PLAYERS_CACHE_TTL_SECONDS

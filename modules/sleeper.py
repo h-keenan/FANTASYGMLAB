@@ -11,7 +11,17 @@ from modules import performance
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
 PLAYERS_CACHE_PATH = "data/sleeper_players.json"
-PLAYERS_CACHE_TTL_SECONDS = 60 * 60
+# Was 60*60 — the entire "Nico Collins still shows as a starter after being
+# ruled Out" class of bug traced back to this single number: the mobile
+# API's stale-while-revalidate refresh (services/mobile_api_service.py's
+# _maybe_schedule_players_refresh, via modules.startup_cold_path /
+# modules.players_refresh_flight) only re-checks Sleeper this often, so an
+# in-game status change could lag up to an hour. Lowered so a live gameday
+# ruling reaches the app in minutes, not up to an hour — the existing
+# single-flight + 45s failure-cooldown guard (players_refresh_flight.py)
+# already prevents this from hammering Sleeper, so shortening the interval
+# doesn't add stampede risk, just a few more cheap background refreshes/hour.
+PLAYERS_CACHE_TTL_SECONDS = 5 * 60
 PLAYER_STATS_CACHE_TEMPLATE = "data/sleeper_player_stats_{season}.json"
 PLAYER_STATS_CACHE_TTL_SECONDS = 12 * 60 * 60
 COMPLETED_PLAYER_STATS_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
