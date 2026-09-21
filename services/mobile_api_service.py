@@ -3347,7 +3347,10 @@ def get_league_matchup(
     }
 
 
-def _project_waiver_row(row: pd.Series, score_field: str) -> dict[str, Any]:
+def _project_waiver_row(
+    row: pd.Series, score_field: str, opponent_by_team: dict[str, dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    matchup = (opponent_by_team or {}).get(str(row.get("team") or ""))
     return {
         "player_id": _clean_json_value(row.get("player_id")),
         "name": _clean_json_value(row.get("name")),
@@ -3359,6 +3362,11 @@ def _project_waiver_row(row: pd.Series, score_field: str) -> dict[str, Any]:
         "tier": _clean_json_value(row.get("player_tier")),
         "opportunity_label": _clean_json_value(row.get("opportunity_label")),
         "score": _clean_json_value(row.get(score_field)),
+        # This week's real opponent (modules.nfl_schedule) — context only,
+        # same "never overweighted" contract as Player Detail's Schedule
+        # tab: doesn't touch score/position_rank/overall_rank above.
+        "opponent": matchup.get("opponent") if matchup else None,
+        "opponent_is_home": matchup.get("is_home") if matchup else None,
         # Wire-relative ranks (rank among available free agents only), not the
         # league-global canonical_* ranks /rankings returns — deliberately
         # separate, matching the web app's waivers page (app.py comment:
@@ -3373,9 +3381,12 @@ def _project_waiver_row(row: pd.Series, score_field: str) -> dict[str, Any]:
 
 
 def _project_priority_add(
-    row: pd.Series, score_field: str, guidance: "faab.FaabGuidance"
+    row: pd.Series,
+    score_field: str,
+    guidance: "faab.FaabGuidance",
+    opponent_by_team: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    projected = _project_waiver_row(row, score_field)
+    projected = _project_waiver_row(row, score_field, opponent_by_team)
     position_rank = int(row.get("position_rank") or 99) or 99
     label, tone = waivers_ui.waiver_recommendation_label(row, position_rank)
     projected["recommendation_label"] = label
@@ -3513,8 +3524,27 @@ def get_league_waivers(
         free_agents["injury_replacement_fit"] = False
         free_agents["injury_replacement_note"] = ""
 
+    # This week's real opponent per team (modules.nfl_schedule) — context
+    # only, per coridian_'s explicit "should not be overweighted": doesn't
+    # touch score_field, position_rank, or overall_rank anywhere above,
+    # same contract as Player Detail's Schedule tab. Best-effort: a league
+    # with no current week (offseason/draft) or an unmapped team just
+    # leaves "opponent" null rather than failing the whole request.
+    opponent_by_team: dict[str, dict[str, Any]] = {}
+    try:
+        current_week = int((league.get("settings") or {}).get("leg") or 0)
+    except (TypeError, ValueError):
+        current_week = 0
+    if current_week > 0:
+        season = sleeper.default_player_stats_season()
+        games_df = nfl_schedule.load_games()
+        for team_code in {str(t) for t in free_agents["team"].dropna().unique() if str(t)}:
+            matchup = nfl_schedule.team_matchup_for_week(team_code, current_week, season, games=games_df)
+            if matchup:
+                opponent_by_team[team_code] = matchup
+
     limited = free_agents.head(max(1, min(limit, 300)))
-    players = [_project_waiver_row(row, score_field) for _, row in limited.iterrows()]
+    players = [_project_waiver_row(row, score_field, opponent_by_team) for _, row in limited.iterrows()]
 
     priority_df = waivers_ui.rank_priority_add_candidates(
         free_agents,
@@ -3543,7 +3573,7 @@ def get_league_waivers(
             remaining_budget=faab_budget.remaining,
             roster_need=str(row.get("position") or "").upper() in needed_upper,
         )
-        priority_adds.append(_project_priority_add(row, score_field, guidance))
+        priority_adds.append(_project_priority_add(row, score_field, guidance, opponent_by_team))
 
     # Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
     # Shortlist) — matches web's Premium-only gate (modules/waivers_ui.py:
@@ -3577,9 +3607,9 @@ def get_league_waivers(
         ]
         faab_df = faab_pool.sort_values(score_field, ascending=False).head(4)
 
-        stash_candidates = [_project_waiver_row(row, score_field) for _, row in stash_df.iterrows()]
-        watchlist_candidates = [_project_waiver_row(row, score_field) for _, row in watchlist_df.iterrows()]
-        faab_targets = [_project_waiver_row(row, score_field) for _, row in faab_df.iterrows()]
+        stash_candidates = [_project_waiver_row(row, score_field, opponent_by_team) for _, row in stash_df.iterrows()]
+        watchlist_candidates = [_project_waiver_row(row, score_field, opponent_by_team) for _, row in watchlist_df.iterrows()]
+        faab_targets = [_project_waiver_row(row, score_field, opponent_by_team) for _, row in faab_df.iterrows()]
 
     return {
         "ok": True,
