@@ -3686,6 +3686,28 @@ def get_trade_hub_ideas(
         card["partner_team_avatar_url"] = avatar_by_team_name.get(
             str(card.get("partner_team_name") or "").strip().lower()
         )
+    # Concept-sheet parity: each card names the partner's real archetype
+    # ("Rebuilding", "Contending", etc.) under their team name — the exact
+    # same archetype_label /v1/leagues/{id}/team-rankings already computes
+    # for every roster (modules.team_eval), matched by team name like the
+    # avatar lookup above rather than threading a new field through
+    # modules.trade_ideas's idea pipeline. Best-effort: cached, so this
+    # rarely costs a fresh computation on top of what Teams/My Team already
+    # triggered.
+    try:
+        rankings_frame = league_rankings.build_league_rankings_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        archetype_by_team_name = {
+            str(row.get("team_name") or "").strip().lower(): _clean_json_value(row.get("archetype_label"))
+            for _, row in rankings_frame.iterrows()
+        }
+    except Exception:
+        archetype_by_team_name = {}
+    for card in ranked:
+        card["partner_team_archetype_label"] = archetype_by_team_name.get(
+            str(card.get("partner_team_name") or "").strip().lower()
+        ) or ""
     approved_count = len(ranked)
     ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
     effective_limit = (
