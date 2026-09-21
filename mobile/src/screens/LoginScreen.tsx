@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
     backgroundColor: colors.surfaceSolid,
     alignItems: 'center',
     justifyContent: 'center',
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   dividerText: { color: colors.textTertiary, fontSize: 12, marginHorizontal: spacing.sm },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,

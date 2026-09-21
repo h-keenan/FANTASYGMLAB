@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },

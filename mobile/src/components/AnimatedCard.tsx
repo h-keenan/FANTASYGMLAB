@@ -76,8 +76,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
     padding: spacing.lg,
     ...shadows.resting,
   },

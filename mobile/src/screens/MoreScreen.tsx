@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   densityOption: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
     backgroundColor: colors.surface,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
