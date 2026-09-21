@@ -543,6 +543,11 @@ function TradeIdeaCard({
           <AppText style={styles.partnerName} numberOfLines={1}>
             {idea.partner_team_name}
           </AppText>
+          {idea.partner_team_archetype_label ? (
+            <AppText style={styles.partnerArchetype} numberOfLines={1}>
+              {idea.partner_team_archetype_label}
+            </AppText>
+          ) : null}
         </View>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
@@ -733,6 +738,7 @@ const styles = StyleSheet.create({
   partnerInitial: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   partnerTextGroup: { flex: 1 },
   partnerName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  partnerArchetype: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
   shareButton: {
     width: 30,
     height: 30,

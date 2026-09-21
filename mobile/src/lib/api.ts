@@ -1016,6 +1016,10 @@ export interface TradePackage {
 export interface TradeIdea {
   partner_team_name: string;
   partner_team_avatar_url: string | null;
+  // Real archetype label (e.g. "Rebuilding", "Aging Contender") from the
+  // same computation /v1/leagues/{id}/team-rankings uses — empty when it
+  // couldn't be matched to a roster.
+  partner_team_archetype_label: string;
   rationale: string;
   trade_gain: number;
   confidence_label: string;
