@@ -138,12 +138,14 @@ services:
       - key: REVENUECAT_BILLING_MODE
         sync: false
         # test until live-billing review; must match SANDBOX vs PRODUCTION events
-  # Basic automated push-trigger sweep (mobile). Not deployed until Founder
-  # Ops syncs this Blueprint entry, selects a plan, and sets the env vars
-  # below. Run docs/supabase_push_notification_log.sql first. Every run:
-  # checks every registered push token's Sleeper leagues for a new
-  # top_priority/watch "Next Move" item (modules.push_triggers) and pushes
-  # it once via Expo — see modules/push_triggers.py's module docstring.
+  # Basic automated push-trigger sweep (mobile). Deployed 2026-09-21 (crn-dao76krtqb8s73e64hg0)
+  # after finding this Blueprint entry had never been synced — that, plus
+  # the push_tokens/push_notification_log tables never being created, was
+  # the entire "notifications don't work" root cause; all three are fixed
+  # and live now. Every run: checks every registered push token's Sleeper
+  # leagues for a new top_priority/watch "Next Move" item
+  # (modules.push_triggers) and pushes it once via Expo — see
+  # modules/push_triggers.py's module docstring.
   - type: cron
     name: fantasygm-lab-push-trigger-sweep
     branch: main
