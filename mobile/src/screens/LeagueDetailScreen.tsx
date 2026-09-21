@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   heroCard: {
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
     padding: spacing.lg,
     minHeight: 132,
   },

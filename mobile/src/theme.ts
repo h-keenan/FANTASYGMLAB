@@ -42,6 +42,13 @@ export const colors = {
   surfaceSolid: '#151B22',
   border: '#2E3A4A',
   borderStrong: '#3C4A5C',
+  // Concept-sheet card outline: every card there reads with a faint cyan
+  // edge against the navy background, not a neutral gray hairline. Scoped
+  // to AnimatedCard's default border only (never swapped in for the
+  // generic `border`/`borderStrong` line tokens, which stay neutral for
+  // dividers, inputs, and non-card outlines) so this doesn't cascade into
+  // unrelated UI that was never meant to look "branded."
+  cardBorder: 'rgba(92,228,255,0.28)',
   hairline: 'rgba(255,255,255,0.08)',
   textPrimary: '#F2F4F7',
   textSecondary: '#A6B0BB',

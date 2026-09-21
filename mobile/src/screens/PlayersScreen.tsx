@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   searchInput: {
     marginHorizontal: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
   },
   pillActive: { backgroundColor: colors.accent, borderColor: colors.accent, borderWidth: 1.5 },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },

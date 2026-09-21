@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
     padding: spacing.lg,
     width: '100%',
     maxWidth: 420,
