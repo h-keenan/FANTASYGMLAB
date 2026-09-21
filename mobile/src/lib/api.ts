@@ -376,6 +376,11 @@ export interface WaiverPlayer {
   stale_free_agent: boolean;
   injury_replacement_fit: boolean;
   injury_replacement_note: string;
+  // This week's real NFL opponent (context only — never factored into
+  // score/position_rank/overall_rank above). Null in the offseason/draft
+  // or when the team code has no schedule match.
+  opponent: string | null;
+  opponent_is_home: boolean | null;
 }
 
 export interface WaiverFaabGuidance {

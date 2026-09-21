@@ -43,6 +43,11 @@ function injuryPillColor(status: string | null): string | null {
   return null;
 }
 
+function opponentLabel(player: Pick<WaiverPlayer, 'opponent' | 'opponent_is_home'>): string | null {
+  if (!player.opponent) return null;
+  return `${player.opponent_is_home ? 'vs' : '@'} ${player.opponent}`;
+}
+
 const NO_LEAGUE_REASONS = new Set([
   'no_sleeper_username_linked',
   'sleeper_user_not_found',
@@ -376,6 +381,9 @@ function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPre
           <View style={styles.metaRow}>
             <PositionBadge position={player.position} />
             <AppText style={styles.meta} numberOfLines={1}>{player.team}</AppText>
+            {opponentLabel(player) ? (
+              <AppText style={styles.meta} numberOfLines={1}>{opponentLabel(player)}</AppText>
+            ) : null}
           </View>
           {player.injury_replacement_fit ? (
             <AppText style={styles.injuryFitText}>{player.injury_replacement_note}</AppText>
@@ -440,6 +448,9 @@ function WaiverCard({
           <View style={styles.metaRow}>
             <PositionBadge position={player.position} />
             <AppText style={styles.meta} numberOfLines={1}>{player.team}</AppText>
+            {opponentLabel(player) ? (
+              <AppText style={styles.meta} numberOfLines={1}>{opponentLabel(player)}</AppText>
+            ) : null}
             {player.position_rank ? (
               <View style={styles.positionRankPill}>
                 <AppText style={styles.positionRankText}>
