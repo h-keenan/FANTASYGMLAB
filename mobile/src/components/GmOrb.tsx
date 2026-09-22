@@ -29,6 +29,7 @@ import TrajectoryArcs from './TrajectoryArcs';
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
+import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
 import { maskShowcaseFields } from '../lib/showcaseMode';
@@ -309,6 +310,7 @@ export default function GmOrb() {
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [recapReady, setRecapReady] = useState(false);
+  const [tradeHubHasNew, setTradeHubHasNew] = useState(false);
   // This used to clamp bottom to a 100pt ceiling, on the theory that a
   // reported "orb sits mid-screen" bug meant some device was inflating the
   // inset. Measured rawInsets.bottom on a real iPhone (34), an iOS simulator
@@ -424,6 +426,35 @@ export default function GmOrb() {
       .catch(() => {
         if (!cancelled) setRecapReady(false);
       });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning
+    // as the alert-count effect above: `league` is a fresh object literal
+    // every render, only leagueId actually matters.
+  }, [open, league?.leagueId]);
+
+  // Same glyph idea as Recap's, for Trade Hub: no server-side "new idea"
+  // concept exists (see lib/tradeHubSeen.ts), so this is just "does the
+  // live idea count exceed what this device last actually viewed on the
+  // Trade Hub screen."
+  useEffect(() => {
+    if (!open || !league) {
+      setTradeHubHasNew(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ideas, seenCount] = await Promise.all([
+          api.getTradeHubIdeas(league.leagueId),
+          getSeenTradeIdeaCount(league.leagueId),
+        ]);
+        if (!cancelled) setTradeHubHasNew(ideas.ideas.length > seenCount);
+      } catch {
+        if (!cancelled) setTradeHubHasNew(false);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -555,7 +586,13 @@ export default function GmOrb() {
                     destination={destination}
                     isCurrent={destination.route === currentRouteName}
                     unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
-                    hasNew={destination.route === 'Recap' ? recapReady : false}
+                    hasNew={
+                      destination.route === 'Recap'
+                        ? recapReady
+                        : destination.route === 'TradeHub'
+                          ? tradeHubHasNew
+                          : false
+                    }
                     onPress={() => go(destination)}
                   />
                 ))}
