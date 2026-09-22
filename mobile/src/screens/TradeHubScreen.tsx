@@ -17,6 +17,7 @@ import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueHero from '../components/TradeValueHero';
 import {
+  type AllTradesEntitlement,
   type DraftPickAsset,
   type PresentationAsset,
   type RankedPlayer,
@@ -168,6 +169,21 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const [watchingAd, setWatchingAd] = useState(false);
   const [lens, setLens] = useState<ValuationLens>('Dynasty');
 
+  // "All Trades" — the concept sheet's second Trade Hub tab: browse ideas
+  // across every roster in the league, not just the caller's own. Kept as
+  // fully separate state from "For You" above rather than reusing `ideas`,
+  // since it's paginated (Load More) and never gets the ad-unlock gate
+  // "For You" has — it has its own cumulative free-tier cap instead.
+  const [viewMode, setViewMode] = useState<'for_you' | 'all_trades'>('for_you');
+  const [allTradesIdeas, setAllTradesIdeas] = useState<TradeIdea[]>([]);
+  const [allTradesCursor, setAllTradesCursor] = useState(0);
+  const [allTradesHasMore, setAllTradesHasMore] = useState(false);
+  const [allTradesEntitlement, setAllTradesEntitlement] = useState<AllTradesEntitlement | null>(null);
+  const [allTradesLoading, setAllTradesLoading] = useState(false);
+  const [allTradesLoadingMore, setAllTradesLoadingMore] = useState(false);
+  const [allTradesError, setAllTradesError] = useState<string | null>(null);
+  const [allTradesStarted, setAllTradesStarted] = useState(false);
+
   useScreenHeaderTitle(navigation, 'Trade Hub', leagueName);
 
   useEffect(() => {
@@ -222,25 +238,103 @@ export default function TradeHubScreen({ route, navigation }: Props) {
     void load(strategy, next, lens);
   }, [adUnlocks, load, strategy, watchingAd, lens]);
 
+  const loadAllTrades = useCallback(
+    async (options: { reset: boolean }) => {
+      const cursor = options.reset ? 0 : allTradesCursor;
+      const shownCount = options.reset ? 0 : allTradesIdeas.length;
+      if (options.reset) {
+        setAllTradesLoading(true);
+      } else {
+        setAllTradesLoadingMore(true);
+      }
+      setAllTradesError(null);
+      try {
+        const result = await api.getAllTrades(leagueId, {
+          strategy,
+          lens,
+          cursor,
+          pageSize: 3,
+          shownCount,
+        });
+        setAllTradesIdeas((prev) => (options.reset ? result.ideas : [...prev, ...result.ideas]));
+        setAllTradesCursor(result.next_cursor);
+        setAllTradesHasMore(result.has_more);
+        setAllTradesEntitlement(result.entitlement);
+      } catch (err) {
+        setAllTradesError(err instanceof Error ? err.message : 'Failed to load All Trades.');
+      } finally {
+        setAllTradesLoading(false);
+        setAllTradesLoadingMore(false);
+      }
+    },
+    [leagueId, strategy, lens, allTradesCursor, allTradesIdeas.length],
+  );
+
+  const onSelectAllTrades = useCallback(() => {
+    setViewMode('all_trades');
+    if (!allTradesStarted) {
+      setAllTradesStarted(true);
+      void loadAllTrades({ reset: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTradesStarted]);
+
+  // Strategy/lens changed while All Trades has already been viewed once —
+  // start over from the first page rather than silently keep stale ideas
+  // generated under the old stance/lens.
+  useEffect(() => {
+    if (!allTradesStarted) return;
+    setAllTradesIdeas([]);
+    setAllTradesCursor(0);
+    setAllTradesHasMore(false);
+    void loadAllTrades({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [strategy, lens]);
+
+  const isForYou = viewMode === 'for_you';
+  const activeLoading = isForYou ? loading : allTradesLoading;
+  const activeError = isForYou ? error : allTradesError;
+  const activeData = isForYou ? (activeLoading || activeError || notReadyReason ? [] : ideas ?? []) : allTradesIdeas;
+
   return (
     <View style={styles.root}>
       <GridBackground />
       <FlatList
       style={styles.container}
-      data={loading || error || notReadyReason ? [] : ideas ?? []}
+      data={activeData}
       keyExtractor={(_, index) => String(index)}
       contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
       ListHeaderComponent={
         <View>
           <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
           <ScreenHero title="TRADE HUB" subtitle={leagueName} />
+          <View style={styles.viewModeRow}>
+            <TouchableOpacity
+              style={[styles.viewModePill, isForYou && styles.viewModePillActive]}
+              onPress={() => setViewMode('for_you')}
+            >
+              <AppText style={[styles.viewModePillText, isForYou && styles.viewModePillTextActive]}>For You</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewModePill, !isForYou && styles.viewModePillActive]}
+              onPress={onSelectAllTrades}
+            >
+              <AppText style={[styles.viewModePillText, !isForYou && styles.viewModePillTextActive]}>
+                All Trades
+              </AppText>
+            </TouchableOpacity>
+          </View>
           <AppText style={styles.disclaimer} numberOfLines={1}>
-            Real ideas from the same engine and Trust checks as the web app's Trade Hub.
+            {isForYou
+              ? "Real ideas from the same engine and Trust checks as the web app's Trade Hub."
+              : 'Real ideas across every roster in the league, not just yours.'}
           </AppText>
-          {!loading && !error && !notReadyReason && ideas ? <IdeaSummaryRow ideas={ideas} /> : null}
-          {loading ? <ActivityIndicator style={styles.loading} color={colors.accent} /> : null}
-          {error ? <AppText style={styles.error}>{error}</AppText> : null}
-          {notReadyReason ? (
+          {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
+            <IdeaSummaryRow ideas={ideas} />
+          ) : null}
+          {activeLoading ? <ActivityIndicator style={styles.loading} color={colors.accent} /> : null}
+          {activeError ? <AppText style={styles.error}>{activeError}</AppText> : null}
+          {isForYou && notReadyReason ? (
             <AppText style={styles.notReadyText}>
               {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't build Trade Hub ideas for this league."}
             </AppText>
@@ -251,26 +345,81 @@ export default function TradeHubScreen({ route, navigation }: Props) {
         <TradeIdeaCard idea={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
       )}
       ListEmptyComponent={
-        !loading && !error && !notReadyReason ? (
+        !activeLoading && !activeError && !(isForYou && notReadyReason) ? (
           <EmptyState
             icon="shuffle-outline"
             title="No trades yet"
-            subtitle="No trade idea clears the bar for this strategy right now — check back after rosters move."
+            subtitle={
+              isForYou
+                ? 'No trade idea clears the bar for this strategy right now — check back after rosters move.'
+                : 'No trade idea cleared the bar for any team yet — check back after rosters move.'
+            }
           />
         ) : null
       }
       ListFooterComponent={
-        !loading && !error && !notReadyReason && entitlement && entitlement.hidden_count > 0 ? (
-          <TradeHubGateCard
-            entitlement={entitlement}
-            watchingAd={watchingAd}
-            onWatchAd={onWatchAd}
+        isForYou ? (
+          !activeLoading && !activeError && !notReadyReason && entitlement && entitlement.hidden_count > 0 ? (
+            <TradeHubGateCard
+              entitlement={entitlement}
+              watchingAd={watchingAd}
+              onWatchAd={onWatchAd}
+              onUpgrade={() => navigation.navigate('Paywall')}
+            />
+          ) : null
+        ) : (
+          <AllTradesFooter
+            loadingMore={allTradesLoadingMore}
+            hasMore={allTradesHasMore}
+            entitlement={allTradesEntitlement}
+            onLoadMore={() => void loadAllTrades({ reset: false })}
             onUpgrade={() => navigation.navigate('Paywall')}
           />
-        ) : null
+        )
       }
       />
     </View>
+  );
+}
+
+function AllTradesFooter({
+  loadingMore,
+  hasMore,
+  entitlement,
+  onLoadMore,
+  onUpgrade,
+}: {
+  loadingMore: boolean;
+  hasMore: boolean;
+  entitlement: AllTradesEntitlement | null;
+  onLoadMore: () => void;
+  onUpgrade: () => void;
+}) {
+  if (loadingMore) {
+    return <ActivityIndicator style={styles.loading} color={colors.accent} />;
+  }
+  if (!hasMore) return null;
+  const freeGated = Boolean(entitlement && !entitlement.is_premium && entitlement.remaining_free <= 0);
+  if (freeGated) {
+    return (
+      <AnimatedCard style={styles.gateCard}>
+        <View style={styles.gateIconDisc}>
+          <Ionicons name="lock-closed" size={20} color={colors.premium} />
+        </View>
+        <AppText style={styles.gateTitle}>More teams to browse</AppText>
+        <AppText style={styles.gateBody}>
+          Free shows {entitlement?.free_limit} ideas across All Trades. Go Pro to browse every team.
+        </AppText>
+        <TouchableOpacity style={styles.gatePrimaryButton} onPress={onUpgrade}>
+          <AppText style={styles.gatePrimaryButtonText}>Upgrade to Pro</AppText>
+        </TouchableOpacity>
+      </AnimatedCard>
+    );
+  }
+  return (
+    <TouchableOpacity style={styles.loadMoreButton} onPress={onLoadMore}>
+      <AppText style={styles.loadMoreButtonText}>Load More Teams</AppText>
+    </TouchableOpacity>
   );
 }
 
@@ -593,6 +742,11 @@ function TradeIdeaCard({
           </AppText>
         </View>
       ) : null}
+      {idea.source_team_name ? (
+        <AppText style={styles.sourceTeamLabel} numberOfLines={1}>
+          FOR {idea.source_team_name.toUpperCase()}
+        </AppText>
+      ) : null}
       <View style={styles.partnerRow}>
         {idea.partner_team_avatar_url ? (
           <TeamAvatar avatarId={idea.partner_team_avatar_url} size={36} />
@@ -738,6 +892,31 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 11, color: colors.textTertiary, marginBottom: spacing.md },
+  viewModeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  viewModePill: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.surface,
+  },
+  viewModePillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
+  viewModePillText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  viewModePillTextActive: { color: colors.accent },
+  loadMoreButton: {
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.surface,
+  },
+  loadMoreButtonText: { fontSize: 14, fontWeight: '700', color: colors.accent },
   loading: { marginVertical: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginTop: spacing.lg },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20, marginTop: spacing.xl },
@@ -776,6 +955,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
   },
   landedTargetText: { fontSize: 11, fontWeight: '600', color: colors.premium, flexShrink: 1 },
+  sourceTeamLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.6,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+  },
   categoryBadge: {
     alignSelf: 'flex-start',
     borderRadius: radii.sm,

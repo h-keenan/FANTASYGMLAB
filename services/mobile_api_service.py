@@ -3825,9 +3825,15 @@ def get_league_all_trades(
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    roster_profiles = sleeper.get_league_roster_profiles(league_id)
     avatar_by_team_name = {
-        str(p.get("team_name") or "").strip().lower(): p.get("avatar_url")
-        for p in sleeper.get_league_roster_profiles(league_id).values()
+        str(p.get("team_name") or "").strip().lower(): p.get("avatar_url") for p in roster_profiles.values()
+    }
+    # roster_id -> team_name, so each card can say whose perspective it's
+    # from ("Team A ↔ Team B") — partner_team_name alone is ambiguous once
+    # a card isn't necessarily generated from the caller's own roster.
+    team_name_by_roster_id = {
+        str(roster_id): str(profile.get("team_name") or "") for roster_id, profile in roster_profiles.items()
     }
     try:
         rankings_frame = league_rankings.build_league_rankings_frame_cached(
@@ -3873,6 +3879,7 @@ def get_league_all_trades(
                 break
             card = trade_hub_engine.project_trade_idea_card(record, is_headline=False).to_dict()
             card["source_roster_id"] = str(roster_id)
+            card["source_team_name"] = team_name_by_roster_id.get(str(roster_id), "")
             card["partner_team_avatar_url"] = avatar_by_team_name.get(
                 str(card.get("partner_team_name") or "").strip().lower()
             )
