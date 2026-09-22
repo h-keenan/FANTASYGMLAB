@@ -31,9 +31,10 @@ import { api } from '../lib/api';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useDensity } from '../context/DensityContext';
 import { useGmStance } from '../context/GmStanceContext';
+import { useThemeMode } from '../context/ThemeModeContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 // PlayerDetail's route param still expects the /rankings RankedPlayer shape;
@@ -156,6 +157,8 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 
 export default function TradeHubScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   // Read-only here: the header's GmStanceHeaderButton is the only place
   // stance is changed, and a change there re-runs `load` through this.
@@ -395,6 +398,8 @@ function AllTradesFooter({
   onLoadMore: () => void;
   onUpgrade: () => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (loadingMore) {
     return <ActivityIndicator style={styles.loading} color={colors.accent} />;
   }
@@ -434,6 +439,8 @@ function TradeHubGateCard({
   onWatchAd: () => void;
   onUpgrade: () => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const canWatchMoreAds = adsAvailable && entitlement.ad_unlocks_applied < entitlement.max_ad_unlocks;
   return (
     <AnimatedCard style={styles.gateCard}>
@@ -479,6 +486,8 @@ function AssetRow({
   onPressPlayer?: (asset: PresentationAsset) => void;
   onPressPick?: (asset: PresentationAsset) => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (asset.asset_type === 'pick') {
     const canOpenPick = Boolean(onPressPick && asset.pick_id);
     return (
@@ -539,36 +548,42 @@ function AssetRow({
   );
 }
 
-const VALUE_EDGE_BAND_COLOR: Record<string, string> = {
-  Favorable: colors.success,
-  Fair: colors.textSecondary,
-  'Slight Overpay': colors.premium,
-  'Major Overpay': colors.danger,
-};
+function valueEdgeBandColor(colors: ThemeColors): Record<string, string> {
+  return {
+    Favorable: colors.success,
+    Fair: colors.textSecondary,
+    'Slight Overpay': colors.premium,
+    'Major Overpay': colors.danger,
+  };
+}
 
 // modules/trade_hub_ui.py's trade_hub_display_section() taxonomy — mapped
 // to the app's existing semantic palette (not a new color per category)
 // so a scan down the Trade Hub feed reads as distinct idea types instead
 // of one flat gray/blue-gray repeated on every card ("two-tone bluish
 // gray... does not look good").
-const CATEGORY_COLORS: Record<string, string> = {
-  'Headline Recommendation': colors.accent,
-  'Health Relief': colors.danger,
-  'Draft Capital': colors.premium,
-  'Age Optimization': colors.violet,
-  Rebuild: colors.violet,
-  Contender: colors.success,
-  'Need-Based': colors.accentSoft,
-  'High Confidence': colors.success,
-};
+function categoryColors(colors: ThemeColors): Record<string, string> {
+  return {
+    'Headline Recommendation': colors.accent,
+    'Health Relief': colors.danger,
+    'Draft Capital': colors.premium,
+    'Age Optimization': colors.violet,
+    Rebuild: colors.violet,
+    Contender: colors.success,
+    'Need-Based': colors.accentSoft,
+    'High Confidence': colors.success,
+  };
+}
 
-function categoryColor(category: string): string {
-  return CATEGORY_COLORS[category] ?? colors.textSecondary;
+function categoryColor(category: string, colors: ThemeColors): string {
+  return categoryColors(colors)[category] ?? colors.textSecondary;
 }
 
 function CategoryBadge({ category }: { category: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (!category) return null;
-  const color = categoryColor(category);
+  const color = categoryColor(category, colors);
   return (
     <View style={[styles.categoryBadge, { backgroundColor: `${color}26`, borderColor: `${color}80` }]}>
       <AppText style={[styles.categoryBadgeText, { color }]} numberOfLines={1}>
@@ -578,14 +593,20 @@ function CategoryBadge({ category }: { category: string }) {
   );
 }
 
-const IMPACT_TAG_CONFIG: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
-  high_impact: { label: 'High Impact', icon: 'flash', color: colors.premium },
-  buy_low: { label: 'Buy Low', icon: 'trending-down', color: colors.success },
-  sell_high: { label: 'Sell High', icon: 'trending-up', color: colors.danger },
-};
+function impactTagConfig(
+  colors: ThemeColors,
+): Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> {
+  return {
+    high_impact: { label: 'High Impact', icon: 'flash', color: colors.premium },
+    buy_low: { label: 'Buy Low', icon: 'trending-down', color: colors.success },
+    sell_high: { label: 'Sell High', icon: 'trending-up', color: colors.danger },
+  };
+}
 
 function ImpactBadge({ impactTag }: { impactTag: string }) {
-  const config = IMPACT_TAG_CONFIG[impactTag];
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const config = impactTagConfig(colors)[impactTag];
   if (!config) return null;
   return (
     <View style={[styles.impactBadge, { borderColor: `${config.color}80` }]}>
@@ -604,6 +625,8 @@ function ImpactBadge({ impactTag }: { impactTag: string }) {
  * invented here), so an idea with no tag just doesn't count toward any of
  * the three impact buckets — the total is still every idea's real total. */
 function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const counts = useMemo(() => {
     let highImpact = 0;
     let buyLow = 0;
@@ -639,6 +662,8 @@ function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
 }
 
 function MeterRow({ label, value, level, color }: { label: string; value: string; level: number; color: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.meter}>
       <AppText style={styles.meterLabel}>{label}</AppText>
@@ -673,6 +698,8 @@ function RationaleDetailModal({
   partnerTeamName: string;
   rationale: string;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.rationaleBackdrop} onPress={onClose}>
@@ -708,6 +735,8 @@ function TradeIdeaCard({
   leagueName: string;
   navigation: Props['navigation'];
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { showExplanations } = useDensity();
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
@@ -718,9 +747,9 @@ function TradeIdeaCard({
   const openPick = (asset: PresentationAsset) =>
     navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
 
-  const bandColor = VALUE_EDGE_BAND_COLOR[idea.value_edge_band] ?? colors.textSecondary;
+  const bandColor = valueEdgeBandColor(colors)[idea.value_edge_band] ?? colors.textSecondary;
 
-  const categoryAccent = categoryColor(idea.category);
+  const categoryAccent = categoryColor(idea.category, colors);
 
   const landedTargetNames = (idea.landed_gm_target_player_ids ?? [])
     .map((playerId) => idea.package.receive.find((asset) => asset.player_id === playerId)?.name)
@@ -864,7 +893,8 @@ function TradeIdeaCard({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   gateCard: { alignItems: 'center', padding: spacing.lg, marginTop: spacing.xs },
   gateIconDisc: {
@@ -1135,4 +1165,5 @@ const styles = StyleSheet.create({
   meterSegments: { flexDirection: 'row', gap: 3 },
   meterSegment: { width: 14, height: 4, borderRadius: 2 },
   meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-});
+  });
+}
