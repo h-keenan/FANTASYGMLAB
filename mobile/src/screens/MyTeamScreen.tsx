@@ -11,6 +11,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import { resolvePlayerTier } from '../lib/playerTier';
 import PositionBadge from '../components/PositionBadge';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
@@ -308,7 +309,19 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
         <View style={styles.metaRow}>
           <PositionBadge position={player.position} />
           <AppText style={styles.meta} numberOfLines={1}>
-            {[player.team, player.opportunity_label].filter(Boolean).join(' · ') || '—'}
+            {!player.team && !player.opportunity_label ? (
+              '—'
+            ) : (
+              <>
+                {player.team}
+                {player.team && player.opportunity_label ? ' · ' : ''}
+                {player.opportunity_label ? (
+                  <AppText style={[styles.meta, { color: resolvePlayerTier(player.tier).color }]}>
+                    {player.opportunity_label}
+                  </AppText>
+                ) : null}
+              </>
+            )}
           </AppText>
         </View>
       </View>

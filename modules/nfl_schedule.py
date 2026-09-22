@@ -116,6 +116,7 @@ def _row_from_game(game: pd.Series, *, team_is_home: bool) -> dict[str, Any]:
         "played": bool(played),
         "team_score": float(team_score) if played else None,
         "opponent_score": float(opponent_score) if played and opponent_score is not None and not pd.isna(opponent_score) else None,
+        "bye": False,
     }
 
 
@@ -143,6 +144,29 @@ def team_schedule(
 
     rows = [_row_from_game(g, team_is_home=True) for _, g in season_games[season_games["home_team"] == team_code].iterrows()]
     rows += [_row_from_game(g, team_is_home=False) for _, g in season_games[season_games["away_team"] == team_code].iterrows()]
+    # nflverse's games.csv has no explicit bye-week row for a team — it's
+    # just the one week number missing from that team's home/away rows
+    # within its own season span. Synthesized here (never as an extra fetch)
+    # so the schedule doesn't silently skip straight from one week to the
+    # next with no visual sign the team didn't play that week.
+    if rows:
+        present_weeks = {row["week"] for row in rows}
+        first_week, last_week = min(present_weeks), max(present_weeks)
+        for week in range(first_week, last_week + 1):
+            if week not in present_weeks:
+                rows.append(
+                    {
+                        "week": week,
+                        "opponent": None,
+                        "is_home": None,
+                        "spread_line": None,
+                        "total_line": None,
+                        "played": False,
+                        "team_score": None,
+                        "opponent_score": None,
+                        "bye": True,
+                    }
+                )
     rows.sort(key=lambda row: row["week"])
     return rows
 

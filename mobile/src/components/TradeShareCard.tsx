@@ -6,6 +6,7 @@ import QRCode from 'react-native-qrcode-svg';
 import type { RankedPlayer, TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import PlayerAvatar from './PlayerAvatar';
+import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
 
 const CARD_WIDTH = 360;
@@ -25,9 +26,7 @@ function AssetLine({ player }: { player: RankedPlayer }) {
     <View style={styles.assetLine}>
       <PlayerAvatar playerId={player.player_id} size={32} tier={player.tier} style={styles.assetAvatar} />
       <View style={styles.assetTextGroup}>
-        <AppText style={styles.assetName} numberOfLines={1}>
-          {player.name ?? 'Unknown'}
-        </AppText>
+        <PlayerNameText name={player.name ?? 'Unknown'} style={styles.assetName} />
         <View style={styles.assetMetaRow}>
           <PositionBadge position={player.position} />
           <AppText style={styles.assetMeta} numberOfLines={1}>
@@ -193,7 +192,13 @@ const styles = StyleSheet.create({
   qrRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.lg,
+    // 'auto' (not a fixed value), same trick as `footer` below: with both
+    // this and `footer` set to marginTop: 'auto', flexbox splits whatever
+    // room is left in the fixed-height card evenly across the two gaps
+    // instead of dumping it all into one gap right above the footer (which
+    // is what a fixed margin here + `footer`'s own auto margin produced for
+    // any trade whose rationale was shorter than the max 6 lines).
+    marginTop: 'auto',
     paddingTop: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,

@@ -811,13 +811,14 @@ export interface CareerResponse {
  */
 export interface ScheduleWeek {
   week: number;
-  opponent: string;
-  is_home: boolean;
+  opponent: string | null;
+  is_home: boolean | null;
   spread_line: number | null;
   total_line: number | null;
   played: boolean;
   team_score: number | null;
   opponent_score: number | null;
+  bye: boolean;
 }
 
 export interface ScheduleResponse {

@@ -120,6 +120,53 @@ def test_bye_week_has_no_matching_game():
     assert nfl_schedule.team_matchup_for_week("KC", 3, 2026, games=games) is None
 
 
+def test_team_schedule_synthesizes_a_bye_row_for_a_gap_within_its_own_span():
+    # NE has games in weeks 1 and 3 but nothing in week 2 — a real bye,
+    # distinct from "this team has no game data past its last known week".
+    games = pd.DataFrame(
+        [
+            {
+                "season": 2026,
+                "game_type": "REG",
+                "week": 1,
+                "home_team": "NE",
+                "away_team": "KC",
+                "home_score": 10.0,
+                "away_score": 24.0,
+                "spread_line": 3.0,
+                "total_line": 40.0,
+            },
+            {
+                "season": 2026,
+                "game_type": "REG",
+                "week": 3,
+                "home_team": "BUF",
+                "away_team": "NE",
+                "home_score": None,
+                "away_score": None,
+                "spread_line": -6.0,
+                "total_line": 41.0,
+            },
+        ]
+    )
+
+    schedule = nfl_schedule.team_schedule("NE", 2026, games=games)
+
+    assert [row["week"] for row in schedule] == [1, 2, 3]
+    bye_row = next(row for row in schedule if row["week"] == 2)
+    assert bye_row["bye"] is True
+    assert bye_row["opponent"] is None
+    assert bye_row["played"] is False
+    assert schedule[0]["bye"] is False
+    assert schedule[2]["bye"] is False
+    # The synthesized bye row doesn't fool the single-week lookup into
+    # reporting a real opponent — it's still an explicit "this is a bye".
+    matchup = nfl_schedule.team_matchup_for_week("NE", 2, 2026, games=games)
+    assert matchup is not None
+    assert matchup["bye"] is True
+    assert matchup["opponent"] is None
+
+
 def test_matchup_for_week_returns_the_one_real_game():
     games = _games_frame()
 

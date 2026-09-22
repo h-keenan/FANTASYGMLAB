@@ -694,10 +694,14 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
         <AppText style={styles.scheduleWeekLabel}>WK {week.week}</AppText>
       </View>
       <View style={styles.scheduleOpponentCol}>
+        {week.bye ? (
+          <AppText style={styles.scheduleBye}>BYE</AppText>
+        ) : (
         <AppText style={styles.scheduleOpponent} numberOfLines={1}>
           {week.is_home ? 'vs' : '@'} {week.opponent}
         </AppText>
-        {week.played ? (
+        )}
+        {week.bye ? null : week.played ? (
           <AppText style={styles.scheduleDetail}>
             Final: {week.team_score != null ? Math.round(week.team_score) : '—'}-
             {week.opponent_score != null ? Math.round(week.opponent_score) : '—'}
@@ -1615,6 +1619,7 @@ function createStyles(colors: ThemeColors) {
   scheduleWeekLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   scheduleOpponentCol: { flex: 1 },
   scheduleOpponent: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  scheduleBye: { fontSize: 14, fontWeight: '700', color: colors.danger, letterSpacing: 0.4 },
   scheduleDetail: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
   scheduleDetailMuted: { fontSize: 12, color: colors.textTertiary, marginTop: 1, fontStyle: 'italic' },
   });
