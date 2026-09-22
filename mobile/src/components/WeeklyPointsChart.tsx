@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { LayoutChangeEvent, View } from 'react-native';
 import AppText from './AppText';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import type { WeeklyStatPoint } from '../lib/api';
-import { colors, spacing, typography } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { spacing, typography, type ThemeColors } from '../theme';
 
 const HEIGHT = 140;
 const TOP_PAD = 16;
@@ -32,6 +33,8 @@ function buildAreaPath(points: Array<{ x: number; y: number }>, baselineY: numbe
  * snap% bar since neither existed before (the season card only ever showed
  * one aggregate PPG number). */
 export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [width, setWidth] = useState(0);
 
   const played = weeks.filter((week) => week.fantasy_points_ppr != null);
@@ -97,26 +100,28 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
 
 const LABEL_WIDTH = 20;
 
-const styles = {
-  empty: {
-    ...typography.bodyMuted,
-    color: colors.textSecondary,
-    textAlign: 'center' as const,
-    paddingVertical: spacing.lg,
-  },
-  // Absolutely positioned per-point at the same x the SVG drew its dot at —
-  // a flexbox space-between row assumes even spacing across the full width,
-  // which breaks down for a single point (centers the dot but left-aligns
-  // its lone label) and isn't guaranteed to line up for any point count.
-  labelRow: {
-    height: 16,
-    marginTop: spacing.xs,
-  },
-  weekLabel: {
-    ...typography.caption,
-    color: colors.textTertiary,
-    position: 'absolute' as const,
-    width: LABEL_WIDTH,
-    textAlign: 'center' as const,
-  },
-};
+function createStyles(colors: ThemeColors) {
+  return {
+    empty: {
+      ...typography.bodyMuted,
+      color: colors.textSecondary,
+      textAlign: 'center' as const,
+      paddingVertical: spacing.lg,
+    },
+    // Absolutely positioned per-point at the same x the SVG drew its dot at —
+    // a flexbox space-between row assumes even spacing across the full width,
+    // which breaks down for a single point (centers the dot but left-aligns
+    // its lone label) and isn't guaranteed to line up for any point count.
+    labelRow: {
+      height: 16,
+      marginTop: spacing.xs,
+    },
+    weekLabel: {
+      ...typography.caption,
+      color: colors.textTertiary,
+      position: 'absolute' as const,
+      width: LABEL_WIDTH,
+      textAlign: 'center' as const,
+    },
+  };
+}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, ViewStyle, type PressableProps } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -7,7 +7,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { colors, gradients, motion, radii, shadows, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { gradients, lightGradients, motion, radii, shadows, spacing, type ThemeColors } from '../theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -33,6 +34,8 @@ interface AnimatedCardProps extends PressableProps {
  * fights a caller's padding.
  */
 export default function AnimatedCard({ style, children, glow, onPressIn, onPressOut, ...rest }: AnimatedCardProps) {
+  const { colors, isDark } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useSharedValue(1);
   const shadowT = useSharedValue(0); // 0 = resting, 1 = pressed
 
@@ -66,13 +69,14 @@ export default function AnimatedCard({ style, children, glow, onPressIn, onPress
   if (!glow) return pressable;
 
   return (
-    <LinearGradient colors={gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.glowRim}>
+    <LinearGradient colors={isDark ? gradients.accent : lightGradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.glowRim}>
       {pressable}
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
@@ -97,4 +101,5 @@ const styles = StyleSheet.create({
     ...shadows.orbGlow,
   },
   cardGlowInner: { borderWidth: 0 },
-});
+  });
+}

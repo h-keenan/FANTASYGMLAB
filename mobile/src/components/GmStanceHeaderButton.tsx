@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { TEAM_STRATEGY_OPTIONS } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
  * A single header-mounted stance switcher, shared by every screen that
@@ -24,6 +25,8 @@ import { colors, radii, spacing } from '../theme';
  */
 export default function GmStanceHeaderButton({ leagueId }: { leagueId: string }) {
   const { strategy, isSet, setStrategy, clearStrategy } = useGmStance(leagueId);
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const current = TEAM_STRATEGY_OPTIONS.find((option) => option.value === strategy);
 
@@ -84,7 +87,8 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -129,4 +133,5 @@ const styles = StyleSheet.create({
   },
   resetTextGroup: { flexShrink: 1, paddingRight: spacing.sm },
   resetHint: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
-});
+  });
+}

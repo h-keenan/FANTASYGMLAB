@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { RecapStory, RecapTradeAsset } from '../lib/api';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import IconCircle from './IconCircle';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
@@ -24,6 +25,8 @@ interface Props {
  * (the card itself, and `players`, stay truncated to 2-per-side).
  */
 export default function RecapTradeDetailModal({ visible, onClose, story }: Props) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (!story) return null;
   const leftAssets = story.left_assets ?? [];
   const rightAssets = story.right_assets ?? [];
@@ -64,6 +67,8 @@ export default function RecapTradeDetailModal({ visible, onClose, story }: Props
 }
 
 function TeamAssetColumn({ teamName, assets }: { teamName: string; assets: RecapTradeAsset[] }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.column}>
       <AppText style={styles.columnTeam} numberOfLines={1}>
@@ -79,6 +84,8 @@ function TeamAssetColumn({ teamName, assets }: { teamName: string; assets: Recap
 }
 
 function AssetRow({ asset }: { asset: RecapTradeAsset }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (asset.kind === 'pick') {
     return (
       <View style={styles.assetRow}>
@@ -105,7 +112,8 @@ function AssetRow({ asset }: { asset: RecapTradeAsset }) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -163,4 +171,5 @@ const styles = StyleSheet.create({
   lensRow: { marginTop: spacing.xs },
   lensLabel: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
   lensNote: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
-});
+  });
+}

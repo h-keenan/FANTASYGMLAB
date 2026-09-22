@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { ValuationLens } from '../lib/api';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 
 const LENS_OPTIONS: { value: ValuationLens; label: string; hint: string }[] = [
   { value: 'Dynasty', label: 'Dynasty', hint: 'Values future upside alongside this year.' },
@@ -29,6 +30,8 @@ export default function EvaluationLensHeaderButton({
   lens: ValuationLens;
   onChange: (lens: ValuationLens) => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const current = LENS_OPTIONS.find((option) => option.value === lens);
 
@@ -73,7 +76,8 @@ export default function EvaluationLensHeaderButton({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -112,4 +116,5 @@ const styles = StyleSheet.create({
   optionText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   optionTextActive: { color: colors.premium },
   optionHint: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
-});
+  });
+}

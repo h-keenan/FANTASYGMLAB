@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 
 import { api, type PendingTradeOutcome, type TradeOutcomeAnswer } from '../lib/api';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
  * "Did this trade happen?" — the follow-up half of Trade Outcomes.
@@ -15,6 +16,8 @@ import { colors, radii, spacing } from '../theme';
  * foreground check catches it) and continuous polling would just be waste.
  */
 export default function TradeOutcomePrompt() {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [queue, setQueue] = useState<PendingTradeOutcome[]>([]);
   const [answering, setAnswering] = useState(false);
   const checking = useRef(false);
@@ -109,7 +112,8 @@ export default function TradeOutcomePrompt() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -160,4 +164,5 @@ const styles = StyleSheet.create({
   secondaryButton: { backgroundColor: colors.surfaceSolid, borderWidth: 1, borderColor: colors.border },
   secondaryButtonText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   spinner: { marginVertical: spacing.md },
-});
+  });
+}
