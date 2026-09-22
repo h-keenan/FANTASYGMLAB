@@ -146,6 +146,65 @@ def test_active_free_agent_and_unsigned_rookie_remain_eligible():
     assert eligibility_diagnostics(filtered)["retained_current_free_agents"] == 2
 
 
+def _pre_annotated(rows: list[dict]) -> pd.DataFrame:
+    """A players frame that already carries the trust/annotation columns —
+    exercises filter_current_fantasy_players' own DEF/league filtering in
+    isolation from annotate_player_eligibility's separate current-player
+    heuristics (which a synthetic DEF/team-defense fixture row doesn't
+    realistically satisfy and isn't what this is testing)."""
+    frame = pd.DataFrame(rows)
+    frame["is_current_fantasy_eligible"] = True
+    frame["player_eligibility_reason"] = "test"
+    frame["trust_enforcement"] = "test"
+    frame["trust_evidence_confidence"] = "test"
+    frame["trust_block_reason"] = ""
+    frame["trust_validation_fingerprint"] = "test"
+    return frame
+
+
+def test_def_players_are_dropped_for_a_league_with_no_def_roster_slot():
+    players = _pre_annotated(
+        [
+            {"player_id": "kc-def", "position": "DEF"},
+            {"player_id": "current", "position": "RB"},
+        ]
+    )
+    league = {"roster_positions": ["QB", "RB", "WR", "TE", "FLEX", "BN"]}
+
+    filtered = filter_current_fantasy_players(players, league=league)
+
+    assert filtered["player_id"].tolist() == ["current"]
+
+
+def test_def_players_are_kept_for_a_league_with_a_def_roster_slot():
+    players = _pre_annotated(
+        [
+            {"player_id": "kc-def", "position": "DEF"},
+            {"player_id": "current", "position": "RB"},
+        ]
+    )
+    league = {"roster_positions": ["QB", "RB", "WR", "TE", "DEF", "FLEX", "BN"]}
+
+    filtered = filter_current_fantasy_players(players, league=league)
+
+    assert set(filtered["player_id"].tolist()) == {"kc-def", "current"}
+
+
+def test_def_players_are_kept_when_no_league_is_passed_at_all():
+    # Default (no `league` kwarg) must keep every existing caller's exact
+    # current behavior — this is opt-in per call site, never a blanket change.
+    players = _pre_annotated(
+        [
+            {"player_id": "kc-def", "position": "DEF"},
+            {"player_id": "current", "position": "RB"},
+        ]
+    )
+
+    filtered = filter_current_fantasy_players(players)
+
+    assert set(filtered["player_id"].tolist()) == {"kc-def", "current"}
+
+
 def test_missing_status_is_not_assumed_active_without_current_signal():
     player = _player(
         "unknown",

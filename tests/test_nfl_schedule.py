@@ -185,6 +185,72 @@ def test_playoff_rows_are_excluded_from_the_regular_season_schedule():
     assert all(row["week"] != 20 for row in kc_schedule)
 
 
+def _defense_strength_frame() -> pd.DataFrame:
+    # KC allows very few points across 3 games (tough defense); NE allows a
+    # lot (weak defense); BUF sits in between (average). Only 3 teams so the
+    # tough/average/weak terciles are each exactly one team.
+    games = [
+        {"season": 2026, "game_type": "REG", "week": 1, "home_team": "KC", "away_team": "BUF", "home_score": 30, "away_score": 24},
+        {"season": 2026, "game_type": "REG", "week": 2, "home_team": "NE", "away_team": "KC", "home_score": 6, "away_score": 27},
+        {"season": 2026, "game_type": "REG", "week": 3, "home_team": "KC", "away_team": "BUF", "home_score": 20, "away_score": 7},
+        {"season": 2026, "game_type": "REG", "week": 1, "home_team": "NE", "away_team": "BUF", "home_score": 10, "away_score": 38},
+        {"season": 2026, "game_type": "REG", "week": 3, "home_team": "NE", "away_team": "BUF", "home_score": 13, "away_score": 41},
+    ]
+    for game in games:
+        game.setdefault("spread_line", None)
+        game.setdefault("total_line", None)
+    return pd.DataFrame(games)
+
+
+def test_team_defense_strength_ranks_teams_by_points_allowed():
+    games = _defense_strength_frame()
+
+    strength = nfl_schedule.team_defense_strength(2026, games=games)
+
+    # KC allowed 24, 6, 7 -> average 12.3, by far the fewest.
+    # BUF allowed 30, 20 -> average 25.
+    # NE allowed 27, 38, 41 -> average 35.3, by far the most.
+    assert strength["KC"]["rank"] == 1
+    assert strength["KC"]["tier"] == "tough"
+    assert strength["NE"]["rank"] == 3
+    assert strength["NE"]["tier"] == "weak"
+    assert strength["BUF"]["tier"] == "average"
+
+
+def test_team_defense_strength_includes_recent_games_average():
+    games = _defense_strength_frame()
+
+    strength = nfl_schedule.team_defense_strength(2026, games=games)
+
+    # KC allows 24 (wk1, home vs BUF), 6 (wk2, away at NE), 7 (wk3, home vs BUF).
+    assert strength["KC"]["games_played"] == 3
+    assert strength["KC"]["points_allowed_avg"] == round((24 + 6 + 7) / 3, 1)
+    # Recent-3 for KC is the same 3 games it has played.
+    assert strength["KC"]["recent_points_allowed_avg"] == round((24 + 6 + 7) / 3, 1)
+
+
+def test_team_defense_strength_omits_teams_with_no_completed_games():
+    games = pd.DataFrame(
+        [
+            {
+                "season": 2026,
+                "game_type": "REG",
+                "week": 1,
+                "home_team": "KC",
+                "away_team": "BUF",
+                "home_score": None,
+                "away_score": None,
+                "spread_line": -2.5,
+                "total_line": 47.5,
+            }
+        ]
+    )
+
+    strength = nfl_schedule.team_defense_strength(2026, games=games)
+
+    assert strength == {}
+
+
 def test_load_games_falls_back_to_disk_cache_on_fetch_failure(tmp_path):
     cache_path = tmp_path / "nfl_games.csv"
     _games_frame().to_csv(cache_path, index=False)

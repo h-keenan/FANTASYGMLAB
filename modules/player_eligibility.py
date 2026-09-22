@@ -419,8 +419,17 @@ def filter_current_fantasy_players(
     *,
     surface: str = "",
     now: datetime | None = None,
+    league: dict | None = None,
 ) -> pd.DataFrame:
-    """Filter before ranking while preserving the original order of eligible rows."""
+    """Filter before ranking while preserving the original order of eligible rows.
+
+    `league` is optional and, when passed, additionally drops DEF/D-ST rows
+    for a league whose own `roster_positions` don't include a DEF slot at
+    all — those players were showing up in rankings/search/waivers for
+    leagues that can never actually roster them. Every existing caller that
+    doesn't pass `league` keeps its exact current behavior; this is opt-in
+    per call site, not a blanket behavior change.
+    """
     if players is None:
         players = pd.DataFrame()
     # Prepared / snapshot frames already carry the canonical flag. Re-running
@@ -451,6 +460,9 @@ def filter_current_fantasy_players(
         pass
     if annotated.empty:
         return annotated
-    return annotated[
-        annotated["is_current_fantasy_eligible"].fillna(False).astype(bool)
-    ].copy()
+    eligible = annotated[annotated["is_current_fantasy_eligible"].fillna(False).astype(bool)].copy()
+    if league is not None and "position" in eligible.columns:
+        roster_positions = league.get("roster_positions") or []
+        if "DEF" not in roster_positions:
+            eligible = eligible[eligible["position"] != "DEF"]
+    return eligible

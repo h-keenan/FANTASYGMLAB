@@ -819,6 +819,10 @@ export interface ScheduleWeek {
   team_score: number | null;
   opponent_score: number | null;
   bye: boolean;
+  /** Real points-allowed-based defense strength for this opponent — never
+   * a scoring input, display only. Null when that team has no completed
+   * games yet to rank it by. */
+  opponent_defense_tier: 'tough' | 'average' | 'weak' | null;
 }
 
 export interface ScheduleResponse {
