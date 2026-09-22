@@ -284,6 +284,64 @@ def test_me_reports_ok_status_for_a_new_user_with_no_profile_row_yet(monkeypatch
     assert body["user"]["profile_status"] == "ok"
 
 
+def test_export_my_data_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/me/export")
+    assert response.status_code == 401
+
+
+def test_export_my_data_returns_every_table(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    table_response = Mock(status_code=200)
+    table_response.json.return_value = [{"user_id": "user-123"}]
+
+    # auth fetch, then one requests.get per table in _EXPORTABLE_USER_TABLES.
+    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 7):
+        response = client.get("/v1/me/export", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["user"]["id"] == "user-123"
+    assert set(body["tables"].keys()) == {
+        "profiles",
+        "user_settings",
+        "saved_leagues",
+        "gm_targets",
+        "mobile_alert_reads",
+        "trade_outcomes",
+        "push_tokens",
+    }
+    assert body["tables"]["profiles"] == [{"user_id": "user-123"}]
+
+
+def test_export_my_data_reports_a_per_table_error_instead_of_failing_the_whole_request(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    ok_response = Mock(status_code=200)
+    ok_response.json.return_value = []
+    failing_response = Mock(status_code=500)
+    failing_response.json.return_value = {"error": "boom"}
+
+    # First table lookup (profiles) fails; the rest succeed — the request
+    # as a whole must still return 200 with the failure isolated to its
+    # own table key.
+    with patch("requests.get", side_effect=[auth_user_response, failing_response] + [ok_response] * 6):
+        response = client.get("/v1/me/export", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "error" in body["tables"]["profiles"]
+    assert body["tables"]["user_settings"] == []
+
+
 def test_league_endpoints_wrap_sleeper_module(monkeypatch):
     client = _client(monkeypatch)
 

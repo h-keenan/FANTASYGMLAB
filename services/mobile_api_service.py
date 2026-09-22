@@ -347,6 +347,47 @@ def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     }
 
 
+# Every Supabase table that stores a row keyed to this user's own auth id,
+# mirrored from docs/supabase_delete_account.sql's cascade list — kept in
+# sync manually since deletion is a DB-level FK cascade with no single
+# code list of its own. Add a table here whenever a new one gets added to
+# that cascade.
+_EXPORTABLE_USER_TABLES = (
+    "profiles",
+    "user_settings",
+    "saved_leagues",
+    "gm_targets",
+    "mobile_alert_reads",
+    "trade_outcomes",
+    "push_tokens",
+)
+
+
+@app.get("/v1/me/export")
+def export_my_data(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """GDPR/CCPA data-access request, self-service: every row this account
+    owns across every Supabase table, as one JSON document. Uses the
+    caller's own access token for every query (account_store.fetch_rows),
+    the same RLS-scoped pattern _fetch_profile_fields already relies on —
+    a user can only ever read rows RLS already lets them read, so this
+    endpoint can't be tricked into returning another account's data.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    tables: dict[str, Any] = {}
+    for table in _EXPORTABLE_USER_TABLES:
+        rows, error = account_store.fetch_rows(config, access_token, table, user_id=user_id)
+        tables[table] = rows if not error else {"error": error}
+    return {
+        "ok": True,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "user": {"id": user_id, "email": user.get("email") or ""},
+        "tables": tables,
+    }
+
+
 @app.get("/v1/sleeper/leagues")
 def lookup_sleeper_leagues(
     username: str = "",

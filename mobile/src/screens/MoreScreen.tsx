@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, ScrollView, Share, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -114,6 +114,34 @@ export default function MoreScreen({ navigation }: Props) {
     } finally {
       setSendingTestPush(false);
     }
+  };
+
+  const [exporting, setExporting] = useState(false);
+  const onExportData = async () => {
+    setExporting(true);
+    try {
+      const result = await api.exportMyData();
+      await Share.share({
+        title: 'My FantasyGM Lab data',
+        message: JSON.stringify(result, null, 2),
+      });
+    } catch {
+      Alert.alert('Could not export your data', 'Please try again in a moment.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Compliant cancellation path for IAP is the platform's own subscription
+  // settings, not a custom in-app flow (Apple/Google require this) — this
+  // just saves the "your device's account settings" instruction on the
+  // Paywall from being a manual hunt.
+  const onManageSubscription = () => {
+    const url =
+      Platform.OS === 'ios'
+        ? 'https://apps.apple.com/account/subscriptions'
+        : 'https://play.google.com/store/account/subscriptions';
+    void Linking.openURL(url);
   };
 
   const onDeleteAccount = () => {
@@ -259,6 +287,20 @@ export default function MoreScreen({ navigation }: Props) {
       ))}
 
       <AppText style={styles.sectionLabel}>Account</AppText>
+      <TouchableOpacity style={styles.row} onPress={onManageSubscription}>
+        <View style={styles.labelGroup}>
+          <IconCircle name="card-outline" color={colors.textSecondary} style={styles.icon} />
+          <AppText style={styles.label}>Manage Subscription</AppText>
+        </View>
+        <AppText style={styles.chevron}>{'›'}</AppText>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.row} onPress={onExportData} disabled={exporting}>
+        <View style={styles.labelGroup}>
+          <IconCircle name="download-outline" color={colors.textSecondary} style={styles.icon} />
+          <AppText style={styles.label}>Export My Data</AppText>
+        </View>
+        {exporting ? <ActivityIndicator size="small" color={colors.textSecondary} /> : <AppText style={styles.chevron}>{'›'}</AppText>}
+      </TouchableOpacity>
       <TouchableOpacity style={styles.row} onPress={onDeleteAccount} disabled={deleting}>
         <View style={styles.labelGroup}>
           <IconCircle name="trash-outline" color={colors.danger} style={styles.icon} />
