@@ -1059,6 +1059,12 @@ export interface TradeIdea {
   // watchlist — lets the card call out "lands your target" without a
   // second lookup, since package.receive already has the matching name.
   landed_gm_target_player_ids: string[];
+  // All Trades only: which roster this idea was generated for (not
+  // necessarily the caller's own), and that roster's real team name so a
+  // card can read "Team A <-> Team B" instead of just naming the partner.
+  // Both absent on regular Trade Hub ideas (always the caller's own).
+  source_roster_id?: string;
+  source_team_name?: string;
 }
 
 export interface TradeHubEntitlement {
@@ -1077,6 +1083,26 @@ export interface TradeHubResponse {
   ideas: TradeIdea[];
   reason: string;
   entitlement?: TradeHubEntitlement;
+}
+
+export interface AllTradesEntitlement {
+  is_premium: boolean;
+  free_limit: number;
+  ad_bonus_per_unlock: number;
+  max_ad_unlocks: number;
+  ad_unlocks_applied: number;
+  // Free-only ideas remaining after this page, carried forward via
+  // shownCount on the next "Load More" call.
+  remaining_free: number;
+}
+
+export interface AllTradesResponse {
+  ok: true;
+  ideas: TradeIdea[];
+  has_more: boolean;
+  next_cursor: number;
+  total_teams: number;
+  entitlement: AllTradesEntitlement;
 }
 
 // Matches the backend's MAX_PLAYER_IDS_PER_REQUEST — batch client-side so a
@@ -1180,6 +1206,29 @@ export const api = {
     authorizedFetch<TradeHubResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${strategy}&ad_unlocks=${adUnlocks}&lens=${encodeURIComponent(lens)}`,
     ),
+  getAllTrades: (
+    leagueId: string,
+    options: {
+      strategy?: TeamStrategy;
+      lens?: ValuationLens;
+      cursor?: number;
+      pageSize?: number;
+      shownCount?: number;
+      adUnlocks?: number;
+    } = {},
+  ) => {
+    const params = new URLSearchParams({
+      strategy: options.strategy ?? 'retool',
+      lens: options.lens ?? 'Dynasty',
+      cursor: String(options.cursor ?? 0),
+      page_size: String(options.pageSize ?? 3),
+      shown_count: String(options.shownCount ?? 0),
+      ad_unlocks: String(options.adUnlocks ?? 0),
+    });
+    return authorizedFetch<AllTradesResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/all-trades?${params.toString()}`,
+    );
+  },
   getLeagueAlerts: (leagueId: string, limit = 12) =>
     authorizedFetch<AlertsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`),
   getPlayerQuickView: (playerId: string) =>
