@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -36,7 +36,8 @@ import {
 import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor, resolvePlayerTier } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model';
@@ -56,12 +57,14 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 // bad / neutral" per coridian_'s ask rather than News's own icon set:
 // speculative always reads as "pending" regardless of event type, since an
 // unconfirmed injury or trade rumor isn't yet a confirmed positive/negative.
-const NEWS_IMPACT_COLOR: Record<string, string> = {
-  'injury/status': colors.danger,
-  transaction: colors.textSecondary,
-  'role/depth chart': colors.success,
-  'off-field/drama': colors.danger,
-};
+function newsImpactColor(colors: ThemeColors): Record<string, string> {
+  return {
+    'injury/status': colors.danger,
+    transaction: colors.textSecondary,
+    'role/depth chart': colors.success,
+    'off-field/drama': colors.danger,
+  };
+}
 
 const NEWS_IMPACT_LABEL: Record<string, string> = {
   'injury/status': 'Injury News',
@@ -71,10 +74,12 @@ const NEWS_IMPACT_LABEL: Record<string, string> = {
 };
 
 function NewsImpactBadge({ items, onPress }: { items: NewsItem[]; onPress: () => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (items.length === 0) return null;
   const top = items[0];
   const pending = top.speculative;
-  const color = pending ? colors.premium : NEWS_IMPACT_COLOR[top.event_type ?? ''] ?? colors.textSecondary;
+  const color = pending ? colors.premium : newsImpactColor(colors)[top.event_type ?? ''] ?? colors.textSecondary;
   const label = pending ? 'Pending' : NEWS_IMPACT_LABEL[top.event_type ?? ''] ?? 'In The News';
   return (
     <TouchableOpacity
@@ -97,6 +102,8 @@ function NewsImpactModal({
   items: NewsItem[];
   onClose: () => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -130,6 +137,8 @@ function NewsImpactModal({
 }
 
 function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.sectionHeadingRow}>
       <Ionicons name={icon} size={15} color={colors.accent} style={styles.sectionHeadingIcon} />
@@ -226,7 +235,7 @@ function rosterRecommendationDetail(rec: RosterRecommendation): string {
   }`;
 }
 
-function percentileColor(percentile: number | null | undefined): string {
+function percentileColor(percentile: number | null | undefined, colors: ThemeColors): string {
   if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) {
     return colors.accentSoft;
   }
@@ -246,7 +255,7 @@ function primeWindowLabel(window: QuickViewStats['prime_window']): string | null
   return `In Prime · ${range}`;
 }
 
-function primeWindowColor(status: 'before' | 'in' | 'after'): string {
+function primeWindowColor(status: 'before' | 'in' | 'after', colors: ThemeColors): string {
   if (status === 'in') return colors.successBright;
   if (status === 'before') return colors.accentSoft;
   return colors.textTertiary;
@@ -261,6 +270,8 @@ function StatCell({
   value: string | number | null;
   percentile?: number | null;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const display = value === null || value === undefined || value === '' ? '—' : value;
   const pctl = percentileLabel(percentile);
   return (
@@ -274,8 +285,8 @@ function StatCell({
         </AppText>
         {pctl ? (
           <View style={styles.statCellPercentileRow}>
-            <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile)} />
-            <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile) }]} numberOfLines={1}>
+            <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile, colors)} />
+            <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile, colors) }]} numberOfLines={1}>
               {pctl}
             </AppText>
           </View>
@@ -290,6 +301,8 @@ function StatGrid({
 }: {
   items: Array<{ label: string; value: string | number | null; percentile?: number | null }>;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.statGrid}>
       {items.map((item, index) => (
@@ -322,6 +335,8 @@ function StatSection({
   items: QuickViewStatItem[];
   first?: boolean;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (items.length === 0) return null;
   return (
     <View style={first ? undefined : styles.subSection}>
@@ -357,6 +372,8 @@ function PercentBar({
   display: string;
   percentile?: number | null;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pctl = percentileLabel(percentile);
   return (
     <View style={styles.percentRow}>
@@ -368,8 +385,8 @@ function PercentBar({
           <AppText style={styles.percentValue}>{display}</AppText>
           {pctl ? (
             <View style={styles.statCellPercentileRow}>
-              <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile)} />
-              <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile) }]}>{pctl}</AppText>
+              <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile, colors)} />
+              <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile, colors) }]}>{pctl}</AppText>
             </View>
           ) : null}
         </View>
@@ -386,6 +403,8 @@ function PercentBar({
  * bar, so this renders each as one instead of falling through to the
  * generic StatGrid the other sections use. */
 function UsageSection({ items }: { items: QuickViewStatItem[] }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (items.length === 0) return null;
   return (
     <View style={styles.subSection}>
@@ -427,6 +446,8 @@ function UsageSection({ items }: { items: QuickViewStatItem[] }) {
 const WEEKLY_STATS_SEASONS_BACK = 3;
 
 function TrendsSection({ playerId }: { playerId: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   // Set once from the first response and never touched again — the anchor
   // for the year picker's window, independent of whichever year the user
   // has since tapped over to.
@@ -502,16 +523,17 @@ const AWARD_TIER_COLORS: Record<string, string> = {
   silver: '#D9DFE6',
   bronze: '#CD7F32',
 };
-const AWARD_UNTIERED_COLOR = colors.accentSoft;
 
 function AwardsSection({ awards }: { awards: PlayerAward[] }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (awards.length === 0) return null;
   return (
     <View style={[styles.card, styles.cardSpaced]}>
       <SectionHeading title="Awards" icon="trophy-outline" />
       <View style={styles.awardsWrap}>
         {awards.map((award) => {
-          const tierColor = (award.tier && AWARD_TIER_COLORS[award.tier]) || AWARD_UNTIERED_COLOR;
+          const tierColor = (award.tier && AWARD_TIER_COLORS[award.tier]) || colors.accentSoft;
           return (
             <View key={award.badge_id} style={[styles.awardChip, { borderLeftColor: tierColor }]}>
               <View style={[styles.awardMedal, { backgroundColor: `${tierColor}26` }]}>
@@ -530,6 +552,8 @@ function AwardsSection({ awards }: { awards: PlayerAward[] }) {
 }
 
 function BioSection({ bio }: { bio: QuickViewBio }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const rows: Array<[string, string]> = [
     ['Experience', bio.years_in_league],
     ['Draft capital', bio.draft_capital],
@@ -551,6 +575,8 @@ function BioSection({ bio }: { bio: QuickViewBio }) {
 }
 
 function TabRow({ active, onChange }: { active: DetailTab; onChange: (tab: DetailTab) => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.tabRow}>
       {TABS.map((tab) => (
@@ -575,6 +601,8 @@ function CareerSeasonCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const label = `${season.season} ${season.current_season ? 'Regular Season (in progress)' : 'Regular Season'}`;
   return (
     <View style={[styles.card, styles.cardSpaced]}>
@@ -605,6 +633,8 @@ function CareerSeasonCard({
 // compare two seasons. Only the most recent stays open by default; older
 // ones collapse to just their header until tapped.
 function CareerSection({ playerId }: { playerId: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [seasons, setSeasons] = useState<CareerSeason[] | null>(null);
   const [expandedIndex, setExpandedIndex] = useState(0);
 
@@ -648,6 +678,8 @@ function CareerSection({ playerId }: { playerId: string }) {
  * the real spread/total (never estimated) or a plain "not posted yet"
  * note when the market hasn't priced that week yet. */
 function ScheduleRow({ week }: { week: ScheduleWeek }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const spreadText =
     week.spread_line != null
       ? week.spread_line < 0
@@ -685,6 +717,8 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
 }
 
 function ScheduleSection({ playerId }: { playerId: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [weeks, setWeeks] = useState<ScheduleWeek[] | null>(null);
 
   useEffect(() => {
@@ -724,7 +758,7 @@ function ScheduleSection({ playerId }: { playerId: string }) {
  * a new value computed here) — colored by the same good/caution/bad read
  * those screens imply through context, so it reads as an "insight chip"
  * at a glance instead of plain gray label text. */
-function opportunityChipColor(label: string | null | undefined): string {
+function opportunityChipColor(label: string | null | undefined, colors: ThemeColors): string {
   const normalized = (label ?? '').toLowerCase();
   if (!normalized) return colors.textSecondary;
   if (normalized.includes('elite') || normalized.includes('strong')) return colors.success;
@@ -735,14 +769,16 @@ function opportunityChipColor(label: string | null | undefined): string {
   return colors.textSecondary;
 }
 
-const WORKLOAD_TREND_COLOR: Record<string, string> = {
-  rising: colors.success,
-  climbing: colors.success,
-  increasing: colors.success,
-  falling: colors.danger,
-  declining: colors.danger,
-  decreasing: colors.danger,
-};
+function workloadTrendColor(colors: ThemeColors): Record<string, string> {
+  return {
+    rising: colors.success,
+    climbing: colors.success,
+    increasing: colors.success,
+    falling: colors.danger,
+    declining: colors.danger,
+    decreasing: colors.danger,
+  };
+}
 
 /**
  * The weekly-usage recency read, as a tinted chip. Purely a renderer: the
@@ -751,6 +787,8 @@ const WORKLOAD_TREND_COLOR: Record<string, string> = {
  * non-null here gets shown, and nothing is re-thresholded client-side.
  */
 function UsageTrendChip({ trend }: { trend: UsageTrend }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const rising = trend.direction === 'up';
   const tint = rising ? colors.success : colors.danger;
   const tintMuted = rising ? colors.successMuted : colors.dangerMuted;
@@ -774,8 +812,10 @@ function UsageTrendChip({ trend }: { trend: UsageTrend }) {
  * insight chips instead of the plain text line this data used to render as
  * on the Model tab only. Never invents a third chip to fill the row. */
 function InsightChipsRow({ model }: { model: QuickViewModel }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const trendKey = (model.workload_trend ?? '').toLowerCase();
-  const trendColor = WORKLOAD_TREND_COLOR[trendKey] ?? colors.textSecondary;
+  const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
   const trendUp = trendKey === 'rising' || trendKey === 'climbing' || trendKey === 'increasing';
   const chips: Array<{ icon: IoniconName; color: string; title: string; detail: string }> = [];
   if (model.workload_trend) {
@@ -816,8 +856,10 @@ function InsightChipsRow({ model }: { model: QuickViewModel }) {
 }
 
 function ModelSection({ model }: { model: QuickViewModel }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const trendKey = (model.workload_trend ?? '').toLowerCase();
-  const trendColor = WORKLOAD_TREND_COLOR[trendKey] ?? colors.textSecondary;
+  const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
   return (
     <View style={styles.card}>
       <SectionHeading title="Model Breakdown" icon="analytics-outline" />
@@ -855,6 +897,8 @@ function ModelSection({ model }: { model: QuickViewModel }) {
 
 export default function PlayerDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
   const [stats, setStats] = useState<QuickViewStats | null>(null);
   const [model, setModel] = useState<QuickViewModel | null>(null);
@@ -1065,7 +1109,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
               strokeWidth={9}
               valueLabel={String(overallRating)}
               valueFontScale={0.38}
-              color={percentileColor(overallRating)}
+              color={percentileColor(overallRating, colors)}
               label="Overall"
             />
           ) : null}
@@ -1086,17 +1130,17 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           <View
             style={[
               styles.primeWindowBadge,
-              { borderColor: primeWindowColor(stats.prime_window.status) },
+              { borderColor: primeWindowColor(stats.prime_window.status, colors) },
             ]}
           >
-            <AppText style={[styles.primeWindowText, { color: primeWindowColor(stats.prime_window.status) }]}>
+            <AppText style={[styles.primeWindowText, { color: primeWindowColor(stats.prime_window.status, colors) }]}>
               {primeWindowLabel(stats.prime_window)}
             </AppText>
           </View>
         ) : null}
         {player.opportunity_label ? (
-          <View style={[styles.primeWindowBadge, { borderColor: opportunityChipColor(player.opportunity_label) }]}>
-            <AppText style={[styles.primeWindowText, { color: opportunityChipColor(player.opportunity_label) }]}>
+          <View style={[styles.primeWindowBadge, { borderColor: opportunityChipColor(player.opportunity_label, colors) }]}>
+            <AppText style={[styles.primeWindowText, { color: opportunityChipColor(player.opportunity_label, colors) }]}>
               {player.opportunity_label}
             </AppText>
           </View>
@@ -1235,7 +1279,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
@@ -1572,4 +1617,5 @@ const styles = StyleSheet.create({
   scheduleOpponent: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   scheduleDetail: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
   scheduleDetailMuted: { fontSize: 12, color: colors.textTertiary, marginTop: 1, fontStyle: 'italic' },
-});
+  });
+}
