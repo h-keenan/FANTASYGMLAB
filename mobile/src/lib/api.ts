@@ -1038,6 +1038,12 @@ export interface TradeIdea {
   // Favorable / Fair / Slight Overpay / Major Overpay — a presentation
   // bucket derived from trade_gain, not a new/different number.
   value_edge_band: string;
+  // "high_impact" (High confidence), "buy_low" (receiving a player whose
+  // real opportunity_label reads Backup With Upside/Committee Back —
+  // role trending up, price probably hasn't caught up), "sell_high"
+  // (sending a Starter At Risk — established value, opportunity already
+  // softening), or "" — real signals already on the idea, not new scoring.
+  impact_tag: string;
   // player_ids from package.receive that are on the caller's GM Targets
   // watchlist — lets the card call out "lands your target" without a
   // second lookup, since package.receive already has the matching name.
