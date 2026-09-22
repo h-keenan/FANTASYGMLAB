@@ -112,6 +112,7 @@ from modules import (
     sleeper,
     sleeper_leagues,
     startup_cold_path,
+    team_trade_history,
     trade_analyzer_fit,
     trade_hub_engine,
     trade_hub_ui,
@@ -582,13 +583,30 @@ def get_league_team_rankings(
         for _, row in standings_frame.iterrows():
             standings_by_roster[str(row.get("roster_id"))] = row.to_dict()
 
+    # Real per-team buy/sell tendency read off actual Sleeper trade history
+    # (modules.team_trade_history — the data half of "Decision Memory").
+    # Best-effort: a scan failure (e.g. an offseason league with no
+    # transactions endpoint data yet) just leaves every team "Neutral"
+    # rather than failing team-rankings entirely.
+    try:
+        trade_tendencies = team_trade_history.league_trade_tendencies_cached(league_id, PLAYERS_DB_PATH)
+    except Exception:
+        trade_tendencies = {}
+
     teams: list[dict[str, Any]] = []
     for _, row in rankings_frame.iterrows():
         roster_id = str(row.get("roster_id"))
         standing = standings_by_roster.get(roster_id, {})
+        try:
+            tendency = trade_tendencies.get(int(roster_id), {})
+        except (TypeError, ValueError):
+            tendency = {}
         teams.append(
             {
                 "roster_id": roster_id,
+                "trade_tendency": tendency.get("tendency", team_trade_history.NEUTRAL),
+                "trade_tendency_sell_count": int(tendency.get("sell_count") or 0),
+                "trade_tendency_buy_count": int(tendency.get("buy_count") or 0),
                 "team_name": _clean_json_value(row.get("team_name")),
                 "owner_name": _clean_json_value(standing.get("owner_name") or row.get("owner_name")),
                 "owner_username": _clean_json_value(standing.get("owner_username")),
@@ -3734,10 +3752,26 @@ def get_trade_hub_ideas(
         }
     except Exception:
         archetype_by_team_name = {}
+        rankings_frame = pd.DataFrame()
+    # Decision Memory's data half: a partner with a real history of selling
+    # (modules.team_trade_history, off actual Sleeper trade history) is
+    # surfaced here too — same "context, not new scoring" contract as the
+    # NFL schedule import: nothing below changes trade_gain/confidence/
+    # category, it's presentation only until a separate, deliberate pass
+    # decides how (or whether) to weight it in the engine itself.
+    try:
+        trade_tendencies = team_trade_history.league_trade_tendencies_cached(league_id, PLAYERS_DB_PATH)
+        tendency_by_team_name = {
+            str(row.get("team_name") or "").strip().lower(): trade_tendencies.get(int(row.get("roster_id") or 0), {})
+            for _, row in rankings_frame.iterrows()
+        }
+    except Exception:
+        tendency_by_team_name = {}
     for card in ranked:
-        card["partner_team_archetype_label"] = archetype_by_team_name.get(
-            str(card.get("partner_team_name") or "").strip().lower()
-        ) or ""
+        team_key = str(card.get("partner_team_name") or "").strip().lower()
+        card["partner_team_archetype_label"] = archetype_by_team_name.get(team_key) or ""
+        tendency = tendency_by_team_name.get(team_key, {})
+        card["partner_trade_tendency"] = tendency.get("tendency", team_trade_history.NEUTRAL)
     approved_count = len(ranked)
     ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
     effective_limit = (

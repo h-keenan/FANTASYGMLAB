@@ -28,6 +28,7 @@ interface TeamRow {
   powerRank: number | null;
   recordLabel: string | null;
   archetypeLabel: string | null;
+  tradeTendency: string | null;
 }
 
 export default function TeamsScreen({ route, navigation }: Props) {
@@ -72,6 +73,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
               powerRank: ranking?.power_rank ?? null,
               recordLabel: ranking?.record_label ?? null,
               archetypeLabel: ranking?.archetype_label ?? null,
+              tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
             };
           });
           // Pure Power Rank order — no longer pins the caller's own team
@@ -157,6 +159,24 @@ export default function TeamsScreen({ route, navigation }: Props) {
                   </AppText>
                 </View>
               ) : null}
+              {item.tradeTendency ? (
+                <View style={styles.tendencyRow}>
+                  <Ionicons
+                    name={item.tradeTendency === 'Seller' ? 'trending-down' : 'trending-up'}
+                    size={11}
+                    color={item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium}
+                  />
+                  <AppText
+                    style={[
+                      styles.tendencyText,
+                      { color: item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    Real history of {item.tradeTendency === 'Seller' ? 'selling' : 'buying'}
+                  </AppText>
+                </View>
+              ) : null}
             </View>
             {item.powerRank != null ? (
               <View style={[styles.rankPill, item.powerRank === 1 && styles.rankPillFirst]}>
@@ -209,6 +229,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   archetypeBadgeText: { fontSize: 10, fontWeight: '700', color: colors.badgeText },
+  tendencyRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  tendencyText: { fontSize: 11, fontWeight: '600' },
   rankPill: {
     backgroundColor: colors.background,
     borderRadius: radii.sm,

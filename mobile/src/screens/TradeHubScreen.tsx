@@ -610,6 +610,24 @@ function TradeIdeaCard({
               {idea.partner_team_archetype_label}
             </AppText>
           ) : null}
+          {idea.partner_trade_tendency && idea.partner_trade_tendency !== 'Neutral' ? (
+            <View style={styles.tendencyChip}>
+              <Ionicons
+                name={idea.partner_trade_tendency === 'Seller' ? 'trending-down' : 'trending-up'}
+                size={10}
+                color={idea.partner_trade_tendency === 'Seller' ? colors.accentSoft : colors.premium}
+              />
+              <AppText
+                style={[
+                  styles.tendencyChipText,
+                  { color: idea.partner_trade_tendency === 'Seller' ? colors.accentSoft : colors.premium },
+                ]}
+                numberOfLines={1}
+              >
+                Real history of {idea.partner_trade_tendency === 'Seller' ? 'selling' : 'buying'}
+              </AppText>
+            </View>
+          ) : null}
         </View>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
@@ -825,6 +843,8 @@ const styles = StyleSheet.create({
   partnerTextGroup: { flex: 1 },
   partnerName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   partnerArchetype: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
+  tendencyChip: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  tendencyChipText: { fontSize: 11, fontWeight: '600' },
   shareButton: {
     width: 30,
     height: 30,
