@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
@@ -17,7 +17,8 @@ import { api, type DashboardItem } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, gradients, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { gradients, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -47,6 +48,8 @@ function scoringLabel(scoringSettings: Record<string, unknown> | undefined): str
 
 export default function LeagueDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [summary, setSummary] = useState<LeagueSummary | null>(null);
   const [dashboardItems, setDashboardItems] = useState<DashboardItem[]>([]);
@@ -223,7 +226,8 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.md },
@@ -266,4 +270,5 @@ const styles = StyleSheet.create({
   stripValueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
   stripTextGroup2: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   error: { color: colors.danger, textAlign: 'center' },
-});
+  });
+}

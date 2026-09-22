@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -16,10 +16,13 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '../context/AuthContext';
 import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
-import { colors, gradients, radii, spacing, typography } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { gradients, radii, spacing, typography, type ThemeColors } from '../theme';
 
 export default function LoginScreen() {
   const { signIn, signUp, signInAsGuest } = useAuth();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
@@ -177,7 +180,8 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   hero: { position: 'absolute', top: 0, left: 0, right: 0, height: '55%' },
   container: {
@@ -277,4 +281,5 @@ const styles = StyleSheet.create({
     color: colors.success,
     marginBottom: spacing.sm,
   },
-});
+  });
+}

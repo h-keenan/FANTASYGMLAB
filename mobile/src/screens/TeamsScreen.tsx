@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
@@ -14,7 +14,8 @@ import TeamAvatar from '../components/TeamAvatar';
 import { api } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Teams'>;
@@ -33,6 +34,8 @@ interface TeamRow {
 
 export default function TeamsScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +205,8 @@ export default function TeamsScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.sm },
@@ -269,4 +273,5 @@ const styles = StyleSheet.create({
   },
   count: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   error: { color: colors.danger, textAlign: 'center' },
-});
+  });
+}

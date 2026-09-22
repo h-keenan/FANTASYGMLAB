@@ -12,7 +12,8 @@ import PositionBadge from '../components/PositionBadge';
 import { api, type QuickViewModel, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerCompare'>;
@@ -66,6 +67,8 @@ function buildRows(a: CompareSide, b: CompareSide): CompareRow[] {
 const LOWER_IS_BETTER = new Set(['Position Rank']);
 
 function CompareRowView({ row }: { row: CompareRow }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const lowerIsBetter = LOWER_IS_BETTER.has(row.label);
   const hasBoth = row.a !== null && row.b !== null;
   const aWins = hasBoth && row.a !== row.b && (lowerIsBetter ? row.a! < row.b! : row.a! > row.b!);
@@ -83,6 +86,8 @@ function CompareRowView({ row }: { row: CompareRow }) {
 }
 
 function IdentityHeader({ side, align }: { side: RankedPlayer; align: 'left' | 'right' }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.identity, align === 'right' && styles.identityRight]}>
       <PlayerAvatar playerId={side.player_id} size={56} tier={side.tier} />
@@ -103,6 +108,8 @@ function IdentityHeader({ side, align }: { side: RankedPlayer; align: 'left' | '
 
 export default function PlayerCompareScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
   const [search, setSearch] = useState('');
   const [candidates, setCandidates] = useState<RankedPlayer[] | null>(null);
@@ -232,7 +239,8 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pickerHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.lg, paddingBottom: spacing.sm },
@@ -293,4 +301,5 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
   rowValue: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   rowValueWin: { color: colors.successBright },
-});
+  });
+}
