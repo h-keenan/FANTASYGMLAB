@@ -312,3 +312,40 @@ def test_project_trade_idea_card_forwards_injury_and_opportunity_detail_on_asset
 def test_project_trade_idea_card_maps_negative_gain_to_an_overpay_band():
     card = trade_hub_engine.project_trade_idea_card(_fake_idea(trade_gain=-2000))
     assert card.to_dict()["value_edge_band"] == "Major Overpay"
+
+
+def test_project_trade_idea_card_tags_high_confidence_as_high_impact():
+    card = trade_hub_engine.project_trade_idea_card(_fake_idea(trade_confidence_label="High"))
+    assert card.to_dict()["impact_tag"] == "high_impact"
+
+
+def test_project_trade_idea_card_tags_buy_low_from_receive_side_opportunity_label():
+    idea = _fake_idea(
+        trade_confidence_label="Low",
+        receive_assets=[
+            {"asset_type": "player", "player_id": "opp-rb", "name": "opp-rb", "opportunity_label": "Backup With Upside"}
+        ],
+    )
+    card = trade_hub_engine.project_trade_idea_card(idea)
+    assert card.to_dict()["impact_tag"] == "buy_low"
+
+
+def test_project_trade_idea_card_tags_sell_high_from_send_side_opportunity_label():
+    idea = _fake_idea(
+        trade_confidence_label="Low",
+        receive_assets=[{"asset_type": "player", "player_id": "opp-rb", "name": "opp-rb"}],
+        send_assets=[
+            {"asset_type": "player", "player_id": "my-rb", "name": "my-rb", "opportunity_label": "Starter At Risk"}
+        ],
+    )
+    card = trade_hub_engine.project_trade_idea_card(idea)
+    assert card.to_dict()["impact_tag"] == "sell_high"
+
+
+def test_project_trade_idea_card_leaves_impact_tag_empty_with_no_matching_signal():
+    idea = _fake_idea(
+        trade_confidence_label="Low",
+        receive_assets=[{"asset_type": "player", "player_id": "opp-rb", "name": "opp-rb"}],
+    )
+    card = trade_hub_engine.project_trade_idea_card(idea)
+    assert card.to_dict()["impact_tag"] == ""

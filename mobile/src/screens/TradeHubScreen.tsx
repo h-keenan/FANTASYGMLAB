@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -237,6 +237,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           <AppText style={styles.disclaimer} numberOfLines={1}>
             Real ideas from the same engine and Trust checks as the web app's Trade Hub.
           </AppText>
+          {!loading && !error && !notReadyReason && ideas ? <IdeaSummaryRow ideas={ideas} /> : null}
           {loading ? <ActivityIndicator style={styles.loading} color={colors.accent} /> : null}
           {error ? <AppText style={styles.error}>{error}</AppText> : null}
           {notReadyReason ? (
@@ -428,6 +429,66 @@ function CategoryBadge({ category }: { category: string }) {
   );
 }
 
+const IMPACT_TAG_CONFIG: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
+  high_impact: { label: 'High Impact', icon: 'flash', color: colors.premium },
+  buy_low: { label: 'Buy Low', icon: 'trending-down', color: colors.success },
+  sell_high: { label: 'Sell High', icon: 'trending-up', color: colors.danger },
+};
+
+function ImpactBadge({ impactTag }: { impactTag: string }) {
+  const config = IMPACT_TAG_CONFIG[impactTag];
+  if (!config) return null;
+  return (
+    <View style={[styles.impactBadge, { borderColor: `${config.color}80` }]}>
+      <Ionicons name={config.icon} size={11} color={config.color} />
+      <AppText style={[styles.impactBadgeText, { color: config.color }]} numberOfLines={1}>
+        {config.label.toUpperCase()}
+      </AppText>
+    </View>
+  );
+}
+
+/** "12 Trade Ideas / 3 High Impact / 5 Buy Low / 4 Sell High" — a pure
+ * client-side tally over the same ideas the list already renders, per the
+ * concept sheet's Trade Hub summary row. Every count is real (impact_tag
+ * is computed server-side from confidence_label/opportunity_label, not
+ * invented here), so an idea with no tag just doesn't count toward any of
+ * the three impact buckets — the total is still every idea's real total. */
+function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
+  const counts = useMemo(() => {
+    let highImpact = 0;
+    let buyLow = 0;
+    let sellHigh = 0;
+    for (const idea of ideas) {
+      if (idea.impact_tag === 'high_impact') highImpact += 1;
+      else if (idea.impact_tag === 'buy_low') buyLow += 1;
+      else if (idea.impact_tag === 'sell_high') sellHigh += 1;
+    }
+    return { total: ideas.length, highImpact, buyLow, sellHigh };
+  }, [ideas]);
+
+  if (counts.total === 0) return null;
+
+  const tiles: Array<{ key: string; value: number; label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = [
+    { key: 'total', value: counts.total, label: 'Trade Ideas', icon: 'bulb-outline', color: colors.accent },
+    { key: 'high_impact', value: counts.highImpact, label: 'High Impact', icon: 'flash', color: colors.premium },
+    { key: 'buy_low', value: counts.buyLow, label: 'Buy Low', icon: 'trending-down', color: colors.success },
+    { key: 'sell_high', value: counts.sellHigh, label: 'Sell High', icon: 'trending-up', color: colors.danger },
+  ];
+
+  return (
+    <View style={styles.summaryRow}>
+      {tiles.map((tile) => (
+        <View key={tile.key} style={styles.summaryTile}>
+          <Ionicons name={tile.icon} size={16} color={tile.color} />
+          <AppText style={styles.summaryValue}>{tile.value}</AppText>
+          <AppText style={styles.summaryLabel} numberOfLines={1}>{tile.label}</AppText>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function MeterRow({ label, value, level, color }: { label: string; value: string; level: number; color: string }) {
   return (
     <View style={styles.meter}>
@@ -518,9 +579,10 @@ function TradeIdeaCard({
 
   return (
     <AnimatedCard style={{ ...styles.card, borderLeftWidth: 3, borderLeftColor: categoryAccent }}>
-      {idea.category ? (
-        <View style={styles.categoryRow}>
+      {idea.category || idea.impact_tag ? (
+        <View style={[styles.categoryRow, styles.categoryRowSpread]}>
           <CategoryBadge category={idea.category} />
+          <ImpactBadge impactTag={idea.impact_tag} />
         </View>
       ) : null}
       {landedTargetNames.length > 0 ? (
@@ -682,6 +744,30 @@ const styles = StyleSheet.create({
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl, lineHeight: 20 },
   card: { padding: 0, marginBottom: spacing.md },
   categoryRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  categoryRowSpread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  impactBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  impactBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  summaryRow: {
+    flexDirection: 'row',
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.surface,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  summaryTile: { flex: 1, alignItems: 'center', gap: 2 },
+  summaryValue: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  summaryLabel: { fontSize: 10, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
   landedTargetRow: {
     flexDirection: 'row',
     alignItems: 'center',

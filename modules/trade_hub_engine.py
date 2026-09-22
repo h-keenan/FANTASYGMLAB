@@ -282,6 +282,43 @@ def enforce_generated_trade_ideas(
     return list(board.recommendations)
 
 
+
+# Opportunity labels (modules.rankings' real opportunity-tier
+# classification, already on every player asset via _player_asset) that
+# mean "role trending up, price probably hasn't caught up yet" — the same
+# labels rankings.py maps to workload_trend "Rising" for these tiers.
+_BUY_LOW_OPPORTUNITY_LABELS = frozenset({"Backup With Upside", "Committee Back"})
+# "Starter At Risk" is rankings.py's own workload_trend="Fragile" tier —
+# established trade value from a starter reputation, but the opportunity
+# signal underneath is already softening.
+_SELL_HIGH_OPPORTUNITY_LABELS = frozenset({"Starter At Risk"})
+
+
+def _classify_impact_tag(idea: Mapping[str, Any], confidence_label: str) -> str:
+    """high_impact / buy_low / sell_high, or "" — real signals already on
+    every idea (confidence_label, and each asset's opportunity_label), not
+    new modeling. Priority order matches the concept sheet: a high-
+    confidence idea is flagged as such first, then buy/sell opportunity."""
+
+    if confidence_label == "High":
+        return "high_impact"
+    receive_labels = {
+        str(asset.get("opportunity_label") or "")
+        for asset in (idea.get("receive_assets") or [])
+        if isinstance(asset, Mapping)
+    }
+    if receive_labels & _BUY_LOW_OPPORTUNITY_LABELS:
+        return "buy_low"
+    send_labels = {
+        str(asset.get("opportunity_label") or "")
+        for asset in (idea.get("send_assets") or [])
+        if isinstance(asset, Mapping)
+    }
+    if send_labels & _SELL_HIGH_OPPORTUNITY_LABELS:
+        return "sell_high"
+    return ""
+
+
 @dataclass(frozen=True)
 class TradeIdeaCard:
     partner_team_name: str
@@ -293,6 +330,7 @@ class TradeIdeaCard:
     package: dict[str, Any]
     category: str
     value_edge_band: str
+    impact_tag: str = ""
     landed_gm_target_player_ids: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
@@ -306,6 +344,7 @@ class TradeIdeaCard:
             "package": self.package,
             "category": self.category,
             "value_edge_band": self.value_edge_band,
+            "impact_tag": self.impact_tag,
             "landed_gm_target_player_ids": list(self.landed_gm_target_player_ids),
         }
 
@@ -326,16 +365,18 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
     # than this function re-deriving rank from a Mapping with no board
     # context. modules/ can't import app.py to reuse that helper directly.
     category = "Headline Recommendation" if is_headline else trade_hub_ui.trade_hub_display_section(dict(idea))
+    confidence_label = _safe_text(idea.get("trade_confidence_label"), "Low")
     return TradeIdeaCard(
         partner_team_name=_safe_text(idea.get("partner_team_name"), "Trade partner"),
         rationale=_safe_text(idea.get("rationale")),
         trade_gain=gain,
-        confidence_label=_safe_text(idea.get("trade_confidence_label"), "Low"),
+        confidence_label=confidence_label,
         market_realism_label=_safe_text(idea.get("market_realism_label"), "Thin"),
         reasoning_tags=tuple(str(tag) for tag in (idea.get("reasoning_tags") or ())),
         package=package,
         category=category,
         value_edge_band=trade_visual_language.trade_value_band(edge_label),
+        impact_tag=_classify_impact_tag(idea, confidence_label),
         landed_gm_target_player_ids=tuple(
             str(pid) for pid in (idea.get("landed_gm_target_player_ids") or ())
         ),
