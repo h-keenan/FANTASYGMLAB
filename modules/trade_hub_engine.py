@@ -423,6 +423,7 @@ def generate_trade_idea_records(
     max_ideas: int = MAX_TRADE_IDEAS,
     untouchable_player_ids: tuple[str, ...] = (),
     gm_target_player_ids: tuple[str, ...] = (),
+    trade_block_player_ids: tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_ui already work with (trade_confidence_label,
@@ -435,6 +436,14 @@ def generate_trade_idea_records(
     contract). `gm_target_player_ids` never changes what's generated — it
     only tags ideas that would land one of those players (see
     _tag_landed_gm_targets) so the UI can call it out.
+
+    `trade_block_player_ids` is the Trade Finder feature: when non-empty,
+    every outgoing package is built ONLY from these specific players (the
+    ones the caller explicitly chose to shop) instead of the passive
+    board's normal "anything not protected" pool — modules.trade_ideas.
+    build_trade_ideas' own `trade_block_names` parameter already supports
+    this restriction, it just wasn't wired up outside the web app before.
+    Resolved to names for the same reason untouchables are.
 
     `generate_trade_ideas` narrows these to TradeIdeaCard for the mobile
     Trade Hub card UI; callers that need the raw engine fields — ranking via
@@ -470,12 +479,18 @@ def generate_trade_idea_records(
         matches = strategy_df[strategy_df["player_id"].astype(str).isin(untouchable_ids)]
         untouchable_names = [str(name) for name in matches["name"].tolist() if str(name)]
 
+    trade_block_ids = {str(pid) for pid in trade_block_player_ids if str(pid)}
+    trade_block_names: list[str] = []
+    if trade_block_ids and "player_id" in strategy_df.columns and "name" in strategy_df.columns:
+        matches = strategy_df[strategy_df["player_id"].astype(str).isin(trade_block_ids)]
+        trade_block_names = [str(name) for name in matches["name"].tolist() if str(name)]
+
     raw_ideas = trade_ideas_module.build_trade_ideas(
         df_players=strategy_df,
         league_id=league_id,
         df_summary=df_summary,
         my_roster_id=my_roster_id,
-        trade_block_names=[],
+        trade_block_names=trade_block_names,
         untouchable_names=untouchable_names,
         role_map={},
         max_ideas=max_ideas,
@@ -541,7 +556,7 @@ def _generate_trade_idea_records_cached(
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(players_db_path)
     players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="trade_hub_ideas_cache"
+        players_df, surface="trade_hub_ideas_cache", league=league
     )
     if players_df.empty:
         return []
@@ -593,6 +608,64 @@ def generate_trade_idea_records_cached(
         tuple(sorted({str(pid) for pid in untouchable_player_ids if str(pid)})),
         tuple(sorted({str(pid) for pid in gm_target_player_ids if str(pid)})),
         _trade_hub_ideas_cache_bucket(),
+    )
+
+
+def generate_trade_finder_records(
+    *,
+    league_id: str,
+    roster_id: int,
+    strategy: str,
+    lens: str,
+    players_db_path: str,
+    trade_block_player_ids: tuple[str, ...],
+    untouchable_player_ids: tuple[str, ...] = (),
+    gm_target_player_ids: tuple[str, ...] = (),
+) -> list[dict[str, Any]]:
+    """Trade Finder: "select these specific players/picks, find who'd want
+    them" — the same idea-generation engine as the passive Trade Hub board
+    (modules.trade_ideas.build_trade_ideas), but with the outgoing package
+    pool restricted to exactly the caller's chosen players via that
+    function's own `trade_block_names` parameter (see
+    generate_trade_idea_records' docstring). Deliberately NOT the cached
+    front door above: an on-demand, user-initiated search over an
+    arbitrary player selection isn't the kind of repeated-within-30s call
+    the passive board's cache bucket exists to dedupe, and caching it would
+    mean one more dimension (the selection itself) in the cache key for no
+    real benefit.
+
+    Picks aren't handled here (build_trade_ideas' trade_block_names is
+    player-name-keyed only) — a selected pick simply doesn't narrow the
+    search the way a selected player does yet.
+    """
+    league = sleeper.get_league(league_id)
+    if not league:
+        return []
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(players_db_path)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(players_db_path)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="trade_finder", league=league
+    )
+    if players_df.empty:
+        return []
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+    rosters = sleeper.get_rosters(league_id)
+    return generate_trade_idea_records(
+        league_id=league_id,
+        my_roster_id=roster_id,
+        players_df=valued,
+        rosters=rosters,
+        untouchable_player_ids=untouchable_player_ids,
+        gm_target_player_ids=gm_target_player_ids,
+        trade_block_player_ids=trade_block_player_ids,
+        league_settings=settings,
+        score_field=score_field,
+        team_strategy=strategy,
     )
 
 

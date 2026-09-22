@@ -178,6 +178,97 @@ def test_generate_trade_idea_records_resolves_untouchable_ids_to_names_and_block
     assert mock_enforce.call_args.kwargs["untouchables"] == ("my-rb",)
 
 
+def test_generate_trade_idea_records_resolves_trade_block_ids_to_names():
+    """Trade Finder's trade_block_player_ids is player_id-keyed; the
+    engine's own trade_block_names restriction (modules.trade_ideas.
+    build_trade_ideas) is name-keyed — confirms the resolution happens."""
+
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
+    )
+
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch("modules.trade_ideas.build_trade_ideas", return_value=[]) as mock_build:
+                trade_hub_engine.generate_trade_idea_records(
+                    league_id="league-1",
+                    my_roster_id=1,
+                    players_df=players_df,
+                    rosters=_rosters(),
+                    league_settings=SETTINGS,
+                    score_field="dynasty_score",
+                    team_strategy="contender",
+                    trade_block_player_ids=("my-rb",),
+                )
+
+    assert mock_build.call_args.kwargs["trade_block_names"] == ["my-rb"]
+
+
+def test_generate_trade_idea_records_defaults_to_an_unrestricted_trade_block():
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
+    )
+
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch("modules.trade_ideas.build_trade_ideas", return_value=[]) as mock_build:
+                trade_hub_engine.generate_trade_idea_records(
+                    league_id="league-1",
+                    my_roster_id=1,
+                    players_df=players_df,
+                    rosters=_rosters(),
+                    league_settings=SETTINGS,
+                    score_field="dynasty_score",
+                    team_strategy="contender",
+                )
+
+    assert mock_build.call_args.kwargs["trade_block_names"] == []
+
+
+def test_generate_trade_finder_records_wires_the_selection_through_to_the_engine():
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
+    )
+
+    with patch("modules.sleeper.get_league", return_value={"roster_positions": ["QB", "RB", "WR"]}):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            with patch(
+                "modules.player_eligibility.filter_current_fantasy_players",
+                side_effect=lambda df, **kwargs: df,
+            ):
+                with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+                    with patch(
+                        "modules.trade_hub_engine.generate_trade_idea_records",
+                        return_value=[],
+                    ) as mock_generate:
+                        trade_hub_engine.generate_trade_finder_records(
+                            league_id="league-1",
+                            roster_id=1,
+                            strategy="contender",
+                            lens="Dynasty",
+                            players_db_path="unused.db",
+                            trade_block_player_ids=("my-rb",),
+                        )
+
+    assert mock_generate.call_args.kwargs["trade_block_player_ids"] == ("my-rb",)
+    assert mock_generate.call_args.kwargs["my_roster_id"] == 1
+    assert mock_generate.call_args.kwargs["league_id"] == "league-1"
+
+
+def test_generate_trade_finder_records_returns_empty_for_an_unknown_league():
+    with patch("modules.sleeper.get_league", return_value=None):
+        result = trade_hub_engine.generate_trade_finder_records(
+            league_id="ghost-league",
+            roster_id=1,
+            strategy="contender",
+            lens="Dynasty",
+            players_db_path="unused.db",
+            trade_block_player_ids=("my-rb",),
+        )
+
+    assert result == []
+
+
 def test_generate_trade_idea_records_tags_ideas_that_land_a_gm_target():
     players_df = pd.DataFrame(
         [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]

@@ -31,6 +31,7 @@ import AlertsScreen from '../screens/AlertsScreen';
 import GmTargetsScreen from '../screens/GmTargetsScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradeHubScreen from '../screens/TradeHubScreen';
+import TradeFinderScreen from '../screens/TradeFinderScreen';
 import TeamsScreen from '../screens/TeamsScreen';
 import DraftCenterScreen from '../screens/DraftCenterScreen';
 import PickDetailScreen from '../screens/PickDetailScreen';
@@ -57,6 +58,7 @@ export type RootStackParamList = {
   Recap: { leagueId: string; leagueName: string };
   Dashboard: { leagueId: string; leagueName: string };
   TradeHub: { leagueId: string; leagueName: string };
+  TradeFinder: { leagueId: string; leagueName: string };
   Teams: { leagueId: string; leagueName: string };
   DraftCenter: { leagueId: string; leagueName: string };
   PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };
@@ -160,6 +162,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Recap" component={RecapScreen} />
           <AppStack.Screen name="Dashboard" component={DashboardScreen} />
           <AppStack.Screen name="TradeHub" component={TradeHubScreen} />
+          <AppStack.Screen name="TradeFinder" component={TradeFinderScreen} />
           <AppStack.Screen name="Teams" component={TeamsScreen} />
           <AppStack.Screen name="DraftCenter" component={DraftCenterScreen} />
           <AppStack.Screen name="PickDetail" component={PickDetailScreen} />

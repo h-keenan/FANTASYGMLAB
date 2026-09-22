@@ -4214,6 +4214,96 @@ def test_trade_hub_premium_entitlement_sees_full_board_ignoring_ad_unlocks(monke
     assert body["entitlement"]["hidden_count"] == 0
 
 
+def test_trade_finder_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/trade-finder?player_ids=p1")
+    assert response.status_code == 401
+
+
+def test_trade_finder_returns_empty_without_a_player_selection(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/trade-finder",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["ideas"] == []
+    assert body["reason"] == "no_players_selected"
+
+
+def test_trade_finder_rejects_an_invalid_lens(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/trade-finder?player_ids=p1&lens=NotReal",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 422
+
+
+def test_trade_finder_passes_the_selected_players_to_the_engine(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    fake_record = {
+        "partner_team_name": "Rival GM",
+        "rationale": "Shopping a specific player.",
+        "trade_gain": 12,
+        "trade_confidence_label": "Moderate",
+        "market_realism_label": "Plausible",
+        "reasoning_tags": ["Trade Finder"],
+        "send_assets": [],
+        "receive_assets": [],
+    }
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids}],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            with patch(
+                                "modules.trade_hub_engine.generate_trade_idea_records",
+                                return_value=[fake_record],
+                            ) as mock_generate:
+                                response = client.get(
+                                    "/v1/leagues/abc/trade-finder?player_ids=my1,my2,my1",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert len(body["ideas"]) == 1
+    assert body["ideas"][0]["partner_team_name"] == "Rival GM"
+    assert mock_generate.call_args.kwargs["trade_block_player_ids"] == ("my1", "my2")
+    assert mock_generate.call_args.kwargs["my_roster_id"] == 1
+
+
 def test_all_trades_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/all-trades")

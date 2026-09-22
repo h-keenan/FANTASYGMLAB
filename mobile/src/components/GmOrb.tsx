@@ -131,6 +131,14 @@ function leagueDestinations(colors: ThemeColors): Destination[] {
       subtitle: 'Trade ideas and negotiation tools',
     },
     {
+      label: 'Trade Finder',
+      route: 'TradeFinder',
+      icon: 'search-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Pick players to trade, find who wants them',
+    },
+    {
       label: 'Trade Analyzer',
       route: 'TradeAnalyzer',
       icon: 'git-compare-outline',

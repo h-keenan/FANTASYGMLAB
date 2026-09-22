@@ -1214,6 +1214,18 @@ export const api = {
     authorizedFetch<TradeHubResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${strategy}&ad_unlocks=${adUnlocks}&lens=${encodeURIComponent(lens)}`,
     ),
+  /** Trade Finder — "select these specific players, find who'd want them."
+   * Same card shape as Trade Hub (no entitlement gating on this response;
+   * this is a fresh, on-demand search rather than the passive board). */
+  getTradeFinderIdeas: (
+    leagueId: string,
+    playerIds: string[],
+    strategy: TeamStrategy = 'retool',
+    lens: ValuationLens = 'Dynasty',
+  ) =>
+    authorizedFetch<TradeHubResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(','))}&strategy=${strategy}&lens=${encodeURIComponent(lens)}`,
+    ),
   getAllTrades: (
     leagueId: string,
     options: {
