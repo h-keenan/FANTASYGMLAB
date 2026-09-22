@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Circle, Path, Polygon } from 'react-native-svg';
 
-import { colors } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
 
 /**
  * The three-arc "Analyze / Project / Execute" trajectory motif from the
@@ -16,6 +16,7 @@ import { colors } from '../theme';
  * arc region instead of the full icon canvas.
  */
 export default function TrajectoryArcs({ width = 160, height = 108 }: { width?: number; height?: number }) {
+  const { colors } = useThemeMode();
   return (
     <Svg width={width} height={height} viewBox="150 60 700 470" fill="none">
       <Path

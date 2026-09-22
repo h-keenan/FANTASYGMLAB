@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, View, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 
-import { colors } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import type { ThemeColors } from '../theme';
 import { resolvePlayerTier } from '../lib/playerTier';
 
 const SLEEPER_HEADSHOT_BASE = 'https://sleepercdn.com/content/nfl/players';
@@ -30,6 +31,8 @@ interface PlayerAvatarProps {
  * unlike RN's own `Image`) avoids re-fetching the same photo every time.
  */
 export default function PlayerAvatar({ playerId, size = 40, tier, style }: PlayerAvatarProps) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [failed, setFailed] = useState(false);
   const dimension = { width: size, height: size, borderRadius: size / 2 };
   const ringColor = tier ? resolvePlayerTier(tier).color : colors.border;
@@ -49,8 +52,10 @@ export default function PlayerAvatar({ playerId, size = 40, tier, style }: Playe
   );
 }
 
-const styles = StyleSheet.create({
-  fallback: {
-    backgroundColor: colors.surfaceSolid,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    fallback: {
+      backgroundColor: colors.surfaceSolid,
+    },
+  });
+}

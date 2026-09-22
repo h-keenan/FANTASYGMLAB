@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import AppText from './AppText';
 import Animated, {
@@ -9,7 +9,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
  * Compact branded loading state for a single screen's "still loading initial
@@ -30,6 +31,8 @@ export default function BrandedSpinner({
   label?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pulse = useSharedValue(0);
 
   useEffect(() => {
@@ -49,8 +52,10 @@ export default function BrandedSpinner({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  mark: { width: 40, height: 40, borderRadius: radii.md },
-  label: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+    mark: { width: 40, height: 40, borderRadius: radii.md },
+    label: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
+  });
+}
