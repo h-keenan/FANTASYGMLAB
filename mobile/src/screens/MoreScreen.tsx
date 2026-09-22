@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
@@ -9,7 +9,7 @@ import { api, type PushCategory } from '../lib/api';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
 import { isShowcaseModeAvailable } from '../lib/showcaseMode';
-import { colors, spacing } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useAuth } from '../context/AuthContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
@@ -48,7 +48,8 @@ export default function MoreScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const { density, setDensity } = useDensity();
-  const { mode: themeMode, setMode: setThemeMode } = useThemeMode();
+  const { mode: themeMode, setMode: setThemeMode, colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
   const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
   const { deleteAccount, session } = useAuth();
@@ -268,7 +269,8 @@ export default function MoreScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   sectionLabel: {
     fontSize: 12,
@@ -332,4 +334,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
   },
-});
+  });
+}
