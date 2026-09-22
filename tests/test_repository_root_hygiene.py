@@ -12,6 +12,7 @@ ALLOWED_ROOT_FILES = {
     ".gitignore",
     ".python-version",
     "AGENTS.md",
+    "DEPENDENCIES.md",
     "DEPLOYMENT.md",
     "app.py",
     "favicon.ico",
