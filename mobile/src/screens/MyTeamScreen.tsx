@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,7 +16,8 @@ import TeamAvatar from '../components/TeamAvatar';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyTeam'>;
@@ -86,6 +87,8 @@ function ageLabel(averageAge: number | null): string {
 
 export default function MyTeamScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [starters, setStarters] = useState<LineupPlayer[]>([]);
   const [bench, setBench] = useState<LineupPlayer[]>([]);
@@ -205,6 +208,8 @@ export default function MyTeamScreen({ route, navigation }: Props) {
  * nothing.
  */
 function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueSize: number }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const valuePercentile = percentileFromRank(team.power_rank, leagueSize);
   const draftCapitalPercentile = percentileFromRank(team.draft_capital_rank, leagueSize);
   const starterPercentile = percentileFromRank(team.starter_rank, leagueSize);
@@ -271,6 +276,8 @@ function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueS
 }
 
 function PercentileBar({ label, percentile, color }: { label: string; percentile: number | null; color: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const width = percentile ?? 0;
   return (
     <View style={styles.percentileBarRow}>
@@ -286,6 +293,8 @@ function PercentileBar({ label, percentile, color }: { label: string; percentile
 }
 
 function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <AnimatedCard style={styles.card} onPress={onPress}>
       <View style={styles.slotBadge}>
@@ -319,7 +328,8 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
@@ -437,4 +447,5 @@ const styles = StyleSheet.create({
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
-});
+  });
+}

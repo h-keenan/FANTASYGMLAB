@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,7 +10,8 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PickDetail'>;
@@ -19,16 +20,18 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /** Same three round-slot buckets modules/trade_ideas.py projects over, in
  * board order (a pick that lands early in the round is the valuable one). */
-const BUCKETS = [
-  { key: 'early', label: 'Early', color: colors.success },
-  { key: 'mid', label: 'Mid', color: colors.accent },
-  { key: 'late', label: 'Late', color: colors.textSecondary },
-] as const;
+function buckets(colors: ThemeColors) {
+  return [
+    { key: 'early', label: 'Early', color: colors.success },
+    { key: 'mid', label: 'Mid', color: colors.accent },
+    { key: 'late', label: 'Late', color: colors.textSecondary },
+  ] as const;
+}
 
 /** Confidence here is the probability mass sitting on the single most likely
  * slot bucket — the model's own `projection_confidence`, not a rescaling of
  * it. The thresholds only pick a color/word for it. */
-function confidenceIdentity(confidence: number): { color: string; word: string } {
+function confidenceIdentity(confidence: number, colors: ThemeColors): { color: string; word: string } {
   if (confidence >= 0.6) return { color: colors.success, word: 'High' };
   if (confidence >= 0.45) return { color: colors.accent, word: 'Moderate' };
   return { color: colors.premium, word: 'Low' };
@@ -50,6 +53,8 @@ function MultiplierRow({
   multiplier: number | null;
   note: string;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const delta = multiplier === null ? 0 : multiplier - 1;
   const neutral = Math.abs(delta) < 0.005;
   const color = neutral || multiplier === null
@@ -79,6 +84,8 @@ function MultiplierRow({
 }
 
 function BucketBar({ label, percent, color }: { label: string; percent: number; color: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.bucketRow}>
       <AppText style={styles.bucketLabel}>{label}</AppText>
@@ -91,6 +98,8 @@ function BucketBar({ label, percent, color }: { label: string; percent: number; 
 }
 
 function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.sectionHeadingRow}>
       <Ionicons name={icon} size={15} color={colors.accent} style={styles.sectionHeadingIcon} />
@@ -100,6 +109,8 @@ function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
 }
 
 function StatCell({ label, value }: { label: string; value: string | number | null }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const display = value === null || value === undefined || value === '' ? '—' : value;
   return (
     <View style={styles.statCell}>
@@ -114,6 +125,8 @@ function StatCell({ label, value }: { label: string; value: string | number | nu
 }
 
 function StatGrid({ items }: { items: Array<{ label: string; value: string | number | null }> }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.statGrid}>
       {items.map((item, index) => (
@@ -141,6 +154,8 @@ function horizonCopy(yearsOut: number | null, futureDiscount: number | null): st
 
 export default function PickDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { pick, leagueName } = route.params;
 
   useScreenHeaderTitle(navigation, pick.label ?? 'Draft Pick', leagueName);
@@ -151,7 +166,7 @@ export default function PickDetailScreen({ route, navigation }: Props) {
   const futureDiscount = num(pick.future_discount);
   const confidence = num(pick.projection_confidence);
   const confidencePct = confidence === null ? null : confidence * 100;
-  const identity = confidenceIdentity(confidence ?? 0);
+  const identity = confidenceIdentity(confidence ?? 0, colors);
   const projectedSlot = num(pick.projected_slot_percentile);
 
   const bucketValues: Record<string, number | null> = {
@@ -159,7 +174,7 @@ export default function PickDetailScreen({ route, navigation }: Props) {
     mid: num(pick.mid_probability),
     late: num(pick.late_probability),
   };
-  const hasBuckets = BUCKETS.some((bucket) => bucketValues[bucket.key] !== null);
+  const hasBuckets = buckets(colors).some((bucket) => bucketValues[bucket.key] !== null);
   // Every field below the headline is optional on the type (an older API
   // build predates them), so the whole breakdown collapses to one honest
   // notice rather than a grid of em-dashes.
@@ -230,7 +245,7 @@ export default function PickDetailScreen({ route, navigation }: Props) {
               {hasBuckets ? (
                 <View style={styles.buckets}>
                   <AppText style={styles.bucketsCaption}>Where this pick likely lands in its round</AppText>
-                  {BUCKETS.map((bucket) => (
+                  {buckets(colors).map((bucket) => (
                     <BucketBar
                       key={bucket.key}
                       label={bucket.label}
@@ -298,7 +313,8 @@ export default function PickDetailScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
@@ -428,4 +444,5 @@ const styles = StyleSheet.create({
   },
   resultValue: { fontSize: 22, fontWeight: '800', color: colors.accent },
   notice: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
-});
+  });
+}
