@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import Svg, { Circle } from 'react-native-svg';
 
-import { colors } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import type { ThemeColors } from '../theme';
 
 /** A confidence/value ring instead of a linear bar — pulled directly from a
  * UI reference coridian_ shared (the same circular-percentage pattern
@@ -14,7 +15,7 @@ export default function CircularProgressRing({
   percent,
   size = 72,
   strokeWidth = 7,
-  color = colors.accent,
+  color,
   label,
   valueLabel,
   valueFontScale = 0.26,
@@ -33,6 +34,9 @@ export default function CircularProgressRing({
    * bigger scale without crowding the stroke. */
   valueFontScale?: number;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const resolvedColor = color ?? colors.accent;
   const clamped = Math.max(0, Math.min(100, percent));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -55,7 +59,7 @@ export default function CircularProgressRing({
             cx={center}
             cy={center}
             r={radius}
-            stroke={color}
+            stroke={resolvedColor}
             strokeWidth={strokeWidth}
             fill="none"
             strokeLinecap="round"
@@ -68,7 +72,7 @@ export default function CircularProgressRing({
           />
         </Svg>
         <View style={[StyleSheet.absoluteFillObject, styles.centerContent]}>
-          <AppText style={[styles.value, { color, fontSize: size * valueFontScale }]} numberOfLines={1}>
+          <AppText style={[styles.value, { color: resolvedColor, fontSize: size * valueFontScale }]} numberOfLines={1}>
             {valueLabel ?? `${Math.round(clamped)}%`}
           </AppText>
         </View>
@@ -78,16 +82,18 @@ export default function CircularProgressRing({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { alignItems: 'center' },
-  centerContent: { alignItems: 'center', justifyContent: 'center' },
-  value: { fontWeight: '800' },
-  label: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginTop: 4,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: { alignItems: 'center' },
+    centerContent: { alignItems: 'center', justifyContent: 'center' },
+    value: { fontWeight: '800' },
+    label: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.textTertiary,
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      marginTop: 4,
+    },
+  });
+}

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from './AppText';
 import { captureRef } from 'react-native-view-shot';
@@ -6,7 +6,8 @@ import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { WeeklyRecap } from '../lib/api';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import RecapShareCard, { CARD_HEIGHT, CARD_WIDTH } from './RecapShareCard';
 
 const PREVIEW_SCALE = 0.82;
@@ -20,6 +21,8 @@ interface Props {
 
 /** Preview + share sheet for the real branded recap PNG, plus a fallback plain-text share. */
 export default function RecapSharePreviewModal({ visible, onClose, leagueName, recap }: Props) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const cardRef = useRef<View>(null);
   const [capturing, setCapturing] = useState(false);
 
@@ -88,7 +91,8 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -138,4 +142,5 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   closeButton: { paddingVertical: spacing.sm },
   closeButtonText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-});
+  });
+}

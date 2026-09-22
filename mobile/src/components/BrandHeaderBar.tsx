@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -6,7 +6,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import AppText from './AppText';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { colors, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { spacing, type ThemeColors } from '../theme';
 
 /**
  * The concept sheet's persistent branded bar (wordmark + star + more-menu)
@@ -25,6 +26,8 @@ export default function BrandHeaderBar({
   leagueName?: string;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={styles.row}>
@@ -54,7 +57,8 @@ export default function BrandHeaderBar({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -96,4 +100,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+  });
+}
