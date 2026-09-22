@@ -3682,66 +3682,16 @@ def get_league_waivers(
 AD_BONUS_IDEAS_PER_UNLOCK = 2
 MAX_AD_UNLOCKS = 3
 
-@app.get("/v1/leagues/{league_id}/trade-hub")
-def get_trade_hub_ideas(
-    league_id: str,
-    strategy: str = "retool",
-    lens: str = "Dynasty",
-    ad_unlocks: int = 0,
-    user: dict[str, Any] = Depends(require_user),
-) -> dict[str, Any]:
-    """Real trade ideas for the caller's roster in this league.
 
-    Shares the exact same idea-generation engine as the web app's Trade Hub
-    (modules.trade_ideas.build_trade_ideas) and the same production Trust
-    enforcement boundary, via modules.trade_hub_engine — see that module's
-    docstring for why it's a fresh composition rather than importing
-    app.py directly (modules/ never imports app.py).
-
-    Free-tier gating reuses the web app's own ranking and free-count
-    contract (modules.trade_hub_ui.order_trade_hub_visible_ideas /
-    FREE_VISIBLE_IDEAS) so the "first 2 ideas" a Free mobile user sees are
-    identically chosen to the web app's. `ad_unlocks` (client-tracked,
-    reset per session) temporarily raises that ceiling — a mobile-only
-    reward mechanic, not part of the shared entitlement contract.
+def _project_and_enrich_trade_idea_cards(
+    records: list[dict[str, Any]], *, league_id: str, lens: str
+) -> list[dict[str, Any]]:
+    """Raw trade_hub_engine records -> ranked, mobile-card-shaped dicts with
+    partner avatar/archetype/trade-tendency attached. Shared by Trade Hub's
+    own board and Trade Finder — both project and enrich the exact same way,
+    only how `records` was generated (passive board vs. a specific trade
+    block search) differs between the two callers.
     """
-
-    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
-        raise HTTPException(
-            status_code=422,
-            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
-        )
-
-    config = auth_supabase.get_supabase_config()
-    user_id = str(user.get("id") or "")
-    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
-
-    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
-    if my_roster is None:
-        return {"ok": True, "ideas": [], "reason": reason}
-
-    league = sleeper.get_league(league_id)
-    if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
-
-    roster_id = my_roster.get("roster_id")
-    if roster_id is None:
-        return {"ok": True, "ideas": [], "reason": "empty_roster"}
-
-    gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
-        config, user_id, str(user.get("_access_token") or ""), league_id
-    )
-    records = trade_hub_engine.generate_trade_idea_records_cached(
-        league_id=league_id,
-        roster_id=int(roster_id),
-        strategy=strategy,
-        lens=lens,
-        players_db_path=PLAYERS_DB_PATH,
-        untouchable_player_ids=gm_untouchable_ids,
-        gm_target_player_ids=gm_target_ids,
-    )
-
-    is_premium = str(profile.get("entitlement") or "free") == "premium"
     # Rank on the raw engine records (trade_confidence_label, tier, etc.) —
     # the same fields the web app's Trade Hub sorts on — then project only
     # the visible slice to the narrower mobile card shape.
@@ -3803,6 +3753,70 @@ def get_trade_hub_ideas(
         card["partner_team_archetype_label"] = archetype_by_team_name.get(team_key) or ""
         tendency = tendency_by_team_name.get(team_key, {})
         card["partner_trade_tendency"] = tendency.get("tendency", team_trade_history.NEUTRAL)
+    return ranked
+
+
+@app.get("/v1/leagues/{league_id}/trade-hub")
+def get_trade_hub_ideas(
+    league_id: str,
+    strategy: str = "retool",
+    lens: str = "Dynasty",
+    ad_unlocks: int = 0,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Real trade ideas for the caller's roster in this league.
+
+    Shares the exact same idea-generation engine as the web app's Trade Hub
+    (modules.trade_ideas.build_trade_ideas) and the same production Trust
+    enforcement boundary, via modules.trade_hub_engine — see that module's
+    docstring for why it's a fresh composition rather than importing
+    app.py directly (modules/ never imports app.py).
+
+    Free-tier gating reuses the web app's own ranking and free-count
+    contract (modules.trade_hub_ui.order_trade_hub_visible_ideas /
+    FREE_VISIBLE_IDEAS) so the "first 2 ideas" a Free mobile user sees are
+    identically chosen to the web app's. `ad_unlocks` (client-tracked,
+    reset per session) temporarily raises that ceiling — a mobile-only
+    reward mechanic, not part of the shared entitlement contract.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return {"ok": True, "ideas": [], "reason": reason}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    roster_id = my_roster.get("roster_id")
+    if roster_id is None:
+        return {"ok": True, "ideas": [], "reason": "empty_roster"}
+
+    gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
+    records = trade_hub_engine.generate_trade_idea_records_cached(
+        league_id=league_id,
+        roster_id=int(roster_id),
+        strategy=strategy,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
+        untouchable_player_ids=gm_untouchable_ids,
+        gm_target_player_ids=gm_target_ids,
+    )
+
+    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
     approved_count = len(ranked)
     ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
     effective_limit = (
@@ -3829,6 +3843,65 @@ def get_trade_hub_ideas(
             "ad_unlocks_applied": ad_unlocks_applied,
         },
     }
+
+
+@app.get("/v1/leagues/{league_id}/trade-finder")
+def get_trade_finder_ideas(
+    league_id: str,
+    player_ids: str = "",
+    strategy: str = "retool",
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Trade Finder — "select these specific players, find who'd want
+    them," coridian_'s own trade-block request. Same engine, Trust
+    enforcement, and card shape as /trade-hub (see
+    trade_hub_engine.generate_trade_finder_records' own docstring), just
+    restricted to a caller-chosen player selection instead of the passive
+    board's normal "anything not protected" pool. `player_ids` is a
+    comma-separated list of this league's own player_ids — an empty or
+    all-invalid selection returns an empty idea list rather than silently
+    falling back to the unrestricted board (a Trade Finder search that
+    ignores what was actually selected would be worse than no result).
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    selected_ids = tuple(sorted({pid.strip() for pid in player_ids.split(",") if pid.strip()}))
+    if not selected_ids:
+        return {"ok": True, "ideas": [], "reason": "no_players_selected"}
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return {"ok": True, "ideas": [], "reason": reason}
+
+    roster_id = my_roster.get("roster_id")
+    if roster_id is None:
+        return {"ok": True, "ideas": [], "reason": "empty_roster"}
+
+    gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
+    records = trade_hub_engine.generate_trade_finder_records(
+        league_id=league_id,
+        roster_id=int(roster_id),
+        strategy=strategy,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
+        trade_block_player_ids=selected_ids,
+        untouchable_player_ids=gm_untouchable_ids,
+        gm_target_player_ids=gm_target_ids,
+    )
+    ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
+    return {"ok": True, "ideas": ranked, "reason": ""}
 
 
 @app.get("/v1/leagues/{league_id}/all-trades")
