@@ -9,6 +9,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import CircularProgressRing from '../components/CircularProgressRing';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
+import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -168,6 +169,7 @@ export default function PickDetailScreen({ route, navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerButtonRow}>
+          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
           <EvaluationLensHeaderButton leagueId={leagueId} />
           <GmStanceHeaderButton leagueId={leagueId} />
         </View>

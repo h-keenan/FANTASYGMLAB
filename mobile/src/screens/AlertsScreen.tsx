@@ -11,6 +11,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
+import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -95,6 +96,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerButtonRow}>
+          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
           <EvaluationLensHeaderButton leagueId={leagueId} />
           <GmStanceHeaderButton leagueId={leagueId} />
         </View>

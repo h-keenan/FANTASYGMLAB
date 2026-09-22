@@ -11,6 +11,12 @@ const HEIGHT = 140;
 const TOP_PAD = 16;
 const BOTTOM_PAD = 22;
 const SIDE_PAD = 8;
+// Reserves room on the left for the max/min value labels (coridian_: "the
+// points per week graph needs to have the points on the y-axis") — the
+// x-axis week labels below already have their own row, so these two values
+// are the only y-axis markers, placed right at the high/low dots rather
+// than a full gridline scale.
+const LEFT_PAD = 30;
 const FILL_GRADIENT_ID = 'weeklyPointsFill';
 
 function buildPath(points: Array<{ x: number; y: number }>): string {
@@ -46,16 +52,18 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
   const maxValue = Math.max(...values, 1);
   const minValue = Math.min(...values, 0);
   const range = maxValue - minValue || 1;
-  const plotWidth = Math.max(width - SIDE_PAD * 2, 1);
+  const plotWidth = Math.max(width - LEFT_PAD - SIDE_PAD, 1);
   const plotHeight = HEIGHT - TOP_PAD - BOTTOM_PAD;
   const step = played.length > 1 ? plotWidth / (played.length - 1) : 0;
 
   const points = played.map((week, index) => ({
-    x: SIDE_PAD + (played.length > 1 ? step * index : plotWidth / 2),
+    x: LEFT_PAD + (played.length > 1 ? step * index : plotWidth / 2),
     y: TOP_PAD + plotHeight - ((week.fantasy_points_ppr as number) - minValue) / range * plotHeight,
     week: week.week,
     value: week.fantasy_points_ppr as number,
   }));
+  const maxY = TOP_PAD;
+  const minY = TOP_PAD + plotHeight;
 
   const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
 
@@ -70,7 +78,7 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
             </LinearGradient>
           </Defs>
           <Line
-            x1={SIDE_PAD}
+            x1={LEFT_PAD}
             y1={TOP_PAD + plotHeight}
             x2={width - SIDE_PAD}
             y2={TOP_PAD + plotHeight}
@@ -80,9 +88,23 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
           <Path d={buildAreaPath(points, TOP_PAD + plotHeight)} fill={`url(#${FILL_GRADIENT_ID})`} />
           <Path d={buildPath(points)} stroke={colors.accent} strokeWidth={2} fill="none" />
           {points.map((point) => (
-            <Circle key={point.week} cx={point.x} cy={point.y} r={3.5} fill={colors.accent} />
+            <Circle
+              key={point.week}
+              cx={point.x}
+              cy={point.y}
+              r={3.5}
+              fill={
+                point.value === maxValue ? colors.successBright : point.value === minValue ? colors.danger : colors.accent
+              }
+            />
           ))}
         </Svg>
+      ) : null}
+      {width > 0 ? (
+        <>
+          <AppText style={[styles.axisLabel, styles.axisLabelHigh, { top: maxY - 7 }]}>{Math.round(maxValue)}</AppText>
+          <AppText style={[styles.axisLabel, styles.axisLabelLow, { top: minY - 7 }]}>{Math.round(minValue)}</AppText>
+        </>
       ) : null}
       <View style={styles.labelRow}>
         {points.map((point) => (
@@ -123,5 +145,15 @@ function createStyles(colors: ThemeColors) {
       width: LABEL_WIDTH,
       textAlign: 'center' as const,
     },
+    axisLabel: {
+      ...typography.caption,
+      fontWeight: '700' as const,
+      position: 'absolute' as const,
+      left: 0,
+      width: LEFT_PAD - 4,
+      textAlign: 'right' as const,
+    },
+    axisLabelHigh: { color: colors.successBright },
+    axisLabelLow: { color: colors.danger },
   };
 }

@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import BrandedSpinner from '../components/BrandedSpinner';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
+import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -134,6 +135,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerButtonRow}>
+          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
           <EvaluationLensHeaderButton leagueId={leagueId} />
           <GmStanceHeaderButton leagueId={leagueId} />
         </View>

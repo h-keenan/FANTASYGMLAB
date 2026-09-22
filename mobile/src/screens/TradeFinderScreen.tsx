@@ -13,6 +13,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
+import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PlayerNameText from '../components/PlayerNameText';
@@ -131,6 +132,7 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerButtonRow}>
+          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
           <EvaluationLensHeaderButton leagueId={leagueId} />
           <GmStanceHeaderButton leagueId={leagueId} />
         </View>

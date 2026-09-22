@@ -20,6 +20,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
+import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { resolvePlayerTier } from '../lib/playerTier';
 import PositionBadge from '../components/PositionBadge';
@@ -111,6 +112,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerButtonRow}>
+          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
           <EvaluationLensHeaderButton leagueId={leagueId} />
           <GmStanceHeaderButton leagueId={leagueId} />
         </View>
