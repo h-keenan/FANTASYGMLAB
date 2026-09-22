@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -33,7 +33,8 @@ import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
-import { colors, motion, radii, shadows, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { motion, radii, shadows, spacing, type ThemeColors } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -53,141 +54,145 @@ interface Destination {
   subtitle: string;
 }
 
-const LEAGUE_DESTINATIONS: Destination[] = [
-  {
-    label: 'League Overview',
-    route: 'LeagueDetail',
-    icon: 'grid-outline',
-    needsLeague: true,
-    color: colors.accent,
-    subtitle: 'Standings, settings, and league context',
-  },
-  {
-    label: 'Next Move',
-    route: 'Dashboard',
-    icon: 'flash-outline',
-    needsLeague: true,
-    color: colors.accent,
-    subtitle: 'Personalized insights and recommendations',
-  },
-  // Alerts was buried last in the list despite being time-sensitive —
-  // moved up next to the other "check this now" destinations.
-  {
-    label: 'Alerts',
-    route: 'Alerts',
-    icon: 'notifications-outline',
-    needsLeague: true,
-    color: colors.danger,
-    subtitle: 'Injuries, news, and important updates',
-  },
-  {
-    label: 'My Team',
-    route: 'MyTeam',
-    icon: 'shirt-outline',
-    needsLeague: true,
-    color: colors.success,
-    subtitle: 'Roster, lineup, and team analysis',
-  },
-  {
-    label: 'Matchup',
-    route: 'Matchup',
-    icon: 'american-football-outline',
-    needsLeague: true,
-    color: colors.success,
-    subtitle: "This week's matchup and comparison",
-  },
-  {
-    label: 'Waivers',
-    route: 'Waivers',
-    icon: 'swap-horizontal-outline',
-    needsLeague: true,
-    color: colors.success,
-    subtitle: 'Top adds, trends, and free agents',
-  },
-  {
-    label: 'Teams',
-    route: 'Teams',
-    icon: 'people-circle-outline',
-    needsLeague: true,
-    color: colors.violet,
-    subtitle: 'View and compare league teams',
-  },
-  {
-    label: 'Players',
-    route: 'Players',
-    icon: 'people-outline',
-    needsLeague: true,
-    color: colors.violet,
-    subtitle: 'Search, rankings, and player insights',
-  },
-  {
-    label: 'Trade Hub',
-    route: 'TradeHub',
-    icon: 'shuffle-outline',
-    needsLeague: true,
-    color: colors.premium,
-    subtitle: 'Trade ideas and negotiation tools',
-  },
-  {
-    label: 'Trade Analyzer',
-    route: 'TradeAnalyzer',
-    icon: 'git-compare-outline',
-    needsLeague: true,
-    color: colors.premium,
-    subtitle: 'Analyze and compare any trade',
-  },
-  {
-    label: 'Trade Calculator',
-    route: 'TradeCalculator',
-    icon: 'calculator-outline',
-    needsLeague: true,
-    color: colors.premium,
-    subtitle: 'Quick value comparisons',
-  },
-  {
-    label: 'GM Targets',
-    route: 'GmTargets',
-    icon: 'bookmark-outline',
-    needsLeague: true,
-    color: colors.premium,
-    subtitle: 'Your saved watchlist',
-  },
-  {
-    label: 'Draft Center',
-    route: 'DraftCenter',
-    icon: 'albums-outline',
-    needsLeague: true,
-    color: colors.premium,
-    subtitle: 'Picks, order, and draft tools',
-  },
-  {
-    label: 'Recap',
-    route: 'Recap',
-    icon: 'newspaper-outline',
-    needsLeague: true,
-    color: colors.violet,
-    subtitle: 'Weekly league recap and stories',
-  },
-];
+function leagueDestinations(colors: ThemeColors): Destination[] {
+  return [
+    {
+      label: 'League Overview',
+      route: 'LeagueDetail',
+      icon: 'grid-outline',
+      needsLeague: true,
+      color: colors.accent,
+      subtitle: 'Standings, settings, and league context',
+    },
+    {
+      label: 'Next Move',
+      route: 'Dashboard',
+      icon: 'flash-outline',
+      needsLeague: true,
+      color: colors.accent,
+      subtitle: 'Personalized insights and recommendations',
+    },
+    // Alerts was buried last in the list despite being time-sensitive —
+    // moved up next to the other "check this now" destinations.
+    {
+      label: 'Alerts',
+      route: 'Alerts',
+      icon: 'notifications-outline',
+      needsLeague: true,
+      color: colors.danger,
+      subtitle: 'Injuries, news, and important updates',
+    },
+    {
+      label: 'My Team',
+      route: 'MyTeam',
+      icon: 'shirt-outline',
+      needsLeague: true,
+      color: colors.success,
+      subtitle: 'Roster, lineup, and team analysis',
+    },
+    {
+      label: 'Matchup',
+      route: 'Matchup',
+      icon: 'american-football-outline',
+      needsLeague: true,
+      color: colors.success,
+      subtitle: "This week's matchup and comparison",
+    },
+    {
+      label: 'Waivers',
+      route: 'Waivers',
+      icon: 'swap-horizontal-outline',
+      needsLeague: true,
+      color: colors.success,
+      subtitle: 'Top adds, trends, and free agents',
+    },
+    {
+      label: 'Teams',
+      route: 'Teams',
+      icon: 'people-circle-outline',
+      needsLeague: true,
+      color: colors.violet,
+      subtitle: 'View and compare league teams',
+    },
+    {
+      label: 'Players',
+      route: 'Players',
+      icon: 'people-outline',
+      needsLeague: true,
+      color: colors.violet,
+      subtitle: 'Search, rankings, and player insights',
+    },
+    {
+      label: 'Trade Hub',
+      route: 'TradeHub',
+      icon: 'shuffle-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Trade ideas and negotiation tools',
+    },
+    {
+      label: 'Trade Analyzer',
+      route: 'TradeAnalyzer',
+      icon: 'git-compare-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Analyze and compare any trade',
+    },
+    {
+      label: 'Trade Calculator',
+      route: 'TradeCalculator',
+      icon: 'calculator-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Quick value comparisons',
+    },
+    {
+      label: 'GM Targets',
+      route: 'GmTargets',
+      icon: 'bookmark-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Your saved watchlist',
+    },
+    {
+      label: 'Draft Center',
+      route: 'DraftCenter',
+      icon: 'albums-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Picks, order, and draft tools',
+    },
+    {
+      label: 'Recap',
+      route: 'Recap',
+      icon: 'newspaper-outline',
+      needsLeague: true,
+      color: colors.violet,
+      subtitle: 'Weekly league recap and stories',
+    },
+  ];
+}
 
-const GENERAL_DESTINATIONS: Destination[] = [
-  { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: 'Switch leagues and manage account' },
-  { label: 'News', route: 'News', icon: 'globe-outline', color: colors.violet, subtitle: 'Latest NFL news and updates' },
-  {
-    label: 'Premium',
-    route: 'Paywall',
-    icon: 'star-outline',
-    color: colors.premium,
-    subtitle: 'Unlock the full FantasyGM Lab experience',
-  },
-  {
-    label: 'More',
-    route: 'More',
-    icon: 'ellipsis-horizontal-outline',
-    color: colors.textSecondary,
-    subtitle: 'Settings, legal, and support',
-  },
-];
+function generalDestinations(colors: ThemeColors): Destination[] {
+  return [
+    { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: 'Switch leagues and manage account' },
+    { label: 'News', route: 'News', icon: 'globe-outline', color: colors.violet, subtitle: 'Latest NFL news and updates' },
+    {
+      label: 'Premium',
+      route: 'Paywall',
+      icon: 'star-outline',
+      color: colors.premium,
+      subtitle: 'Unlock the full FantasyGM Lab experience',
+    },
+    {
+      label: 'More',
+      route: 'More',
+      icon: 'ellipsis-horizontal-outline',
+      color: colors.textSecondary,
+      subtitle: 'Settings, legal, and support',
+    },
+  ];
+}
 
 interface SavedLeagueRow {
   id: string;
@@ -225,6 +230,8 @@ const SHOW_ORB_DEBUG_OVERLAY = process.env.EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY ==
  * colored backdrop per icon reads as a scannable landmark, not just a
  * decoration next to the label. */
 function DestIcon({ name, color, current }: { name: IconName; color: string; current: boolean }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return <IconCircle name={name} color={current ? colors.accent : color} iconSize={17} style={styles.destIconCircle} />;
 }
 
@@ -243,6 +250,8 @@ function DestinationRow({
   unreadCount?: number;
   onPress: () => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity
       style={[
@@ -276,6 +285,8 @@ function DestinationRow({
 }
 
 export default function GmOrb() {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
@@ -437,7 +448,7 @@ export default function GmOrb() {
     <>
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(13,17,23,0)', 'rgba(13,17,23,0.92)']}
+        colors={[`${colors.background}00`, `${colors.background}EB`]}
         style={[styles.scrim, { height: ORB_SCRIM_BASE_HEIGHT + insets.bottom }]}
       />
       <View style={[styles.orbWrap, { bottom: insets.bottom + spacing.md }]}>
@@ -487,7 +498,7 @@ export default function GmOrb() {
             {league ? (
               <>
                 <AppText style={styles.sectionLabel}>{league.leagueName}</AppText>
-                {LEAGUE_DESTINATIONS.map((destination) => (
+                {leagueDestinations(colors).map((destination) => (
                   <DestinationRow
                     key={destination.route}
                     destination={destination}
@@ -523,7 +534,7 @@ export default function GmOrb() {
             ) : null}
 
             <AppText style={styles.sectionLabel}>General</AppText>
-            {GENERAL_DESTINATIONS.map((destination) => (
+            {generalDestinations(colors).map((destination) => (
               <DestinationRow
                 key={destination.route}
                 destination={destination}
@@ -538,7 +549,8 @@ export default function GmOrb() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   scrim: {
     position: 'absolute',
     left: 0,
@@ -669,4 +681,5 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   unreadCountBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
-});
+  });
+}
