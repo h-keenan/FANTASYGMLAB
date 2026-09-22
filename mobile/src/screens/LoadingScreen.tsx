@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import Animated, {
@@ -10,7 +10,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import TrajectoryArcs from '../components/TrajectoryArcs';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
  * Branded launch/loading state, matching the web app's splash (FGL mark,
@@ -26,6 +27,8 @@ import { colors, radii, spacing } from '../theme';
  * states, success confirmations) meant to share this same drawn mark.
  */
 export default function LoadingScreen({ status = 'Loading…' }: { status?: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pulse = useSharedValue(0);
 
   useEffect(() => {
@@ -51,7 +54,8 @@ export default function LoadingScreen({ status = 'Loading…' }: { status?: stri
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
@@ -70,4 +74,5 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
   status: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.lg },
-});
+  });
+}

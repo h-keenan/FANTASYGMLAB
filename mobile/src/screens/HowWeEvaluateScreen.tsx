@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
@@ -6,7 +6,8 @@ import GridBackground from '../components/GridBackground';
 import ContentSections, { type ContentSection } from '../components/ContentSections';
 import methodologyContent from '../data/methodologyContent.json';
 import { useOrbClearance } from '../lib/orbLayout';
-import { colors, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { spacing, type ThemeColors } from '../theme';
 
 interface MethodologyContent {
   title: string;
@@ -19,6 +20,8 @@ const CONTENT = methodologyContent as MethodologyContent;
 
 export default function HowWeEvaluateScreen() {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={styles.root}>
@@ -32,22 +35,24 @@ export default function HowWeEvaluateScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
-  kicker: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.accent,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-  },
-  note: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    marginBottom: spacing.xl,
-    lineHeight: 21,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
+    kicker: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.accent,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: spacing.xs,
+    },
+    note: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      marginBottom: spacing.xl,
+      lineHeight: 21,
+    },
+  });
+}

@@ -7,16 +7,19 @@ import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
 import { api, type NewsItem } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const EVENT_BADGE_COLORS: Record<string, string> = {
-  'injury/status': colors.danger,
-  transaction: colors.accent,
-  'role/depth chart': colors.success,
-  'off-field/drama': colors.textSecondary,
-};
+function eventBadgeColors(colors: ThemeColors): Record<string, string> {
+  return {
+    'injury/status': colors.danger,
+    transaction: colors.accent,
+    'role/depth chart': colors.success,
+    'off-field/drama': colors.textSecondary,
+  };
+}
 
 const EVENT_BADGE_ICONS: Record<string, IconName> = {
   'injury/status': 'medkit-outline',
@@ -67,6 +70,8 @@ function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsItem[]
 
 export default function NewsScreen() {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [items, setItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +122,7 @@ export default function NewsScreen() {
           <AnimatedCard
             style={StyleSheet.flatten([
               styles.card,
-              { borderLeftWidth: 3, borderLeftColor: EVENT_BADGE_COLORS[item.event_type ?? ''] ?? colors.border },
+              { borderLeftWidth: 3, borderLeftColor: eventBadgeColors(colors)[item.event_type ?? ''] ?? colors.border },
             ])}
             onPress={() => {
               if (item.link) void Linking.openURL(item.link);
@@ -128,7 +133,7 @@ export default function NewsScreen() {
                 <View
                   style={[
                     styles.badge,
-                    { backgroundColor: EVENT_BADGE_COLORS[item.event_type] ?? colors.textSecondary },
+                    { backgroundColor: eventBadgeColors(colors)[item.event_type] ?? colors.textSecondary },
                   ]}
                 >
                   <Ionicons
@@ -159,7 +164,8 @@ export default function NewsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   disclaimer: {
     fontSize: 12,
@@ -213,4 +219,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
-});
+  });
+}
