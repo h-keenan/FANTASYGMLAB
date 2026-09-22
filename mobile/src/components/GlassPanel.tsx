@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
 
-import { colors, radii } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, type ThemeColors } from '../theme';
 
 interface GlassPanelProps {
   style?: ViewStyle | ViewStyle[];
@@ -17,9 +18,11 @@ interface GlassPanelProps {
  * consistent across devices.
  */
 export default function GlassPanel({ style, children }: GlassPanelProps) {
+  const { colors, isDark } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (Platform.OS === 'ios') {
     return (
-      <BlurView intensity={40} tint="dark" style={[styles.panel, style]}>
+      <BlurView intensity={40} tint={isDark ? 'dark' : 'light'} style={[styles.panel, style]}>
         {children}
       </BlurView>
     );
@@ -27,14 +30,16 @@ export default function GlassPanel({ style, children }: GlassPanelProps) {
   return <View style={[styles.panel, styles.androidFallback, style]}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
-  panel: {
-    borderRadius: radii.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    overflow: 'hidden',
-  },
-  androidFallback: {
-    backgroundColor: colors.backgroundElevated,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    panel: {
+      borderRadius: radii.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderStrong,
+      overflow: 'hidden',
+    },
+    androidFallback: {
+      backgroundColor: colors.backgroundElevated,
+    },
+  });
+}

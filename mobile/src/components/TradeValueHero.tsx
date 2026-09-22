@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import AppText from './AppText';
 
-import { colors } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import type { ThemeColors } from '../theme';
 
 type HeroSize = 'sm' | 'lg';
 
@@ -16,7 +17,7 @@ const SIZES: Record<HeroSize, { value: number; label: number; tracking: number }
 
 /** Same green/red/neutral mapping TradeShareCard uses for its hero number,
  * so the inline treatment and the shared PNG agree on what a gain looks like. */
-export function tradeValueColor(delta: number): string {
+export function tradeValueColor(delta: number, colors: ThemeColors): string {
   return delta > 0 ? colors.successBright : delta < 0 ? colors.danger : colors.textSecondary;
 }
 
@@ -43,8 +44,10 @@ export default function TradeValueHero({
   label?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const metrics = SIZES[size];
-  const tone = tradeValueColor(delta);
+  const tone = tradeValueColor(delta, colors);
   const value = tradeValueLabel(delta);
 
   return (
@@ -61,7 +64,9 @@ export default function TradeValueHero({
   );
 }
 
-const styles = StyleSheet.create({
-  value: { fontWeight: '800' },
-  label: { color: colors.textSecondary, marginTop: -2 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    value: { fontWeight: '800' },
+    label: { color: colors.textSecondary, marginTop: -2 },
+  });
+}
