@@ -10,7 +10,7 @@ from modules.html_rendering import render_html_fragment
 from modules.workspace_ui import render_section_header
 
 
-LAST_UPDATED = "June 22, 2026"
+LAST_UPDATED = "September 22, 2026"
 
 NO_AFFILIATION_TEXT = (
     f"{brand_identity.PRODUCT_NAME} is an independent fantasy football tool. It is not affiliated with, "
@@ -131,8 +131,20 @@ LEGAL_PAGES: dict[str, LegalPage] = {
             LegalSection(
                 "Third-party services and data",
                 (
-                    f"{brand_identity.PRODUCT_NAME} relies on third-party platforms, APIs, hosting, and data sources to provide league, player, injury, news, and related information. Requests to those services may expose standard technical information such as network address, browser details, or request metadata under the provider's own policies.",
+                    f"{brand_identity.PRODUCT_NAME} uses the following third-party services to operate: Supabase (account sign-in and app data storage), the Sleeper API and ESPN Fantasy API (public league, roster, and player data from the fantasy platform you connect), Apple Sign in with Apple and Google Sign-In (optional sign-in methods), RevenueCat and, on the web app, Stripe (subscription billing), the nflverse public data project (NFL schedule and game results), and Expo's push notification service (delivering app notifications to your device).",
+                    f"Each provider receives only the information it needs to perform its function — for example, your email and authentication tokens with Supabase, your league and roster identifiers with Sleeper or ESPN, and purchase or receipt information with RevenueCat or Stripe. {brand_identity.PRODUCT_NAME} does not use any third-party advertising, analytics, or session-recording service, and does not sell your data.",
                     f"Third-party data may be incomplete, delayed, unavailable, or subject to separate terms. {brand_identity.PRODUCT_NAME} does not control those services.",
+                ),
+            ),
+            LegalSection(
+                "Your privacy rights and controls",
+                (
+                    "You can manage your account data directly in the app, under More > Account:",
+                ),
+                bullets=(
+                    f"Export My Data — request a copy of the account data {brand_identity.PRODUCT_NAME} stores about you.",
+                    "Delete Account — permanently delete your account and the data associated with it.",
+                    "Manage Subscription — view or cancel an active subscription through Apple's or Google's own subscription settings.",
                 ),
             ),
             LegalSection(
