@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
@@ -15,30 +15,37 @@ import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Recap'>;
 
-const STORY_META: Record<
+function storyMeta(colors: ThemeColors): Record<
   string,
   { icon: React.ComponentProps<typeof Ionicons>['name']; color: string }
-> = {
-  performance: { icon: 'trophy', color: colors.premium },
-  performance_low: { icon: 'trending-down', color: colors.premium },
-  matchup: { icon: 'flame', color: colors.danger },
-  matchup_close: { icon: 'pulse', color: colors.danger },
-  waiver: { icon: 'cash-outline', color: colors.success },
-  waiver_low: { icon: 'pricetag-outline', color: colors.success },
-  trade: { icon: 'swap-horizontal', color: colors.accent },
-  activity: { icon: 'repeat', color: colors.violet },
-  activity_low: { icon: 'moon-outline', color: colors.violet },
-  roster_riser: { icon: 'trending-up', color: colors.accent },
-};
-const DEFAULT_STORY_META = { icon: 'newspaper-outline' as const, color: colors.textSecondary };
+> {
+  return {
+    performance: { icon: 'trophy', color: colors.premium },
+    performance_low: { icon: 'trending-down', color: colors.premium },
+    matchup: { icon: 'flame', color: colors.danger },
+    matchup_close: { icon: 'pulse', color: colors.danger },
+    waiver: { icon: 'cash-outline', color: colors.success },
+    waiver_low: { icon: 'pricetag-outline', color: colors.success },
+    trade: { icon: 'swap-horizontal', color: colors.accent },
+    activity: { icon: 'repeat', color: colors.violet },
+    activity_low: { icon: 'moon-outline', color: colors.violet },
+    roster_riser: { icon: 'trending-up', color: colors.accent },
+  };
+}
+function defaultStoryMeta(colors: ThemeColors) {
+  return { icon: 'newspaper-outline' as const, color: colors.textSecondary };
+}
 
 export default function RecapScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [recap, setRecap] = useState<WeeklyRecap | null>(null);
   const [maxCompletedWeek, setMaxCompletedWeek] = useState(0);
@@ -168,7 +175,9 @@ export default function RecapScreen({ route, navigation }: Props) {
 }
 
 function StoryCard({ story, onPress }: { story: RecapStory; onPress?: () => void }) {
-  const meta = STORY_META[story.story_type] ?? DEFAULT_STORY_META;
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const meta = storyMeta(colors)[story.story_type] ?? defaultStoryMeta(colors);
   const isMatchup = story.story_type === 'matchup' || story.story_type === 'matchup_close';
   const isTrade = story.story_type === 'trade';
 
@@ -230,7 +239,8 @@ function StoryCard({ story, onPress }: { story: RecapStory; onPress?: () => void
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
@@ -304,4 +314,5 @@ const styles = StyleSheet.create({
   storySummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
-});
+  });
+}

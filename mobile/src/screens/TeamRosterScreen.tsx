@@ -11,7 +11,8 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeamRoster'>;
@@ -67,6 +68,8 @@ type RosterSection = { title: string; data: RankedPlayer[] };
 
 export default function TeamRosterScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { ownerName, playerIds, leagueId, leagueName, rosterId } = route.params;
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [ranking, setRanking] = useState<TeamRanking | null>(null);
@@ -255,6 +258,8 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 }
 
 function ArchetypeDetailList({ label, items, color }: { label: string; items: string[]; color: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.detailListGroup}>
       <AppText style={[styles.detailListLabel, { color }]}>{label}</AppText>
@@ -267,7 +272,8 @@ function ArchetypeDetailList({ label, items, color }: { label: string; items: st
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.sm },
@@ -368,4 +374,5 @@ const styles = StyleSheet.create({
   },
   injuryText: { fontSize: 11, fontWeight: '700', color: colors.danger },
   error: { color: colors.danger, textAlign: 'center' },
-});
+  });
+}

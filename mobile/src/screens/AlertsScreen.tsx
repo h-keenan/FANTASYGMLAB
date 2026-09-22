@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Linking, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
@@ -14,18 +14,21 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Alerts'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const EVENT_BADGE_COLORS: Record<string, string> = {
-  'injury/status': colors.danger,
-  transaction: colors.accent,
-  'role/depth chart': colors.success,
-  'off-field/drama': colors.textSecondary,
-};
+function eventBadgeColors(colors: ThemeColors): Record<string, string> {
+  return {
+    'injury/status': colors.danger,
+    transaction: colors.accent,
+    'role/depth chart': colors.success,
+    'off-field/drama': colors.textSecondary,
+  };
+}
 
 const EVENT_BADGE_ICONS: Record<string, IconName> = {
   'injury/status': 'medkit-outline',
@@ -41,12 +44,14 @@ const ROSTER_RELATIONSHIP_LABEL: Record<Exclude<RosterRelationship, null>, strin
   ir: 'IR',
 };
 
-const ROSTER_RELATIONSHIP_COLOR: Record<Exclude<RosterRelationship, null>, string> = {
-  starter: colors.success,
-  bench: colors.textSecondary,
-  taxi: colors.violet,
-  ir: colors.danger,
-};
+function rosterRelationshipColor(colors: ThemeColors): Record<Exclude<RosterRelationship, null>, string> {
+  return {
+    starter: colors.success,
+    bench: colors.textSecondary,
+    taxi: colors.violet,
+    ir: colors.danger,
+  };
+}
 
 const NOT_READY_MESSAGES: Record<string, string> = {
   no_sleeper_username_linked:
@@ -71,6 +76,8 @@ function relativeTime(publishedTs: number | null): string {
 
 export default function AlertsScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<AlertItem[]>([]);
   const [recapReadyWeek, setRecapReadyWeek] = useState<number | null>(null);
@@ -210,13 +217,13 @@ export default function AlertsScreen({ route, navigation }: Props) {
                   <View
                     style={[
                       styles.relationshipPill,
-                      { backgroundColor: `${ROSTER_RELATIONSHIP_COLOR[item.roster_relationship]}26` },
+                      { backgroundColor: `${rosterRelationshipColor(colors)[item.roster_relationship]}26` },
                     ]}
                   >
                     <AppText
                       style={[
                         styles.relationshipPillText,
-                        { color: ROSTER_RELATIONSHIP_COLOR[item.roster_relationship] },
+                        { color: rosterRelationshipColor(colors)[item.roster_relationship] },
                       ]}
                     >
                       {ROSTER_RELATIONSHIP_LABEL[item.roster_relationship]}
@@ -230,7 +237,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
               <View
                 style={[
                   styles.badge,
-                  { backgroundColor: EVENT_BADGE_COLORS[item.event_type] ?? colors.textSecondary },
+                  { backgroundColor: eventBadgeColors(colors)[item.event_type] ?? colors.textSecondary },
                 ]}
               >
                 <Ionicons
@@ -259,7 +266,8 @@ export default function AlertsScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   center: {
     flex: 1,
@@ -348,4 +356,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
-});
+  });
+}
