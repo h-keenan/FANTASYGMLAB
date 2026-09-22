@@ -548,7 +548,7 @@ def get_league_team_rankings(
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
     players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_team_rankings"
+        players_df, surface="mobile_api_team_rankings", league=league
     )
     if players_df.empty:
         return {"ok": True, "teams": [], "reason": "no_player_data"}
@@ -689,7 +689,9 @@ def get_league_draft_center(
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_draft_center")
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_draft_center", league=league
+    )
     if players_df.empty:
         return {
             "ok": True,
@@ -814,7 +816,9 @@ def get_league_draft_picks(
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_draft_picks")
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_draft_picks", league=league
+    )
     if players_df.empty:
         return {"ok": True, "picks": [], "reason": "no_player_data"}
 
@@ -1141,7 +1145,7 @@ def get_league_rankings(
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
     players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_rankings"
+        players_df, surface="mobile_api_rankings", league=league
     )
     if players_df.empty:
         return {"ok": True, "players": []}
@@ -1192,7 +1196,7 @@ def get_player_rank_in_league(
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
     players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_rankings"
+        players_df, surface="mobile_api_rankings", league=league
     )
     if players_df.empty:
         return {"ok": True, "player": None}
@@ -1401,7 +1405,7 @@ def post_trade_analyzer(
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
     players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_trade_analyzer"
+        players_df, surface="mobile_api_trade_analyzer", league=league
     )
     if players_df.empty:
         return {"ok": True, "verdict": None, "reason": "no_player_data"}
@@ -1533,7 +1537,9 @@ def get_league_recap(
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_recap")
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_recap", league=league
+    )
     lookup_rows: list[dict[str, Any]] = []
     if not players_df.empty:
         settings = league_value_settings.detect_league_value_settings_from_payload(league)
@@ -2132,6 +2138,14 @@ def get_player_schedule(
 
     season = sleeper.default_player_stats_season()
     weeks = nfl_schedule.team_schedule(str(team), season)
+    # Real points-allowed-based defense strength (see nfl_schedule's own
+    # docstring) attached per week for display only — never a scoring
+    # input, same "context only" contract as the rest of this schedule.
+    defense_strength = nfl_schedule.team_defense_strength(season)
+    for week in weeks:
+        opponent = week.get("opponent")
+        entry = defense_strength.get(str(opponent)) if opponent else None
+        week["opponent_defense_tier"] = entry["tier"] if entry else None
     return {"ok": True, "team": str(team), "season": season, "weeks": weeks}
 
 
@@ -2838,7 +2852,7 @@ def get_league_dashboard(
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
     players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_dashboard"
+        players_df, surface="mobile_api_dashboard", league=league
     )
     if players_df.empty:
         return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": "no_player_data"}
@@ -3090,7 +3104,9 @@ def get_league_my_team(
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_my_team")
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_my_team", league=league
+    )
     if players_df.empty:
         return {"ok": True, "starters": [], "bench": [], "reason": "no_player_data"}
 
@@ -3336,7 +3352,9 @@ def get_league_matchup(
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(players_df, surface="mobile_api_matchup")
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_matchup", league=league
+    )
     if players_df.empty:
         return _empty_matchup("no_player_data", week=current_week)
 
@@ -3476,7 +3494,7 @@ def get_league_waivers(
     if players_df is None or players_df.empty:
         players_df = rankings.build_players_table(PLAYERS_DB_PATH)
     players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_waivers"
+        players_df, surface="mobile_api_waivers", league=league
     )
     if players_df.empty:
         return {"ok": True, "players": [], "priority_adds": [], "needed_positions": [], "reason": "no_player_data"}

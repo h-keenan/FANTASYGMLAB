@@ -680,6 +680,18 @@ function CareerSection({ playerId }: { playerId: string }) {
  * has actually published for it — a final score once played, otherwise
  * the real spread/total (never estimated) or a plain "not posted yet"
  * note when the market hasn't priced that week yet. */
+/** Tough defense = bad matchup for this player's offense (danger/red);
+ * weak defense = good matchup (success/green); average or unranked (not
+ * enough completed games yet) stays the normal text color. Never used for
+ * anything but this display — see nfl_schedule.team_defense_strength's own
+ * docstring for why this is real points-allowed data, not a per-player
+ * grade. */
+function defenseTierColor(tier: ScheduleWeek['opponent_defense_tier'], colors: ThemeColors): string {
+  if (tier === 'tough') return colors.danger;
+  if (tier === 'weak') return colors.success;
+  return colors.textPrimary;
+}
+
 function ScheduleRow({ week }: { week: ScheduleWeek }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -700,7 +712,10 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
         {week.bye ? (
           <AppText style={styles.scheduleBye}>BYE</AppText>
         ) : (
-        <AppText style={styles.scheduleOpponent} numberOfLines={1}>
+        <AppText
+          style={[styles.scheduleOpponent, { color: defenseTierColor(week.opponent_defense_tier, colors) }]}
+          numberOfLines={1}
+        >
           {week.is_home ? 'vs' : '@'} {week.opponent}
         </AppText>
         )}
@@ -752,7 +767,8 @@ function ScheduleSection({ playerId }: { playerId: string }) {
   return (
     <View style={styles.card}>
       <AppText style={styles.scheduleDisclaimer}>
-        Real opponent and market lines — never used to adjust this player's value or rankings.
+        Real opponent, market lines, and opponent defense strength (from actual points allowed) —
+        never used to adjust this player's value or rankings.
       </AppText>
       {weeks.map((week) => (
         <ScheduleRow key={week.week} week={week} />

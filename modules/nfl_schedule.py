@@ -171,6 +171,74 @@ def team_schedule(
     return rows
 
 
+def team_defense_strength(season: int, *, games: pd.DataFrame | None = None) -> dict[str, dict[str, Any]]:
+    """Every team's real defensive strength this season, from actual points
+    allowed in completed games — not a fabricated per-player grade. This app
+    has no individual-defender data or IDP scoring at all (it's built
+    entirely around skill-position offense), so "impact defender is hurt"
+    isn't something this can model directly; a defense trending worse
+    lately (whatever the cause) shows up here instead, by blending the
+    season-long average with a recent-games average rather than only the
+    season number alone.
+
+    Returns {team_code: {"points_allowed_avg", "recent_points_allowed_avg"
+    (None until at least 2 games), "games_played", "rank" (1 = toughest),
+    "tier" ("tough" | "average" | "weak")} for every team with at least one
+    completed game. Teams with no completed games yet aren't included —
+    no fabricated rank for a team nothing is known about yet.
+    """
+    df = games if games is not None else load_games()
+    if df.empty or "season" not in df.columns:
+        return {}
+    season_games = _normalize_team_code(df[df["season"] == season])
+    if "game_type" in season_games.columns:
+        season_games = season_games[season_games["game_type"] == "REG"]
+    played = season_games[season_games["home_score"].notna() & season_games["away_score"].notna()]
+    if played.empty:
+        return {}
+
+    # One row per (team, week, points allowed that week) — grouping on the
+    # team's own game count (not calendar week) so "recent" means this
+    # team's last N games regardless of where its bye fell.
+    rows: list[dict[str, Any]] = []
+    for _, game in played.iterrows():
+        rows.append({"team": game["home_team"], "week": game["week"], "points_allowed": game["away_score"]})
+        rows.append({"team": game["away_team"], "week": game["week"], "points_allowed": game["home_score"]})
+    long_df = pd.DataFrame(rows)
+
+    recent_games = 3
+    entries: dict[str, dict[str, Any]] = {}
+    weighted_by_team: dict[str, float] = {}
+    for team, group in long_df.groupby("team"):
+        ordered = group.sort_values("week")
+        season_avg = float(ordered["points_allowed"].mean())
+        recent = ordered.tail(recent_games)
+        recent_avg = float(recent["points_allowed"].mean()) if len(recent) >= 2 else None
+        weighted = (season_avg + recent_avg) / 2 if recent_avg is not None else season_avg
+        entries[str(team)] = {
+            "points_allowed_avg": round(season_avg, 1),
+            "recent_points_allowed_avg": round(recent_avg, 1) if recent_avg is not None else None,
+            "games_played": int(len(ordered)),
+        }
+        weighted_by_team[str(team)] = weighted
+
+    ranked_teams = sorted(weighted_by_team, key=lambda team: weighted_by_team[team])
+    total = len(ranked_teams)
+    tough_cutoff = max(1, round(total / 3))
+    weak_cutoff = total - max(1, round(total / 3))
+    for index, team in enumerate(ranked_teams):
+        rank = index + 1
+        entries[team]["rank"] = rank
+        if rank <= tough_cutoff:
+            entries[team]["tier"] = "tough"
+        elif rank > weak_cutoff:
+            entries[team]["tier"] = "weak"
+        else:
+            entries[team]["tier"] = "average"
+
+    return entries
+
+
 def team_matchup_for_week(
     team: str,
     week: int,
