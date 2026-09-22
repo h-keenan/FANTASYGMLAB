@@ -3,7 +3,10 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -13,11 +16,17 @@ import AppText from '../components/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
+import AgeGate from '../components/AgeGate';
+import ContentSections, { type ContentSection } from '../components/ContentSections';
+import legalContent from '../data/legalContent.json';
 import { useAuth } from '../context/AuthContext';
+import { hasPassedAgeGate } from '../lib/ageGate';
 import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { gradients, radii, spacing, typography, type ThemeColors } from '../theme';
+
+const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
 
 export default function LoginScreen() {
   const { signIn, signUp, signInAsGuest } = useAuth();
@@ -31,10 +40,16 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  const [ageVerified, setAgeVerified] = useState<boolean | null>(null);
+  const [legalPageKey, setLegalPageKey] = useState<string | null>(null);
   const google = useGoogleSignIn();
 
   useEffect(() => {
     void isAppleAuthAvailable().then(setAppleAvailable);
+  }, []);
+
+  useEffect(() => {
+    void hasPassedAgeGate().then(setAgeVerified);
   }, []);
 
   useEffect(() => {
@@ -72,6 +87,13 @@ export default function LoginScreen() {
     setGuestSubmitting(false);
     if (result.error) setError(result.error);
   };
+
+  if (ageVerified === null) {
+    return <View style={styles.root} />;
+  }
+  if (!ageVerified) {
+    return <AgeGate onPassed={() => setAgeVerified(true)} />;
+  }
 
   return (
     <View style={styles.root}>
@@ -175,7 +197,31 @@ export default function LoginScreen() {
             </>
           )}
         </TouchableOpacity>
+
+        <View style={styles.legalRow}>
+          <AppText style={styles.legalLink} onPress={() => setLegalPageKey('terms')}>
+            Terms of Use
+          </AppText>
+          <AppText style={styles.legalDivider}>·</AppText>
+          <AppText style={styles.legalLink} onPress={() => setLegalPageKey('privacy')}>
+            Privacy Policy
+          </AppText>
+        </View>
       </KeyboardAvoidingView>
+
+      <Modal visible={legalPageKey !== null} animationType="slide" onRequestClose={() => setLegalPageKey(null)}>
+        <View style={[styles.root, styles.legalModal]}>
+          <View style={styles.legalModalHeader}>
+            <AppText style={styles.legalModalTitle}>{legalPageKey ? LEGAL_PAGES[legalPageKey]?.title : ''}</AppText>
+            <Pressable onPress={() => setLegalPageKey(null)} hitSlop={12}>
+              <AppText style={styles.legalModalClose}>Done</AppText>
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.legalModalContent}>
+            {legalPageKey ? <ContentSections sections={LEGAL_PAGES[legalPageKey]?.sections ?? []} /> : null}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -273,6 +319,33 @@ function createStyles(colors: ThemeColors) {
     marginTop: 4,
     paddingHorizontal: spacing.lg,
   },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
+  legalLink: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  legalDivider: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    marginHorizontal: spacing.sm,
+  },
+  legalModal: { paddingTop: spacing.xl * 2 },
+  legalModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  legalModalTitle: { ...typography.title, fontSize: 20, color: colors.textPrimary, flexShrink: 1 },
+  legalModalClose: { color: colors.accent, fontSize: 16, fontWeight: '600' },
+  legalModalContent: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl * 2 },
   error: {
     color: colors.danger,
     marginBottom: spacing.sm,

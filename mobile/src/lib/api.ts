@@ -1124,6 +1124,8 @@ export const api = {
    */
   setShowcaseModeEnabled,
   getMe: () => authorizedFetch<MeResponse>('/v1/me'),
+  /** GDPR/CCPA data-access request — every row this account owns, as JSON. */
+  exportMyData: () => authorizedFetch<{ ok: true; generated_at: string; user: object; tables: object }>('/v1/me/export'),
   getLeague: (leagueId: string) =>
     authorizedFetch<LeagueResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}`),
   getLeagueUsers: (leagueId: string) =>
