@@ -185,6 +185,13 @@ export interface TeamRanking {
   archetype_strengths: string[];
   archetype_risks: string[];
   archetype_recommendations: string[];
+  // Real buy/sell pattern read off this team's actual Sleeper trade
+  // history (modules.team_trade_history) — "Seller"/"Buyer"/"Neutral".
+  // Context, not a new rank; Neutral covers both "no lean" and "not
+  // enough trade history yet."
+  trade_tendency: string;
+  trade_tendency_sell_count: number;
+  trade_tendency_buy_count: number;
 }
 
 export interface LeagueTeamRankingsResponse {
@@ -1025,6 +1032,10 @@ export interface TradeIdea {
   // same computation /v1/leagues/{id}/team-rankings uses — empty when it
   // couldn't be matched to a roster.
   partner_team_archetype_label: string;
+  // Real buy/sell pattern from this partner's actual Sleeper trade history
+  // (modules.team_trade_history) — "Seller"/"Buyer"/"Neutral". Context
+  // only; doesn't change trade_gain, confidence_label, or category.
+  partner_trade_tendency: string;
   rationale: string;
   trade_gain: number;
   confidence_label: string;
