@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -19,7 +19,8 @@ import {
   purchasePackage,
   restorePurchases,
 } from '../lib/revenuecat';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
@@ -37,6 +38,8 @@ const FEATURES = [
 
 export default function PaywallScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -218,7 +221,8 @@ export default function PaywallScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
@@ -279,4 +283,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
-});
+  });
+}
