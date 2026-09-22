@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
@@ -64,8 +65,15 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   useScreenHeaderTitle(navigation, 'League Overview', leagueName);
 
   useEffect(() => {
-    navigation.setOptions({ headerRight: () => <GmStanceHeaderButton leagueId={leagueId} /> });
-  }, [navigation, leagueId]);
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
 
   useEffect(() => {
     void setLastLeague({ leagueId, leagueName });
@@ -230,6 +238,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.md },

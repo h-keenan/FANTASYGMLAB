@@ -243,11 +243,17 @@ function DestinationRow({
   destination,
   isCurrent,
   unreadCount,
+  hasNew,
   onPress,
 }: {
   destination: Destination;
   isCurrent: boolean;
   unreadCount?: number;
+  /** A plain "something changed here" glyph next to the title — for a
+   * destination with real new content but no natural count to show (a
+   * ready recap, new trade ideas), as opposed to `unreadCount`'s numeric
+   * badge (Alerts' actual unread article count). */
+  hasNew?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useThemeMode();
@@ -263,9 +269,12 @@ function DestinationRow({
     >
       <DestIcon name={destination.icon} color={destination.color} current={isCurrent} />
       <View style={styles.destTextGroup}>
-        <AppText style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
-          {destination.label}
-        </AppText>
+        <View style={styles.destTitleRow}>
+          <AppText style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>
+            {destination.label}
+          </AppText>
+          {hasNew ? <View style={[styles.newDot, { backgroundColor: destination.color }]} /> : null}
+        </View>
         <AppText style={styles.destSubtitle} numberOfLines={1}>
           {destination.subtitle}
         </AppText>
@@ -291,6 +300,7 @@ export default function GmOrb() {
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
+  const [recapReady, setRecapReady] = useState(false);
   // This used to clamp bottom to a 100pt ceiling, on the theory that a
   // reported "orb sits mid-screen" bug meant some device was inflating the
   // inset. Measured rawInsets.bottom on a real iPhone (34), an iOS simulator
@@ -386,6 +396,32 @@ export default function GmOrb() {
     // fresh object literal from currentLeagueContext() every render (not
     // memoized); depending on it directly would refetch every render while
     // the sheet is open. leagueId is the only part that actually matters.
+  }, [open, league?.leagueId]);
+
+  // Same "ready and worth a glance" signal Alerts already surfaces as its
+  // own recap-ready banner — mirrored here as a plain glyph on the Recap
+  // row itself, so the destination list doesn't need opening Alerts first
+  // to notice a new recap exists.
+  useEffect(() => {
+    if (!open || !league) {
+      setRecapReady(false);
+      return;
+    }
+    let cancelled = false;
+    api
+      .getLeagueRecap(league.leagueId)
+      .then((result) => {
+        if (!cancelled) setRecapReady(Boolean(result.recap && !result.recap.incomplete));
+      })
+      .catch(() => {
+        if (!cancelled) setRecapReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning
+    // as the alert-count effect above: `league` is a fresh object literal
+    // every render, only leagueId actually matters.
   }, [open, league?.leagueId]);
 
   const openSheet = () => {
@@ -511,6 +547,7 @@ export default function GmOrb() {
                     destination={destination}
                     isCurrent={destination.route === currentRouteName}
                     unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
+                    hasNew={destination.route === 'Recap' ? recapReady : false}
                     onPress={() => go(destination)}
                   />
                 ))}
@@ -678,6 +715,8 @@ function createStyles(colors: ThemeColors) {
   destRowCurrent: { borderLeftColor: colors.accent, backgroundColor: colors.accentMuted },
   destIconCircle: { marginRight: spacing.md },
   destTextGroup: { flex: 1 },
+  destTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  newDot: { width: 6, height: 6, borderRadius: 3 },
   destText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   destTextCurrent: { color: colors.accent },
   destSubtitle: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },

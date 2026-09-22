@@ -34,6 +34,7 @@ import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useDensity } from '../context/DensityContext';
 import { useGmStance } from '../context/GmStanceContext';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -173,7 +174,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [adUnlocks, setAdUnlocks] = useState(0);
   const [watchingAd, setWatchingAd] = useState(false);
-  const [lens, setLens] = useState<ValuationLens>('Dynasty');
+  const { lens } = useValuationLens(leagueId);
 
   // "All Trades" — the concept sheet's second Trade Hub tab: browse ideas
   // across every roster in the league, not just the caller's own. Kept as
@@ -196,7 +197,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.headerButtonRow}>
-          <EvaluationLensHeaderButton lens={lens} onChange={setLens} />
+          <EvaluationLensHeaderButton leagueId={leagueId} />
           <GmStanceHeaderButton leagueId={leagueId} />
         </View>
       ),
