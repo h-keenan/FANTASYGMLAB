@@ -33,7 +33,8 @@ import {
 import { useGmStance } from '../context/GmStanceContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeAnalyzer'>;
@@ -52,12 +53,14 @@ type SearchItem =
 const MAX_SEARCH_RESULTS = 40;
 const POSITION_FILTERS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 
-const TONE_COLORS: Record<TradeVerdict['tone'], string> = {
-  accept: colors.success,
-  decline: colors.danger,
-  counter: colors.accent,
-  fair: colors.textSecondary,
-};
+function toneColors(colors: ThemeColors): Record<TradeVerdict['tone'], string> {
+  return {
+    accept: colors.success,
+    decline: colors.danger,
+    counter: colors.accent,
+    fair: colors.textSecondary,
+  };
+}
 
 // modules/trade_offer_analyzer.py's only three confidence strings — mapped
 // to a ring fill so "how sure is the model" reads as a glanceable number
@@ -92,6 +95,8 @@ interface OtherTeam {
 const ALL_TEAMS_ID = '__all__';
 
 export default function TradeAnalyzerScreen({ route, navigation }: Props) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -546,6 +551,8 @@ function VerdictSection({
   text: string;
   color: string;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (!text) return null;
   return (
     <View style={styles.verdictSection}>
@@ -575,8 +582,10 @@ function VerdictCard({
   partnerTeamName: string;
   onBuildCounter: () => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
-  const toneColor = TONE_COLORS[verdict.tone];
+  const toneColor = toneColors(colors)[verdict.tone];
 
   return (
     <View style={[styles.verdictCard, { borderLeftColor: toneColor }]}>
@@ -658,6 +667,8 @@ function TradeSide({
   onPressHeader: () => void;
   onRemove: (id: string) => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity
       style={[styles.side, active && styles.sideActive]}
@@ -681,7 +692,8 @@ function TradeSide({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {
@@ -846,4 +858,5 @@ const styles = StyleSheet.create({
   resultScore: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
-});
+  });
+}
