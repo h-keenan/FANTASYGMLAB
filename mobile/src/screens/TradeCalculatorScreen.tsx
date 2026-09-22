@@ -21,7 +21,8 @@ import { api, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeCalculator'>;
@@ -35,6 +36,8 @@ function playerScore(player: RankedPlayer): number {
 }
 
 export default function TradeCalculatorScreen({ route, navigation }: Props) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [rankings, setRankings] = useState<RankedPlayer[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -223,6 +226,8 @@ function TradeSide({
   onPressHeader: () => void;
   onRemove: (playerId: string) => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.side, active && styles.sideActive]}>
       <TouchableOpacity onPress={onPressHeader}>
@@ -245,7 +250,8 @@ function TradeSide({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
   center: {
     flex: 1,
@@ -333,4 +339,5 @@ const styles = StyleSheet.create({
   resultScore: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center' },
-});
+  });
+}

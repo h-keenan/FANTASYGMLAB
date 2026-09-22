@@ -23,7 +23,8 @@ import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer, type UsageTrend, type ValuationLens } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Players'>;
@@ -67,6 +68,8 @@ function matchesAvailability(injuryStatus: string | null, filter: AvailabilityFi
  * threshold here.
  */
 function UsageTrendPill({ trend }: { trend: UsageTrend }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const rising = trend.direction === 'up';
   const tint = rising ? colors.success : colors.danger;
   return (
@@ -84,6 +87,8 @@ function UsageTrendPill({ trend }: { trend: UsageTrend }) {
 
 export default function PlayersScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [lens, setLens] = useState<ValuationLens>('Dynasty');
   const [position, setPosition] = useState('ALL');
@@ -243,7 +248,8 @@ export default function PlayersScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   searchInput: {
     marginHorizontal: spacing.lg,
@@ -308,4 +314,5 @@ const styles = StyleSheet.create({
   score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
-});
+  });
+}
