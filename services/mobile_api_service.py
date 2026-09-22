@@ -2583,16 +2583,21 @@ def update_push_preference(
 
 
 UI_DENSITY_VALUES = {"guided", "compact"}
+THEME_MODE_VALUES = {"light", "dark", "auto"}
 
 
 def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any]:
     density = str(settings.get("ui_density") or "guided")
     if density not in UI_DENSITY_VALUES:
         density = "guided"
+    theme_mode = str(settings.get("theme_mode") or "dark")
+    if theme_mode not in THEME_MODE_VALUES:
+        theme_mode = "dark"
     last_league_id = str(settings.get("last_league_id") or "")
     last_league_name = str(settings.get("last_league_name") or "")
     return {
         "ui_density": density,
+        "theme_mode": theme_mode,
         "last_league": (
             {"league_id": last_league_id, "league_name": last_league_name} if last_league_id else None
         ),
@@ -2620,6 +2625,7 @@ def get_device_preferences(user: dict[str, Any] = Depends(require_user)) -> dict
 
 class UpdateDevicePreferencesRequest(BaseModel):
     ui_density: str | None = None
+    theme_mode: str | None = None
     last_league_id: str | None = None
     last_league_name: str | None = None
 
@@ -2640,6 +2646,11 @@ def update_device_preferences(
             status_code=422,
             detail="ui_density must be one of: " + ", ".join(UI_DENSITY_VALUES),
         )
+    if body.theme_mode is not None and body.theme_mode not in THEME_MODE_VALUES:
+        raise HTTPException(
+            status_code=422,
+            detail="theme_mode must be one of: " + ", ".join(THEME_MODE_VALUES),
+        )
 
     config = auth_supabase.get_supabase_config()
     access_token = str(user.get("_access_token") or "")
@@ -2650,6 +2661,8 @@ def update_device_preferences(
     settings = dict(current.get("settings") or {})
     if body.ui_density is not None:
         settings["ui_density"] = body.ui_density
+    if body.theme_mode is not None:
+        settings["theme_mode"] = body.theme_mode
     if body.last_league_id is not None:
         settings["last_league_id"] = body.last_league_id
     if body.last_league_name is not None:

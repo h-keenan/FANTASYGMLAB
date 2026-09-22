@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
@@ -9,10 +9,11 @@ import { api, type PushCategory } from '../lib/api';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
 import { isShowcaseModeAvailable } from '../lib/showcaseMode';
-import { colors, spacing } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useAuth } from '../context/AuthContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
+import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
@@ -30,6 +31,12 @@ const DENSITY_OPTIONS: Array<{ value: UiDensity; label: string; description: str
   { value: 'compact', label: 'Compact', description: 'Just the calls — hide the explanation text' },
 ];
 
+const THEME_OPTIONS: Array<{ value: ThemeMode; label: string; description: string }> = [
+  { value: 'dark', label: 'Night', description: 'OLED black — always dark' },
+  { value: 'light', label: 'Day', description: 'Glacier ice white — always light' },
+  { value: 'auto', label: 'Auto', description: "Match this device's system setting" },
+];
+
 const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; description: string }> = [
   { value: 'top_priority', label: 'Top Priority moves', description: 'The single most urgent recommendation for your roster' },
   { value: 'watch', label: 'Watch items', description: 'Worth knowing, not urgent' },
@@ -41,6 +48,8 @@ export default function MoreScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const { density, setDensity } = useDensity();
+  const { mode: themeMode, setMode: setThemeMode, colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
   const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
   const { deleteAccount, session } = useAuth();
@@ -152,6 +161,25 @@ export default function MoreScreen({ navigation }: Props) {
         })}
       </View>
 
+      <AppText style={styles.sectionLabel}>Theme</AppText>
+      <View style={styles.densityRow}>
+        {THEME_OPTIONS.map((option) => {
+          const active = themeMode === option.value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              style={[styles.densityOption, active && styles.densityOptionActive]}
+              onPress={() => setThemeMode(option.value)}
+            >
+              <AppText style={[styles.densityOptionLabel, active && styles.densityOptionLabelActive]}>
+                {option.label}
+              </AppText>
+              <AppText style={styles.densityOptionDescription}>{option.description}</AppText>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <AppText style={styles.sectionLabel}>Notifications</AppText>
       <TouchableOpacity style={styles.row} onPress={onSendTestPush} disabled={sendingTestPush}>
         <View style={styles.labelGroup}>
@@ -241,7 +269,8 @@ export default function MoreScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   sectionLabel: {
     fontSize: 12,
@@ -305,4 +334,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
   },
-});
+  });
+}

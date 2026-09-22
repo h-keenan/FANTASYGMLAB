@@ -13,6 +13,7 @@ import { syncLastLeagueFromServer } from '../lib/lastLeague';
 import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotifications';
 import { supabase } from '../lib/supabase';
 import { useDensity } from './DensityContext';
+import { useThemeMode } from './ThemeModeContext';
 
 interface AuthContextValue {
   session: Session | null;
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { syncDensityFromServer } = useDensity();
+  const { syncModeFromServer } = useThemeMode();
 
   useEffect(() => {
     let isMounted = true;
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const result = await api.getDevicePreferences();
         if (!result.ok) return;
         syncDensityFromServer(result.ui_density);
+        syncModeFromServer(result.theme_mode);
         if (result.last_league) {
           await syncLastLeagueFromServer({
             leagueId: result.last_league.league_id,

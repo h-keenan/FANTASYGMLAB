@@ -3058,7 +3058,7 @@ def test_get_device_preferences_defaults_to_guided_with_no_league(monkeypatch):
         response = client.get("/v1/preferences", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
-    assert response.json() == {"ok": True, "ui_density": "guided", "last_league": None}
+    assert response.json() == {"ok": True, "ui_density": "guided", "theme_mode": "dark", "last_league": None}
 
 
 def test_get_device_preferences_reflects_stored_values(monkeypatch):
@@ -3085,6 +3085,7 @@ def test_get_device_preferences_reflects_stored_values(monkeypatch):
     assert response.json() == {
         "ok": True,
         "ui_density": "compact",
+        "theme_mode": "dark",
         "last_league": {"league_id": "abc", "league_name": "Dynasty Warriors"},
     }
 
@@ -3102,6 +3103,44 @@ def test_update_device_preferences_rejects_an_invalid_density(monkeypatch):
             headers={"Authorization": "Bearer good-token"},
         )
     assert response.status_code == 422
+
+
+def test_update_device_preferences_rejects_an_invalid_theme_mode(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/preferences",
+            json={"theme_mode": "midnight"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_update_device_preferences_stores_theme_mode(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": "user-123", "settings": {}}]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/preferences",
+                json={"theme_mode": "light"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json()["theme_mode"] == "light"
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["theme_mode"] == "light"
 
 
 def test_update_device_preferences_merges_without_clobbering_push_categories(monkeypatch):
@@ -3127,6 +3166,7 @@ def test_update_device_preferences_merges_without_clobbering_push_categories(mon
     assert response.json() == {
         "ok": True,
         "ui_density": "compact",
+        "theme_mode": "dark",
         "last_league": {"league_id": "abc", "league_name": "Dynasty Warriors"},
     }
     upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
@@ -3162,6 +3202,7 @@ def test_update_device_preferences_partial_update_only_touches_sent_fields(monke
     assert response.json() == {
         "ok": True,
         "ui_density": "compact",
+        "theme_mode": "dark",
         "last_league": {"league_id": "xyz", "league_name": "New League"},
     }
 
