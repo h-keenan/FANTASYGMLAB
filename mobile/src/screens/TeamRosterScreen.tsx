@@ -8,6 +8,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import { resolvePlayerTier } from '../lib/playerTier';
 import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -237,7 +238,21 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
                 {item.name ?? 'Unknown player'}
               </AppText>
               <AppText style={styles.meta}>
-                {[item.team, item.opportunity_label ?? item.status].filter(Boolean).join(' · ') || '—'}
+                {!item.team && !item.opportunity_label && !item.status ? (
+                  '—'
+                ) : (
+                  <>
+                    {item.team}
+                    {item.team && (item.opportunity_label ?? item.status) ? ' · ' : ''}
+                    {item.opportunity_label ? (
+                      <AppText style={[styles.meta, { color: resolvePlayerTier(item.tier).color }]}>
+                        {item.opportunity_label}
+                      </AppText>
+                    ) : (
+                      item.status
+                    )}
+                  </>
+                )}
               </AppText>
             </View>
             {item.overall_rank != null ? (

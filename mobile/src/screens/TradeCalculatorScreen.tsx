@@ -16,6 +16,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PlayerNameText from '../components/PlayerNameText';
 import PositionBadge from '../components/PositionBadge';
 import { api, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -240,9 +241,7 @@ function TradeSide({
           style={styles.chip}
           onPress={() => onRemove(player.player_id)}
         >
-          <AppText style={styles.chipText} numberOfLines={1}>
-            {player.name ?? 'Unknown'}
-          </AppText>
+          <PlayerNameText name={player.name ?? 'Unknown'} style={styles.chipText} />
           <AppText style={styles.chipRemove}>{'×'}</AppText>
         </TouchableOpacity>
       ))}

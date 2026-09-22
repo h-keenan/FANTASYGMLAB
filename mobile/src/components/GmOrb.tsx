@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -26,6 +25,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StackActions } from '@react-navigation/routers';
 
 import IconCircle from './IconCircle';
+import TrajectoryArcs from './TrajectoryArcs';
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
@@ -466,7 +466,14 @@ export default function GmOrb() {
               // than sitting exactly on the line.
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Image source={require('../../assets/icon.png')} style={styles.orbImage} />
+              {/* The vector brand mark, not the flat app-icon PNG: that PNG
+                  is a fully opaque square with its own baked-in dark-navy
+                  fill, so it always shows through as a "grey" disc no
+                  matter what this circle's own backgroundColor is set to.
+                  TrajectoryArcs has no background of its own, so the disc's
+                  real backgroundColor (colors.background, matching where
+                  the screen's own wash ends) shows through correctly. */}
+              <TrajectoryArcs width={34} height={23} />
             </TouchableOpacity>
           </Animated.View>
         </GestureDetector>
@@ -590,12 +597,17 @@ function createStyles(colors: ThemeColors) {
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: 'rgba(0,212,255,0.55)',
-    backgroundColor: colors.surface,
+    // `background`, not `surface` — the orb sits right where the screen's
+    // GridBackground wash ends (bottom of the screen), which is
+    // `background`'s own tone (true OLED black in dark mode). `surface` is
+    // one step lighter, and now that `background` is pure black (it used to
+    // equal `surface`), that one-step difference reads as a visibly grey
+    // disc against the black backdrop instead of blending into it.
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.orbGlow,
   },
-  orbImage: { width: ORB_SIZE * 1.15, height: ORB_SIZE * 1.15 },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000',

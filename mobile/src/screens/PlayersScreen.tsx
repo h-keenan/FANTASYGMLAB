@@ -18,6 +18,7 @@ import EmptyState from '../components/EmptyState';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import { resolvePlayerTier } from '../lib/playerTier';
 import PositionBadge from '../components/PositionBadge';
 import TierBadge from '../components/TierBadge';
 import { api, type RankedPlayer, type UsageTrend, type ValuationLens } from '../lib/api';
@@ -226,7 +227,13 @@ export default function PlayersScreen({ route, navigation }: Props) {
                 <View style={styles.metaRow}>
                   <PositionBadge position={item.position} />
                   <AppText style={styles.meta} numberOfLines={1}>
-                    {[item.team, item.opportunity_label].filter(Boolean).join(' · ')}
+                    {item.team}
+                    {item.team && item.opportunity_label ? ' · ' : ''}
+                    {item.opportunity_label ? (
+                      <AppText style={[styles.meta, { color: resolvePlayerTier(item.tier).color }]}>
+                        {item.opportunity_label}
+                      </AppText>
+                    ) : null}
                   </AppText>
                   {item.usage_trend ? <UsageTrendPill trend={item.usage_trend} /> : null}
                   <TierBadge storedTier={item.tier} />

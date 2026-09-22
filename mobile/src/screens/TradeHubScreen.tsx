@@ -12,6 +12,7 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PlayerNameText from '../components/PlayerNameText';
 import TeamAvatar from '../components/TeamAvatar';
 import PositionBadge from '../components/PositionBadge';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
@@ -523,9 +524,7 @@ function AssetRow({
     >
       <PlayerAvatar playerId={asset.player_id} size={36} tier={asset.tier} style={styles.assetAvatar} />
       <View style={styles.assetTextGroup}>
-        <AppText style={styles.assetName} numberOfLines={1}>
-          {asset.name ?? 'Unknown'}
-        </AppText>
+        <PlayerNameText name={asset.name ?? 'Unknown'} style={styles.assetName} />
         <View style={styles.assetMetaRow}>
           <PositionBadge position={asset.position} />
           <AppText style={styles.assetMeta} numberOfLines={1}>
