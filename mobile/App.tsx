@@ -16,6 +16,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { DensityProvider } from './src/context/DensityContext';
 import { GmStanceProvider } from './src/context/GmStanceContext';
 import { ShowcaseModeProvider } from './src/context/ShowcaseModeContext';
+import { ThemeModeProvider, useThemeMode } from './src/context/ThemeModeContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
@@ -55,19 +56,29 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
-        <DensityProvider>
-          <GmStanceProvider>
-            {/* Outside AuthProvider so the masking flag is armed from
-                storage before the first authorized request goes out. */}
-            <ShowcaseModeProvider>
-              <AuthProvider>
-                <RootNavigator />
-              </AuthProvider>
-            </ShowcaseModeProvider>
-          </GmStanceProvider>
-        </DensityProvider>
-        <StatusBar style="light" />
+        <ThemeModeProvider>
+          <DensityProvider>
+            <GmStanceProvider>
+              {/* Outside AuthProvider so the masking flag is armed from
+                  storage before the first authorized request goes out. */}
+              <ShowcaseModeProvider>
+                <AuthProvider>
+                  <RootNavigator />
+                </AuthProvider>
+              </ShowcaseModeProvider>
+            </GmStanceProvider>
+          </DensityProvider>
+          <ThemedStatusBar />
+        </ThemeModeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** Light-mode needs dark status bar icons on its icy-white background —
+ * the old hardcoded `style="light"` only ever made sense for the
+ * dark-only theme this app had before today. */
+function ThemedStatusBar() {
+  const { isDark } = useThemeMode();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
 }

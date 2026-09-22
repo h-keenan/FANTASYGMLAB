@@ -15,33 +15,31 @@ import { Platform } from 'react-native';
 
 /**
  * Dark surface ramp — three steppable solid tiers (background < surface <
- * backgroundElevated) plus two line weights (border < borderStrong). The
- * brand-sheet values (`background` #0D1117 canvas, `surface` #151B22 card)
- * are fixed points; the tiers above them were previously bunched so tightly
- * that the whole app read as one muddy blue-gray (and `border` was the
- * *literal same hex* as `backgroundElevated`, so any bordered element on an
- * elevated background had a zero-contrast edge).
+ * backgroundElevated) plus two line weights (border < borderStrong).
+ * `background` is true OLED black per direct feedback (2026-09-22) — every
+ * other tier shifted down the same ramp so the *relative* contrast steps
+ * that made the original ramp legible are preserved, just anchored to #000
+ * instead of #0D1117.
  *
- * Relative contrast between neighbours, after widening:
- *   surface -> backgroundElevated  1.26
- *   backgroundElevated -> border   1.19
- *   border -> borderStrong         1.28
+ * Relative contrast between neighbours:
+ *   surface -> backgroundElevated  ~1.26
+ *   backgroundElevated -> border   ~1.19
+ *   border -> borderStrong         ~1.28
  * `border` deliberately sits *above* `backgroundElevated` so a rim reads on
- * all three surfaces (1.64 on background, 1.50 on surface, 1.19 on
- * elevated) — in dark mode a rim catches light, it doesn't cut a groove.
- * Hue stays 213-217deg throughout, desaturating slightly as it lightens so
- * the top of the ramp doesn't skew blue.
+ * all three surfaces — in dark mode a rim catches light, it doesn't cut a
+ * groove. Hue stays 213-217deg throughout, desaturating slightly as it
+ * lightens so the top of the ramp doesn't skew blue.
  *
  * `border` is a *line* token: for solid chip/track/disc fills use
  * `backgroundElevated`, never `border`.
  */
-export const colors = {
-  background: '#0D1117',
-  backgroundElevated: '#242E3B',
-  surface: '#151B22',
-  surfaceSolid: '#151B22',
-  border: '#2E3A4A',
-  borderStrong: '#3C4A5C',
+const darkColors = {
+  background: '#000000',
+  backgroundElevated: '#1A1F26',
+  surface: '#0D1117',
+  surfaceSolid: '#0D1117',
+  border: '#242E3B',
+  borderStrong: '#2E3A4A',
   // Concept-sheet card outline: every card there reads with a faint cyan
   // edge against the navy background, not a neutral gray hairline. Scoped
   // to AnimatedCard's default border only (never swapped in for the
@@ -67,6 +65,58 @@ export const colors = {
   badgeText: '#5CE4FF',
   violet: '#8B93FF',
 };
+
+/**
+ * Light theme: "glacier ice white" per direct feedback (2026-09-22) — a
+ * cool pale-blue backdrop (not stark white) with pure-white cards standing
+ * up off it, and the same brand hues darkened just enough to clear AA text
+ * contrast on a light ground (the dark theme's accent/danger/success/
+ * premium are tuned for a near-black backdrop and fail contrast used as
+ * text here).
+ */
+const lightColors = {
+  background: '#EAF3F8',
+  backgroundElevated: '#D9E8F0',
+  surface: '#FFFFFF',
+  surfaceSolid: '#FFFFFF',
+  border: '#C7D9E3',
+  borderStrong: '#AFC7D5',
+  cardBorder: 'rgba(0,120,160,0.25)',
+  hairline: 'rgba(10,30,45,0.08)',
+  textPrimary: '#0B1D26',
+  textSecondary: '#3E5867',
+  textTertiary: '#6B8494',
+  accent: '#0077A3',
+  accentSoft: '#00A6CC',
+  accentMuted: 'rgba(0,119,163,0.12)',
+  danger: '#D92D2D',
+  dangerMuted: 'rgba(217,45,45,0.12)',
+  success: '#178A43',
+  successBright: '#22C55E',
+  successMuted: 'rgba(23,138,67,0.12)',
+  premium: '#B8860B',
+  premiumMuted: 'rgba(184,134,11,0.12)',
+  badgeBackground: 'rgba(0,119,163,0.12)',
+  badgeText: '#0077A3',
+  violet: '#6B5FCC',
+};
+
+export type ThemeColors = typeof darkColors;
+export { darkColors, lightColors };
+
+/**
+ * Default/legacy export — every screen that hasn't migrated to
+ * `useThemeMode()` yet (see context/ThemeModeContext.tsx) still imports
+ * this directly and always renders in dark, exactly as before. Screens
+ * migrated to the new theme system read `colors` from the hook instead of
+ * this static export so they actually respond to the Day/Night/Auto
+ * toggle — see ThemeModeContext's own docstring for the migration status
+ * and why a static export couldn't just be reassigned in place (React
+ * Native bakes StyleSheet.create's values in at module-load time, so
+ * mutating this object's properties would not update any already-created
+ * style sheet).
+ */
+export const colors = darkColors;
 
 /**
  * Position identity — byte-identical to modules/design_tokens.py's
@@ -95,8 +145,13 @@ export function positionColor(position: string | null | undefined): string {
 }
 
 export const gradients = {
-  hero: ['#16202C', '#0D1117'] as const,
+  hero: ['#16202C', '#000000'] as const,
   accent: ['#5CE4FF', '#00D4FF'] as const,
+};
+
+export const lightGradients = {
+  hero: ['#FFFFFF', '#EAF3F8'] as const,
+  accent: ['#00A6CC', '#0077A3'] as const,
 };
 
 export const spacing = {
