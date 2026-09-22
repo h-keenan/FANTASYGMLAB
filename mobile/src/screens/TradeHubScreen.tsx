@@ -37,6 +37,7 @@ import { useGmStance } from '../context/GmStanceContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
+import { setSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -220,6 +221,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           setNotReadyReason(null);
           setIdeas(result.ideas);
           setEntitlement(result.entitlement ?? null);
+          void setSeenTradeIdeaCount(leagueId, result.ideas.length);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load Trade Hub ideas.');
