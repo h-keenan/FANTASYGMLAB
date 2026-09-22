@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,7 +17,8 @@ import TierBadge from '../components/TierBadge';
 import { api, type MatchupComparison, type MatchupResponse, type MatchupSide, type MatchupStarter } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Matchup'>;
@@ -47,11 +48,13 @@ const NOT_READY_MESSAGES: Record<string, string> = {
   opponent_roster_missing: "Couldn't load your opponent's roster right now — try again in a bit.",
 };
 
-const EDGE_COLOR: Record<MatchupComparison['edge'], string> = {
-  you: colors.successBright,
-  opponent: colors.danger,
-  even: colors.textSecondary,
-};
+function edgeColor(colors: ThemeColors): Record<MatchupComparison['edge'], string> {
+  return {
+    you: colors.successBright,
+    opponent: colors.danger,
+    even: colors.textSecondary,
+  };
+}
 
 function recordLabel(side: MatchupSide): string {
   if (side.wins == null || side.losses == null) return '—';
@@ -78,6 +81,8 @@ function toRankedPlayer(player: MatchupStarter) {
 
 export default function MatchupScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,7 +159,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
                 {mine.team_name}
               </AppText>
               <AppText style={styles.versusRecord}>{recordLabel(mine)}</AppText>
-              <AppText style={[styles.versusValue, { color: EDGE_COLOR[comparison.edge === 'you' ? 'you' : 'even'] }]}>
+              <AppText style={[styles.versusValue, { color: edgeColor(colors)[comparison.edge === 'you' ? 'you' : 'even'] }]}>
                 {Math.round(comparison.my_season_value).toLocaleString()}
               </AppText>
             </View>
@@ -170,7 +175,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
               </AppText>
               <AppText style={styles.versusRecord}>{recordLabel(opponent)}</AppText>
               <AppText
-                style={[styles.versusValue, { color: EDGE_COLOR[comparison.edge === 'opponent' ? 'you' : 'even'] }]}
+                style={[styles.versusValue, { color: edgeColor(colors)[comparison.edge === 'opponent' ? 'you' : 'even'] }]}
               >
                 {Math.round(comparison.opponent_season_value).toLocaleString()}
               </AppText>
@@ -179,7 +184,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
           <ValueSplitBar comparison={comparison} />
 
-          <AppText style={[styles.edgeHeadline, { color: EDGE_COLOR[comparison.edge] }]}>
+          <AppText style={[styles.edgeHeadline, { color: edgeColor(colors)[comparison.edge] }]}>
             {comparison.headline}
             {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
           </AppText>
@@ -208,6 +213,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
 }
 
 function ValueSplitBar({ comparison }: { comparison: MatchupComparison }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const total = comparison.my_season_value + comparison.opponent_season_value;
   const mineShare = total > 0 ? Math.max(0.05, Math.min(0.95, comparison.my_season_value / total)) : 0.5;
   return (
@@ -229,6 +236,8 @@ function StarterSection({
   onPressPlayer: (player: MatchupStarter) => void;
   accent: string;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeaderRow}>
@@ -251,6 +260,8 @@ function StarterSection({
 }
 
 function StarterRow({ player, onPress }: { player: MatchupStarter; onPress: () => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <AnimatedCard style={styles.card} onPress={onPress}>
       <View style={styles.cardTopRow}>
@@ -285,7 +296,8 @@ function StarterRow({ player, onPress }: { player: MatchupStarter; onPress: () =
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
@@ -374,4 +386,5 @@ const styles = StyleSheet.create({
   why: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: spacing.sm },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
-});
+  });
+}

@@ -14,22 +14,24 @@ import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../
 import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DraftCenter'>;
 
 type PickScope = 'mine' | 'league';
 
-const TONE_COLOR: Record<string, string> = {
-  power: colors.premium,
-  strength: colors.success,
-  opportunity: colors.success,
-  strategy: colors.accent,
-  weakness: colors.danger,
-  risk: colors.danger,
-};
-const DEFAULT_TONE_COLOR = colors.accent;
+function toneColorMap(colors: ThemeColors): Record<string, string> {
+  return {
+    power: colors.premium,
+    strength: colors.success,
+    opportunity: colors.success,
+    strategy: colors.accent,
+    weakness: colors.danger,
+    risk: colors.danger,
+  };
+}
 
 const POSTURE_REASON_MESSAGE: Record<string, string> = {
   no_sleeper_username_linked: "Link your Sleeper account and join this league from Home to see your own draft posture.",
@@ -40,6 +42,8 @@ const POSTURE_REASON_MESSAGE: Record<string, string> = {
 
 export default function DraftCenterScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [posture, setPosture] = useState<DraftPosture | null>(null);
   const [postureReason, setPostureReason] = useState('');
@@ -169,11 +173,11 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
               />
             </View>
             <AnimatedCard
-              style={StyleSheet.flatten([styles.postureCard, { borderColor: TONE_COLOR[posture.tone] ?? DEFAULT_TONE_COLOR }])}
+              style={StyleSheet.flatten([styles.postureCard, { borderColor: toneColorMap(colors)[posture.tone] ?? colors.accent }])}
             >
-              <View style={[styles.posturePill, { backgroundColor: TONE_COLOR[posture.tone] ?? DEFAULT_TONE_COLOR }]}>
+              <View style={[styles.posturePill, { backgroundColor: toneColorMap(colors)[posture.tone] ?? colors.accent }]}>
                 <AppText
-                  style={[styles.postureLabel, { color: contrastTextColor(TONE_COLOR[posture.tone] ?? DEFAULT_TONE_COLOR) }]}
+                  style={[styles.postureLabel, { color: contrastTextColor(toneColorMap(colors)[posture.tone] ?? colors.accent) }]}
                 >
                   {posture.label}
                 </AppText>
@@ -264,6 +268,8 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
 }
 
 function PostureTile({ label, value, note, first }: { label: string; value: string; note: string; first?: boolean }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.tile, first && styles.tileFirst]}>
       <View style={styles.tileValueRow}>
@@ -293,6 +299,8 @@ function PickRow({
   first?: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const meta = [pick.pick_tier, pick.projected_pick_range].filter(Boolean).join(' · ');
   const confidence = typeof pick.projection_confidence === 'number' ? pick.projection_confidence : null;
   return (
@@ -320,7 +328,9 @@ function PickRow({
 }
 
 function DraftInsightCard({ card }: { card: DraftCard }) {
-  const toneColor = TONE_COLOR[card.tone] ?? DEFAULT_TONE_COLOR;
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const toneColor = toneColorMap(colors)[card.tone] ?? colors.accent;
   return (
     <AnimatedCard style={styles.insightCard}>
       <View style={[styles.insightBadge, { backgroundColor: `${toneColor}26` }]}>
@@ -337,7 +347,8 @@ function DraftInsightCard({ card }: { card: DraftCard }) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
@@ -474,4 +485,5 @@ const styles = StyleSheet.create({
   insightItemRow: { flexDirection: 'row', marginBottom: 4 },
   insightItemMark: { color: colors.textSecondary, marginRight: spacing.sm },
   insightItemText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-});
+  });
+}

@@ -24,7 +24,8 @@ import TierBadge from '../components/TierBadge';
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Waivers'>;
@@ -35,7 +36,7 @@ const BEST_AVAILABLE_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K'];
 const INJURY_RISK_STATUSES = new Set(['out', 'ir', 'doubtful', 'pup', 'suspended']);
 const INJURY_WATCH_STATUSES = new Set(['questionable', 'sus']);
 
-function injuryPillColor(status: string | null): string | null {
+function injuryPillColor(status: string | null, colors: ThemeColors): string | null {
   const normalized = (status ?? '').trim().toLowerCase();
   if (!normalized) return null;
   if (INJURY_RISK_STATUSES.has(normalized)) return colors.danger;
@@ -69,6 +70,8 @@ function reasonMessage(reason: string): string | null {
 
 export default function WaiversScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [freeAgents, setFreeAgents] = useState<WaiverPlayer[] | null>(null);
   const [priorityAdds, setPriorityAdds] = useState<WaiverPriorityAdd[]>([]);
@@ -290,6 +293,8 @@ function SecondaryWaiverBoard({
   leagueName: string;
   navigation: Props['navigation'];
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (!isPremium) {
     return (
       <View style={styles.secondaryLockWrap}>
@@ -349,6 +354,8 @@ function BestAvailableCard({
   count: number;
   onPress: () => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <AnimatedCard style={styles.bestAvailableCard} onPress={onPress}>
       <View style={styles.bestAvailablePosBadge}>
@@ -365,7 +372,9 @@ function BestAvailableCard({
 }
 
 function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPress: () => void }) {
-  const injuryColor = injuryPillColor(player.injury_status);
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const injuryColor = injuryPillColor(player.injury_status, colors);
   return (
     <AnimatedCard style={styles.priorityCard} onPress={onPress}>
       <View style={styles.priorityTopRow}>
@@ -428,7 +437,9 @@ function WaiverCard({
   topOfBoard?: boolean;
   onPress: () => void;
 }) {
-  const injuryColor = injuryPillColor(player.injury_status);
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const injuryColor = injuryPillColor(player.injury_status, colors);
   return (
     <AnimatedCard
       style={StyleSheet.flatten([styles.card, player.stale_free_agent && styles.cardStale])}
@@ -478,7 +489,8 @@ function WaiverCard({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   disclaimer: {
     fontSize: 12,
@@ -636,4 +648,5 @@ const styles = StyleSheet.create({
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
-});
+  });
+}
