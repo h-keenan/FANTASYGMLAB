@@ -1,13 +1,11 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import Svg, { Defs, LinearGradient, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { colors, gradients } from '../theme';
 
-const CELL = 72;
-
 /**
- * The app's shared screen backdrop: three layers, back to front.
+ * The app's shared screen backdrop: two layers, back to front.
  *
  * 1. A navy-to-black wash (the same `gradients.hero` pair already used on
  *    Login/Home) instead of a flat `colors.background` fill — before this,
@@ -17,8 +15,11 @@ const CELL = 72;
  * 2. A soft cyan glow bloom anchored top-center, echoing the concept
  *    sheet's corner-glow treatment — kept faint on purpose (this app's
  *    established rule is distinct accents, not overdone ones).
- * 3. The web app's ops-grid hairline texture (modules/interface_reimagining_styles.py's
- *    `.stApp` rule), unchanged from before.
+ *
+ * A hairline ops-grid pattern used to sit on top of this (ported from the
+ * web app's `.stApp` rule) — removed per direct feedback on Build 32, it
+ * just read as unwanted grey noise over the new navy wash rather than a
+ * texture worth keeping.
  */
 export default function GridBackground() {
   return (
@@ -32,13 +33,9 @@ export default function GridBackground() {
           <Stop offset="0" stopColor={colors.accent} stopOpacity={0.12} />
           <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
         </RadialGradient>
-        <Pattern id="opsGrid" width={CELL} height={CELL} patternUnits="userSpaceOnUse">
-          <Path d={`M ${CELL} 0 L 0 0 0 ${CELL}`} fill="none" stroke={colors.hairline} strokeWidth={1} />
-        </Pattern>
       </Defs>
       <Rect x={0} y={0} width="100%" height="100%" fill="url(#screenWash)" />
       <Rect x={0} y={0} width="100%" height="100%" fill="url(#glowBloom)" />
-      <Rect x={0} y={0} width="100%" height="100%" fill="url(#opsGrid)" />
     </Svg>
   );
 }
