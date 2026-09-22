@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, type ViewStyle } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,21 +32,23 @@ import { getCachedDashboard, setCachedDashboard } from '../lib/dashboardCache';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
-import { colors, radii, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 type DashboardNavigation = Props['navigation'];
 
-const CATEGORY_META: Record<
-  DashboardItemCategory,
-  { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }
-> = {
-  top_priority: { label: 'Top Priority', icon: 'flash', color: colors.accent },
-  watch: { label: 'Watch', icon: 'eye-outline', color: colors.danger },
-  waiver_opportunity: { label: 'Waiver Opportunity', icon: 'swap-horizontal-outline', color: colors.premium },
-  league_movement: { label: 'League Movement', icon: 'trending-up-outline', color: colors.textSecondary },
-};
+function categoryMeta(
+  colors: ThemeColors,
+): Record<DashboardItemCategory, { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }> {
+  return {
+    top_priority: { label: 'Top Priority', icon: 'flash', color: colors.accent },
+    watch: { label: 'Watch', icon: 'eye-outline', color: colors.danger },
+    waiver_opportunity: { label: 'Waiver Opportunity', icon: 'swap-horizontal-outline', color: colors.premium },
+    league_movement: { label: 'League Movement', icon: 'trending-up-outline', color: colors.textSecondary },
+  };
+}
 
 // Only destinations mobile can navigate to with just {leagueId, leagueName} —
 // "my_team" would need TeamRoster's ownerName/playerIds params, which this
@@ -91,7 +93,7 @@ function bestByRank(teams: TeamRanking[], rankKey: 'power_rank' | 'draft_capital
  * was never ported to modules/ either), so it would take real new backend
  * work rather than reusing existing data.
  */
-function buildLeaguePulseTiles(teams: TeamRanking[]): LeaguePulseTile[] {
+function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): LeaguePulseTile[] {
   const contenders = teams.filter((t) => t.strategy === 'contender');
   const rebuilders = teams.filter((t) => t.strategy === 'rebuild' || t.strategy === 'tank');
   const contender = bestByRank(contenders, 'power_rank');
@@ -128,6 +130,8 @@ function buildLeaguePulseTiles(teams: TeamRanking[]): LeaguePulseTile[] {
 
 export default function DashboardScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<DashboardItem[] | null>(null);
   const [teamSnapshot, setTeamSnapshot] = useState<TeamSnapshot | null>(null);
@@ -321,7 +325,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
 }
 
 function LeaguePulseSection({ teams }: { teams: TeamRanking[] }) {
-  const tiles = buildLeaguePulseTiles(teams);
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const tiles = buildLeaguePulseTiles(teams, colors);
   return (
     <View style={styles.pulseSection}>
       <AppText style={styles.pulseHeading}>League Pulse</AppText>
@@ -359,17 +365,19 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 // — IconCircle's own docstring is "a list of rows scans by color before it
 // scans by label," which only holds if the same destination always gets
 // the same color everywhere, not a fresh one invented per screen.
-const QUICK_ACTIONS: Array<{
+function quickActions(colors: ThemeColors): Array<{
   label: string;
   route: 'TradeHub' | 'Players' | 'Waivers' | 'DraftCenter';
   icon: React.ComponentProps<typeof IconCircle>['name'];
   color: string;
-}> = [
-  { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', color: colors.premium },
-  { label: 'Rankings', route: 'Players', icon: 'people-outline', color: colors.violet },
-  { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
-  { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
-];
+}> {
+  return [
+    { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', color: colors.premium },
+    { label: 'Rankings', route: 'Players', icon: 'people-outline', color: colors.violet },
+    { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
+    { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
+  ];
+}
 
 /** The concept sheet's Dashboard panel leads with a 2x2 "Quick Actions"
  * shortcut grid (Trade Hub/Rankings/Waivers/Draft Picks) above the daily
@@ -384,9 +392,11 @@ function QuickActionsGrid({
   leagueName: string;
   navigation: DashboardNavigation;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.quickActionsGrid}>
-      {QUICK_ACTIONS.map((action) => (
+      {quickActions(colors).map((action) => (
         <TouchableOpacity
           key={action.route}
           style={[styles.quickActionCell, { borderColor: `${action.color}55` }]}
@@ -413,6 +423,8 @@ function DestinationButton({
   leagueName: string;
   navigation: DashboardNavigation;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const label = DESTINATION_BUTTON_LABEL[item.destination];
   const routeName = DESTINATION_ROUTE[item.destination];
   if (!label || !routeName) return null;
@@ -430,6 +442,8 @@ function DestinationButton({
 }
 
 function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (asset.asset_type === 'pick') {
     return (
       <View style={styles.assetRow}>
@@ -461,6 +475,8 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
 }
 
 function NewBadge() {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.newBadge}>
       <AppText style={styles.newBadgeText}>NEW</AppText>
@@ -479,6 +495,8 @@ function TeamSnapshotRow({
   leagueName: string;
   navigation: DashboardNavigation;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const record =
     snapshot.wins != null && snapshot.losses != null
       ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
@@ -557,6 +575,8 @@ function WeeklyMatchupCard({
   leagueName: string;
   navigation: DashboardNavigation;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const mine = matchup.my_team;
   const opponent = matchup.opponent;
   const comparison = matchup.comparison;
@@ -647,6 +667,8 @@ function injuryImpactLine(player: InjuryImpactPlayer): string {
  * bulleted label/items style TeamRosterScreen already uses for archetype
  * strengths and risks. */
 function TeamHealthContextCard({ snapshot }: { snapshot: TeamSnapshot }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const players = snapshot.top_injury_impact_players ?? [];
   const keyInjuries = snapshot.key_injuries_summary?.trim() ?? '';
   const fallbackSummary = snapshot.top_injury_impact_summary?.trim() ?? '';
@@ -692,6 +714,8 @@ function TopPriorityTradeCard({
   isNew: boolean;
   showExplanations: boolean;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const presentation = item.presentation!;
   const gain = presentation.trade_gain;
   const gainColor = gain > 0 ? colors.successBright : gain < 0 ? colors.danger : colors.textSecondary;
@@ -784,6 +808,8 @@ function BriefingCard({
   isNew: boolean;
   showExplanations: boolean;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (item.presentation?.trade_package) {
     return (
       <TopPriorityTradeCard
@@ -796,7 +822,7 @@ function BriefingCard({
       />
     );
   }
-  const meta = CATEGORY_META[item.category] ?? CATEGORY_META.watch;
+  const meta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
   return (
     <AnimatedCard style={StyleSheet.flatten([styles.card, { borderLeftColor: meta.color } as ViewStyle])}>
       <View style={styles.cardHeaderRow}>
@@ -811,7 +837,8 @@ function BriefingCard({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
@@ -1044,4 +1071,5 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
-});
+  });
+}
