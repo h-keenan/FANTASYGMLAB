@@ -13,6 +13,7 @@ import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -95,6 +96,7 @@ interface OtherTeam {
 const ALL_TEAMS_ID = '__all__';
 
 export default function TradeAnalyzerScreen({ route, navigation }: Props) {
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
@@ -310,12 +312,12 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   };
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.error}>{error}</AppText>
       </View>
     );
@@ -323,7 +325,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
 
   if (notReadyReason) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't verify your roster in this league."}
         </AppText>
@@ -475,7 +477,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       style={styles.container}
       data={searchResults}
       keyExtractor={(item) => (item.kind === 'player' ? item.player.player_id : item.pick.pick_id)}
-      contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance }]}
+      contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={header}
       renderItem={({ item }) =>

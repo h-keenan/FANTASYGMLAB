@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -108,6 +109,7 @@ function IdentityHeader({ side, align }: { side: RankedPlayer; align: 'left' | '
 
 export default function PlayerCompareScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
@@ -169,7 +171,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
 
   if (!playerB) {
     return (
-      <View style={styles.root}>
+      <View style={[styles.root, { paddingTop: headerHeight }]}>
         <GridBackground />
         <View style={styles.pickerHeader}>
           <PlayerAvatar playerId={player.player_id} size={40} tier={player.tier} />
@@ -213,7 +215,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
       <TouchableOpacity style={styles.changeButton} onPress={() => setPlayerB(null)}>
         <Ionicons name="swap-horizontal-outline" size={14} color={colors.accent} />

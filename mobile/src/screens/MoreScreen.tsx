@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, TouchableOpac
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import IconCircle from '../components/IconCircle';
 import { api, type PushCategory } from '../lib/api';
@@ -46,6 +47,7 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
 
 export default function MoreScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const [sendingTestPush, setSendingTestPush] = useState(false);
   const { density, setDensity } = useDensity();
   const { mode: themeMode, setMode: setThemeMode, colors } = useThemeMode();
@@ -141,7 +143,7 @@ export default function MoreScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <GridBackground />
-      <ScrollView contentContainerStyle={{ paddingBottom: orbClearance }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: orbClearance, paddingTop: headerHeight }}>
       <AppText style={styles.sectionLabel}>Display</AppText>
       <View style={styles.densityRow}>
         {DENSITY_OPTIONS.map((option) => {

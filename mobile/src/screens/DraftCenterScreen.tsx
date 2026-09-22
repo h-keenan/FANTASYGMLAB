@@ -5,6 +5,7 @@ import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -42,6 +43,7 @@ const POSTURE_REASON_MESSAGE: Record<string, string> = {
 
 export default function DraftCenterScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
@@ -123,12 +125,12 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   }, [visiblePicks]);
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.error}>{error}</AppText>
       </View>
     );
@@ -136,7 +138,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
 
   if (reason) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.notReadyText}>
           Draft Center isn't ready for this league yet — try again in a bit.
         </AppText>
@@ -147,7 +149,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   return (
     <View style={styles.root}>
       <GridBackground />
-      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <ScreenHero title="DRAFT CENTER" subtitle={leagueName} />
         <AppText style={styles.sectionLabel}>Your Draft Posture</AppText>

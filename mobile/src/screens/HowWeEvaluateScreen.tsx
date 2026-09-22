@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import ContentSections, { type ContentSection } from '../components/ContentSections';
 import methodologyContent from '../data/methodologyContent.json';
@@ -20,13 +21,14 @@ const CONTENT = methodologyContent as MethodologyContent;
 
 export default function HowWeEvaluateScreen() {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={styles.root}>
       <GridBackground />
-      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight + spacing.xl }]}>
         <AppText style={styles.kicker}>{CONTENT.kicker}</AppText>
         <AppText style={styles.note}>{CONTENT.note}</AppText>
         <ContentSections sections={CONTENT.sections} />

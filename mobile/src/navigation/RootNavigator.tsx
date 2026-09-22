@@ -1,16 +1,16 @@
 import React from 'react';
 import { Image, TouchableOpacity, View } from 'react-native';
-import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors } from '../theme';
 import type { DraftPickAsset, RankedPlayer } from '../lib/api';
 import GmOrb from '../components/GmOrb';
 import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
 import { navigationRef } from './navigationRef';
 
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeModeContext';
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import LeagueDetailScreen from '../screens/LeagueDetailScreen';
@@ -68,21 +68,22 @@ export type RootStackParamList = {
 const AppStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator();
 
-const navigationTheme: Theme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: colors.accent,
-    background: colors.background,
-    card: colors.background,
-    text: colors.textPrimary,
-    border: colors.hairline,
-    notification: colors.danger,
-  },
-};
-
 export default function RootNavigator() {
   const { session, loading } = useAuth();
+  const { colors, isDark } = useThemeMode();
+
+  const navigationTheme: Theme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      primary: colors.accent,
+      background: colors.background,
+      card: colors.background,
+      text: colors.textPrimary,
+      border: colors.hairline,
+      notification: colors.danger,
+    },
+  };
 
   if (loading) {
     return (
@@ -101,9 +102,18 @@ export default function RootNavigator() {
             // league name as a redundant "pill" on every screen. "minimal"
             // keeps just the chevron.
             headerBackButtonDisplayMode: 'minimal',
-            headerStyle: { backgroundColor: colors.background },
+            // Transparent (not a flat colors.background fill) so each
+            // screen's own GridBackground gradient wash extends up behind
+            // the header instead of stopping at a hard seam where the
+            // header used to sit — coridian_'s "the background gradient
+            // should start in the header and bleed into the main
+            // background." Every screen must add its own top padding sized
+            // to the (now-floating) header's height, via useHeaderHeight(),
+            // since a transparent header no longer reserves layout space.
+            headerTransparent: true,
+            headerStyle: { backgroundColor: 'transparent' },
             headerTintColor: colors.textPrimary,
-            headerShadowVisible: true,
+            headerShadowVisible: false,
             headerTitleAlign: 'center',
             contentStyle: { backgroundColor: colors.background },
           }}

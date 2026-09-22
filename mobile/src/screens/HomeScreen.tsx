@@ -14,6 +14,7 @@ import {
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,6 +46,7 @@ interface SavedLeague {
 
 export default function HomeScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { session, signOut } = useAuth();
@@ -266,7 +268,7 @@ export default function HomeScreen({ navigation }: Props) {
   }, [leagues, navigation]);
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
 
   const defaultLeague = leagues?.find((league) => league.is_default) ?? leagues?.[0] ?? null;
@@ -278,7 +280,7 @@ export default function HomeScreen({ navigation }: Props) {
       <FlatList
         data={leagues ?? []}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accent} />}
         ListHeaderComponent={
           <>

@@ -9,6 +9,7 @@ import {
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -38,6 +39,7 @@ const FEATURES = [
 
 export default function PaywallScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
@@ -102,7 +104,7 @@ export default function PaywallScreen({ navigation }: Props) {
 
   if (purchased) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.successTitle}>You're on Premium</AppText>
         <AppText style={styles.successSubtitle}>
           It may take a moment to reflect everywhere in the app.
@@ -119,7 +121,7 @@ export default function PaywallScreen({ navigation }: Props) {
     <GridBackground />
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
+      contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
       showsVerticalScrollIndicator={false}
     >
       <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={8}>

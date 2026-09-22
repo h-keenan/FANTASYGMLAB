@@ -6,6 +6,7 @@ import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
@@ -30,6 +31,7 @@ interface TargetRow {
 
 export default function GmTargetsScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
@@ -103,11 +105,11 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenHero title="GM TARGETS" subtitle={leagueName} />

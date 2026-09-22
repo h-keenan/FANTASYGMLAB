@@ -11,6 +11,7 @@ import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -88,6 +89,7 @@ function UsageTrendPill({ trend }: { trend: UsageTrend }) {
 
 export default function PlayersScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
@@ -133,7 +135,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   }, [players, position, ageFilter, statusFilter, availabilityFilter, search]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenHero title="PLAYERS" subtitle={leagueName} />

@@ -12,6 +12,7 @@ import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
@@ -37,6 +38,7 @@ function playerScore(player: RankedPlayer): number {
 }
 
 export default function TradeCalculatorScreen({ route, navigation }: Props) {
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
@@ -108,12 +110,12 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
   };
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.error}>{error}</AppText>
       </View>
     );
@@ -121,7 +123,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingTop: headerHeight }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <GridBackground />
