@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -158,6 +159,7 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 
 export default function TradeHubScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
@@ -307,7 +309,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       style={styles.container}
       data={activeData}
       keyExtractor={(_, index) => String(index)}
-      contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
+      contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
       ListHeaderComponent={
         <View>
           <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />

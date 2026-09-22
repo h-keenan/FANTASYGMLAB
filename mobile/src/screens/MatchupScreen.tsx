@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -81,6 +82,7 @@ function toRankedPlayer(player: MatchupStarter) {
 
 export default function MatchupScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
@@ -110,12 +112,12 @@ export default function MatchupScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.error}>{error}</AppText>
       </View>
     );
@@ -124,7 +126,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
   if (!matchup || !matchup.my_team || !matchup.opponent || !matchup.comparison) {
     const reason = matchup?.reason ?? '';
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.notice}>
           {NOT_READY_MESSAGES[reason] ?? "Couldn't build this week's matchup for this league."}
         </AppText>
@@ -139,7 +141,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
   return (
     <View style={styles.root}>
       <GridBackground />
-      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <ScreenHero title="MATCHUP" subtitle={leagueName} />
         <AnimatedCard glow style={styles.headlineCard}>

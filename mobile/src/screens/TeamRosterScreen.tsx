@@ -3,6 +3,7 @@ import { SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -69,6 +70,7 @@ type RosterSection = { title: string; data: RankedPlayer[] };
 
 export default function TeamRosterScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { ownerName, playerIds, leagueId, leagueName, rosterId } = route.params;
@@ -131,12 +133,12 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   }, [players]);
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.error}>{error}</AppText>
       </View>
     );
@@ -153,7 +155,9 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
         stickySectionHeadersEnabled={false}
         keyExtractor={(item) => item.player_id}
         contentContainerStyle={
-          sections.length === 0 ? styles.emptyContainer : [styles.listContent, { paddingBottom: orbClearance }]
+          sections.length === 0
+            ? [styles.emptyContainer, { paddingTop: headerHeight }]
+            : [styles.listContent, { paddingBottom: orbClearance, paddingTop: headerHeight }]
         }
         ListEmptyComponent={
           <AppText style={styles.empty}>

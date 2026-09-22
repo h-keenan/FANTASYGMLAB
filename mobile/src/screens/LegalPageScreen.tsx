@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import ContentSections, { type ContentSection } from '../components/ContentSections';
 import legalContent from '../data/legalContent.json';
@@ -24,6 +25,7 @@ const LAST_UPDATED = (legalContent as { lastUpdated: string }).lastUpdated;
 
 export default function LegalPageScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const page = PAGES[route.params.pageKey];
@@ -34,14 +36,14 @@ export default function LegalPageScreen({ route, navigation }: Props) {
 
   if (!page) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: headerHeight }]}>
         <AppText style={styles.error}>This page isn't available.</AppText>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight + spacing.xl }]}>
       <AppText style={styles.kicker}>{page.kicker}</AppText>
       <AppText style={styles.note}>{page.note}</AppText>
 

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import CircularProgressRing from '../components/CircularProgressRing';
@@ -901,6 +902,7 @@ function ModelSection({ model }: { model: QuickViewModel }) {
 
 export default function PlayerDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
@@ -1102,7 +1104,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     <>
     <View style={styles.root}>
     <GridBackground />
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
       <View style={styles.header}>
         <View style={styles.heroIdentityRow}>
           <PlayerAvatar playerId={player.player_id} size={88} tier={player.tier} />

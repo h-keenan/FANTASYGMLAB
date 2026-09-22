@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -70,6 +71,7 @@ function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsItem[]
 
 export default function NewsScreen() {
   const orbClearance = useOrbClearance();
+  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [items, setItems] = useState<NewsItem[]>([]);
@@ -95,7 +97,7 @@ export default function NewsScreen() {
   const sections = useMemo(() => groupByDate(items), [items]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <AppText style={styles.disclaimer}>
         General NFL news — injury, role, transaction, and off-field signal only. Not filtered to
