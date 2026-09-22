@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, type ViewStyle } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -150,6 +152,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const { showExplanations } = useDensity();
 
   useScreenHeaderTitle(navigation, 'Next Move', leagueName);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
 
   useFocusEffect(
     useCallback(() => {
@@ -841,6 +854,7 @@ function BriefingCard({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },

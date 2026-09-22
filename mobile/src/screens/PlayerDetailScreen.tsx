@@ -15,6 +15,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import CircularProgressRing from '../components/CircularProgressRing';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -928,6 +930,17 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   useScreenHeaderTitle(navigation, player.name ?? 'Player');
 
   useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
+
+  useEffect(() => {
     let cancelled = false;
     api
       .getPlayerNews(player.player_id)
@@ -1287,6 +1300,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },

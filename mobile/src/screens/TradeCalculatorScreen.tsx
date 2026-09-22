@@ -15,6 +15,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import BrandedSpinner from '../components/BrandedSpinner';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PlayerNameText from '../components/PlayerNameText';
@@ -24,6 +26,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -42,6 +45,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
+  const { lens } = useValuationLens(leagueId);
   const [rankings, setRankings] = useState<RankedPlayer[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,10 +60,21 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
   useScreenHeaderTitle(navigation, 'Trade Calculator', leagueName);
 
   useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const result = await api.getLeagueRankings(leagueId, { lens: 'Dynasty', limit: 300 });
+        const result = await api.getLeagueRankings(leagueId, { lens, limit: 300 });
         if (!cancelled) setRankings(result.players);
       } catch (err) {
         if (!cancelled) {
@@ -72,7 +87,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [leagueId]);
+  }, [leagueId, lens]);
 
   const selectedIds = useMemo(
     () => new Set([...sideA, ...sideB].map((p) => p.player_id)),
@@ -253,6 +268,7 @@ function TradeSide({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
   center: {
     flex: 1,

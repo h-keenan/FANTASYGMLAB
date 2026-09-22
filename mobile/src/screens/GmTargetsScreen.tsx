@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
@@ -10,6 +10,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -40,6 +42,17 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useScreenHeaderTitle(navigation, 'GM Targets', leagueName);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -196,6 +209,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   disclaimer: {

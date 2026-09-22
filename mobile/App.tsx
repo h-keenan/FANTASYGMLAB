@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { DensityProvider } from './src/context/DensityContext';
 import { GmStanceProvider } from './src/context/GmStanceContext';
+import { ValuationLensProvider } from './src/context/ValuationLensContext';
 import { ShowcaseModeProvider } from './src/context/ShowcaseModeContext';
 import { ThemeModeProvider, useThemeMode } from './src/context/ThemeModeContext';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -59,13 +60,15 @@ export default function App() {
         <ThemeModeProvider>
           <DensityProvider>
             <GmStanceProvider>
-              {/* Outside AuthProvider so the masking flag is armed from
-                  storage before the first authorized request goes out. */}
-              <ShowcaseModeProvider>
-                <AuthProvider>
-                  <RootNavigator />
-                </AuthProvider>
-              </ShowcaseModeProvider>
+              <ValuationLensProvider>
+                {/* Outside AuthProvider so the masking flag is armed from
+                    storage before the first authorized request goes out. */}
+                <ShowcaseModeProvider>
+                  <AuthProvider>
+                    <RootNavigator />
+                  </AuthProvider>
+                </ShowcaseModeProvider>
+              </ValuationLensProvider>
             </GmStanceProvider>
           </DensityProvider>
           <ThemedStatusBar />

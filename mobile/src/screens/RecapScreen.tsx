@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
@@ -59,6 +61,17 @@ export default function RecapScreen({ route, navigation }: Props) {
   const [tradeStory, setTradeStory] = useState<RecapStory | null>(null);
 
   useScreenHeaderTitle(navigation, 'Recap', leagueName);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,6 +256,7 @@ function StoryCard({ story, onPress }: { story: RecapStory; onPress?: () => void
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },

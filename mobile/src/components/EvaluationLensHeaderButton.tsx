@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { ValuationLens } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 const LENS_OPTIONS: { value: ValuationLens; label: string; hint: string }[] = [
@@ -22,16 +23,17 @@ const LENS_OPTIONS: { value: ValuationLens; label: string; hint: string }[] = [
  * pill). This is the missing Evaluation half, following the same compact
  * pill-plus-sheet pattern rather than reusing PlayersScreen's full
  * horizontal pill row, which doesn't fit in a nav header.
+ *
+ * Self-contained like GmStanceHeaderButton (just a leagueId prop, no
+ * lens/onChange threaded in from the parent screen) — reads and writes the
+ * one shared ValuationLensContext value for this league, so every screen
+ * showing this button agrees on the same chosen lens instead of each one
+ * defaulting to its own local "Dynasty" guess.
  */
-export default function EvaluationLensHeaderButton({
-  lens,
-  onChange,
-}: {
-  lens: ValuationLens;
-  onChange: (lens: ValuationLens) => void;
-}) {
+export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { lens, setLens } = useValuationLens(leagueId);
   const [open, setOpen] = useState(false);
   const current = LENS_OPTIONS.find((option) => option.value === lens);
 
@@ -57,7 +59,7 @@ export default function EvaluationLensHeaderButton({
                   key={option.value}
                   style={styles.optionRow}
                   onPress={() => {
-                    onChange(option.value);
+                    setLens(option.value);
                     setOpen(false);
                   }}
                 >

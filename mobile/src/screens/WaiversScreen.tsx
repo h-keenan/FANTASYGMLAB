@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -26,6 +28,7 @@ import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -75,6 +78,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
+  const { lens } = useValuationLens(leagueId);
   const [freeAgents, setFreeAgents] = useState<WaiverPlayer[] | null>(null);
   const [priorityAdds, setPriorityAdds] = useState<WaiverPriorityAdd[]>([]);
   const [neededPositions, setNeededPositions] = useState<string[]>([]);
@@ -90,12 +94,23 @@ export default function WaiversScreen({ route, navigation }: Props) {
 
   useScreenHeaderTitle(navigation, 'Waivers', leagueName);
 
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
+
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
         try {
-          const result = await api.getLeagueWaivers(leagueId, { lens: 'Dynasty', limit: 300 });
+          const result = await api.getLeagueWaivers(leagueId, { lens, limit: 300 });
           if (cancelled) return;
           setFreeAgents(result.players);
           setPriorityAdds(result.priority_adds);
@@ -114,7 +129,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
       return () => {
         cancelled = true;
       };
-    }, [leagueId]),
+    }, [leagueId, lens]),
   );
 
   const filtered = useMemo(() => {
@@ -493,6 +508,7 @@ function WaiverCard({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   disclaimer: {
     fontSize: 12,

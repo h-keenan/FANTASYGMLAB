@@ -17,6 +17,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import BrandedSpinner from '../components/BrandedSpinner';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
@@ -32,6 +33,7 @@ import {
   type TradeVerdict,
 } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
+import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -119,6 +121,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [search, setSearch] = useState('');
   // Read-only here: stance is changed from the header button only.
   const { strategy } = useGmStance(leagueId);
+  const { lens } = useValuationLens(leagueId);
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -128,16 +131,24 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   useScreenHeaderTitle(navigation, 'Trade Analyzer', leagueName);
 
   useEffect(() => {
-    navigation.setOptions({ headerRight: () => <GmStanceHeaderButton leagueId={leagueId} /> });
-  }, [navigation, leagueId]);
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
 
-  // A verdict is analyzed under one stance, so it goes stale the moment the
-  // stance changes. The removed in-page strategy pills cleared it inline;
-  // the header button can change stance from anywhere, so watch the value
-  // instead. (No-op on first render — `verdict` starts null.)
+  // A verdict is analyzed under one stance/lens, so it goes stale the
+  // moment either changes. The removed in-page strategy pills cleared it
+  // inline; the header buttons can change stance/lens from anywhere, so
+  // watch both values instead. (No-op on first render — `verdict` starts
+  // null.)
   useEffect(() => {
     setVerdict(null);
-  }, [strategy]);
+  }, [strategy, lens]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,7 +156,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       try {
         const [myRoster, rankingsResult, usersResult, rostersResult, picksResult] = await Promise.all([
           api.getMyRoster(leagueId),
-          api.getLeagueRankings(leagueId, { lens: 'Dynasty', limit: 300 }),
+          api.getLeagueRankings(leagueId, { lens, limit: 300 }),
           api.getLeagueUsers(leagueId),
           api.getLeagueRosters(leagueId),
           api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: 'unavailable' })),
@@ -192,7 +203,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [leagueId]);
+  }, [leagueId, lens]);
 
   const selectedIds = useMemo(
     () => new Set([...sendIds, ...receiveIds].map((p) => p.player_id)),
@@ -296,7 +307,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         sendPickIds: sendPicks.map((p) => p.pick_id),
         receivePickIds: receivePicks.map((p) => p.pick_id),
         strategy,
-        lens: 'Dynasty',
+        lens,
         partnerRosterId: selectedTeamId === ALL_TEAMS_ID ? '' : selectedTeamId,
       });
       if (result.verdict) {
@@ -696,6 +707,7 @@ function TradeSide({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import CircularProgressRing from '../components/CircularProgressRing';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -158,9 +160,20 @@ export default function PickDetailScreen({ route, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { pick, leagueName } = route.params;
+  const { pick, leagueId, leagueName } = route.params;
 
   useScreenHeaderTitle(navigation, pick.label ?? 'Draft Pick', leagueName);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
 
   const score = num(pick.score);
   const baseScore = num(pick.base_score);
@@ -317,6 +330,7 @@ export default function PickDetailScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },

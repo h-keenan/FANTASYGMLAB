@@ -18,6 +18,8 @@ import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { resolvePlayerTier } from '../lib/playerTier';
 import PositionBadge from '../components/PositionBadge';
@@ -26,12 +28,12 @@ import { api, type RankedPlayer, type UsageTrend, type ValuationLens } from '../
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Players'>;
 
-const LENSES: ValuationLens[] = ['Dynasty', 'Rebuild', 'Non-Dynasty'];
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
 const AGE_FILTERS = ['ALL', 'Under 25', '25-28', '29+'] as const;
 const STATUS_FILTERS = ['ALL', 'Active', 'Inactive'] as const;
@@ -93,7 +95,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
-  const [lens, setLens] = useState<ValuationLens>('Dynasty');
+  const { lens } = useValuationLens(leagueId);
   const [position, setPosition] = useState('ALL');
   const [ageFilter, setAgeFilter] = useState<AgeFilter>('ALL');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
@@ -104,6 +106,17 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useScreenHeaderTitle(navigation, 'Players', leagueName);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,17 +161,6 @@ export default function PlayersScreen({ route, navigation }: Props) {
         placeholderTextColor={colors.textTertiary}
       />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {LENSES.map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[styles.pill, lens === option && styles.pillActive]}
-            onPress={() => setLens(option)}
-          >
-            <AppText style={[styles.pillText, lens === option && styles.pillTextActive]}>{option}</AppText>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {POSITIONS.map((option) => (
           <TouchableOpacity
@@ -259,6 +261,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
   searchInput: {
     marginHorizontal: spacing.lg,

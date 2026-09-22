@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import ScreenHero from '../components/ScreenHero';
@@ -10,6 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import GridBackground from '../components/GridBackground';
 import TeamAvatar from '../components/TeamAvatar';
 import { api } from '../lib/api';
@@ -44,6 +46,17 @@ export default function TeamsScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useScreenHeaderTitle(navigation, 'Teams', leagueName);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerButtonRow}>
+          <EvaluationLensHeaderButton leagueId={leagueId} />
+          <GmStanceHeaderButton leagueId={leagueId} />
+        </View>
+      ),
+    });
+  }, [navigation, leagueId, styles]);
 
   useFocusEffect(
     useCallback(() => {
@@ -209,6 +222,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.sm },
