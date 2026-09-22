@@ -3764,3 +3764,138 @@ def get_trade_hub_ideas(
             "ad_unlocks_applied": ad_unlocks_applied,
         },
     }
+
+
+@app.get("/v1/leagues/{league_id}/all-trades")
+def get_league_all_trades(
+    league_id: str,
+    strategy: str = "retool",
+    lens: str = "Dynasty",
+    cursor: int = 0,
+    page_size: int = 3,
+    shown_count: int = 0,
+    ad_unlocks: int = 0,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Browse trade ideas across every roster in the league, not just the
+    caller's — the concept sheet's "All Trades" tab.
+
+    Paginated by roster rather than generated all at once: each roster's
+    ideas are real, non-trivial work (modules.trade_hub_engine.
+    generate_trade_idea_records_cached, cached per (league, roster,
+    strategy, lens) but still a cold pass the first time), so a 12-team
+    league would mean 12x the compute of Trade Hub's own board if this ran
+    eagerly. `cursor`/`page_size` walk rosters in a stable order; the
+    client re-calls with the next cursor on "Load More" — no team is ever
+    left out, it just isn't all generated up front.
+
+    Same free-tier gating as /trade-hub (modules.trade_hub_ui.
+    FREE_VISIBLE_IDEAS), applied cumulatively via `shown_count` (how many
+    ideas the client has already been shown across prior pages) — a Free
+    user's cap doesn't reset every time they tap Load More.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    is_premium = str(profile.get("entitlement") or "free") == "premium"
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    my_roster, _reason = _resolve_my_roster(user, league_id, profile=profile)
+    my_roster_id = int(my_roster.get("roster_id")) if my_roster and my_roster.get("roster_id") is not None else None
+
+    rosters = sleeper.get_rosters(league_id)
+    roster_ids = sorted({
+        int(r["roster_id"]) for r in rosters if isinstance(r, dict) and r.get("roster_id") is not None
+    })
+    total_teams = len(roster_ids)
+    cursor = max(0, cursor)
+    page_size = max(1, min(page_size, 6))
+    page_roster_ids = roster_ids[cursor : cursor + page_size]
+
+    gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
+    avatar_by_team_name = {
+        str(p.get("team_name") or "").strip().lower(): p.get("avatar_url")
+        for p in sleeper.get_league_roster_profiles(league_id).values()
+    }
+    try:
+        rankings_frame = league_rankings.build_league_rankings_frame_cached(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+        )
+        archetype_by_team_name = {
+            str(row.get("team_name") or "").strip().lower(): _clean_json_value(row.get("archetype_label"))
+            for _, row in rankings_frame.iterrows()
+        }
+    except Exception:
+        archetype_by_team_name = {}
+
+    # Free-tier remaining budget carried in from prior pages — computed
+    # once, up front, so a page never hands out more than a Free user has
+    # left regardless of how many teams' ideas it touches.
+    ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
+    free_cap = trade_hub_ui.FREE_VISIBLE_IDEAS + AD_BONUS_IDEAS_PER_UNLOCK * ad_unlocks_applied
+    remaining_free = max(0, free_cap - max(0, int(shown_count or 0)))
+
+    ideas: list[dict[str, Any]] = []
+    for roster_id in page_roster_ids:
+        if not is_premium and remaining_free <= 0:
+            break
+        is_my_roster = my_roster_id is not None and roster_id == my_roster_id
+        try:
+            records = trade_hub_engine.generate_trade_idea_records_cached(
+                league_id=league_id,
+                roster_id=roster_id,
+                strategy=strategy,
+                lens=lens,
+                players_db_path=PLAYERS_DB_PATH,
+                untouchable_player_ids=gm_untouchable_ids if is_my_roster else (),
+                gm_target_player_ids=gm_target_ids if is_my_roster else (),
+            )
+        except Exception:
+            continue
+        ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))
+        # Cap per-team so one roster's board can't eat a whole page —
+        # "All Trades" is meant to sample across the league, not repeat
+        # Trade Hub's own full-depth board once per team.
+        for record in ranked_records[:2]:
+            if not is_premium and remaining_free <= 0:
+                break
+            card = trade_hub_engine.project_trade_idea_card(record, is_headline=False).to_dict()
+            card["source_roster_id"] = str(roster_id)
+            card["partner_team_avatar_url"] = avatar_by_team_name.get(
+                str(card.get("partner_team_name") or "").strip().lower()
+            )
+            card["partner_team_archetype_label"] = archetype_by_team_name.get(
+                str(card.get("partner_team_name") or "").strip().lower()
+            ) or ""
+            ideas.append(card)
+            if not is_premium:
+                remaining_free -= 1
+
+    next_cursor = cursor + page_size
+    return {
+        "ok": True,
+        "ideas": ideas,
+        "has_more": next_cursor < total_teams and (is_premium or remaining_free > 0 or ad_unlocks_applied < MAX_AD_UNLOCKS),
+        "next_cursor": next_cursor,
+        "total_teams": total_teams,
+        "entitlement": {
+            "is_premium": is_premium,
+            "free_limit": trade_hub_ui.FREE_VISIBLE_IDEAS,
+            "ad_bonus_per_unlock": AD_BONUS_IDEAS_PER_UNLOCK,
+            "max_ad_unlocks": MAX_AD_UNLOCKS,
+            "ad_unlocks_applied": ad_unlocks_applied,
+            "remaining_free": remaining_free,
+        },
+    }
