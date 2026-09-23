@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
-import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -138,7 +137,6 @@ export default function TeamsScreen({ route, navigation }: Props) {
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <ScreenHero title="TEAMS" subtitle={leagueName} />
       <FlatList
       style={styles.list}
       contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}

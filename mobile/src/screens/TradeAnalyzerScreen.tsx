@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
-import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -349,7 +348,6 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const header = (
     <View>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <ScreenHero title="TRADE ANALYZER" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         The real accept / decline / counter verdict for {leagueName} — weighs asset value, starting
         lineup impact, roster needs, age, draft capital, and injury risk.

@@ -9,7 +9,6 @@ import AnimatedCard from '../components/AnimatedCard';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CircularProgressRing from '../components/CircularProgressRing';
@@ -178,7 +177,6 @@ export default function MyTeamScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <ScreenHero title="MY TEAM" subtitle={leagueName} />
         <AppText style={styles.disclaimer}>
           Your suggested starting lineup for {leagueName} — the same optimal-lineup logic the web
           app's Dashboard and My Team pages use.
