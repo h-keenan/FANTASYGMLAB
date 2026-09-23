@@ -181,6 +181,29 @@ function rosterRecommendationDetail(rec: RosterRecommendation): string {
   }`;
 }
 
+type RosterRecTone = 'success' | 'caution' | 'danger' | 'neutral';
+
+/** Real state read over the same LineupPlayer fields Waivers/My Team already
+ * expose — never a new computation. `ruled_out` (confirmed unavailable, e.g.
+ * Out/IR/PUP) is always the strongest signal regardless of starter/bench; a
+ * suggested starter still carrying a weekly injury tag (Questionable, not
+ * ruled out) reads as caution rather than a flat "all clear" green; a clean
+ * starter is success; a healthy bench call is neutral. Replaces the old
+ * two-state (green starter / gray bench) read with the four real states
+ * coridian_ asked for. */
+function rosterRecTone(rec: RosterRecommendation): RosterRecTone {
+  if (rec.player.ruled_out) return 'danger';
+  if (rec.isStarter) return rec.player.injury_label ? 'caution' : 'success';
+  return 'neutral';
+}
+
+function rosterRecToneColor(tone: RosterRecTone, colors: ThemeColors): string {
+  if (tone === 'success') return colors.success;
+  if (tone === 'caution') return colors.premium;
+  if (tone === 'danger') return colors.danger;
+  return colors.textTertiary;
+}
+
 // Derived from modules.rankings.AGE_CURVE_CONTROL_POINTS server-side — the
 // same age curve already discounting this player's dynasty value, not a
 // separately invented projection. See QuickViewStats.prime_window.
@@ -342,16 +365,55 @@ function UsageRows({ items }: { items: QuickViewStatItem[] }) {
 // of already-computed items — no new metric is invented.
 const RECEIVING_LABELS = new Set(['Receptions', 'Rec Yards', 'Rec TDs']);
 
-function splitProductionStats(items: QuickViewStatItem[]): {
-  production: QuickViewStatItem[];
-  receiving: QuickViewStatItem[];
-} {
-  const production: QuickViewStatItem[] = [];
-  const receiving: QuickViewStatItem[] = [];
+// QB's own `_key_stats` order already ends in Rush Yards/Rush TDs (see
+// modules/player_quick_view.py) mixed into the same "Production" card as
+// passing volume — coridian_'s brief wants QB rushing pulled out into its
+// own secondary/smaller-weight treatment instead of sitting at equal visual
+// weight next to Pass Att/Pass Yards/Pass TDs. Same split mechanism as
+// RECEIVING_LABELS above, just keyed to the position that applies to.
+const QB_RUSHING_LABELS = new Set(['Rush Yards', 'Rush TDs']);
+
+/** Splits `season.key_stats` into the primary "Production" (QB: "Passing
+ * Production") group and a secondary group — Receiving for every non-QB
+ * position, QB Rushing for QB — using the label sets above. Still pure
+ * relabeling/regrouping of already-computed items; no metric is invented and
+ * no backend value is recomputed. */
+function splitKeyStats(
+  position: string,
+  items: QuickViewStatItem[],
+): { primary: QuickViewStatItem[]; secondary: QuickViewStatItem[] } {
+  const secondaryLabels = position === 'QB' ? QB_RUSHING_LABELS : RECEIVING_LABELS;
+  const primary: QuickViewStatItem[] = [];
+  const secondary: QuickViewStatItem[] = [];
   for (const item of items) {
-    (RECEIVING_LABELS.has(item.label) ? receiving : production).push(item);
+    (secondaryLabels.has(item.label) ? secondary : primary).push(item);
   }
-  return { production, receiving };
+  return { primary, secondary };
+}
+
+type StatGroupKey = 'fantasy' | 'production' | 'receiving' | 'qbRushing' | 'usage' | 'efficiency' | 'college';
+
+const DEFAULT_STAT_GROUP_ORDER: StatGroupKey[] = ['fantasy', 'production', 'receiving', 'usage', 'efficiency', 'college'];
+
+/**
+ * Position-aware stat-group ORDER only — never which metrics exist per
+ * position (that's already correctly data-driven server-side; see
+ * modules/player_quick_view.py's `_key_stats`/`_fantasy_stats`/`_usage_stats`/
+ * `_efficiency_stats`). coridian_'s brief: for QB, decision importance runs
+ * Fantasy Output -> Passing Production -> (QB Rushing, secondary weight) ->
+ * Usage -> Efficiency -> Role Trend -> Bio, with Role Trend/Bio rendered
+ * outside this array (see PlayerDetailScreen's InsightChipsRow/Bio
+ * placement, unchanged). One shared `AnalyticsSection`-based architecture
+ * consults this table — never a per-position screen/component copy. Add a
+ * position's own array here to reorder its groups; any position missing from
+ * this table falls back to DEFAULT_STAT_GROUP_ORDER unchanged.
+ */
+const STAT_GROUP_ORDER: Partial<Record<string, StatGroupKey[]>> = {
+  QB: ['fantasy', 'production', 'qbRushing', 'usage', 'efficiency', 'college'],
+};
+
+function statGroupOrderForPosition(position: string): StatGroupKey[] {
+  return STAT_GROUP_ORDER[position] ?? DEFAULT_STAT_GROUP_ORDER;
 }
 
 // Mirrors services/mobile_api_service.py's MAX_WEEKLY_STATS_SEASONS_BACK —
@@ -1087,36 +1149,45 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       value: rank.position_rank,
       descriptor: rank.position_rank != null && player.position ? `of ${player.position}s` : null,
     },
-    { key: 'age', label: 'Age', value: player.age },
-    { key: 'status', label: 'Status', value: player.status, tone: statusTone(player.status) },
+    { key: 'age', label: 'Age', value: player.age, emphasis: 'supporting' },
+    { key: 'status', label: 'Status', value: player.status, tone: statusTone(player.status), emphasis: 'supporting' },
     {
       key: 'injury',
       label: 'Injury Status',
       value: player.injury_status ?? 'Healthy',
       tone: injuryTone(player.injury_status),
+      emphasis: 'supporting',
     },
   ];
 
+  const rosterRecToneValue = rosterRec ? rosterRecTone(rosterRec) : null;
+  const rosterRecColor = rosterRecToneValue ? rosterRecToneColor(rosterRecToneValue, colors) : colors.textTertiary;
+  const hasWatchControls = watching !== null;
+  const hasNews = newsItems.length > 0;
+
+  // "Add to GM Targets" / untouchable-toggle / Compare / the news-status pill
+  // now render as ONE row (coridian_'s concept sheet: 3 pill controls in a
+  // single line, not a separate status bar above the actions) instead of the
+  // old standalone NewsImpactBadge line sitting above its own watchRow.
   const heroActions = (
     <>
       <PlayerTags tags={tags} />
       {rosterRec ? (
-        <View
-          style={[
-            styles.rosterRecCard,
-            { borderColor: rosterRec.isStarter ? colors.success : colors.textTertiary },
-          ]}
-        >
+        <View style={[styles.rosterRecCard, { borderColor: rosterRecColor }]}>
           <View
             style={[
               styles.rosterRecBadge,
-              { backgroundColor: rosterRec.isStarter ? colors.success : colors.backgroundElevated },
+              rosterRecToneValue === 'neutral'
+                ? { backgroundColor: colors.backgroundElevated }
+                : { backgroundColor: rosterRecColor },
             ]}
           >
             <AppText
               style={[
                 styles.rosterRecBadgeText,
-                { color: rosterRec.isStarter ? colors.background : colors.textSecondary },
+                rosterRecToneValue === 'neutral'
+                  ? { color: colors.textSecondary }
+                  : { color: contrastTextColor(rosterRecColor) },
               ]}
             >
               {rosterRec.isStarter ? 'STARTER' : 'BENCH'}
@@ -1128,39 +1199,43 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           </View>
         </View>
       ) : null}
-      <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
-      {watching !== null ? (
-        <View style={styles.watchRow}>
-          <TouchableOpacity
-            style={[styles.watchButton, watching && styles.watchButtonActive]}
-            onPress={toggleWatch}
-            disabled={watchBusy}
-          >
-            <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
-              {watching ? '★ Watching' : '☆ Add to GM Targets'}
-            </AppText>
-          </TouchableOpacity>
-          {watching ? (
-            <TouchableOpacity
-              style={[styles.untouchableButton, untouchable && styles.untouchableButtonActive]}
-              onPress={toggleUntouchable}
-              disabled={untouchableBusy}
-              accessibilityLabel={untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
-            >
-              <Ionicons
-                name={untouchable ? 'lock-closed' : 'lock-open-outline'}
-                size={16}
-                color={untouchable ? colors.background : colors.textSecondary}
-              />
-            </TouchableOpacity>
+      {hasWatchControls || hasNews ? (
+        <View style={styles.actionRow}>
+          {hasWatchControls ? (
+            <>
+              <TouchableOpacity
+                style={[styles.watchButton, watching && styles.watchButtonActive]}
+                onPress={toggleWatch}
+                disabled={watchBusy}
+              >
+                <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
+                  {watching ? '★ Watching' : '☆ Add to GM Targets'}
+                </AppText>
+              </TouchableOpacity>
+              {watching ? (
+                <TouchableOpacity
+                  style={[styles.untouchableButton, untouchable && styles.untouchableButtonActive]}
+                  onPress={toggleUntouchable}
+                  disabled={untouchableBusy}
+                  accessibilityLabel={untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
+                >
+                  <Ionicons
+                    name={untouchable ? 'lock-closed' : 'lock-open-outline'}
+                    size={16}
+                    color={untouchable ? colors.background : colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={styles.compareButton}
+                onPress={() => navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
+              >
+                <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
+                <AppText style={styles.compareButtonText}>Compare</AppText>
+              </TouchableOpacity>
+            </>
           ) : null}
-          <TouchableOpacity
-            style={styles.compareButton}
-            onPress={() => navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
-          >
-            <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
-            <AppText style={styles.compareButtonText}>Compare</AppText>
-          </TouchableOpacity>
+          <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
         </View>
       ) : null}
     </>
@@ -1202,8 +1277,6 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   if (loading) {
     content.push(<ActivityIndicator key="loading" style={styles.loader} color={colors.accent} />);
   } else {
-    content.push(<AwardsStrip key="awards" awards={awards} />);
-
     const showTabs = Boolean(stats?.seasons.length || model);
     if (showTabs) {
       tabBarIndex = content.length;
@@ -1215,60 +1288,105 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     }
 
     if (activeTab === 'stats' && season) {
-      const { production, receiving } = splitProductionStats(season.key_stats);
+      const position = (player.position ?? '').toUpperCase();
+      const isQB = position === 'QB';
+      const { primary: productionItems, secondary: secondaryItems } = splitKeyStats(position, season.key_stats);
+
+      // One group -> one rendered node, keyed by the same StatGroupKey the
+      // position-aware order table above uses to sequence them — this is the
+      // "consult a config, don't hardcode one fixed order" architecture the
+      // brief asks for (item 17), not a per-position screen/component.
+      const groupNodes: Partial<Record<StatGroupKey, React.ReactNode>> = {};
+
+      if (season.fantasy.length > 0) {
+        groupNodes.fantasy = (
+          <AnalyticsSection key="fantasy" title="Fantasy Output" icon="american-football-outline">
+            <View style={styles.metricGrid}>
+              {season.fantasy.map((item, index) => (
+                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+              ))}
+            </View>
+          </AnalyticsSection>
+        );
+      }
+
+      if (productionItems.length > 0) {
+        groupNodes.production = (
+          <AnalyticsSection key="production" title={isQB ? 'Passing Production' : 'Production'} icon="bar-chart-outline">
+            <View style={styles.metricGrid}>
+              {productionItems.map((item, index) => (
+                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+              ))}
+            </View>
+          </AnalyticsSection>
+        );
+      }
+
+      if (secondaryItems.length > 0) {
+        if (isQB) {
+          // Secondary/smaller weight vs. the MetricCard+PercentileBar tiles
+          // above — reuses StatGrid, the same lighter-weight pattern Bio/
+          // Model/Career already use, rather than inventing a new component.
+          groupNodes.qbRushing = (
+            <AnalyticsSection key="qb-rushing" title="QB Rushing" icon="walk-outline">
+              <StatGrid
+                items={secondaryItems.map((item) => ({ label: item.label, value: item.value || null, percentile: item.percentile }))}
+              />
+            </AnalyticsSection>
+          );
+        } else {
+          groupNodes.receiving = (
+            <AnalyticsSection key="receiving" title="Receiving" icon="locate-outline">
+              <View style={styles.metricGrid}>
+                {secondaryItems.map((item, index) => (
+                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                ))}
+              </View>
+            </AnalyticsSection>
+          );
+        }
+      }
+
+      if (season.usage.length > 0) {
+        groupNodes.usage = (
+          <AnalyticsSection key="usage" title="Usage" icon="speedometer-outline">
+            <UsageRows items={season.usage} />
+          </AnalyticsSection>
+        );
+      }
+
+      if (season.efficiency.length > 0) {
+        groupNodes.efficiency = (
+          <AnalyticsSection key="efficiency" title="Efficiency" icon="calculator-outline">
+            <View style={styles.metricGrid}>
+              {season.efficiency.map((item, index) => (
+                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+              ))}
+            </View>
+          </AnalyticsSection>
+        );
+      }
+
+      if (stats?.college_available && stats.college.length > 0) {
+        groupNodes.college = (
+          <AnalyticsSection key="college" title="College" icon="school-outline">
+            <View style={styles.metricGrid}>
+              {stats.college.map((item, index) => (
+                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+              ))}
+            </View>
+          </AnalyticsSection>
+        );
+      }
+
+      const orderedGroups = statGroupOrderForPosition(position)
+        .map((key) => groupNodes[key])
+        .filter((node): node is React.ReactNode => Boolean(node));
+
       content.push(
         <View key="stats-tab">
           <AppText style={styles.seasonLabel}>{season.label}</AppText>
-          {season.fantasy.length > 0 ? (
-            <AnalyticsSection title="Fantasy Scoring" icon="american-football-outline">
-              <View style={styles.metricGrid}>
-                {season.fantasy.map((item, index) => (
-                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
-                ))}
-              </View>
-            </AnalyticsSection>
-          ) : null}
-          {production.length > 0 ? (
-            <AnalyticsSection title="Production" icon="bar-chart-outline">
-              <View style={styles.metricGrid}>
-                {production.map((item, index) => (
-                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
-                ))}
-              </View>
-            </AnalyticsSection>
-          ) : null}
-          {receiving.length > 0 ? (
-            <AnalyticsSection title="Receiving" icon="locate-outline">
-              <View style={styles.metricGrid}>
-                {receiving.map((item, index) => (
-                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
-                ))}
-              </View>
-            </AnalyticsSection>
-          ) : null}
-          {season.usage.length > 0 ? (
-            <AnalyticsSection title="Usage" icon="speedometer-outline">
-              <UsageRows items={season.usage} />
-            </AnalyticsSection>
-          ) : null}
-          {season.efficiency.length > 0 ? (
-            <AnalyticsSection title="Efficiency" icon="calculator-outline">
-              <View style={styles.metricGrid}>
-                {season.efficiency.map((item, index) => (
-                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
-                ))}
-              </View>
-            </AnalyticsSection>
-          ) : null}
-          {stats?.college_available && stats.college.length > 0 ? (
-            <AnalyticsSection title="College" icon="school-outline">
-              <View style={styles.metricGrid}>
-                {stats.college.map((item, index) => (
-                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
-                ))}
-              </View>
-            </AnalyticsSection>
-          ) : null}
+          {orderedGroups}
           {model ? <InsightChipsRow model={model} /> : null}
         </View>,
       );
@@ -1300,8 +1418,25 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       );
     }
 
-    if (bio) {
-      content.push(<BioSection key="bio" bio={bio} />);
+    // Awards + Bio paired at the bottom (concept sheet's 2-column row)
+    // instead of Awards sitting alone above the tabs and Bio sitting alone
+    // below them — both are tab-agnostic "always visible" cards either way,
+    // so this only changes where they sit, not when they show.
+    if (awards.length > 0 || bio) {
+      content.push(
+        <View key="awards-bio-row" style={styles.awardsBioRow}>
+          {awards.length > 0 ? (
+            <View style={styles.awardsBioCol}>
+              <AwardsStrip awards={awards} />
+            </View>
+          ) : null}
+          {bio ? (
+            <View style={styles.awardsBioCol}>
+              <BioSection bio={bio} />
+            </View>
+          ) : null}
+        </View>,
+      );
     }
     if (!season && !model && !stats?.college_available && !bio && awards.length === 0) {
       content.push(
@@ -1317,8 +1452,19 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     <View style={styles.root}>
     <GridBackground />
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+      // headerTransparent (RootNavigator) floats the native header above
+      // this screen instead of reserving layout space for it, so the
+      // ScrollView's own frame has to be pushed down by `useHeaderHeight()`
+      // here — on the *container* `style`, not just the scrollable content's
+      // top padding. That distinction is the fix: `stickyHeaderIndices`
+      // pins its child to the top of the ScrollView's own frame, not to the
+      // top of its (padded) content. With the old code the offset lived only
+      // in `contentContainerStyle`'s `paddingTop`, so the frame itself still
+      // started at y=0 under the header — once the tab bar stuck, it stuck
+      // at the literal top of the screen, behind/under the transparent
+      // header (status-bar and title collision) instead of just below it.
+      style={[styles.container, { marginTop: headerHeight }]}
+      contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}
       stickyHeaderIndices={tabBarIndex !== null ? [tabBarIndex] : undefined}
     >
       {content}
@@ -1335,7 +1481,7 @@ function createStyles(colors: ThemeColors) {
   root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
-  watchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   watchButton: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
@@ -1387,7 +1533,6 @@ function createStyles(colors: ThemeColors) {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radii.pill,
@@ -1447,6 +1592,12 @@ function createStyles(colors: ThemeColors) {
     paddingBottom: spacing.sm,
   },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  // Awards + Bio paired side-by-side per the concept sheet's bottom row —
+  // each column is `flex: 1` so a lone section (no awards, or no bio) still
+  // fills the full row, and `minWidth: '46%'` lets the pair wrap to a
+  // full-width stack on a narrow phone instead of squeezing unreadably.
+  awardsBioRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  awardsBioCol: { flex: 1, minWidth: '46%' },
   insightChipsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   insightChip: {
     flex: 1,

@@ -14,6 +14,12 @@ export interface SnapshotItem {
    * RBs" — describing what the rank means, never a fabricated count. */
   descriptor?: string | null;
   tone?: 'success' | 'danger' | 'neutral';
+  /** 'supporting' renders at a smaller weight than the default 'primary' —
+   * per coridian_'s hierarchy ask, Overall/Position Rank should read as the
+   * card's second tier under Value Score, with Age/Status/Injury as
+   * supporting context rather than all five items sharing equal weight.
+   * Omit (or pass 'primary') to keep full weight. */
+  emphasis?: 'primary' | 'supporting';
 }
 
 /**
@@ -58,7 +64,14 @@ export default function PlayerSnapshotCard({
         {items.map((item) => (
           <View key={item.key} style={styles.item}>
             <AppText style={styles.itemLabel}>{item.label}</AppText>
-            <AppText style={[styles.itemValue, { color: toneColor(item.tone) }]} numberOfLines={1}>
+            <AppText
+              style={[
+                styles.itemValue,
+                item.emphasis === 'supporting' ? styles.itemValueSupporting : null,
+                { color: toneColor(item.tone) },
+              ]}
+              numberOfLines={1}
+            >
               {item.value === null || item.value === undefined || item.value === '' ? '—' : item.value}
             </AppText>
             {item.descriptor ? (
@@ -94,6 +107,7 @@ function createStyles(colors: ThemeColors) {
     item: { minWidth: '18%', flexGrow: 1, flexBasis: '18%', paddingRight: spacing.xs, marginBottom: spacing.xs },
     itemLabel: { fontSize: 10, color: colors.textSecondary },
     itemValue: { fontSize: 17, fontWeight: '800', marginTop: 2 },
+    itemValueSupporting: { fontSize: 14, fontWeight: '700' },
     itemDescriptor: { fontSize: 9, color: colors.textTertiary, marginTop: 1 },
   });
 }
