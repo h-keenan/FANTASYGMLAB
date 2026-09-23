@@ -62,6 +62,10 @@ function toneColors(colors: ThemeColors): Record<TradeVerdict['tone'], string> {
     decline: colors.danger,
     counter: colors.accent,
     fair: colors.textSecondary,
+    // Never actually produced here — Trade Analyzer only ever renders a
+    // real accept/decline/counter/fair verdict, never Trade Hub's 'idea'
+    // tone — included only so this stays a valid Record<TradeVerdict['tone'], ...>.
+    idea: colors.accent,
   };
 }
 
