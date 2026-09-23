@@ -66,6 +66,11 @@ class DailyBriefingItem:
     freshness: str
     provenance: str
     route_player_id: str = ""
+    # Several callers only carry a bare player_id for their route — mobile
+    # hand-builds a lean navigable player from route_player_id/_name rather
+    # than fetching a full record (same pattern AlertsScreen already used
+    # for matched-player taps), so a display name has to ride along too.
+    route_player_name: str = ""
     route_focus_mode: str = ""
     recommendation_narrative: Mapping[str, Any] | None = None
     handoff_context: Mapping[str, Any] | None = None
@@ -223,6 +228,7 @@ def _item_from_tile(
             f"dashboard_workflow.organize_dashboard_items|{category}|{entitlement}"
         ),
         route_player_id=_text(tile.get("route_player_id")),
+        route_player_name=_text(tile.get("route_player_name")),
         route_focus_mode=_text(tile.get("route_focus_mode")),
         recommendation_narrative=narrative,
         handoff_context=(

@@ -169,7 +169,10 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       </View>
 
       {sideA.length > 0 || sideB.length > 0 ? (
-        <AppText style={styles.deltaLabel}>{valueDirectionLabel(delta)}</AppText>
+        <>
+          <AppText style={styles.deltaLabel}>{valueDirectionLabel(delta)}</AppText>
+          <ValueSplitBar totalA={totalA} totalB={totalB} />
+        </>
       ) : null}
 
       <View style={styles.positionRow}>
@@ -226,6 +229,23 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
         }
       />
     </KeyboardAvoidingView>
+  );
+}
+
+/** A visual read of the two sides' totals under the plain "Slight value edge
+ * to Side A"-style text — coridian_: "this visually looks bad should have a
+ * value bar graph under." Same split-bar pattern MatchupScreen already uses
+ * for "your lineup vs. their lineup." */
+function ValueSplitBar({ totalA, totalB }: { totalA: number; totalB: number }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const total = totalA + totalB;
+  const shareA = total > 0 ? Math.max(0.05, Math.min(0.95, totalA / total)) : 0.5;
+  return (
+    <View style={styles.splitBar}>
+      <View style={[styles.splitFill, { flex: shareA, backgroundColor: colors.danger }]} />
+      <View style={[styles.splitFill, { flex: 1 - shareA, backgroundColor: colors.accent }]} />
+    </View>
   );
 }
 
@@ -314,8 +334,17 @@ function createStyles(colors: ThemeColors) {
     fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  splitBar: {
+    flexDirection: 'row',
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    backgroundColor: colors.border,
     marginBottom: spacing.md,
   },
+  splitFill: { height: '100%' },
   positionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   pill: {
     paddingHorizontal: spacing.sm,

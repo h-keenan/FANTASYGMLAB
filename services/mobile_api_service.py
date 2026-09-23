@@ -88,6 +88,7 @@ from modules import (
     auth_supabase,
     canonical_player_ranking,
     dashboard_engine,
+    draft_assistant,
     draft_center_ui,
     faab,
     gm_targets,
@@ -927,7 +928,22 @@ def get_league_draft_picks(
     if df_summary.empty:
         return {"ok": True, "picks": [], "reason": "no_rankings_data"}
 
-    picks = trade_ideas.list_draft_pick_assets(league_id, df_summary, league_settings=settings)
+    # Real Sleeper draft-completion check — mirrors app.py's own
+    # cached_rookie_draft_context/rookie_draft_status_items call sites (e.g.
+    # cached_draft_pick_assets), rather than falling back to
+    # list_draft_pick_assets' own league-type-only guess. Without this, a
+    # completed rookie draft still showed its picks as available/upcoming
+    # trade assets in the mobile Draft Center.
+    draft_status = dict(
+        draft_assistant.rookie_draft_status_items(
+            draft_assistant.rookie_draft_context(
+                league_id, league_settings_items=tuple(settings.items())
+            )
+        )
+    )
+    picks = trade_ideas.list_draft_pick_assets(
+        league_id, df_summary, league_settings=settings, draft_status=draft_status
+    )
     projected = [
         {
             "pick_id": f"{pick.get('season')}:{pick.get('round')}:{pick.get('original_roster_id')}",
@@ -2906,6 +2922,7 @@ def _project_briefing_item(item: Any) -> dict[str, Any]:
         "supporting_context": payload.get("supporting_context"),
         "destination": payload.get("destination"),
         "route_player_id": payload.get("route_player_id") or "",
+        "route_player_name": payload.get("route_player_name") or "",
         "recommendation_narrative": payload.get("recommendation_narrative"),
         "presentation": payload.get("presentation"),
         "recommendation_id": payload.get("recommendation_id") or "",

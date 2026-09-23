@@ -259,9 +259,20 @@ def my_team_injury_alert(context) -> dict:
         sync_label = ""
     if sync_label and "happened" not in sync_label.casefold():
         note = f"{note} · {sync_label}"
+    # Only route to a specific player when there's exactly one unambiguous
+    # starter to point at — "1 injured starter" with a single actionable
+    # starter is the concrete case this fixes (the card used to be a dead
+    # end with no way to see who it meant); 2+ starters would make a single
+    # player link misleading about which one the headline refers to.
+    starters_only = [item for item in actionable if item.get("roster_relevance") == "starter"]
+    single_starter = starters_only[0] if len(starters_only) == 1 else None
+    route_player_id = str(single_starter.get("player_id") or "") if single_starter else ""
+    route_player_name = str(single_starter.get("name") or "") if single_starter else ""
     return {
         "value": value,
         "note": note,
+        "route_player_id": route_player_id,
+        "route_player_name": route_player_name,
         "starter_count": starter_count,
         "weekly_count": weekly_count,
         "future_count": future_count,

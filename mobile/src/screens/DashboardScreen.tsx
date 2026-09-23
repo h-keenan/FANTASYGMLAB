@@ -23,6 +23,7 @@ import {
   type InjuryImpactPlayer,
   type MatchupResponse,
   type PresentationAsset,
+  type RankedPlayer,
   type TeamRanking,
   type TeamSnapshot,
 } from '../lib/api';
@@ -838,8 +839,35 @@ function BriefingCard({
     );
   }
   const meta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
+  // A tile that points at exactly one player (e.g. "1 injured starter") used
+  // to be a dead end with no way to see who it meant — same lean-player
+  // pattern AlertsScreen already uses for its own matched-player taps, since
+  // Player Detail fetches everything else itself from player_id.
+  const openPlayer = item.route_player_id
+    ? () => {
+        const player: RankedPlayer = {
+          player_id: item.route_player_id,
+          name: item.route_player_name || null,
+          position: null,
+          team: null,
+          age: null,
+          status: null,
+          injury_status: null,
+          tier: null,
+          score: null,
+          overall_rank: null,
+          position_rank: null,
+          rank_unavailable_reason: null,
+          opportunity_label: null,
+        };
+        navigation.navigate('PlayerDetail', { player, leagueId, leagueName });
+      }
+    : undefined;
   return (
-    <AnimatedCard style={StyleSheet.flatten([styles.card, { borderLeftColor: meta.color } as ViewStyle])}>
+    <AnimatedCard
+      style={StyleSheet.flatten([styles.card, { borderLeftColor: meta.color } as ViewStyle])}
+      onPress={openPlayer}
+    >
       <View style={styles.cardHeaderRow}>
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</AppText>

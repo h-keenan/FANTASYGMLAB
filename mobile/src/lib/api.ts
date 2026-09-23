@@ -942,6 +942,7 @@ export interface DashboardItem {
   supporting_context: string;
   destination: string;
   route_player_id: string;
+  route_player_name: string;
   recommendation_narrative: Record<string, unknown> | null;
   presentation: DashboardTradePresentation | null;
   recommendation_id: string;

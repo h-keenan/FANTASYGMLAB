@@ -177,6 +177,8 @@ def build_injury_tile(injury_display_context: Mapping[str, Any]) -> dict[str, An
         "note": alert.get("note"),
         "tone": "risk",
         "route_key": "my_team",
+        "route_player_id": alert.get("route_player_id") or "",
+        "route_player_name": alert.get("route_player_name") or "",
     }
 
 

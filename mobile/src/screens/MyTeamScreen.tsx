@@ -13,6 +13,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
+import IconCircle from '../components/IconCircle';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { resolvePlayerTier } from '../lib/playerTier';
@@ -224,6 +225,28 @@ export default function MyTeamScreen({ route, navigation }: Props) {
  * showing invented numbers next to real ones would be worse than showing
  * nothing.
  */
+/** Green/amber/red by percentile instead of one fixed hue per row — a weak
+ * metric (e.g. 9% draft capital) used to render in the same "good" green as
+ * a strong one, which read as flat/uninformative. coridian_: "we need to
+ * include colors ... for things like roster age draft capital team value,
+ * starter strength ... it's not scannable." */
+function percentileColor(percentile: number | null, colors: ThemeColors): string {
+  if (percentile == null) return colors.textTertiary;
+  if (percentile >= 60) return colors.success;
+  if (percentile >= 30) return colors.premium;
+  return colors.danger;
+}
+
+/** Young/Prime/Aging isn't itself good/bad, but Prime is the ideal state,
+ * Aging carries real roster risk, and Young is still "not there yet" —
+ * distinct from a plain percentile tier. */
+function ageColor(averageAge: number | null, colors: ThemeColors): string {
+  if (averageAge == null) return colors.textTertiary;
+  if (averageAge <= 28) return colors.success;
+  if (averageAge <= 30) return colors.premium;
+  return colors.danger;
+}
+
 function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueSize: number }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -232,16 +255,20 @@ function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueS
   const starterPercentile = percentileFromRank(team.starter_rank, leagueSize);
   const outlook = team.archetype_label || team.strategy_label;
 
-  const metrics: { label: string; value: string; note: string }[] = [
+  const metrics: { label: string; value: string; note: string; icon: React.ComponentProps<typeof IconCircle>['name']; color: string }[] = [
     {
       label: 'Roster Age',
       value: team.average_age != null ? team.average_age.toFixed(1) : '—',
       note: ageLabel(team.average_age),
+      icon: 'calendar-outline',
+      color: ageColor(team.average_age, colors),
     },
     {
       label: 'Draft Capital',
       value: team.draft_capital_rank != null ? `#${team.draft_capital_rank}` : '—',
       note: percentileLabel(draftCapitalPercentile),
+      icon: 'albums-outline',
+      color: percentileColor(draftCapitalPercentile, colors),
     },
   ];
 
@@ -277,25 +304,27 @@ function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueS
       <View style={styles.analyticsMetricsRow}>
         {metrics.map((metric) => (
           <View key={metric.label} style={styles.analyticsMetric}>
-            <AppText style={styles.analyticsMetricValue}>{metric.value}</AppText>
+            <IconCircle name={metric.icon} color={metric.color} size={28} iconSize={15} style={styles.analyticsMetricIcon} />
+            <AppText style={[styles.analyticsMetricValue, { color: metric.color }]}>{metric.value}</AppText>
             <AppText style={styles.analyticsMetricLabel}>{metric.label}</AppText>
             <AppText style={styles.analyticsMetricNote}>{metric.note}</AppText>
           </View>
         ))}
       </View>
       <View style={styles.analyticsBars}>
-        <PercentileBar label="Team Value" percentile={valuePercentile} color={colors.accent} />
-        <PercentileBar label="Starter Strength" percentile={starterPercentile} color={colors.success} />
-        <PercentileBar label="Draft Capital" percentile={draftCapitalPercentile} color={colors.premium} />
+        <PercentileBar label="Team Value" percentile={valuePercentile} />
+        <PercentileBar label="Starter Strength" percentile={starterPercentile} />
+        <PercentileBar label="Draft Capital" percentile={draftCapitalPercentile} />
       </View>
     </View>
   );
 }
 
-function PercentileBar({ label, percentile, color }: { label: string; percentile: number | null; color: string }) {
+function PercentileBar({ label, percentile }: { label: string; percentile: number | null }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const width = percentile ?? 0;
+  const color = percentileColor(percentile, colors);
   return (
     <View style={styles.percentileBarRow}>
       <AppText style={styles.percentileBarLabel} numberOfLines={1}>
@@ -408,6 +437,7 @@ function createStyles(colors: ThemeColors) {
     borderTopColor: colors.border,
   },
   analyticsMetric: { flex: 1, alignItems: 'center' },
+  analyticsMetricIcon: { marginBottom: 4 },
   analyticsMetricValue: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
   analyticsMetricLabel: {
     fontSize: 11,
