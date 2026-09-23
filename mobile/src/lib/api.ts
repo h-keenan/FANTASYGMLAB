@@ -256,6 +256,11 @@ export interface LineupPlayer {
   slot: string | null;
   suggested_starter: boolean;
   opportunity_label: string | null;
+  /** 0-99 "OVR" badge — percentiled against the full league-eligible pool
+   * at this position (not just this roster), same curve/gate as
+   * QuickViewStats.overall_rating. Null when that position's pool was too
+   * thin to rank against. */
+  overall_rating: number | null;
 }
 
 export interface MyTeamResponse {
@@ -355,6 +360,11 @@ export interface RankedPlayer {
   // /rankings wire rows carry this, and Player Detail fetches its own copy
   // from /quick-view regardless.
   usage_trend?: UsageTrend | null;
+  /** 0-99 "OVR" badge — percentiled against the full ranked pool at this
+   * position, same curve/gate as QuickViewStats.overall_rating. Null when
+   * that position's pool was too thin to rank against. Optional for the
+   * same hand-built-row reason as `usage_trend` above. */
+  overall_rating?: number | null;
 }
 
 export interface LeagueRankingsResponse {
@@ -388,6 +398,12 @@ export interface WaiverPlayer {
   // or when the team code has no schedule match.
   opponent: string | null;
   opponent_is_home: boolean | null;
+  /** 0-99 "OVR" badge — percentiled against the full league-eligible pool
+   * at this position (rostered players included), NOT the wire-relative
+   * free-agent-only pool position_rank/overall_rank above use. Same
+   * curve/gate as QuickViewStats.overall_rating; null when that position's
+   * pool was too thin to rank against. */
+  overall_rating: number | null;
 }
 
 export interface WaiverFaabGuidance {

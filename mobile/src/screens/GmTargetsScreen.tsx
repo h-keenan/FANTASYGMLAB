@@ -14,6 +14,7 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
+import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -178,9 +179,12 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
                 <AppText style={styles.untouchableLabel}>Untouchable — never offered in a trade</AppText>
               ) : null}
             </View>
-            <AppText style={styles.score}>
-              {item.player?.score != null ? Math.round(item.player.score) : '—'}
-            </AppText>
+            <View style={styles.scoreColumn}>
+              <AppText style={styles.score}>
+                {item.player?.score != null ? Math.round(item.player.score) : '—'}
+              </AppText>
+              <OverallRatingBadge rating={item.player?.overall_rating} />
+            </View>
             <TouchableOpacity
               style={[styles.iconButton, item.target.untouchable ? styles.iconButtonActive : null]}
               onPress={() => toggleUntouchable(item.target.player_id, !item.target.untouchable)}
@@ -228,7 +232,8 @@ function createStyles(colors: ThemeColors) {
   meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   untouchableLabel: { fontSize: 11, fontWeight: '600', color: colors.premium, marginTop: 3 },
-  score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginRight: spacing.sm },
+  scoreColumn: { alignItems: 'flex-end', gap: 2, marginRight: spacing.sm },
+  score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   iconButton: {
     width: 30,
     height: 30,

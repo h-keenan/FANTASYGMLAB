@@ -436,6 +436,57 @@ def _overall_rating(
     return _overall_rating_from_percentile(float(value))
 
 
+def overall_ratings_for_pool(
+    frame: pd.DataFrame | None,
+    *,
+    score_column: str,
+    position_column: str = "position",
+) -> pd.Series:
+    """0-99 overall rating for every row of an already-assembled ranked pool.
+
+    List endpoints (rankings, my-team, waivers, ...) already build and hold
+    the full per-league, per-position pool they need to answer their own
+    request — re-deriving an isolated percentile per row through
+    ``_overall_rating``/``_position_pool`` (which re-filters the canonical
+    player frame from scratch for every single player) would be both
+    wasteful and a second, easily-diverging copy of the same pool logic.
+    This is that same computation, vectorized over a pool the caller already
+    has in hand: percentile via ``rank(pct=True)`` *within each position
+    group in `frame`*, gated by the same ``PERCENTILE_MIN_POOL`` floor, fed
+    into the exact same ``_overall_rating_from_percentile`` curve
+    ``_overall_rating`` uses — one curve, two entry points, so a player's
+    badge never disagrees with itself depending which screen rendered it.
+
+    Returns a ``pandas.Series`` of ``int | None`` aligned to ``frame``'s
+    index (``None`` for a row whose position group is missing, unscored, or
+    thinner than ``PERCENTILE_MIN_POOL``). Passing ``None``/empty/malformed
+    input returns an empty Series rather than raising, matching
+    ``_position_pool``'s own "no trustworthy comparison" contract.
+    """
+
+    empty = pd.Series(dtype=object)
+    if frame is None or not isinstance(frame, pd.DataFrame) or frame.empty:
+        return empty
+    if position_column not in frame.columns or score_column not in frame.columns:
+        return pd.Series([None] * len(frame), index=frame.index, dtype=object)
+
+    positions = frame[position_column].astype(str).str.upper()
+    scores = pd.to_numeric(frame[score_column], errors="coerce")
+    pool_sizes = scores.groupby(positions).transform(lambda s: int(s.notna().sum()))
+    percentiles = scores.groupby(positions).rank(pct=True)
+
+    def _rating(percentile: float, pool_size: int) -> int | None:
+        if pd.isna(percentile) or pool_size < PERCENTILE_MIN_POOL:
+            return None
+        return _overall_rating_from_percentile(float(percentile))
+
+    return pd.Series(
+        [_rating(p, n) for p, n in zip(percentiles, pool_sizes)],
+        index=frame.index,
+        dtype=object,
+    )
+
+
 def _stat_percentiles(
     players_df: pd.DataFrame | None,
     row: Mapping[str, object],

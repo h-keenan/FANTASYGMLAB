@@ -11,6 +11,7 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
+import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import { api, type QuickViewModel, type RankedPlayer } from '../lib/api';
@@ -37,12 +38,27 @@ interface CompareRow {
   a: number | null;
   b: number | null;
   format?: (value: number) => string;
+  // Small secondary "OVR" pill shown next to the Value Score row's raw
+  // numbers — same 0-99 rating as the "Overall" row above, just surfaced
+  // right next to the raw score too, per the list-screen badge audit. Not
+  // a replacement for the dedicated Overall row: that row is the detailed
+  // head-to-head comparison, this is the at-a-glance badge every other
+  // list screen's value score now carries.
+  overallA?: number | null;
+  overallB?: number | null;
 }
 
 function buildRows(a: CompareSide, b: CompareSide): CompareRow[] {
   return [
     { label: 'Overall', a: a.overallRating, b: b.overallRating },
-    { label: 'Value Score', a: a.player.score, b: b.player.score, format: (v) => Math.round(v).toLocaleString() },
+    {
+      label: 'Value Score',
+      a: a.player.score,
+      b: b.player.score,
+      format: (v) => Math.round(v).toLocaleString(),
+      overallA: a.overallRating,
+      overallB: b.overallRating,
+    },
     {
       label: 'Position Rank',
       a: a.player.position_rank,
@@ -80,11 +96,17 @@ function CompareRowView({ row }: { row: CompareRow }) {
   const display = (value: number | null) => (value === null ? '—' : row.format ? row.format(value) : String(value));
   return (
     <View style={styles.row}>
-      <AppText style={[styles.rowValue, aWins && styles.rowValueWin]}>{display(row.a)}</AppText>
+      <View style={styles.rowValueColumn}>
+        <AppText style={[styles.rowValue, aWins && styles.rowValueWin]}>{display(row.a)}</AppText>
+        {row.overallA !== undefined ? <OverallRatingBadge rating={row.overallA} /> : null}
+      </View>
       <AppText style={styles.rowLabel} numberOfLines={1}>
         {row.label}
       </AppText>
-      <AppText style={[styles.rowValue, bWins && styles.rowValueWin]}>{display(row.b)}</AppText>
+      <View style={styles.rowValueColumn}>
+        <AppText style={[styles.rowValue, bWins && styles.rowValueWin]}>{display(row.b)}</AppText>
+        {row.overallB !== undefined ? <OverallRatingBadge rating={row.overallB} /> : null}
+      </View>
     </View>
   );
 }
@@ -317,7 +339,8 @@ function createStyles(colors: ThemeColors) {
   tableCard: { padding: spacing.md, gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowLabel: { flex: 1, fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
-  rowValue: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  rowValueColumn: { flex: 1, alignItems: 'center', gap: 2 },
+  rowValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   rowValueWin: { color: colors.successBright },
   });
 }

@@ -20,6 +20,7 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
+import OverallRatingBadge from '../components/OverallRatingBadge';
 import PremiumLock from '../components/PremiumLock';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -384,6 +385,7 @@ function BestAvailableCard({
         {player.name ?? 'Unknown'}
       </AppText>
       <AppText style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+      <OverallRatingBadge rating={player.overall_rating} />
       <AppText style={styles.bestAvailableCount}>{count} active</AppText>
     </AnimatedCard>
   );

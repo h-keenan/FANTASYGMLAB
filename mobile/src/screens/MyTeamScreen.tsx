@@ -13,6 +13,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
+import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { resolvePlayerTier } from '../lib/playerTier';
 import PositionBadge from '../components/PositionBadge';
@@ -351,6 +352,7 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
       <View style={styles.valueColumn}>
         <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
         <AppText style={styles.valueLabel}>VALUE</AppText>
+        <OverallRatingBadge rating={player.overall_rating} />
       </View>
     </AnimatedCard>
   );
@@ -471,7 +473,7 @@ function createStyles(colors: ThemeColors) {
   // the suggested lineup when nothing available could fill the slot.
   injuryPillOut: { backgroundColor: colors.danger },
   injuryTextOut: { color: colors.badgeText },
-  valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm },
+  valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm, gap: 2 },
   valueNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
