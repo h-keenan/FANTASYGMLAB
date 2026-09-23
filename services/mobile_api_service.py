@@ -1223,6 +1223,11 @@ def _project_ranking_row(row: pd.Series, score_field: str) -> dict[str, Any]:
         "rank_unavailable_reason": _clean_json_value(row.get("rank_unavailable_reason")),
         "opportunity_label": _clean_json_value(row.get("opportunity_label")),
         "usage_trend": _project_usage_trend(row),
+        # 0-99 "OVR" badge — see player_quick_view.overall_ratings_for_pool.
+        # Computed by the caller over the full ranked pool (before any
+        # limit=N truncation) and stashed on "_overall_rating_col" so this
+        # row-at-a-time projector doesn't need its own copy of the pool.
+        "overall_rating": _clean_json_value(row.get("_overall_rating_col")),
     }
 
 
@@ -1271,6 +1276,15 @@ def get_league_rankings(
         scoring_format=scoring_context.scoring_format,
         score_field=score_field,
         context=scoring_context,
+    )
+
+    # Computed on the full ranked pool (every eligible player at every
+    # position), before the limit=N truncation below narrows it to the page
+    # the client asked for — narrowing first would shrink/bias each
+    # position's percentile pool by whatever the requested limit happened to
+    # cut off. See player_quick_view.overall_ratings_for_pool.
+    ranked["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(
+        ranked, score_column=score_field
     )
 
     ranked = ranked.sort_values(score_field, ascending=False).head(limit)
@@ -3146,6 +3160,11 @@ def _project_lineup_row(row: pd.Series, score_field: str) -> dict[str, Any]:
         "slot": _clean_json_value(row.get("slot")),
         "suggested_starter": bool(row.get("suggested_starter")),
         "opportunity_label": _clean_json_value(row.get("opportunity_label")),
+        # 0-99 "OVR" badge — see player_quick_view.overall_ratings_for_pool.
+        # _suggested_lineup_split computes this over the FULL league pool
+        # (every eligible player at the position), not just this roster's
+        # dozen-odd players, and stashes it here before slicing to the roster.
+        "overall_rating": _clean_json_value(row.get("_overall_rating_col")),
     }
 
 
@@ -3162,6 +3181,18 @@ def _suggested_lineup_split(
     two surfaces can never drift into showing different "best lineup"
     answers for the same roster.
     """
+
+    # Overall rating is percentiled against the full league-eligible pool
+    # (every rosterable player at the position), not the dozen players on
+    # this one roster — a roster's own per-position pool is almost always
+    # thinner than PERCENTILE_MIN_POOL and would rate every starter a 99.
+    # Attached to `valued` before the roster slice below so it survives
+    # suggest_optimal_lineup's copy (which preserves incoming columns).
+    if "_overall_rating_col" not in valued.columns:
+        valued = valued.copy()
+        valued["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(
+            valued, score_column=score_field
+        )
 
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
@@ -3539,6 +3570,14 @@ def _project_waiver_row(
         "stale_free_agent": bool(row.get("stale_free_agent") or False),
         "injury_replacement_fit": bool(row.get("injury_replacement_fit") or False),
         "injury_replacement_note": _clean_json_value(row.get("injury_replacement_note")) or "",
+        # 0-99 "OVR" badge — see player_quick_view.overall_ratings_for_pool.
+        # Percentiled against the full league-eligible pool (attached to
+        # `valued` in get_league_waivers before the free-agent-only filter
+        # below), NOT the free-agent-only pool `position_rank`/`overall_rank`
+        # above use — a wire-relative rank among only the leftover free
+        # agents would rate every free agent far too generously against the
+        # true, rostered-players-included position pool the hero ring uses.
+        "overall_rating": _clean_json_value(row.get("_overall_rating_col")),
     }
 
 
@@ -3614,6 +3653,13 @@ def get_league_waivers(
 
     valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
+    # Percentiled against the full league-eligible pool (rostered players
+    # included) BEFORE the free-agent-only filter below narrows it — see
+    # _project_waiver_row's overall_rating comment for why the wire-relative
+    # free-agent pool would be the wrong denominator for this number.
+    valued["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(
+        valued, score_column=score_field
+    )
 
     rosters = sleeper.get_rosters(league_id)
     roster_player_map = {

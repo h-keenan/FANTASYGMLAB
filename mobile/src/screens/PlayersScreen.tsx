@@ -20,6 +20,7 @@ import GridBackground from '../components/GridBackground';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
+import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { resolvePlayerTier } from '../lib/playerTier';
 import PositionBadge from '../components/PositionBadge';
@@ -243,7 +244,10 @@ export default function PlayersScreen({ route, navigation }: Props) {
                   <TierBadge storedTier={item.tier} />
                 </View>
               </View>
-              <AppText style={styles.score}>{item.score != null ? Math.round(item.score) : '—'}</AppText>
+              <View style={styles.scoreColumn}>
+                <AppText style={styles.score}>{item.score != null ? Math.round(item.score) : '—'}</AppText>
+                <OverallRatingBadge rating={item.overall_rating} />
+              </View>
             </AnimatedCard>
           )}
           ListEmptyComponent={
@@ -323,6 +327,7 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
   },
   trendPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  scoreColumn: { alignItems: 'flex-end', gap: 3 },
   score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },

@@ -2454,6 +2454,100 @@ def test_rankings_rows_carry_the_usage_trend_beside_opportunity_label(monkeypatc
     assert by_name["Backup Runner"]["usage_trend"] is None
 
 
+def _fake_wide_position_pool_frame():
+    """12 WRs (a qualifying PERCENTILE_MIN_POOL=10+ pool) with a strictly
+    increasing "score", plus a single RB (a deliberately thin, non-qualifying
+    pool). Dynasty lens for a non-redraft, non-keeper league leaves
+    dynasty_pre_league == base_scores (== the "score" column) untouched
+    (see league_value_settings.apply_valuation_lens), and every row here
+    shares a position/settings multiplier, so final dynasty_score preserves
+    this exact "score" ordering — a deterministic pool to percentile against,
+    with no need to predict the engine's own composite formula.
+    """
+
+    rows = [
+        {
+            "player_id": f"wr{i}",
+            "name": f"Wideout {i}",
+            "position": "WR",
+            "team": "KC",
+            "age": 26,
+            "years_exp": 4,
+            "status": "Active",
+            "injury_status": None,
+            "score": i * 100,
+            "dynasty_score": i * 100,
+            "value_score": i * 100,
+        }
+        for i in range(1, 13)
+    ]
+    rows.append(
+        {
+            "player_id": "rb_lonely",
+            "name": "Lonely Runner",
+            "position": "RB",
+            "team": "KC",
+            "age": 26,
+            "years_exp": 4,
+            "status": "Active",
+            "injury_status": None,
+            "score": 500,
+            "dynasty_score": 500,
+            "value_score": 500,
+        }
+    )
+    return pd.DataFrame(rows)
+
+
+def test_rankings_rows_carry_overall_rating_percentiled_within_position(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=_fake_wide_position_pool_frame()):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    response = client.get(
+                        "/v1/leagues/abc/rankings?lens=Dynasty&limit=20",
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    by_id = {player["player_id"]: player for player in response.json()["players"]}
+
+    # A pool of 1 (rb_lonely) is well under PERCENTILE_MIN_POOL — no rating
+    # invented on too thin a comparison, same gate the hero ring uses.
+    assert by_id["rb_lonely"]["overall_rating"] is None
+
+    # A pool of 12 qualifies. wr12 has the highest score in its position
+    # group, i.e. percentile 1.0 -- the top of the curve.
+    assert by_id["wr12"]["overall_rating"] == 99
+    for player in by_id.values():
+        if player["position"] == "WR":
+            assert player["overall_rating"] is not None
+            assert 1 <= player["overall_rating"] <= 99
+
+    # Higher score within the same position never rates lower — the same
+    # monotonic curve _overall_rating uses for the single-player path.
+    wr_by_score = sorted(
+        (p for p in by_id.values() if p["position"] == "WR"),
+        key=lambda p: p["score"],
+    )
+    ratings = [p["overall_rating"] for p in wr_by_score]
+    assert ratings == sorted(ratings)
+
+
 def test_weekly_stats_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/players/9001/weekly-stats")
@@ -4764,6 +4858,92 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
     assert target["overall_rank"] == 1
 
 
+def test_waivers_overall_rating_uses_the_full_league_pool_not_just_free_agents(monkeypatch):
+    """position_rank/overall_rank above are wire-relative (free agents
+    only) — a single free agent is trivially "#1 of 1". overall_rating must
+    NOT reuse that pool: it has to be percentiled against every eligible RB
+    in the league (rostered players included), same universe the hero ring
+    uses, or a lone free agent would read as a 99 overall regardless of how
+    good he actually is.
+    """
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    # Rostered by the OTHER team, purely to widen the league-wide RB pool
+    # without touching the free-agent pool target_rb needs to stay alone in.
+    opponent_roster_ids = [f"rb_filler_{i}" for i in range(1, 11)]
+
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+    filler = pd.DataFrame(
+        [
+            {
+                "player_id": f"rb_filler_{i}",
+                "name": f"Filler Runner {i}",
+                "position": "RB",
+                "team": "SF",
+                "age": 27,
+                "years_exp": 5,
+                "status": "Active",
+                "injury_status": None,
+                "score": 10 * i,
+                "dynasty_score": 10 * i,
+                "value_score": 10 * i,
+                "rebuild_score": 10 * i,
+            }
+            for i in range(1, 11)
+        ]
+    )
+    roster_frame = pd.concat([roster_frame, filler], ignore_index=True)
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": opponent_roster_ids},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=roster_frame):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            with patch(
+                                "modules.player_state_authority.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                response = client.get(
+                                    "/v1/leagues/abc/waivers",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    # The 10 filler RBs are all rostered by roster 2 -- target_rb is still
+    # the only free agent, so the wire-relative pool is unchanged from the
+    # test above (still "#1 of 1").
+    player_ids = [p["player_id"] for p in body["players"]]
+    assert player_ids == ["target_rb"]
+    target = body["players"][0]
+    assert target["position_rank"] == 1
+    assert target["overall_rank"] == 1
+
+    # But the league-wide RB pool is now target_rb (score 6000) + my2/my3/
+    # my8 (2000, tied) + my_bench_rb (300) + 10 fillers (10-100) = 15 RBs,
+    # comfortably over PERCENTILE_MIN_POOL, and target_rb's score is the
+    # unique highest in it -- percentile 1.0, the top of the curve.
+    assert target["overall_rating"] == 99
+
+
 def _waivers_secondary_board_request(monkeypatch, entitlement: str):
     """target_rb plus 7 more free agents (8 total) — Priority Adds caps at
     6, so at least one of the low-scored extras (young_wr, age 22) always
@@ -5175,6 +5355,95 @@ def test_my_team_returns_the_real_suggested_lineup_split(monkeypatch):
     assert starters[0]["slot"] == "QB"
     bench_ids = {player["player_id"] for player in bench}
     assert "my_bench_rb" in bench_ids
+
+
+def test_my_team_overall_rating_is_percentiled_against_the_full_league_pool(monkeypatch):
+    """The roster itself only has 4 WRs — well under PERCENTILE_MIN_POOL — so
+    overall_rating must come from the FULL players_df pool (every eligible
+    player in the league, rostered or not), not from re-deriving a percentile
+    out of just this roster's own dozen players.
+    """
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    frame = _fake_roster_frame()
+    # Give the roster's 4 WRs (my4/my5/my6/my9, all tied at 2000 in the
+    # shared fixture) distinct scores instead -- a tie at the top of the
+    # pool would average their rank(pct=True) below 1.0 and this test would
+    # no longer know what overall_rating to expect without re-deriving the
+    # curve math itself.
+    for player_id, score in (("my4", 2100), ("my5", 2200), ("my6", 2300), ("my9", 2400)):
+        frame.loc[frame["player_id"] == player_id, ["score", "dynasty_score", "value_score"]] = score
+    # Unrostered filler WRs, purely to widen the league-wide WR pool this
+    # test's roster WRs get percentiled against, to 12 total.
+    filler = pd.DataFrame(
+        [
+            {
+                "player_id": f"wr_filler_{i}",
+                "name": f"Filler Wideout {i}",
+                "position": "WR",
+                "team": "SF",
+                "age": 27,
+                "years_exp": 5,
+                "status": "Active",
+                "injury_status": None,
+                "score": 100 * i,
+                "dynasty_score": 100 * i,
+                "value_score": 100 * i,
+                "rebuild_score": 100 * i,
+            }
+            for i in range(1, 9)
+        ]
+    )
+    frame = pd.concat([frame, filler], ignore_index=True)
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=frame):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            response = client.get(
+                                "/v1/leagues/abc/my-team",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    all_rows = body["starters"] + body["bench"]
+    by_id = {row["player_id"]: row for row in all_rows}
+
+    # my4 < my5 < my6 < my9, and all 4 beat every one of the 8 filler WRs
+    # (scores 100-800) -- a fully deterministic 12-player pool. my9 has the
+    # single highest score in it, i.e. percentile 1.0 -- top of the curve.
+    roster_wrs = [row for row in all_rows if row["position"] == "WR"]
+    assert {row["player_id"] for row in roster_wrs} == {"my4", "my5", "my6", "my9"}
+    for row in roster_wrs:
+        assert row["overall_rating"] is not None
+        assert 1 <= row["overall_rating"] <= 99
+    assert by_id["my9"]["overall_rating"] == 99
+    ratings_by_id = {row["player_id"]: row["overall_rating"] for row in roster_wrs}
+    assert ratings_by_id["my4"] < ratings_by_id["my5"] < ratings_by_id["my6"] < ratings_by_id["my9"]
+
+    # RB pool (my2/my3/my8/my_bench_rb/target_rb -- no RB fillers added) is
+    # only 5 players -- under PERCENTILE_MIN_POOL, so no invented rating.
+    assert by_id["my_bench_rb"]["overall_rating"] is None
 
 
 def _fake_matchup_players_frame():

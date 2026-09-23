@@ -482,6 +482,67 @@ def test_overall_rating_is_omitted_when_no_score_column_exists():
     assert player_quick_view.build_stats_view(_subject_row(players), players).overall_rating is None
 
 
+def test_overall_ratings_for_pool_matches_the_single_player_path():
+    """The list-endpoint entry point (used by rankings/my-team/waivers) must
+    never disagree with `_overall_rating` (the single-player quick-view
+    path) for the exact same pool -- both funnel into the same curve, so a
+    player's badge can't read differently depending which screen rendered
+    it."""
+
+    players = _rated_pool(20)
+
+    single = player_quick_view.build_stats_view(_subject_row(players), players).overall_rating
+    ratings = player_quick_view.overall_ratings_for_pool(players, score_column="value_score")
+    subject_index = players.index[players["player_id"] == "fixture-player"][0]
+
+    assert single is not None
+    assert ratings.loc[subject_index] == single
+
+
+def test_overall_ratings_for_pool_is_none_below_the_min_pool_per_position():
+    small = _rated_pool(player_quick_view.PERCENTILE_MIN_POOL - 2)
+
+    ratings = player_quick_view.overall_ratings_for_pool(small, score_column="value_score")
+
+    assert ratings.notna().sum() == 0
+
+
+def test_overall_ratings_for_pool_ranks_within_each_position_group_separately():
+    wr = _rated_pool(20)
+    rb = _pool(20, position="RB")
+    rb["player_id"] = [f"rb-{index}" for index in range(len(rb))]
+    # Every RB outscores the whole WR pool -- a cross-position pool would
+    # sink the WR pool's ratings; grouping by position must not let that
+    # happen. Ascending (not tied) so the top RB unambiguously hits its own
+    # pool's ceiling, same as `_rated_pool` does for the WR/subject pool.
+    rb["value_score"] = [9999.0 + index for index in range(len(rb))]
+    players = pd.concat([wr, rb], ignore_index=True)
+
+    ratings = player_quick_view.overall_ratings_for_pool(players, score_column="value_score")
+    subject_index = players.index[players["player_id"] == "fixture-player"][0]
+
+    # Subject is the top score within the WR pool specifically, unmoved by
+    # the RB pool's much larger raw scores.
+    assert ratings.loc[subject_index] == player_quick_view.OVERALL_RATING_MAX
+    # The top RB (its own pool's max) is independently also top-of-scale.
+    top_rb_index = players.index[players["player_id"] == "rb-19"][0]
+    assert ratings.loc[top_rb_index] == player_quick_view.OVERALL_RATING_MAX
+    # The bottom RB (its own pool's min) rates far lower despite a raw score
+    # (9999.0) still dwarfing every WR's.
+    bottom_rb_index = players.index[players["player_id"] == "rb-0"][0]
+    assert ratings.loc[bottom_rb_index] < ratings.loc[top_rb_index]
+
+
+def test_overall_ratings_for_pool_handles_empty_and_malformed_input():
+    assert player_quick_view.overall_ratings_for_pool(None, score_column="value_score").empty
+    assert player_quick_view.overall_ratings_for_pool(pd.DataFrame(), score_column="value_score").empty
+
+    missing_columns = pd.DataFrame({"player_id": ["a", "b"]})
+    ratings = player_quick_view.overall_ratings_for_pool(missing_columns, score_column="value_score")
+    assert len(ratings) == 2
+    assert ratings.isna().all()
+
+
 def _decision_fit_pool(count: int, **subject_overrides):
     """A pool carrying the four composite value-score inputs the decision-fit
     narrative percentiles, ascending across the pool so the subject's
