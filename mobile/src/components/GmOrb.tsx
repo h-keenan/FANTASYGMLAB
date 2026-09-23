@@ -526,7 +526,7 @@ export default function GmOrb() {
         colors={[`${colors.background}00`, `${colors.background}EB`]}
         style={[styles.scrim, { height: ORB_SCRIM_BASE_HEIGHT + insets.bottom }]}
       />
-      <View style={[styles.orbWrap, { bottom: insets.bottom + spacing.md }]}>
+      <View style={[styles.orbWrap, { bottom: insets.bottom + spacing.xs }]}>
         <GestureDetector gesture={dragGesture}>
           <Animated.View style={orbAnimatedStyle}>
             <TouchableOpacity
@@ -558,7 +558,7 @@ export default function GmOrb() {
         <View pointerEvents="none" style={[styles.debugOverlay, { top: rawInsets.top + 4 }]}>
           <AppText style={styles.debugOverlayText}>
             win:{Math.round(Dimensions.get('window').height)} rawBottom:{Math.round(rawInsets.bottom)}{' '}
-            orbBottomOffset:{Math.round(insets.bottom + spacing.md)}
+            orbBottomOffset:{Math.round(insets.bottom + spacing.xs)}
           </AppText>
         </View>
       )}
