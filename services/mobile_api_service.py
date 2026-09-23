@@ -65,10 +65,12 @@ so the web app and mobile app share one engine.
 
 from __future__ import annotations
 
+import concurrent.futures
 import dataclasses
 import hashlib
 import os
 import re
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -126,12 +128,57 @@ from modules.trade_analyzer_assembly import pick_asset_from_mapping, player_asse
 
 SERVICE_NAME = "mobile-api"
 
+_PLAYERS_CACHE_WARM_TIMEOUT_S = 60
+
+
+def _warm_players_cache_at_startup() -> None:
+    """Best-effort: populate rankings.load_players' process cache before
+    this process starts accepting any traffic (see the lifespan below).
+
+    Without this, the first real requests after a fresh deploy correctly
+    single-flight onto ONE cold rankings.load_players() call (~5s locally,
+    longer under real load/network) instead of each redoing that work —
+    but every OTHER concurrent request still has to wait for that one
+    call, and a real user's app opening right after a deploy can fire a
+    dozen-plus of those at once. Doing this once here, before Render ever
+    considers the deploy healthy enough to receive real traffic, moves
+    that cost into the deploy's own already-expected, already-invisible
+    startup window instead of onto whoever happens to open the app first.
+
+    Bounded by a timeout rather than blocking forever: if this hangs (a
+    genuine network outage reaching Sleeper, say), the process still
+    starts and falls back to today's per-request load-or-build behavior
+    rather than wedging the deploy indefinitely.
+    """
+
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("DYNASTYGM_TEST_MODE"):
+        return
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="dgm-startup-cache-warm")
+    future = executor.submit(rankings.load_players, PLAYERS_DB_PATH)
+    try:
+        future.result(timeout=_PLAYERS_CACHE_WARM_TIMEOUT_S)
+    except Exception:
+        pass
+    # Not wait=True: if the timeout above fired, the load is still running
+    # in the background — let it finish on its own time and populate the
+    # (shared, module-level) cache whenever it completes, rather than
+    # blocking process startup on it a second time here.
+    executor.shutdown(wait=False)
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    _warm_players_cache_at_startup()
+    yield
+
+
 app = FastAPI(
     title="FantasyGM Lab Mobile API",
     version="0.1.0",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
+    lifespan=_lifespan,
 )
 # Full-league JSON payloads (rankings, draft-picks, trade-hub) are pandas-derived
 # and can run into the hundreds of KB uncompressed — this app is consumed
