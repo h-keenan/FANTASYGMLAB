@@ -27,8 +27,10 @@ import {
   type TeamRanking,
   type TeamSnapshot,
 } from '../lib/api';
+import MetricCard from '../components/MetricCard';
 import PremiumLock from '../components/PremiumLock';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import TeamAvatar from '../components/TeamAvatar';
 import TrajectoryArcs from '../components/TrajectoryArcs';
@@ -346,7 +348,7 @@ function LeaguePulseSection({ teams }: { teams: TeamRanking[] }) {
   const tiles = buildLeaguePulseTiles(teams, colors);
   return (
     <View style={styles.pulseSection}>
-      <AppText style={styles.pulseHeading}>League Pulse</AppText>
+      <SectionHeading title="League Pulse" icon="podium-outline" />
       <View style={styles.pulseGrid}>
         {tiles.map((tile) => (
           <View key={tile.label} style={[styles.pulseTile, { borderLeftColor: tile.color }]}>
@@ -398,7 +400,10 @@ function quickActions(colors: ThemeColors): Array<{
 /** The concept sheet's Dashboard panel leads with a 2x2 "Quick Actions"
  * shortcut grid (Trade Hub/Rankings/Waivers/Draft Picks) above the daily
  * briefing feed — this app's Dashboard had no equivalent shortcut row at
- * all, only the deeper GM Orb menu and per-tile destination buttons. */
+ * all, only the deeper GM Orb menu and per-tile destination buttons.
+ * Built on AnimatedCard so these tiles get the same press-scale + resting
+ * shadow every other card on the app already has, instead of a bare
+ * TouchableOpacity box — one card affordance, not a page-specific one. */
 function QuickActionsGrid({
   leagueId,
   leagueName,
@@ -413,16 +418,16 @@ function QuickActionsGrid({
   return (
     <View style={styles.quickActionsGrid}>
       {quickActions(colors).map((action) => (
-        <TouchableOpacity
+        <AnimatedCard
           key={action.route}
-          style={[styles.quickActionCell, { borderColor: `${action.color}55` }]}
+          style={StyleSheet.flatten([styles.quickActionCell, { borderColor: `${action.color}55` }])}
           onPress={() => navigation.navigate(action.route, { leagueId, leagueName })}
         >
-          <IconCircle name={action.icon} color={action.color} size={36} />
+          <IconCircle name={action.icon} color={action.color} size={44} />
           <AppText style={styles.quickActionLabel} numberOfLines={1}>
             {action.label}
           </AppText>
-        </TouchableOpacity>
+        </AnimatedCard>
       ))}
     </View>
   );
@@ -500,6 +505,16 @@ function NewBadge() {
   );
 }
 
+/**
+ * League Snapshot, rebuilt on MetricCard (the same compact-tile primitive
+ * PR #682 introduced for Player Detail's Stats tab) instead of a
+ * Dashboard-only tile style — these five metrics are ranks/counts, not
+ * percentiles, so MetricCard's percentile prop is simply omitted (it
+ * already renders fine as plain label+value in that case). Power/Franchise
+ * stay tappable through to Teams; Injuries stays deliberately non-tappable
+ * (the health context card immediately below is already "the why"), and
+ * gets `valueColor` emphasis when non-zero instead of a one-off danger tile.
+ */
 function TeamSnapshotRow({
   snapshot,
   leagueId,
@@ -518,53 +533,25 @@ function TeamSnapshotRow({
       ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
       : '—';
   const injuredCount = snapshot.injured_starters;
-  // Power/Franchise/Injuries link out to a fuller view — Injuries opens the
-  // same health context card just below rather than a separate screen,
-  // since that's where the "why" already lives.
-  const tiles: { label: string; value: string; tappable?: boolean; tone?: 'danger' }[] = [
-    { label: 'Record', value: record },
-  ];
-  if (snapshot.power_rank != null) tiles.push({ label: 'Power', value: `#${snapshot.power_rank}`, tappable: true });
-  if (snapshot.franchise_rank != null) {
-    tiles.push({ label: 'Franchise', value: `#${snapshot.franchise_rank}`, tappable: true });
-  }
-  tiles.push({ label: 'Avg Age', value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—' });
-  tiles.push({
-    label: 'Injuries',
-    value: injuredCount != null ? String(injuredCount) : '—',
-    tone: injuredCount != null && injuredCount > 0 ? 'danger' : undefined,
-  });
+  const goToTeams = () => navigation.navigate('Teams', { leagueId, leagueName });
+
   return (
     <View style={styles.snapshotSection}>
-      <View style={styles.snapshotHeaderRow}>
-        <Ionicons name="stats-chart" size={14} color={colors.accent} />
-        <AppText style={styles.snapshotHeaderText}>LEAGUE SNAPSHOT</AppText>
-      </View>
+      <SectionHeading title="League Snapshot" icon="stats-chart" />
       <View style={styles.snapshotRow}>
-        {tiles.map((tile) =>
-          tile.tappable ? (
-            <TouchableOpacity
-              key={tile.label}
-              style={[styles.snapshotTile, styles.snapshotTileTappable]}
-              onPress={() => navigation.navigate('Teams', { leagueId, leagueName })}
-            >
-              <AppText style={styles.snapshotValue} numberOfLines={1}>
-                {tile.value}
-              </AppText>
-              <AppText style={styles.snapshotLabel}>{tile.label}</AppText>
-            </TouchableOpacity>
-          ) : (
-            <View key={tile.label} style={styles.snapshotTile}>
-              <AppText
-                style={[styles.snapshotValue, tile.tone === 'danger' && styles.snapshotValueDanger]}
-                numberOfLines={1}
-              >
-                {tile.value}
-              </AppText>
-              <AppText style={styles.snapshotLabel}>{tile.label}</AppText>
-            </View>
-          ),
-        )}
+        <MetricCard label="Record" value={record} />
+        {snapshot.power_rank != null ? (
+          <MetricCard label="Power" value={`#${snapshot.power_rank}`} onPress={goToTeams} />
+        ) : null}
+        {snapshot.franchise_rank != null ? (
+          <MetricCard label="Franchise" value={`#${snapshot.franchise_rank}`} onPress={goToTeams} />
+        ) : null}
+        <MetricCard label="Avg Age" value={snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—'} />
+        <MetricCard
+          label="Injuries"
+          value={injuredCount != null ? String(injuredCount) : '—'}
+          valueColor={injuredCount != null && injuredCount > 0 ? colors.danger : undefined}
+        />
       </View>
     </View>
   );
@@ -691,11 +678,13 @@ function TeamHealthContextCard({ snapshot }: { snapshot: TeamSnapshot }) {
   if (players.length === 0 && !keyInjuries && !fallbackSummary) return null;
 
   return (
-    <AnimatedCard style={StyleSheet.flatten([styles.healthCard, styles.healthCardBorder])}>
-      <View style={styles.healthHeaderRow}>
-        <Ionicons name="pulse-outline" size={15} color={colors.danger} />
-        <AppText style={styles.healthLabel} numberOfLines={1}>
-          {snapshot.health_flag || 'Health context'}
+    <AnimatedCard
+      style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.danger, gap: spacing.sm } as ViewStyle])}
+    >
+      <View style={styles.cardHeaderRow}>
+        <Ionicons name="pulse-outline" size={15} color={colors.danger} style={styles.cardIcon} />
+        <AppText style={[styles.cardLabel, { color: colors.danger }]} numberOfLines={1}>
+          {(snapshot.health_flag || 'Health context').toUpperCase()}
         </AppText>
       </View>
       {keyInjuries ? <AppText style={styles.healthSummary}>Key injuries: {keyInjuries}</AppText> : null}
@@ -735,6 +724,7 @@ function TopPriorityTradeCard({
   const presentation = item.presentation!;
   const gain = presentation.trade_gain;
   const gainColor = gain > 0 ? colors.successBright : gain < 0 ? colors.danger : colors.textSecondary;
+  const gainChipColor = gain > 0 ? colors.successMuted : gain < 0 ? colors.dangerMuted : colors.backgroundElevated;
   const confidenceLevel = CONFIDENCE_LEVELS[presentation.trade_confidence_label?.toLowerCase()] ?? 1;
   const routeName = DESTINATION_ROUTE[item.destination];
 
@@ -782,10 +772,12 @@ function TopPriorityTradeCard({
         <AppText style={styles.valueLabel}>
           TRADE VALUE / {presentation.trade_market_realism_label.toUpperCase()}
         </AppText>
-        <AppText style={[styles.valueNumber, { color: gainColor }]}>
-          {gain > 0 ? '+' : ''}
-          {gain}
-        </AppText>
+        <View style={[styles.valueChip, { backgroundColor: gainChipColor }]}>
+          <AppText style={[styles.valueNumber, { color: gainColor }]}>
+            {gain > 0 ? '+' : ''}
+            {gain}
+          </AppText>
+        </View>
       </View>
       <View style={styles.meterRow}>
         <AppText style={styles.meterLabel}>CONFIDENCE</AppText>
@@ -900,27 +892,21 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.lg,
     gap: spacing.sm,
   },
+  // 2x2 grid (2 tiles per row) per the concept sheet — larger touch targets
+  // and a bigger IconCircle than the old 4-across row, since these are
+  // primary GM-workflow entry points, not a footnote row.
   quickActionCell: {
-    flexBasis: '22%',
+    flexBasis: '47%',
     flexGrow: 1,
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xs,
-    gap: spacing.xs,
-    borderRadius: radii.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.sm,
     borderWidth: 1,
-    backgroundColor: colors.surface,
   },
-  quickActionLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
+  quickActionLabel: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   lockWrap: { marginTop: spacing.md },
   pulseSection: { marginTop: spacing.lg },
-  pulseHeading: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    letterSpacing: 0.4,
-    marginBottom: spacing.sm,
-  },
   pulseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   pulseTile: {
     flexBasis: '48%',
@@ -968,44 +954,10 @@ function createStyles(colors: ThemeColors) {
   matchupEdge: { fontSize: 13, fontWeight: '700', marginTop: spacing.md },
   matchupBasis: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
   snapshotSection: { marginBottom: spacing.md },
-  snapshotHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
-  snapshotHeaderText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
   snapshotRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  snapshotTile: {
-    flexBasis: '30%',
-    flexGrow: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  snapshotTileTappable: { borderColor: colors.accentMuted },
-  healthCard: { padding: spacing.lg, gap: spacing.sm, marginBottom: spacing.md },
-  // Same left-border accent language BriefingCard/TopPriorityTradeCard/
-  // WeeklyMatchupCard use — this card was the one surface on Dashboard still
-  // rendering as a flat, unaccented block despite being the "injury/watch"
-  // category everywhere else on the screen colors red.
-  healthCardBorder: { borderLeftWidth: 4, borderLeftColor: colors.danger },
-  healthHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  healthLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.danger,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    flexShrink: 1,
   },
   healthSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   // Matches TeamRosterScreen's archetype strengths/risks list styling.
@@ -1019,16 +971,6 @@ function createStyles(colors: ThemeColors) {
     marginBottom: 2,
   },
   detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  snapshotValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  snapshotValueDanger: { color: colors.danger },
-  snapshotLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: 2,
-  },
   newBadge: {
     backgroundColor: colors.accent,
     borderRadius: radii.pill,
@@ -1091,12 +1033,20 @@ function createStyles(colors: ThemeColors) {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
   },
-  valueLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-  valueNumber: { fontSize: 18, fontWeight: '800' },
-  meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  valueLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4, flexShrink: 1 },
+  // A soft tinted chip around the number, not just colored text — "obvious
+  // but not sloppy" per coridian_'s brief, so the value result reads as the
+  // one clear headline of the row instead of competing with its own label.
+  valueChip: {
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  valueNumber: { fontSize: 20, fontWeight: '800' },
+  meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
   meterLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   meterSegments: { flexDirection: 'row', gap: 3 },
-  meterSegment: { width: 14, height: 4, borderRadius: 2 },
+  meterSegment: { width: 18, height: 5, borderRadius: radii.pill },
   meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
   destButton: {
     marginTop: spacing.md,
