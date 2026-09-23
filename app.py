@@ -111,7 +111,7 @@ from modules import player_state_authority
 from modules import runtime_trace
 from modules import startup_coordinator
 from modules import startup_critical_path
-from modules import startup_cold_path
+from modules import players_refresh_flight, startup_cold_path
 from modules import shell_chrome_schema
 from modules import game_plan_package
 from modules import game_plan_process_cache
@@ -870,7 +870,13 @@ def ensure_players(*, allow_network_refresh: bool = False):
         return startup_cold_path.ensure_players_for_startup(
             db_path=DB_PATH,
             load_players_fn=load_players,
-            build_players_table_fn=build_players_table,
+            # Out-of-process, not build_players_table directly — see
+            # modules.players_refresh_flight.build_players_table_out_of_process:
+            # this is real CPU work (normalizing/scoring ~1700-2000 players),
+            # and this app serves every session from one process, so an
+            # in-process rebuild holds the GIL long enough to stall every
+            # other user's request while it runs.
+            build_players_table_fn=players_refresh_flight.build_players_table_out_of_process,
             session_state=st.session_state,
             allow_network_refresh=allow_network_refresh,
         )
@@ -18111,7 +18117,7 @@ def main():
         ):
             startup_cold_path.maybe_refresh_players_after_shell(
                 db_path=DB_PATH,
-                build_players_table_fn=build_players_table,
+                build_players_table_fn=players_refresh_flight.build_players_table_out_of_process,
                 session_state=st.session_state,
                 background=True,
             )
@@ -18370,7 +18376,7 @@ def main():
         ):
             startup_cold_path.maybe_refresh_players_after_shell(
                 db_path=DB_PATH,
-                build_players_table_fn=build_players_table,
+                build_players_table_fn=players_refresh_flight.build_players_table_out_of_process,
                 session_state=st.session_state,
                 background=True,
             )

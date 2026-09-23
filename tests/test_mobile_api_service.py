@@ -87,7 +87,10 @@ def test_maybe_schedule_players_refresh_schedules_when_stale(monkeypatch):
     mobile_api_service._maybe_schedule_players_refresh()
 
     assert called["db_path"] == mobile_api_service.PLAYERS_DB_PATH
-    assert called["build_players_table_fn"] is mobile_api_service.rankings.build_players_table
+    assert (
+        called["build_players_table_fn"]
+        is mobile_api_service.players_refresh_flight.build_players_table_out_of_process
+    )
     assert called["background"] is True
     assert called["session_state"][mobile_api_service.startup_cold_path.PLAYERS_REFRESH_PENDING_KEY] is True
 

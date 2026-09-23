@@ -68,7 +68,7 @@ def test_cached_public_data_load_has_single_entry_point():
     assert "public_player_data_load" in source
     assert "ensure_players(" in source
     assert "ensure_players_for_startup" in source
-    assert "build_players_table_fn=build_players_table" in source
+    assert "build_players_table_fn=players_refresh_flight.build_players_table_out_of_process" in source
     assert "load_players_fn=load_players" in source
 
 
