@@ -449,7 +449,21 @@ function UsageSection({ items }: { items: QuickViewStatItem[] }) {
 // page back to last year or the year before.
 const WEEKLY_STATS_SEASONS_BACK = 3;
 
-function TrendsSection({ playerId }: { playerId: string }) {
+/** "Rookie" or "N season(s)" — see modules/player_quick_view.py's
+ * build_executive_snapshot (years_exp=0 -> "Rookie", else "{n} season(s)").
+ * Returns how many seasons before the current one actually happened, so
+ * the year picker below doesn't offer tabs for years before the player
+ * was in the league (coridian_: "it shouldn't show other years if he's a
+ * rookie this year"). Null (parse failure/no bio yet) falls back to the
+ * full 3-year window rather than guessing wrong in the other direction. */
+function priorSeasonsFromExperience(yearsInLeague: string | null): number | null {
+  if (!yearsInLeague) return null;
+  if (yearsInLeague === 'Rookie') return 0;
+  const match = /^(\d+)\s+season/.exec(yearsInLeague);
+  return match ? Number(match[1]) : null;
+}
+
+function TrendsSection({ playerId, yearsInLeague }: { playerId: string; yearsInLeague: string | null }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Set once from the first response and never touched again — the anchor
@@ -486,9 +500,12 @@ function TrendsSection({ playerId }: { playerId: string }) {
     return <AppText style={styles.notice}>No weekly trend data available for this player yet.</AppText>;
   }
 
+  const priorSeasons = priorSeasonsFromExperience(yearsInLeague);
+  const seasonCount =
+    priorSeasons === null ? WEEKLY_STATS_SEASONS_BACK : Math.min(WEEKLY_STATS_SEASONS_BACK, priorSeasons + 1);
   const yearOptions = defaultYear === null
     ? []
-    : Array.from({ length: WEEKLY_STATS_SEASONS_BACK }, (_, index) => defaultYear - index);
+    : Array.from({ length: seasonCount }, (_, index) => defaultYear - index);
 
   return (
     <View style={styles.card}>
@@ -1289,7 +1306,9 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             </>
           ) : null}
 
-          {activeTab === 'trends' ? <TrendsSection playerId={player.player_id} /> : null}
+          {activeTab === 'trends' ? (
+            <TrendsSection playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
+          ) : null}
 
           {activeTab === 'schedule' ? <ScheduleSection playerId={player.player_id} /> : null}
 
