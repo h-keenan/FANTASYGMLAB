@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { LayoutChangeEvent, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { LayoutChangeEvent, Pressable, View } from 'react-native';
 import AppText from './AppText';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 
@@ -42,6 +42,13 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [width, setWidth] = useState(0);
+  // coridian_: "you need to be able to tap on points on the graph to see
+  // what the value is" — the dots themselves are too small a target to tap
+  // reliably, so each gets its own larger invisible touch area (below).
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  useEffect(() => {
+    setSelectedWeek(null);
+  }, [weeks]);
 
   const played = weeks.filter((week) => week.fantasy_points_ppr != null);
   if (played.length === 0) {
@@ -64,6 +71,7 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
   }));
   const maxY = TOP_PAD;
   const minY = TOP_PAD + plotHeight;
+  const selectedTooltipPoint = points.find((point) => point.week === selectedWeek) ?? null;
 
   const onLayout = (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width);
 
@@ -92,13 +100,41 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
               key={point.week}
               cx={point.x}
               cy={point.y}
-              r={3.5}
+              r={point.week === selectedWeek ? 5.5 : 3.5}
               fill={
                 point.value === maxValue ? colors.successBright : point.value === minValue ? colors.danger : colors.accent
               }
+              stroke={point.week === selectedWeek ? colors.textPrimary : 'none'}
+              strokeWidth={point.week === selectedWeek ? 2 : 0}
             />
           ))}
         </Svg>
+      ) : null}
+      {width > 0
+        ? points.map((point) => (
+            <Pressable
+              key={point.week}
+              onPress={() => setSelectedWeek((current) => (current === point.week ? null : point.week))}
+              hitSlop={10}
+              style={[styles.touchTarget, { left: point.x - 14, top: point.y - 14 }]}
+            />
+          ))
+        : null}
+      {selectedTooltipPoint ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.tooltip,
+            {
+              left: Math.min(Math.max(selectedTooltipPoint.x - TOOLTIP_WIDTH / 2, 0), Math.max(width - TOOLTIP_WIDTH, 0)),
+              top: Math.max(selectedTooltipPoint.y - 34, 0),
+            },
+          ]}
+        >
+          <AppText style={styles.tooltipText}>
+            Week {selectedTooltipPoint.week} · {selectedTooltipPoint.value.toFixed(1)} pts
+          </AppText>
+        </View>
       ) : null}
       {width > 0 ? (
         <>
@@ -121,6 +157,7 @@ export default function WeeklyPointsChart({ weeks }: { weeks: WeeklyStatPoint[] 
 }
 
 const LABEL_WIDTH = 20;
+const TOOLTIP_WIDTH = 100;
 
 function createStyles(colors: ThemeColors) {
   return {
@@ -155,5 +192,26 @@ function createStyles(colors: ThemeColors) {
     },
     axisLabelHigh: { color: colors.successBright },
     axisLabelLow: { color: colors.danger },
+    touchTarget: {
+      position: 'absolute' as const,
+      width: 28,
+      height: 28,
+    },
+    tooltip: {
+      position: 'absolute' as const,
+      width: TOOLTIP_WIDTH,
+      backgroundColor: colors.backgroundElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 6,
+      paddingVertical: 4,
+      paddingHorizontal: 6,
+      alignItems: 'center' as const,
+    },
+    tooltipText: {
+      ...typography.caption,
+      fontWeight: '700' as const,
+      color: colors.textPrimary,
+    },
   };
 }
