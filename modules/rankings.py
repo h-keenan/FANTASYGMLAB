@@ -183,11 +183,18 @@ INJURY_STATUSES = {
 
 
 def _append_display_sentence(base: str, sentence: str) -> str:
-    """Append display copy as a clean sentence without changing scoring inputs."""
+    """Append display copy as a clean sentence without changing scoring inputs.
+
+    Not called twice on the same row in any current pipeline, but this
+    guard costs nothing and rules out a duplicated-sentence explanation
+    paragraph if that ever changes.
+    """
     clean_base = str(base or "").strip()
     clean_sentence = str(sentence or "").strip()
     if not clean_base:
         return clean_sentence
+    if clean_sentence and clean_sentence in clean_base:
+        return clean_base
     if clean_base[-1] not in ".!?":
         clean_base += "."
     return f"{clean_base} {clean_sentence}"
@@ -891,30 +898,6 @@ def rank_to_value(search_rank) -> int:
     return 0
 
 
-def age_adjustment(age, base_value: int) -> int:
-    if age is None or base_value <= 0:
-        return 0
-
-    try:
-        age = float(age)
-    except Exception:
-        return 0
-
-    if age <= 22:
-        return int(base_value * 0.18)
-    if age <= 24:
-        return int(base_value * 0.12)
-    if age <= 26:
-        return int(base_value * 0.05)
-    if age <= 28:
-        return 0
-    if age <= 30:
-        return int(base_value * -0.10)
-    if age <= 32:
-        return int(base_value * -0.22)
-    return int(base_value * -0.40)
-
-
 def _normalize_name(name: str) -> str:
     return "".join(ch for ch in str(name or "").lower() if ch.isalnum())
 
@@ -1578,18 +1561,6 @@ def depth_chart_slot(position: str, depth_chart_position, depth_chart_order=None
     return order_value if order_value and order_value > 0 else None
 
 
-def projected_starter_status(
-    position: str,
-    depth_chart_position,
-    market_score: float = 0.0,
-    depth_chart_order=None,
-) -> bool:
-    """Starter projection from depth chart. Market is not used for valuation access."""
-
-    slot = depth_chart_slot(position, depth_chart_position, depth_chart_order)
-    return slot == 1
-
-
 def normalize_snap_share(snap_share) -> float | None:
     """Normalize Sleeper season snap share to a 0..1 fraction. None when absent/invalid."""
 
@@ -1896,15 +1867,6 @@ def _opportunity_group_sort_key_values(
     age_num = pd.to_numeric(age, errors="coerce")
     age_num = 99.0 if pd.isna(age_num) else float(age_num)
     return (slot_num, projected, market, age_num)
-
-
-def _opportunity_group_sort_key(row: pd.Series) -> tuple:
-    return _opportunity_group_sort_key_values(
-        row.get("depth_chart_slot"),
-        row.get("projected_starter"),
-        row.get("market_score"),
-        row.get("age"),
-    )
 
 
 def enrich_opportunity_context(df: pd.DataFrame) -> pd.DataFrame:
@@ -2399,22 +2361,6 @@ def _injury_weekly_role(row) -> bool:
     )
 
 
-def _injury_roster_relevance(row) -> tuple[float, str]:
-    if _injury_future_asset_profile(row):
-        return 1.05, "future asset"
-    if bool(_row_get(row, "_injured_starter")) or _injury_weekly_role(row):
-        return 1.35, "starter"
-    role_text = " ".join(
-        str(_row_get(row, field) or "").strip().lower()
-        for field in ("role", "role_label", "player_tier", "tier_label")
-    )
-    if any(label in role_text for label in ("core", "elite", "star", "untouchable")):
-        return 1.20, "core asset"
-    if any(label in role_text for label in ("starter", "contributor", "flex")):
-        return 0.90, "contributor"
-    return 0.65, "depth"
-
-
 def _injury_level_from_row(row) -> str:
     return _injury_level_cached(
         str(_row_get(row, "status") or "").strip().lower(),
@@ -2511,16 +2457,6 @@ def _healthy_position_cover_from_index(
         if record.get("cover_capable"):
             return True
     return False
-
-
-def _healthy_position_cover(roster: pd.DataFrame, injured_row) -> bool:
-    index = build_player_injury_index(roster)
-    records = list(index.values())
-    return _healthy_position_cover_from_index(
-        records,
-        str(_row_get(injured_row, "player_id") or "").strip(),
-        str(_row_get(injured_row, "position") or ""),
-    )
 
 
 def _empty_team_injury_summary() -> Dict[str, Any]:

@@ -131,6 +131,7 @@ from modules.player_images import fetch_player_headshot_bytes, headshot_data_url
 from modules import player_cards
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_tiers import assign_player_tiers
+from modules.trade_hub_engine import apply_strategy_age_curve, strategy_adjusted_pick_score_multiplier
 from modules.player_tier_identity import resolve_player_tier_identity
 from modules.league_value_settings import (
     DEFAULT_LEAGUE_VALUE_SETTINGS,
@@ -1257,132 +1258,11 @@ def apply_strategy_to_metrics(metrics: dict | None, strategy: str) -> dict | Non
     return updated
 
 
-def strategy_adjusted_pick_score_multiplier(base_multiplier: float, strategy: str) -> float:
-    strategy_key = normalize_team_strategy(strategy)
-    strategy_multipliers = {
-        "contender": 0.88,
-        "fringe_contender": 0.95,
-        "retool": 1.02,
-        "rebuild": 1.16,
-        "tank": 1.25,
-    }
-    return float(base_multiplier) * strategy_multipliers.get(strategy_key, 1.0)
-
-
-def apply_strategy_age_curve(
-    df: pd.DataFrame,
-    strategy: str,
-    score_field: str,
-) -> pd.DataFrame:
-    """Apply team-strategy preference without destroying league/base values.
-
-    Writes ``strategy_score`` / ``strategy_preference_multiplier``. League values
-    are snapshotted to ``league_*`` when missing. Only the active ``score_field``
-    is overwritten for Trade Hub ranking compatibility; ``base_score`` and other
-    lens columns remain league-truth.
-    """
-
-    if df.empty:
-        return df
-
-    strategy_key = normalize_team_strategy(strategy)
-    if (
-        str(df.attrs.get("strategy_curve") or "") == strategy_key
-        and str(df.attrs.get("strategy_curve_field") or "") == str(score_field or "")
-        and "strategy_score" in df.columns
-    ):
-        return df
-
-    df = df.copy()
-    ages = pd.to_numeric(df.get("age", pd.Series(float("nan"), index=df.index)), errors="coerce")
-    positions = (
-        df.get("position", pd.Series("", index=df.index))
-        .fillna("")
-        .astype(str)
-        .str.upper()
-    )
-    multiplier = pd.Series(1.0, index=df.index, dtype="float64")
-
-    if strategy_key == "contender":
-        multiplier = multiplier.mask(ages.ge(25) & ages.le(30), 1.04)
-        multiplier = multiplier.mask(ages.le(22), 0.98)
-        multiplier = multiplier.mask((positions == "RB") & ages.ge(29), 0.94)
-    elif strategy_key == "fringe_contender":
-        multiplier = multiplier.mask(ages.ge(24) & ages.le(29), 1.025)
-        multiplier = multiplier.mask(ages.le(24), 1.01)
-        multiplier = multiplier.mask((positions.isin(["RB", "WR", "TE"])) & ages.ge(31), 0.96)
-    elif strategy_key == "retool":
-        multiplier = multiplier.mask(ages.le(25), 1.04)
-        multiplier = multiplier.mask(ages.ge(26) & ages.le(29), 1.01)
-        multiplier = multiplier.mask((positions == "RB") & ages.ge(28), 0.91)
-        multiplier = multiplier.mask((positions.isin(["WR", "TE"])) & ages.ge(31), 0.94)
-    elif strategy_key == "rebuild":
-        multiplier = multiplier.mask(ages.le(23), 1.10)
-        multiplier = multiplier.mask(ages.gt(23) & ages.le(25), 1.06)
-        multiplier = multiplier.mask(ages.gt(25) & ages.le(26), 1.02)
-        multiplier = multiplier.mask((positions == "RB") & ages.ge(28), 0.82)
-        multiplier = multiplier.mask((positions == "WR") & ages.ge(30), 0.86)
-        multiplier = multiplier.mask((positions == "TE") & ages.ge(31), 0.88)
-        multiplier = multiplier.mask((positions == "QB") & ages.ge(34), 0.92)
-    elif strategy_key == "tank":
-        multiplier = multiplier.mask(ages.le(23), 1.15)
-        multiplier = multiplier.mask(ages.gt(23) & ages.le(25), 1.09)
-        multiplier = multiplier.mask((positions == "RB") & ages.ge(27), 0.75)
-        multiplier = multiplier.mask((positions == "WR") & ages.ge(30), 0.80)
-        multiplier = multiplier.mask((positions == "TE") & ages.ge(31), 0.84)
-        multiplier = multiplier.mask((positions == "QB") & ages.ge(34), 0.88)
-
-    for column, league_column in (
-        ("dynasty_score", "league_dynasty_score"),
-        ("value_score", "league_value_score"),
-        ("rebuild_score", "league_rebuild_score"),
-    ):
-        if column in df.columns and league_column not in df.columns:
-            df[league_column] = pd.to_numeric(df[column], errors="coerce").fillna(0).round().astype(int)
-
-    df["strategy_preference_multiplier"] = multiplier.round(4)
-    primary = score_field if score_field in df.columns else "dynasty_score"
-    if primary not in df.columns:
-        primary = "league_dynasty_score" if "league_dynasty_score" in df.columns else "base_score"
-    primary_scores = pd.to_numeric(df.get(primary, pd.Series(0, index=df.index)), errors="coerce").fillna(0)
-    # Prefer frozen league value when available for the active lens.
-    league_primary = {
-        "dynasty_score": "league_dynasty_score",
-        "value_score": "league_value_score",
-        "rebuild_score": "league_rebuild_score",
-    }.get(primary)
-    if league_primary and league_primary in df.columns:
-        primary_scores = pd.to_numeric(df[league_primary], errors="coerce").fillna(primary_scores)
-
-    df["strategy_score"] = (primary_scores * multiplier).clip(lower=0).round().astype(int)
-
-    # Compatibility: Trade Hub ranks on score_field — overlay preference there only.
-    if score_field in df.columns or score_field:
-        df[score_field] = df["strategy_score"]
-
-    # Restore non-active lens columns from league snapshots so strategy does not
-    # redefine universal multi-lens values.
-    for column, league_column in (
-        ("dynasty_score", "league_dynasty_score"),
-        ("value_score", "league_value_score"),
-        ("rebuild_score", "league_rebuild_score"),
-    ):
-        if column == score_field:
-            continue
-        if league_column in df.columns:
-            df[column] = df[league_column]
-
-    if "base_score" in df.columns:
-        df["base_score"] = pd.to_numeric(df["base_score"], errors="coerce").fillna(0).round().astype(int)
-
-    df = assign_player_tiers(
-        df,
-        primary_score_field=score_field if score_field in df.columns else "strategy_score",
-    )
-    curved = format_score_columns(df)
-    curved.attrs["strategy_curve"] = strategy_key
-    curved.attrs["strategy_curve_field"] = str(score_field or "")
-    return curved
+# strategy_adjusted_pick_score_multiplier and apply_strategy_age_curve now
+# live in modules/trade_hub_engine.py (imported above) — this file used to
+# carry its own byte-for-byte copy of both (trade_hub_engine.py's was a
+# "faithful port" of these, kept in sync by hand), a real drift risk if
+# either side's age-curve tables were ever tuned without the other.
 
 
 strategy_trade_result_note = trade_analyzer_fit_module.strategy_trade_result_note
