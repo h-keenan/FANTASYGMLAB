@@ -510,7 +510,7 @@ export interface TradeCounterAction {
 
 export interface TradeVerdict {
   band: string;
-  ui_verdict: 'ACCEPT' | 'DECLINE' | 'COUNTER' | 'FAIR';
+  ui_verdict: 'ACCEPT' | 'DECLINE' | 'COUNTER' | 'FAIR' | 'IDEA';
   confidence: string;
   rationale: string;
   value_summary: string;
@@ -520,7 +520,12 @@ export interface TradeVerdict {
   counter_guidance: string;
   fit_total: number;
   value_delta: number;
-  tone: 'accept' | 'counter' | 'decline' | 'fair';
+  // 'idea' is Trade Hub's own tone — a suggested idea nobody has proposed
+  // or acted on yet, as opposed to Trade Analyzer's real accept/decline/
+  // counter verdict on a trade the caller is actually considering. Never
+  // map a Trade Hub idea onto accept/decline: nothing has been accepted
+  // or declined, and the share card's headline says so directly.
+  tone: 'accept' | 'counter' | 'decline' | 'fair' | 'idea';
   counter_action?: TradeCounterAction | null;
 }
 

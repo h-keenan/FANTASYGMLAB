@@ -19,6 +19,8 @@ const HEADLINE_META: Record<TradeVerdict['tone'], { headline: string; color: str
   counter: { headline: 'COUNTER THIS TRADE', color: colors.premium },
   decline: { headline: 'TRADE DECLINED', color: colors.danger },
   fair: { headline: 'FAIR TRADE', color: colors.textSecondary },
+  // Trade Hub's own suggestions — nobody has accepted or declined anything.
+  idea: { headline: 'TRADE IDEA', color: colors.accent },
 };
 
 function AssetLine({ player }: { player: RankedPlayer }) {

@@ -128,10 +128,13 @@ function shareAssetsToPlayers(assets: PresentationAsset[]): RankedPlayer[] {
 
 function ideaToShareVerdict(idea: TradeIdea): TradeVerdict {
   const gain = idea.trade_gain;
-  const tone: TradeVerdict['tone'] = gain > 0 ? 'accept' : gain < 0 ? 'decline' : 'fair';
   return {
     band: idea.market_realism_label || 'Trade Hub idea',
-    ui_verdict: tone === 'accept' ? 'ACCEPT' : tone === 'decline' ? 'DECLINE' : 'FAIR',
+    // Always 'idea'/'IDEA' — this is a suggestion nobody has proposed or
+    // acted on, not a real accept/decline verdict (coridian_: "it should
+    // never say trade declined or trade accepted on the share sheet").
+    // The value-change number below still colors green/red by sign.
+    ui_verdict: 'IDEA',
     confidence: idea.confidence_label || 'Low',
     rationale: idea.rationale,
     value_summary: `${gain > 0 ? '+' : ''}${gain} value vs ${idea.partner_team_name}`,
@@ -141,7 +144,7 @@ function ideaToShareVerdict(idea: TradeIdea): TradeVerdict {
     counter_guidance: '',
     fit_total: 0,
     value_delta: gain,
-    tone,
+    tone: 'idea',
   };
 }
 
