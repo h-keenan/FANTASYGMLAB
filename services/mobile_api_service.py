@@ -2892,6 +2892,7 @@ def _project_briefing_item(item: Any) -> dict[str, Any]:
         "supporting_context": payload.get("supporting_context"),
         "destination": payload.get("destination"),
         "route_player_id": payload.get("route_player_id") or "",
+        "route_player_name": payload.get("route_player_name") or "",
         "recommendation_narrative": payload.get("recommendation_narrative"),
         "presentation": payload.get("presentation"),
         "recommendation_id": payload.get("recommendation_id") or "",
