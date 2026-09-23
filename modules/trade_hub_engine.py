@@ -497,6 +497,12 @@ def generate_trade_idea_records(
         score_field=score_field,
         pick_score_multiplier=strategy_adjusted_pick_score_multiplier(1.0, team_strategy),
         team_strategy=team_strategy,
+        # A Trade Finder selection IS the "intentional player-focused search"
+        # build_trade_ideas' own docstring describes — without this, picking
+        # any core/protected starter (a QB1, a locked-in WR1) silently empties
+        # the trade-block pool and the search returns zero ideas no matter
+        # what's selected, which is exactly what it looked like from outside.
+        allow_protected_focus=bool(trade_block_names),
         league_settings=dict(league_settings or {}),
         draft_status=None,
         search_budget="",

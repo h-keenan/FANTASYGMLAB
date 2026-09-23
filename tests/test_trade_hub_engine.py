@@ -204,6 +204,36 @@ def test_generate_trade_idea_records_resolves_trade_block_ids_to_names():
     assert mock_build.call_args.kwargs["trade_block_names"] == ["my-rb"]
 
 
+def test_generate_trade_idea_records_allows_a_protected_starter_when_explicitly_selected():
+    """Regression: selecting a core/protected starter (a QB1, a locked-in
+    WR1) in Trade Finder used to silently return zero ideas no matter what
+    was picked — build_trade_ideas' own protected-player guard emptied the
+    trade-block pool before any search ran. An explicit selection has to
+    override that guard, per build_trade_ideas' own
+    "only an intentional player-focused search may evaluate a protected
+    outgoing asset" contract."""
+
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
+    )
+
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch("modules.trade_ideas.build_trade_ideas", return_value=[]) as mock_build:
+                trade_hub_engine.generate_trade_idea_records(
+                    league_id="league-1",
+                    my_roster_id=1,
+                    players_df=players_df,
+                    rosters=_rosters(),
+                    league_settings=SETTINGS,
+                    score_field="dynasty_score",
+                    team_strategy="contender",
+                    trade_block_player_ids=("my-qb",),
+                )
+
+    assert mock_build.call_args.kwargs["allow_protected_focus"] is True
+
+
 def test_generate_trade_idea_records_defaults_to_an_unrestricted_trade_block():
     players_df = pd.DataFrame(
         [_player("my-qb", "QB", value=80), _player("my-rb", "RB", value=40), _player("opp-rb", "RB", value=70), _player("opp-wr", "WR", value=60)]
@@ -223,6 +253,7 @@ def test_generate_trade_idea_records_defaults_to_an_unrestricted_trade_block():
                 )
 
     assert mock_build.call_args.kwargs["trade_block_names"] == []
+    assert mock_build.call_args.kwargs["allow_protected_focus"] is False
 
 
 def test_generate_trade_finder_records_wires_the_selection_through_to_the_engine():
