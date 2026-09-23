@@ -456,7 +456,38 @@ class TestSupabaseAccounts(unittest.TestCase):
 
         self.assertFalse(saved)
         self.assertIn("Supabase tables are not set up yet", error)
+        self.assertIn("docs/supabase_accounts.sql", error)
         self.assertNotIn("schema cache", error)
+
+    def test_missing_table_setup_error_names_that_tables_own_migration_file(self):
+        """_safe_error used to always blame docs/supabase_accounts.sql no
+        matter which table's lookup actually failed — wrong for any table
+        set up by a different docs/supabase_*.sql file."""
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        response = Mock(status_code=404)
+        response.json.return_value = {
+            "message": "Could not find the table 'public.mobile_alert_reads' in the schema cache"
+        }
+        with patch.object(account_store.requests, "get", return_value=response):
+            rows, error = account_store.fetch_rows(
+                config, "access-token", "mobile_alert_reads", user_id="user-1"
+            )
+
+        self.assertEqual(rows, [])
+        self.assertIn("docs/supabase_mobile_alert_reads.sql", error)
+        self.assertNotIn("supabase_accounts.sql", error)
+
+    def test_missing_table_setup_error_falls_back_for_an_unmapped_table(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        response = Mock(status_code=404)
+        response.json.return_value = {"message": "Could not find the table 'public.some_new_table'"}
+        with patch.object(account_store.requests, "get", return_value=response):
+            rows, error = account_store.fetch_rows(
+                config, "access-token", "some_new_table", user_id="user-1"
+            )
+
+        self.assertEqual(rows, [])
+        self.assertIn("docs/supabase_accounts.sql", error)
 
     def test_fetch_saved_leagues_filters_current_user_only(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}

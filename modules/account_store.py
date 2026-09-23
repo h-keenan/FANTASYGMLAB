@@ -116,7 +116,23 @@ def profile_status_notice(
     )
 
 
-def _safe_error(response: requests.Response) -> str:
+# Which migration actually creates each table — _safe_error used to always
+# blame docs/supabase_accounts.sql regardless of which table's lookup
+# failed, which is wrong for anything set up by one of the other
+# docs/supabase_*.sql files (mobile_alert_reads, gm_targets, trade_outcomes,
+# push_tokens, ...) and sends whoever's debugging it to the wrong file.
+_TABLE_SETUP_DOCS: dict[str, str] = {
+    "profiles": "docs/supabase_accounts.sql",
+    "saved_leagues": "docs/supabase_accounts.sql",
+    "user_settings": "docs/supabase_accounts.sql",
+    "gm_targets": "docs/supabase_gm_targets.sql",
+    "mobile_alert_reads": "docs/supabase_mobile_alert_reads.sql",
+    "trade_outcomes": "docs/supabase_trade_outcomes.sql",
+    "push_tokens": "docs/supabase_push_tokens.sql",
+}
+
+
+def _safe_error(response: requests.Response, *, table: str = "") -> str:
     try:
         payload = response.json()
     except Exception:
@@ -131,7 +147,8 @@ def _safe_error(response: requests.Response) -> str:
         or "could not find the table" in lower_message
         or "relation" in lower_message and "does not exist" in lower_message
     ):
-        return "Supabase tables are not set up yet. Run docs/supabase_accounts.sql in your Supabase SQL editor."
+        setup_doc = _TABLE_SETUP_DOCS.get(table, "docs/supabase_accounts.sql")
+        return f"Supabase tables are not set up yet. Run {setup_doc} in your Supabase SQL editor."
     if response.status_code in {401, 403}:
         return message or f"HTTP {response.status_code} unauthorized JWT"
     return message or "Supabase table request failed."
@@ -213,7 +230,7 @@ def upsert_row(
     except Exception:
         return False, "Could not reach Supabase table storage."
     if response.status_code >= 400:
-        return False, _safe_error(response)
+        return False, _safe_error(response, table=table)
     return True, ""
 
 
@@ -239,7 +256,7 @@ def clear_default_saved_leagues(
     except Exception:
         return False, "Could not reach Supabase table storage."
     if response.status_code >= 400:
-        return False, _safe_error(response)
+        return False, _safe_error(response, table="saved_leagues")
     return True, ""
 
 
@@ -271,7 +288,7 @@ def delete_rows(
     except Exception:
         return False, "Could not reach Supabase table storage."
     if response.status_code >= 400:
-        return False, _safe_error(response)
+        return False, _safe_error(response, table=table)
     return True, ""
 
 
@@ -320,7 +337,7 @@ def fetch_rows(
     except Exception:
         return [], "Could not reach Supabase table storage."
     if response.status_code >= 400:
-        return [], _safe_error(response)
+        return [], _safe_error(response, table=table)
     try:
         payload = response.json()
     except Exception:
