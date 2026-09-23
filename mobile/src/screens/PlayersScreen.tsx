@@ -93,7 +93,7 @@ function UsageTrendPill({ trend }: { trend: UsageTrend }) {
 export default function PlayersScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const { lens } = useValuationLens(leagueId);
@@ -236,7 +236,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
                     {item.team}
                     {item.team && item.opportunity_label ? ' · ' : ''}
                     {item.opportunity_label ? (
-                      <AppText style={[styles.meta, { color: resolvePlayerTier(item.tier).color }]}>
+                      <AppText style={[styles.meta, { color: resolvePlayerTier(item.tier, isDark).color }]}>
                         {item.opportunity_label}
                       </AppText>
                     ) : null}

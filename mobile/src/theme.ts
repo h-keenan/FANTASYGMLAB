@@ -140,8 +140,29 @@ export const positionColors: Record<string, string> = {
   DST: '#D4D4D8',
 };
 
-export function positionColor(position: string | null | undefined): string {
-  return positionColors[(position ?? '').toUpperCase()] ?? colors.textSecondary;
+// coridian_ (2026-09-22): "a lot of the colored aspects blend in" on light
+// mode. `positionColors` above was never given a light-mode counterpart —
+// those pastel dark-mode fills pop against near-black but read as barely-
+// there washes against glacier-white/pale-blue surfaces. These are the same
+// hues pushed several steps darker/more saturated so PositionBadge's chip
+// text stays legible on light backgrounds too.
+export const positionColorsLight: Record<string, string> = {
+  QB: '#BE123C',
+  RB: '#15803D',
+  WR: '#0369A1',
+  TE: '#C2410C',
+  K: '#6D28D9',
+  DEF: '#3F3F46',
+  DST: '#3F3F46',
+};
+
+export function positionColor(
+  position: string | null | undefined,
+  isDark = true,
+  fallback: string = colors.textSecondary,
+): string {
+  const table = isDark ? positionColors : positionColorsLight;
+  return table[(position ?? '').toUpperCase()] ?? fallback;
 }
 
 export const gradients = {

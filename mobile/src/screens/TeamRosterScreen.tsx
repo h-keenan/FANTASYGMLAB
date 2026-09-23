@@ -74,7 +74,7 @@ type RosterSection = { title: string; data: RankedPlayer[] };
 export default function TeamRosterScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { ownerName, playerIds, leagueId, leagueName, rosterId } = route.params;
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
@@ -264,7 +264,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
                     {item.team}
                     {item.team && (item.opportunity_label ?? item.status) ? ' · ' : ''}
                     {item.opportunity_label ? (
-                      <AppText style={[styles.meta, { color: resolvePlayerTier(item.tier).color }]}>
+                      <AppText style={[styles.meta, { color: resolvePlayerTier(item.tier, isDark).color }]}>
                         {item.opportunity_label}
                       </AppText>
                     ) : (

@@ -24,6 +24,23 @@ export const PLAYER_TIER_LADDER: PlayerTierIdentity[] = [
   { tierId: 'depth_developmental', semanticLabel: 'Depth / Developmental', shortLabel: 'DEPTH/DEV', abbrLabel: 'DEPTH', rankOrder: 7, color: '#626A75' },
 ];
 
+// coridian_ (2026-09-22): "a lot of the colored aspects blend in" on light
+// mode. The ladder above was tuned entirely for a near-black backdrop —
+// `contributor`'s #D7DBE2 is nearly white, unreadable on a light card, and
+// several others are too pale to hold their own hue against glacier-white.
+// Same tier identities, colors pushed dark/saturated enough to read on a
+// light surface. Keyed by tierId so PLAYER_TIER_LADDER's own order/labels
+// stay the single source of truth for everything except color.
+const TIER_COLOR_LIGHT: Record<string, string> = {
+  generational: '#0E7490',
+  elite: '#4338CA',
+  impact_starter: '#B91C1C',
+  starter: '#854D0E',
+  contributor: '#475569',
+  committee_role: '#C2410C',
+  depth_developmental: '#52525B',
+};
+
 const DEFAULT_TIER = PLAYER_TIER_LADDER[6];
 
 const STORED_TIER_TO_ID: Record<string, string> = {
@@ -63,12 +80,14 @@ function normalize(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/_/g, ' ').split(/\s+/).filter(Boolean).join(' ');
 }
 
-export function resolvePlayerTier(storedTier: string | null | undefined): PlayerTierIdentity {
+export function resolvePlayerTier(storedTier: string | null | undefined, isDark = true): PlayerTierIdentity {
   const key = normalize(storedTier);
-  if (!key || ROLE_OPPORTUNITY_LABELS.has(key)) return DEFAULT_TIER;
-  const mappedId = STORED_TIER_TO_ID[key];
-  if (!mappedId) return DEFAULT_TIER;
-  return TIER_BY_ID.get(mappedId) ?? DEFAULT_TIER;
+  const base =
+    !key || ROLE_OPPORTUNITY_LABELS.has(key)
+      ? DEFAULT_TIER
+      : TIER_BY_ID.get(STORED_TIER_TO_ID[key]) ?? DEFAULT_TIER;
+  if (isDark) return base;
+  return { ...base, color: TIER_COLOR_LIGHT[base.tierId] ?? base.color };
 }
 
 /** Black or white, whichever reads on a solid fill of this color — the

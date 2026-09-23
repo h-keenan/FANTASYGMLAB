@@ -31,11 +31,11 @@ interface PlayerAvatarProps {
  * unlike RN's own `Image`) avoids re-fetching the same photo every time.
  */
 export default function PlayerAvatar({ playerId, size = 40, tier, style }: PlayerAvatarProps) {
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [failed, setFailed] = useState(false);
   const dimension = { width: size, height: size, borderRadius: size / 2 };
-  const ringColor = tier ? resolvePlayerTier(tier).color : colors.border;
+  const ringColor = tier ? resolvePlayerTier(tier, isDark).color : colors.border;
   const ring = { borderWidth: tier ? 2 : StyleSheet.hairlineWidth, borderColor: ringColor };
 
   if (!playerId || failed) {

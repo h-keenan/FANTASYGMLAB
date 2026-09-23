@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 
+import { useThemeMode } from '../context/ThemeModeContext';
 import { resolvePlayerTier } from '../lib/playerTier';
 import { radii, spacing } from '../theme';
 
@@ -12,8 +13,9 @@ export default function TierBadge({
   storedTier: string | null | undefined;
   size?: 'sm' | 'md';
 }) {
+  const { isDark } = useThemeMode();
   if (!storedTier) return null;
-  const tier = resolvePlayerTier(storedTier);
+  const tier = resolvePlayerTier(storedTier, isDark);
   const label = size === 'md' ? tier.shortLabel : tier.abbrLabel;
   return (
     <View
