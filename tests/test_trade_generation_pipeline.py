@@ -127,6 +127,53 @@ def test_protected_player_exclusion_is_identical_with_pipeline_cache(monkeypatch
         assert all("Protected Core" not in idea["my_player"] for idea in ideas)
 
 
+def test_direct_one_for_one_swap_fires_when_no_picks_are_in_play(monkeypatch):
+    """Regression for coridian_'s "zero plausible trades" Trade Finder report.
+
+    Selecting a single ordinary player (Trade Finder's own single-select
+    case) restricts the outgoing pool to exactly that one asset.
+    Patterns 1 (needs a second outgoing player), 2/3/4 (each need at least
+    one draft pick on one side) can never fire in that shape, so when no
+    roster has spare pick capital either (a plausible real-league state —
+    every pick already accounted for, or the format doesn't treat future
+    picks as trade capital), the engine used to return zero ideas even
+    though a plain, fair one-for-one swap (Mine A's 4400 for Target A's
+    5000 or Target C's 4800, both within the direct-swap value band) was
+    obviously available. This asserts that swap now surfaces.
+    """
+
+    _install_deterministic_context(monkeypatch)
+    # Same roster/player-id shape as _players(), but Mine A is bumped to a
+    # value genuinely comparable to Target A/C (the shared fixture's 2500
+    # sits too far below every target for *any* value-fit band to matter,
+    # which would make this test pass for the wrong reason) — a realistic
+    # "give a movable RB, get a similarly-valued WR" one-for-one.
+    players = _players().copy()
+    players.loc[players["player_id"] == "mine-a", "value_score"] = 4400
+    ideas = trade_ideas.build_trade_ideas(
+        players,
+        "league",
+        _summary(),
+        1,
+        ["Mine A"],
+        [],
+        {},
+        max_ideas=20,
+        team_strategy="contender",
+        adapter=FakeAdapter(),
+        allow_protected_focus=True,
+    )
+
+    assert ideas
+    assert all(idea["my_player"] == "Mine A" for idea in ideas)
+    assert all(len(idea["send_assets"]) == 1 and len(idea["receive_assets"]) == 1 for idea in ideas)
+    assert all(
+        asset.get("asset_type") == "player"
+        for idea in ideas
+        for asset in idea["receive_assets"]
+    )
+
+
 def test_trade_flame_diagnostics_include_all_generation_stages(monkeypatch):
     events = [
         {

@@ -3545,6 +3545,47 @@ def _build_trade_ideas_impl(
                         add_idea(idea)
                         break
 
+        # 1b. Trade one movable piece directly for a comparable partner piece
+        # — the plain value-for-value swap real leagues make constantly.
+        # Patterns 1, 2, 3, and 4 all require either a second outgoing player
+        # or at least one draft pick on one side of the table; when a search
+        # is restricted to a single player (Trade Finder's own single-select
+        # case, coridian_'s "zero plausible trades" report) and neither
+        # roster has spare pick capital in play, none of those patterns can
+        # ever fire and an otherwise ordinary, fair one-for-one swap is
+        # missed entirely — this closes that gap.
+        for player in my_player_assets[:outgoing_cap]:
+            player_pos = str(player.get("position") or "").upper()
+            if player_pos in my_needs and player_pos not in my_strengths:
+                continue
+            for target in partner_player_assets[:14]:
+                if target["score"] < 1500:
+                    continue
+                send_assets = make_package(player)
+                receive_assets = make_package(target)
+                if not _value_fits(player["score"], target["score"], low=-1200, high=1200):
+                    continue
+                fit_bonus = package_fit_priority(send_assets, receive_assets)
+                if fit_bonus < 0:
+                    continue
+                fit_context = package_fit_context(send_assets, receive_assets)
+                if fit_context["score"] < 0 or fit_context["partner_score"] <= 0:
+                    continue
+                idea = make_reasoned_idea(
+                    send_assets,
+                    receive_assets,
+                    "Direct one-for-one swap",
+                    (
+                        "A straight value-for-value swap with no draft picks required on either side. "
+                        f"{fit_context['rationale']}"
+                    ).strip(),
+                    70 + fit_bonus + fit_context["score"],
+                    fit_context=fit_context,
+                )
+                if idea:
+                    add_idea(idea)
+                    break
+
         # 2. Buy a need-position upgrade with one player plus one owned pick.
         if active_strategy in {"contender", "fringe_contender", "retool"} and my_pick_assets:
             for target in partner_target_players[:target_cap]:
