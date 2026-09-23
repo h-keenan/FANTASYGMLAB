@@ -30,6 +30,11 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeFinder'>;
 
+// Button height (paddingVertical * 2 + line height) plus its own gap above
+// the orb clearance zone (see the `bottom` override on the button below) —
+// the list's last row needs to clear both, not just the orb.
+const SEARCH_BUTTON_CLEARANCE = 56 + spacing.sm + spacing.lg;
+
 function RosterRow({
   player,
   selected,
@@ -219,7 +224,7 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
       <FlatList
         data={roster}
         keyExtractor={(item) => item.player_id}
-        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance + SEARCH_BUTTON_CLEARANCE }]}
         ListHeaderComponent={
           ideas !== null ? (
             <View style={styles.resultsSection}>
@@ -248,7 +253,14 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
       />
 
       <TouchableOpacity
-        style={[styles.searchButton, selectedIds.size === 0 && styles.searchButtonDisabled]}
+        style={[
+          styles.searchButton,
+          // Sits above GM Orb's own darkening scrim rather than inside it —
+          // stacked there, the button's solid fill and the scrim gradient
+          // read as one muddy double-treatment at the bottom of the screen.
+          { bottom: orbClearance + spacing.sm },
+          selectedIds.size === 0 && styles.searchButtonDisabled,
+        ]}
         onPress={search}
         disabled={searching || selectedIds.size === 0}
       >
