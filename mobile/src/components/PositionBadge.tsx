@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 
+import { useThemeMode } from '../context/ThemeModeContext';
 import { positionColor, radii, spacing } from '../theme';
 
 /** Colored position chip — QB/RB/WR/TE/K/DEF each get web's exact
@@ -15,8 +16,9 @@ export default function PositionBadge({
   position: string | null | undefined;
   size?: 'sm' | 'md';
 }) {
+  const { isDark, colors } = useThemeMode();
   if (!position) return null;
-  const color = positionColor(position);
+  const color = positionColor(position, isDark, colors.textSecondary);
   return (
     <View
       style={[

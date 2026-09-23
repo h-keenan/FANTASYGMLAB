@@ -922,7 +922,7 @@ function ModelSection({ model }: { model: QuickViewModel }) {
 export default function PlayerDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
   const [stats, setStats] = useState<QuickViewStats | null>(null);
@@ -1119,7 +1119,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   };
 
   const season = stats?.seasons[0];
-  const tierIdentity = resolvePlayerTier(player.tier);
+  const tierIdentity = resolvePlayerTier(player.tier, isDark);
   // The 2K-style headline: one 0-99 read on the same value_score the
   // Snapshot grid below already shows, percentiled inside the player's
   // position by the same backend machinery as the per-stat percentiles on

@@ -311,7 +311,7 @@ function PercentileBar({ label, percentile, color }: { label: string; percentile
 }
 
 function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => void }) {
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <AnimatedCard style={styles.card} onPress={onPress}>
@@ -333,7 +333,7 @@ function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => v
                 {player.team}
                 {player.team && player.opportunity_label ? ' · ' : ''}
                 {player.opportunity_label ? (
-                  <AppText style={[styles.meta, { color: resolvePlayerTier(player.tier).color }]}>
+                  <AppText style={[styles.meta, { color: resolvePlayerTier(player.tier, isDark).color }]}>
                     {player.opportunity_label}
                   </AppText>
                 ) : null}
