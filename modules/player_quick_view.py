@@ -277,12 +277,24 @@ _OVERALL_SCORE_FIELDS = ("value_score", "dynasty_score", "score")
 #: bulk of the pool down and reserve the top of the scale for players who
 #: are actually near the best at their position, without touching the
 #: underlying value_score or the comparison pool itself.
+#:
+#: A second pass (coridian_'s follow-up: "there seems to be a lot of players
+#: 90+") found the first curve's top end still too generous: because the
+#: rating ranks WITHIN each position separately, "top 3%" at (0.97, 92) meant
+#: every position independently minted its own handful of 90+ players —
+#: roughly 5-6% of every position's eligible pool, ~50+ players total across
+#: a ~1000-player universe. Real 90+ overalls are rare across the WHOLE
+#: player pool, not just rare-per-position. Pushed the 85 and 90+ breakpoints
+#: further into the tail (0.97 -> 85, 0.995 -> 90) so 90+ is reserved for
+#: roughly the top 0.5% at a position — the true 1-2 difference-makers, not
+#: the top 10-20.
 _OVERALL_RATING_CURVE: tuple[tuple[float, float], ...] = (
     (0.0, 40.0),
-    (0.50, 65.0),
-    (0.75, 75.0),
-    (0.90, 85.0),
-    (0.97, 92.0),
+    (0.50, 62.0),
+    (0.80, 72.0),
+    (0.93, 80.0),
+    (0.97, 85.0),
+    (0.995, 90.0),
     (1.0, float(OVERALL_RATING_MAX)),
 )
 
