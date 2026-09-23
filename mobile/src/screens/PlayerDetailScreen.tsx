@@ -25,6 +25,7 @@ import MetricCard from '../components/MetricCard';
 import PlayerHero from '../components/PlayerHero';
 import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnapshotCard';
 import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
+import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
@@ -142,17 +143,6 @@ function NewsImpactModal({
         </View>
       </View>
     </Modal>
-  );
-}
-
-function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.sectionHeadingRow}>
-      <Ionicons name={icon} size={15} color={colors.accent} style={styles.sectionHeadingIcon} />
-      <AppText style={styles.sectionTitle}>{title}</AppText>
-    </View>
   );
 }
 
@@ -1510,14 +1500,6 @@ function createStyles(colors: ThemeColors) {
     marginBottom: -spacing.sm,
     textTransform: 'uppercase',
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-  sectionHeadingIcon: { marginRight: spacing.xs },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   statCell: {
     minWidth: '46%',
