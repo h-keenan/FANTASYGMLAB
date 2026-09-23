@@ -436,12 +436,22 @@ def test_dead_age_adjustment_not_used_in_composite():
 
 
 def test_strategy_age_curve_is_overlay_not_rankings_owner():
-    """Strategy may reweight recommendation boards; rankings.py owns universal talent."""
+    """Strategy may reweight recommendation boards; rankings.py owns universal talent.
+
+    apply_strategy_age_curve used to be defined twice — once in app.py, once
+    as a "faithful port" in modules/trade_hub_engine.py — a real drift risk
+    if either copy's age-curve tables were tuned without the other. Both
+    call sites now share the one definition in trade_hub_engine.py; app.py
+    just imports it.
+    """
 
     rankings_src = (ROOT / "modules" / "rankings.py").read_text(encoding="utf-8")
     app_src = (ROOT / "app.py").read_text(encoding="utf-8")
+    engine_src = (ROOT / "modules" / "trade_hub_engine.py").read_text(encoding="utf-8")
     assert "def apply_strategy_age_curve" not in rankings_src
-    assert "def apply_strategy_age_curve" in app_src
+    assert "def apply_strategy_age_curve" not in app_src
+    assert "from modules.trade_hub_engine import" in app_src and "apply_strategy_age_curve" in app_src
+    assert "def apply_strategy_age_curve" in engine_src
     assert "def apply_valuation_model" in rankings_src
 
 
