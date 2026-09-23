@@ -11,8 +11,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.fantasygmlab.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIDesignRequiresCompatibility": true
+      },
+      "buildNumber": "35"
     },
     "android": {
       "package": "com.fantasygmlab.app",
