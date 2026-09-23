@@ -658,6 +658,11 @@ export interface RecapStory {
   glyph: string;
   primary_team: string;
   secondary_team: string;
+  // Roster ids the story centers on, when available (empty string when not
+  // applicable — modules/league_recaps.py's `_roster_id_str` convention).
+  // Used to make story cards tappable through to TeamRoster.
+  primary_roster_id: string;
+  secondary_roster_id: string;
   players: string[];
   metric_label: string;
   metric_value: string;

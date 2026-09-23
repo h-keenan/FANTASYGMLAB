@@ -1637,6 +1637,10 @@ def test_recap_returns_real_weekly_recap(monkeypatch):
     assert recap["stories"]
     assert recap["incomplete"] is False
     assert body["max_completed_week"] == 3
+    # Roster ids flow through unchanged from modules.league_recaps so the
+    # mobile Recap screen can make non-trade story cards tappable.
+    performance = next(story for story in recap["stories"] if story["story_type"] == "performance")
+    assert performance["primary_roster_id"] == "1"
 
 
 def test_recap_accepts_an_explicit_past_week(monkeypatch):

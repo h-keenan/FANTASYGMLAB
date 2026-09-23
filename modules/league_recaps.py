@@ -72,6 +72,18 @@ def _float(value: object, default: float = 0.0) -> float:
         return default
 
 
+def _roster_id_str(value: object) -> str:
+    """String roster id for mobile navigation, or "" when unavailable.
+
+    Matches the house convention elsewhere in this module (e.g. `_text`,
+    `_trade_asset_view`'s `player_id`) of defaulting optional identifiers to
+    an empty string rather than "0" or None.
+    """
+
+    roster_id = _int(value, 0)
+    return str(roster_id) if roster_id > 0 else ""
+
+
 def league_history_window(league: Mapping[str, Any] | None) -> tuple[int, int, int]:
     """(current_leg, regular_season_end, max_history_week) from league settings.
 
@@ -329,6 +341,8 @@ def _story(
     glyph: str,
     primary_team: str = "",
     secondary_team: str = "",
+    primary_roster_id: str = "",
+    secondary_roster_id: str = "",
     players: Sequence[str] = (),
     metric_label: str = "",
     metric_value: str = "",
@@ -345,6 +359,8 @@ def _story(
         "glyph": glyph,
         "primary_team": primary_team,
         "secondary_team": secondary_team,
+        "primary_roster_id": primary_roster_id,
+        "secondary_roster_id": secondary_roster_id,
         "players": list(players),
         "metric_label": metric_label,
         "metric_value": metric_value,
@@ -393,6 +409,7 @@ def _performance_story(
         summary=summary,
         glyph="insights",
         primary_team=team,
+        primary_roster_id=_roster_id_str(roster_id),
         metric_label="Points",
         metric_value=f"{points:.1f}",
         history_week=week,
@@ -439,6 +456,7 @@ def _performance_low_story(
         summary=summary,
         glyph="insights",
         primary_team=team,
+        primary_roster_id=_roster_id_str(roster_id),
         metric_label="Points",
         metric_value=f"{points:.1f}",
         history_week=week,
@@ -512,6 +530,8 @@ def _matchup_story(
         glyph="league",
         primary_team=winner,
         secondary_team=loser,
+        primary_roster_id=_roster_id_str(row.get("winner_roster_id")),
+        secondary_roster_id=_roster_id_str(row.get("loser_roster_id")),
         metric_label="Margin",
         metric_value=f"{_float(row.get('margin'), 0.0):.1f}",
         history_week=week,
@@ -558,6 +578,8 @@ def _matchup_close_story(
         glyph="league",
         primary_team=winner,
         secondary_team=loser,
+        primary_roster_id=_roster_id_str(row.get("winner_roster_id")),
+        secondary_roster_id=_roster_id_str(row.get("loser_roster_id")),
         metric_label="Margin",
         metric_value=f"{_float(row.get('margin'), 0.0):.1f}",
         history_week=week,
@@ -626,6 +648,7 @@ def _waiver_story(
         summary=summary,
         glyph="waiver",
         primary_team=team,
+        primary_roster_id=_roster_id_str(side.get("roster_id")),
         players=(player,),
         metric_label="FAAB",
         metric_value=f"${bid}",
@@ -665,6 +688,7 @@ def _waiver_low_story(
         summary=summary,
         glyph="waiver",
         primary_team=team,
+        primary_roster_id=_roster_id_str(side.get("roster_id")),
         players=(player,),
         metric_label="FAAB",
         metric_value=f"${bid}",
@@ -843,6 +867,7 @@ def _activity_story(
         summary=summary,
         glyph="insights",
         primary_team=team,
+        primary_roster_id=_roster_id_str(roster_id),
         metric_label="Moves",
         metric_value=str(count),
         history_filter=history.FILTER_ALL,
@@ -894,6 +919,7 @@ def _activity_low_story(
         summary=summary,
         glyph="insights",
         primary_team=team,
+        primary_roster_id=_roster_id_str(roster_id),
         metric_label="Moves",
         metric_value=str(count),
         history_filter=history.FILTER_ALL,
@@ -916,6 +942,7 @@ def _riser_story(movement: Mapping[str, Any] | None, *, week: int) -> dict[str, 
         summary=f"{name} moved up {delta} Power Rank spot{'s' if delta != 1 else ''} after Week {week}.",
         glyph="insights",
         primary_team=name,
+        primary_roster_id=_roster_id_str(riser.get("roster_id")),
         metric_label="Power Rank",
         metric_value=f"+{delta}",
         history_week=week,
