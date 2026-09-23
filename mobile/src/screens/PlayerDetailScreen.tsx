@@ -1222,32 +1222,34 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           <PositionBadge position={player.position} size="md" />
           {player.team ? <AppText style={styles.meta}>{player.team}</AppText> : null}
         </View>
-        {player.tier ? (
-          <View style={[styles.tierBadge, { backgroundColor: tierIdentity.color }]}>
-            <AppText style={[styles.tierText, { color: contrastTextColor(tierIdentity.color) }]}>
-              {tierIdentity.shortLabel}
-            </AppText>
-          </View>
-        ) : null}
-        {stats?.prime_window ? (
-          <View
-            style={[
-              styles.primeWindowBadge,
-              { borderColor: primeWindowColor(stats.prime_window.status, colors) },
-            ]}
-          >
-            <AppText style={[styles.primeWindowText, { color: primeWindowColor(stats.prime_window.status, colors) }]}>
-              {primeWindowLabel(stats.prime_window)}
-            </AppText>
-          </View>
-        ) : null}
-        {player.opportunity_label ? (
-          <View style={[styles.primeWindowBadge, { borderColor: opportunityChipColor(player.opportunity_label, colors) }]}>
-            <AppText style={[styles.primeWindowText, { color: opportunityChipColor(player.opportunity_label, colors) }]}>
-              {player.opportunity_label}
-            </AppText>
-          </View>
-        ) : null}
+        <View style={styles.statusChipRow}>
+          {player.tier ? (
+            <View style={[styles.tierBadge, { backgroundColor: tierIdentity.color }]}>
+              <AppText style={[styles.tierText, { color: contrastTextColor(tierIdentity.color) }]}>
+                {tierIdentity.shortLabel}
+              </AppText>
+            </View>
+          ) : null}
+          {stats?.prime_window ? (
+            <View
+              style={[
+                styles.primeWindowBadge,
+                { borderColor: primeWindowColor(stats.prime_window.status, colors) },
+              ]}
+            >
+              <AppText style={[styles.primeWindowText, { color: primeWindowColor(stats.prime_window.status, colors) }]}>
+                {primeWindowLabel(stats.prime_window)}
+              </AppText>
+            </View>
+          ) : null}
+          {player.opportunity_label ? (
+            <View style={[styles.primeWindowBadge, { borderColor: opportunityChipColor(player.opportunity_label, colors) }]}>
+              <AppText style={[styles.primeWindowText, { color: opportunityChipColor(player.opportunity_label, colors) }]}>
+                {player.opportunity_label}
+              </AppText>
+            </View>
+          ) : null}
+        </View>
         {rosterRec ? (
           <View
             style={[
@@ -1400,15 +1402,21 @@ function createStyles(colors: ThemeColors) {
   name: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
   meta: { fontSize: 14, color: colors.textSecondary },
-  tierBadge: {
+  statusChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.xs,
     marginTop: spacing.sm,
+  },
+  tierBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radii.pill,
   },
   tierText: { fontSize: 12, fontWeight: '700' },
   primeWindowBadge: {
-    marginTop: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radii.pill,
