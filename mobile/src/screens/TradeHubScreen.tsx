@@ -16,6 +16,7 @@ import PlayerAvatar from '../components/PlayerAvatar';
 import PlayerNameText from '../components/PlayerNameText';
 import TeamAvatar from '../components/TeamAvatar';
 import PositionBadge from '../components/PositionBadge';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueHero from '../components/TradeValueHero';
 import {
@@ -336,11 +337,13 @@ export default function TradeHubScreen({ route, navigation }: Props) {
               </AppText>
             </TouchableOpacity>
           </View>
-          <AppText style={styles.disclaimer} numberOfLines={1}>
-            {isForYou
-              ? "Real ideas from the same engine and Trust checks as the web app's Trade Hub."
-              : 'Real ideas across every roster in the league, not just yours.'}
-          </AppText>
+          <ScreenInfoNote
+            text={
+              isForYou
+                ? "Real ideas from the same engine and Trust checks as the web app's Trade Hub."
+                : 'Real ideas across every roster in the league, not just yours.'
+            }
+          />
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
             <IdeaSummaryRow ideas={ideas} />
           ) : null}

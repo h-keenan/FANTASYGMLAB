@@ -15,6 +15,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import TierBadge from '../components/TierBadge';
 import { api, type MatchupComparison, type MatchupResponse, type MatchupSide, type MatchupStarter } from '../lib/api';
@@ -208,12 +209,9 @@ export default function MatchupScreen({ route, navigation }: Props) {
           <AppText style={styles.basisLabel}>{comparison.basis_label}</AppText>
         </AnimatedCard>
 
-        <AppText style={styles.disclaimer}>
-          Starters on both sides are each roster's best available lineup by season-long value — the same
-          optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. It
-          isn't necessarily the lineup they've set in Sleeper, and it doesn't account for this week's opponent
-          defenses or weather.
-        </AppText>
+        <ScreenInfoNote
+          text="Starters on both sides are each roster's best available lineup by season-long value — the same optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. It isn't necessarily the lineup they've set in Sleeper, and it doesn't account for this week's opponent defenses or weather."
+        />
 
         <StarterSection title="Your suggested starters" side={mine} onPressPlayer={openPlayer} accent={colors.accent} />
         <StarterSection

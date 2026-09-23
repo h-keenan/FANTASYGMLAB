@@ -22,6 +22,7 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import TierBadge from '../components/TierBadge';
 import CircularProgressRing from '../components/CircularProgressRing';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
@@ -352,10 +353,9 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const header = (
     <View>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <AppText style={styles.disclaimer}>
-        The real accept / decline / counter verdict for {leagueName} — weighs asset value, starting
-        lineup impact, roster needs, age, draft capital, and injury risk.
-      </AppText>
+      <ScreenInfoNote
+        text={`The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`}
+      />
 
       <View style={styles.sidesRow}>
         <TradeSide

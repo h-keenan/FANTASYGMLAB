@@ -16,6 +16,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import { resolvePlayerTier } from '../lib/playerTier';
 import PositionBadge from '../components/PositionBadge';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -177,10 +178,9 @@ export default function MyTeamScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <AppText style={styles.disclaimer}>
-          Your suggested starting lineup for {leagueName} — the same optimal-lineup logic the web
-          app's Dashboard and My Team pages use.
-        </AppText>
+        <ScreenInfoNote
+          text={`Your suggested starting lineup for ${leagueName} — the same optimal-lineup logic the web app's Dashboard and My Team pages use.`}
+        />
 
         {myTeam ? <TeamAnalyticsSection team={myTeam} leagueSize={leagueSize} /> : null}
 

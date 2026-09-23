@@ -17,6 +17,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PlayerNameText from '../components/PlayerNameText';
 import PositionBadge from '../components/PositionBadge';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import TradeValueHero from '../components/TradeValueHero';
 import { api, type LineupPlayer, type TradeIdea } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
@@ -214,10 +215,9 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <AppText style={styles.disclaimer}>
-        Pick the players you'd actually consider moving — the engine searches every other roster in{' '}
-        {leagueName} for plausible trades built around exactly that selection.
-      </AppText>
+      <ScreenInfoNote
+        text={`Pick the players you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
+      />
 
       <FlatList
         data={roster}
