@@ -114,6 +114,53 @@ def test_maybe_schedule_players_refresh_noop_when_fresh(monkeypatch):
     assert called["hit"] is False
 
 
+def test_warm_players_cache_at_startup_is_a_noop_under_pytest():
+    from services import mobile_api_service
+
+    # PYTEST_CURRENT_TEST is set automatically by pytest for the duration of
+    # every test — deliberately NOT unset here, unlike the tests below, to
+    # confirm the guard actually skips real work during the test suite
+    # (every other test in this file constructs a TestClient, which
+    # triggers the lifespan and thus this function).
+    with patch("modules.rankings.load_players") as mock_load:
+        mobile_api_service._warm_players_cache_at_startup()
+
+    mock_load.assert_not_called()
+
+
+def test_warm_players_cache_at_startup_loads_the_players_db_outside_tests(monkeypatch):
+    from services import mobile_api_service
+
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("DYNASTYGM_TEST_MODE", raising=False)
+
+    with patch("modules.rankings.load_players", return_value=pd.DataFrame({"player_id": ["1"]})) as mock_load:
+        mobile_api_service._warm_players_cache_at_startup()
+
+    mock_load.assert_called_once_with(mobile_api_service.PLAYERS_DB_PATH)
+
+
+def test_warm_players_cache_at_startup_does_not_block_past_its_timeout(monkeypatch):
+    from services import mobile_api_service
+
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("DYNASTYGM_TEST_MODE", raising=False)
+    monkeypatch.setattr(mobile_api_service, "_PLAYERS_CACHE_WARM_TIMEOUT_S", 0.05)
+
+    def slow_load(_db_path):
+        time.sleep(2)
+        return pd.DataFrame({"player_id": ["1"]})
+
+    started = time.perf_counter()
+    with patch("modules.rankings.load_players", side_effect=slow_load):
+        mobile_api_service._warm_players_cache_at_startup()
+    elapsed = time.perf_counter() - started
+
+    # Returns promptly once its own short timeout fires, rather than
+    # waiting the full 2s for the (still-running-in-the-background) load.
+    assert elapsed < 1.5
+
+
 def test_health_root_and_ready(monkeypatch):
     client = _client(monkeypatch)
 
