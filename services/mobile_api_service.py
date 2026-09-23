@@ -244,7 +244,15 @@ def _maybe_schedule_players_refresh() -> None:
         session_state: dict[str, Any] = {startup_cold_path.PLAYERS_REFRESH_PENDING_KEY: True}
         players_refresh_flight.schedule_deferred_players_refresh(
             db_path=PLAYERS_DB_PATH,
-            build_players_table_fn=rankings.build_players_table,
+            # Out-of-process, not rankings.build_players_table directly: this
+            # service is a single always-on instance, and the in-process
+            # rebuild (real CPU work normalizing/scoring ~1700-2000 players)
+            # was found to hold the GIL long enough to produce periodic p95
+            # latency spikes (15-18+ seconds) for every other in-flight
+            # request. A subprocess can't contend for this process's GIL no
+            # matter how long the rebuild takes. See
+            # modules.players_refresh_flight.build_players_table_out_of_process.
+            build_players_table_fn=players_refresh_flight.build_players_table_out_of_process,
             session_state=session_state,
             pending_key=startup_cold_path.PLAYERS_REFRESH_PENDING_KEY,
             background=True,

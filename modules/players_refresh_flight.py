@@ -15,13 +15,23 @@ Contract:
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable, MutableMapping
+from pathlib import Path
 from typing import Any
 
 from modules import performance
 from modules import runtime_trace
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REFRESH_SUBPROCESS_SCRIPT = _REPO_ROOT / "scripts" / "refresh_players_db_subprocess.py"
+# Generous ceiling on a full Sleeper/FantasyCalc fetch + ~1700-2000 player
+# scoring pass; a hang here should fail the refresh (previous players.db is
+# untouched either way), not block this signature's cooldown forever.
+_REFRESH_SUBPROCESS_TIMEOUT_S = 180
 
 
 PUBLIC_PLAYERS_REFRESH_SIGNATURE = "public_sleeper_players_v1"
@@ -163,6 +173,42 @@ def _mark_refresh_complete(
                 _LAST_ERROR[signature] = error[:120]
         if event is not None:
             event.set()
+
+
+def build_players_table_out_of_process(db_path: str, refresh: bool = True):
+    """Drop-in replacement for modules.rankings.build_players_table as the
+    `build_players_table_fn` passed to schedule_deferred_players_refresh.
+
+    Runs the actual (CPU-bound) rebuild in a separate OS process
+    (scripts/refresh_players_db_subprocess.py) instead of in-process, so it
+    can't hold this process's GIL and stall concurrent request handling —
+    see that script's module docstring for the full "why." A blocking
+    subprocess wait releases the GIL for its duration (CPython drops it
+    around blocking syscalls), so the background thread that calls this
+    stays alive to do its normal completion bookkeeping without itself
+    contending for the GIL while the child does the real work.
+
+    Returns a real players DataFrame (by reading it back from disk after a
+    successful subprocess run) so callers — run_public_players_refresh
+    checks `.empty` — see the exact same contract as calling
+    rankings.build_players_table directly.
+    """
+
+    from modules import rankings
+
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(_REFRESH_SUBPROCESS_SCRIPT), db_path],
+            timeout=_REFRESH_SUBPROCESS_TIMEOUT_S,
+            capture_output=True,
+            text=True,
+            cwd=str(_REPO_ROOT),
+        )
+    except Exception:
+        return rankings.empty_players_table()
+    if completed.returncode != 0:
+        return rankings.empty_players_table()
+    return rankings.load_players(db_path)
 
 
 def run_public_players_refresh(
