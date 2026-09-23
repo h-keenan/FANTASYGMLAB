@@ -29,7 +29,16 @@ export default function PlayerNameText({
       {...rest}
       numberOfLines={1}
       onTextLayout={(event) => {
-        if (!clipped && event.nativeEvent.lines.length > 1) setClipped(true);
+        // Can't check `lines.length > 1` here — with numberOfLines={1} also
+        // set, RN caps the reported lines at 1 no matter what, so that check
+        // can never fire (this was the actual bug: names kept clipping to
+        // "Rhamondre S..." instead of abbreviating). A truncated line's
+        // reported text is always shorter than the real name (RN appends an
+        // ellipsis and drops what didn't fit), so compare lengths instead.
+        const renderedText = event.nativeEvent.lines[0]?.text ?? '';
+        if (!clipped && renderedText.length > 0 && renderedText.length < name.trim().length) {
+          setClipped(true);
+        }
       }}
     >
       {clipped ? abbreviate(name) : name}
