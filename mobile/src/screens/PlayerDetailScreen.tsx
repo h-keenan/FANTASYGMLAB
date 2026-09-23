@@ -1033,7 +1033,20 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     api
       .getPlayerRankInLeague(leagueId, player.player_id)
       .then((result) => {
-        if (cancelled || !result.player) return;
+        if (cancelled) return;
+        if (!result.player) {
+          // A bare "—" with no explanation read as a broken/glitched load
+          // (coridian_: "occasional glitch where it doesn't load the
+          // information") when this is really just a player outside the
+          // current rankings pool (recently signed, practice squad, etc.)
+          // — say so instead of leaving the dash unexplained.
+          setRank({
+            overall_rank: null,
+            position_rank: null,
+            rank_unavailable_reason: "Not enough current data to rank this player yet.",
+          });
+          return;
+        }
         setRank({
           overall_rank: result.player.overall_rank,
           position_rank: result.player.position_rank,
@@ -1041,8 +1054,10 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         });
       })
       .catch(() => {
-        // Keep whatever the route params already had (often nothing) —
-        // this is an enrichment, not a blocking fetch.
+        // A real network/request failure — keep whatever the route params
+        // already had (often nothing) rather than asserting a specific
+        // reason we don't actually know; this is an enrichment fetch, not
+        // a blocking one.
       });
     return () => {
       cancelled = true;
