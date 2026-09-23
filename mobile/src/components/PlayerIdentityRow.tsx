@@ -37,6 +37,16 @@ export interface PlayerIdentityRowProps {
    * (not translucent) pill so it reads as more urgent than an ordinary
    * "Questionable" tag. */
   ruledOut?: boolean;
+  /** Color family for the injury pill when not `ruledOut`: 'risk' (red,
+   * default — matches every existing caller) for a genuine
+   * risk/out-caliber status, or 'watch' (amber) for a lower-severity flag
+   * like "Questionable" that shouldn't read as urgently as "Out"/"IR".
+   * `ruledOut` always wins and renders solid red regardless of tone, since
+   * that state is unconditionally the most severe. Added for Waivers,
+   * which previously drew this same risk/watch distinction with a
+   * screen-local color helper — kept optional so Matchup/Trade Hub/etc.
+   * are unaffected. */
+  injuryTone?: 'risk' | 'watch';
   onPress?: () => void;
   /** Renders a hairline divider under the row — set false on the last row
    * of a group so the group's own bottom edge stays clean. */
@@ -68,12 +78,16 @@ export default function PlayerIdentityRow({
   contextLine,
   injuryLabel,
   ruledOut,
+  injuryTone = 'risk',
   onPress,
   showDivider = false,
 }: PlayerIdentityRowProps) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tierIdentity = tier ? resolvePlayerTier(tier, isDark) : null;
+  const isWatch = injuryTone === 'watch';
+  const injuryPillBg = ruledOut ? colors.danger : isWatch ? colors.premiumMuted : colors.dangerMuted;
+  const injuryTextColor = ruledOut ? colors.badgeText : isWatch ? colors.premium : colors.danger;
 
   const labelBits: string[] = [];
   if (tierIdentity) labelBits.push(tierIdentity.shortLabel);
@@ -100,8 +114,8 @@ export default function PlayerIdentityRow({
             {name ?? 'Unknown player'}
           </AppText>
           {injuryLabel ? (
-            <View style={[styles.injuryPill, ruledOut && styles.injuryPillOut]}>
-              <AppText style={[styles.injuryText, ruledOut && styles.injuryTextOut]} numberOfLines={1}>
+            <View style={[styles.injuryPill, { backgroundColor: injuryPillBg }]}>
+              <AppText style={[styles.injuryText, { color: injuryTextColor }]} numberOfLines={1}>
                 {injuryLabel}
               </AppText>
             </View>
@@ -153,17 +167,16 @@ function createStyles(colors: ThemeColors) {
     team: { fontSize: 11, color: colors.textSecondary },
     label: { fontSize: 10.5, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.3 },
     context: { fontSize: 11, color: colors.textTertiary },
+    // Colors (background/text) are applied inline per-row from
+    // injuryTone/ruledOut — see the component body — since they vary per
+    // player, not per theme, and this StyleSheet is memoized on colors
+    // alone.
     injuryPill: {
       flexShrink: 0,
-      backgroundColor: colors.dangerMuted,
       borderRadius: radii.pill,
       paddingHorizontal: spacing.sm,
       paddingVertical: 2,
     },
-    injuryText: { fontSize: 10, fontWeight: '700', color: colors.danger },
-    // A ruled-out starter is only here because nothing available could fill
-    // the slot — a solid pill so it can't read as an ordinary injury note.
-    injuryPillOut: { backgroundColor: colors.danger },
-    injuryTextOut: { color: colors.badgeText },
+    injuryText: { fontSize: 10, fontWeight: '700' },
   });
 }
