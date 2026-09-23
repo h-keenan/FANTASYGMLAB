@@ -11,9 +11,12 @@ import { spacing, type ThemeColors } from '../theme';
 
 /**
  * The concept sheet's persistent branded bar (wordmark + star + more-menu)
- * that sits above the big screen title on every screen — additive content
- * like ScreenHero, not a replacement for the native stack header's back
- * button, so it carries no back control of its own.
+ * that sits at the top of every screen's scrollable content — additive
+ * content, not a replacement for the native stack header's back button, so
+ * it carries no back control of its own. The native header (ScreenHeaderTitle)
+ * is the single source of truth for the screen title and league name; this
+ * used to sit below a second, redundant repeat of both (ScreenHero, removed
+ * per coridian_: "the top of many of the pages looks bad and pasted text").
  *
  * Star and "…" are real navigation shortcuts (GM Targets, More), not
  * decorative — this app's rule is no button that does nothing.

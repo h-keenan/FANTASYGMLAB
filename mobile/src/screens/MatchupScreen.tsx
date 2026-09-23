@@ -10,7 +10,6 @@ import AnimatedCard from '../components/AnimatedCard';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
@@ -158,7 +157,6 @@ export default function MatchupScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <ScreenHero title="MATCHUP" subtitle={leagueName} />
         <AnimatedCard glow style={styles.headlineCard}>
           <View style={styles.weekRow}>
             <Ionicons name="american-football-outline" size={14} color={colors.accent} />

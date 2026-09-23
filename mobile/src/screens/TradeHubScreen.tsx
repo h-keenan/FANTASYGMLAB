@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
-import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -318,7 +317,6 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       ListHeaderComponent={
         <View>
           <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-          <ScreenHero title="TRADE HUB" subtitle={leagueName} />
           <View style={styles.viewModeRow}>
             <TouchableOpacity
               style={[styles.viewModePill, isForYou && styles.viewModePillActive]}

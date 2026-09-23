@@ -8,7 +8,6 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
-import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -153,7 +152,6 @@ export default function PlayersScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <ScreenHero title="PLAYERS" subtitle={leagueName} />
       <TextInput
         style={styles.searchInput}
         placeholder="Search players"

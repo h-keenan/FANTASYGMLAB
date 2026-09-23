@@ -9,7 +9,6 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
-import ScreenHero from '../components/ScreenHero';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -145,7 +144,6 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
     >
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <ScreenHero title="TRADE CALCULATOR" subtitle={leagueName} />
       <AppText style={styles.disclaimer}>
         Raw asset value only — {leagueName}'s {'“'}Dynasty{'”'} valuations. Doesn't yet
         weigh roster fit or strategy, unlike the full web Trade Analyzer.
