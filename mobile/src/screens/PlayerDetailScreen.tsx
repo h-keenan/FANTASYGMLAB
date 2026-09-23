@@ -4,7 +4,6 @@ import {
   Alert,
   Linking,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -15,15 +14,20 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
-import CircularProgressRing from '../components/CircularProgressRing';
+import AnalyticsSection from '../components/AnalyticsSection';
+import AwardsStrip from '../components/AwardsStrip';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PositionBadge from '../components/PositionBadge';
+import MetricCard from '../components/MetricCard';
+import PlayerHero from '../components/PlayerHero';
+import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnapshotCard';
+import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
+import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
 import {
   api,
   type CareerSeason,
@@ -152,59 +156,6 @@ function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
   );
 }
 
-/** 1 -> "1st", 22 -> "22nd", 13 -> "13th". Teens are all "th" regardless of
- * their last digit, which is the case a naive last-digit switch gets wrong. */
-function ordinal(value: number): string {
-  const rounded = Math.round(value);
-  const lastTwo = Math.abs(rounded) % 100;
-  const lastOne = Math.abs(rounded) % 10;
-  if (lastTwo >= 11 && lastTwo <= 13) return `${rounded}th`;
-  if (lastOne === 1) return `${rounded}st`;
-  if (lastOne === 2) return `${rounded}nd`;
-  if (lastOne === 3) return `${rounded}rd`;
-  return `${rounded}th`;
-}
-
-/** "59 rush yards" says nothing about whether 59 is good for the position —
- * this is the peer-group answer the backend attaches to each stat. Absent
- * (null/undefined) whenever the position pool was too small to rank against,
- * in which case nothing renders rather than a made-up number. */
-function percentileLabel(percentile: number | null | undefined): string | null {
-  if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) return null;
-  return `${ordinal(percentile)} pctl`;
-}
-
-/** Reads the percentile's color off a red -> gold -> green ramp so "9th" and
- * "91st" don't arrive in the same flat blue. Anchored on the existing palette
- * (danger at 0, premium at 50, successBright at 100) and interpolated
- * channel-wise rather than bucketed into three flat bands, so neighbouring
- * stats stay distinguishable instead of snapping at a cutoff. Anything
- * unrankable keeps the old accentSoft. */
-function mixHex(from: string, to: string, t: number): string {
-  const parse = (hex: string) => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-  const [r1, g1, b1] = parse(from);
-  const [r2, g2, b2] = parse(to);
-  const channel = (a: number, b: number) =>
-    Math.round(a + (b - a) * t)
-      .toString(16)
-      .padStart(2, '0');
-  return `#${channel(r1, r2)}${channel(g1, g2)}${channel(b1, b2)}`;
-}
-
-/** Real, not fabricated: the same percentile the badge text already shows,
- * just given a direction — at/above the 50th percentile reads as a trend
- * up, below it a trend down. Never a week-over-week delta (this app has no
- * such series for most stats); the concept sheet's "trend arrows on stat
- * tiles" is satisfied here by direction-of-percentile, not invented change. */
-function percentileTrendIcon(percentile: number | null | undefined): IoniconName | null {
-  if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) return null;
-  return percentile >= 50 ? 'caret-up' : 'caret-down';
-}
-
 /** Real start/sit read, not a new computation — the same
  * suggest_optimal_lineup pass My Team and Matchup already run against the
  * caller's own roster, just looked up for this one player. Omitted
@@ -238,15 +189,6 @@ function rosterRecommendationDetail(rec: RosterRecommendation): string {
   return `Not in your suggested starting lineup this week${
     rec.player.injury_label ? ` — ${rec.player.injury_label}` : ''
   }`;
-}
-
-function percentileColor(percentile: number | null | undefined, colors: ThemeColors): string {
-  if (percentile === null || percentile === undefined || !Number.isFinite(percentile)) {
-    return colors.accentSoft;
-  }
-  const clamped = Math.max(0, Math.min(100, percentile));
-  if (clamped <= 50) return mixHex(colors.danger, colors.premium, clamped / 50);
-  return mixHex(colors.premium, colors.successBright, (clamped - 50) / 50);
 }
 
 // Derived from modules.rankings.AGE_CURVE_CONTROL_POINTS server-side — the
@@ -322,41 +264,6 @@ function StatGrid({
   );
 }
 
-/** `first` drops the top divider/margin — used when this is the leading
- * subsection inside a shared outer card (see the Stats tab, which groups
- * Production/Fantasy/Efficiency/Usage/College into ONE card instead of one
- * per category: five separate cards each with their own border+padding+
- * margin was the literal cause of "Usage is buried at the bottom... the UI
- * is too spaced out" — same stat density, far less card chrome between
- * categories that all describe the same season). */
-function StatSection({
-  title,
-  icon,
-  items,
-  first,
-}: {
-  title: string;
-  icon: IoniconName;
-  items: QuickViewStatItem[];
-  first?: boolean;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  if (items.length === 0) return null;
-  return (
-    <View style={first ? undefined : styles.subSection}>
-      <SectionHeading title={title} icon={icon} />
-      <StatGrid
-        items={items.map((item) => ({
-          label: item.label,
-          value: item.value || null,
-          percentile: item.percentile,
-        }))}
-      />
-    </View>
-  );
-}
-
 /** "72%" -> 72; anything else (blank, non-percent stats) -> null, so the
  * caller falls back to a plain StatCell instead of drawing an empty bar. */
 function parsePercent(value: string): number | null {
@@ -406,14 +313,13 @@ function PercentBar({
 /** Usage stats (Snap %, Route %, Target Share, Carry Share, Opportunity)
  * are all shares — a plain number is harder to size up at a glance than a
  * bar, so this renders each as one instead of falling through to the
- * generic StatGrid the other sections use. */
-function UsageSection({ items }: { items: QuickViewStatItem[] }) {
+ * generic StatGrid the other sections use. Renders bare rows only — the
+ * caller (AnalyticsSection) supplies the card chrome and "Usage" heading. */
+function UsageRows({ items }: { items: QuickViewStatItem[] }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  if (items.length === 0) return null;
   return (
-    <View style={styles.subSection}>
-      <SectionHeading title="Usage" icon="speedometer-outline" />
+    <>
       {items.map((item, index) => {
         const percent = item.value ? parsePercent(item.value) : null;
         if (percent === null) {
@@ -433,8 +339,29 @@ function UsageSection({ items }: { items: QuickViewStatItem[] }) {
           />
         );
       })}
-    </View>
+    </>
   );
+}
+
+// Receiving-specific labels split out of `season.key_stats` — the backend's
+// _key_stats already orders these together per position (see
+// modules/player_quick_view.py's _key_stats `order` map), this just groups
+// them under their own "Receiving" card instead of "Production" per the
+// concept sheet's split, e.g. RB: Production = Games/Rush Att/Rush Yards/
+// Rush TDs/Targets, Receiving = Receptions/Rec Yards/Rec TDs. Pure relabeling
+// of already-computed items — no new metric is invented.
+const RECEIVING_LABELS = new Set(['Receptions', 'Rec Yards', 'Rec TDs']);
+
+function splitProductionStats(items: QuickViewStatItem[]): {
+  production: QuickViewStatItem[];
+  receiving: QuickViewStatItem[];
+} {
+  const production: QuickViewStatItem[] = [];
+  const receiving: QuickViewStatItem[] = [];
+  for (const item of items) {
+    (RECEIVING_LABELS.has(item.label) ? receiving : production).push(item);
+  }
+  return { production, receiving };
 }
 
 // Mirrors services/mobile_api_service.py's MAX_WEEKLY_STATS_SEASONS_BACK —
@@ -533,79 +460,6 @@ function TrendsSection({ playerId, yearsInLeague }: { playerId: string; yearsInL
   );
 }
 
-// Previous bronze (#9DA4AE) was a blue-gray, not remotely bronze-colored —
-// on a small icon at dark-mode contrast, all three tiers read as "plain
-// gray," which is exactly the "awards look bland" complaint. These are
-// closer to actual metallic gold/silver/bronze. Untiered awards (some
-// achievements have no tier — see modules/player_awards.py's tier=None
-// cases) previously fell back to colors.border, nearly invisible against
-// the card background; now a visible neutral accent instead.
-const AWARD_TIER_COLORS: Record<string, string> = {
-  gold: '#FFD700',
-  silver: '#D9DFE6',
-  bronze: '#CD7F32',
-};
-
-function AwardsSection({ awards }: { awards: PlayerAward[] }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const [selectedAward, setSelectedAward] = useState<PlayerAward | null>(null);
-  if (awards.length === 0) return null;
-  const selectedTierColor = selectedAward
-    ? (selectedAward.tier && AWARD_TIER_COLORS[selectedAward.tier]) || colors.accentSoft
-    : colors.accentSoft;
-  return (
-    <View style={[styles.card, styles.cardSpaced]}>
-      <SectionHeading title="Awards" icon="trophy-outline" />
-      <View style={styles.awardsWrap}>
-        {awards.map((award) => {
-          const tierColor = (award.tier && AWARD_TIER_COLORS[award.tier]) || colors.accentSoft;
-          return (
-            <TouchableOpacity
-              key={award.badge_id}
-              style={[styles.awardChip, { borderLeftColor: tierColor }]}
-              onPress={() => setSelectedAward(award)}
-            >
-              <View style={[styles.awardMedal, { backgroundColor: `${tierColor}26` }]}>
-                <Ionicons name="medal" size={18} color={tierColor} />
-              </View>
-              <View style={styles.awardChipTextGroup}>
-                <AppText style={[styles.awardChipLabel, { color: tierColor }]}>{award.short_label}</AppText>
-                {award.season ? <AppText style={styles.awardChipSeason}>{award.season}</AppText> : null}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      <Modal visible={selectedAward !== null} transparent animationType="fade" onRequestClose={() => setSelectedAward(null)}>
-        <Pressable style={styles.awardBackdrop} onPress={() => setSelectedAward(null)}>
-          <Pressable style={styles.awardSheet} onPress={(event) => event.stopPropagation()}>
-            {selectedAward ? (
-              <>
-                <View style={styles.awardSheetHeaderRow}>
-                  <View style={[styles.awardMedal, { backgroundColor: `${selectedTierColor}26` }]}>
-                    <Ionicons name="medal" size={22} color={selectedTierColor} />
-                  </View>
-                  <View style={styles.awardChipTextGroup}>
-                    <AppText style={[styles.awardSheetTitle, { color: selectedTierColor }]}>{selectedAward.title}</AppText>
-                    {selectedAward.season ? <AppText style={styles.awardChipSeason}>{selectedAward.season}</AppText> : null}
-                  </View>
-                </View>
-                <AppText style={styles.awardSheetDescription}>{selectedAward.description}</AppText>
-                {selectedAward.occurrence_count > 1 ? (
-                  <AppText style={styles.awardSheetMeta}>
-                    Earned {selectedAward.occurrence_count} times
-                  </AppText>
-                ) : null}
-              </>
-            ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
-  );
-}
-
 function BioSection({ bio }: { bio: QuickViewBio }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -625,24 +479,6 @@ function BioSection({ bio }: { bio: QuickViewBio }) {
     <View style={[styles.card, styles.cardSpaced]}>
       <SectionHeading title="Bio" icon="person-outline" />
       <StatGrid items={rows.map(([label, value]) => ({ label, value }))} />
-    </View>
-  );
-}
-
-function TabRow({ active, onChange }: { active: DetailTab; onChange: (tab: DetailTab) => void }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.tabRow}>
-      {TABS.map((tab) => (
-        <TouchableOpacity
-          key={tab.key}
-          style={[styles.tabPill, active === tab.key && styles.tabPillActive]}
-          onPress={() => onChange(tab.key)}
-        >
-          <AppText style={[styles.tabPillText, active === tab.key && styles.tabPillTextActive]}>{tab.label}</AppText>
-        </TouchableOpacity>
-      ))}
     </View>
   );
 }
@@ -970,6 +806,30 @@ function ModelSection({ model }: { model: QuickViewModel }) {
   );
 }
 
+/** Coarse good/neutral/bad read for the Snapshot card's Status cell —
+ * purely a color hint over the same `player.status` string every list
+ * screen already shows verbatim; never a second status computation. */
+function statusTone(status: string | null | undefined): SnapshotItem['tone'] {
+  const normalized = (status ?? '').toLowerCase();
+  if (!normalized) return 'neutral';
+  if (normalized.includes('active')) return 'success';
+  if (normalized.includes('injured') || normalized.includes('out') || normalized.includes('ir') || normalized.includes('suspend')) {
+    return 'danger';
+  }
+  return 'neutral';
+}
+
+/** Same read for the Injury Status cell — a null/absent value already means
+ * "Healthy" everywhere else in this app (see the old Snapshot's own
+ * `?? 'Healthy'` fallback), so that fallback keeps its green tone here too. */
+function injuryTone(injuryStatus: string | null | undefined): SnapshotItem['tone'] {
+  if (!injuryStatus) return 'success';
+  const normalized = injuryStatus.toLowerCase();
+  if (normalized.includes('healthy')) return 'success';
+  if (normalized.includes('out') || normalized.includes('ir') || normalized.includes('doubtful')) return 'danger';
+  return 'neutral';
+}
+
 export default function PlayerDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
@@ -1187,198 +1047,291 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const season = stats?.seasons[0];
   const tierIdentity = resolvePlayerTier(player.tier, isDark);
   // The 2K-style headline: one 0-99 read on the same value_score the
-  // Snapshot grid below already shows, percentiled inside the player's
+  // Snapshot card below already shows, percentiled inside the player's
   // position by the same backend machinery as the per-stat percentiles on
   // the Stats tab. Null (too thin a pool to rank against) renders nothing —
-  // the header just falls back to the centered avatar it had before.
+  // the hero just falls back to the plain portrait it had before.
   const rawOverall = stats?.overall_rating;
   const overallRating =
     rawOverall === null || rawOverall === undefined || !Number.isFinite(rawOverall)
       ? null
       : rawOverall;
 
+  const tags: PlayerTagSpec[] = [];
+  if (player.tier) {
+    tags.push({
+      key: 'tier',
+      label: tierIdentity.shortLabel,
+      color: tierIdentity.color,
+      variant: 'solid',
+      contrastText: contrastTextColor(tierIdentity.color),
+    });
+  }
+  if (stats?.prime_window) {
+    tags.push({
+      key: 'prime',
+      label: primeWindowLabel(stats.prime_window) ?? '',
+      color: primeWindowColor(stats.prime_window.status, colors),
+      variant: 'outline',
+    });
+  }
+  if (player.opportunity_label) {
+    tags.push({
+      key: 'opportunity',
+      label: player.opportunity_label,
+      color: opportunityChipColor(player.opportunity_label, colors),
+      variant: 'outline',
+    });
+  }
+
+  const snapshotItems: SnapshotItem[] = [
+    {
+      key: 'overall_rank',
+      label: 'Overall Rank',
+      value: rank.overall_rank,
+      descriptor: rank.overall_rank != null ? 'of all players' : null,
+    },
+    {
+      key: 'position_rank',
+      label: 'Position Rank',
+      value: rank.position_rank,
+      descriptor: rank.position_rank != null && player.position ? `of ${player.position}s` : null,
+    },
+    { key: 'age', label: 'Age', value: player.age },
+    { key: 'status', label: 'Status', value: player.status, tone: statusTone(player.status) },
+    {
+      key: 'injury',
+      label: 'Injury Status',
+      value: player.injury_status ?? 'Healthy',
+      tone: injuryTone(player.injury_status),
+    },
+  ];
+
+  const heroActions = (
+    <>
+      <PlayerTags tags={tags} />
+      {rosterRec ? (
+        <View
+          style={[
+            styles.rosterRecCard,
+            { borderColor: rosterRec.isStarter ? colors.success : colors.textTertiary },
+          ]}
+        >
+          <View
+            style={[
+              styles.rosterRecBadge,
+              { backgroundColor: rosterRec.isStarter ? colors.success : colors.backgroundElevated },
+            ]}
+          >
+            <AppText
+              style={[
+                styles.rosterRecBadgeText,
+                { color: rosterRec.isStarter ? colors.background : colors.textSecondary },
+              ]}
+            >
+              {rosterRec.isStarter ? 'STARTER' : 'BENCH'}
+            </AppText>
+          </View>
+          <View style={styles.rosterRecTextGroup}>
+            <AppText style={styles.rosterRecTitle}>Roster Recommendation</AppText>
+            <AppText style={styles.rosterRecDetail}>{rosterRecommendationDetail(rosterRec)}</AppText>
+          </View>
+        </View>
+      ) : null}
+      <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
+      {watching !== null ? (
+        <View style={styles.watchRow}>
+          <TouchableOpacity
+            style={[styles.watchButton, watching && styles.watchButtonActive]}
+            onPress={toggleWatch}
+            disabled={watchBusy}
+          >
+            <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
+              {watching ? '★ Watching' : '☆ Add to GM Targets'}
+            </AppText>
+          </TouchableOpacity>
+          {watching ? (
+            <TouchableOpacity
+              style={[styles.untouchableButton, untouchable && styles.untouchableButtonActive]}
+              onPress={toggleUntouchable}
+              disabled={untouchableBusy}
+              accessibilityLabel={untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
+            >
+              <Ionicons
+                name={untouchable ? 'lock-closed' : 'lock-open-outline'}
+                size={16}
+                color={untouchable ? colors.background : colors.textSecondary}
+              />
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            style={styles.compareButton}
+            onPress={() => navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
+          >
+            <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
+            <AppText style={styles.compareButtonText}>Compare</AppText>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </>
+  );
+
+  // Built as an array (rather than a JSX fragment) so the segmented tab
+  // bar's position can be computed dynamically and passed to the
+  // ScrollView's `stickyHeaderIndices` — the brief asks for the subnav to
+  // "remain easily accessible as the user scrolls" via a sticky treatment,
+  // and the index has to reflect whatever actually rendered above it (the
+  // rank-unavailable notice and the loading spinner are both conditional).
+  const content: React.ReactNode[] = [];
+  content.push(
+    <PlayerHero
+      key="hero"
+      playerId={player.player_id}
+      tier={player.tier}
+      name={player.name ?? 'Unknown player'}
+      position={player.position}
+      team={player.team}
+      overallRating={overallRating}
+      ringColor={overallRating !== null ? percentileColor(overallRating, colors) : colors.accent}
+      glowColor={tierIdentity.color}
+    >
+      {heroActions}
+    </PlayerHero>,
+  );
+  content.push(<PlayerSnapshotCard key="snapshot" valueScore={player.score != null ? Math.round(player.score) : null} items={snapshotItems} />);
+  if (rank.rank_unavailable_reason) {
+    content.push(
+      <AppText key="rank-note" style={styles.notice}>
+        {rank.rank_unavailable_reason}
+      </AppText>,
+    );
+  }
+
+  let tabBarIndex: number | null = null;
+
+  if (loading) {
+    content.push(<ActivityIndicator key="loading" style={styles.loader} color={colors.accent} />);
+  } else {
+    content.push(<AwardsStrip key="awards" awards={awards} />);
+
+    const showTabs = Boolean(stats?.seasons.length || model);
+    if (showTabs) {
+      tabBarIndex = content.length;
+      content.push(
+        <View key="tabbar" style={styles.tabBarWrap}>
+          <SegmentedTabBar options={TABS} active={activeTab} onChange={setActiveTab} />
+        </View>,
+      );
+    }
+
+    if (activeTab === 'stats' && season) {
+      const { production, receiving } = splitProductionStats(season.key_stats);
+      content.push(
+        <View key="stats-tab">
+          <AppText style={styles.seasonLabel}>{season.label}</AppText>
+          {season.fantasy.length > 0 ? (
+            <AnalyticsSection title="Fantasy Scoring" icon="american-football-outline">
+              <View style={styles.metricGrid}>
+                {season.fantasy.map((item, index) => (
+                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                ))}
+              </View>
+            </AnalyticsSection>
+          ) : null}
+          {production.length > 0 ? (
+            <AnalyticsSection title="Production" icon="bar-chart-outline">
+              <View style={styles.metricGrid}>
+                {production.map((item, index) => (
+                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                ))}
+              </View>
+            </AnalyticsSection>
+          ) : null}
+          {receiving.length > 0 ? (
+            <AnalyticsSection title="Receiving" icon="locate-outline">
+              <View style={styles.metricGrid}>
+                {receiving.map((item, index) => (
+                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                ))}
+              </View>
+            </AnalyticsSection>
+          ) : null}
+          {season.usage.length > 0 ? (
+            <AnalyticsSection title="Usage" icon="speedometer-outline">
+              <UsageRows items={season.usage} />
+            </AnalyticsSection>
+          ) : null}
+          {season.efficiency.length > 0 ? (
+            <AnalyticsSection title="Efficiency" icon="calculator-outline">
+              <View style={styles.metricGrid}>
+                {season.efficiency.map((item, index) => (
+                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                ))}
+              </View>
+            </AnalyticsSection>
+          ) : null}
+          {stats?.college_available && stats.college.length > 0 ? (
+            <AnalyticsSection title="College" icon="school-outline">
+              <View style={styles.metricGrid}>
+                {stats.college.map((item, index) => (
+                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                ))}
+              </View>
+            </AnalyticsSection>
+          ) : null}
+          {model ? <InsightChipsRow model={model} /> : null}
+        </View>,
+      );
+    }
+
+    if (activeTab === 'trends') {
+      content.push(
+        <TrendsSection key="trends-tab" playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />,
+      );
+    }
+
+    if (activeTab === 'schedule') {
+      content.push(<ScheduleSection key="schedule-tab" playerId={player.player_id} />);
+    }
+
+    if (activeTab === 'career') {
+      content.push(<CareerSection key="career-tab" playerId={player.player_id} />);
+    }
+
+    if (activeTab === 'model') {
+      content.push(
+        model ? (
+          <ModelSection key="model-tab" model={model} />
+        ) : (
+          <AppText key="model-tab" style={styles.notice}>
+            No model breakdown available for this player yet.
+          </AppText>
+        ),
+      );
+    }
+
+    if (bio) {
+      content.push(<BioSection key="bio" bio={bio} />);
+    }
+    if (!season && !model && !stats?.college_available && !bio && awards.length === 0) {
+      content.push(
+        <AppText key="empty-notice" style={styles.notice}>
+          No additional stats available for this player yet.
+        </AppText>,
+      );
+    }
+  }
+
   return (
     <>
     <View style={styles.root}>
     <GridBackground />
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
-      <View style={styles.header}>
-        <View style={styles.heroIdentityRow}>
-          <PlayerAvatar playerId={player.player_id} size={88} tier={player.tier} />
-          {overallRating !== null ? (
-            <CircularProgressRing
-              percent={overallRating}
-              size={100}
-              strokeWidth={9}
-              valueLabel={String(overallRating)}
-              valueFontScale={0.38}
-              color={percentileColor(overallRating, colors)}
-              label="Overall"
-            />
-          ) : null}
-        </View>
-        <AppText style={styles.name}>{player.name ?? 'Unknown player'}</AppText>
-        <View style={styles.heroMetaRow}>
-          <PositionBadge position={player.position} size="md" />
-          {player.team ? <AppText style={styles.meta}>{player.team}</AppText> : null}
-        </View>
-        <View style={styles.statusChipRow}>
-          {player.tier ? (
-            <View style={[styles.tierBadge, { backgroundColor: tierIdentity.color }]}>
-              <AppText style={[styles.tierText, { color: contrastTextColor(tierIdentity.color) }]}>
-                {tierIdentity.shortLabel}
-              </AppText>
-            </View>
-          ) : null}
-          {stats?.prime_window ? (
-            <View
-              style={[
-                styles.primeWindowBadge,
-                { borderColor: primeWindowColor(stats.prime_window.status, colors) },
-              ]}
-            >
-              <AppText style={[styles.primeWindowText, { color: primeWindowColor(stats.prime_window.status, colors) }]}>
-                {primeWindowLabel(stats.prime_window)}
-              </AppText>
-            </View>
-          ) : null}
-          {player.opportunity_label ? (
-            <View style={[styles.primeWindowBadge, { borderColor: opportunityChipColor(player.opportunity_label, colors) }]}>
-              <AppText style={[styles.primeWindowText, { color: opportunityChipColor(player.opportunity_label, colors) }]}>
-                {player.opportunity_label}
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-        {rosterRec ? (
-          <View
-            style={[
-              styles.rosterRecCard,
-              { borderColor: rosterRec.isStarter ? colors.success : colors.textTertiary },
-            ]}
-          >
-            <View
-              style={[
-                styles.rosterRecBadge,
-                { backgroundColor: rosterRec.isStarter ? colors.success : colors.backgroundElevated },
-              ]}
-            >
-              <AppText
-                style={[
-                  styles.rosterRecBadgeText,
-                  { color: rosterRec.isStarter ? colors.background : colors.textSecondary },
-                ]}
-              >
-                {rosterRec.isStarter ? 'STARTER' : 'BENCH'}
-              </AppText>
-            </View>
-            <View style={styles.rosterRecTextGroup}>
-              <AppText style={styles.rosterRecTitle}>Roster Recommendation</AppText>
-              <AppText style={styles.rosterRecDetail}>{rosterRecommendationDetail(rosterRec)}</AppText>
-            </View>
-          </View>
-        ) : null}
-        <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
-        {watching !== null ? (
-          <View style={styles.watchRow}>
-            <TouchableOpacity
-              style={[styles.watchButton, watching && styles.watchButtonActive]}
-              onPress={toggleWatch}
-              disabled={watchBusy}
-            >
-              <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
-                {watching ? '★ Watching' : '☆ Add to GM Targets'}
-              </AppText>
-            </TouchableOpacity>
-            {watching ? (
-              <TouchableOpacity
-                style={[styles.untouchableButton, untouchable && styles.untouchableButtonActive]}
-                onPress={toggleUntouchable}
-                disabled={untouchableBusy}
-                accessibilityLabel={untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
-              >
-                <Ionicons
-                  name={untouchable ? 'lock-closed' : 'lock-open-outline'}
-                  size={16}
-                  color={untouchable ? colors.background : colors.textSecondary}
-                />
-              </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity
-              style={styles.compareButton}
-              onPress={() => navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
-            >
-              <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
-              <AppText style={styles.compareButtonText}>Compare</AppText>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.card}>
-        <SectionHeading title="Snapshot" icon="flash-outline" />
-        <StatGrid
-          items={[
-            { label: 'Value score', value: player.score != null ? Math.round(player.score) : null },
-            { label: 'Overall rank', value: rank.overall_rank },
-            { label: 'Position rank', value: rank.position_rank },
-            { label: 'Age', value: player.age },
-            { label: 'Status', value: player.status },
-            { label: 'Injury status', value: player.injury_status ?? 'Healthy' },
-          ]}
-        />
-      </View>
-
-      {rank.rank_unavailable_reason ? (
-        <AppText style={styles.notice}>{rank.rank_unavailable_reason}</AppText>
-      ) : null}
-
-      {loading ? (
-        <ActivityIndicator style={styles.loader} color={colors.accent} />
-      ) : (
-        <>
-          <AwardsSection awards={awards} />
-
-          {stats?.seasons.length || model ? <TabRow active={activeTab} onChange={setActiveTab} /> : null}
-
-          {activeTab === 'stats' && season ? (
-            <>
-              <AppText style={styles.seasonLabel}>{season.label}</AppText>
-              <View style={[styles.card, styles.cardSpaced]}>
-                <StatSection title="Fantasy" icon="american-football-outline" items={season.fantasy} first />
-                <StatSection title="Production" icon="bar-chart-outline" items={season.key_stats} />
-                <UsageSection items={season.usage} />
-                <StatSection title="Efficiency" icon="calculator-outline" items={season.efficiency} />
-                {stats?.college_available ? (
-                  <StatSection title="College" icon="school-outline" items={stats.college} />
-                ) : null}
-              </View>
-              {model ? <InsightChipsRow model={model} /> : null}
-            </>
-          ) : null}
-
-          {activeTab === 'trends' ? (
-            <TrendsSection playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
-          ) : null}
-
-          {activeTab === 'schedule' ? <ScheduleSection playerId={player.player_id} /> : null}
-
-          {activeTab === 'career' ? <CareerSection playerId={player.player_id} /> : null}
-
-          {activeTab === 'model' ? (
-            model ? (
-              <ModelSection model={model} />
-            ) : (
-              <AppText style={styles.notice}>No model breakdown available for this player yet.</AppText>
-            )
-          ) : null}
-
-          {bio ? <BioSection bio={bio} /> : null}
-          {!season && !model && !stats?.college_available && !bio && awards.length === 0 ? (
-            <AppText style={styles.notice}>No additional stats available for this player yet.</AppText>
-          ) : null}
-        </>
-      )}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+      stickyHeaderIndices={tabBarIndex !== null ? [tabBarIndex] : undefined}
+    >
+      {content}
     </ScrollView>
     </View>
     <NewsImpactModal visible={newsModalOpen} items={newsItems} onClose={() => setNewsModalOpen(false)} />
@@ -1392,37 +1345,6 @@ function createStyles(colors: ThemeColors) {
   root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
-  header: { alignItems: 'center', marginBottom: spacing.xl },
-  heroIdentityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  name: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
-  meta: { fontSize: 14, color: colors.textSecondary },
-  statusChipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  tierBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.pill,
-  },
-  tierText: { fontSize: 12, fontWeight: '700' },
-  primeWindowBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-  },
-  primeWindowText: { fontSize: 12, fontWeight: '700' },
   watchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   watchButton: {
     paddingHorizontal: spacing.lg,
@@ -1521,9 +1443,20 @@ function createStyles(colors: ThemeColors) {
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
     padding: spacing.lg,
   },
   cardSpaced: { marginTop: spacing.lg },
+  // Sticky segmented tab bar: an opaque fill (matching the page background)
+  // so scrolled-past content doesn't show through once this pins to the
+  // top, per the brief's "remain easily accessible as the user scrolls".
+  tabBarWrap: {
+    backgroundColor: colors.background,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   insightChipsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   insightChip: {
     flex: 1,
@@ -1539,32 +1472,6 @@ function createStyles(colors: ThemeColors) {
   insightChipTextGroup: { flex: 1 },
   insightChipTitle: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
   insightChipDetail: { fontSize: 10, color: colors.textSecondary, marginTop: 1, lineHeight: 13 },
-  // A subsection inside a shared card: a hairline + modest top margin reads
-  // as "next category" without the full weight of another card's
-  // border+padding+margin — see StatSection's `first` prop.
-  subSection: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  tabRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-  },
-  tabPill: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  tabPillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
-  tabPillText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  tabPillTextActive: { color: colors.accent },
   trendRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1609,43 +1516,6 @@ function createStyles(colors: ThemeColors) {
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  awardsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  awardChip: {
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderLeftWidth: 3,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    minWidth: '46%',
-    backgroundColor: colors.background,
-  },
-  awardMedal: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  awardChipTextGroup: { flexShrink: 1 },
-  awardChipLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
-  awardChipSeason: { fontSize: 10, color: colors.textTertiary, fontWeight: '600', marginTop: 1 },
-  awardBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  awardSheet: {
-    backgroundColor: colors.backgroundElevated,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
-  awardSheetHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
-  awardSheetTitle: { fontSize: 17, fontWeight: '800' },
-  awardSheetDescription: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-  awardSheetMeta: { fontSize: 12, color: colors.textTertiary, marginTop: spacing.sm, fontWeight: '600' },
   sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   sectionHeadingIcon: { marginRight: spacing.xs },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
