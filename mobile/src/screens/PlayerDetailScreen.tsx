@@ -4,6 +4,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -548,7 +549,11 @@ const AWARD_TIER_COLORS: Record<string, string> = {
 function AwardsSection({ awards }: { awards: PlayerAward[] }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [selectedAward, setSelectedAward] = useState<PlayerAward | null>(null);
   if (awards.length === 0) return null;
+  const selectedTierColor = selectedAward
+    ? (selectedAward.tier && AWARD_TIER_COLORS[selectedAward.tier]) || colors.accentSoft
+    : colors.accentSoft;
   return (
     <View style={[styles.card, styles.cardSpaced]}>
       <SectionHeading title="Awards" icon="trophy-outline" />
@@ -556,7 +561,11 @@ function AwardsSection({ awards }: { awards: PlayerAward[] }) {
         {awards.map((award) => {
           const tierColor = (award.tier && AWARD_TIER_COLORS[award.tier]) || colors.accentSoft;
           return (
-            <View key={award.badge_id} style={[styles.awardChip, { borderLeftColor: tierColor }]}>
+            <TouchableOpacity
+              key={award.badge_id}
+              style={[styles.awardChip, { borderLeftColor: tierColor }]}
+              onPress={() => setSelectedAward(award)}
+            >
               <View style={[styles.awardMedal, { backgroundColor: `${tierColor}26` }]}>
                 <Ionicons name="medal" size={18} color={tierColor} />
               </View>
@@ -564,10 +573,35 @@ function AwardsSection({ awards }: { awards: PlayerAward[] }) {
                 <AppText style={[styles.awardChipLabel, { color: tierColor }]}>{award.short_label}</AppText>
                 {award.season ? <AppText style={styles.awardChipSeason}>{award.season}</AppText> : null}
               </View>
-            </View>
+            </TouchableOpacity>
           );
         })}
       </View>
+      <Modal visible={selectedAward !== null} transparent animationType="fade" onRequestClose={() => setSelectedAward(null)}>
+        <Pressable style={styles.awardBackdrop} onPress={() => setSelectedAward(null)}>
+          <Pressable style={styles.awardSheet} onPress={(event) => event.stopPropagation()}>
+            {selectedAward ? (
+              <>
+                <View style={styles.awardSheetHeaderRow}>
+                  <View style={[styles.awardMedal, { backgroundColor: `${selectedTierColor}26` }]}>
+                    <Ionicons name="medal" size={22} color={selectedTierColor} />
+                  </View>
+                  <View style={styles.awardChipTextGroup}>
+                    <AppText style={[styles.awardSheetTitle, { color: selectedTierColor }]}>{selectedAward.title}</AppText>
+                    {selectedAward.season ? <AppText style={styles.awardChipSeason}>{selectedAward.season}</AppText> : null}
+                  </View>
+                </View>
+                <AppText style={styles.awardSheetDescription}>{selectedAward.description}</AppText>
+                {selectedAward.occurrence_count > 1 ? (
+                  <AppText style={styles.awardSheetMeta}>
+                    Earned {selectedAward.occurrence_count} times
+                  </AppText>
+                ) : null}
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1576,6 +1610,19 @@ function createStyles(colors: ThemeColors) {
   awardChipTextGroup: { flexShrink: 1 },
   awardChipLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
   awardChipSeason: { fontSize: 10, color: colors.textTertiary, fontWeight: '600', marginTop: 1 },
+  awardBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  awardSheet: {
+    backgroundColor: colors.backgroundElevated,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+  awardSheetHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  awardSheetTitle: { fontSize: 17, fontWeight: '800' },
+  awardSheetDescription: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  awardSheetMeta: { fontSize: 12, color: colors.textTertiary, marginTop: spacing.sm, fontWeight: '600' },
   sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   sectionHeadingIcon: { marginRight: spacing.xs },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
