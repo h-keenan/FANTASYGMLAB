@@ -59,6 +59,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [tradeStory, setTradeStory] = useState<RecapStory | null>(null);
+  const [rosterMap, setRosterMap] = useState<Record<string, { playerIds: string[]; teamName: string }>>({});
 
   useScreenHeaderTitle(navigation, 'Recap', leagueName);
 
@@ -98,6 +99,40 @@ export default function RecapScreen({ route, navigation }: Props) {
       cancelled = true;
     };
   }, [leagueId, selectedWeek]);
+
+  // Story cards navigate to TeamRoster, which (like TeamsScreen/LeagueDetailScreen)
+  // needs a pre-fetched playerIds list per roster_id — best-effort: a story
+  // card whose roster isn't found here still navigates, just with an empty
+  // roster (TeamRosterScreen renders its own "no player data" empty state).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [rostersResult, profilesResult] = await Promise.all([
+          api.getLeagueRosters(leagueId),
+          api.getLeagueTeamProfiles(leagueId),
+        ]);
+        if (cancelled) return;
+        const map: Record<string, { playerIds: string[]; teamName: string }> = {};
+        for (const roster of rostersResult.rosters) {
+          const rosterId = String(roster.roster_id ?? '');
+          if (!rosterId) continue;
+          const players = Array.isArray(roster.players) ? roster.players : [];
+          map[rosterId] = {
+            playerIds: players.map(String),
+            teamName: profilesResult.profiles[rosterId]?.team_name || '',
+          };
+        }
+        setRosterMap(map);
+      } catch {
+        // Non-fatal — cards with a primary_roster_id still navigate below,
+        // TeamRosterScreen just starts from an empty roster in that case.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
 
   if (loading && !recap) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
@@ -168,13 +203,24 @@ export default function RecapScreen({ route, navigation }: Props) {
       {recap.incomplete ? (
         <AppText style={styles.incompleteNotice}>{recap.empty_reason || 'Not enough historical data yet.'}</AppText>
       ) : (
-        recap.stories.map((story, index) => (
-          <StoryCard
-            key={`${story.story_type}-${index}`}
-            story={story}
-            onPress={story.story_type === 'trade' ? () => setTradeStory(story) : undefined}
-          />
-        ))
+        recap.stories.map((story, index) => {
+          let onPress: (() => void) | undefined;
+          if (story.story_type === 'trade') {
+            onPress = () => setTradeStory(story);
+          } else if (story.primary_roster_id) {
+            const rosterId = story.primary_roster_id;
+            const rosterEntry = rosterMap[rosterId];
+            onPress = () =>
+              navigation.navigate('TeamRoster', {
+                ownerName: rosterEntry?.teamName || story.primary_team,
+                playerIds: rosterEntry?.playerIds ?? [],
+                leagueId,
+                leagueName,
+                rosterId,
+              });
+          }
+          return <StoryCard key={`${story.story_type}-${index}`} story={story} onPress={onPress} />;
+        })
       )}
       </ScrollView>
       )}

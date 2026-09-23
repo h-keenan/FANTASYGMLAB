@@ -426,6 +426,77 @@ def test_trade_story_includes_full_asset_lists_with_player_ids():
         assert "position" in asset and "team" in asset
 
 
+def test_non_trade_stories_carry_roster_ids_for_mobile_navigation():
+    """Every non-trade story exposes the roster_id(s) it centers on so the
+    mobile Recap screen can navigate its card to TeamRoster (coridian_'s
+    "all of these should be tappable" ask). Two-team stories (matchup,
+    matchup_close) expose both winner (primary) and loser (secondary).
+    Trade stories deliberately keep the field empty — they already have
+    their own tap target (the trade-detail modal).
+    """
+
+    movement = {
+        "available": True,
+        "power_riser": {"team_name": "War Room", "roster_id": 1, "power_delta": 3},
+    }
+    recap = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_trade(), _waiver(), _waiver(bid=11)],
+        matchups=_matchups(),
+        profiles=PROFILES,
+        movement=movement,
+    )
+    by_type = {story["story_type"]: story for story in recap["stories"]}
+
+    performance = by_type[league_recaps.STORY_PERFORMANCE]
+    assert performance["primary_roster_id"] == "1"
+    assert performance["secondary_roster_id"] == ""
+
+    performance_low = by_type[league_recaps.STORY_PERFORMANCE_LOW]
+    assert performance_low["primary_roster_id"] == "4"
+
+    matchup = by_type[league_recaps.STORY_MATCHUP]
+    assert matchup["primary_roster_id"] == "1"
+    assert matchup["secondary_roster_id"] == "2"
+
+    matchup_close = by_type[league_recaps.STORY_MATCHUP_CLOSE]
+    assert matchup_close["primary_roster_id"] == "3"
+    assert matchup_close["secondary_roster_id"] == "4"
+
+    waiver = by_type[league_recaps.STORY_WAIVER]
+    assert waiver["primary_roster_id"] == "1"
+
+    activity = by_type[league_recaps.STORY_ACTIVITY]
+    assert activity["primary_roster_id"] == "1"
+
+    activity_low = by_type[league_recaps.STORY_ACTIVITY_LOW]
+    assert activity_low["primary_roster_id"] == "2"
+
+    riser = by_type[league_recaps.STORY_RISER]
+    assert riser["primary_roster_id"] == "1"
+
+    # Trade already has its own tap target (trade-detail modal) — no fake
+    # roster id manufactured for it.
+    trade = by_type[league_recaps.STORY_TRADE]
+    assert trade["primary_roster_id"] == ""
+    assert trade["secondary_roster_id"] == ""
+
+
+def test_waiver_low_story_roster_id_matches_cheapest_claim():
+    recap = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_waiver(bid=42), _waiver(bid=3, tx_id="w-cheap")],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    low = next(story for story in recap["stories"] if story["story_type"] == league_recaps.STORY_WAIVER_LOW)
+    assert low["primary_roster_id"] == "1"
+
+
 def test_league_recaps_page_header_has_single_owner():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     recaps_block = app.split('if current_page == "league_recaps":', 1)[1].split(
