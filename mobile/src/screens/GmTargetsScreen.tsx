@@ -16,6 +16,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import TierBadge from '../components/TierBadge';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -126,10 +127,9 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <AppText style={styles.disclaimer}>
-        Players you're watching — considering buying, selling, adding, or just keeping an eye on in{' '}
-        {leagueName}.
-      </AppText>
+      <ScreenInfoNote
+        text={`Players you're watching — considering buying, selling, adding, or just keeping an eye on in ${leagueName}.`}
+      />
 
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 

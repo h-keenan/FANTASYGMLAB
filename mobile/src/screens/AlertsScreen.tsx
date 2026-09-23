@@ -14,6 +14,7 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import PlayerAvatar from '../components/PlayerAvatar';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -172,10 +173,9 @@ export default function AlertsScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <AppText style={styles.disclaimer}>
-        Recent news about players on your roster in {leagueName} — injury, role, transaction, and
-        off-field signal only.
-      </AppText>
+      <ScreenInfoNote
+        text={`Recent news about players on your roster in ${leagueName} — injury, role, transaction, and off-field signal only.`}
+      />
 
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 

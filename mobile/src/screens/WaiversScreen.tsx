@@ -23,6 +23,7 @@ import GridBackground from '../components/GridBackground';
 import PremiumLock from '../components/PremiumLock';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import TierBadge from '../components/TierBadge';
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -162,11 +163,11 @@ export default function WaiversScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <AppText style={styles.disclaimer}>
-        Free agents ranked for your roster — ordered by fit for {neededPositions.length > 0
-          ? `your needs at ${neededPositions.join(', ')}`
-          : 'your team'}, not just raw value.
-      </AppText>
+      <ScreenInfoNote
+        text={`Free agents ranked for your roster — ordered by fit for ${
+          neededPositions.length > 0 ? `your needs at ${neededPositions.join(', ')}` : 'your team'
+        }, not just raw value.`}
+      />
 
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
       {error ? <AppText style={styles.error}>{error}</AppText> : null}

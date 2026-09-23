@@ -27,6 +27,7 @@ import {
   type TeamSnapshot,
 } from '../lib/api';
 import PremiumLock from '../components/PremiumLock';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import TeamAvatar from '../components/TeamAvatar';
 import TrajectoryArcs from '../components/TrajectoryArcs';
@@ -261,10 +262,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <AppText style={styles.disclaimer}>
-        The real Next Move briefing for {leagueName} — the same roster-pressure, injury, need, and
-        waiver signals the web app's Dashboard uses.
-      </AppText>
+      <ScreenInfoNote
+        text={`The real Next Move briefing for ${leagueName} — the same roster-pressure, injury, need, and waiver signals the web app's Dashboard uses.`}
+      />
       <QuickActionsGrid leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
       {!isFirstVisit && newRecommendationIds.size > 0 ? (
         <View style={styles.checkInBanner}>

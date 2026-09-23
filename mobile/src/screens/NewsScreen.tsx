@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import GridBackground from '../components/GridBackground';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type NewsItem } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -99,10 +100,7 @@ export default function NewsScreen() {
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <AppText style={styles.disclaimer}>
-        General NFL news — injury, role, transaction, and off-field signal only. Not filtered to
-        your specific rosters yet.
-      </AppText>
+      <ScreenInfoNote text="General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your specific rosters yet." />
 
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 

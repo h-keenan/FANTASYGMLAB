@@ -21,6 +21,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PlayerNameText from '../components/PlayerNameText';
 import PositionBadge from '../components/PositionBadge';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { valueDirectionLabel } from '../lib/tradeValue';
@@ -144,10 +145,9 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
     >
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <AppText style={styles.disclaimer}>
-        Raw asset value only — {leagueName}'s {'“'}Dynasty{'”'} valuations. Doesn't yet
-        weigh roster fit or strategy, unlike the full web Trade Analyzer.
-      </AppText>
+      <ScreenInfoNote
+        text={`Raw asset value only — ${leagueName}'s “Dynasty” valuations. Doesn't yet weigh roster fit or strategy, unlike the full web Trade Analyzer.`}
+      />
 
       <View style={styles.sidesRow}>
         <TradeSide
