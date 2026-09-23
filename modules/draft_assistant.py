@@ -6,7 +6,8 @@ from typing import Any, Iterable
 
 import pandas as pd
 
-from modules import sleeper
+from modules import league_format_context, sleeper
+from modules.league_value_settings import _safe_positive_int
 from modules.platforms.sleeper import get_sleeper_adapter
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_identity import ensure_identity_columns
@@ -683,6 +684,239 @@ def build_live_draft_context(
             else "Manual mode"
         ),
     }
+
+
+def _normalize_draft_status(status: Any) -> str:
+    """Narrower sibling of ``normalize_draft_status`` above.
+
+    Kept distinct (not merged into the public helper) because the rookie-draft
+    detection pipeline below is a byte-for-byte relocation from app.py, whose
+    original private ``_normalize_draft_status`` never treated "done" /
+    "finished" / "closed" as synonyms for "complete" the way the public
+    ``normalize_draft_status`` does. Real Sleeper drafts never emit those
+    values, so the difference is moot in practice, but this keeps the
+    relocation a pure move rather than a behavior change.
+    """
+    text = _safe_text(status).strip().lower().replace("-", "_").replace(" ", "_")
+    if text in {"complete", "completed"}:
+        return "complete"
+    if text in {"drafting", "in_progress", "inprogress", "started"}:
+        return "in_progress"
+    if text in {"pre_draft", "predraft", "scheduled", "setup"}:
+        return "pre_draft"
+    if text == "paused":
+        return "paused"
+    return text or "unknown"
+
+
+def _draft_round_count(draft: dict) -> int:
+    """Sibling of ``draft_round_count`` above, using the stricter
+    (>0-required) ``_safe_positive_int`` from league_value_settings that the
+    original app.py implementation used, to keep this relocation behavior
+    neutral."""
+    settings = draft.get("settings") if isinstance(draft.get("settings"), dict) else {}
+    metadata = draft.get("metadata") if isinstance(draft.get("metadata"), dict) else {}
+    return max(
+        0,
+        _safe_positive_int(
+            settings.get("rounds")
+            or settings.get("round_count")
+            or metadata.get("rounds")
+            or draft.get("rounds"),
+            0,
+        ),
+    )
+
+
+def _draft_stub_sufficient_for_candidate(draft_stub: dict | None) -> bool:
+    """True when league-drafts list metadata is enough to score a candidate.
+
+    Avoids N x get_draft network calls when Sleeper already returned rounds,
+    season, and status on the stub (#234 provider_leagues coalesce).
+    """
+
+    stub = draft_stub if isinstance(draft_stub, dict) else {}
+    if not _safe_text(stub.get("draft_id") or stub.get("id")):
+        return False
+    if _draft_round_count(stub) <= 0:
+        return False
+    status = _normalize_draft_status(stub.get("status"))
+    return status != "unknown"
+
+
+def _draft_payload_for_candidate(draft_stub: dict | None) -> dict:
+    """Use stub metadata when sufficient; otherwise fetch the full draft once."""
+
+    stub = dict(draft_stub or {}) if isinstance(draft_stub, dict) else {}
+    if _draft_stub_sufficient_for_candidate(stub):
+        return stub
+    draft_id = _safe_text(stub.get("draft_id") or stub.get("id"))
+    draft = sleeper.get_draft(draft_id) if draft_id else {}
+    merged = dict(stub)
+    merged.update(draft or {})
+    return merged
+
+
+def _detect_rookie_draft_candidate(league_id: str, league: dict) -> dict:
+    drafts = sleeper.get_league_drafts(league_id) or []
+    rookie_rounds = _safe_positive_int(
+        (league.get("settings") or {}).get("draft_rounds"),
+        4,
+    )
+    league_season = _safe_positive_int(league.get("season"), 0) or datetime.now().year
+    candidates = []
+
+    for draft_stub in drafts:
+        draft_id = _safe_text(draft_stub.get("draft_id") or draft_stub.get("id"))
+        merged = _draft_payload_for_candidate(draft_stub)
+        rounds = _draft_round_count(merged)
+        season = _safe_positive_int(merged.get("season"), league_season)
+        status = _normalize_draft_status(merged.get("status"))
+        start_time = _safe_positive_int(merged.get("start_time"), 0)
+        max_rookie_rounds = max(rookie_rounds + 2, 6)
+        if rounds <= 0 or rounds > max_rookie_rounds:
+            continue
+        score = 0
+        if rounds == rookie_rounds:
+            score += 4
+        elif rounds <= max_rookie_rounds:
+            score += 2
+        if season == league_season:
+            score += 4
+        elif season == league_season + 1:
+            score += 1
+        if status in {"pre_draft", "in_progress", "paused", "complete"}:
+            score += 1
+        candidates.append(
+            {
+                "draft_id": draft_id,
+                "draft": merged,
+                "rounds": rounds,
+                "season": season,
+                "status": status,
+                "score": score,
+                "start_time": start_time,
+            }
+        )
+
+    if not candidates:
+        return {}
+    candidates = sorted(
+        candidates,
+        key=lambda item: (
+            item.get("score", 0),
+            item.get("season", 0),
+            item.get("start_time", 0),
+            -abs(_safe_positive_int(item.get("rounds"), 0) - rookie_rounds),
+        ),
+        reverse=True,
+    )
+    best = candidates[0]
+    return best if best.get("score", 0) >= 5 else {}
+
+
+def rookie_draft_context(
+    league_id: str,
+    league_settings_items: tuple[tuple[str, object], ...] = (),
+) -> dict:
+    """Pure (non-Streamlit) rookie-draft detection for a league.
+
+    Relocated from app.py's ``_cached_rookie_draft_context_impl`` (renamed,
+    since this copy is never itself wrapped in ``st.cache_data``) so that
+    services/mobile_api_service.py can compute the same real draft_status
+    that app.py's ``cached_rookie_draft_context`` wrapper has always used for
+    the web app's Draft Center / Trade Hub, instead of guessing from league
+    type alone. app.py keeps a thin ``@st.cache_data``-wrapped
+    ``cached_rookie_draft_context`` that just calls this function.
+    """
+
+    settings = dict(league_settings_items or ())
+    redraft_league = league_format_context.competition_format(settings) == league_format_context.REDRAFT
+    default_current_year_active = not redraft_league
+    default = {
+        "league_id": league_id,
+        "draft_available": False,
+        "draft_completed": False,
+        "draft_status": "unknown",
+        "draft_year": _safe_positive_int(datetime.now().year, datetime.now().year),
+        "draft_rounds": 0,
+        "picks_made": 0,
+        "total_picks": 0,
+        "current_year_picks_active": default_current_year_active,
+        "current_year_pick_status": (
+            "Current-year picks are inactive because this is a redraft league and no active draft was detected."
+            if redraft_league
+            else "Current-year rookie picks are still active."
+        ),
+        "draft_id": "",
+        "reason": (
+            "No current draft was detected from Sleeper data. Redraft leagues do not invent current-year pick boards after the startup draft."
+            if redraft_league
+            else "No current rookie draft was detected from Sleeper data, so current-year picks stay active."
+        ),
+    }
+    if not league_id:
+        return default
+
+    league = sleeper.get_league(league_id)
+    rosters = sleeper.get_rosters(league_id) or []
+    league_settings = dict(league_settings_items or ())
+    league_size = max(_safe_positive_int(league_settings.get("league_size"), 0), len(rosters))
+    league_season = _safe_positive_int(league.get("season"), datetime.now().year) or datetime.now().year
+    candidate = _detect_rookie_draft_candidate(league_id, league)
+    draft_id = _safe_text(candidate.get("draft_id"))
+    draft = candidate.get("draft") or {}
+    draft_status = _normalize_draft_status(candidate.get("status") or draft.get("status"))
+    draft_year = _safe_positive_int(candidate.get("season") or draft.get("season"), league_season)
+    draft_rounds = _safe_positive_int(candidate.get("rounds") or _draft_round_count(draft), 0)
+    draft_picks = sleeper.get_draft_picks(draft_id) if draft_id else []
+    picks_made = len(draft_picks)
+    total_picks = max(0, draft_rounds * max(league_size, 1))
+    draft_completed = draft_status == "complete" or (total_picks > 0 and picks_made >= total_picks)
+    if draft_id:
+        current_year_picks_active = not draft_completed
+        current_year_pick_status = (
+            "Current-year rookie picks are inactive because the rookie draft is complete."
+            if draft_completed
+            else "Current-year rookie picks are still active because the rookie draft is not complete."
+        )
+        reason = (
+            "Sleeper rookie-draft data shows the current draft is complete."
+            if draft_completed
+            else "Sleeper rookie-draft data shows the current draft is still active or upcoming."
+        )
+    else:
+        current_year_picks_active = default_current_year_active
+        current_year_pick_status = default["current_year_pick_status"]
+        reason = default["reason"]
+
+    return {
+        **default,
+        "draft_available": bool(draft_id),
+        "draft_completed": bool(draft_completed),
+        "draft_status": draft_status,
+        "draft_year": draft_year,
+        "draft_rounds": draft_rounds,
+        "picks_made": picks_made,
+        "total_picks": total_picks,
+        "current_year_picks_active": bool(current_year_picks_active),
+        "current_year_pick_status": current_year_pick_status,
+        "draft_id": draft_id,
+        "reason": reason,
+    }
+
+
+def rookie_draft_status_items(draft_status: dict | None = None) -> tuple[tuple[str, object], ...]:
+    status = draft_status if isinstance(draft_status, dict) else {}
+    keys = (
+        "draft_available",
+        "draft_completed",
+        "draft_status",
+        "draft_year",
+        "current_year_picks_active",
+        "current_year_pick_status",
+    )
+    return tuple((key, status.get(key)) for key in keys)
 
 
 def build_available_player_pool(

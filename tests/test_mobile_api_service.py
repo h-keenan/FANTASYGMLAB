@@ -903,6 +903,68 @@ def test_draft_picks_degrade_confidence_for_further_out_seasons(monkeypatch):
     assert compared, "fixture produced no further-out pick to compare"
 
 
+def test_draft_picks_excludes_current_year_picks_once_the_real_draft_is_complete(monkeypatch):
+    """Regression test for coridian_'s report: after a real Sleeper rookie
+    draft finished, the mobile Draft Center still showed this year's picks
+    as available/upcoming trade assets.
+
+    Root cause: get_league_draft_picks called
+    modules.trade_ideas.list_draft_pick_assets without a draft_status, so it
+    fell back to a league-type-only guess (dynasty => current-year picks
+    always active) instead of checking whether Sleeper's own draft data says
+    the draft is done. The endpoint now computes draft_status the same way
+    app.py's cached_draft_pick_assets does, via
+    modules.draft_assistant.rookie_draft_context /
+    rookie_draft_status_items.
+    """
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_rosters, fake_users = _draft_picks_fixture_context()
+    # Explicit season (not "this year") keeps the assertion deterministic
+    # regardless of the wall-clock year the suite runs in.
+    league_with_completed_draft = {**_TRADE_ANALYZER_LEAGUE, "season": "2030"}
+    completed_rookie_draft = {
+        "draft_id": "rookie-draft-2030",
+        "status": "complete",
+        "season": "2030",
+        "settings": {"rounds": 4},
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=league_with_completed_draft):
+            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                with patch("modules.sleeper.get_users", return_value=fake_users):
+                    with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                        with patch(
+                            "modules.sleeper.get_league_drafts",
+                            return_value=[completed_rookie_draft],
+                        ):
+                            with patch("modules.sleeper.get_draft_picks", return_value=[]):
+                                with patch(
+                                    "modules.rankings.load_players", return_value=_fake_roster_frame()
+                                ):
+                                    with patch(
+                                        "modules.player_eligibility.filter_current_fantasy_players",
+                                        side_effect=lambda df, **kwargs: df,
+                                    ):
+                                        response = client.get(
+                                            "/v1/leagues/abc/draft-picks",
+                                            headers={"Authorization": "Bearer good-token"},
+                                        )
+
+    assert response.status_code == 200
+    picks = response.json()["picks"]
+    assert picks, "fixture should still produce future-season pick assets"
+    current_year_picks = [pick for pick in picks if pick["season"] == 2030]
+    assert not current_year_picks, (
+        "2030 rookie-draft picks should not be offered as trade assets once "
+        "Sleeper reports that draft as complete"
+    )
+
+
 def test_trade_analyzer_includes_a_real_pick_asset_when_pick_ids_given(monkeypatch):
     client = _client(monkeypatch)
 
