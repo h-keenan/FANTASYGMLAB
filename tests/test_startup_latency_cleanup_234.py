@@ -22,6 +22,7 @@ from scripts import verify_package_miss_path
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / "app.py").read_text(encoding="utf-8")
+DRAFT_ASSISTANT_SRC = (ROOT / "modules" / "draft_assistant.py").read_text(encoding="utf-8")
 
 
 @pytest.fixture(autouse=True)
@@ -53,12 +54,17 @@ def test_live_draft_discovery_runs_after_dashboard_game_plan():
 
 
 def test_draft_candidate_prefers_stub_metadata_without_get_draft():
-    assert "_draft_stub_sufficient_for_candidate" in APP
-    assert "_draft_payload_for_candidate" in APP
+    """_detect_rookie_draft_candidate and its stub-sufficiency helpers now
+    live in modules/draft_assistant.py (moved out of app.py so
+    services/mobile_api_service.py can compute real rookie-draft-completion
+    status without importing app.py) — app.py just aliases the names."""
+    assert "_draft_stub_sufficient_for_candidate" in DRAFT_ASSISTANT_SRC
+    assert "_draft_payload_for_candidate" in DRAFT_ASSISTANT_SRC
+    assert "_detect_rookie_draft_candidate = draft_assistant._detect_rookie_draft_candidate" in APP
     # Old per-stub get_draft loop removed from candidate helpers.
-    start = APP.index("def _detect_rookie_draft_candidate")
-    end = APP.index("\ndef ", start + 10)
-    body = APP[start:end]
+    start = DRAFT_ASSISTANT_SRC.index("def _detect_rookie_draft_candidate")
+    end = DRAFT_ASSISTANT_SRC.index("\ndef ", start + 10)
+    body = DRAFT_ASSISTANT_SRC[start:end]
     assert "get_draft(" not in body
     assert "_draft_payload_for_candidate" in body
 
