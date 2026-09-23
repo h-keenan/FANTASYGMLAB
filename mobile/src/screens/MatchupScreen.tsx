@@ -13,11 +13,9 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PositionBadge from '../components/PositionBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
-import TierBadge from '../components/TierBadge';
 import { api, type MatchupComparison, type MatchupResponse, type MatchupSide, type MatchupStarter } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -81,6 +79,35 @@ function toRankedPlayer(player: MatchupStarter) {
     rank_unavailable_reason: null,
     opportunity_label: player.opportunity_label,
   };
+}
+
+/**
+ * `why` is server-composed as `" · "`-joined clauses in a fixed order —
+ * tier, opportunity label, season-value rank-on-roster, injury note (see
+ * `_matchup_starter_why` in services/mobile_api_service.py) — so the tier
+ * and opportunity clauses can be stripped safely by position rather than by
+ * fuzzy text matching. What's left (usually just the rank clause) becomes
+ * the row's one-line supporting context; the tier/opportunity themselves
+ * already render as the row's compact label, and injury already renders as
+ * its own pill, so neither needs to repeat here.
+ */
+function deriveContextLine(player: MatchupStarter): string | null {
+  const why = (player.why ?? '').trim();
+  if (!why) return null;
+  let parts = why.split(' · ').map((part) => part.trim()).filter(Boolean);
+  if (parts.length && /\btier$/i.test(parts[0])) {
+    parts = parts.slice(1);
+  }
+  const opportunity = (player.opportunity_label ?? '').trim().toLowerCase();
+  if (parts.length && opportunity && parts[0].toLowerCase() === opportunity) {
+    parts = parts.slice(1);
+  }
+  // Injury clauses are always the last bit and always contain this em-dash
+  // separator — drop them here since the injury pill already covers it.
+  parts = parts.filter((part) => !part.includes(' — '));
+  if (parts.length === 0) return null;
+  const phrase = parts.join(' · ');
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1);
 }
 
 export default function MatchupScreen({ route, navigation }: Props) {
@@ -168,7 +195,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
             <View style={styles.versusSide}>
               <TeamAvatar
                 avatarId={mine.avatar_url}
-                size={48}
+                size={44}
                 style={StyleSheet.flatten([styles.versusAvatar, { borderColor: colors.accent }])}
               />
               <AppText style={styles.versusTeam} numberOfLines={2}>
@@ -183,8 +210,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
             <View style={styles.versusSide}>
               <TeamAvatar
                 avatarId={opponent.avatar_url}
-                size={48}
-                style={StyleSheet.flatten([styles.versusAvatar, { borderColor: colors.danger }])}
+                size={44}
+                style={StyleSheet.flatten([styles.versusAvatar, { borderColor: colors.violet }])}
               />
               <AppText style={styles.versusTeam} numberOfLines={2}>
                 {opponent.team_name}
@@ -200,13 +227,15 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
           <ValueSplitBar comparison={comparison} />
 
-          <AppText style={[styles.edgeHeadline, { color: edgeColor(colors)[comparison.edge] }]}>
-            {comparison.headline}
-            {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
-          </AppText>
-          {/* Rendered straight from the API so this line can never drift
-              into claiming more than the data behind it. */}
-          <AppText style={styles.basisLabel}>{comparison.basis_label}</AppText>
+          <View style={styles.verdictBlock}>
+            <AppText style={[styles.edgeHeadline, { color: edgeColor(colors)[comparison.edge] }]}>
+              {comparison.headline}
+              {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
+            </AppText>
+            {/* Rendered straight from the API so this line can never drift
+                into claiming more than the data behind it. */}
+            <AppText style={styles.basisLabel}>{comparison.basis_label}</AppText>
+          </View>
         </AnimatedCard>
 
         <ScreenInfoNote
@@ -254,6 +283,7 @@ function StarterSection({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeaderRow}>
+        <View style={[styles.sectionAccentBar, { backgroundColor: accent }]} />
         <AppText style={styles.sectionLabel} numberOfLines={1}>
           {title.toUpperCase()}
         </AppText>
@@ -261,51 +291,30 @@ function StarterSection({
           {Math.round(side.season_value_total).toLocaleString()} SEASON VALUE
         </AppText>
       </View>
-      {side.starters.length === 0 ? (
-        <AppText style={styles.emptySection}>No startable players on this roster right now.</AppText>
-      ) : (
-        side.starters.map((player) => (
-          <StarterRow key={`${side.roster_id}-${player.player_id}`} player={player} onPress={() => onPressPlayer(player)} />
-        ))
-      )}
+      <AnimatedCard style={styles.sectionCard}>
+        {side.starters.length === 0 ? (
+          <AppText style={styles.emptySection}>No startable players on this roster right now.</AppText>
+        ) : (
+          side.starters.map((player, index) => (
+            <PlayerIdentityRow
+              key={`${side.roster_id}-${player.player_id}`}
+              playerId={player.player_id}
+              name={player.name}
+              position={player.position}
+              team={player.team}
+              tier={player.tier}
+              slot={player.slot ?? player.position}
+              opportunityLabel={player.opportunity_label}
+              contextLine={deriveContextLine(player)}
+              injuryLabel={player.injury_label}
+              ruledOut={player.ruled_out}
+              onPress={() => onPressPlayer(player)}
+              showDivider={index < side.starters.length - 1}
+            />
+          ))
+        )}
+      </AnimatedCard>
     </View>
-  );
-}
-
-function StarterRow({ player, onPress }: { player: MatchupStarter; onPress: () => void }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <AnimatedCard style={styles.card} onPress={onPress}>
-      <View style={styles.cardTopRow}>
-        <View style={styles.slotBadge}>
-          <AppText style={styles.slotText}>{player.slot ?? player.position ?? '—'}</AppText>
-        </View>
-        <PlayerAvatar playerId={player.player_id} size={40} tier={player.tier} style={styles.avatar} />
-        <View style={styles.nameColumn}>
-          <AppText style={styles.name} numberOfLines={1}>
-            {player.name ?? 'Unknown player'}
-          </AppText>
-          <View style={styles.metaRow}>
-            <PositionBadge position={player.position} />
-            <TierBadge storedTier={player.tier} />
-            <AppText style={styles.meta} numberOfLines={1}>
-              {player.team ?? '—'}
-            </AppText>
-          </View>
-        </View>
-        {player.injury_label ? (
-          <View style={[styles.injuryPill, player.ruled_out && styles.injuryPillOut]}>
-            <AppText style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>
-              {player.injury_label}
-            </AppText>
-          </View>
-        ) : null}
-      </View>
-      <AppText style={styles.why} numberOfLines={3}>
-        {player.why}
-      </AppText>
-    </AnimatedCard>
   );
 }
 
@@ -341,24 +350,24 @@ function createStyles(colors: ThemeColors) {
   },
   splitBar: {
     flexDirection: 'row',
-    height: 6,
+    height: 8,
     borderRadius: radii.pill,
     overflow: 'hidden',
     marginTop: spacing.md,
     backgroundColor: colors.backgroundElevated,
   },
   splitFill: { height: '100%' },
-  edgeHeadline: { fontSize: 14, fontWeight: '700', marginTop: spacing.md },
+  verdictBlock: { marginTop: spacing.md },
+  edgeHeadline: { fontSize: 14, fontWeight: '700' },
   basisLabel: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
-  disclaimer: { fontSize: 12, color: colors.textTertiary, lineHeight: 17, marginBottom: spacing.md },
   section: { marginTop: spacing.md },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
+  sectionAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
   sectionLabel: {
     flex: 1,
     fontSize: 12,
@@ -368,36 +377,8 @@ function createStyles(colors: ThemeColors) {
     letterSpacing: 0.5,
   },
   sectionTotal: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
-  emptySection: { fontSize: 13, color: colors.textSecondary },
-  card: { padding: spacing.md, marginBottom: spacing.sm },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center' },
-  slotBadge: {
-    width: 40,
-    height: 26,
-    borderRadius: radii.sm,
-    backgroundColor: colors.badgeBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  slotText: { color: colors.badgeText, fontSize: 10, fontWeight: '700' },
-  avatar: { marginRight: spacing.sm },
-  nameColumn: { flex: 1, marginRight: spacing.sm },
-  name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2, flexWrap: 'wrap' },
-  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
-  injuryPill: {
-    backgroundColor: colors.dangerMuted,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  injuryText: { fontSize: 11, fontWeight: '700', color: colors.danger },
-  // A ruled-out starter is only here because nothing available could fill
-  // the slot — a solid pill so it can't read as an ordinary injury note.
-  injuryPillOut: { backgroundColor: colors.danger },
-  injuryTextOut: { color: colors.badgeText },
-  why: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: spacing.sm },
+  sectionCard: { padding: spacing.md, paddingVertical: spacing.xs },
+  emptySection: { fontSize: 13, color: colors.textSecondary, paddingVertical: spacing.sm },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
   });
