@@ -8,14 +8,14 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import BrandHeaderBar from '../components/BrandHeaderBar';
+import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PlayerNameText from '../components/PlayerNameText';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
-import PositionBadge from '../components/PositionBadge';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueHero from '../components/TradeValueHero';
@@ -322,20 +322,14 @@ export default function TradeHubScreen({ route, navigation }: Props) {
         <View>
           <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
           <View style={styles.viewModeRow}>
-            <TouchableOpacity
-              style={[styles.viewModePill, isForYou && styles.viewModePillActive]}
-              onPress={() => setViewMode('for_you')}
-            >
-              <AppText style={[styles.viewModePillText, isForYou && styles.viewModePillTextActive]}>For You</AppText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.viewModePill, !isForYou && styles.viewModePillActive]}
-              onPress={onSelectAllTrades}
-            >
-              <AppText style={[styles.viewModePillText, !isForYou && styles.viewModePillTextActive]}>
-                All Trades
-              </AppText>
-            </TouchableOpacity>
+            <SegmentedTabBar<'for_you' | 'all_trades'>
+              options={[
+                { key: 'for_you', label: 'For You' },
+                { key: 'all_trades', label: 'All Trades' },
+              ]}
+              active={viewMode}
+              onChange={(key) => (key === 'for_you' ? setViewMode('for_you') : onSelectAllTrades())}
+            />
           </View>
           <ScreenInfoNote
             text={
@@ -489,72 +483,57 @@ function TradeHubGateCard({
   );
 }
 
-function AssetRow({
-  asset,
+/**
+ * One side (You Send / You Receive) of a trade package: players render via
+ * the shared PlayerIdentityRow (no `slot` — trade assets have no lineup
+ * slot), picks via DraftPickAssetRow — never a malformed player row for a
+ * pick. Order is preserved exactly as the API returned it; only the
+ * per-asset presentation differs by `asset_type`.
+ */
+function ExchangeAssetList({
+  assets,
   onPressPlayer,
   onPressPick,
 }: {
-  asset: PresentationAsset;
-  onPressPlayer?: (asset: PresentationAsset) => void;
-  onPressPick?: (asset: PresentationAsset) => void;
+  assets: PresentationAsset[];
+  onPressPlayer: (asset: PresentationAsset) => void;
+  onPressPick: (asset: PresentationAsset) => void;
 }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  if (asset.asset_type === 'pick') {
-    const canOpenPick = Boolean(onPressPick && asset.pick_id);
-    return (
-      <TouchableOpacity
-        style={styles.assetRow}
-        disabled={!canOpenPick}
-        activeOpacity={canOpenPick ? 0.7 : 1}
-        onPress={() => onPressPick?.(asset)}
-      >
-        <View style={styles.pickDisc}>
-          <AppText style={styles.pickPlateText}>{asset.round ? `R${asset.round}` : 'PICK'}</AppText>
-        </View>
-        <View style={styles.assetTextGroup}>
-          <AppText style={styles.assetName} numberOfLines={1}>
-            {asset.label || 'Draft pick'}
-          </AppText>
-          <AppText style={styles.assetMeta} numberOfLines={1}>
-            {asset.projected_range || 'Draft pick'}
-          </AppText>
-        </View>
-        {canOpenPick ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
-      </TouchableOpacity>
-    );
-  }
-  const metaLine = [asset.team, asset.age != null ? `Age ${asset.age}` : null].filter(Boolean).join(' · ');
-  const canOpen = Boolean(onPressPlayer && asset.player_id);
   return (
-    <TouchableOpacity
-      style={styles.assetRow}
-      disabled={!canOpen}
-      activeOpacity={canOpen ? 0.7 : 1}
-      onPress={() => onPressPlayer?.(asset)}
-    >
-      <PlayerAvatar playerId={asset.player_id} size={36} tier={asset.tier} style={styles.assetAvatar} />
-      <View style={styles.assetTextGroup}>
-        <PlayerNameText name={asset.name ?? 'Unknown'} style={styles.assetName} />
-        <View style={styles.assetMetaRow}>
-          <PositionBadge position={asset.position} />
-          <AppText style={styles.assetMeta} numberOfLines={1}>
-            {metaLine}
-          </AppText>
-        </View>
-        {asset.role ? (
-          <AppText style={styles.assetRole} numberOfLines={1}>
-            {asset.role}
-          </AppText>
-        ) : null}
-        {asset.injury_status ? (
-          <AppText style={styles.assetInjury} numberOfLines={1}>
-            {asset.injury_status}
-          </AppText>
-        ) : null}
-      </View>
-      {canOpen ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
-    </TouchableOpacity>
+    <>
+      {assets.map((asset, index) => {
+        const showDivider = index < assets.length - 1;
+        if (asset.asset_type === 'pick') {
+          return (
+            <DraftPickAssetRow
+              key={`pick-${asset.pick_id ?? index}`}
+              pickId={asset.pick_id}
+              round={asset.round ? Number(asset.round) : null}
+              label={asset.label}
+              projectedRange={asset.projected_range}
+              pickTier={asset.pick_tier}
+              onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
+              showDivider={showDivider}
+            />
+          );
+        }
+        return (
+          <PlayerIdentityRow
+            key={`player-${asset.player_id ?? index}`}
+            playerId={asset.player_id}
+            name={asset.name}
+            position={asset.position}
+            team={asset.team}
+            tier={asset.tier}
+            opportunityLabel={asset.role}
+            contextLine={asset.age != null ? `Age ${asset.age}` : null}
+            injuryLabel={asset.injury_status}
+            onPress={asset.player_id ? () => onPressPlayer(asset) : undefined}
+            showDivider={showDivider}
+          />
+        );
+      })}
+    </>
   );
 }
 
@@ -659,14 +638,17 @@ function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
   ];
 
   return (
-    <View style={styles.summaryRow}>
-      {tiles.map((tile) => (
-        <View key={tile.key} style={styles.summaryTile}>
-          <Ionicons name={tile.icon} size={16} color={tile.color} />
-          <AppText style={styles.summaryValue}>{tile.value}</AppText>
-          <AppText style={styles.summaryLabel} numberOfLines={1}>{tile.label}</AppText>
-        </View>
-      ))}
+    <View style={styles.summaryBlock}>
+      <AppText style={styles.summaryKicker}>TRADE INTELLIGENCE SUMMARY</AppText>
+      <View style={styles.summaryRow}>
+        {tiles.map((tile) => (
+          <View key={tile.key} style={styles.summaryTile}>
+            <Ionicons name={tile.icon} size={14} color={tile.color} />
+            <AppText style={styles.summaryValue}>{tile.value}</AppText>
+            <AppText style={styles.summaryLabel} numberOfLines={1}>{tile.label}</AppText>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -786,6 +768,12 @@ function TradeIdeaCard({
           FOR {idea.source_team_name.toUpperCase()}
         </AppText>
       ) : null}
+      {/* Header hierarchy per the redesign brief: recommendation type (the
+          category/impact badges above) -> team name + fairness pill on one
+          line -> value-change number prominently on its own line below.
+          The fairness pill used to live next to the value number; it's a
+          secondary quality indicator (section 12), so it now rides with the
+          team identity instead of competing with the headline value. */}
       <View style={styles.partnerRow}>
         {idea.partner_team_avatar_url ? (
           <TeamAvatar avatarId={idea.partner_team_avatar_url} size={36} />
@@ -795,9 +783,18 @@ function TradeIdeaCard({
           </View>
         )}
         <View style={styles.partnerTextGroup}>
-          <AppText style={styles.partnerName} numberOfLines={1}>
-            {idea.partner_team_name}
-          </AppText>
+          <View style={styles.partnerNameRow}>
+            <AppText style={styles.partnerName} numberOfLines={1}>
+              {idea.partner_team_name}
+            </AppText>
+            {idea.value_edge_band ? (
+              <View style={[styles.fairnessPill, { borderColor: bandColor }]}>
+                <AppText style={[styles.fairnessPillText, { color: bandColor }]} numberOfLines={1}>
+                  {idea.value_edge_band}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
           {idea.partner_team_archetype_label ? (
             <AppText style={styles.partnerArchetype} numberOfLines={1}>
               {idea.partner_team_archetype_label}
@@ -827,19 +824,7 @@ function TradeIdeaCard({
         </TouchableOpacity>
       </View>
 
-      {/* Quick visual: the gain used to be a 14pt pill tucked beside the
-          partner name, with the band on its own line below. Both now share
-          one row led by the share card's big color-coded number, so a
-          scrolling feed still gives each idea one scannable headline value
-          without costing an extra row of height. */}
-      <View style={styles.valueEdgeRow}>
-        <TradeValueHero delta={idea.trade_gain} size="sm" />
-        {idea.value_edge_band ? (
-          <View style={[styles.valueEdgeChip, { borderColor: bandColor }]}>
-            <AppText style={[styles.valueEdgeText, { color: bandColor }]}>{idea.value_edge_band}</AppText>
-          </View>
-        ) : null}
-      </View>
+      <TradeValueHero delta={idea.trade_gain} size="sm" style={styles.valueHero} />
 
       <TradeSharePreviewModal
         visible={shareOpen}
@@ -858,9 +843,7 @@ function TradeIdeaCard({
             <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
             <AppText style={styles.exchangeLabel}>You Send</AppText>
           </View>
-          {idea.package.send.map((asset, index) => (
-            <AssetRow key={`send-${index}`} asset={asset} onPressPlayer={openPlayer} onPressPick={openPick} />
-          ))}
+          <ExchangeAssetList assets={idea.package.send} onPressPlayer={openPlayer} onPressPick={openPick} />
         </View>
         <View style={styles.exchangeGutter}>
           <View style={styles.swapDisc}>
@@ -872,9 +855,7 @@ function TradeIdeaCard({
             <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
             <AppText style={styles.exchangeLabel}>You Receive</AppText>
           </View>
-          {idea.package.receive.map((asset, index) => (
-            <AssetRow key={`receive-${index}`} asset={asset} onPressPlayer={openPlayer} onPressPick={openPick} />
-          ))}
+          <ExchangeAssetList assets={idea.package.receive} onPressPlayer={openPlayer} onPressPick={openPick} />
         </View>
       </View>
 
@@ -950,19 +931,7 @@ function createStyles(colors: ThemeColors) {
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 11, color: colors.textTertiary, marginBottom: spacing.md },
-  viewModeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-  viewModePill: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
-    backgroundColor: colors.surface,
-  },
-  viewModePillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
-  viewModePillText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
-  viewModePillTextActive: { color: colors.accent },
+  viewModeRow: { marginBottom: spacing.sm },
   loadMoreButton: {
     alignSelf: 'center',
     marginTop: spacing.sm,
@@ -992,18 +961,26 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 3,
   },
   impactBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  summaryRow: {
-    flexDirection: 'row',
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
-    backgroundColor: colors.surface,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    paddingVertical: spacing.sm,
+  // Deliberately quiet per the redesign brief: no border/card fill, just a
+  // hairline top rule under the kicker so it reads as ambient context above
+  // the feed rather than a competing card of its own.
+  summaryBlock: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.hairline,
   },
+  summaryKicker: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.6,
+    marginBottom: spacing.xs,
+  },
+  summaryRow: { flexDirection: 'row' },
   summaryTile: { flex: 1, alignItems: 'center', gap: 2 },
-  summaryValue: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  summaryValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
   summaryLabel: { fontSize: 10, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
   landedTargetRow: {
     flexDirection: 'row',
@@ -1033,24 +1010,19 @@ function createStyles(colors: ThemeColors) {
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  valueEdgeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  valueEdgeChip: {
+  // The value-change number now stands alone on its own row (section 5:
+  // "value-change number prominently") — the fairness pill moved up next
+  // to the team name (see `fairnessPill` below) since it's a secondary
+  // quality indicator, not part of the headline value.
+  valueHero: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  fairnessPill: {
+    flexShrink: 0,
     borderWidth: 1,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 1,
   },
-  valueEdgeText: { fontSize: 10, fontWeight: '700' },
-  pickPlateText: { fontSize: 11, fontWeight: '700', color: colors.premium },
-  assetRole: { fontSize: 11, color: colors.accent, marginTop: 1 },
-  assetInjury: { fontSize: 11, color: colors.danger, marginTop: 1 },
+  fairnessPillText: { fontSize: 10, fontWeight: '700' },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1058,6 +1030,7 @@ function createStyles(colors: ThemeColors) {
     paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
+  partnerNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   partnerAvatar: {
     width: 36,
     height: 36,
@@ -1068,7 +1041,7 @@ function createStyles(colors: ThemeColors) {
   },
   partnerInitial: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   partnerTextGroup: { flex: 1 },
-  partnerName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  partnerName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
   partnerArchetype: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
   tendencyChip: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
   tendencyChipText: { fontSize: 11, fontWeight: '600' },
@@ -1080,13 +1053,24 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  exchangeRow: { flexDirection: 'row', paddingHorizontal: spacing.md, gap: spacing.sm },
-  exchangeSide: { flex: 1, gap: spacing.xs },
-  exchangeGutter: { width: 28, alignItems: 'center', paddingTop: spacing.lg },
+  exchangeRow: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: spacing.sm },
+  // Each side is its own small tinted surface (per section 6: "the
+  // strongest visual element in the card") so PlayerIdentityRow/
+  // DraftPickAssetRow's dividers have a clear boundary to sit inside of,
+  // rather than floating on the card's bare background.
+  exchangeSide: {
+    flex: 1,
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: 2,
+  },
+  exchangeGutter: { width: 26, alignItems: 'center', justifyContent: 'center' },
   swapDisc: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: colors.backgroundElevated,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1100,26 +1084,12 @@ function createStyles(colors: ThemeColors) {
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  assetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
-  assetAvatar: {},
-  pickDisc: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.backgroundElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  assetTextGroup: { flex: 1 },
-  assetName: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  assetMeta: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
-  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   rationaleLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: colors.textPrimary,
     paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     marginBottom: 2,
   },
   rationale: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingHorizontal: spacing.md },
@@ -1161,11 +1131,14 @@ function createStyles(colors: ThemeColors) {
   },
   rationaleSheetBody: { flexGrow: 0 },
   rationaleSheetText: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  // Compact confidence/realism status strip (section 10): one shared
+  // MeterRow component for both metrics, tight vertical padding so it reads
+  // as a footer strip rather than a second content section.
   footerRow: {
     flexDirection: 'row',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs + 2,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
     gap: spacing.lg,
