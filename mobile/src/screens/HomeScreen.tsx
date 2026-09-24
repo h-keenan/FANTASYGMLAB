@@ -16,12 +16,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import EmptyState from '../components/EmptyState';
 import GlassPanel from '../components/GlassPanel';
+import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import PremiumLock from '../components/PremiumLock';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
@@ -32,7 +33,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { gradients, radii, spacing, typography, type ThemeColors } from '../theme';
+import { radii, spacing, typography, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -275,7 +276,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={gradients.hero} style={styles.heroGradient} />
+      <GridBackground />
 
       <FlatList
         data={leagues ?? []}
@@ -335,7 +336,7 @@ export default function HomeScreen({ navigation }: Props) {
 
             <View style={styles.quickActions}>
               {defaultLeague ? (
-                <TouchableOpacity
+                <AnimatedCard
                   style={styles.quickActionPrimary}
                   onPress={() =>
                     navigation.navigate('Dashboard', {
@@ -351,12 +352,12 @@ export default function HomeScreen({ navigation }: Props) {
                   <AppText style={styles.quickActionPrimaryValue} numberOfLines={1}>
                     {defaultLeague.league_name || defaultLeague.league_id}
                   </AppText>
-                </TouchableOpacity>
+                </AnimatedCard>
               ) : null}
-              <TouchableOpacity style={styles.quickActionSecondary} onPress={() => navigation.navigate('News')}>
+              <AnimatedCard style={styles.quickActionSecondary} onPress={() => navigation.navigate('News')}>
                 <IconCircle name="globe-outline" color={colors.violet} iconSize={18} style={styles.quickActionIconCircle} />
                 <AppText style={styles.quickActionSecondaryLabel}>News</AppText>
-              </TouchableOpacity>
+              </AnimatedCard>
             </View>
 
             <View style={styles.sectionHeader}>
@@ -390,31 +391,57 @@ export default function HomeScreen({ navigation }: Props) {
           </>
         }
         ListEmptyComponent={
-          <AppText style={styles.empty}>
-            {leaguesError
-              ? 'Could not check your saved leagues — pull to retry.'
-              : 'No leagues saved yet. Tap “Add league” and enter your Sleeper username to get started.'}
-          </AppText>
-        }
-        renderItem={({ item }) => (
-          <AnimatedCard
-            style={styles.leagueCard}
-            onPress={() =>
-              navigation.navigate('Dashboard', {
-                leagueId: item.league_id,
-                leagueName: item.league_name || 'League',
-              })
+          <EmptyState
+            icon={leaguesError ? 'cloud-offline-outline' : 'shield-outline'}
+            title={leaguesError ? "Couldn't load your leagues" : 'No leagues yet'}
+            subtitle={
+              leaguesError
+                ? 'Pull down to retry.'
+                : 'Add your Sleeper league to start getting GM recommendations.'
             }
-          >
-            <View style={styles.leagueRow}>
-              <AppText style={styles.leagueName} numberOfLines={1}>
-                {item.league_name || item.league_id}
-              </AppText>
-              {item.is_default ? (
-                <View style={styles.defaultBadge}>
-                  <AppText style={styles.defaultBadgeText}>Default</AppText>
+            actionLabel={!leaguesError && !atLeagueCap ? 'Add league' : undefined}
+            onPressAction={
+              !leaguesError && !atLeagueCap
+                ? () => {
+                    setAddQuery(me?.sleeper_username ?? '');
+                    setAddOpen(true);
+                  }
+                : undefined
+            }
+          />
+        }
+        renderItem={({ item, index }) => {
+          const isFirst = index === 0;
+          const isLast = index === (leagues?.length ?? 0) - 1;
+          return (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[
+                styles.leagueRow,
+                isFirst && styles.leagueRowFirst,
+                isLast && styles.leagueRowLast,
+                !isLast && styles.leagueRowDivider,
+              ]}
+              onPress={() =>
+                navigation.navigate('Dashboard', {
+                  leagueId: item.league_id,
+                  leagueName: item.league_name || 'League',
+                })
+              }
+            >
+              <IconCircle name="shield-outline" color={colors.accent} size={36} iconSize={17} style={styles.leagueIcon} />
+              <View style={styles.leagueTextGroup}>
+                <View style={styles.leagueNameRow}>
+                  <AppText style={styles.leagueName} numberOfLines={1}>
+                    {item.league_name || item.league_id}
+                  </AppText>
+                  {item.is_default ? (
+                    <View style={styles.defaultBadge}>
+                      <AppText style={styles.defaultBadgeText}>Default</AppText>
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
+              </View>
               {/* Hidden while showcase mode is on: the name shown here is a
                   stand-in, and rename prefills from it — saving would write
                   the fake name back into saved_leagues for real. */}
@@ -430,10 +457,10 @@ export default function HomeScreen({ navigation }: Props) {
                   <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
-              <AppText style={styles.chevron}>›</AppText>
-            </View>
-          </AnimatedCard>
-        )}
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          );
+        }}
       />
 
       <Modal visible={addOpen} animationType="fade" transparent onRequestClose={closeAddLeague}>
@@ -494,7 +521,7 @@ export default function HomeScreen({ navigation }: Props) {
                             .join(' · ')}
                         </AppText>
                       </View>
-                      <AppText style={styles.chevron}>›</AppText>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
                     </TouchableOpacity>
                   )}
                 />
@@ -566,9 +593,8 @@ export default function HomeScreen({ navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.lg },
+  container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  heroGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 220 },
   header: {
     marginHorizontal: spacing.lg,
     paddingHorizontal: spacing.lg,
@@ -600,27 +626,25 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.xl,
   },
+  // Left accent rail (not a full glow rim — that variant wraps itself in an
+  // outer gradient that ignores the flex ratio a fixed 2:1 row here needs)
+  // marks this as the strongest action on the screen, matching TeamsScreen's
+  // rowMine treatment: cyan reserved for "this one matters" (§14).
   quickActionPrimary: {
     flex: 2,
-    backgroundColor: colors.accentMuted,
-    borderRadius: radii.md,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.accent,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
   },
   quickActionPrimaryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   quickActionPrimaryLabel: { fontSize: 11, fontWeight: '600', color: colors.accentSoft, textTransform: 'uppercase' },
   quickActionPrimaryValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
   quickActionSecondary: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
     padding: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 2,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.cardBorder,
   },
   quickActionSecondaryLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   quickActionIconCircle: { marginBottom: 2 },
@@ -677,17 +701,36 @@ function createStyles(colors: ThemeColors) {
   listContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl * 3,
-    gap: spacing.sm,
   },
-  leagueCard: {
-    padding: spacing.lg,
-  },
+  // Continuous grouped surface with internal dividers (Magna Carta §12)
+  // instead of a separately-bordered, separately-animated card per league —
+  // every saved league is a peer row in one list, not N independent
+  // modules (matches TeamsScreen/PlayersScreen's row treatment).
   leagueRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
+    borderRightWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
   },
-  leagueName: { flex: 1, fontSize: 16, fontWeight: '500', color: colors.textPrimary, marginRight: spacing.sm },
+  leagueRowFirst: {
+    borderTopWidth: StyleSheet.hairlineWidth * 1.5,
+    borderTopLeftRadius: radii.md,
+    borderTopRightRadius: radii.md,
+  },
+  leagueRowLast: {
+    borderBottomWidth: StyleSheet.hairlineWidth * 1.5,
+    borderBottomLeftRadius: radii.md,
+    borderBottomRightRadius: radii.md,
+  },
+  leagueRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  leagueIcon: { marginRight: spacing.sm },
+  leagueTextGroup: { flex: 1, marginRight: spacing.sm },
+  leagueNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  leagueName: { flexShrink: 1, fontSize: 16, fontWeight: '500', color: colors.textPrimary },
   defaultBadge: {
     backgroundColor: colors.accent,
     paddingHorizontal: spacing.sm,
@@ -695,8 +738,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
   },
   defaultBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  renameButton: { marginLeft: spacing.sm, padding: 2 },
-  chevron: { fontSize: 20, color: colors.textTertiary, marginLeft: spacing.xs },
+  renameButton: { marginLeft: spacing.sm, marginRight: spacing.sm, padding: 2 },
   renameBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -739,12 +781,6 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
   },
   renameSaveText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  empty: {
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.md,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
   error: {
     color: colors.danger,
     paddingHorizontal: spacing.xl,
