@@ -11,6 +11,10 @@ WAIVERS_PRESENTATION_CSS = """
 }
 
 .free-agent-card.dg-ui-card {
+    /* Every card reserves the same border-inline-start box (width/style) so
+       toggling the standout color below never changes a card's dimensions —
+       only .dg-card-primary gets a visible color, via border-inline-start-color. */
+    border-inline-start: var(--border-width-semantic) solid transparent;
     border-radius: var(--radius-none) !important;
     clip-path: none !important;
     margin: 0 !important;
@@ -279,10 +283,12 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
 }
 
 /* Reserve the accent edge for genuine standouts (top-need or injury-fit picks).
-   Secondary/reference cards fall back to the shared dg-card-secondary /
-   dg-card-reference border-color so priority and depth adds read differently. */
+   Only the color changes here (width/style are already set above, identically,
+   for every card) so this never shifts layout — secondary/reference cards fall
+   back to the shared dg-card-secondary/dg-card-reference border-color so
+   priority and depth adds read differently without any dimension change. */
 .free-agent-card.dg-ui-card.dg-card-primary {
-    border-inline-start: var(--border-width-semantic) solid var(--color-opportunity);
+    border-inline-start-color: var(--color-opportunity);
 }
 
 .free-agent-summary-grid {
