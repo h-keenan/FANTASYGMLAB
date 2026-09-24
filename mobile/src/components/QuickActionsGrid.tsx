@@ -48,7 +48,7 @@ export default function QuickActionsGrid({
           style={StyleSheet.flatten([styles.cell, { borderColor: `${action.color}55` }])}
           onPress={action.onPress}
         >
-          <IconCircle name={action.icon} color={action.color} size={44} />
+          <IconCircle name={action.icon} color={action.color} size={34} />
           <AppText style={styles.label} numberOfLines={1}>
             {action.label}
           </AppText>
@@ -65,17 +65,19 @@ function createStyles(colors: ThemeColors) {
       flexWrap: 'wrap',
       gap: spacing.sm,
     },
-    // 2-per-row — larger touch targets and a bigger IconCircle since these
-    // are primary navigation entry points, not a footnote row.
+    // 2-per-row — still a comfortable tap target (the whole card is
+    // tappable), but compact: coridian_ flagged the original lg-padded,
+    // 44pt-icon version as "way too big" for a 4-tile row (screenshot,
+    // 2026-09-23).
     cell: {
       flexBasis: '47%',
       flexGrow: 1,
       alignItems: 'center',
-      paddingVertical: spacing.lg,
+      paddingVertical: spacing.sm + 2,
       paddingHorizontal: spacing.sm,
-      gap: spacing.sm,
+      gap: spacing.xs,
       borderWidth: 1,
     },
-    label: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    label: { fontSize: 12, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   });
 }

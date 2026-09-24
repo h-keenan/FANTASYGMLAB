@@ -3,15 +3,19 @@ import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 
 import { useThemeMode } from '../context/ThemeModeContext';
+import { percentileColor } from '../lib/percentile';
 import { radii, spacing } from '../theme';
 
 /**
  * Small "94 OVR" pill — the 0-99 headline rating (see
  * modules.player_quick_view._overall_rating_from_percentile) shown as a
  * secondary badge next to a row's primary raw value_score, never in place
- * of it. Same tinted-chip visual language as PositionBadge/TierBadge, but
- * intentionally neutral/quiet: this is a supporting number, not the row's
- * headline value.
+ * of it. Tinted by the rating itself via the shared red->gold->green
+ * percentile ramp (OVR is already a 0-99 scale, so it's fed straight into
+ * `percentileColor` — same function Player Detail's OVR ring uses) instead
+ * of one flat neutral gray: coridian_ flagged the gray pills as looking
+ * bad and asked for low-OVR-redder/high-OVR-greener (screenshot,
+ * 2026-09-23).
  *
  * Renders nothing for `null`/`undefined` — the same "too thin a pool to
  * rank against" contract every overall_rating field already carries, so a
@@ -26,15 +30,16 @@ export default function OverallRatingBadge({
 }) {
   const { colors } = useThemeMode();
   if (rating === null || rating === undefined || !Number.isFinite(rating)) return null;
+  const tint = percentileColor(rating, colors);
   return (
     <View
       style={[
         styles.badge,
         size === 'md' && styles.badgeMd,
-        { backgroundColor: `${colors.textSecondary}1f`, borderColor: `${colors.textSecondary}59` },
+        { backgroundColor: `${tint}26`, borderColor: `${tint}70` },
       ]}
     >
-      <AppText style={[styles.text, size === 'md' && styles.textMd, { color: colors.textSecondary }]} numberOfLines={1}>
+      <AppText style={[styles.text, size === 'md' && styles.textMd, { color: tint }]} numberOfLines={1}>
         {Math.round(rating)} OVR
       </AppText>
     </View>
