@@ -1385,6 +1385,22 @@ def render_my_team_workspace(
             unsafe_allow_html=True,
         )
 
+    # Real Sleeper roster-slot placement (already computed for the roster-
+    # limit math above), reused here to tag Key Backups cards distinctly —
+    # not a second resolution of IR/taxi membership, and not the injury-
+    # status system (a card can be tagged "IR" here while its injury pill
+    # says perfectly healthy, or vice versa; see PLAYER_CARD_CONTEXT_TAGS).
+    _key_backup_reserve_ids = {str(pid) for pid in (my_roster_limit.get("reserve_ids") or [])}
+    _key_backup_taxi_ids = {str(pid) for pid in (my_roster_limit.get("taxi_ids") or [])}
+
+    def _key_backup_tags(row) -> list[str]:
+        player_id = str(row.get("player_id") or "")
+        if player_id in _key_backup_reserve_ids:
+            return ["IR"]
+        if player_id in _key_backup_taxi_ids:
+            return ["Taxi"]
+        return ["Bench"] if _safe_text(row.get("role")) == "Bench" else []
+
     _canonical_header("Depth")
     if key_backups_df.empty:
         _render_empty_roster_section(
@@ -1400,7 +1416,7 @@ def render_my_team_workspace(
                 note="First bench players who become meaningful if injuries or lineup changes hit.",
                 max_items=min(len(key_backups_df), 6),
                 status_label="Hold",
-                extra_tags_fn=lambda row: ["Bench"] if _safe_text(row.get("role")) == "Bench" else [],
+                extra_tags_fn=_key_backup_tags,
                 note_fn=lambda row: canonical_player_ranking.format_compact_rank(
                     row.get("canonical_overall_rank", row.get("overall_rank")),
                     row.get("canonical_position_rank", row.get("position_rank")),

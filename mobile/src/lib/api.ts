@@ -255,6 +255,16 @@ export interface LineupPlayer {
   score: number | null;
   slot: string | null;
   suggested_starter: boolean;
+  /**
+   * Where this player actually sits in Sleeper — 'ir' or 'taxi' when the
+   * manager placed them in that slot, else 'starter'/'bench' from the same
+   * suggested-lineup split as `suggested_starter`. A DIFFERENT concept from
+   * `injury_label`: a player can be `injury_label: 'Out'` while sitting in
+   * a plain bench slot, or genuinely IR-placed while healthy-labeled.
+   * Optional only for older cached responses; treat missing as 'bench' for
+   * a non-starter.
+   */
+  roster_slot?: 'starter' | 'bench' | 'ir' | 'taxi';
   opportunity_label: string | null;
   /** 0-99 "OVR" badge — percentiled against the full league-eligible pool
    * at this position (not just this roster), same curve/gate as

@@ -111,6 +111,14 @@ PLAYER_CARD_CONTEXT_TAGS = {
     "healthy": ("Healthy", "success"),
     "contender": ("Contender", "premium"),
     "rebuild": ("Rebuild", "warning"),
+    # Real Sleeper roster-SLOT placement (where the manager parked them),
+    # not an injury-status tag — a player can be tagged "IR" here while
+    # `injury_level`/`is_injury_status` above says he's perfectly healthy,
+    # or vice versa. Used by my_team_ui's Key Backups cards so a genuine
+    # IR/taxi placement reads distinctly from an ordinary scratched bench
+    # player instead of collapsing into one "Bench" tag.
+    "ir": ("IR", "risk"),
+    "taxi": ("Taxi", "hold"),
 }
 
 PLAYER_PRESTIGE_LEVELS = (
