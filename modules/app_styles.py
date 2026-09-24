@@ -1388,6 +1388,31 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .analysis-list li + li {
     margin-top: 0.28rem;
 }
+/* Grouped analysis cards: one bordered surface with hairline row dividers
+   instead of N identically-bordered cards stacked back to back (the
+   "card -> card -> card" anti-pattern). Matches the grouped-list treatment
+   already used by GM Targets/My Team and mobile's DraftCenterScreen
+   DraftInsightBlock grouping. */
+.analysis-group {
+    background: var(--surface-1, rgba(16, 25, 44, 0.94));
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: var(--radius-panel);
+    display: block;
+    margin: 0.65rem 0 1rem;
+    overflow: hidden;
+    padding: 0 0.9rem;
+}
+.analysis-group .analysis-card.analysis-group-item {
+    background: none;
+    border: 0;
+    border-block-end: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0.85rem 0;
+}
+.analysis-group .analysis-card.analysis-group-item.analysis-group-item-last {
+    border-block-end: 0;
+}
 .decision-panel-body {
     display: grid;
     gap: 0.54rem;

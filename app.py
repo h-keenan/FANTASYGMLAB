@@ -21017,7 +21017,8 @@ def main():
                                     note="This layer turns raw capital into action context: who should be buying picks, selling picks, or changing direction.",
                                 )
                                 render_analysis_cards(
-                                    build_draft_decision_cards(draft_workspace)
+                                    build_draft_decision_cards(draft_workspace),
+                                    layout="grouped",
                                 )
                                 render_section_header(
                                     "Draft Partner Discovery",
@@ -21025,7 +21026,8 @@ def main():
                                     note="Use these team types to decide who is most likely to move picks, veterans, or future insulation before you open Trade Hub.",
                                 )
                                 render_analysis_cards(
-                                    build_draft_partner_cards(draft_workspace)
+                                    build_draft_partner_cards(draft_workspace),
+                                    layout="grouped",
                                 )
                                 render_section_header(
                                     "Draft Capital Board",
