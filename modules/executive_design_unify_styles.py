@@ -47,7 +47,7 @@ EXECUTIVE_DESIGN_UNIFY_CSS = (
     "margin:var(--space-md) 0 var(--space-sm)!important;padding:0 0 var(--space-sm)!important}"
     ".dg-ui-section-header--primary{border-bottom-color:var(--color-border-strong)!important;margin-top:0!important}"
     ".dg-ui-section-header--support{border-bottom:0!important;margin-top:var(--space-xl)!important}"
-    ".home-command-card,.summary-tile,.dg-ui-card,.trade-summary-card{"
+    ".home-command-card,.summary-tile,.dg-ui-card,.trade-summary-card,.launch-league-card{"
     "background:var(--color-surface-primary)!important;"
     "border:var(--border-width-default) solid var(--color-border)!important;"
     "box-shadow:var(--shadow-none)!important}"

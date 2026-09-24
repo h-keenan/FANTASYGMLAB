@@ -638,14 +638,18 @@ main h4 {
     text-transform: uppercase;
 }
 .account-confirm-card {
-    background: rgba(22, 163, 74, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.28);
+    /* Pending-confirmation state ("you are not signed in yet") — not a
+       success state, so it borrows the same information/accent treatment as
+       .launch-section-intro rather than success green (Magna Carta semantic
+       color discipline: green is reserved for completed/positive outcomes). */
+    background: var(--color-information-soft, rgba(103, 232, 249, 0.12));
+    border: 1px solid color-mix(in srgb, var(--color-accent-strong) 26%, transparent);
     border-radius: var(--radius-panel);
     margin: 0.64rem 0 0.82rem;
     padding: 0.8rem 0.9rem;
 }
 .account-confirm-title {
-    color: #dcfce7;
+    color: var(--color-text-primary, #f8fafc);
     font-size: 0.98rem;
     font-weight: 850;
     margin-bottom: 0.22rem;
@@ -656,7 +660,7 @@ main h4 {
     line-height: 1.42;
 }
 .account-confirm-status {
-    color: rgba(187, 247, 208, 0.95);
+    color: var(--color-accent, #67e8f9);
     font-size: 0.78rem;
     line-height: 1.35;
     margin-top: 0.45rem;
@@ -711,14 +715,14 @@ main h4 {
     text-transform: uppercase;
 }
 .launch-league-card {
-    background:
-        radial-gradient(circle at top left, color-mix(in srgb, var(--color-accent-strong) 10%, transparent), transparent 34%),
-        linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.96));
-    border: 1px solid rgba(148, 163, 184, 0.12);
+    /* Flat card family (same background/border/shadow language as
+       .dg-ui-card/.home-command-card/.summary-tile) rather than a one-off
+       gradient + heavy shadow — a picker list of same-category leagues reads
+       as one consistent set of rows, not N differently-decorated cards. */
+    background: var(--surface-1);
+    border: var(--border-width-default) solid var(--border-standard);
     border-radius: var(--radius-panel);
-    box-shadow:
-        0 16px 32px rgba(2, 6, 23, 0.18),
-        inset 0 1px 0 rgba(248, 250, 252, 0.03);
+    box-shadow: var(--shadow-none);
     padding: 0.84rem 0.88rem;
     position: relative;
 }
@@ -6656,7 +6660,10 @@ div[class*="st-key-premium_choose_"] button {
 }
 .launch-connect-sleeper {
     background: var(--color-surface-primary);
-    border: 1px solid var(--color-border-subtle);
+    /* Was --color-border-subtle, an undefined token — the invalid var() made
+       this border shorthand a no-op, so only the accent left-rule ever
+       rendered. --border-subtle is the real design-token alias. */
+    border: 1px solid var(--border-subtle);
     border-left: 3px solid var(--color-accent);
     border-radius: var(--radius-none);
     margin: var(--space-sm) 0;
