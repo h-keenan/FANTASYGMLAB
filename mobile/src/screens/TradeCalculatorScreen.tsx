@@ -18,9 +18,7 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PlayerNameText from '../components/PlayerNameText';
-import PositionBadge from '../components/PositionBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -152,6 +150,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       <View style={styles.sidesRow}>
         <TradeSide
           label="You Send"
+          dotColor={colors.danger}
           players={sideA}
           total={totalA}
           active={activeSide === 'A'}
@@ -160,6 +159,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
         />
         <TradeSide
           label="You Receive"
+          dotColor={colors.successBright}
           players={sideB}
           total={totalB}
           active={activeSide === 'B'}
@@ -207,20 +207,17 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
         keyExtractor={(item) => item.player_id}
         contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance }]}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.resultRow} onPress={() => addToActiveSide(item)}>
-            <PlayerAvatar playerId={item.player_id} size={36} tier={item.tier} style={styles.resultAvatar} />
-            <View style={styles.resultInfo}>
-              <AppText style={styles.resultName} numberOfLines={1}>
-                {item.name ?? 'Unknown'}
-              </AppText>
-              <View style={styles.resultMetaRow}>
-                <PositionBadge position={item.position} />
-                <AppText style={styles.resultMeta}>{item.team}</AppText>
-              </View>
-            </View>
-            <AppText style={styles.resultScore}>{Math.round(playerScore(item))}</AppText>
-          </TouchableOpacity>
+        renderItem={({ item, index }) => (
+          <PlayerIdentityRow
+            playerId={item.player_id}
+            name={item.name}
+            position={item.position}
+            team={item.team}
+            tier={item.tier}
+            trailingValue={String(Math.round(playerScore(item)))}
+            onPress={() => addToActiveSide(item)}
+            showDivider={index < searchResults.length - 1}
+          />
         )}
         ListEmptyComponent={
           <AppText style={styles.empty}>
@@ -243,14 +240,26 @@ function ValueSplitBar({ totalA, totalB }: { totalA: number; totalB: number }) {
   const shareA = total > 0 ? Math.max(0.05, Math.min(0.95, totalA / total)) : 0.5;
   return (
     <View style={styles.splitBar}>
+      {/* Send/receive keep the app's one fixed semantic pairing (§3) — red
+          for what you give up, green for what you get — matching the dot
+          colors on the two side cards below and Trade Hub/Finder's exchange
+          rows, instead of a screen-local red/cyan pairing. */}
       <View style={[styles.splitFill, { flex: shareA, backgroundColor: colors.danger }]} />
-      <View style={[styles.splitFill, { flex: 1 - shareA, backgroundColor: colors.accent }]} />
+      <View style={[styles.splitFill, { flex: 1 - shareA, backgroundColor: colors.successBright }]} />
     </View>
   );
 }
 
+/**
+ * One side (You Send / You Receive) of the comparison being built — same
+ * Send/Receive card language as Trade Analyzer/Trade Hub/Trade Finder
+ * (§30): a colored dot + label header, and each selected player as a
+ * PlayerIdentityRow (tap to remove) inside a grouped surface, instead of a
+ * screen-local chip style.
+ */
 function TradeSide({
   label,
+  dotColor,
   players,
   total,
   active,
@@ -258,6 +267,7 @@ function TradeSide({
   onRemove,
 }: {
   label: string;
+  dotColor: string;
   players: RankedPlayer[];
   total: number;
   active: boolean;
@@ -268,20 +278,33 @@ function TradeSide({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.side, active && styles.sideActive]}>
-      <TouchableOpacity onPress={onPressHeader}>
-        <AppText style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</AppText>
+      <TouchableOpacity style={styles.sideHeader} onPress={onPressHeader} activeOpacity={0.7}>
+        <View style={styles.sideLabelRow}>
+          <View style={[styles.sideDot, { backgroundColor: dotColor }]} />
+          <AppText style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</AppText>
+        </View>
         <AppText style={styles.sideTotal}>{Math.round(total)}</AppText>
       </TouchableOpacity>
-      {players.map((player) => (
-        <TouchableOpacity
-          key={player.player_id}
-          style={styles.chip}
-          onPress={() => onRemove(player.player_id)}
-        >
-          <PlayerNameText name={player.name ?? 'Unknown'} style={styles.chipText} />
-          <AppText style={styles.chipRemove}>{'×'}</AppText>
+      {players.length > 0 ? (
+        <View style={styles.sideAssetSurface}>
+          {players.map((player, index) => (
+            <PlayerIdentityRow
+              key={player.player_id}
+              playerId={player.player_id}
+              name={player.name}
+              position={player.position}
+              team={player.team}
+              tier={player.tier}
+              onPress={() => onRemove(player.player_id)}
+              showDivider={index < players.length - 1}
+            />
+          ))}
+        </View>
+      ) : (
+        <TouchableOpacity onPress={onPressHeader} activeOpacity={0.7}>
+          <AppText style={styles.sideEmpty}>Tap to add</AppText>
         </TouchableOpacity>
-      ))}
+      )}
     </View>
   );
 }
@@ -304,31 +327,35 @@ function createStyles(colors: ThemeColors) {
     lineHeight: 16,
   },
   sidesRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  // Same drop-target treatment as Trade Analyzer's side panel: a visible
+  // 2pt edge even when inactive (a `surface` fill alone reads too close to
+  // `background`), cyan only once this side is the active add target.
   side: {
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radii.md,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: colors.cardBorder,
     padding: spacing.md,
     minHeight: 96,
   },
   sideActive: { borderColor: colors.accent },
+  sideHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  sideLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sideDot: { width: 7, height: 7, borderRadius: 3.5 },
   sideLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
   sideLabelActive: { color: colors.accent },
-  sideTotal: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.background,
-    borderRadius: radii.sm,
+  sideTotal: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
+  sideEmpty: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' },
+  // Nested inside `side` (a `surface` panel): step *up* the ramp rather than
+  // down, so the asset group reads as a raised token instead of a hole
+  // punched in the panel at near-identical luminance — same treatment Trade
+  // Analyzer/Trade Hub/Trade Finder give their own exchange-side surfaces.
+  sideAssetSurface: {
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.md,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    marginBottom: spacing.xs,
   },
-  chipText: { flex: 1, fontSize: 13, color: colors.textPrimary, marginRight: spacing.xs },
-  chipRemove: { fontSize: 14, color: colors.textSecondary, fontWeight: '700' },
   deltaLabel: {
     textAlign: 'center',
     fontSize: 14,
@@ -369,20 +396,6 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
   },
   resultsList: { paddingBottom: spacing.xl },
-  resultRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  resultAvatar: { marginRight: spacing.sm },
-  resultInfo: { flex: 1, marginRight: spacing.sm },
-  resultName: { fontSize: 15, fontWeight: '500', color: colors.textPrimary },
-  resultMeta: { fontSize: 12, color: colors.textSecondary },
-  resultMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-  resultScore: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center' },
   });

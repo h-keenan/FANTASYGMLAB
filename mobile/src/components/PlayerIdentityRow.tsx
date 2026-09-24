@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
@@ -47,10 +47,23 @@ export interface PlayerIdentityRowProps {
    * screen-local color helper — kept optional so Matchup/Trade Hub/etc.
    * are unaffected. */
   injuryTone?: 'risk' | 'watch';
+  /** Optional bold value shown at the trailing edge, e.g. a value score
+   * ("82") — same trailing-block contract as DraftPickAssetRow's
+   * `trailingValue`, so a player row and a pick row can sit in the same
+   * search/browse list with matching right-aligned emphasis. Omit for
+   * contexts that already show value elsewhere (e.g. Trade Hub's exchange
+   * rows, where value lives in the trade's own hero). */
+  trailingValue?: string | null;
+  /** One short line under `trailingValue`, e.g. "82% conf". Ignored when
+   * `trailingValue` is absent. */
+  trailingCaption?: string | null;
   onPress?: () => void;
   /** Renders a hairline divider under the row — set false on the last row
    * of a group so the group's own bottom edge stays clean. */
   showDivider?: boolean;
+  /** Optional style override for the row container — e.g. to give it `flex:
+   * 1` when it shares a horizontal row with a sibling action button. */
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -79,8 +92,11 @@ export default function PlayerIdentityRow({
   injuryLabel,
   ruledOut,
   injuryTone = 'risk',
+  trailingValue,
+  trailingCaption,
   onPress,
   showDivider = false,
+  style,
 }: PlayerIdentityRowProps) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -95,7 +111,7 @@ export default function PlayerIdentityRow({
 
   return (
     <TouchableOpacity
-      style={[styles.row, showDivider && styles.divider]}
+      style={[styles.row, showDivider && styles.divider, style]}
       onPress={onPress}
       activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress}
@@ -141,6 +157,18 @@ export default function PlayerIdentityRow({
           </AppText>
         ) : null}
       </View>
+      {trailingValue ? (
+        <View style={styles.trailingBlock}>
+          <AppText style={styles.trailingValue} numberOfLines={1}>
+            {trailingValue}
+          </AppText>
+          {trailingCaption ? (
+            <AppText style={styles.trailingCaption} numberOfLines={1}>
+              {trailingCaption}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -178,5 +206,8 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 2,
     },
     injuryText: { fontSize: 10, fontWeight: '700' },
+    trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
+    trailingValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    trailingCaption: { fontSize: 10, color: colors.textTertiary, marginTop: 1 },
   });
 }

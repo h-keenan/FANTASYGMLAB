@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -43,6 +43,11 @@ export interface DraftPickAssetRowProps {
   /** Renders a hairline divider under the row — set false on the last row
    * of a group so the group's own bottom edge stays clean. */
   showDivider?: boolean;
+  /** Optional style override for the row container — e.g. to give it `flex:
+   * 1` when it shares a horizontal row with a sibling action button (see
+   * Trade Analyzer's pick search results, which pair this row with a
+   * separate "view pick detail" affordance). */
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -76,6 +81,7 @@ export default function DraftPickAssetRow({
   showChevron = false,
   onPress,
   showDivider = false,
+  style,
 }: DraftPickAssetRowProps) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -83,7 +89,7 @@ export default function DraftPickAssetRow({
 
   return (
     <TouchableOpacity
-      style={[styles.row, showDivider && styles.divider]}
+      style={[styles.row, showDivider && styles.divider, style]}
       onPress={onPress}
       activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress}
