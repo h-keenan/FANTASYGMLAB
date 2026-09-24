@@ -1,21 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
-import AnimatedCard from '../components/AnimatedCard';
+import AnalyticsSection from '../components/AnalyticsSection';
 import BrandedSpinner from '../components/BrandedSpinner';
+import CircularProgressRing from '../components/CircularProgressRing';
+import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
 import { api, type QuickViewModel, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
+import { percentileColor } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -38,26 +41,18 @@ interface CompareRow {
   a: number | null;
   b: number | null;
   format?: (value: number) => string;
-  // Small secondary "OVR" pill shown next to the Value Score row's raw
-  // numbers — same 0-99 rating as the "Overall" row above, just surfaced
-  // right next to the raw score too, per the list-screen badge audit. Not
-  // a replacement for the dedicated Overall row: that row is the detailed
-  // head-to-head comparison, this is the at-a-glance badge every other
-  // list screen's value score now carries.
-  overallA?: number | null;
-  overallB?: number | null;
 }
 
-function buildRows(a: CompareSide, b: CompareSide): CompareRow[] {
+// Value Score / Position Rank / Age — the same "how do these two rank"
+// context PlayerSnapshotCard leads with on Player Detail, just doubled for
+// a head-to-head read instead of one player's own snapshot.
+function buildValueRows(a: CompareSide, b: CompareSide): CompareRow[] {
   return [
-    { label: 'Overall', a: a.overallRating, b: b.overallRating },
     {
       label: 'Value Score',
       a: a.player.score,
       b: b.player.score,
       format: (v) => Math.round(v).toLocaleString(),
-      overallA: a.overallRating,
-      overallB: b.overallRating,
     },
     {
       label: 'Position Rank',
@@ -67,6 +62,14 @@ function buildRows(a: CompareSide, b: CompareSide): CompareRow[] {
       format: (v) => `#${v}`,
     },
     { label: 'Age', a: a.player.age, b: b.player.age },
+  ];
+}
+
+// Same four composite subscores PlayerDetailScreen's ModelSection already
+// renders (market/opportunity/scarcity/role) — never recomputed here, just
+// placed head-to-head instead of alongside one player's own breakdown.
+function buildModelRows(a: CompareSide, b: CompareSide): CompareRow[] {
+  return [
     { label: 'Market', a: a.model?.market_score ?? null, b: b.model?.market_score ?? null, format: (v) => Math.round(v).toString() },
     {
       label: 'Opportunity',
@@ -86,7 +89,7 @@ function buildRows(a: CompareSide, b: CompareSide): CompareRow[] {
 
 const LOWER_IS_BETTER = new Set(['Position Rank']);
 
-function CompareRowView({ row }: { row: CompareRow }) {
+function CompareRowView({ row, isLast }: { row: CompareRow; isLast: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const lowerIsBetter = LOWER_IS_BETTER.has(row.label);
@@ -95,36 +98,55 @@ function CompareRowView({ row }: { row: CompareRow }) {
   const bWins = hasBoth && row.a !== row.b && (lowerIsBetter ? row.b! < row.a! : row.b! > row.a!);
   const display = (value: number | null) => (value === null ? '—' : row.format ? row.format(value) : String(value));
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, !isLast && styles.rowDivider]}>
       <View style={styles.rowValueColumn}>
-        <AppText style={[styles.rowValue, aWins && styles.rowValueWin]}>{display(row.a)}</AppText>
-        {row.overallA !== undefined ? <OverallRatingBadge rating={row.overallA} /> : null}
+        <View style={[styles.rowValuePill, aWins && styles.rowValuePillWin]}>
+          <AppText style={[styles.rowValue, aWins && styles.rowValueWin]}>{display(row.a)}</AppText>
+        </View>
       </View>
       <AppText style={styles.rowLabel} numberOfLines={1}>
         {row.label}
       </AppText>
       <View style={styles.rowValueColumn}>
-        <AppText style={[styles.rowValue, bWins && styles.rowValueWin]}>{display(row.b)}</AppText>
-        {row.overallB !== undefined ? <OverallRatingBadge rating={row.overallB} /> : null}
+        <View style={[styles.rowValuePill, bWins && styles.rowValuePillWin]}>
+          <AppText style={[styles.rowValue, bWins && styles.rowValueWin]}>{display(row.b)}</AppText>
+        </View>
       </View>
     </View>
   );
 }
 
-function IdentityHeader({ side, align }: { side: RankedPlayer; align: 'left' | 'right' }) {
+// Compact identity header for one side of the head-to-head — same portrait +
+// "N OVR" ring language PlayerHero uses on Player Detail (§22-23), just sized
+// down to sit two-up on one screen instead of PlayerHero's full-width layout.
+// Reuses CircularProgressRing/percentileColor directly rather than inventing
+// a second ring style for this screen.
+function IdentityHeader({ side }: { side: CompareSide }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const rating = side.overallRating;
   return (
-    <View style={[styles.identity, align === 'right' && styles.identityRight]}>
-      <PlayerAvatar playerId={side.player_id} size={56} tier={side.tier} />
+    <View style={styles.identity}>
+      <PlayerAvatar playerId={side.player.player_id} size={56} tier={side.player.tier} />
+      {rating !== null ? (
+        <CircularProgressRing
+          percent={rating}
+          size={44}
+          strokeWidth={5}
+          valueLabel={String(rating)}
+          valueFontScale={0.34}
+          color={percentileColor(rating, colors)}
+          label="OVR"
+        />
+      ) : null}
       <AppText style={styles.identityName} numberOfLines={2}>
-        {side.name ?? 'Unknown'}
+        {side.player.name ?? 'Unknown'}
       </AppText>
       <View style={styles.identityMetaRow}>
-        <PositionBadge position={side.position} />
-        {side.team ? (
+        <PositionBadge position={side.player.position} />
+        {side.player.team ? (
           <AppText style={styles.identityMeta} numberOfLines={1}>
-            {side.team}
+            {side.player.team}
           </AppText>
         ) : null}
       </View>
@@ -210,46 +232,58 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
         <GridBackground />
-        <View style={styles.pickerHeader}>
-          <PlayerAvatar playerId={player.player_id} size={40} tier={player.tier} />
-          <AppText style={styles.pickerHeaderText}>Compare {player.name ?? 'this player'} against —</AppText>
+        <View style={styles.discoveryCard}>
+          <PlayerIdentityRow
+            playerId={player.player_id}
+            name={player.name}
+            position={player.position}
+            team={player.team}
+            tier={player.tier}
+            contextLine="Choose an opponent below"
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for a player to compare"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            placeholderTextColor={colors.textTertiary}
+          />
         </View>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search for a player to compare"
-          value={search}
-          onChangeText={setSearch}
-          autoCapitalize="none"
-          placeholderTextColor={colors.textTertiary}
-        />
         {candidates === null ? (
           <BrandedSpinner style={styles.center} />
         ) : (
-          <FlatList
-            data={filteredCandidates}
-            keyExtractor={(item) => item.player_id}
-            contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-            ListEmptyComponent={<AppText style={styles.empty}>No players match.</AppText>}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.candidateRow} onPress={() => setPlayerB(item)}>
-                <PlayerAvatar playerId={item.player_id} size={36} tier={item.tier} style={styles.candidateAvatar} />
-                <View style={styles.candidateTextGroup}>
-                  <AppText style={styles.candidateName} numberOfLines={1}>
-                    {item.name ?? 'Unknown'}
-                  </AppText>
-                  <View style={styles.candidateMetaRow}>
-                    <PositionBadge position={item.position} />
-                    <AppText style={styles.candidateMeta}>{item.team}</AppText>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-              </TouchableOpacity>
-            )}
-          />
+          <View style={styles.candidateListCard}>
+            <FlatList
+              data={filteredCandidates}
+              keyExtractor={(item) => item.player_id}
+              contentContainerStyle={{ paddingBottom: orbClearance }}
+              ListEmptyComponent={
+                <EmptyState icon="search-outline" title="No players match" subtitle="Try a different search term." />
+              }
+              renderItem={({ item, index }) => (
+                <PlayerIdentityRow
+                  playerId={item.player_id}
+                  name={item.name}
+                  position={item.position}
+                  team={item.team}
+                  tier={item.tier}
+                  trailingValue={item.score != null ? String(Math.round(item.score)) : null}
+                  onPress={() => setPlayerB(item)}
+                  showDivider={index !== filteredCandidates.length - 1}
+                  style={styles.candidateRow}
+                />
+              )}
+            />
+          </View>
         )}
       </View>
     );
   }
+
+  const valueRows = sides ? buildValueRows(sides[0], sides[1]) : [];
+  const modelRows = sides ? buildModelRows(sides[0], sides[1]) : [];
+  const hasModelRows = modelRows.some((row) => row.a !== null || row.b !== null);
 
   return (
     <View style={[styles.root, { paddingTop: headerHeight }]}>
@@ -261,18 +295,25 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
       {loadingCompare || !sides ? (
         <BrandedSpinner style={styles.center} />
       ) : (
-        <View style={[styles.card, { marginBottom: orbClearance }]}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: orbClearance }]}>
           <View style={styles.identityRow}>
-            <IdentityHeader side={sides[0].player} align="left" />
+            <IdentityHeader side={sides[0]} />
             <AppText style={styles.vsLabel}>VS</AppText>
-            <IdentityHeader side={sides[1].player} align="right" />
+            <IdentityHeader side={sides[1]} />
           </View>
-          <AnimatedCard style={styles.tableCard}>
-            {buildRows(sides[0], sides[1]).map((row) => (
-              <CompareRowView key={row.label} row={row} />
+          <AnalyticsSection title="Value & Rank" icon="flash-outline">
+            {valueRows.map((row, index) => (
+              <CompareRowView key={row.label} row={row} isLast={index === valueRows.length - 1} />
             ))}
-          </AnimatedCard>
-        </View>
+          </AnalyticsSection>
+          {hasModelRows ? (
+            <AnalyticsSection title="Model Breakdown" icon="analytics-outline">
+              {modelRows.map((row, index) => (
+                <CompareRowView key={row.label} row={row} isLast={index === modelRows.length - 1} />
+              ))}
+            </AnalyticsSection>
+          ) : null}
+        </ScrollView>
       )}
     </View>
   );
@@ -283,37 +324,36 @@ function createStyles(colors: ThemeColors) {
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  pickerHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.lg, paddingBottom: spacing.sm },
-  pickerHeaderText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  searchInput: {
+  discoveryCard: {
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
     borderColor: colors.cardBorder,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     fontSize: 15,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     color: colors.textPrimary,
   },
-  listContent: { paddingHorizontal: spacing.lg, gap: spacing.xs },
-  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
-  candidateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
+  candidateListCard: {
+    flex: 1,
+    marginHorizontal: spacing.lg,
     borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
     borderColor: colors.cardBorder,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
   },
-  candidateAvatar: {},
-  candidateTextGroup: { flex: 1 },
-  candidateName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  candidateMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-  candidateMeta: { fontSize: 11, color: colors.textSecondary },
+  candidateRow: { paddingHorizontal: spacing.md },
   changeButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -328,19 +368,34 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.accentMuted,
   },
   changeButtonText: { fontSize: 12, fontWeight: '600', color: colors.accent },
-  card: { paddingHorizontal: spacing.lg },
-  identityRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md },
+  scrollContent: { paddingHorizontal: spacing.lg },
+  identityRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: spacing.sm },
   identity: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  identityRight: {},
   identityName: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   identityMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   identityMeta: { fontSize: 11, color: colors.textSecondary },
-  vsLabel: { fontSize: 12, fontWeight: '800', color: colors.textTertiary, marginTop: spacing.lg },
-  tableCard: { padding: spacing.md, gap: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rowLabel: { flex: 1, fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
-  rowValueColumn: { flex: 1, alignItems: 'center', gap: 2 },
+  vsLabel: { fontSize: 12, fontWeight: '800', color: colors.textTertiary, marginTop: spacing.xl },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm },
+  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  rowLabel: {
+    flex: 1.1,
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  rowValueColumn: { flex: 1, alignItems: 'center' },
+  rowValuePill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  rowValuePillWin: { backgroundColor: `${colors.successBright}1F`, borderColor: colors.successBright },
   rowValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  rowValueWin: { color: colors.successBright },
+  rowValueWin: { color: colors.successBright, fontWeight: '800' },
   });
 }
