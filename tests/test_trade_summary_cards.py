@@ -210,7 +210,11 @@ def test_isolated_trade_component_receives_design_token_styles():
     assert "DynastyGM semantic design tokens" in css
     assert ".trade-summary-card" in css
     assert "border-left: var(--border-width-semantic) solid var(--color-information);" in css
-    assert "font-size: var(--font-size-display);" in css
+    # The value-change number uses the same --type-primary-metric convention
+    # as the loudest number on Dashboard/My Team/GM Targets cards, rather than
+    # a Trade-Hub-only font-size — see modules/card_hierarchy_styles.py and
+    # modules/dense_list_styles.py for the shared pattern.
+    assert ".tvl-edge-num { font: var(--type-primary-metric); }" in css
     assert "@container trade-summary (max-width: 430px)" in css
     assert "flex: 0 0 3.25rem;" in css or "var(--size-asset-compact)" in css
     assert "max-width: 100%;" in css

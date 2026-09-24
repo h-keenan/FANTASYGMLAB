@@ -529,7 +529,12 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("Improves the weakest starting position", captured["html"])
         self.assertIn("tvl-conf", captured["html"])
         self.assertIn("tvl-edge", captured["html"])
-        self.assertNotIn("dg-ui-badge", captured["html"])
+        # A fairness pill (Favorable/Fair/Slight Overpay/Major Overpay) rides
+        # next to the partner name using the shared dg-ui-badge system — the
+        # Magna Carta pass added this so "is this good for me" is scannable
+        # without opening the card, so a badge is now expected here.
+        self.assertIn("dg-ui-badge--neutral", captured["html"])
+        self.assertIn("trade-summary-fairness-pill", captured["html"])
         self.assertIn(">Balance<", captured["html"])
         self.assertIn("trade-summary-why", captured["html"])
         self.assertIn("Review package", captured["html"])
