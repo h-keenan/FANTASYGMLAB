@@ -193,10 +193,20 @@ def chip_html(asset: Mapping[str, Any], *, format_score=None) -> str:
     return f"<div class='toa-chip'>{inner}</div>"
 
 
-def result_row_html(asset: Mapping[str, Any], *, selected: bool = False) -> str:
+def result_row_html(
+    asset: Mapping[str, Any],
+    *,
+    selected: bool = False,
+    format_score=None,
+) -> str:
     from modules.compact_fantasy_assets import compact_asset_html
 
-    inner = compact_asset_html(asset, size="standard", show_value=False)
+    # Roster-browse rows show real value context (matching the mobile Trade
+    # Analyzer search results, which surface each player/pick's score),
+    # instead of forcing the user to add an asset before seeing its value.
+    inner = compact_asset_html(
+        asset, size="standard", show_value=True, format_score=format_score
+    )
     state = " toa-result-row--selected" if selected else ""
     flag = "1" if selected else "0"
     return (

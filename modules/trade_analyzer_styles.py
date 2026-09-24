@@ -54,9 +54,13 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   line-height: 1.05;
 }
 
-.toa-tone-accept .toa-verdict { color: var(--color-accent-strong, #22d3ee); }
-.toa-tone-counter .toa-verdict,
-.toa-tone-fair .toa-verdict { color: var(--color-warning, #f59e0b); }
+/* Tone -> color follows the same mapping as mobile's canonical
+   accept/decline/counter/fair verdict (never a raw value-sign lookup):
+   accept=success, decline=danger, counter=accent, fair=neutral. Counter and
+   fair used to share one amber, making two distinct verdicts read as one. */
+.toa-tone-accept .toa-verdict { color: var(--color-success, #22c55e); }
+.toa-tone-counter .toa-verdict { color: var(--color-accent-strong, #22d3ee); }
+.toa-tone-fair .toa-verdict { color: var(--color-text-secondary, #9ca3af); }
 .toa-tone-decline .toa-verdict { color: var(--color-danger, #ef4444); }
 
 .toa-band,
@@ -89,7 +93,12 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   padding: var(--space-sm, 0.65rem);
 }
 
-.toa-side-receive { border-left-color: var(--color-accent-strong); }
+/* Receive=success/send=danger, matching trade_visual_language.py's shared
+   .dg-trade-side--get/--give convention (also used by Trade Hub) and
+   mobile's You Receive/You Send dot colors. This used to override receive
+   to accent-strong here, disagreeing with the shared module's green for the
+   very same element (compact_matchup_html emits both class names). */
+.toa-side-receive { border-left-color: var(--color-success, #22c55e); }
 .toa-side-send { border-left-color: var(--color-danger, #ef4444); }
 
 .toa-side-label {
@@ -233,7 +242,10 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
   text-transform: uppercase;
 }
 
-.toa-block-receive { border-inline-start: 3px solid var(--color-accent-strong, #22d3ee); }
+/* Same receive=success/send=danger convention as .toa-side-receive/-send
+   above, so the builder columns and the result card agree on what
+   "receive" means instead of one reading green and the other cyan. */
+.toa-block-receive { border-inline-start: 3px solid var(--color-success, #22c55e); }
 .toa-block-send { border-inline-start: 3px solid var(--color-danger, #ef4444); }
 
 .toa-chip-list { display: grid; gap: 0.4rem; margin: 0.35rem 0 0.55rem; }

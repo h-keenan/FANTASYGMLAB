@@ -154,7 +154,9 @@ def _render_side_browser(
             row_cols = st.columns([6, 1])
             with row_cols[0]:
                 st.markdown(
-                    analyzer_builder.result_row_html(asset, selected=selected),
+                    analyzer_builder.result_row_html(
+                        asset, selected=selected, format_score=format_score
+                    ),
                     unsafe_allow_html=True,
                 )
             with row_cols[1]:

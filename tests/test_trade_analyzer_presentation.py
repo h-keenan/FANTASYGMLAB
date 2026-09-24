@@ -40,7 +40,9 @@ def test_partner_selector_is_compact_not_full_bleed():
 
 
 def test_player_and_pick_rows_use_compact_identity_with_attached_action():
-    assert "result_row_html(asset, selected=selected)" in UI
+    assert "result_row_html(" in UI
+    assert "selected=selected" in UI
+    assert "format_score=format_score" in UI
     assert 'key=f"toa_add_{side}_{token}"' in UI
     html = builder.result_row_html(
         {
