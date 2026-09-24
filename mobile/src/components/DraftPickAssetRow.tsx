@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -25,6 +26,19 @@ export interface DraftPickAssetRowProps {
    * name) — kept to a single line by the caller, same contract as
    * PlayerIdentityRow's `contextLine`. */
   contextLine?: string | null;
+  /** Optional bold value shown at the trailing edge, e.g. an estimated
+   * value score ("82"). Right-aligned, same weight class as
+   * PlayerIdentityRow's metric emphasis. Omit for contexts with no
+   * standalone value to show (e.g. Trade Hub's exchange rows, where value
+   * lives in the trade's own hero instead). */
+  trailingValue?: string | null;
+  /** One short line under `trailingValue`, e.g. "74% conf". Ignored when
+   * `trailingValue` is absent. */
+  trailingCaption?: string | null;
+  /** Renders a chevron-forward affordance after the trailing value block —
+   * opt-in so existing non-navigating callers are unaffected. Defaults to
+   * false. */
+  showChevron?: boolean;
   onPress?: () => void;
   /** Renders a hairline divider under the row — set false on the last row
    * of a group so the group's own bottom edge stays clean. */
@@ -40,11 +54,16 @@ export interface DraftPickAssetRowProps {
  * and a one-line projected-slot / pick-quality meta line.
  *
  * Built for the Trade Hub redesign, which previously had its own inline
- * pick row (and Dashboard/Draft Center/Trade Analyzer each still have their
- * own separate inline versions — not migrated to this component in the
- * same change). Meant to sit inside a shared card/surface as one of several
- * rows separated by `showDivider`, not individually bordered — same
- * contract as PlayerIdentityRow.
+ * pick row (and Dashboard/Trade Analyzer still have their own separate
+ * inline versions — not migrated to this component in the same change).
+ * Meant to sit inside a shared card/surface as one of several rows
+ * separated by `showDivider`, not individually bordered — same contract as
+ * PlayerIdentityRow.
+ *
+ * Draft Center's Pick Values list also renders through this row (with
+ * `trailingValue`/`trailingCaption`/`showChevron`, which Trade Hub's
+ * exchange rows leave unset) — see DraftCenterScreen's `pickSeasons`
+ * rendering.
  */
 export default function DraftPickAssetRow({
   round,
@@ -52,6 +71,9 @@ export default function DraftPickAssetRow({
   projectedRange,
   pickTier,
   contextLine,
+  trailingValue,
+  trailingCaption,
+  showChevron = false,
   onPress,
   showDivider = false,
 }: DraftPickAssetRowProps) {
@@ -86,6 +108,21 @@ export default function DraftPickAssetRow({
           </AppText>
         ) : null}
       </View>
+      {trailingValue ? (
+        <View style={styles.trailingBlock}>
+          <AppText style={styles.trailingValue} numberOfLines={1}>
+            {trailingValue}
+          </AppText>
+          {trailingCaption ? (
+            <AppText style={styles.trailingCaption} numberOfLines={1}>
+              {trailingCaption}
+            </AppText>
+          ) : null}
+        </View>
+      ) : null}
+      {showChevron ? (
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={styles.chevron} />
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -110,5 +147,9 @@ function createStyles(colors: ThemeColors) {
     label: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     meta: { fontSize: 11, color: colors.textSecondary },
     context: { fontSize: 11, color: colors.textTertiary },
+    trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
+    trailingValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    trailingCaption: { fontSize: 10, color: colors.textTertiary, marginTop: 1 },
+    chevron: { marginLeft: spacing.xs },
   });
 }
