@@ -20,6 +20,40 @@ from modules.semantic_glyphs import glyph_html
 
 MEMORY_VIEWS = ("Recaps", "History", "Storylines")
 
+# Presentation-only grouping taxonomy for the recap board — mirrors the
+# mobile RecapScreen's storyCategory()/categoryMeta() collapse of the ten
+# backend story types into the handful of categories a reader actually
+# thinks in terms of, and the same "group consecutive same-category items"
+# pattern already shipped for Alerts (alerts_activity_ui.alert_category_bucket).
+# Reads only the already-computed story_type; never alters recap generation.
+_RECAP_STORY_CATEGORIES: dict[str, str] = {
+    league_recaps.STORY_PERFORMANCE: "performance",
+    league_recaps.STORY_PERFORMANCE_LOW: "performance",
+    league_recaps.STORY_MATCHUP: "matchup",
+    league_recaps.STORY_MATCHUP_CLOSE: "matchup",
+    league_recaps.STORY_WAIVER: "waiver",
+    league_recaps.STORY_WAIVER_LOW: "waiver",
+    league_recaps.STORY_TRADE: "trade",
+    league_recaps.STORY_ACTIVITY: "activity",
+    league_recaps.STORY_ACTIVITY_LOW: "activity",
+    league_recaps.STORY_RISER: "roster",
+}
+_RECAP_CATEGORY_LABELS: dict[str, str] = {
+    "performance": "Performance",
+    "matchup": "Matchups",
+    "waiver": "Waivers",
+    "trade": "Trades",
+    "activity": "League Activity",
+    "roster": "Roster Watch",
+    "other": "Storylines",
+}
+
+
+def recap_story_category(story_type: str) -> str:
+    """Presentation-only bucket for grouping/coloring; not a business signal."""
+
+    return _RECAP_STORY_CATEGORIES.get(_text(story_type), "other")
+
 
 def _text(value: object, default: str = "") -> str:
     if value is None:
@@ -28,7 +62,7 @@ def _text(value: object, default: str = "") -> str:
     return text if text else default
 
 
-def recap_story_html(story: Mapping[str, Any]) -> str:
+def recap_story_html(story: Mapping[str, Any], *, lead: bool = False) -> str:
     glyph = _text(story.get("glyph"), "history")
     title = escape(_text(story.get("title"), "Story"))
     summary = escape(_text(story.get("summary")))
@@ -65,8 +99,21 @@ def recap_story_html(story: Mapping[str, Any]) -> str:
         f"<p class='dg-recap-editorial'>{escape(editorial)}</p>" if editorial else ""
     )
     grades = transaction_grades_ui.recap_grade_strip_html(story.get("grade"))
+    # In-card affordance: the same action a deep-link button below the board
+    # performs, named here so the card itself signals it leads somewhere
+    # (mirrors mobile RecapScreen's "View team"/"View trade details" footer
+    # row) instead of a colored border being the only, silent clickability cue.
+    deep_link_label = history_deep_link_label(story)
+    affordance_html = (
+        f"<p class='dg-recap-affordance'>{escape(deep_link_label)} &rsaquo;</p>"
+        if deep_link_label
+        else ""
+    )
+    classes = f"dg-recap-story dg-recap-story--{escape(_text(story.get('story_type'), 'story'))}"
+    if lead:
+        classes += " dg-recap-story--lead"
     return (
-        f"<article class='dg-recap-story dg-recap-story--{escape(_text(story.get('story_type'), 'story'))}'>"
+        f"<article class='{classes}'>"
         "<div class='dg-recap-story-kicker'>"
         + glyph_html(glyph, size="kicker")
         + f"<h3>{title}</h3></div>"
@@ -77,17 +124,52 @@ def recap_story_html(story: Mapping[str, Any]) -> str:
         + editorial_html
         + grades
         + lenses
+        + affordance_html
         + "</article>"
     )
+
+
+def _grouped_stories_html(stories: Sequence[Mapping[str, Any]]) -> str:
+    """Renders every story after the lead as labeled category sections —
+    consecutive same-category stories share one group (header + dividers)
+    instead of each repeating as its own identically-bordered card. Mirrors
+    the grouping already shipped for Alerts (alert_category_bucket in
+    modules/alerts_activity_ui.py) and the mobile RecapScreen's groupStories."""
+    parts: list[str] = []
+    current_category: str | None = None
+    group_open = False
+    for story in stories:
+        category = recap_story_category(_text(story.get("story_type")))
+        if category != current_category:
+            if group_open:
+                parts.append("</div>")
+            label = escape(_RECAP_CATEGORY_LABELS.get(category, "Storylines"))
+            parts.append(
+                f"<div class='dg-recap-group dg-recap-group--{escape(category)}'>"
+                "<span class='dg-recap-group__bar'></span>"
+                f"{label}</div>"
+                "<div class='dg-recap-group-body'>"
+            )
+            current_category = category
+            group_open = True
+        parts.append(recap_story_html(story))
+    if group_open:
+        parts.append("</div>")
+    return "".join(parts)
 
 
 def recap_edition_html(recap: Mapping[str, Any]) -> str:
     week = _text(recap.get("week") or recap.get("period_key"), "—")
     headline = escape(_text(recap.get("headline"), f"Week {week} recap"))
-    stories = [recap_story_html(story) for story in recap.get("stories") or () if isinstance(story, Mapping)]
-    body = "".join(stories) or (
-        "<p class='dg-recap-empty'>Not enough historical data for a recap this week.</p>"
-    )
+    stories = [story for story in recap.get("stories") or () if isinstance(story, Mapping)]
+    if stories:
+        # The lead story (stories[0], the same story the masthead headline
+        # above is drawn from — see build_weekly_recap's builder priority
+        # order) carries the strongest visual weight; everything else is a
+        # quieter, grouped-by-category storyline below it (UI Magna Carta).
+        body = recap_story_html(stories[0], lead=True) + _grouped_stories_html(stories[1:])
+    else:
+        body = "<p class='dg-recap-empty'>Not enough historical data for a recap this week.</p>"
     return (
         "<section class='dg-recap-edition' aria-label='Weekly recap'>"
         "<header class='dg-recap-masthead'>"
@@ -340,8 +422,15 @@ def render_league_recaps_page(
         label = history_deep_link_label(story)
         if not label or open_history is None:
             continue
+        # Every card that opens a deep link now says so in its own body (see
+        # recap_story_html's dg-recap-affordance line), but the actual button
+        # still renders below the whole board — name it after its story so
+        # two cards sharing a category (e.g. two waiver stories) don't render
+        # two identical, unattributable "View waiver history" buttons.
+        story_title = _text(story.get("title"))
+        button_label = f"{label} — {story_title}" if story_title else label
         if st.button(
-            label,
+            button_label,
             key=f"league_recap_history_{home_league_id}_{selected_week}_{index}",
             use_container_width=False,
         ):
