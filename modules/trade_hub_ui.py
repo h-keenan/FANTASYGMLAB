@@ -37,6 +37,7 @@ from modules.trade_visual_language import (
     confidence_indicator_html,
     cue_html,
     exchange_marker_html,
+    trade_value_band,
     value_edge_html,
 )
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
@@ -109,6 +110,14 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     white-space: normal;
     word-break: normal;
 }
+.trade-summary-title-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    min-width: 0;
+}
+.trade-summary-fairness-pill { flex: 0 0 auto; }
 .trade-summary-partner-kicker {
     color: var(--color-text-muted);
     font-size: var(--font-size-badge);
@@ -117,7 +126,22 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     text-transform: uppercase;
 }
 .trade-summary-partner { color: var(--color-text-muted); flex: 0 0 auto; font: var(--type-supporting-metadata); }
-.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 2; overflow-x: clip; padding-block: var(--space-xs); width: 100%; }
+.trade-summary-value-row {
+    align-items: center;
+    color: var(--color-text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--font-size-caption);
+    gap: var(--space-sm);
+    justify-content: flex-start;
+    max-width: 100%;
+    min-width: 0;
+    order: 2;
+}
+.trade-summary-value-row .tvl-edge { column-gap: var(--space-sm); }
+.trade-summary-value-row .tvl-edge-num { font: var(--type-primary-metric); }
+.trade-summary-value-row .tvl-edge-cap { display: none; }
+.trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 3; overflow-x: clip; padding-block: var(--space-xs); width: 100%; }
 .trade-summary-for { align-items: center; color: var(--color-information); display: flex; font: var(--type-supporting-metadata); justify-content: flex-start; letter-spacing: var(--letter-spacing-badge); text-transform: uppercase; }
 .trade-summary-side { align-items: start; display: grid; gap: var(--space-2xs); grid-template-columns: minmax(0, 1fr); justify-content: start; min-width: 0; }
 .trade-summary-assets .dg-compact-asset--standard,.trade-summary-assets .dg-compact-asset--compact{--size-asset-standard:var(--size-asset-compact);align-items:center;column-gap:var(--space-xs);grid-template-columns:var(--size-asset-compact) minmax(0,1fr);max-width:100%;width:100%}
@@ -166,9 +190,6 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
 }
 .trade-summary-avatar--pick { color: var(--color-information); font-size: var(--font-size-badge); font-weight: var(--font-weight-title); }
 .trade-summary-asset-name { color: var(--color-text-primary); font-size: var(--font-size-body); font-weight: var(--font-weight-title); max-width: 100%; min-width: 0; overflow: visible; overflow-wrap: break-word; text-overflow: clip; white-space: normal; word-break: normal; }
-.trade-summary-value { align-items: center; color: var(--color-text-muted); display: flex; font-size: var(--font-size-caption); gap: var(--space-sm); justify-content: flex-start; }
-.trade-summary-value strong { font-size: var(--font-size-display); font-weight: var(--font-weight-display); }
-.trade-summary-value .tvl-edge-cap { display: none; }
 .trade-delta-positive { color: var(--color-success); }
 .trade-delta-negative { color: var(--color-danger); }
 .trade-delta-neutral { color: var(--color-text-secondary); }
@@ -196,14 +217,17 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     gap: var(--space-xs);
     max-width: 100%;
     min-width: 0;
-    order: 3;
+    opacity: var(--opacity-secondary);
+    order: 4;
 }
+.trade-summary-executive .tvl-conf-ring { height: 2rem; width: 2rem; }
+.trade-summary-executive .tvl-conf-ring-value { font-size: var(--font-size-badge); }
 .trade-summary-why {
     color: var(--color-text-secondary);
     font: var(--type-supporting-metadata);
     line-height: var(--line-height-body);
     margin: 0;
-    order: 3;
+    order: 5;
 }
 .trade-summary-secondary {
     color: var(--color-text-muted);
@@ -222,6 +246,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     line-height: var(--line-height-caption);
     margin: 0;
     max-width: 100%;
+    order: 6;
     overflow-wrap: anywhere;
     white-space: normal;
 }
@@ -268,7 +293,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     gap: var(--space-md);
     justify-content: flex-start;
     max-width: 100%;
-    order: 5;
+    order: 7;
     padding-top: var(--space-sm);
 }
 .trade-summary-footer .trade-summary-affordance {
@@ -1479,6 +1504,33 @@ def trade_summary_card_category(idea: dict) -> str:
     return trade_hub_display_section(idea)
 
 
+_TRADE_FAIRNESS_BAND_TONE = {
+    "favorable": "success",
+    "fair": "neutral",
+    "slight overpay": "caution",
+    "major overpay": "danger",
+}
+
+
+def trade_fairness_pill_html(delta_text: object) -> str:
+    """Scannable fairness verdict badge, decoupled from the raw value-edge color.
+
+    Pass the same formatted delta string given to ``value_edge_html`` so the
+    two never disagree on the band. The badge's tone is chosen from the band
+    itself (Favorable/Fair/Slight Overpay/Major Overpay) rather than the
+    number's raw sign, so a marginally positive "Fair" trade doesn't read as
+    success-green and a marginally negative "Slight Overpay" doesn't read as
+    danger-red.
+    """
+
+    band = trade_value_band(delta_text)
+    tone = _TRADE_FAIRNESS_BAND_TONE.get(band.strip().casefold(), "neutral")
+    return (
+        f"<span class='dg-ui-badge dg-ui-badge--{tone} trade-summary-fairness-pill' "
+        f"aria-label='Trade fairness: {escape(band, quote=True)}'>{escape(band)}</span>"
+    )
+
+
 def group_trade_hub_ideas(
     ideas: list[dict],
     *,
@@ -1938,30 +1990,34 @@ def render_trade_idea_card(
         if focused
         else ""
     )
+    # Header hierarchy: recommendation type (category) leads, then team name
+    # paired with a fairness verdict pill, then the value-change number gets
+    # its own prominent row before the send/receive package — mirroring the
+    # mobile Trade Hub redesign's card order (category -> team+fairness pill
+    # -> value-change number) instead of burying the verdict below the assets.
+    # Derive the pill from the same formatted delta_text that value_edge_html
+    # buckets internally, so the two never disagree on the band for one idea.
+    fairness_pill_html = trade_fairness_pill_html(delta_text)
     summary_html = textwrap.dedent(
         f"""
         <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}{focused_class}" data-trade-summary-key="{summary_key}" data-recommendation-id="{escape(idea_rec_id, quote=True)}" aria-label="View trade details: {tag} with {partner}">
             <header class="trade-summary-header">
                 <div class="trade-summary-heading">
                     {focus_kicker}
-                    <div class="trade-summary-title">{partner}</div>
                     <div class="trade-summary-category">{section}</div>
+                    <div class="trade-summary-title-row">
+                        <div class="trade-summary-title">{partner}</div>
+                        {fairness_pill_html}
+                    </div>
                 </div>
             </header>
+            <div class="trade-summary-value-row"><span class="trade-summary-side-label">Balance</span>{edge_html}</div>
             <div class="trade-summary-package">
                 <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You send</span>{_trade_summary_assets_html(send_assets)}</div>
                 <div class="trade-summary-for" data-trade-chrome="1" aria-hidden="true">{exchange_marker_html()}</div>
                 <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You get</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
-            <div class="trade-summary-executive">
-                <div class="trade-summary-impact-row">
-                    <div class="trade-summary-value">
-                        <span>Balance</span>
-                        {edge_html}
-                    </div>
-                    {confidence_html}
-                </div>
-            </div>
+            <div class="trade-summary-executive">{confidence_html}</div>
             <div class="trade-summary-why">{cue_html("why", why_raw)}</div>
             {confidence_note_html}
             <div class="trade-summary-footer">

@@ -109,15 +109,20 @@ def test_tier_frame_is_a_thin_ring_not_a_padded_window():
     assert "inset 0 0 0 4px" not in FOOTBALL_ASSET_CSS
 
 
-def test_trade_idea_card_hierarchy_is_partner_then_exchange_then_why():
+def test_trade_idea_card_hierarchy_is_partner_then_value_then_exchange_then_why():
+    # Magna Carta pass: the fairness verdict and value-change number now carry
+    # the strongest visual weight and lead the card (right after the partner
+    # name), ahead of the send/receive package — matching the mobile Trade
+    # Hub redesign's header order (recommendation type -> team + fairness
+    # pill -> value-change number -> assets -> quieter confidence -> why).
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     start = source.index('<div class="trade-summary-title">{partner}</div>')
     end = source.index("Review package</div>") + len("Review package")
     card = source[start:end]
-    assert card.index("trade-summary-title") < card.index("You send")
+    assert card.index("trade-summary-title") < card.index(">Balance<")
+    assert card.index(">Balance<") < card.index("You send")
     assert card.index("You send") < card.index("You get")
-    assert card.index("You get") < card.index(">Balance<")
-    assert card.index(">Balance<") < card.index("trade-summary-why")
+    assert card.index("You get") < card.index("trade-summary-why")
     assert card.index("trade-summary-why") < card.index("Review package")
     assert "Review package →" not in card
     assert "Sending" not in card
@@ -126,7 +131,7 @@ def test_trade_idea_card_hierarchy_is_partner_then_exchange_then_why():
     assert "tvl-sr" in marker
     assert marker.count("FOR") == 1
     assert "tvl-sr'>FOR<" in marker.replace(" ", "") or "tvl-sr'>FOR</span>" in marker
-    assert ".trade-summary-value .tvl-edge-cap { display: none; }" in TRADE_SUMMARY_COMPONENT_CSS
+    assert ".trade-summary-value-row .tvl-edge-cap { display: none; }" in TRADE_SUMMARY_COMPONENT_CSS
 
 
 def test_compact_trade_rows_keep_identity_without_role_age_stack():

@@ -20,19 +20,26 @@ def test_command_bar_and_portrait_finalization_live_in_unify_layer():
     assert "EXECUTIVE_DESIGN_UNIFY_CSS" in styles
 
 
-def test_trade_summary_eye_flow_puts_package_before_impact():
+def test_trade_summary_eye_flow_puts_value_before_package():
+    # Magna Carta pass: recommendation type (category) leads, then team name +
+    # fairness pill, then the value-change number gets its own prominent row
+    # ahead of the send/receive package; confidence moved after the package so
+    # it reads as supporting detail rather than competing with the verdict.
     css = TRADE_SUMMARY_COMPONENT_CSS
-    assert ".trade-summary-package" in css and "order: 2" in css
-    assert ".trade-summary-executive" in css and "order: 3" in css
+    assert ".trade-summary-value-row" in css and "order: 2" in css
+    assert ".trade-summary-package" in css and "order: 3" in css
+    assert ".trade-summary-executive" in css and "order: 4" in css
     assert "flex-direction: column" in css
     assert "opacity: 0.72" in css
     html_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     start = html_source.index('<article class="trade-summary-card')
     end = html_source.index("</article>", start)
     card = html_source[start:end]
-    assert card.index("trade-summary-title") < card.index("trade-summary-category")
+    assert card.index("trade-summary-category") < card.index("trade-summary-title")
+    assert card.index("trade-summary-title") < card.index("trade-summary-value-row")
+    assert card.index("trade-summary-value-row") < card.index("trade-summary-package")
     assert card.index("trade-summary-package") < card.index("trade-summary-executive")
-    assert card.index("trade-summary-impact-row") < card.index("trade-summary-why")
+    assert card.index("trade-summary-executive") < card.index("trade-summary-why")
 
 
 def test_dashboard_actions_precede_analysis_zones():
