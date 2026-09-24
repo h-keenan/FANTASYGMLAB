@@ -1,19 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
-import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
@@ -21,10 +13,9 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import OverallRatingBadge from '../components/OverallRatingBadge';
-import PlayerAvatar from '../components/PlayerAvatar';
-import { resolvePlayerTier } from '../lib/playerTier';
-import PositionBadge from '../components/PositionBadge';
-import TierBadge from '../components/TierBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import ScreenInfoNote from '../components/ScreenInfoNote';
+import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type RankedPlayer, type UsageTrend, type ValuationLens } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -90,10 +81,117 @@ function UsageTrendPill({ trend }: { trend: UsageTrend }) {
   );
 }
 
+/**
+ * One labeled row of filter chips — Position/Age/Status/Availability all
+ * share this exact treatment (Magna Carta §18) instead of four subtly
+ * different ad hoc rows. Chips wrap onto a second line on narrow screens
+ * rather than requiring a horizontal swipe per row, matching Waivers'
+ * canonical discovery-card filter treatment.
+ */
+function FilterGroup<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly T[];
+  value: T;
+  onChange: (next: T) => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.filterGroup}>
+      <AppText style={styles.filterLabel}>{label}</AppText>
+      <View style={styles.pillRow}>
+        {options.map((option) => (
+          <TouchableOpacity
+            key={option}
+            style={[styles.pill, value === option && styles.pillActive]}
+            onPress={() => onChange(option)}
+          >
+            <AppText style={[styles.pillText, value === option && styles.pillTextActive]}>{option}</AppText>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Dense grouped-table row for the ranked player list — canonical
+ * PlayerIdentityRow for identity (rank as the leading slot chip, tier +
+ * opportunity classification, injury pill), plus a trailing value column
+ * matching the value-first hierarchy every other ranked/board list on the
+ * app now uses (see WaiversScreen's FreeAgentRow). Rows sit inside one
+ * continuous bordered surface with hairline dividers rather than each being
+ * its own card (Magna Carta §12) — with ~300 rows in play, an individually
+ * bordered+animated card per row was also the main scroll-performance cost
+ * this redesign removes.
+ */
+function PlayerRankRow({
+  player,
+  isFirst,
+  isLast,
+  onPress,
+}: {
+  player: RankedPlayer;
+  isFirst: boolean;
+  isLast: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const injury = waiverInjuryDisplay(player.injury_status);
+  return (
+    <View
+      style={[
+        styles.playerRow,
+        isFirst && styles.playerRowFirst,
+        isLast && styles.playerRowLast,
+        !isLast && styles.playerRowDivider,
+      ]}
+    >
+      <View style={styles.playerIdentity}>
+        <PlayerIdentityRow
+          playerId={player.player_id}
+          name={player.name}
+          position={player.position}
+          team={player.team}
+          tier={player.tier}
+          slot={player.overall_rank != null ? String(player.overall_rank) : '—'}
+          opportunityLabel={player.opportunity_label}
+          injuryLabel={injury.label}
+          injuryTone={injury.tone}
+          ruledOut={injury.ruledOut}
+          onPress={onPress}
+          showDivider={false}
+        />
+      </View>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.playerTrailing}>
+        <AppText style={styles.playerScore}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <View style={styles.playerTrailingChips}>
+          {player.position && player.position_rank ? (
+            <View style={styles.positionRankPill}>
+              <AppText style={styles.positionRankText}>
+                {player.position}
+                {player.position_rank}
+              </AppText>
+            </View>
+          ) : null}
+          <OverallRatingBadge rating={player.overall_rating} />
+          {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function PlayersScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
-  const { colors, isDark } = useThemeMode();
+  const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const { lens } = useValuationLens(leagueId);
@@ -153,61 +251,29 @@ export default function PlayersScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search players"
-        value={search}
-        onChangeText={setSearch}
-        autoCapitalize="none"
-        placeholderTextColor={colors.textTertiary}
-      />
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {POSITIONS.map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[styles.pill, position === option && styles.pillActive]}
-            onPress={() => setPosition(option)}
-          >
-            <AppText style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</AppText>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {AGE_FILTERS.map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[styles.pill, ageFilter === option && styles.pillActive]}
-            onPress={() => setAgeFilter(option)}
-          >
-            <AppText style={[styles.pillText, ageFilter === option && styles.pillTextActive]}>{option}</AppText>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {STATUS_FILTERS.map((option) => (
-          <TouchableOpacity
-            key={`status-${option}`}
-            style={[styles.pill, statusFilter === option && styles.pillActive]}
-            onPress={() => setStatusFilter(option)}
-          >
-            <AppText style={[styles.pillText, statusFilter === option && styles.pillTextActive]}>{option}</AppText>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {AVAILABILITY_FILTERS.map((option) => (
-          <TouchableOpacity
-            key={`availability-${option}`}
-            style={[styles.pill, availabilityFilter === option && styles.pillActive]}
-            onPress={() => setAvailabilityFilter(option)}
-          >
-            <AppText style={[styles.pillText, availabilityFilter === option && styles.pillTextActive]}>{option}</AppText>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <ScreenInfoNote text="Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown." />
 
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
+
+      <View style={styles.discoveryCard}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search players"
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+          placeholderTextColor={colors.textTertiary}
+        />
+        <FilterGroup label="Position" options={POSITIONS} value={position} onChange={setPosition} />
+        <FilterGroup label="Age" options={AGE_FILTERS} value={ageFilter} onChange={setAgeFilter} />
+        <FilterGroup label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
+        <FilterGroup
+          label="Availability"
+          options={AVAILABILITY_FILTERS}
+          value={availabilityFilter}
+          onChange={setAvailabilityFilter}
+        />
+      </View>
 
       {loading ? (
         <BrandedSpinner style={styles.loading} />
@@ -216,39 +282,16 @@ export default function PlayersScreen({ route, navigation }: Props) {
           data={filtered}
           keyExtractor={(item) => item.player_id}
           contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-          renderItem={({ item }) => (
-            <AnimatedCard
-              style={styles.card}
+          initialNumToRender={16}
+          maxToRenderPerBatch={16}
+          windowSize={9}
+          renderItem={({ item, index }) => (
+            <PlayerRankRow
+              player={item}
+              isFirst={index === 0}
+              isLast={index === filtered.length - 1}
               onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
-            >
-              <PlayerAvatar playerId={item.player_id} size={40} tier={item.tier} style={styles.avatar} />
-              <View style={styles.rankBadge}>
-                <AppText style={styles.rankText}>{item.overall_rank ?? '—'}</AppText>
-              </View>
-              <View style={styles.nameColumn}>
-                <AppText style={styles.name} numberOfLines={1}>
-                  {item.name ?? 'Unknown'}
-                </AppText>
-                <View style={styles.metaRow}>
-                  <PositionBadge position={item.position} />
-                  <AppText style={styles.meta} numberOfLines={1}>
-                    {item.team}
-                    {item.team && item.opportunity_label ? ' · ' : ''}
-                    {item.opportunity_label ? (
-                      <AppText style={[styles.meta, { color: resolvePlayerTier(item.tier, isDark).color }]}>
-                        {item.opportunity_label}
-                      </AppText>
-                    ) : null}
-                  </AppText>
-                  {item.usage_trend ? <UsageTrendPill trend={item.usage_trend} /> : null}
-                  <TierBadge storedTier={item.tier} />
-                </View>
-              </View>
-              <View style={styles.scoreColumn}>
-                <AppText style={styles.score}>{item.score != null ? Math.round(item.score) : '—'}</AppText>
-                <OverallRatingBadge rating={item.overall_rating} />
-              </View>
-            </AnimatedCard>
+            />
           )}
           ListEmptyComponent={
             <EmptyState
@@ -267,29 +310,44 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
-  searchInput: {
+  discoveryCard: {
     marginHorizontal: spacing.lg,
-    borderWidth: 1,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
     borderColor: colors.cardBorder,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     fontSize: 15,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
   },
-  filterRow: {
+  filterGroup: { gap: 4 },
+  filterLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  pillRow: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
+    flexWrap: 'wrap',
     gap: spacing.xs,
-    marginBottom: spacing.sm,
   },
   pill: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
@@ -297,25 +355,40 @@ function createStyles(colors: ThemeColors) {
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   pillTextActive: { color: '#fff', fontWeight: '700' },
   loading: { marginTop: spacing.xl },
-  listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
-  card: { flexDirection: 'row', alignItems: 'center', padding: spacing.md },
-  avatar: { marginRight: spacing.sm },
-  rankBadge: {
-    width: 30,
-    height: 26,
-    borderRadius: radii.sm,
-    backgroundColor: colors.badgeBackground,
+  listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  playerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
+    borderRightWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
   },
-  rankText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
-  nameColumn: { flex: 1, marginRight: spacing.sm },
-  name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
-  // Geometry copied from PositionBadge, its immediate neighbour in this row,
-  // so the two read as one family of inline tags.
+  playerRowFirst: {
+    borderTopWidth: StyleSheet.hairlineWidth * 1.5,
+    borderTopLeftRadius: radii.md,
+    borderTopRightRadius: radii.md,
+  },
+  playerRowLast: {
+    borderBottomWidth: StyleSheet.hairlineWidth * 1.5,
+    borderBottomLeftRadius: radii.md,
+    borderBottomRightRadius: radii.md,
+  },
+  playerRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  playerIdentity: { flex: 1 },
+  playerTrailing: { alignItems: 'flex-end', gap: 3, paddingLeft: spacing.sm },
+  playerScore: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  playerTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  positionRankPill: {
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 1,
+  },
+  positionRankText: { fontSize: 10, fontWeight: '700', color: colors.textSecondary },
+  // Geometry copied from PositionBadge/PlayerIdentityRow's own chips so the
+  // trend pill reads as one family of inline tags with them.
   trendPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -327,9 +400,6 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
   },
   trendPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  scoreColumn: { alignItems: 'flex-end', gap: 3 },
-  score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }
