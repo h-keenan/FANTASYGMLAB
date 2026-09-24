@@ -8541,8 +8541,8 @@ def render_startup_draft_center(
             {
                 "label": "Tier Break Warning",
                 "value": _safe_text(best_available.get("player_tier"), "Developmental"),
-                "note": tier_warning,
-                "tone": "franchise",
+                "note": f"{tier_warning} {trade_move}".strip(),
+                "tone": "risk",
             },
         ]
     )
@@ -8555,7 +8555,6 @@ def render_startup_draft_center(
         max_buttons=3,
         open_mode="quick_view",
     )
-    st.caption(trade_move)
 
     render_section_header(
         "Draft Board",
