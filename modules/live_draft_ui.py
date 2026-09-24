@@ -130,7 +130,7 @@ def _prestige_level(tier: str) -> str:
     return "depth"
 
 
-def _recommendation_html(rec: dict[str, Any]) -> str:
+def _recommendation_html(rec: dict[str, Any], *, primary: bool = False) -> str:
     adp_delta = rec.get("adp_delta")
     adp_text = (
         f"{adp_delta:+.1f} vs ADP"
@@ -150,6 +150,10 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
         )
         if label
     )
+    # Only the single primary recommendation carries the full why/analysis
+    # breakdown — alternates stay a compact identity + value row so the one
+    # time-critical answer ("who should I draft right now") keeps the most
+    # visual and informational weight on the page.
     details = (
         "<div class='live-draft-rec-executive'>"
         f"<p class='live-draft-rec-why'>{escape(reason)}</p>"
@@ -158,6 +162,8 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
         f"<span><strong>Value vs ADP</strong>{escape(adp_text)}</span>"
         "</div>"
         "</div>"
+        if primary
+        else ""
     )
     asset = football_assets.FootballPlayerAsset(
         player_id=_text(rec.get("player_id")),
@@ -178,7 +184,7 @@ def _recommendation_html(rec: dict[str, Any]) -> str:
         identity=resolve_player_tier_identity(rec, stored_tier=rec.get("tier")),
         tags_html=tags,
         details_html=details,
-        extra_classes=("live-draft-rec-card",),
+        extra_classes=("live-draft-rec-card",) if primary else ("live-draft-rec-alt-card",),
     )
 
 
@@ -197,7 +203,16 @@ def _render_recommendations(
     if not recs:
         st.info("No recommendations are available yet. Load a league roster and draft board first.")
         return
-    html = "<div class='live-draft-rec-grid'>" + "".join(_recommendation_html(rec) for rec in recs) + "</div>"
+    primary_rec, alternates = recs[0], recs[1:]
+    body = _recommendation_html(primary_rec, primary=True)
+    if alternates:
+        body += (
+            "<div class='live-draft-rec-alt-label'>Also consider</div>"
+            "<div class='live-draft-rec-alt-group'>"
+            + "".join(_recommendation_html(rec) for rec in alternates)
+            + "</div>"
+        )
+    html = f"<div class='live-draft-rec-grid'>{body}</div>"
     if render_tappable_player_html and open_player_quick_view:
         clicked = render_tappable_player_html(
             html=html,
