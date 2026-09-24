@@ -113,6 +113,21 @@ def scroll_action_into_view(page: Page, name: str, *, target_y: int = 200) -> di
           const br = btn.getBoundingClientRect();
           const mr = main.getBoundingClientRect();
           main.scrollTop += (br.top - mr.top - targetY);
+          // A real user repositioning the page for their next click does it
+          // with a scroll/wheel gesture, which the app's own
+          // cancelForUserScroll listener uses to drop any stale in-place
+          // anchor left over from a prior click (unless that anchor is a
+          // lockScroll one, e.g. the GM orb's fixed trigger). Setting
+          // scrollTop directly here — as this harness does to position the
+          // next target without simulating pixel-perfect mouse/wheel events —
+          // bypasses that listener, so a still-"fresh" (<5s old) anchor from
+          // the previous in-place action can survive and have its own
+          // delayed restore() corrections fire later using now-stale
+          // geometry, fighting this repositioning. Mirror the real-gesture
+          // behavior here so the harness doesn't leave state a genuine user
+          // action would have cleared.
+          const anchor = window.__dgInPlaceAnchor;
+          if (anchor && !anchor.lockScroll) window.__dgInPlaceAnchor = null;
           const box = btn.getBoundingClientRect();
           return {
             ok: true,
