@@ -11,9 +11,11 @@ WAIVERS_PRESENTATION_CSS = """
 }
 
 .free-agent-card.dg-ui-card {
-    border-color: var(--color-border) !important;
+    /* Every card reserves the same border-inline-start box (width/style) so
+       toggling the standout color below never changes a card's dimensions —
+       only .dg-card-primary gets a visible color, via border-inline-start-color. */
+    border-inline-start: var(--border-width-semantic) solid transparent;
     border-radius: var(--radius-none) !important;
-    box-shadow: var(--shadow-card), var(--shadow-surface-inset) !important;
     clip-path: none !important;
     margin: 0 !important;
     min-height: var(--touch-target-min);
@@ -221,6 +223,15 @@ div[class*="st-key-waiver_recommendation_"] {
     padding: var(--space-sm);
 }
 
+/* The card + Share button share one visible frame (this wrapper); the inner
+   card's own border/shadow are zeroed below to avoid a double frame. Reserve
+   the accent border for a genuine standout (top-need or injury-fit pick) so
+   Priority Adds read differently from Stash/Watchlist/FAAB Shortlist depth —
+   same color-mix formula as the sitewide .dg-card-primary treatment. */
+div[class*="st-key-waiver_recommendation_"]:has(.dg-card-primary) {
+    border-color: color-mix(in srgb, var(--color-accent-strong) 30%, transparent);
+}
+
 div[class*="st-key-waiver_recommendation_"] .free-agent-card.dg-ui-card {
     border: 0 !important;
     box-shadow: none !important;
@@ -245,7 +256,9 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
 }
 
 .waiver-faab-block dd {
-    color: var(--color-text-primary);
+    /* FAAB bid dollars are a concrete, positive recommendation, not a caution
+       flag — match the mobile FAABGuidance correction (green, not amber). */
+    color: var(--color-success);
     font: var(--font-card-title);
     margin: var(--space-2xs) 0 0;
 }
@@ -261,19 +274,6 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     margin-top: var(--space-xs);
 }
 
-.waiver-faab-block dd {
-    color: var(--color-text-primary);
-    font: var(--font-card-title);
-    margin: var(--space-2xs) 0 0;
-}
-
-.waiver-faab-block p {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-caption);
-    line-height: var(--line-height-caption);
-    margin: var(--space-2xs) 0 0;
-}
-
 .free-agent-summary-card {
     border-color: var(--color-border) !important;
     border-radius: var(--radius-none) !important;
@@ -282,8 +282,13 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     opacity: 0.96;
 }
 
-.free-agent-card.dg-ui-card {
-    border-inline-start: var(--border-width-semantic) solid var(--color-opportunity);
+/* Reserve the accent edge for genuine standouts (top-need or injury-fit picks).
+   Only the color changes here (width/style are already set above, identically,
+   for every card) so this never shifts layout — secondary/reference cards fall
+   back to the shared dg-card-secondary/dg-card-reference border-color so
+   priority and depth adds read differently without any dimension change. */
+.free-agent-card.dg-ui-card.dg-card-primary {
+    border-inline-start-color: var(--color-opportunity);
 }
 
 .free-agent-summary-grid {
