@@ -42,6 +42,36 @@ def test_landing_copy_answers_core_questions_without_hype():
     assert "Live billing is not enabled" in html
 
 
+def test_landing_hero_notes_mobile_apps_coming_soon_without_fabrication():
+    hero = marketing_landing.landing_hero_html()
+    assert "fgl-landing__mobile-badge" in hero
+    assert marketing_landing.MOBILE_SOON_LABEL in hero
+    from html import escape as _escape
+
+    assert _escape(marketing_landing.MOBILE_SOON_TEXT) in hero
+    assert "iOS" in hero
+    assert "Android" in hero
+    assert "coming soon" in hero.casefold()
+    # Honest, minimal copy only — no fabricated dates, links, or download claim.
+    lowered = hero.casefold()
+    for needle in (
+        "apps.apple.com",
+        "play.google.com",
+        "download now",
+        "available now",
+        "waitlist",
+        "sign up",
+        "2026",
+        "2027",
+    ):
+        assert needle not in lowered
+    css = (ROOT / "modules" / "marketing_landing_styles.py").read_text(encoding="utf-8")
+    assert "fgl-landing__mobile-badge" in css
+    # Compact hero (mid-flow) stays uncluttered — badge is a landing-only touch.
+    compact = marketing_landing.landing_hero_html(compact=True)
+    assert "fgl-landing__mobile-badge" not in compact
+
+
 def test_product_preview_is_generic_workspace_not_fake_league_data():
     html = marketing_landing.landing_product_preview_html()
     assert "data-fgl-product-preview='1'" in html

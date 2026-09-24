@@ -61,6 +61,12 @@ HERO_SUPPORT = (
 )
 TRUST_LINE = "No account required to try it · Sleeper supported"
 
+# Native mobile apps are in closed TestFlight beta today — not yet public on
+# either store. Keep this honest: no dates, no links, no download claim.
+MOBILE_SOON_LABEL = "Coming soon"
+MOBILE_SOON_TEXT = "iOS & Android apps"
+MOBILE_SOON_NOTE = "Mobile apps are in private beta today"
+
 PRIMARY_CTA_LABEL = "Import your league"
 SECONDARY_CTA_LABEL = "Sign in"
 GUEST_CTA_LABEL = "Continue as guest"
@@ -477,6 +483,23 @@ def landing_composition_html() -> str:
     return landing_capability_preview_html()
 
 
+def landing_mobile_soon_badge_html() -> str:
+    """Small pill noting native apps are coming — mirrors the Founder Beta
+
+    badge's pill/left-accent visual language (see brand_identity.
+    founder_beta_badge_html) rather than inventing a new treatment. Copy is
+    intentionally minimal: no store links, no dates, no download claim.
+    """
+
+    return (
+        "<span class='fgl-landing__mobile-badge' "
+        f"title='{escape(MOBILE_SOON_NOTE)}'>"
+        f"<em>{escape(MOBILE_SOON_LABEL)}</em>"
+        f"<span>{escape(MOBILE_SOON_TEXT)}</span>"
+        "</span>"
+    )
+
+
 def landing_hero_html(*, compact: bool = False) -> str:
     mark = brand_identity.mark_img_html(size_px=36 if compact else 40, css_class="fgl-landing__mark")
     badge = brand_identity.founder_beta_badge_html(compact=True)
@@ -504,6 +527,7 @@ def landing_hero_html(*, compact: bool = False) -> str:
         "<div class='fgl-landing__hero-copy'>"
         f"<h1 class='fgl-landing__value'>{escape(APP_HERO_STATEMENT)}</h1>"
         f"<p class='fgl-landing__support'>{escape(APP_HERO_SUPPORT)}</p>"
+        f"{landing_mobile_soon_badge_html()}"
         "</div>"
         "</div>"
         "</section>"
