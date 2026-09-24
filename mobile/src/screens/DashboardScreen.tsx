@@ -29,6 +29,7 @@ import {
 } from '../lib/api';
 import MetricCard from '../components/MetricCard';
 import PremiumLock from '../components/PremiumLock';
+import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
@@ -268,7 +269,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       <ScreenInfoNote
         text={`The real Next Move briefing for ${leagueName} — the same roster-pressure, injury, need, and waiver signals the web app's Dashboard uses.`}
       />
-      <QuickActionsGrid leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+      <DashboardQuickActions leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
       {!isFirstVisit && newRecommendationIds.size > 0 ? (
         <View style={styles.checkInBanner}>
           <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
@@ -400,11 +401,11 @@ function quickActions(colors: ThemeColors): Array<{
 /** The concept sheet's Dashboard panel leads with a 2x2 "Quick Actions"
  * shortcut grid (Trade Hub/Rankings/Waivers/Draft Picks) above the daily
  * briefing feed — this app's Dashboard had no equivalent shortcut row at
- * all, only the deeper GM Orb menu and per-tile destination buttons.
- * Built on AnimatedCard so these tiles get the same press-scale + resting
- * shadow every other card on the app already has, instead of a bare
- * TouchableOpacity box — one card affordance, not a page-specific one. */
-function QuickActionsGrid({
+ * all, only the deeper GM Orb menu and per-tile destination buttons. Renders
+ * through the shared QuickActionsGrid component so any other hub-style
+ * screen (League Detail) gets the exact same tile affordance rather than a
+ * page-specific reimplementation. */
+function DashboardQuickActions({
   leagueId,
   leagueName,
   navigation,
@@ -415,22 +416,14 @@ function QuickActionsGrid({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.quickActionsGrid}>
-      {quickActions(colors).map((action) => (
-        <AnimatedCard
-          key={action.route}
-          style={StyleSheet.flatten([styles.quickActionCell, { borderColor: `${action.color}55` }])}
-          onPress={() => navigation.navigate(action.route, { leagueId, leagueName })}
-        >
-          <IconCircle name={action.icon} color={action.color} size={44} />
-          <AppText style={styles.quickActionLabel} numberOfLines={1}>
-            {action.label}
-          </AppText>
-        </AnimatedCard>
-      ))}
-    </View>
-  );
+  const actions: QuickAction[] = quickActions(colors).map((action) => ({
+    key: action.route,
+    label: action.label,
+    icon: action.icon,
+    color: action.color,
+    onPress: () => navigation.navigate(action.route, { leagueId, leagueName }),
+  }));
+  return <QuickActionsGrid actions={actions} style={styles.quickActionsGrid} />;
 }
 
 function DestinationButton({
@@ -886,25 +879,10 @@ function createStyles(colors: ThemeColors) {
     padding: spacing.xl,
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16, textAlign: 'center' },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: spacing.lg,
-    gap: spacing.sm,
-  },
-  // 2x2 grid (2 tiles per row) per the concept sheet — larger touch targets
-  // and a bigger IconCircle than the old 4-across row, since these are
-  // primary GM-workflow entry points, not a footnote row.
-  quickActionCell: {
-    flexBasis: '47%',
-    flexGrow: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.sm,
-    gap: spacing.sm,
-    borderWidth: 1,
-  },
-  quickActionLabel: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  // Dashboard's content container has no `gap` (everything else here relies
+  // on manual marginBottom), so the shared grid's own spacing is overridden
+  // here rather than the grid inventing an opinion about screen spacing.
+  quickActionsGrid: { marginBottom: spacing.lg },
   lockWrap: { marginTop: spacing.md },
   pulseSection: { marginTop: spacing.lg },
   pulseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
