@@ -34,9 +34,9 @@ LEAGUE_RECAPS_CSS = """
     margin:var(--space-xs) 0 0;
 }
 .dg-recap-board{
-    display:grid;
+    display:flex;
+    flex-direction:column;
     gap:var(--space-md);
-    grid-template-columns:minmax(0,1fr);
 }
 .dg-recap-story{
     border-left:var(--border-width-semantic) solid var(--color-border-strong);
@@ -45,15 +45,83 @@ LEAGUE_RECAPS_CSS = """
     min-width:0;
     padding:0 0 0 var(--space-sm);
 }
-.dg-recap-story--performance{border-left-color:var(--color-prestige-elite)}
-.dg-recap-story--performance_low{border-left-color:var(--color-prestige-elite)}
-.dg-recap-story--trade{border-left-color:var(--color-accent)}
-.dg-recap-story--waiver{border-left-color:var(--color-success)}
-.dg-recap-story--waiver_low{border-left-color:var(--color-success)}
-.dg-recap-story--matchup{border-left-color:var(--color-information)}
-.dg-recap-story--matchup_close{border-left-color:var(--color-information)}
-.dg-recap-story--activity{border-left-color:var(--color-warning)}
-.dg-recap-story--activity_low{border-left-color:var(--color-warning)}
+/* Routine (non-lead) stories share one grouped surface per category — see
+   .dg-recap-group below for the color signal — so an individual card no
+   longer repeats a colored left border; a plain divider separates rows
+   within a group instead of N identically-bordered cards. */
+.dg-recap-group-body .dg-recap-story{
+    border-left:none;
+    border-top:var(--border-width-default) solid var(--color-border);
+    padding:var(--space-sm) 0 0;
+}
+.dg-recap-group-body .dg-recap-story:first-child{
+    border-top:none;
+    padding-top:0;
+}
+/* The lead story (stories[0] — the same story the masthead headline is
+   drawn from) is the one card allowed to dominate: elevated surface, a
+   full-strength colored border keyed to its own category, and bigger type. */
+.dg-recap-story--lead{
+    background:var(--color-surface-raised);
+    border:var(--border-width-default) solid var(--color-border);
+    border-left:var(--border-width-semantic) solid var(--color-accent);
+    box-shadow:var(--shadow-card);
+    padding:var(--space-md);
+}
+.dg-recap-story--lead.dg-recap-story--performance,
+.dg-recap-story--lead.dg-recap-story--performance_low{border-left-color:var(--color-prestige-elite)}
+.dg-recap-story--lead.dg-recap-story--trade{border-left-color:var(--color-accent)}
+.dg-recap-story--lead.dg-recap-story--waiver,
+.dg-recap-story--lead.dg-recap-story--waiver_low{border-left-color:var(--color-success)}
+.dg-recap-story--lead.dg-recap-story--matchup,
+.dg-recap-story--lead.dg-recap-story--matchup_close{border-left-color:var(--color-danger)}
+.dg-recap-story--lead.dg-recap-story--activity,
+.dg-recap-story--lead.dg-recap-story--activity_low{border-left-color:var(--color-warning)}
+.dg-recap-story--lead.dg-recap-story--roster_riser{border-left-color:var(--color-accent)}
+.dg-recap-story--lead .dg-recap-story-kicker h3{
+    font-size:var(--font-size-section-title);
+}
+.dg-recap-story--lead .dg-recap-summary{
+    color:var(--color-text-primary);
+}
+/* Category group header — one per run of consecutive same-category
+   stories below the lead. Mirrors .dg-alerts-group (alerts_activity_styles.py)
+   so a routine story's category reads through this label + accent bar
+   instead of its own card repeating a colored border. */
+.dg-recap-group{
+    align-items:center;
+    color:var(--color-text-muted);
+    display:flex;
+    font:var(--type-supporting-metadata);
+    gap:var(--space-xs);
+    letter-spacing:var(--letter-spacing-badge);
+    margin:0 0 var(--space-2xs);
+    text-transform:uppercase;
+}
+.dg-recap-group__bar{
+    background:currentColor;
+    display:inline-block;
+    height:0.8rem;
+    width:3px;
+}
+.dg-recap-group-body{
+    display:grid;
+    gap:var(--space-2xs);
+}
+.dg-recap-group--performance{color:var(--color-prestige-elite)}
+.dg-recap-group--matchup{color:var(--color-danger)}
+.dg-recap-group--waiver{color:var(--color-success)}
+.dg-recap-group--trade{color:var(--color-accent)}
+.dg-recap-group--activity{color:var(--color-warning)}
+.dg-recap-group--roster{color:var(--color-accent)}
+.dg-recap-group--other{color:var(--color-text-muted)}
+.dg-recap-affordance{
+    color:var(--color-accent);
+    font:var(--type-supporting-metadata);
+    letter-spacing:var(--letter-spacing-badge);
+    margin:var(--space-2xs) 0 0;
+    text-transform:uppercase;
+}
 .dg-recap-story-kicker{
     align-items:center;
     display:flex;
@@ -132,11 +200,6 @@ LEAGUE_RECAPS_CSS = """
 .dg-tx-grade--pending{color:var(--color-text-muted)}
 @media (min-width:1024px){
     .dg-recap-edition{max-width:none}
-    .dg-recap-board{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .dg-recap-story:first-child{grid-column:1/-1}
-}
-@media (max-width:430px){
-    .dg-recap-board{grid-template-columns:minmax(0,1fr)}
 }
 div[class*="st-key-league_memory_view_"] [data-testid="stPills"],
 div[class*="st-key-league_memory_view_"] [data-testid="stButtonGroup"],
