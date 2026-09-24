@@ -16,8 +16,14 @@ from modules.league_format_context import (
     future_picks_are_trade_capital,
     pick_is_actionable_capital,
 )
-from modules.league_recaps import league_history_window
-from modules.league_standings import win_percentage
+from modules.record_signal import (
+    RECORD_SIGNAL_WEIGHT_CEILING,
+    RECORD_SIGNAL_WEIGHT_FLOOR,
+    RECORD_SIGNAL_WEIGHT_SEASON_SLOPE,
+    blend_percentile_with_record,
+    record_signal_weight as _record_signal_weight,
+    season_progress_fraction as _season_progress_fraction,
+)
 from modules.team_eval import (
     get_team_vs_league,
     normalize_team_strategy,
@@ -94,14 +100,14 @@ DEFAULT_CLASS_STRENGTH_BY_YEAR: Dict[int, float] = {
 TEAM_MODIFIER_BASE = 0.88
 TEAM_MODIFIER_RANGE = 0.24
 # How much a team's real win-loss record outweighs its roster-value
-# percentile once it has actually played at least one game. A floor well
-# above zero so a couple of results already move the number (this is
-# directly coridian_'s "I'm 0-2 and it's not being taken into account"
-# complaint) and a ceiling below 1.0 so roster talent -- which is also what
-# out-year picks are keyed off of -- never loses all say, even in Week 17.
-RECORD_SIGNAL_WEIGHT_FLOOR = 0.30
-RECORD_SIGNAL_WEIGHT_CEILING = 0.85
-RECORD_SIGNAL_WEIGHT_SEASON_SLOPE = 0.55
+# percentile once it has actually played at least one game -- floor/ceiling/
+# slope now live in modules.record_signal (shared with team_eval's posture
+# classification) and are re-exported here unchanged so existing call sites
+# and tests keep working. A floor well above zero so a couple of results
+# already move the number (this is directly coridian_'s "I'm 0-2 and it's
+# not being taken into account" complaint) and a ceiling below 1.0 so roster
+# talent -- which is also what out-year picks are keyed off of -- never
+# loses all say, even in Week 17.
 CORE_POSITIONS = ("QB", "RB", "WR", "TE")
 POSITION_MINIMUMS = {"QB": 1, "RB": 3, "WR": 4, "TE": 1}
 PRIMARY_REASON_TAGS = {
@@ -281,40 +287,6 @@ def _normalize_bucket_probabilities(weights: Dict[str, float]) -> Dict[str, floa
     return {bucket: normalized[bucket] / total for bucket in buckets}
 
 
-def _record_signal_weight(season_progress: float | None) -> float:
-    """How much a real win-loss record should outweigh roster-value when a
-    team has actually played games. See RECORD_SIGNAL_WEIGHT_* comments above
-    for why the floor/ceiling/slope were chosen. `season_progress` is a
-    0.0 (preseason) - 1.0 (regular-season finale) fraction, the same signal
-    `modules.league_recaps.league_history_window`'s (leg / regular_season_end)
-    already produces elsewhere in the app.
-    """
-
-    progress = _clamp_float(season_progress if season_progress is not None else 0.0, 0.0, 1.0)
-    return _clamp_float(
-        RECORD_SIGNAL_WEIGHT_FLOOR + (RECORD_SIGNAL_WEIGHT_SEASON_SLOPE * progress),
-        RECORD_SIGNAL_WEIGHT_FLOOR,
-        RECORD_SIGNAL_WEIGHT_CEILING,
-    )
-
-
-def _season_progress_fraction(league: Mapping[str, Any] | None) -> float:
-    """Fraction of the regular season completed, reusing the exact leg /
-    playoff_week_start fields `league_recaps.league_history_window` already
-    reads (no new time signal invented). 0.0 when the league object is
-    missing/unplayed so real-record blending safely no-ops preseason."""
-
-    if not isinstance(league, Mapping):
-        return 0.0
-    try:
-        current_leg, regular_season_end, _max_history_week = league_history_window(league)
-    except Exception:
-        return 0.0
-    if regular_season_end <= 0:
-        return 0.0
-    return _clamp_float(current_leg / regular_season_end, 0.0, 1.0)
-
-
 def _pick_team_context(
     original_roster_id: int,
     df_summary: pd.DataFrame,
@@ -363,21 +335,14 @@ def _pick_team_context(
     # orientation as roster_value_percentile (0 = strongest roster) so the
     # two blend directly. A weaker team (by wins) means an earlier/more
     # valuable pick for that roster, exactly like a weaker team by talent.
-    slot_percentile = roster_value_percentile
-    record_weight = 0.0
-    if isinstance(roster_record, Mapping):
-        wins = _safe_int(roster_record.get("wins"), 0)
-        losses = _safe_int(roster_record.get("losses"), 0)
-        ties = _safe_int(roster_record.get("ties"), 0)
-        win_pct = win_percentage(wins, losses, ties)
-        if win_pct is not None:
-            record_weakness_percentile = _clamp_float(1.0 - win_pct, 0.0, 1.0)
-            record_weight = _record_signal_weight(season_progress)
-            slot_percentile = _clamp_float(
-                ((1.0 - record_weight) * roster_value_percentile) + (record_weight * record_weakness_percentile),
-                0.0,
-                1.0,
-            )
+    # Shared with team_eval's posture classification via modules.record_signal
+    # so both call sites use the identical floor/ceiling/slope blend.
+    slot_percentile, record_weight = blend_percentile_with_record(
+        roster_value_percentile,
+        roster_record,
+        season_progress,
+        record_strength_is_high=False,
+    )
 
     if slot_percentile >= 0.67:
         tier_bucket = "early"

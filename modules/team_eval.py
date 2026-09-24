@@ -1,8 +1,9 @@
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Mapping, Optional
 
 import pandas as pd
 
 from modules import runtime_trace
+from modules.record_signal import blend_percentile_with_record, season_progress_fraction
 from modules.sleeper import get_league_roster_profiles
 from modules.platforms.sleeper import get_sleeper_adapter
 
@@ -157,11 +158,40 @@ def _empty_summary_row(
     }
 
 
-def _classify_team_strategy(score_percentile: float, avg_age, age_median) -> str:
+def _classify_team_strategy(
+    score_percentile: float,
+    avg_age,
+    age_median,
+    *,
+    roster_record: Optional[Mapping[str, Any]] = None,
+    season_progress: Optional[float] = None,
+) -> str:
+    """Classify a team's roster "posture" from a roster-value percentile
+    (`score_percentile`, from `total_score`) blended with the team's REAL
+    win-loss record (`roster_record` = Sleeper's own roster `settings` dict,
+    `{"wins", "losses", "ties"}`).
+
+    Previously this was pure roster-value: a team with a strong roster on
+    paper but a bad real start (e.g. 0-2) still classified as "Contender" --
+    the same bug class flagged by coridian_ for draft pick projections
+    (fixed in `modules.trade_ideas._pick_team_context`). The blend here
+    reuses that fix's exact formula (`modules.record_signal`), weighted by
+    how much of the season has actually been played via `season_progress`:
+    early on, a couple of results are noisy so roster value still leads;
+    late in the season the record carries most of the weight instead.
+    """
+
     try:
         pct = float(score_percentile)
     except Exception:
         pct = 0.5
+
+    pct, _record_weight = blend_percentile_with_record(
+        pct,
+        roster_record,
+        season_progress,
+        record_strength_is_high=True,
+    )
 
     age_delta = 0.0
     try:
@@ -392,6 +422,23 @@ def build_league_summary(
     if not rosters or not users:
         return pd.DataFrame()
 
+    # Real win-loss record per roster + how much of the regular season has
+    # been played -- both already present on the `league`/`rosters` payloads
+    # fetched above -- fed into _classify_team_strategy so a team's actual
+    # standing (not just roster talent) moves its posture classification.
+    # Same signal, same shared helper (modules.record_signal) as
+    # trade_ideas._pick_team_context's fix for this exact bug class.
+    try:
+        league = platform_adapter.get_league(league_id)
+    except Exception:
+        league = {}
+    season_progress = season_progress_fraction(league)
+    roster_settings_by_id: Dict[Any, Any] = {
+        r.get("roster_id"): r.get("settings")
+        for r in rosters
+        if r.get("roster_id") is not None and isinstance(r.get("settings"), dict)
+    }
+
     user_map: Dict[str, str] = {}
     for u in users:
         name = u.get("display_name") or u.get("username") or "Unknown"
@@ -472,6 +519,8 @@ def build_league_summary(
             float(score_percentiles.loc[idx]),
             row.get("avg_age"),
             age_median,
+            roster_record=roster_settings_by_id.get(row.get("roster_id")),
+            season_progress=season_progress,
         )
         strategies.append(strategy)
         strategy_labels.append(team_strategy_label(strategy))
