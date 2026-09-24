@@ -31,7 +31,6 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
 .dg-daily-briefing-kicker-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
 .dg-daily-briefing-kicker{color:var(--color-text-primary);font:var(--font-card-title);letter-spacing:var(--letter-spacing-badge);opacity:1;text-transform:uppercase}
 .dg-game-plan-card{opacity:1}
-.dg-game-plan-card .dg-glyph--waiver{color:var(--color-success)!important;opacity:1}
 .dg-daily-briefing-kind{align-items:center;color:var(--color-text-secondary);display:inline-flex;font:var(--type-supporting-metadata);gap:var(--space-xs);letter-spacing:var(--letter-spacing-badge);opacity:1;text-transform:uppercase}
 .dg-daily-briefing-kind .dg-glyph{opacity:1}
 .dg-daily-briefing-kind .dg-glyph{margin-right:0}

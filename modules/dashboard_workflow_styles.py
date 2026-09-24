@@ -288,12 +288,12 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
 }
 .dashboard-hydrate-skeleton {
     display: grid;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
 }
 .dashboard-hydrate-skeleton-row {
     background: var(--surface-2, var(--color-surface-muted));
-    border-radius: var(--radius-card, 0.5rem);
+    border-radius: var(--radius-panel);
     height: 4.5rem;
     min-height: 4.5rem;
 }
@@ -320,11 +320,23 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
 
 div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
 div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
+    background: var(--border-standard);
+    border: var(--border-width-default) solid var(--border-standard);
+    border-radius: var(--radius-panel);
     display: grid;
-    gap: var(--space-xs);
+    gap: var(--border-width-default);
     grid-template-columns: 1fr 1fr;
+    overflow: hidden;
 }
+/* Six related roster metrics read as one grouped panel with hairline dividers
+   (the grid gap above shows the container background through) rather than six
+   separately-bordered cards — each metric keeps its own tone accent via the
+   existing dg-card-* top-strip, just without a competing full box border. */
 div[class*="st-key-dashboard_team_snapshot"] .summary-tile {
+    background: var(--surface-1);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
     margin: 0;
     min-height: 0;
     padding: var(--space-xs) var(--space-sm);
