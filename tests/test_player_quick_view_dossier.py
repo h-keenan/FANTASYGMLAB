@@ -517,7 +517,12 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     renderer_start = source.index("def render_player_quick_view_content(")
     renderer_end = source.index("def render_player_detail_content(", renderer_start)
     renderer = source[renderer_start:renderer_end]
-    assert renderer.count("player_quick_view.build_stats_view(row)") == 1
+    # df_players is passed so the dormant percentile/OVR machinery in
+    # build_stats_view actually has a pool to rank against (see
+    # test_percentiles_rank_the_player_inside_their_position_group and
+    # test_overall_rating_tops_out_for_the_best_score_in_the_position) —
+    # still exactly one call, never a second recompute.
+    assert renderer.count("player_quick_view.build_stats_view(row, df_players)") == 1
     assert "current_season_summary_html(" in renderer
     assert "render_current_season(quick_view_stats, omit_empty=True)" in renderer
     assert "render_college_production(quick_view_stats, omit_empty=True)" in renderer

@@ -67,6 +67,8 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .player-dossier-rank-cell strong,.pqv-signal-badge-answer{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
 .pqv-signal-badge-group{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin:var(--space-xs) 0 0}
 .pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
+.pqv-signal-badge--risk{border-left-color:var(--color-warning)}
+.pqv-signal-badge--risk .pqv-signal-badge-answer{color:var(--color-warning)}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio{margin:0 0 var(--space-sm);max-width:none}
 .player-quick-view-shell{max-width:54rem;min-width:0;overflow-x:clip}
 .player-quick-view-shell .dg-tier-legend{margin:var(--space-2xs) 0 0;max-width:22rem}
@@ -95,6 +97,16 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .pqv-model-cell strong{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
 .pqv-model-cell small{color:var(--color-text-secondary);font-size:var(--font-size-caption);line-height:1.25;overflow-wrap:anywhere}
 .player-quick-view-stat-grid{display:grid;gap:var(--space-xs);grid-template-columns:repeat(2,minmax(0,1fr))}
+.pqv-stat-percentile{align-items:center;display:flex;gap:var(--space-2xs);margin-top:2px}
+.pqv-stat-percentile-bar{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:block;height:6px;max-width:4rem;overflow:hidden;width:100%}
+.pqv-stat-percentile-bar>span{display:block;height:100%}
+.pqv-stat-percentile-label{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);white-space:nowrap}
+.pqv-stat-percentile--low .pqv-stat-percentile-bar>span{background:var(--color-danger)}
+.pqv-stat-percentile--mid .pqv-stat-percentile-bar>span{background:var(--color-action)}
+.pqv-stat-percentile--high .pqv-stat-percentile-bar>span{background:var(--color-success)}
+.player-dossier-rank-cell strong.pqv-ovr--low{color:var(--color-danger)}
+.player-dossier-rank-cell strong.pqv-ovr--mid{color:var(--color-action)}
+.player-dossier-rank-cell strong.pqv-ovr--high{color:var(--color-success)}
 .player-dossier-timeline-metrics{display:grid;gap:var(--space-2xs) var(--space-sm);grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-dossier-timeline-metrics span{color:var(--color-text-secondary);font-size:var(--font-size-caption);overflow-wrap:anywhere}
 .player-dossier-timeline-year{display:grid;gap:2px}

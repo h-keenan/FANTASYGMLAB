@@ -4326,7 +4326,7 @@ def render_player_quick_view_content(
         + "</div>"
     )
     with _pqv_exclusive("pqv_current_season"):
-        quick_view_stats = player_quick_view.build_stats_view(row)
+        quick_view_stats = player_quick_view.build_stats_view(row, df_players)
         fantasy_ppg = ""
         if quick_view_stats.seasons:
             fantasy_ppg = next(
@@ -4508,6 +4508,7 @@ def render_player_quick_view_content(
         position_display=position_rank_label,
         dynasty_value=value_score,
         scoring_format="",
+        overall_rating=quick_view_stats.overall_rating,
         signal_badges=identity_badges,
         identity=resolve_player_tier_identity(row, stored_tier=tier_label),
         include_tier_legend=False,
@@ -4538,6 +4539,21 @@ def render_player_quick_view_content(
         ),
         confidence=confidence_display,
         factors=why_factors,
+        # action_tile_tone (risk / opportunity / strategy) was already being
+        # computed for this exact player-action classification but only fed
+        # the archived snapshot_html path (see DossierSnapshot below) — the
+        # live Decision panel rendered the same Shop/Hold/Drop/Trade Target
+        # text with no color regardless of state. Reuses the same
+        # glyph_chip_html tones (success/warning/primary) already used for
+        # the header context chips above, not a new one-off palette.
+        status_pill_html=(
+            glyph_chip_html(
+                primary_status,
+                {"risk": "warning", "opportunity": "success"}.get(action_tile_tone, "primary"),
+            )
+            if primary_status
+            else ""
+        ),
     )
     model_summary_html = player_quick_view.compact_model_summary_html(
         (

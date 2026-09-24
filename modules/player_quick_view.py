@@ -813,12 +813,41 @@ def build_stats_view(
     )
 
 
+#: Shared red -> gold -> green banding for every position-group percentile
+#: shown on this screen (stat rows and the hero OVR badge alike) — one ramp,
+#: not a bespoke color per surface. Bands intentionally skew wide in the
+#: middle: a 34th-66th percentile is an ordinary, unremarkable result and
+#: should not read as either a warning or a strength.
+def _percentile_band(percentile: float) -> str:
+    if percentile < 34:
+        return "low"
+    if percentile < 67:
+        return "mid"
+    return "high"
+
+
+def _percentile_chip_html(percentile: float | None) -> str:
+    if percentile is None:
+        return ""
+    clamped = max(1, min(100, round(percentile)))
+    band = _percentile_band(clamped)
+    return (
+        f"<div class='pqv-stat-percentile pqv-stat-percentile--{band}' "
+        f"aria-label='{clamped} percentile at position'>"
+        "<span class='pqv-stat-percentile-bar'>"
+        f"<span style='width:{clamped}%'></span></span>"
+        f"<span class='pqv-stat-percentile-label'>{_ordinal(clamped)} pct</span>"
+        "</div>"
+    )
+
+
 def dense_section_html(title: str, items: tuple[StatItem, ...] | list[StatItem]) -> str:
     rows = "".join(
         "<div class='player-quick-view-stat-row'>"
         f"<div class='player-quick-view-stat-label'>{escape(item.label)}</div>"
         "<div class='player-quick-view-stat-copy'>"
         f"<div class='player-quick-view-stat-value dg-stat-tone-{escape(item.tone)}'>{escape(item.value)}</div>"
+        + _percentile_chip_html(item.percentile)
         + (f"<div class='player-quick-view-stat-note'>{escape(item.note)}</div>" if item.note else "")
         + "</div></div>"
         for item in items
@@ -839,16 +868,32 @@ def dossier_section_heading_html(title: str, subtitle: str = "") -> str:
     )
 
 
+#: OVR badge banding on the rating's own 1-99 scale (see
+#: ``_OVERALL_RATING_CURVE``): a 62 is already the curve's own mid-pack
+#: reference point, so only a clearly below-curve rating reads as low and
+#: only the curve's compressed top end reads as high.
+def _overall_rating_band(rating: int) -> str:
+    if rating < 50:
+        return "low"
+    if rating < 80:
+        return "mid"
+    return "high"
+
+
 def rank_strip_html(
     *,
     overall_display: str,
     position_display: str = "",
     scoring_format: str = "",
     dynasty_value: str = "",
+    overall_rating: int | None = None,
 ) -> str:
     """One compact value/rank owner: dynasty value, overall, position, format."""
 
-    cells: list[tuple[str, str]] = []
+    cells: list[tuple[str, str, str]] = []
+    if overall_rating is not None:
+        band = _overall_rating_band(int(overall_rating))
+        cells.append(("Overall rating", f"{int(overall_rating)}/99", f" pqv-ovr--{band}"))
     overall = _text(overall_display)
     if overall and overall.casefold() not in {
         "rank unavailable",
@@ -856,23 +901,28 @@ def rank_strip_html(
         "unavailable",
         "unknown",
     }:
-        cells.append(("Overall rank", overall))
+        cells.append(("Overall rank", overall, ""))
     position = _text(position_display)
     if position and position.casefold() not in {"not available", "unavailable", "unknown"}:
-        cells.append(("Position rank", position))
+        cells.append(("Position rank", position, ""))
     value = _text(dynasty_value)
     if value and value.casefold() not in {"not available", "unavailable", "unknown"}:
-        cells.append(("Dynasty value", value))
+        cells.append(("Dynasty value", value, ""))
     fmt = _text(scoring_format)
     if fmt:
-        cells.append(("Format", fmt))
+        cells.append(("Format", fmt, ""))
     if not cells:
         return ""
     cell_html = "".join(
         "<div class='player-dossier-rank-cell'>"
-        f"<span>{escape(label)}</span><strong>{escape(text)}</strong>"
-        "</div>"
-        for label, text in cells
+        f"<span>{escape(label)}</span>"
+        + (
+            f"<strong class='{escape(tone_class.strip())}'>{escape(text)}</strong>"
+            if tone_class.strip()
+            else f"<strong>{escape(text)}</strong>"
+        )
+        + "</div>"
+        for label, text, tone_class in cells
     )
     return (
         "<div class='player-dossier-rank-strip pqv-hero-value' role='group' "
@@ -894,6 +944,7 @@ def pqv_hero_html(
     position_display: str = "",
     dynasty_value: str = "",
     scoring_format: str = "",
+    overall_rating: int | None = None,
     signal_badges: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
     identity: PlayerTierIdentity | None = None,
     include_tier_legend: bool = False,
@@ -912,6 +963,7 @@ def pqv_hero_html(
         position_display=position_display,
         scoring_format=scoring_format,
         dynasty_value=dynasty_value,
+        overall_rating=overall_rating,
     )
     filtered_badges = []
     for question, answer in signal_badges:
@@ -1021,7 +1073,16 @@ def pqv_primary_workspace_html(
 
 
 def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, str], ...]) -> str:
-    """Labeled identity badges. Each badge answers a distinct question."""
+    """Labeled identity badges. Each badge answers a distinct question.
+
+    Every badge shared the same neutral gray accent regardless of what it
+    said — a "Health: Questionable" flag read no differently than a routine
+    "Usage" trend note. The caller only ever appends a "Health" badge when
+    the player is already flagged as not fully healthy (see the
+    identity-badge construction in ``render_player_quick_view_content``), so
+    that one question is always a real concern and gets the same warning
+    accent ``_player_injury_chip`` already uses for it elsewhere.
+    """
 
     parts: list[str] = []
     seen: set[str] = set()
@@ -1034,8 +1095,9 @@ def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, 
         if key in seen:
             continue
         seen.add(key)
+        risk_class = " pqv-signal-badge--risk" if label.casefold() == "health" else ""
         parts.append(
-            "<span class='pqv-signal-badge' role='listitem'>"
+            f"<span class='pqv-signal-badge{risk_class}' role='listitem'>"
             f"<span class='pqv-signal-badge-question'>{escape(label)}</span>"
             f"<span class='pqv-signal-badge-answer'>{escape(value)}</span>"
             "</span>"
@@ -1999,12 +2061,19 @@ def recommendation_context_html(
     recommendation_id: str = "",
     confidence: str = "",
     factors: list[tuple[str, str]] | tuple[tuple[str, str], ...] | None = None,
+    status_pill_html: str = "",
 ) -> str:
     """Render PQV recommendation or neutral player context.
 
     When ``active_recommendation`` is false, this is general player analysis —
     not a synthesized recommendation. Shop/Hold/Drop/Acquire/Monitor verbs are
     suppressed unless an active canonical recommendation is bound.
+
+    ``status_pill_html`` is a pre-rendered, already-colored status chip for
+    this player's roster status (Core Asset / Trade Candidate / Drop
+    Candidate / Hold / ...), passed in rather than built here so this module
+    never takes on its own status-color mapping. Omitting it changes nothing
+    else — the Decision panel simply has no status chip.
     """
 
     title = "Decision" if active_recommendation else "Player Context"
@@ -2021,7 +2090,7 @@ def recommendation_context_html(
             action_text = "No active recommendation"
         confidence_text = ""
     topline = ""
-    if action_text or confidence_text:
+    if action_text or confidence_text or status_pill_html:
         topline = (
             "<div class='pqv-decision-topline'>"
             + (
@@ -2029,6 +2098,7 @@ def recommendation_context_html(
                 if action_text
                 else ""
             )
+            + status_pill_html
             + (
                 f"<span class='pqv-recommendation-confidence'>{escape(confidence_text)}</span>"
                 if confidence_text
