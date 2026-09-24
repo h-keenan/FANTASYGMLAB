@@ -5,6 +5,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from copy import deepcopy
 from itertools import combinations
+from math import exp
 from types import MappingProxyType
 from hashlib import sha256
 import json
@@ -15,6 +16,8 @@ from modules.league_format_context import (
     future_picks_are_trade_capital,
     pick_is_actionable_capital,
 )
+from modules.league_recaps import league_history_window
+from modules.league_standings import win_percentage
 from modules.team_eval import (
     get_team_vs_league,
     normalize_team_strategy,
@@ -81,6 +84,24 @@ DEFAULT_PICK_LEAGUE_SETTINGS = {
 DEFAULT_CLASS_STRENGTH_BY_YEAR: Dict[int, float] = {
     2026: 1.15,
 }
+# Team-strength ("team_modifier") band: how much a team's own standing can
+# move its own pick's value. Widened from a hard-coded 0.96-1.04 (+/-4%,
+# barely enough to register a real 0-2 record) to +/-12%, sized against this
+# same formula's sibling multipliers -- comparable to one year of
+# future_discount decay (0.88x per years_out step), but well inside
+# class/prospect-strength's +/-20-25% ceiling so it never dominates the
+# overall score on its own.
+TEAM_MODIFIER_BASE = 0.88
+TEAM_MODIFIER_RANGE = 0.24
+# How much a team's real win-loss record outweighs its roster-value
+# percentile once it has actually played at least one game. A floor well
+# above zero so a couple of results already move the number (this is
+# directly coridian_'s "I'm 0-2 and it's not being taken into account"
+# complaint) and a ceiling below 1.0 so roster talent -- which is also what
+# out-year picks are keyed off of -- never loses all say, even in Week 17.
+RECORD_SIGNAL_WEIGHT_FLOOR = 0.30
+RECORD_SIGNAL_WEIGHT_CEILING = 0.85
+RECORD_SIGNAL_WEIGHT_SEASON_SLOPE = 0.55
 CORE_POSITIONS = ("QB", "RB", "WR", "TE")
 POSITION_MINIMUMS = {"QB": 1, "RB": 3, "WR": 4, "TE": 1}
 PRIMARY_REASON_TAGS = {
@@ -260,7 +281,62 @@ def _normalize_bucket_probabilities(weights: Dict[str, float]) -> Dict[str, floa
     return {bucket: normalized[bucket] / total for bucket in buckets}
 
 
-def _pick_team_context(original_roster_id: int, df_summary: pd.DataFrame) -> Dict[str, float | str]:
+def _record_signal_weight(season_progress: float | None) -> float:
+    """How much a real win-loss record should outweigh roster-value when a
+    team has actually played games. See RECORD_SIGNAL_WEIGHT_* comments above
+    for why the floor/ceiling/slope were chosen. `season_progress` is a
+    0.0 (preseason) - 1.0 (regular-season finale) fraction, the same signal
+    `modules.league_recaps.league_history_window`'s (leg / regular_season_end)
+    already produces elsewhere in the app.
+    """
+
+    progress = _clamp_float(season_progress if season_progress is not None else 0.0, 0.0, 1.0)
+    return _clamp_float(
+        RECORD_SIGNAL_WEIGHT_FLOOR + (RECORD_SIGNAL_WEIGHT_SEASON_SLOPE * progress),
+        RECORD_SIGNAL_WEIGHT_FLOOR,
+        RECORD_SIGNAL_WEIGHT_CEILING,
+    )
+
+
+def _season_progress_fraction(league: Mapping[str, Any] | None) -> float:
+    """Fraction of the regular season completed, reusing the exact leg /
+    playoff_week_start fields `league_recaps.league_history_window` already
+    reads (no new time signal invented). 0.0 when the league object is
+    missing/unplayed so real-record blending safely no-ops preseason."""
+
+    if not isinstance(league, Mapping):
+        return 0.0
+    try:
+        current_leg, regular_season_end, _max_history_week = league_history_window(league)
+    except Exception:
+        return 0.0
+    if regular_season_end <= 0:
+        return 0.0
+    return _clamp_float(current_leg / regular_season_end, 0.0, 1.0)
+
+
+def _pick_team_context(
+    original_roster_id: int,
+    df_summary: pd.DataFrame,
+    *,
+    roster_record: Mapping[str, Any] | None = None,
+    season_progress: float | None = None,
+) -> Dict[str, float | str]:
+    """Blend roster-value percentile (talent, from `total_score`) with the
+    team's REAL win-loss record (from Sleeper's own roster settings, via
+    `roster_record` = {"wins", "losses", "ties"}) into a single slot
+    percentile used both for this pick's projected range (Bug 1's model) and
+    its `team_modifier` (Bug 2's fix).
+
+    Previously this used roster talent only -- a team could be 0-2 with a
+    talented roster and see almost no movement, which is exactly
+    coridian_'s reported bug ("I am 0 and 2 ... nothing's being taken into
+    account"). Win-loss is blended in, weighted by how much of the season
+    has actually been played (`season_progress`): early on a couple of
+    results are noisy, so roster value still leads; late in the season the
+    record is close to determining final draft order, so it leads instead.
+    """
+
     if df_summary.empty or "roster_id" not in df_summary.columns or "total_score" not in df_summary.columns:
         return {"tier_bucket": "mid", "team_modifier": 1.0, "slot_percentile": 0.5}
 
@@ -281,18 +357,41 @@ def _pick_team_context(original_roster_id: int, df_summary: pd.DataFrame) -> Dic
     ranked["strength_rank"] = ranked["_total_score_key"].rank(method="average", ascending=False)
     team_rank = float(ranked.loc[ranked["_roster_id_key"] == original_roster_id, "strength_rank"].iloc[0])
     total_teams = max(1, int(len(ranked)))
-    slot_percentile = (team_rank - 1) / max(total_teams - 1, 1)
+    roster_value_percentile = (team_rank - 1) / max(total_teams - 1, 1)
+
+    # Real win-loss signal: 0.0 = best possible record, 1.0 = worst -- same
+    # orientation as roster_value_percentile (0 = strongest roster) so the
+    # two blend directly. A weaker team (by wins) means an earlier/more
+    # valuable pick for that roster, exactly like a weaker team by talent.
+    slot_percentile = roster_value_percentile
+    record_weight = 0.0
+    if isinstance(roster_record, Mapping):
+        wins = _safe_int(roster_record.get("wins"), 0)
+        losses = _safe_int(roster_record.get("losses"), 0)
+        ties = _safe_int(roster_record.get("ties"), 0)
+        win_pct = win_percentage(wins, losses, ties)
+        if win_pct is not None:
+            record_weakness_percentile = _clamp_float(1.0 - win_pct, 0.0, 1.0)
+            record_weight = _record_signal_weight(season_progress)
+            slot_percentile = _clamp_float(
+                ((1.0 - record_weight) * roster_value_percentile) + (record_weight * record_weakness_percentile),
+                0.0,
+                1.0,
+            )
+
     if slot_percentile >= 0.67:
         tier_bucket = "early"
     elif slot_percentile >= 0.34:
         tier_bucket = "mid"
     else:
         tier_bucket = "late"
-    team_modifier = 0.96 + (slot_percentile * 0.08)
+    team_modifier = TEAM_MODIFIER_BASE + (slot_percentile * TEAM_MODIFIER_RANGE)
     return {
         "tier_bucket": tier_bucket,
         "team_modifier": float(team_modifier),
         "slot_percentile": float(slot_percentile),
+        "roster_value_percentile": float(roster_value_percentile),
+        "record_weight": float(record_weight),
     }
 
 
@@ -304,7 +403,13 @@ def _pick_range_projection(
     current_slot = _clamp_float(current_slot_percentile, 0.0, 1.0)
     stability = max(0.42, 0.84 - (max(0, years_out) * 0.18))
     projected_slot = _clamp_float(0.5 + ((current_slot - 0.5) * stability), 0.0, 1.0)
-    spread = min(0.34, 0.18 + (max(0, years_out) * 0.05))
+    # Base spread raised 0.18 -> 0.30 at years_out=0. Bucket centers are
+    # 0.32-0.34 apart, so at the old 0.18 spread almost every projected slot
+    # sat >= 1 spread-width from two of the three centers; combined with the
+    # hard clamp below that meant those two buckets got LITERAL zero weight,
+    # making a false ~100%/0%/0% confidence the normal output, not an edge
+    # case (this was coridian_'s "how can this be 100% certain" bug).
+    spread = min(0.40, 0.30 + (max(0, years_out) * 0.035))
     bucket_centers = {
         "late": 0.18,
         "mid": 0.50,
@@ -313,7 +418,12 @@ def _pick_range_projection(
     weights = {}
     for bucket, center in bucket_centers.items():
         distance = abs(projected_slot - center)
-        weights[bucket] = max(0.0, 1.0 - (distance / max(spread, 0.01))) ** 2
+        # Gaussian-shaped falloff instead of a hard-clamped quadratic
+        # (max(0, 1 - distance/spread) ** 2): exp() is never exactly zero,
+        # so a pick projected near one bucket's center still keeps some real
+        # probability mass on its neighbors instead of manufacturing false
+        # certainty.
+        weights[bucket] = exp(-((distance / max(spread, 0.01)) ** 2))
     probabilities = _normalize_bucket_probabilities(weights)
     ordered = sorted(probabilities.items(), key=lambda item: item[1], reverse=True)
     primary_bucket, primary_probability = ordered[0]
@@ -484,7 +594,7 @@ def _pick_value_components(
     base = _weighted_pick_base_value(round_num, bucket_probabilities)
     future_discount = 0.88 ** years_out
     projected_slot_percentile = _safe_float(projection.get("projected_slot_percentile"), 0.5)
-    team_modifier = 0.96 + (projected_slot_percentile * 0.08)
+    team_modifier = TEAM_MODIFIER_BASE + (projected_slot_percentile * TEAM_MODIFIER_RANGE)
     format_multiplier = _weighted_pick_format_multiplier(round_num, bucket_probabilities, league_settings)
     class_strength_multiplier = _rookie_class_strength_multiplier(season, class_strength_by_year)
     prospect_strength_multiplier = _prospect_rankings_multiplier(
@@ -577,8 +687,27 @@ def _build_roster_pick_assets(
         for r in rosters
         if r.get("roster_id") is not None and _safe_int(r.get("roster_id")) > 0
     ]
+    # Real win-loss record per roster + how much of the regular season has
+    # been played, both already present on the `league`/`rosters` payloads
+    # fetched above -- fed into _pick_team_context so a team's actual
+    # standing (not just roster talent) moves its own pick's projected slot
+    # and team_modifier. See _pick_team_context's docstring for the bug this
+    # fixes (coridian_'s "I'm 0-2 and it's not being taken into account").
+    roster_settings_by_id = {
+        _safe_int(r.get("roster_id")): r.get("settings")
+        for r in rosters
+        if r.get("roster_id") is not None and isinstance(r.get("settings"), dict)
+    }
+    season_progress = _season_progress_fraction(league)
     pick_team_contexts = {
-        roster_id: MappingProxyType(_pick_team_context(roster_id, df_summary))
+        roster_id: MappingProxyType(
+            _pick_team_context(
+                roster_id,
+                df_summary,
+                roster_record=roster_settings_by_id.get(roster_id),
+                season_progress=season_progress,
+            )
+        )
         for roster_id in dict.fromkeys(roster_ids)
     }
     owner_by_pick = {}
