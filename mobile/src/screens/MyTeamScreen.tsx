@@ -456,6 +456,16 @@ function StartersFullSection({
  * secondary tone so cyan stays reserved for the roster's actual starting
  * value (Magna Carta §2 — "cyan second"), not a completely different row
  * design.
+ *
+ * Split into up to three grouped cards — plain Bench, Injured Reserve, Taxi
+ * Squad — using the server's real Sleeper `roster_slot` (see
+ * LineupPlayer.roster_slot), not `injury_label`: a healthy player can be
+ * parked on IR just as easily as an actually-hurt one can sit in a plain
+ * bench slot, so this is strictly "where the manager placed them," kept
+ * distinct from the injury tag each row already renders via LineupRow.
+ * Reuses the same SectionHeaderRow/sectionLabel/AnimatedCard/LineupRow
+ * building blocks as the rest of this screen rather than a new pattern —
+ * an IR/Taxi group with nothing in it simply doesn't render.
  */
 function BenchFullSection({
   bench,
@@ -466,24 +476,66 @@ function BenchFullSection({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const activeBench = bench.filter((p) => p.roster_slot !== 'ir' && p.roster_slot !== 'taxi');
+  const irBench = bench.filter((p) => p.roster_slot === 'ir');
+  const taxiBench = bench.filter((p) => p.roster_slot === 'taxi');
   return (
     <View>
       <SectionHeaderRow label="Bench" />
       {bench.length === 0 ? (
         <EmptyState icon="people-outline" title="No bench players." />
       ) : (
-        <AnimatedCard style={styles.groupCard}>
-          {bench.map((player, index) => (
-            <LineupRow
-              key={player.player_id}
-              player={player}
-              showDivider={index < bench.length - 1}
-              onPress={() => onPressPlayer(player)}
-              muted
-            />
-          ))}
-        </AnimatedCard>
+        <>
+          {activeBench.length > 0 ? (
+            <AnimatedCard style={styles.groupCard}>
+              {activeBench.map((player, index) => (
+                <LineupRow
+                  key={player.player_id}
+                  player={player}
+                  showDivider={index < activeBench.length - 1}
+                  onPress={() => onPressPlayer(player)}
+                  muted
+                />
+              ))}
+            </AnimatedCard>
+          ) : null}
+          {irBench.length > 0 ? (
+            <BenchSlotGroup label="Injured Reserve" players={irBench} onPressPlayer={onPressPlayer} />
+          ) : null}
+          {taxiBench.length > 0 ? (
+            <BenchSlotGroup label="Taxi Squad" players={taxiBench} onPressPlayer={onPressPlayer} />
+          ) : null}
+        </>
       )}
+    </View>
+  );
+}
+
+function BenchSlotGroup({
+  label,
+  players,
+  onPressPlayer,
+}: {
+  label: string;
+  players: LineupPlayer[];
+  onPressPlayer: (player: LineupPlayer) => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View>
+      <AppText style={styles.sectionLabel}>{label}</AppText>
+      <AnimatedCard style={styles.groupCard}>
+        {players.map((player, index) => (
+          <LineupRow
+            key={player.player_id}
+            player={player}
+            showDivider={index < players.length - 1}
+            onPress={() => onPressPlayer(player)}
+            muted
+          />
+        ))}
+      </AnimatedCard>
     </View>
   );
 }

@@ -1742,6 +1742,42 @@ def _fetch_read_alert_keys(
     return {str(row.get("alert_key")) for row in rows if isinstance(row, dict) and row.get("alert_key")}
 
 
+def _roster_reserve_taxi_ids(roster: dict[str, Any]) -> tuple[set[str], set[str]]:
+    """(reserve_ids, taxi_ids) — the two Sleeper roster slots that sit
+    outside the normal starter/bench lineup, as string player ids.
+
+    Shared by `_roster_relationship_map` (Alerts' roster-relationship pill)
+    and `_suggested_lineup_split` (My Team's bench `roster_slot` tag) so
+    both read Sleeper's real IR/taxi placement the exact same way instead
+    of each re-deriving it from the raw roster payload.
+    """
+
+    reserve = {str(pid) for pid in (roster.get("reserve") or []) if pid}
+    taxi = {str(pid) for pid in (roster.get("taxi") or []) if pid}
+    return reserve, taxi
+
+
+def _roster_slot_for_player(
+    player_id: str, *, reserve_ids: set[str], taxi_ids: set[str], is_starter: bool
+) -> str:
+    """"starter"|"bench"|"taxi"|"ir" for one rostered player.
+
+    Sleeper's real reserve/taxi placement always wins over starter/bench —
+    a manager can genuinely start an IR-tagged player, but the roster-slot
+    concept this resolves is about WHERE they parked him, not the lineup
+    optimizer's opinion. `is_starter` is Sleeper's own `starters` list for
+    `_roster_relationship_map`, or `suggest_optimal_lineup`'s
+    `suggested_starter` flag for `_suggested_lineup_split` — either way,
+    this is the one place reserve/taxi precedence is decided.
+    """
+
+    if player_id in reserve_ids:
+        return "ir"
+    if player_id in taxi_ids:
+        return "taxi"
+    return "starter" if is_starter else "bench"
+
+
 def _roster_relationship_map(roster: dict[str, Any]) -> dict[str, str]:
     """player_id -> "starter"|"bench"|"taxi"|"ir" for every rostered player.
 
@@ -1751,21 +1787,15 @@ def _roster_relationship_map(roster: dict[str, Any]) -> dict[str, str]:
     """
 
     starters = {str(pid) for pid in (roster.get("starters") or []) if pid}
-    taxi = {str(pid) for pid in (roster.get("taxi") or []) if pid}
-    reserve = {str(pid) for pid in (roster.get("reserve") or []) if pid}
+    reserve_ids, taxi_ids = _roster_reserve_taxi_ids(roster)
     players = {str(pid) for pid in (roster.get("players") or []) if pid}
 
-    relationship: dict[str, str] = {}
-    for player_id in players:
-        if player_id in reserve:
-            relationship[player_id] = "ir"
-        elif player_id in taxi:
-            relationship[player_id] = "taxi"
-        elif player_id in starters:
-            relationship[player_id] = "starter"
-        else:
-            relationship[player_id] = "bench"
-    return relationship
+    return {
+        player_id: _roster_slot_for_player(
+            player_id, reserve_ids=reserve_ids, taxi_ids=taxi_ids, is_starter=player_id in starters
+        )
+        for player_id in players
+    }
 
 
 def _project_alert_item(
@@ -3127,7 +3157,9 @@ def get_league_dashboard(
 _LINEUP_SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K"]
 
 
-def _project_lineup_row(row: pd.Series, score_field: str) -> dict[str, Any]:
+def _project_lineup_row(
+    row: pd.Series, score_field: str, *, reserve_ids: set[str], taxi_ids: set[str]
+) -> dict[str, Any]:
     """One lineup row for the client.
 
     injury_label, not raw injury_status, is what a client renders as the
@@ -3138,10 +3170,19 @@ def _project_lineup_row(row: pd.Series, score_field: str) -> dict[str, Any]:
     who are most unavailable. modules.rankings.injury_display_label is the
     one place that resolution lives (the web dossier reads the same
     injury_level severity behind it).
+
+    `roster_slot` is a completely separate concept from injury_label: it's
+    WHERE the manager parked this player in Sleeper (starter/bench/taxi/
+    ir), resolved via `_roster_slot_for_player` — the same function
+    `_roster_relationship_map` uses — so a genuine IR/taxi placement and a
+    merely-scratched healthy bench player never collapse into one
+    indistinguishable "bench" bucket on the client.
     """
 
     status = _clean_json_value(row.get("status"))
     injury_status = _clean_json_value(row.get("injury_status"))
+    player_id = str(row.get("player_id") or "")
+    suggested_starter = bool(row.get("suggested_starter"))
     return {
         "player_id": _clean_json_value(row.get("player_id")),
         "name": _clean_json_value(row.get("name")),
@@ -3158,7 +3199,10 @@ def _project_lineup_row(row: pd.Series, score_field: str) -> dict[str, Any]:
         "tier": _clean_json_value(row.get("player_tier")),
         "score": _clean_json_value(row.get(score_field)),
         "slot": _clean_json_value(row.get("slot")),
-        "suggested_starter": bool(row.get("suggested_starter")),
+        "suggested_starter": suggested_starter,
+        "roster_slot": _roster_slot_for_player(
+            player_id, reserve_ids=reserve_ids, taxi_ids=taxi_ids, is_starter=suggested_starter
+        ),
         "opportunity_label": _clean_json_value(row.get("opportunity_label")),
         # 0-99 "OVR" badge — see player_quick_view.overall_ratings_for_pool.
         # _suggested_lineup_split computes this over the FULL league pool
@@ -3170,7 +3214,7 @@ def _project_lineup_row(row: pd.Series, score_field: str) -> dict[str, Any]:
 
 def _suggested_lineup_split(
     valued: pd.DataFrame,
-    roster_player_ids: set[str],
+    roster: dict[str, Any],
     settings: dict[str, Any],
     score_field: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -3179,8 +3223,14 @@ def _suggested_lineup_split(
     The single place /my-team and /matchup both run
     modules.team_eval.suggest_optimal_lineup and project its rows, so the
     two surfaces can never drift into showing different "best lineup"
-    answers for the same roster.
+    answers for the same roster. Each row also carries its real Sleeper
+    `roster_slot` (ir/taxi/starter/bench — see `_roster_slot_for_player`),
+    so a genuine IR/taxi placement reads distinctly from an ordinary
+    scratched bench player on both /my-team and /matchup.
     """
+
+    roster_player_ids = {str(pid) for pid in (roster.get("players") or []) if pid}
+    reserve_ids, taxi_ids = _roster_reserve_taxi_ids(roster)
 
     # Overall rating is percentiled against the full league-eligible pool
     # (every rosterable player at the position), not the dozen players on
@@ -3197,7 +3247,10 @@ def _suggested_lineup_split(
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
 
-    players = [_project_lineup_row(row, score_field) for _, row in lineup_df.iterrows()]
+    players = [
+        _project_lineup_row(row, score_field, reserve_ids=reserve_ids, taxi_ids=taxi_ids)
+        for _, row in lineup_df.iterrows()
+    ]
     starters = [p for p in players if p["suggested_starter"]]
     starters.sort(
         key=lambda p: _LINEUP_SLOT_ORDER.index(p["slot"]) if p["slot"] in _LINEUP_SLOT_ORDER else len(_LINEUP_SLOT_ORDER)
@@ -3261,7 +3314,7 @@ def get_league_my_team(
     if not roster_player_ids:
         return {"ok": True, "starters": [], "bench": [], "reason": "empty_roster"}
 
-    starters, bench = _suggested_lineup_split(valued, roster_player_ids, settings, score_field)
+    starters, bench = _suggested_lineup_split(valued, my_roster, settings, score_field)
 
     return {
         "ok": True,
@@ -3344,8 +3397,7 @@ def _matchup_side(
     response as `starters_basis` so the client can say so out loud.
     """
 
-    roster_player_ids = {str(pid) for pid in (roster.get("players") or [])}
-    starters, _bench = _suggested_lineup_split(valued, roster_player_ids, settings, score_field)
+    starters, _bench = _suggested_lineup_split(valued, roster, settings, score_field)
 
     best_score_by_position: dict[str, float] = {}
     for player in starters:
