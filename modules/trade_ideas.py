@@ -68,7 +68,22 @@ DEFAULT_PICK_LEAGUE_SETTINGS = {
     "wr_count": 3,
     "te_count": 1,
 }
-DEFAULT_CLASS_STRENGTH_BY_YEAR: Dict[int, float] = {}
+# Editorial, consensus-based class-strength multipliers keyed by rookie draft
+# season (NOT derived from any live data feed/model — there is no automated
+# signal for "how good is this incoming draft class" today). Values are
+# clamped to [0.8, 1.25] by _rookie_class_strength_multiplier; 1.0 is neutral.
+#
+# 2026: widely covered by fantasy/dynasty analysts as an unusually strong,
+# top-heavy rookie class (multiple consensus first-round-caliber WRs/RBs and
+# a deeper-than-usual QB group). 1.15 signals "notably above average" without
+# maxing out the clamp for a single editorial data point.
+#
+# Add future years here as classes are evaluated (e.g. `2025: 1.0` would be a
+# placeholder/example for an "average" class — not an asserted real grade;
+# do not add a year unless there's an actual editorial basis for its value).
+DEFAULT_CLASS_STRENGTH_BY_YEAR: Dict[int, float] = {
+    2026: 1.15,
+}
 # Team-strength ("team_modifier") band: how much a team's own standing can
 # move its own pick's value. Widened from a hard-coded 0.96-1.04 (+/-4%,
 # barely enough to register a real 0-2 record) to +/-12%, sized against this
