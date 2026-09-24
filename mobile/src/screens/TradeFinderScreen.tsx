@@ -9,23 +9,30 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PlayerNameText from '../components/PlayerNameText';
-import PositionBadge from '../components/PositionBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import TeamAvatar from '../components/TeamAvatar';
 import TradeValueHero from '../components/TradeValueHero';
-import { api, type LineupPlayer, type TradeIdea } from '../lib/api';
+import {
+  api,
+  type DraftPickAsset,
+  type LineupPlayer,
+  type PresentationAsset,
+  type RankedPlayer,
+  type TradeIdea,
+} from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { radii, shadows, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeFinder'>;
@@ -35,72 +42,291 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TradeFinder'>;
 // the list's last row needs to clear both, not just the orb.
 const SEARCH_BUTTON_CLEARANCE = 56 + spacing.sm + spacing.lg;
 
+const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
+const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
+
+function valueEdgeBandColor(colors: ThemeColors): Record<string, string> {
+  return {
+    Favorable: colors.success,
+    Fair: colors.textSecondary,
+    'Slight Overpay': colors.premium,
+    'Major Overpay': colors.danger,
+  };
+}
+
+// Same shape adapters Trade Hub's idea feed uses to hand a lean
+// PresentationAsset off to PlayerDetail/PickDetail — kept local to this
+// screen (rather than imported from TradeHubScreen, which isn't a module
+// other screens pull from) since they're small, pure display-shape shims,
+// not shared business logic. PlayerDetail fetches its own real
+// overall/position rank on mount, so those two fields are just placeholders
+// here, same as Trade Hub.
+function assetToRankedPlayer(asset: PresentationAsset): RankedPlayer {
+  return {
+    player_id: asset.player_id ?? '',
+    name: asset.name ?? null,
+    position: asset.position ?? null,
+    team: asset.team ?? null,
+    age: asset.age ?? null,
+    status: null,
+    injury_status: asset.injury_status ?? null,
+    tier: asset.tier ?? null,
+    score: asset.score ?? null,
+    overall_rank: null,
+    position_rank: null,
+    rank_unavailable_reason: null,
+    opportunity_label: asset.role ?? null,
+  };
+}
+
+function assetToDraftPick(asset: PresentationAsset): DraftPickAsset {
+  return {
+    pick_id: asset.pick_id ?? '',
+    label: asset.label ?? null,
+    score: asset.score ?? null,
+    season: asset.season ? Number(asset.season) : null,
+    round: asset.round ? Number(asset.round) : null,
+    original_roster_id: asset.original_roster_id ?? '',
+    owner_roster_id: asset.owner_roster_id ?? '',
+    original_team_name: asset.original_team_name ?? null,
+    owner_team_name: asset.owner_team_name ?? null,
+    pick_tier: asset.pick_tier ?? null,
+    projected_pick_range: asset.projected_range ?? null,
+    tier_bucket: asset.tier_bucket ?? null,
+    base_score: asset.base_score ?? null,
+    years_out: asset.years_out ?? null,
+    future_discount: asset.future_discount ?? null,
+    team_modifier: asset.team_modifier ?? null,
+    format_multiplier: asset.format_multiplier ?? null,
+    class_strength_multiplier: asset.class_strength_multiplier ?? null,
+    prospect_strength_multiplier: asset.prospect_strength_multiplier ?? null,
+    slot_percentile: asset.slot_percentile ?? null,
+    projected_slot_percentile: asset.projected_slot_percentile ?? null,
+    early_probability: asset.early_probability ?? null,
+    mid_probability: asset.mid_probability ?? null,
+    late_probability: asset.late_probability ?? null,
+    projection_confidence: asset.projection_confidence ?? null,
+    projection_source: asset.projection_source ?? null,
+    is_current_year_pick: asset.is_current_year_pick ?? null,
+  };
+}
+
+/**
+ * One side (You Send / You Receive) of a proposed trade — same treatment as
+ * Trade Hub's idea feed: players via the shared PlayerIdentityRow (no
+ * `slot`, trade assets have no lineup slot), picks via DraftPickAssetRow.
+ */
+function ExchangeAssetList({
+  assets,
+  onPressPlayer,
+  onPressPick,
+}: {
+  assets: PresentationAsset[];
+  onPressPlayer: (asset: PresentationAsset) => void;
+  onPressPick: (asset: PresentationAsset) => void;
+}) {
+  return (
+    <>
+      {assets.map((asset, index) => {
+        const showDivider = index < assets.length - 1;
+        if (asset.asset_type === 'pick') {
+          return (
+            <DraftPickAssetRow
+              key={`pick-${asset.pick_id ?? index}`}
+              pickId={asset.pick_id}
+              round={asset.round ? Number(asset.round) : null}
+              label={asset.label}
+              projectedRange={asset.projected_range}
+              pickTier={asset.pick_tier}
+              onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
+              showDivider={showDivider}
+            />
+          );
+        }
+        return (
+          <PlayerIdentityRow
+            key={`player-${asset.player_id ?? index}`}
+            playerId={asset.player_id}
+            name={asset.name}
+            position={asset.position}
+            team={asset.team}
+            tier={asset.tier}
+            opportunityLabel={asset.role}
+            contextLine={asset.age != null ? `Age ${asset.age}` : null}
+            injuryLabel={asset.injury_status}
+            onPress={asset.player_id ? () => onPressPlayer(asset) : undefined}
+            showDivider={showDivider}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function MeterRow({ label, value, level, color }: { label: string; value: string; level: number; color: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.meter}>
+      <AppText style={styles.meterLabel}>{label}</AppText>
+      <View style={styles.meterSegments}>
+        {[1, 2, 3].map((segment) => (
+          <View
+            key={segment}
+            style={[styles.meterSegment, { backgroundColor: segment <= level ? color : colors.borderStrong }]}
+          />
+        ))}
+      </View>
+      <AppText style={[styles.meterValue, { color }]}>{value}</AppText>
+    </View>
+  );
+}
+
 function RosterRow({
   player,
   selected,
   onToggle,
+  isFirst,
+  isLast,
 }: {
   player: LineupPlayer;
   selected: boolean;
   onToggle: () => void;
+  isFirst: boolean;
+  isLast: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity style={[styles.rosterRow, selected && styles.rosterRowSelected]} onPress={onToggle}>
-      <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-        {selected ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
-      </View>
-      <PlayerAvatar playerId={player.player_id} size={36} tier={player.tier} style={styles.rosterAvatar} />
-      <View style={styles.rosterTextGroup}>
-        <PlayerNameText name={player.name ?? 'Unknown player'} style={styles.rosterName} />
-        <View style={styles.rosterMetaRow}>
-          <PositionBadge position={player.position} />
-          <AppText style={styles.rosterMeta} numberOfLines={1}>
-            {player.team ?? '—'}
-          </AppText>
+    <View
+      style={[
+        styles.rosterRow,
+        isFirst && styles.rosterRowFirst,
+        isLast && styles.rosterRowLast,
+        !isLast && styles.rosterRowDivider,
+        selected && styles.rosterRowSelected,
+      ]}
+    >
+      <TouchableOpacity
+        onPress={onToggle}
+        hitSlop={8}
+        style={styles.checkboxTouch}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: selected }}
+        accessibilityLabel={`${player.name ?? 'Player'}${selected ? ', selected' : ''}`}
+      >
+        <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
+          {selected ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
         </View>
+      </TouchableOpacity>
+      <View style={styles.rosterIdentity}>
+        <PlayerIdentityRow
+          playerId={player.player_id}
+          name={player.name}
+          position={player.position}
+          team={player.team}
+          tier={player.tier}
+          injuryLabel={player.injury_label}
+          ruledOut={player.ruled_out}
+          onPress={onToggle}
+          showDivider={false}
+        />
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
-function ResultCard({ idea }: { idea: TradeIdea }) {
+/**
+ * A proposed trade for the selected players — the exact same TradeIdea shape
+ * and card language Trade Hub's feed uses (§30: Send/Receive is a canonical
+ * shared module), just for the on-demand set of results this specific
+ * search returned rather than a passive, paginated board. No category/
+ * impact-tag badges or share sheet here: those are Trade Hub *feed*
+ * concepts (ranking/browsing many ideas over time), and don't add anything
+ * to "here's what this exact selection could fetch."
+ */
+function ResultCard({
+  idea,
+  onPressPlayer,
+  onPressPick,
+}: {
+  idea: TradeIdea;
+  onPressPlayer: (asset: PresentationAsset) => void;
+  onPressPick: (asset: PresentationAsset) => void;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
+  const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
+  const bandColor = valueEdgeBandColor(colors)[idea.value_edge_band] ?? colors.textSecondary;
+
   return (
     <AnimatedCard style={styles.resultCard}>
-      <View style={styles.resultHeaderRow}>
-        <AppText style={styles.resultPartner} numberOfLines={1}>
-          {idea.partner_team_name}
-        </AppText>
-        <TradeValueHero delta={idea.trade_gain} size="sm" />
-      </View>
-      <View style={styles.resultPackageRow}>
-        <View style={styles.resultPackageSide}>
-          <AppText style={styles.resultPackageLabel}>YOU SEND</AppText>
-          {idea.package.send.map((asset, index) => (
-            <AppText key={asset.player_id ?? `send-${index}`} style={styles.resultAssetName} numberOfLines={1}>
-              {asset.name ?? asset.label ?? 'Unknown'}
+      <View style={styles.partnerRow}>
+        {idea.partner_team_avatar_url ? (
+          <TeamAvatar avatarId={idea.partner_team_avatar_url} size={36} />
+        ) : (
+          <View style={styles.partnerAvatar}>
+            <AppText style={styles.partnerInitial}>{idea.partner_team_name.charAt(0).toUpperCase()}</AppText>
+          </View>
+        )}
+        <View style={styles.partnerTextGroup}>
+          <View style={styles.partnerNameRow}>
+            <AppText style={styles.partnerName} numberOfLines={1}>
+              {idea.partner_team_name}
             </AppText>
-          ))}
-        </View>
-        <Ionicons name="swap-horizontal" size={16} color={colors.textTertiary} />
-        <View style={styles.resultPackageSide}>
-          <AppText style={styles.resultPackageLabel}>YOU RECEIVE</AppText>
-          {idea.package.receive.map((asset, index) => (
-            <AppText key={asset.player_id ?? `receive-${index}`} style={styles.resultAssetName} numberOfLines={1}>
-              {asset.name ?? asset.label ?? 'Unknown'}
+            {idea.value_edge_band ? (
+              <View style={[styles.fairnessPill, { borderColor: bandColor }]}>
+                <AppText style={[styles.fairnessPillText, { color: bandColor }]} numberOfLines={1}>
+                  {idea.value_edge_band}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+          {idea.partner_team_archetype_label ? (
+            <AppText style={styles.partnerArchetype} numberOfLines={1}>
+              {idea.partner_team_archetype_label}
             </AppText>
-          ))}
+          ) : null}
         </View>
       </View>
-      <AppText style={styles.resultRationale} numberOfLines={4}>
-        {idea.rationale}
-      </AppText>
-      <View style={styles.resultFooterRow}>
-        <AppText style={styles.resultConfidence}>{idea.confidence_label} confidence</AppText>
-        <AppText style={styles.resultRealism}>{idea.market_realism_label}</AppText>
+
+      <TradeValueHero delta={idea.trade_gain} size="sm" style={styles.valueHero} />
+
+      <View style={styles.exchangeRow}>
+        <View style={styles.exchangeSide}>
+          <View style={styles.exchangeLabelRow}>
+            <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
+            <AppText style={styles.exchangeLabel}>You Send</AppText>
+          </View>
+          <ExchangeAssetList assets={idea.package.send} onPressPlayer={onPressPlayer} onPressPick={onPressPick} />
+        </View>
+        <View style={styles.exchangeGutter}>
+          <View style={styles.swapDisc}>
+            <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+          </View>
+        </View>
+        <View style={styles.exchangeSide}>
+          <View style={styles.exchangeLabelRow}>
+            <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
+            <AppText style={styles.exchangeLabel}>You Receive</AppText>
+          </View>
+          <ExchangeAssetList assets={idea.package.receive} onPressPlayer={onPressPlayer} onPressPick={onPressPick} />
+        </View>
+      </View>
+
+      {idea.rationale ? (
+        <>
+          <AppText style={styles.rationaleLabel}>Why this works</AppText>
+          <AppText style={styles.rationale} numberOfLines={4}>
+            {idea.rationale}
+          </AppText>
+        </>
+      ) : null}
+
+      <View style={styles.footerRow}>
+        <MeterRow label="CONFIDENCE" value={idea.confidence_label} level={confidenceLevel} color={colors.accent} />
+        <MeterRow label="REALISM" value={idea.market_realism_label} level={realismLevel} color={colors.premium} />
       </View>
     </AnimatedCard>
   );
@@ -143,7 +369,7 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
         </View>
       ),
     });
-  }, [navigation, leagueId, styles]);
+  }, [navigation, leagueId, leagueName, styles]);
 
   useFocusEffect(
     useCallback(() => {
@@ -199,6 +425,11 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
     }
   };
 
+  const openPlayer = (asset: PresentationAsset) =>
+    navigation.navigate('PlayerDetail', { player: assetToRankedPlayer(asset), leagueId, leagueName });
+  const openPick = (asset: PresentationAsset) =>
+    navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
+
   if (loadingRoster) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
@@ -212,41 +443,53 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: headerHeight }]}>
+    <View style={styles.container}>
       <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <ScreenInfoNote
-        text={`Pick the players you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
-      />
-
       <FlatList
         data={roster}
         keyExtractor={(item) => item.player_id}
-        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance + SEARCH_BUTTON_CLEARANCE }]}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: headerHeight, paddingBottom: orbClearance + SEARCH_BUTTON_CLEARANCE },
+        ]}
         ListHeaderComponent={
-          ideas !== null ? (
-            <View style={styles.resultsSection}>
-              <AppText style={styles.sectionLabel}>
-                {searching ? 'Searching…' : `${ideas.length} plausible trade${ideas.length === 1 ? '' : 's'} found`}
-              </AppText>
-              {searchError ? <AppText style={styles.error}>{searchError}</AppText> : null}
-              {ideas.map((idea, index) => (
-                <ResultCard key={`${idea.partner_team_name}-${index}`} idea={idea} />
-              ))}
-              <AppText style={styles.sectionLabel}>Your Roster</AppText>
-            </View>
-          ) : (
-            <>
-              {searchError ? <AppText style={styles.error}>{searchError}</AppText> : null}
-              <AppText style={styles.sectionLabel}>Your Roster</AppText>
-            </>
-          )
+          <View>
+            <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+            <ScreenInfoNote
+              text={`Pick the players you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
+            />
+            {ideas !== null ? (
+              <View style={styles.resultsSection}>
+                <AppText style={styles.sectionLabel}>
+                  {searching ? 'Searching…' : `${ideas.length} plausible trade${ideas.length === 1 ? '' : 's'} found`}
+                </AppText>
+                {searchError ? <AppText style={styles.error}>{searchError}</AppText> : null}
+                {ideas.map((idea, index) => (
+                  <ResultCard
+                    key={`${idea.partner_team_name}-${index}`}
+                    idea={idea}
+                    onPressPlayer={openPlayer}
+                    onPressPick={openPick}
+                  />
+                ))}
+              </View>
+            ) : searchError ? (
+              <AppText style={styles.error}>{searchError}</AppText>
+            ) : null}
+            <AppText style={styles.sectionLabel}>Your Roster</AppText>
+          </View>
         }
         ListEmptyComponent={
           <EmptyState icon="people-outline" title="No roster found" subtitle="Nothing to shop yet in this league." />
         }
-        renderItem={({ item }) => (
-          <RosterRow player={item} selected={selectedIds.has(item.player_id)} onToggle={() => toggle(item.player_id)} />
+        renderItem={({ item, index }) => (
+          <RosterRow
+            player={item}
+            selected={selectedIds.has(item.player_id)}
+            onToggle={() => toggle(item.player_id)}
+            isFirst={index === 0}
+            isLast={index === roster.length - 1}
+          />
         )}
       />
 
@@ -261,6 +504,8 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
         ]}
         onPress={search}
         disabled={searching || selectedIds.size === 0}
+        accessibilityRole="button"
+        accessibilityLabel="Find Trades"
       >
         {searching ? (
           <ActivityIndicator color="#fff" />
@@ -285,14 +530,10 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.background,
       padding: spacing.xl,
     },
-    disclaimer: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      paddingHorizontal: spacing.lg,
-      marginBottom: spacing.sm,
-      lineHeight: 16,
-    },
-    listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 4, gap: spacing.sm },
+    // No `gap` here: the roster rows below need to render flush against
+    // each other (hairline dividers, not gaps) to read as one continuous
+    // grouped surface per section 12 — see `rosterRow`/`rosterRowDivider`.
+    listContent: { padding: spacing.lg, paddingTop: 0 },
     sectionLabel: {
       fontSize: 12,
       fontWeight: '700',
@@ -302,17 +543,36 @@ function createStyles(colors: ThemeColors) {
       marginTop: spacing.md,
       marginBottom: spacing.sm,
     },
+    resultsSection: { marginBottom: spacing.sm },
+    // Roster selection list: one continuous grouped surface with hairline
+    // dividers between rows (Magna Carta section 12) instead of a bordered
+    // card per player — only the group's own first/last row rounds the
+    // corners, matching the canonical grouped-row pattern already used by
+    // Waivers' free-agent table.
     rosterRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      padding: spacing.md,
-      borderRadius: radii.md,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
       backgroundColor: colors.surface,
-      marginBottom: spacing.xs,
+      paddingHorizontal: spacing.md,
+      borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
+      borderRightWidth: StyleSheet.hairlineWidth * 1.5,
+      borderColor: colors.cardBorder,
     },
-    rosterRowSelected: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
+    rosterRowFirst: {
+      borderTopWidth: StyleSheet.hairlineWidth * 1.5,
+      borderTopLeftRadius: radii.md,
+      borderTopRightRadius: radii.md,
+    },
+    rosterRowLast: {
+      borderBottomWidth: StyleSheet.hairlineWidth * 1.5,
+      borderBottomLeftRadius: radii.md,
+      borderBottomRightRadius: radii.md,
+    },
+    rosterRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    // Cyan is the app's fixed "selected state" semantic (section 3/14) — a
+    // subtle tint on the row itself, not a fresh per-screen selection color.
+    rosterRowSelected: { backgroundColor: colors.accentMuted },
+    checkboxTouch: { paddingVertical: spacing.sm, paddingRight: spacing.sm },
     checkbox: {
       width: 22,
       height: 22,
@@ -321,48 +581,102 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.borderStrong,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.sm,
     },
     checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
-    rosterAvatar: { marginRight: spacing.sm },
-    rosterTextGroup: { flex: 1 },
-    rosterName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-    rosterMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-    rosterMeta: { fontSize: 12, color: colors.textSecondary },
-    resultsSection: { marginBottom: spacing.sm },
-    resultCard: { padding: spacing.md, marginBottom: spacing.sm },
-    resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-    resultPartner: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flex: 1, marginRight: spacing.sm },
-    resultPackageRow: {
+    rosterIdentity: { flex: 1 },
+    resultCard: { padding: 0, marginBottom: spacing.sm },
+    partnerRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
+      padding: spacing.md,
+      paddingBottom: spacing.sm,
       gap: spacing.sm,
-      marginTop: spacing.sm,
     },
-    resultPackageSide: { flex: 1, gap: 2 },
-    resultPackageLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-    resultAssetName: { fontSize: 12, color: colors.textPrimary },
-    resultRationale: { fontSize: 12, color: colors.textSecondary, lineHeight: 17, marginTop: spacing.sm },
-    resultFooterRow: {
+    partnerAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.backgroundElevated,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    partnerInitial: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    partnerTextGroup: { flex: 1 },
+    partnerNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    partnerName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+    partnerArchetype: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
+    fairnessPill: {
+      flexShrink: 0,
+      borderWidth: 1,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 1,
+    },
+    fairnessPillText: { fontSize: 10, fontWeight: '700' },
+    valueHero: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+    exchangeRow: { flexDirection: 'row', paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: spacing.sm },
+    // Each side is its own small tinted surface so PlayerIdentityRow/
+    // DraftPickAssetRow's dividers have a clear boundary to sit inside of,
+    // rather than floating on the card's bare background — same pattern
+    // Trade Hub's idea feed uses for this exact content type.
+    exchangeSide: {
+      flex: 1,
+      backgroundColor: colors.backgroundElevated,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.sm,
+      paddingTop: spacing.xs,
+      paddingBottom: 2,
+    },
+    exchangeGutter: { width: 26, alignItems: 'center', justifyContent: 'center' },
+    swapDisc: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: colors.backgroundElevated,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    exchangeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
+    exchangeDot: { width: 6, height: 6, borderRadius: 3 },
+    exchangeLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.textTertiary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    rationaleLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      paddingHorizontal: spacing.md,
+      marginTop: spacing.sm,
+      marginBottom: 2,
+    },
+    rationale: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, paddingHorizontal: spacing.md },
+    footerRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       marginTop: spacing.sm,
-      paddingTop: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs + 2,
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.border,
+      borderTopColor: colors.hairline,
+      gap: spacing.lg,
     },
-    resultConfidence: { fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
-    resultRealism: { fontSize: 11, color: colors.textTertiary },
+    meter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    meterLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+    meterSegments: { flexDirection: 'row', gap: 3 },
+    meterSegment: { width: 14, height: 4, borderRadius: 2 },
+    meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
     searchButton: {
       position: 'absolute',
       left: spacing.lg,
       right: spacing.lg,
-      bottom: spacing.lg,
       backgroundColor: colors.accent,
       borderRadius: radii.md,
       paddingVertical: spacing.md,
       alignItems: 'center',
-      ...({} as object),
+      ...shadows.resting,
     },
     searchButtonDisabled: { opacity: 0.4 },
     searchButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
