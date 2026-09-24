@@ -50,8 +50,9 @@ interface Destination {
   // green (colors.success) = roster/waiver/positive-action,
   // amber (colors.premium) = draft/trade-capital,
   // purple (colors.violet) = secondary/analytical,
-  // red (colors.danger) = alerts only. Drives the icon-circle tint only —
-  // the sheet no longer paints a matching rail down the row (see NavRow).
+  // red (colors.danger) = alerts only. Drives both the icon-circle tint AND
+  // the row's left rail (see NavRow) — one value, two places it shows up,
+  // never two independently-chosen colors for the same destination.
   color: string;
   // One-line "what's here" — real interface copy describing the actual
   // screen, not a data claim. "Matchup" deliberately says "comparison," not
@@ -263,11 +264,22 @@ function DestIcon({ name, color, current }: { name: IconName; color: string; cur
 /**
  * Canonical navigation-row component (coridian_'s "ONE canonical
  * navigation-row" ask) — every destination in every group renders through
- * this. No per-row colored rail anymore: the old `borderLeftColor` per
- * destination was exactly the "rainbow of rails" the redesign brief called
- * out as visual noise. Hierarchy now comes from typography + the single
- * cyan active-state treatment (background tint, accent icon/title, CURRENT
- * label) instead of fourteen different border colors down the list.
+ * this.
+ *
+ * Left rail: restored per coridian_'s "make it closer to the concept pics"
+ * (2026-09-24), after an *earlier* pass had removed it entirely for
+ * looking like "the rainbow" in the real 19-destination list. Rather than
+ * re-litigate that by reintroducing a brand-new hue per row, the rail
+ * reuses the exact same `destination.color` that already tints the icon
+ * circle today — no new color is added to the sheet, the existing
+ * category color (accent/success/premium/violet/danger/textSecondary,
+ * five-ish hues shared across many rows, not nineteen distinct ones) just
+ * now also shows up as a thin 3pt edge instead of only the icon backdrop.
+ * Kept deliberately thin (not a thick block) so it reads as a scannable
+ * category marker, not a loud stripe. `isCurrent` overrides to the single
+ * accent color exactly like `DestIcon` already does for the icon itself —
+ * the active-row treatment stays one consistent language, it just now
+ * paints the rail too instead of only the background tint.
  */
 function NavRow({
   destination,
@@ -291,7 +303,11 @@ function NavRow({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity
-      style={[styles.destRow, isCurrent && styles.destRowCurrent]}
+      style={[
+        styles.destRow,
+        isCurrent && styles.destRowCurrent,
+        { borderLeftColor: isCurrent ? colors.accent : destination.color },
+      ]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={destination.label}
@@ -343,98 +359,94 @@ function NavSection({ label, children }: { label: string; children: React.ReactN
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View>
-      <AppText style={styles.sectionLabel}>{label}</AppText>
+      <AppText style={styles.sectionLabel} numberOfLines={1}>
+        {label}
+      </AppText>
       {children}
     </View>
   );
 }
 
 /**
- * Compact league-context module (coridian_'s "league-switcher module" ask) —
- * surfaced near the top of the sheet instead of buried mid-list as its own
- * "Switch League" section. Built on AnimatedCard so it reads as a distinct
- * module rather than another plain destination row (per coridian_'s "not
- * styled identically to plain destination rows"), which is also why this is
- * the one place in the sheet that *does* reuse the shared card primitive.
- * Collapsed by default; expands in place to the same radio-row switching UI
- * the sheet always had, calling the exact same `onSwitch` (GmOrb's
- * `switchToLeague`) with no changes to routing/state logic. Hidden bar
- * itself only renders when there's something to show: an open league, or
- * multiple saved leagues to switch between (mirrors the original gating).
+ * League-context module (coridian_'s original "league-switcher module" ask).
+ *
+ * Restructured (2026-09-24) to match the concept mockup's "Switch League"
+ * section: the mockup shows every saved league as a plain radio row
+ * directly in the main list, under a normal all-caps section label — never
+ * a separate collapsed card with its own expand/collapse chevron. That
+ * collapse/expand mechanic was this component's own earlier invention, not
+ * something either the original ask or the concept actually called for, so
+ * dropping it in favor of the concept's always-visible list is a pure UI
+ * simplification, not a logic change: `onSwitch` below is still exactly
+ * GmOrb's `switchToLeague`, unchanged.
+ *
+ * When there's nothing to switch between (0 or 1 saved leagues), this still
+ * renders the original non-interactive current-league card instead of a
+ * radio list — the concept mockup never shows that case, so that path is
+ * untouched rather than guessed at.
  */
 function LeagueSwitcher({
   league,
   savedLeagues,
-  expanded,
-  onToggle,
   onSwitch,
 }: {
   league: { leagueId: string; leagueName: string } | null;
   savedLeagues: SavedLeagueRow[];
-  expanded: boolean;
-  onToggle: () => void;
   onSwitch: (row: SavedLeagueRow) => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const hasAlternates = savedLeagues.length > 1;
-  const title = league?.leagueName || 'Select a league';
+
+  if (!hasAlternates) {
+    const title = league?.leagueName || 'Select a league';
+    return (
+      <View style={styles.leagueModule}>
+        <AnimatedCard style={styles.leagueBar} disabled accessibilityLabel={title}>
+          <View style={styles.leagueBarRow}>
+            <IconCircle name="trophy-outline" color={colors.accent} size={30} iconSize={15} />
+            <View style={styles.leagueBarText}>
+              <AppText style={styles.leagueBarTitle} numberOfLines={1}>
+                {title}
+              </AppText>
+              <AppText style={styles.leagueBarCaption}>Current league</AppText>
+            </View>
+          </View>
+        </AnimatedCard>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.leagueModule}>
-      <AnimatedCard
-        style={styles.leagueBar}
-        onPress={hasAlternates ? onToggle : undefined}
-        disabled={!hasAlternates}
-        accessibilityRole="button"
-        accessibilityLabel={hasAlternates ? `${title}. Switch league.` : title}
-        accessibilityState={hasAlternates ? { expanded } : undefined}
-      >
-        <View style={styles.leagueBarRow}>
-          <IconCircle name="trophy-outline" color={colors.accent} size={30} iconSize={15} />
-          <View style={styles.leagueBarText}>
-            <AppText style={styles.leagueBarTitle} numberOfLines={1}>
-              {title}
+    <NavSection label="Switch League">
+      {savedLeagues.map((row) => {
+        // Never collapsed by name — every real saved_leagues row (keyed
+        // by its own `id`/`league_id`) gets its own entry here even when
+        // two leagues share a display name; only `league_id` decides
+        // which one is "current."
+        const active = row.league_id === league?.leagueId;
+        return (
+          <TouchableOpacity
+            key={row.id}
+            style={styles.leagueAltRow}
+            onPress={() => onSwitch(row)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={row.league_name || row.league_id}
+          >
+            <Ionicons
+              name={active ? 'radio-button-on' : 'radio-button-off'}
+              size={18}
+              color={active ? colors.accent : colors.textTertiary}
+              style={styles.leagueAltRowIcon}
+            />
+            <AppText style={[styles.leagueAltRowText, active && styles.leagueAltRowTextActive]} numberOfLines={1}>
+              {row.league_name || row.league_id}
             </AppText>
-            <AppText style={styles.leagueBarCaption}>{hasAlternates ? 'Switch league' : 'Current league'}</AppText>
-          </View>
-          {hasAlternates ? (
-            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
-          ) : null}
-        </View>
-      </AnimatedCard>
-      {expanded && hasAlternates ? (
-        <View style={styles.leagueAltList}>
-          {savedLeagues.map((row) => {
-            // Never collapsed by name — every real saved_leagues row (keyed
-            // by its own `id`/`league_id`) gets its own entry here even when
-            // two leagues share a display name; only `league_id` decides
-            // which one is "current."
-            const active = row.league_id === league?.leagueId;
-            return (
-              <TouchableOpacity
-                key={row.id}
-                style={styles.leagueAltRow}
-                onPress={() => onSwitch(row)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={row.league_name || row.league_id}
-              >
-                <Ionicons
-                  name={active ? 'radio-button-on' : 'radio-button-off'}
-                  size={16}
-                  color={active ? colors.accent : colors.textTertiary}
-                  style={styles.leagueAltRowIcon}
-                />
-                <AppText style={[styles.leagueAltRowText, active && styles.leagueAltRowTextActive]} numberOfLines={1}>
-                  {row.league_name || row.league_id}
-                </AppText>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ) : null}
-    </View>
+          </TouchableOpacity>
+        );
+      })}
+    </NavSection>
   );
 }
 
@@ -447,10 +459,6 @@ export default function GmOrb() {
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [recapReady, setRecapReady] = useState(false);
   const [tradeHubHasNew, setTradeHubHasNew] = useState(false);
-  // Collapsed by default every time the sheet opens — see closeSheet, which
-  // resets this so a stale expanded state never carries over to the next
-  // open.
-  const [switcherExpanded, setSwitcherExpanded] = useState(false);
   // This used to clamp bottom to a 100pt ceiling, on the theory that a
   // reported "orb sits mid-screen" bug meant some device was inflating the
   // inset. Measured rawInsets.bottom on a real iPhone (34), an iOS simulator
@@ -616,7 +624,6 @@ export default function GmOrb() {
 
   const closeSheet = () => {
     setOpen(false);
-    setSwitcherExpanded(false);
     sheetY.value = withTiming(400, { duration: CLOSE_MS });
     backdropOpacity.value = withTiming(0, { duration: 200 });
     orbScale.value = withTiming(1, { duration: 200 });
@@ -724,18 +731,19 @@ export default function GmOrb() {
 
           <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
             {league || savedLeagues.length > 1 ? (
-              <LeagueSwitcher
-                league={league}
-                savedLeagues={savedLeagues}
-                expanded={switcherExpanded}
-                onToggle={() => setSwitcherExpanded((prev) => !prev)}
-                onSwitch={switchToLeague}
-              />
+              <LeagueSwitcher league={league} savedLeagues={savedLeagues} onSwitch={switchToLeague} />
             ) : null}
 
             {league ? (
               <>
-                <NavSection label="League">
+                {/* Concept sheet labels this section with the actual league
+                    name ("KEEPER LEAGUE"), not a generic "League" literal —
+                    matches the screen's own title bar right behind the
+                    sheet, which already shows the same name as its
+                    subtitle. Falls back to the generic label only in the
+                    (practically unreachable, since this whole branch is
+                    gated on `league`) case of a blank name. */}
+                <NavSection label={league.leagueName || 'League'}>
                   {coreLeagueDestinations(colors).map((destination) => (
                     <NavRow
                       key={destination.route}
@@ -890,30 +898,29 @@ function createStyles(colors: ThemeColors) {
     lineHeight: 18,
     marginTop: spacing.sm,
   },
-  // League-context module (LeagueSwitcher) — a distinct card-like surface,
-  // deliberately not styled like the plain destRow rows below it.
+  // Single-league context card (LeagueSwitcher's !hasAlternates branch) — a
+  // distinct card-like surface, deliberately not styled like the plain
+  // destRow/leagueAltRow rows. Unused (and no longer rendered) once there's
+  // more than one saved league — see leagueAltRow below.
   leagueModule: { marginBottom: spacing.md },
   leagueBar: { padding: spacing.md },
   leagueBarRow: { flexDirection: 'row', alignItems: 'center' },
   leagueBarText: { flex: 1, marginLeft: spacing.md, marginRight: spacing.sm },
   leagueBarTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   leagueBarCaption: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
-  leagueAltList: {
-    marginTop: spacing.xs,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.cardBorder,
-    backgroundColor: colors.surface,
-  },
+  // "Switch League" radio rows — styled as a plain NavSection list (per the
+  // concept mockup: inline rows with a hairline divider, no surrounding
+  // card/box) rather than the boxed dropdown list this used to sit inside.
   leagueAltRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  leagueAltRowIcon: { marginRight: spacing.sm },
-  leagueAltRowText: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+  leagueAltRowIcon: { marginRight: spacing.md },
+  leagueAltRowText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
   leagueAltRowTextActive: { color: colors.accent },
   destRow: {
     flexDirection: 'row',
@@ -922,10 +929,16 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
+    // Actual color comes from the inline style in NavRow (per-destination,
+    // or accent when current) — this just reserves the thin edge and gives
+    // every row a value so nothing renders unstyled before that overrides.
+    borderLeftWidth: 3,
   },
-  // The one and only active-navigation treatment (coridian_'s "exactly one
-  // visual language for active navigation") — a subtle background tint, no
-  // per-row rails anymore (see NavRow's docstring).
+  // The active-navigation treatment (coridian_'s "exactly one visual
+  // language for active navigation") is still one thing — a background
+  // tint — the rail is a second, independent signal (category, not
+  // current-ness) that happens to also flip to accent when current so the
+  // two never visually disagree.
   destRowCurrent: { backgroundColor: colors.accentMuted },
   destIconCircle: { marginRight: spacing.md },
   destTextGroup: { flex: 1 },
