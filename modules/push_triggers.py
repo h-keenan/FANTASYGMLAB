@@ -383,17 +383,28 @@ def league_briefing_push_items(
         score_field=score_field,
         rosters=rosters,
     )
-    return [
-        {
+    league_name = _safe_text(league.get("name"), "Your league")
+    items: list[dict[str, Any]] = []
+    for item in briefing.items:
+        if item.category not in PUSH_CATEGORIES or not item.recommendation_id:
+            continue
+        push_item: dict[str, Any] = {
             "league_id": league_id,
-            "league_name": _safe_text(league.get("name"), "Your league"),
+            "league_name": league_name,
             "category": item.category,
             "headline": item.headline,
             "recommendation_id": item.recommendation_id,
         }
-        for item in briefing.items
-        if item.category in PUSH_CATEGORIES and item.recommendation_id
-    ]
+        # route_player_id/_name already exist on DailyBriefingItem for the
+        # Dashboard's own player-tap-through (modules/daily_gm_briefing.py,
+        # built for the Dashboard injury-tap-through feature) — carry them
+        # into the push payload so a tap can deep-link straight to that
+        # player instead of always landing on the league hub.
+        if item.route_player_id:
+            push_item["player_id"] = item.route_player_id
+            push_item["player_name"] = item.route_player_name
+        items.append(push_item)
+    return items
 
 
 def recap_push_item(league_id: str, league: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -461,6 +472,11 @@ def injury_status_push_items(
                 "category": "injury",
                 "headline": f"{name} is now {status_raw}",
                 "recommendation_id": f"injury:{player_id}:{status_norm}",
+                # player_id/name are already in scope for this row — carry
+                # them along so a tap can deep-link to this exact player
+                # instead of only the league hub.
+                "player_id": player_id,
+                "player_name": name,
             }
         )
     return items
@@ -588,15 +604,22 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                 if recommendation_id in already_sent:
                     continue
                 title = PUSH_TITLE_BY_CATEGORY.get(push_item["category"], "Watch")
+                notification_data: dict[str, Any] = {
+                    "league_id": league_id,
+                    "league_name": push_item["league_name"],
+                    "category": push_item["category"],
+                }
+                # Only top_priority/watch (route_player_id-sourced) and
+                # injury items carry a player_id — recap and
+                # gm_stance_reminder stay league-level routing on purpose.
+                if push_item.get("player_id"):
+                    notification_data["player_id"] = push_item["player_id"]
+                    notification_data["player_name"] = push_item.get("player_name", "")
                 result = push_tokens.send_expo_push_notifications(
                     tokens,
                     title=f"{title} — {push_item['league_name']}",
                     body=push_item["headline"],
-                    data={
-                        "league_id": league_id,
-                        "league_name": push_item["league_name"],
-                        "category": push_item["category"],
-                    },
+                    data=notification_data,
                 )
                 record_notification(config, user_id=user_id, recommendation_id=recommendation_id, league_id=league_id)
                 if result.get("ok"):

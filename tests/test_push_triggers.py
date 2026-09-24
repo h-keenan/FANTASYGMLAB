@@ -114,7 +114,13 @@ def test_already_notified_batch_fails_closed_on_unsafe_id_characters():
 
 def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
     config_env = {"SUPABASE_URL": "https://x.supabase.co", "SUPABASE_SERVICE_ROLE_KEY": "srk"}
-    fake_item = Mock(category="top_priority", headline="Trade with Rival GM", recommendation_id="rec-abc")
+    fake_item = Mock(
+        category="top_priority",
+        headline="Trade with Rival GM",
+        recommendation_id="rec-abc",
+        route_player_id="",
+        route_player_name="",
+    )
     fake_briefing = Mock(items=[fake_item])
     players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 50}])
 
@@ -236,6 +242,11 @@ def test_recap_push_item_builds_a_stable_dedup_id_per_week():
         "headline": "Week 3 recap is ready",
         "recommendation_id": "recap:league-1:3",
     }
+    # recap is intentionally still league-level routing — confirming the
+    # exact dict shape above already proves no player_id/player_name keys
+    # snuck in, but assert explicitly since that's the behavior under test.
+    assert "player_id" not in item
+    assert "player_name" not in item
 
 
 def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
@@ -300,6 +311,78 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
     push_call = mock_post.call_args_list[0]
     assert push_call.kwargs["json"][0]["title"] == "Recap Ready — Test League"
     assert push_call.kwargs["json"][0]["body"] == "Week 3 recap is ready"
+    assert "player_id" not in push_call.kwargs["json"][0]["data"]
+    assert "player_name" not in push_call.kwargs["json"][0]["data"]
+
+
+def test_league_briefing_push_items_includes_player_fields_from_route_player_id():
+    fake_item = Mock(
+        category="top_priority",
+        headline="Trade with Rival GM",
+        recommendation_id="rec-abc",
+        route_player_id="p9",
+        route_player_name="Star Player",
+    )
+    fake_briefing = Mock(items=[fake_item])
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 50}])
+    with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+        with patch(
+            "modules.sleeper.get_rosters",
+            return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+        ):
+            with patch("modules.dashboard_engine.compose_next_move_briefing", return_value=fake_briefing):
+                items = push_triggers.league_briefing_push_items(
+                    league_id="league-1",
+                    sleeper_user_id="sleeper-user-1",
+                    players_df=players_df,
+                    score_field="dynasty_score",
+                )
+    assert items == [
+        {
+            "league_id": "league-1",
+            "league_name": "Test League",
+            "category": "top_priority",
+            "headline": "Trade with Rival GM",
+            "recommendation_id": "rec-abc",
+            "player_id": "p9",
+            "player_name": "Star Player",
+        }
+    ]
+
+
+def test_league_briefing_push_items_omits_player_fields_without_route_player_id():
+    fake_item = Mock(
+        category="watch",
+        headline="Keep an eye on this",
+        recommendation_id="rec-xyz",
+        route_player_id="",
+        route_player_name="",
+    )
+    fake_briefing = Mock(items=[fake_item])
+    players_df = pd.DataFrame([{"player_id": "p1", "position": "RB", "dynasty_score": 50}])
+    with patch("modules.sleeper.get_league", return_value={"name": "Test League"}):
+        with patch(
+            "modules.sleeper.get_rosters",
+            return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["p1"]}],
+        ):
+            with patch("modules.dashboard_engine.compose_next_move_briefing", return_value=fake_briefing):
+                items = push_triggers.league_briefing_push_items(
+                    league_id="league-1",
+                    sleeper_user_id="sleeper-user-1",
+                    players_df=players_df,
+                    score_field="dynasty_score",
+                )
+    assert items == [
+        {
+            "league_id": "league-1",
+            "league_name": "Test League",
+            "category": "watch",
+            "headline": "Keep an eye on this",
+            "recommendation_id": "rec-xyz",
+        }
+    ]
+    assert "player_id" not in items[0]
+    assert "player_name" not in items[0]
 
 
 def test_injury_status_push_items_fires_for_risk_status():
@@ -322,6 +405,8 @@ def test_injury_status_push_items_fires_for_risk_status():
             "category": "injury",
             "headline": "Hurt Guy is now Out",
             "recommendation_id": "injury:p1:out",
+            "player_id": "p1",
+            "player_name": "Hurt Guy",
         }
     ]
 
@@ -418,6 +503,11 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
     push_call = mock_post.call_args_list[0]
     assert push_call.kwargs["json"][0]["title"] == "Injury Update — Test League"
     assert push_call.kwargs["json"][0]["body"] == "Hurt Guy is now Out"
+    # The routing metadata reaches the actual Expo payload, not just the
+    # intermediate push_item dict — this is what mobile's routeNotificationTap
+    # reads to deep-link to the player instead of only the league hub.
+    assert push_call.kwargs["json"][0]["data"]["player_id"] == "p1"
+    assert push_call.kwargs["json"][0]["data"]["player_name"] == "Hurt Guy"
 
 
 def test_fetch_push_preferences_defaults_missing_categories_to_enabled():
@@ -608,6 +698,10 @@ def test_gm_stance_reminder_push_item_fires_when_league_has_no_stance():
     assert item["category"] == "gm_stance_reminder"
     assert item["recommendation_id"] == "gm_stance_reminder:league-1"
     assert item["league_name"] == "Test League"
+    # gm_stance_reminder is intentionally still league-level routing — no
+    # more-specific per-item target exists for it.
+    assert "player_id" not in item
+    assert "player_name" not in item
 
 
 def test_gm_stance_reminder_push_item_none_once_a_stance_is_stored():
