@@ -13,7 +13,7 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
-import PlayerAvatar from '../components/PlayerAvatar';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -25,6 +25,10 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Alerts'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
+// Semantic mapping preserved from the pre-redesign screen: red = injury/risk,
+// cyan = transaction/GM intelligence, green = role upside, gray = everything
+// else. These already line up with the Magna Carta's §3 semantic system, so
+// the redesign reuses them rather than inventing a new palette per type.
 function eventBadgeColors(colors: ThemeColors): Record<string, string> {
   return {
     'injury/status': colors.danger,
@@ -40,6 +44,24 @@ const EVENT_BADGE_ICONS: Record<string, IconName> = {
   'role/depth chart': 'layers-outline',
   'off-field/drama': 'alert-circle-outline',
 };
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  'injury/status': 'Injury / Status',
+  transaction: 'Transaction',
+  'role/depth chart': 'Role / Depth Chart',
+  'off-field/drama': 'Off-Field',
+};
+
+function eventTypeLabel(eventType: string | null): string {
+  if (!eventType) return 'Update';
+  return (
+    EVENT_TYPE_LABELS[eventType] ??
+    eventType
+      .split('/')
+      .map((part) => part.replace(/\b\w/g, (c) => c.toUpperCase()))
+      .join(' / ')
+  );
+}
 
 const ROSTER_RELATIONSHIP_LABEL: Record<Exclude<RosterRelationship, null>, string> = {
   starter: 'Starter',
@@ -76,6 +98,32 @@ function relativeTime(publishedTs: number | null): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+interface AlertGroup {
+  eventType: string | null;
+  alerts: AlertItem[];
+}
+
+/**
+ * Clusters consecutive alerts that share the same event_type into one group.
+ * Keeps the feed's existing chronological order intact (only adjacent runs
+ * merge), so a burst of same-type news shares one surface with dividers
+ * instead of repeating an identical bordered card per item — the alert TYPE
+ * is still communicated per-row via semantic color/icon, not by splitting
+ * unrelated types into separate boxes (Magna Carta §12).
+ */
+function groupAlertsByType(items: AlertItem[]): AlertGroup[] {
+  const groups: AlertGroup[] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (last && last.eventType === item.event_type) {
+      last.alerts.push(item);
+    } else {
+      groups.push({ eventType: item.event_type, alerts: [item] });
+    }
+  }
+  return groups;
 }
 
 export default function AlertsScreen({ route, navigation }: Props) {
@@ -129,6 +177,8 @@ export default function AlertsScreen({ route, navigation }: Props) {
     void load();
   }, [load]);
 
+  const groupedAlerts = useMemo(() => groupAlertsByType(items), [items]);
+
   const openAndMarkRead = (item: AlertItem) => {
     if (!item.read) {
       setItems((prev) => prev.map((row) => (row.alert_key === item.alert_key ? { ...row, read: true } : row)));
@@ -180,14 +230,14 @@ export default function AlertsScreen({ route, navigation }: Props) {
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <FlatList
-        data={items}
-        keyExtractor={(item, index) => item.link ?? String(index)}
+        data={groupedAlerts}
+        keyExtractor={(group, index) => `${group.eventType ?? 'other'}-${group.alerts[0]?.alert_key ?? index}`}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListHeaderComponent={
           recapReadyWeek != null ? (
             <TouchableOpacity onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}>
-              <AnimatedCard style={styles.recapCard}>
+              <AnimatedCard glow style={styles.recapCard}>
                 <IconCircle name="newspaper-outline" color={colors.accent} size={36} style={styles.recapIconDisc} />
                 <View style={styles.recapTextGroup}>
                   <AppText style={styles.recapTitle}>Week {recapReadyWeek} League Recap is ready</AppText>
@@ -207,170 +257,158 @@ export default function AlertsScreen({ route, navigation }: Props) {
             />
           ) : null
         }
-        renderItem={({ item }) => (
-          <AnimatedCard
-            style={StyleSheet.flatten([styles.card, item.read && styles.cardRead])}
-            onPress={() => openAndMarkRead(item)}
-          >
-            <View style={styles.headerRow}>
-              <View style={styles.headerLeft}>
-                {!item.read ? <View style={styles.unreadDot} /> : null}
-                {item.matched_player ? (
-                  <TouchableOpacity
-                    style={styles.playerBadge}
-                    onPress={() => openPlayer(item)}
-                    disabled={!item.matched_player_id}
-                    hitSlop={4}
-                  >
-                    {item.matched_player_id ? (
-                      <PlayerAvatar playerId={item.matched_player_id} size={28} style={styles.playerBadgeAvatar} />
-                    ) : null}
-                    <AppText style={styles.playerBadgeText}>{item.matched_player}</AppText>
-                  </TouchableOpacity>
-                ) : null}
-                {item.roster_relationship ? (
-                  <View
-                    style={[
-                      styles.relationshipPill,
-                      { backgroundColor: `${rosterRelationshipColor(colors)[item.roster_relationship]}26` },
-                    ]}
-                  >
-                    <AppText
-                      style={[
-                        styles.relationshipPillText,
-                        { color: rosterRelationshipColor(colors)[item.roster_relationship] },
-                      ]}
-                    >
-                      {ROSTER_RELATIONSHIP_LABEL[item.roster_relationship]}
-                    </AppText>
-                  </View>
-                ) : null}
+        renderItem={({ item: group }) => {
+          const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
+          const icon = EVENT_BADGE_ICONS[group.eventType ?? ''] ?? 'information-circle-outline';
+          return (
+            <View style={styles.group}>
+              <View style={styles.groupHeaderRow}>
+                <View style={[styles.groupAccentBar, { backgroundColor: accentColor }]} />
+                <Ionicons name={icon} size={13} color={accentColor} style={styles.groupIcon} />
+                <AppText style={[styles.groupLabel, { color: accentColor }]} numberOfLines={1}>
+                  {eventTypeLabel(group.eventType)}
+                </AppText>
               </View>
-              <AppText style={styles.time}>{relativeTime(item.published_ts)}</AppText>
+              <AnimatedCard style={styles.groupCard}>
+                {group.alerts.map((alert, index) => (
+                  <AlertRow
+                    key={alert.alert_key}
+                    alert={alert}
+                    showDivider={index < group.alerts.length - 1}
+                    onPress={() => openAndMarkRead(alert)}
+                    onPressPlayer={() => openPlayer(alert)}
+                  />
+                ))}
+              </AnimatedCard>
             </View>
-            {item.event_type ? (
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: eventBadgeColors(colors)[item.event_type] ?? colors.textSecondary },
-                ]}
-              >
-                <Ionicons
-                  name={EVENT_BADGE_ICONS[item.event_type] ?? 'information-circle-outline'}
-                  size={11}
-                  color="#fff"
-                  style={styles.badgeIcon}
-                />
-                <AppText style={styles.badgeText}>{item.event_type}</AppText>
-              </View>
-            ) : null}
-            <AppText style={[styles.title, item.read && styles.titleRead]} numberOfLines={2}>
-              {item.title}
-            </AppText>
-            {item.summary ? (
-              <AppText style={styles.summary} numberOfLines={3}>
-                {item.summary}
-              </AppText>
-            ) : null}
-            {item.speculative ? <AppText style={styles.speculative}>Unconfirmed / speculative</AppText> : null}
-            {item.source ? <AppText style={styles.source}>Source: {item.source}</AppText> : null}
-          </AnimatedCard>
-        )}
+          );
+        }}
       />
     </View>
   );
 }
 
+function AlertRow({
+  alert,
+  showDivider,
+  onPress,
+  onPressPlayer,
+}: {
+  alert: AlertItem;
+  showDivider: boolean;
+  onPress: () => void;
+  onPressPlayer: () => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createRowStyles(colors), [colors]);
+  const relationshipColors = rosterRelationshipColor(colors);
+  const footerBits = [
+    alert.speculative ? 'Unconfirmed / speculative' : null,
+    alert.source ? `Source: ${alert.source}` : null,
+  ].filter((bit): bit is string => Boolean(bit));
+
+  return (
+    <TouchableOpacity
+      style={[styles.row, showDivider && styles.rowDivider, alert.read && styles.rowRead]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.metaRow}>
+        {!alert.read ? <View style={styles.unreadDot} /> : null}
+        {alert.roster_relationship ? (
+          <View
+            style={[
+              styles.relationshipPill,
+              { backgroundColor: `${relationshipColors[alert.roster_relationship]}26` },
+            ]}
+          >
+            <AppText
+              style={[styles.relationshipPillText, { color: relationshipColors[alert.roster_relationship] }]}
+            >
+              {ROSTER_RELATIONSHIP_LABEL[alert.roster_relationship]}
+            </AppText>
+          </View>
+        ) : null}
+        <View style={styles.metaSpacer} />
+        <AppText style={styles.time}>{relativeTime(alert.published_ts)}</AppText>
+      </View>
+      {alert.matched_player ? (
+        <PlayerIdentityRow
+          playerId={alert.matched_player_id}
+          name={alert.matched_player}
+          onPress={alert.matched_player_id ? onPressPlayer : undefined}
+        />
+      ) : null}
+      <AppText style={[styles.title, alert.read && styles.titleRead]} numberOfLines={2}>
+        {alert.title}
+      </AppText>
+      {alert.summary ? (
+        <AppText style={styles.summary} numberOfLines={3}>
+          {alert.summary}
+        </AppText>
+      ) : null}
+      {footerBits.length > 0 ? <AppText style={styles.footerMeta}>{footerBits.join(' · ')}</AppText> : null}
+    </TouchableOpacity>
+  );
+}
+
+function createRowStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: { paddingVertical: spacing.sm + 2 },
+    rowRead: { opacity: 0.6 },
+    rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
+    unreadDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.accent },
+    relationshipPill: { borderRadius: radii.pill, paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
+    relationshipPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+    metaSpacer: { flex: 1 },
+    time: { fontSize: 11, color: colors.textTertiary },
+    title: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.xs, marginBottom: 3 },
+    titleRead: { fontWeight: '500', color: colors.textSecondary },
+    summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+    footerMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
+  });
+}
+
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    padding: spacing.xl,
-  },
-  notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
-  disclaimer: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    lineHeight: 16,
-  },
-  listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
-  recapCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.accentMuted,
-  },
-  recapIconDisc: { marginRight: spacing.sm },
-  recapTextGroup: { flex: 1 },
-  recapTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  recapSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  card: { padding: spacing.lg },
-  cardRead: { opacity: 0.6 },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.accent,
-  },
-  playerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.badgeBackground,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.pill,
-  },
-  playerBadgeAvatar: { marginRight: spacing.xs },
-  playerBadgeText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
-  relationshipPill: { borderRadius: radii.pill, paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
-  relationshipPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.pill,
-    marginBottom: spacing.xs,
-  },
-  badgeIcon: { marginRight: 4 },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  time: { fontSize: 12, color: colors.textSecondary },
-  title: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.xs },
-  titleRead: { fontWeight: '500' },
-  summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  speculative: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: spacing.xs,
-  },
-  source: {
-    fontSize: 11,
-    color: colors.textTertiary,
-    marginTop: spacing.xs,
-  },
-  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
-  error: {
-    color: colors.danger,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
+    headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+      padding: spacing.xl,
+    },
+    notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
+    listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3 },
+    recapCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      marginBottom: spacing.md,
+    },
+    recapIconDisc: { marginRight: spacing.sm },
+    recapTextGroup: { flex: 1 },
+    recapTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    recapSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    group: { marginBottom: spacing.md },
+    groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
+    groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
+    groupIcon: { marginLeft: -2 },
+    groupLabel: {
+      flex: 1,
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    groupCard: { padding: spacing.md, paddingVertical: spacing.xs },
+    error: {
+      color: colors.danger,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+    },
   });
 }
