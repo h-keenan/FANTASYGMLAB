@@ -15,6 +15,7 @@ from modules import auth_supabase
 from modules import saved_leagues
 from modules import startup_coordinator
 from modules import startup_critical_path
+from modules import ui_primitives
 from modules import user_preferences
 
 AUTH_STORAGE_COMPONENT = st.components.v2.component(
@@ -1044,37 +1045,34 @@ def render_account_panel(
         actions["logged_in"] = True
         email = _auth_email(st.session_state)
         st.caption(f"Signed in as {email or 'account user'}")
-        button_cols = st.columns(2)
-        with button_cols[0]:
-            if st.button("Save league", key="account_save_current_league", use_container_width=True):
-                saved, error = save_current_context(
-                    config=config,
-                    access_token=access_token,
-                    user_id=user_id,
-                    email=email,
-                    username=username,
-                    selected_league_id=selected_league_id,
-                    selected_league_name=selected_league_name,
-                    my_roster_id=my_roster_id,
-                )
-                actions["saved"] = saved
-                if saved:
-                    st.success("Saved.")
-                    st.session_state.pop("account_saved_leagues_cache", None)
-                elif saved_leagues.is_cap_message(error):
-                    # Hitting the plan's league limit is a Premium wall, not a
-                    # failure — say what happened and offer the way out
-                    # instead of a dead-end "try again".
-                    st.session_state[SAVED_LEAGUE_CAP_NOTICE_KEY] = error
-                else:
-                    st.warning("Could not save this league right now. Please try again.")
+        if st.button(
+            "Save league",
+            key="account_save_current_league",
+            use_container_width=True,
+            type="primary",
+        ):
+            saved, error = save_current_context(
+                config=config,
+                access_token=access_token,
+                user_id=user_id,
+                email=email,
+                username=username,
+                selected_league_id=selected_league_id,
+                selected_league_name=selected_league_name,
+                my_roster_id=my_roster_id,
+            )
+            actions["saved"] = saved
+            if saved:
+                st.success("Saved.")
+                st.session_state.pop("account_saved_leagues_cache", None)
+            elif saved_leagues.is_cap_message(error):
+                # Hitting the plan's league limit is a Premium wall, not a
+                # failure — say what happened and offer the way out
+                # instead of a dead-end "try again".
+                st.session_state[SAVED_LEAGUE_CAP_NOTICE_KEY] = error
+            else:
+                st.warning("Could not save this league right now. Please try again.")
         _render_saved_league_cap_notice()
-        with button_cols[1]:
-            if st.button("Log out", key="account_logout", use_container_width=True):
-                error = complete_sign_out(st.session_state, config=config)
-                if error:
-                    st.warning("Signed out on this device. Remote session close could not be confirmed.")
-                st.rerun()
 
         saved_rows = st.session_state.get("account_saved_leagues_cache")
         if not isinstance(saved_rows, list):
@@ -1087,6 +1085,8 @@ def render_account_panel(
                 st.caption("Saved leagues could not be loaded right now.")
                 saved_rows = []
             st.session_state["account_saved_leagues_cache"] = saved_rows
+
+        ui_primitives.render_section_header("Saved leagues", weight="context")
         if saved_rows:
             option_labels = {
                 saved_league_label(row): row
@@ -1103,6 +1103,7 @@ def render_account_panel(
         else:
             st.caption("No saved leagues yet.")
 
+        ui_primitives.render_section_header("Preferences", weight="context")
         with st.expander("Profile preferences", expanded=False):
             settings_row = st.session_state.get("account_user_settings")
             onboarding_hidden = user_preferences.onboarding_is_dismissed(settings_row)
@@ -1126,6 +1127,17 @@ def render_account_panel(
                     st.warning("Onboarding could not be reset right now. Please try again.")
                 else:
                     st.success("League Orientation will appear again.")
+
+        # Sign-out gets its own visually distinct (danger-toned) surface rather
+        # than sitting next to routine actions like Save league — mirrors the
+        # mobile More screen's destructive-action treatment.
+        ui_primitives.render_section_header("Danger zone", weight="context")
+        with st.container(key="dg_cta_destructive_account_logout"):
+            if st.button("Log out", key="account_logout", use_container_width=True):
+                error = complete_sign_out(st.session_state, config=config)
+                if error:
+                    st.warning("Signed out on this device. Remote session close could not be confirmed.")
+                st.rerun()
         return actions
 
     st.caption("Use the main launch screen to create an account or sign in. Guest mode remains available.")
