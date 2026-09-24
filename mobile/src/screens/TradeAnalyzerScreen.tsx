@@ -15,15 +15,15 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
+import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PositionBadge from '../components/PositionBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import TierBadge from '../components/TierBadge';
 import CircularProgressRing from '../components/CircularProgressRing';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueHero from '../components/TradeValueHero';
@@ -45,10 +45,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TradeAnalyzer'>;
 type Side = 'send' | 'receive';
 type AssetType = 'players' | 'picks';
 
-interface SideChip {
-  id: string;
-  name: string;
-}
+type SideAssetItem =
+  | { kind: 'player'; player: RankedPlayer }
+  | { kind: 'pick'; pick: DraftPickAsset };
 
 type SearchItem =
   | { kind: 'player'; player: RankedPlayer }
@@ -362,8 +361,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           label="You Send"
           dotColor={colors.danger}
           items={[
-            ...sendIds.map((p) => ({ id: p.player_id, name: p.name ?? 'Unknown' })),
-            ...sendPicks.map((p) => ({ id: p.pick_id, name: p.label ?? 'Draft pick' })),
+            ...sendIds.map((player): SideAssetItem => ({ kind: 'player', player })),
+            ...sendPicks.map((pick): SideAssetItem => ({ kind: 'pick', pick })),
           ]}
           active={activeSide === 'send'}
           onPressHeader={() => setActiveSide('send')}
@@ -373,8 +372,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           label="You Receive"
           dotColor={colors.successBright}
           items={[
-            ...receiveIds.map((p) => ({ id: p.player_id, name: p.name ?? 'Unknown' })),
-            ...receivePicks.map((p) => ({ id: p.pick_id, name: p.label ?? 'Draft pick' })),
+            ...receiveIds.map((player): SideAssetItem => ({ kind: 'player', player })),
+            ...receivePicks.map((pick): SideAssetItem => ({ kind: 'pick', pick })),
           ]}
           active={activeSide === 'receive'}
           onPressHeader={() => setActiveSide('receive')}
@@ -495,42 +494,38 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={header}
-      renderItem={({ item }) =>
-        item.kind === 'player' ? (
-          <TouchableOpacity style={styles.resultRow} onPress={() => addPlayerToSide(item.player)}>
-            <PlayerAvatar playerId={item.player.player_id} size={36} tier={item.player.tier} style={styles.resultAvatar} />
-            <View style={styles.resultInfo}>
-              <AppText style={styles.resultName} numberOfLines={1}>
-                {item.player.name ?? 'Unknown'}
-              </AppText>
-              <View style={styles.resultMetaRow}>
-                <PositionBadge position={item.player.position} />
-                <AppText style={styles.resultMeta}>{item.player.team}</AppText>
-                <TierBadge storedTier={item.player.tier} />
-              </View>
-            </View>
-            <AppText style={styles.resultScore}>{Math.round(playerScore(item.player))}</AppText>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.resultRow} onPress={() => addPickToSide(item.pick)}>
-            <View style={styles.pickBadge}>
-              <Ionicons name="albums-outline" size={18} color={colors.accent} />
-            </View>
-            <View style={styles.resultInfo}>
-              <AppText style={styles.resultName} numberOfLines={1}>
-                {item.pick.label ?? 'Draft pick'}
-              </AppText>
-              <View style={styles.resultMetaRow}>
-                <AppText style={styles.resultMeta}>
-                  {[item.pick.pick_tier, item.pick.projected_pick_range].filter(Boolean).join(' · ')}
-                </AppText>
-              </View>
-            </View>
-            <AppText style={styles.resultScore}>{item.pick.score != null ? Math.round(item.pick.score) : '—'}</AppText>
-            {/* Tapping the row still adds the pick to the package — this is
-                the escape hatch to "why is it worth that?" (the same Pick
-                Detail the Draft Center's pick list opens) without giving up
-                one-tap add. */}
+      renderItem={({ item, index }) => {
+        const showDivider = index < searchResults.length - 1;
+        if (item.kind === 'player') {
+          return (
+            <PlayerIdentityRow
+              playerId={item.player.player_id}
+              name={item.player.name}
+              position={item.player.position}
+              team={item.player.team}
+              tier={item.player.tier}
+              trailingValue={String(Math.round(playerScore(item.player)))}
+              onPress={() => addPlayerToSide(item.player)}
+              showDivider={showDivider}
+            />
+          );
+        }
+        return (
+          <View style={[styles.pickResultRow, showDivider && styles.pickResultDivider]}>
+            <DraftPickAssetRow
+              style={styles.pickResultRowInner}
+              pickId={item.pick.pick_id}
+              round={item.pick.round}
+              label={item.pick.label}
+              projectedRange={item.pick.projected_pick_range}
+              pickTier={item.pick.pick_tier}
+              trailingValue={item.pick.score != null ? String(Math.round(item.pick.score)) : '—'}
+              onPress={() => addPickToSide(item.pick)}
+            />
+            {/* This info button is the escape hatch to "why is it worth
+                that?" (the same Pick Detail the Draft Center's pick list
+                opens) — the row itself still adds the pick on tap, so
+                bulk-adding stays one tap. */}
             <TouchableOpacity
               style={styles.pickInfoButton}
               hitSlop={8}
@@ -540,9 +535,9 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             >
               <Ionicons name="information-circle-outline" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
-          </TouchableOpacity>
-        )
-      }
+          </View>
+        );
+      }}
       ListEmptyComponent={
         <AppText style={styles.empty}>
           {assetType === 'players' && activeSide === 'send' && myRosterIds.size === 0
@@ -605,7 +600,7 @@ function VerdictCard({
   const toneColor = toneColors(colors)[verdict.tone];
 
   return (
-    <View style={[styles.verdictCard, { borderLeftColor: toneColor }]}>
+    <AnimatedCard style={StyleSheet.flatten([styles.verdictCard, { borderLeftColor: toneColor }])}>
       <View style={styles.verdictHeaderRow}>
         <AppText style={[styles.verdictBand, { color: toneColor }]}>{verdict.band}</AppText>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
@@ -665,10 +660,17 @@ function VerdictCard({
         sendPlayers={sendIds}
         receivePlayers={receiveIds}
       />
-    </View>
+    </AnimatedCard>
   );
 }
 
+/**
+ * One side (You Send / You Receive) of the trade being built — the same
+ * Send/Receive card language Trade Hub/Trade Finder use for a proposed
+ * trade's asset lists (§30), just editable here: each row's own tap removes
+ * it instead of opening detail, and tapping the header makes this side the
+ * active add target for the search list below.
+ */
 function TradeSide({
   label,
   dotColor,
@@ -679,7 +681,7 @@ function TradeSide({
 }: {
   label: string;
   dotColor: string;
-  items: SideChip[];
+  items: SideAssetItem[];
   active: boolean;
   onPressHeader: () => void;
   onRemove: (id: string) => void;
@@ -687,25 +689,49 @@ function TradeSide({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity
-      style={[styles.side, active && styles.sideActive]}
-      onPress={onPressHeader}
-      activeOpacity={0.85}
-    >
-      <View style={styles.sideLabelRow}>
+    <View style={[styles.side, active && styles.sideActive]}>
+      <TouchableOpacity style={styles.sideLabelRow} onPress={onPressHeader} activeOpacity={0.7}>
         <View style={[styles.sideDot, { backgroundColor: dotColor }]} />
         <AppText style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</AppText>
-      </View>
-      {items.map((item) => (
-        <TouchableOpacity key={item.id} style={styles.chip} onPress={() => onRemove(item.id)}>
-          <AppText style={styles.chipText} numberOfLines={1}>
-            {item.name}
-          </AppText>
-          <AppText style={styles.chipRemove}>{'×'}</AppText>
+      </TouchableOpacity>
+      {items.length > 0 ? (
+        <View style={styles.sideAssetSurface}>
+          {items.map((item, index) => {
+            const showDivider = index < items.length - 1;
+            if (item.kind === 'player') {
+              return (
+                <PlayerIdentityRow
+                  key={`player-${item.player.player_id}`}
+                  playerId={item.player.player_id}
+                  name={item.player.name}
+                  position={item.player.position}
+                  team={item.player.team}
+                  tier={item.player.tier}
+                  onPress={() => onRemove(item.player.player_id)}
+                  showDivider={showDivider}
+                />
+              );
+            }
+            return (
+              <DraftPickAssetRow
+                key={`pick-${item.pick.pick_id}`}
+                pickId={item.pick.pick_id}
+                round={item.pick.round}
+                label={item.pick.label}
+                projectedRange={item.pick.projected_pick_range}
+                pickTier={item.pick.pick_tier}
+                onPress={() => onRemove(item.pick.pick_id)}
+                showDivider={showDivider}
+              />
+            );
+          })}
+        </View>
+      ) : (
+        <TouchableOpacity onPress={onPressHeader} activeOpacity={0.7}>
+          <AppText style={styles.sideEmpty}>Tap to add</AppText>
         </TouchableOpacity>
-      ))}
-      {items.length === 0 ? <AppText style={styles.sideEmpty}>Tap to add</AppText> : null}
-    </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
@@ -742,21 +768,15 @@ function createStyles(colors: ThemeColors) {
   sideLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
   sideLabelActive: { color: colors.accent },
   sideEmpty: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    // Nested inside `side` (a `surface` panel): step *up* the ramp rather
-    // than down, so the chip reads as a raised token instead of a hole
-    // punched in the panel at near-identical luminance.
+  // Nested inside `side` (a `surface` panel): step *up* the ramp rather than
+  // down, so the asset group reads as a raised token instead of a hole
+  // punched in the panel at near-identical luminance — same treatment Trade
+  // Hub/Trade Finder give their own exchange-side surfaces.
+  sideAssetSurface: {
     backgroundColor: colors.backgroundElevated,
-    borderRadius: radii.sm,
+    borderRadius: radii.md,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    marginBottom: spacing.xs,
   },
-  chipText: { flex: 1, fontSize: 13, color: colors.textPrimary, marginRight: spacing.xs },
-  chipRemove: { fontSize: 14, color: colors.textSecondary, fontWeight: '700' },
   assetTypeRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
   teamRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   pill: {
@@ -779,13 +799,10 @@ function createStyles(colors: ThemeColors) {
   },
   analyzeButtonDisabled: { opacity: 0.5 },
   analyzeButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  // AnimatedCard already supplies the surface fill/radius/border/shadow —
+  // this just adds the tone-colored left rail and the card's own spacing.
   verdictCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
     borderLeftWidth: 4,
-    padding: spacing.lg,
     marginBottom: spacing.md,
   },
   verdictHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -850,30 +867,13 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
   },
   resultsList: { paddingBottom: spacing.xl },
-  resultRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  resultAvatar: { marginRight: spacing.sm },
+  // A pick search row pairs DraftPickAssetRow (which owns the "add to
+  // package" tap) with a separate "view pick detail" button — the outer row
+  // carries the group divider so both children read as one continuous row.
+  pickResultRow: { flexDirection: 'row', alignItems: 'center' },
+  pickResultRowInner: { flex: 1 },
+  pickResultDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   pickInfoButton: { marginLeft: spacing.sm },
-  pickBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.pill,
-    backgroundColor: colors.badgeBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  resultInfo: { flex: 1, marginRight: spacing.sm },
-  resultName: { fontSize: 15, fontWeight: '500', color: colors.textPrimary },
-  resultMeta: { fontSize: 12, color: colors.textSecondary },
-  resultMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
-  resultScore: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });
