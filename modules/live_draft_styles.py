@@ -63,12 +63,16 @@ LIVE_DRAFT_CSS = """
     text-transform: uppercase;
 }
 
-.live-draft-chip-success { border-color: rgba(45, 212, 191, 0.52); color: rgba(153, 246, 228, 0.96); }
-.live-draft-chip-warning { border-color: rgba(245, 158, 11, 0.52); color: rgba(253, 230, 138, 0.96); }
+/* Success/warning chips borrow the canonical semantic tokens directly
+   (green for success, amber for warning) instead of restating one-off
+   rgba values — success previously drifted to a teal hue that did not
+   match --color-success anywhere else in the app. */
+.live-draft-chip-success { border-color: var(--color-success); color: var(--color-success); }
+.live-draft-chip-warning { border-color: var(--color-warning); color: var(--color-warning); }
 
 .live-draft-command {
     align-items: center;
-    border-left: 4px solid rgba(103, 232, 249, 0.84);
+    border-left: 4px solid var(--color-accent);
     display: grid;
     gap: 0.55rem;
     grid-template-columns: minmax(0, 1fr) minmax(9rem, 0.62fr);
@@ -77,7 +81,7 @@ LIVE_DRAFT_CSS = """
 }
 
 .live-draft-command-mine {
-    border-left-color: rgba(245, 158, 11, 0.88);
+    border-left-color: var(--color-warning);
 }
 
 .live-draft-section-head {
@@ -100,10 +104,13 @@ LIVE_DRAFT_CSS = """
     text-align: right;
 }
 
+/* The single most time-critical answer on this page ("who should I draft
+   right now") must outrank the alternates it sits beside — so this is a
+   vertical stack (primary card, then one grouped alternates surface), not
+   a grid of N equally-weighted cards. */
 .live-draft-rec-grid {
     display: grid;
     gap: var(--space-sm);
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 }
 
 .live-draft-rec-card {
@@ -116,6 +123,38 @@ LIVE_DRAFT_CSS = """
     grid-column: 1;
     min-width: 0;
     text-align: left;
+}
+
+.live-draft-rec-alt-label {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-metadata);
+    letter-spacing: var(--letter-spacing-badge);
+    margin-top: var(--space-xs);
+    text-transform: uppercase;
+}
+
+/* One grouped surface with dividers for the remaining alternates, per the
+   same dense-list-over-N-cards pattern already used by the pick board and
+   rankings below — not another row of individually bordered/shadowed
+   dg-football-asset cards. */
+.live-draft-rec-alt-group {
+    background: var(--color-surface-primary);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-card);
+}
+
+.live-draft-rec-alt-group .live-draft-rec-alt-card {
+    background: transparent;
+    border: none;
+    border-bottom: var(--border-width-default) solid var(--color-border);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.live-draft-rec-alt-group .live-draft-rec-alt-card:last-child {
+    border-bottom: none;
 }
 
 .live-draft-rec-name {
@@ -183,7 +222,6 @@ LIVE_DRAFT_CSS = """
         text-align: left;
     }
 
-    .live-draft-rec-grid,
     .live-draft-rec-analysis {
         grid-template-columns: 1fr;
     }
