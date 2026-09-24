@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useEffect, useMemo, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import QRCode from 'react-native-qrcode-svg';
@@ -13,6 +13,10 @@ const CARD_WIDTH = 360;
 const CARD_HEIGHT = 540;
 const SHARE_QR_URL = 'https://fantasygmlab.com';
 const QR_SIZE = 60;
+// Safety net only — NOT the fix. If some avatar never fires onLoad/onError
+// (e.g. a hung request), don't leave the share button stuck forever. The
+// real fix is waiting for PlayerAvatar's onLoadSettle below.
+const AVATAR_READY_TIMEOUT_MS = 4000;
 
 const HEADLINE_META: Record<TradeVerdict['tone'], { headline: string; color: string }> = {
   accept: { headline: 'TRADE ACCEPTED', color: colors.accent },
@@ -23,10 +27,24 @@ const HEADLINE_META: Record<TradeVerdict['tone'], { headline: string; color: str
   idea: { headline: 'TRADE IDEA', color: colors.accent },
 };
 
-function AssetLine({ player }: { player: RankedPlayer }) {
+function AssetLine({
+  player,
+  trackKey,
+  onAvatarSettle,
+}: {
+  player: RankedPlayer;
+  trackKey: string;
+  onAvatarSettle: (key: string) => void;
+}) {
   return (
     <View style={styles.assetLine}>
-      <PlayerAvatar playerId={player.player_id} size={32} tier={player.tier} style={styles.assetAvatar} />
+      <PlayerAvatar
+        playerId={player.player_id}
+        size={32}
+        tier={player.tier}
+        style={styles.assetAvatar}
+        onLoadSettle={() => onAvatarSettle(trackKey)}
+      />
       <View style={styles.assetTextGroup}>
         <PlayerNameText name={player.name ?? 'Unknown'} style={styles.assetName} />
         <View style={styles.assetMetaRow}>
@@ -47,17 +65,57 @@ function AssetLine({ player }: { player: RankedPlayer }) {
  * footer), built from the same TradeVerdict data the on-screen card shows.
  * Rendered at a fixed 360x450 logical size so react-native-view-shot's
  * capture produces a consistent image regardless of device.
+ *
+ * `onReadyChange` reports whether every rendered player headshot has
+ * settled (loaded, failed, or had no id to load) — see PlayerAvatar's
+ * onLoadSettle doc comment for why a capturer needs this. It fires
+ * synchronously false→true→false as props change, so a caller (the share
+ * modal) should treat the latest value as the source of truth, not a
+ * one-shot event.
  */
 const TradeShareCard = forwardRef<View, {
   leagueName: string;
   verdict: TradeVerdict;
   sendPlayers: RankedPlayer[];
   receivePlayers: RankedPlayer[];
-}>(({ leagueName, verdict, sendPlayers, receivePlayers }, ref) => {
+  onReadyChange?: (ready: boolean) => void;
+}>(({ leagueName, verdict, sendPlayers, receivePlayers, onReadyChange }, ref) => {
   const meta = HEADLINE_META[verdict.tone];
   const gain = verdict.value_delta;
   const gainColor = gain > 0 ? colors.successBright : gain < 0 ? colors.danger : colors.textSecondary;
   const gainLabel = `${gain > 0 ? '+' : ''}${gain.toLocaleString()}`;
+
+  const sendShown = sendPlayers.slice(0, 3);
+  const receiveShown = receivePlayers.slice(0, 3);
+  const trackedKeys = useMemo(
+    () => [
+      ...sendShown.map((p, i) => `send-${p.player_id ?? i}`),
+      ...receiveShown.map((p, i) => `receive-${p.player_id ?? i}`),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sendShown.map((p) => p.player_id).join(','), receiveShown.map((p) => p.player_id).join(',')],
+  );
+  const trackedSignature = trackedKeys.join('|');
+
+  const [settledKeys, setSettledKeys] = useState<Set<string>>(new Set());
+  const handleAvatarSettle = React.useCallback((key: string) => {
+    setSettledKeys((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }, []);
+  const allSettled = trackedKeys.every((k) => settledKeys.has(k));
+
+  // Re-arm the timeout safety net whenever the actual trade content changes.
+  const [forceReady, setForceReady] = useState(false);
+  useEffect(() => {
+    setForceReady(false);
+    const timer = setTimeout(() => setForceReady(true), AVATAR_READY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [trackedSignature]);
+
+  const ready = allSettled || forceReady;
+  useEffect(() => {
+    onReadyChange?.(ready);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   return (
     <View ref={ref} collapsable={false} style={styles.card}>
@@ -96,8 +154,13 @@ const TradeShareCard = forwardRef<View, {
             <View style={[styles.exchangeDot, { backgroundColor: colors.danger }]} />
             <AppText style={styles.exchangeKicker}>YOU SEND</AppText>
           </View>
-          {sendPlayers.slice(0, 3).map((player) => (
-            <AssetLine key={player.player_id} player={player} />
+          {sendShown.map((player, i) => (
+            <AssetLine
+              key={player.player_id}
+              player={player}
+              trackKey={`send-${player.player_id ?? i}`}
+              onAvatarSettle={handleAvatarSettle}
+            />
           ))}
         </View>
         <View style={styles.exchangeSide}>
@@ -105,8 +168,13 @@ const TradeShareCard = forwardRef<View, {
             <View style={[styles.exchangeDot, { backgroundColor: colors.successBright }]} />
             <AppText style={styles.exchangeKicker}>YOU RECEIVE</AppText>
           </View>
-          {receivePlayers.slice(0, 3).map((player) => (
-            <AssetLine key={player.player_id} player={player} />
+          {receiveShown.map((player, i) => (
+            <AssetLine
+              key={player.player_id}
+              player={player}
+              trackKey={`receive-${player.player_id ?? i}`}
+              onAvatarSettle={handleAvatarSettle}
+            />
           ))}
         </View>
       </View>

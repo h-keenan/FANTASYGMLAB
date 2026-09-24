@@ -38,6 +38,14 @@ export default function TradeSharePreviewModal({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const cardRef = useRef<View>(null);
   const [capturing, setCapturing] = useState(false);
+  // Root cause: react-native-view-shot's captureRef does not wait for
+  // in-flight <Image> loads (this is documented behavior of the library,
+  // not a bug) — it snapshots whatever has already painted. TradeShareCard's
+  // avatars are freshly-mounted `expo-image` instances every time this modal
+  // opens, so tapping "Share image" right away raced the headshots' async
+  // load/decode and produced a PNG with the layout/text but blank photos.
+  // TradeShareCard reports readiness here; onShareImage waits on it below.
+  const imagesReadyRef = useRef(false);
 
   // Best-effort: a share sheet dismissed without sending still gets recorded
   // (the later "did this happen?" prompt already has a "Didn't send" answer
@@ -54,10 +62,27 @@ export default function TradeSharePreviewModal({
       .catch(() => {});
   };
 
+  const waitForImagesReady = async (timeoutMs = 4000) => {
+    const start = Date.now();
+    while (!imagesReadyRef.current && Date.now() - start < timeoutMs) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+
   const onShareImage = async () => {
     if (!cardRef.current) return;
     setCapturing(true);
     try {
+      // Wait for every avatar headshot to have loaded (or failed/settled)
+      // before snapshotting — see imagesReadyRef comment above for why.
+      await waitForImagesReady();
+      // onLoad fires once the bitmap is decoded and handed to the native
+      // image view, which can still be a frame ahead of that view actually
+      // being composited/painted on screen. Yielding two animation frames
+      // gives the native layer time to flush that paint before the native
+      // snapshot runs, without guessing at a fixed wait duration.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       const uri = await captureRef(cardRef, {
         format: 'png',
         quality: 1,
@@ -114,6 +139,9 @@ export default function TradeSharePreviewModal({
                 verdict={verdict}
                 sendPlayers={sendPlayers}
                 receivePlayers={receivePlayers}
+                onReadyChange={(ready) => {
+                  imagesReadyRef.current = ready;
+                }}
               />
             </View>
           </View>
