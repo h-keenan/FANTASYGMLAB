@@ -5,12 +5,13 @@ import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
+import AnimatedCard from '../components/AnimatedCard';
 import IconCircle from '../components/IconCircle';
 import { api, type PushCategory } from '../lib/api';
 import { syncPushToken } from '../lib/pushNotifications';
 import { useOrbClearance } from '../lib/orbLayout';
 import { isShowcaseModeAvailable } from '../lib/showcaseMode';
-import { spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { useAuth } from '../context/AuthContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
@@ -18,8 +19,9 @@ import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
+type IconName = React.ComponentProps<typeof IconCircle>['name'];
 
-const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: React.ComponentProps<typeof IconCircle>['name'] }> = [
+const LEGAL_ITEMS: Array<{ pageKey: string; label: string; icon: IconName }> = [
   { pageKey: 'about_disclaimer', label: 'About / Disclaimer', icon: 'information-circle-outline' },
   { pageKey: 'terms', label: 'Terms of Use', icon: 'document-text-outline' },
   { pageKey: 'privacy', label: 'Privacy Policy', icon: 'shield-checkmark-outline' },
@@ -169,214 +171,318 @@ export default function MoreScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.root}>
       <GridBackground />
-      <ScrollView contentContainerStyle={{ paddingBottom: orbClearance, paddingTop: headerHeight }}>
-      <AppText style={styles.sectionLabel}>Display</AppText>
-      <View style={styles.densityRow}>
-        {DENSITY_OPTIONS.map((option) => {
-          const active = density === option.value;
-          return (
-            <TouchableOpacity
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}
+      >
+        <AppText style={[styles.sectionLabel, styles.sectionLabelFirst]}>Preferences</AppText>
+        <AppText style={styles.groupCaption}>Density</AppText>
+        <View style={styles.optionRow}>
+          {DENSITY_OPTIONS.map((option) => (
+            <OptionCard
               key={option.value}
-              style={[styles.densityOption, active && styles.densityOptionActive]}
+              label={option.label}
+              description={option.description}
+              active={density === option.value}
               onPress={() => setDensity(option.value)}
-            >
-              <AppText style={[styles.densityOptionLabel, active && styles.densityOptionLabelActive]}>
-                {option.label}
-              </AppText>
-              <AppText style={styles.densityOptionDescription}>{option.description}</AppText>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <AppText style={styles.sectionLabel}>Theme</AppText>
-      <View style={styles.densityRow}>
-        {THEME_OPTIONS.map((option) => {
-          const active = themeMode === option.value;
-          return (
-            <TouchableOpacity
-              key={option.value}
-              style={[styles.densityOption, active && styles.densityOptionActive]}
-              onPress={() => setThemeMode(option.value)}
-            >
-              <AppText style={[styles.densityOptionLabel, active && styles.densityOptionLabelActive]}>
-                {option.label}
-              </AppText>
-              <AppText style={styles.densityOptionDescription}>{option.description}</AppText>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <AppText style={styles.sectionLabel}>Notifications</AppText>
-      <TouchableOpacity style={styles.row} onPress={onSendTestPush} disabled={sendingTestPush}>
-        <View style={styles.labelGroup}>
-          <IconCircle name="notifications-outline" color={colors.accent} style={styles.icon} />
-          <AppText style={styles.label}>Send test notification</AppText>
-        </View>
-        {sendingTestPush ? <ActivityIndicator size="small" color={colors.accent} /> : <AppText style={styles.chevron}>{'›'}</AppText>}
-      </TouchableOpacity>
-
-      {pushCategories
-        ? PUSH_CATEGORY_LABELS.map((item) => (
-            <View key={item.value} style={styles.row}>
-              <View style={styles.labelGroup}>
-                <View style={styles.toggleTextGroup}>
-                  <AppText style={styles.label}>{item.label}</AppText>
-                  <AppText style={styles.toggleDescription}>{item.description}</AppText>
-                </View>
-              </View>
-              <Switch
-                value={pushCategories[item.value]}
-                onValueChange={(next) => onTogglePushCategory(item.value, next)}
-                disabled={updatingCategory === item.value}
-                trackColor={{ true: colors.accent, false: colors.border }}
-              />
-            </View>
-          ))
-        : null}
-
-      <AppText style={styles.sectionLabel}>About</AppText>
-      <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('HowWeEvaluate')}>
-        <View style={styles.labelGroup}>
-          <IconCircle name="school-outline" color={colors.violet} style={styles.icon} />
-          <AppText style={styles.label}>How We Evaluate</AppText>
-        </View>
-        <AppText style={styles.chevron}>{'›'}</AppText>
-      </TouchableOpacity>
-
-      {showcaseAvailable ? (
-        <>
-          <AppText style={styles.sectionLabel}>Developer</AppText>
-          <View style={styles.row}>
-            <View style={styles.labelGroup}>
-              <IconCircle name="videocam-outline" color={colors.premium} style={styles.icon} />
-              <View style={styles.toggleTextGroup}>
-                <AppText style={styles.label}>Showcase mode</AppText>
-                <AppText style={styles.toggleDescription}>
-                  Replaces every team name, league name, owner name and username with
-                  stand-ins so screen recordings stay anonymous. Player and football data
-                  are untouched.
-                </AppText>
-              </View>
-            </View>
-            <Switch
-              value={showcaseMode}
-              onValueChange={setShowcaseMode}
-              trackColor={{ true: colors.premium, false: colors.border }}
             />
-          </View>
-        </>
-      ) : null}
+          ))}
+        </View>
+        <AppText style={styles.groupCaption}>Theme</AppText>
+        <View style={styles.optionRow}>
+          {THEME_OPTIONS.map((option) => (
+            <OptionCard
+              key={option.value}
+              label={option.label}
+              description={option.description}
+              active={themeMode === option.value}
+              onPress={() => setThemeMode(option.value)}
+            />
+          ))}
+        </View>
 
-      <AppText style={styles.sectionLabel}>Legal</AppText>
-      {LEGAL_ITEMS.map((item) => (
-        <TouchableOpacity
-          key={item.pageKey}
-          style={styles.row}
-          onPress={() => navigation.navigate('LegalPage', { pageKey: item.pageKey })}
-        >
-          <View style={styles.labelGroup}>
-            <IconCircle name={item.icon} color={colors.textSecondary} style={styles.icon} />
-            <AppText style={styles.label}>{item.label}</AppText>
-          </View>
-          <AppText style={styles.chevron}>{'›'}</AppText>
-        </TouchableOpacity>
-      ))}
+        <AppText style={styles.sectionLabel}>Notifications</AppText>
+        <AnimatedCard style={styles.groupCard}>
+          <SettingsRow
+            icon="notifications-outline"
+            iconColor={colors.accent}
+            label="Send test notification"
+            onPress={onSendTestPush}
+            disabled={sendingTestPush}
+            right={sendingTestPush ? <ActivityIndicator size="small" color={colors.accent} /> : undefined}
+            showDivider={Boolean(pushCategories)}
+          />
+          {pushCategories
+            ? PUSH_CATEGORY_LABELS.map((item, index) => (
+                <SettingsRow
+                  key={item.value}
+                  label={item.label}
+                  description={item.description}
+                  showDivider={index < PUSH_CATEGORY_LABELS.length - 1}
+                  right={
+                    <Switch
+                      value={pushCategories[item.value]}
+                      onValueChange={(next) => onTogglePushCategory(item.value, next)}
+                      disabled={updatingCategory === item.value}
+                      trackColor={{ true: colors.accent, false: colors.border }}
+                    />
+                  }
+                />
+              ))
+            : null}
+        </AnimatedCard>
 
-      <AppText style={styles.sectionLabel}>Account</AppText>
-      <TouchableOpacity style={styles.row} onPress={onManageSubscription}>
-        <View style={styles.labelGroup}>
-          <IconCircle name="card-outline" color={colors.textSecondary} style={styles.icon} />
-          <AppText style={styles.label}>Manage Subscription</AppText>
-        </View>
-        <AppText style={styles.chevron}>{'›'}</AppText>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.row} onPress={onExportData} disabled={exporting}>
-        <View style={styles.labelGroup}>
-          <IconCircle name="download-outline" color={colors.textSecondary} style={styles.icon} />
-          <AppText style={styles.label}>Export My Data</AppText>
-        </View>
-        {exporting ? <ActivityIndicator size="small" color={colors.textSecondary} /> : <AppText style={styles.chevron}>{'›'}</AppText>}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.row} onPress={onDeleteAccount} disabled={deleting}>
-        <View style={styles.labelGroup}>
-          <IconCircle name="trash-outline" color={colors.danger} style={styles.icon} />
-          <AppText style={styles.dangerLabel}>Delete account</AppText>
-        </View>
-        {deleting ? <ActivityIndicator size="small" color={colors.danger} /> : null}
-      </TouchableOpacity>
+        <AppText style={styles.sectionLabel}>About</AppText>
+        <AnimatedCard style={styles.groupCard}>
+          <SettingsRow
+            icon="school-outline"
+            iconColor={colors.violet}
+            label="How We Evaluate"
+            onPress={() => navigation.navigate('HowWeEvaluate')}
+            showDivider={false}
+          />
+        </AnimatedCard>
+
+        {showcaseAvailable ? (
+          <>
+            <AppText style={styles.sectionLabel}>Developer</AppText>
+            <AnimatedCard style={styles.groupCard}>
+              <SettingsRow
+                icon="videocam-outline"
+                iconColor={colors.premium}
+                label="Showcase mode"
+                description="Replaces every team name, league name, owner name and username with stand-ins so screen recordings stay anonymous. Player and football data are untouched."
+                showDivider={false}
+                right={
+                  <Switch
+                    value={showcaseMode}
+                    onValueChange={setShowcaseMode}
+                    trackColor={{ true: colors.premium, false: colors.border }}
+                  />
+                }
+              />
+            </AnimatedCard>
+          </>
+        ) : null}
+
+        <AppText style={styles.sectionLabel}>Legal</AppText>
+        <AnimatedCard style={styles.groupCard}>
+          {LEGAL_ITEMS.map((item, index) => (
+            <SettingsRow
+              key={item.pageKey}
+              icon={item.icon}
+              iconColor={colors.textSecondary}
+              label={item.label}
+              onPress={() => navigation.navigate('LegalPage', { pageKey: item.pageKey })}
+              showDivider={index < LEGAL_ITEMS.length - 1}
+            />
+          ))}
+        </AnimatedCard>
+
+        <AppText style={styles.sectionLabel}>Account</AppText>
+        <AnimatedCard style={styles.groupCard}>
+          <SettingsRow
+            icon="card-outline"
+            iconColor={colors.textSecondary}
+            label="Manage Subscription"
+            onPress={onManageSubscription}
+            showDivider
+          />
+          <SettingsRow
+            icon="download-outline"
+            iconColor={colors.textSecondary}
+            label="Export My Data"
+            onPress={onExportData}
+            disabled={exporting}
+            right={exporting ? <ActivityIndicator size="small" color={colors.textSecondary} /> : undefined}
+            showDivider={false}
+          />
+        </AnimatedCard>
+
+        {/* Destructive action gets its own visually distinct surface
+            (danger border/tint) rather than sitting in the neutral Account
+            card above — Magna Carta §17: destructive actions should look
+            distinct, not just be a row with red text among routine ones. */}
+        <AnimatedCard style={styles.dangerCard}>
+          <SettingsRow
+            icon="trash-outline"
+            iconColor={colors.danger}
+            label="Delete account"
+            danger
+            onPress={onDeleteAccount}
+            disabled={deleting}
+            right={deleting ? <ActivityIndicator size="small" color={colors.danger} /> : null}
+            showDivider={false}
+          />
+        </AnimatedCard>
       </ScrollView>
     </View>
   );
 }
 
+/**
+ * One selectable choice card (Density/Theme) — a compact label + supporting
+ * description, active state rendered as an accent-tinted fill + border
+ * (same "illuminated" language SegmentedTabBar uses for its active segment)
+ * rather than a plain border-color swap. Kept local: SegmentedTabBar itself
+ * only supports a bare label per option, no room for the description text
+ * these two choosers need, so this is a genuine variant rather than a
+ * duplicate of an existing shared component (§47).
+ */
+function OptionCard({
+  label,
+  description,
+  active,
+  onPress,
+}: {
+  label: string;
+  description: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity
+      style={[styles.optionCard, active && styles.optionCardActive]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <AppText style={[styles.optionLabel, active && styles.optionLabelActive]}>{label}</AppText>
+      <AppText style={styles.optionDescription}>{description}</AppText>
+    </TouchableOpacity>
+  );
+}
+
+/**
+ * One settings-list row — icon-in-circle (or none for indented toggle rows
+ * that already share a parent icon), label, optional description, optional
+ * right-side control (chevron/switch/spinner), optional bottom divider.
+ * Mirrors the AlertRow/LineupRow local-row convention already established
+ * on AlertsScreen/MyTeamScreen for rows living inside a `groupCard`.
+ */
+function SettingsRow({
+  icon,
+  iconColor,
+  label,
+  description,
+  onPress,
+  disabled,
+  right,
+  showDivider,
+  danger,
+}: {
+  icon?: IconName;
+  iconColor?: string;
+  label: string;
+  description?: string;
+  onPress?: () => void;
+  disabled?: boolean;
+  right?: React.ReactNode;
+  showDivider: boolean;
+  danger?: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const content = (
+    <View style={[styles.row, showDivider && styles.rowDivider]}>
+      <View style={styles.labelGroup}>
+        {icon ? <IconCircle name={icon} color={iconColor ?? colors.textSecondary} style={styles.icon} /> : null}
+        <View style={styles.labelTextGroup}>
+          <AppText style={danger ? styles.dangerLabel : styles.label}>{label}</AppText>
+          {description ? <AppText style={styles.rowDescription}>{description}</AppText> : null}
+        </View>
+      </View>
+      {right !== undefined ? right : onPress ? <AppText style={styles.chevron}>{'›'}</AppText> : null}
+    </View>
+  );
+  if (!onPress) return content;
+  return (
+    <TouchableOpacity onPress={onPress} disabled={disabled} activeOpacity={0.7}>
+      {content}
+    </TouchableOpacity>
+  );
+}
+
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xs,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  labelGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  // Icon-in-colored-circle per row (same disc GM Orb's destination sheet
-  // uses) — More is the app's other menu-like list, so it gets the same
-  // scannable landmark per row. Sections keep distinct tints (accent for
-  // actions, violet for learning, neutral for legal, danger for delete)
-  // rather than one accent everywhere.
-  icon: { marginRight: spacing.md },
-  label: { fontSize: 16, color: colors.textPrimary, flexShrink: 1 },
-  dangerLabel: { fontSize: 16, color: colors.danger, flexShrink: 1 },
-  chevron: { fontSize: 20, color: colors.textSecondary },
-  toggleTextGroup: { flexShrink: 1, paddingRight: spacing.md },
-  toggleDescription: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  densityRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  densityOption: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  densityOptionActive: {
-    borderColor: colors.accent,
-  },
-  densityOptionLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  densityOptionLabelActive: {
-    color: colors.accent,
-  },
-  densityOptionDescription: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
+    root: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: 'transparent' },
+    content: { padding: spacing.lg },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textTertiary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginTop: spacing.lg,
+      marginBottom: spacing.sm,
+    },
+    sectionLabelFirst: { marginTop: 0 },
+    groupCaption: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: spacing.xs,
+    },
+    // One grouped surface per section with hairline dividers between rows,
+    // instead of a separately bordered/backgrounded row per item — Magna
+    // Carta §12, same `groupCard` pattern MyTeamScreen/AlertsScreen use.
+    groupCard: { padding: spacing.md, paddingVertical: 0 },
+    dangerCard: {
+      padding: spacing.md,
+      paddingVertical: 0,
+      marginTop: spacing.md,
+      borderColor: colors.danger,
+      backgroundColor: colors.dangerMuted,
+    },
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      gap: spacing.md,
+    },
+    rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    labelGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, flex: 1 },
+    icon: { marginRight: spacing.md },
+    labelTextGroup: { flexShrink: 1 },
+    label: { fontSize: 15, color: colors.textPrimary, flexShrink: 1 },
+    dangerLabel: { fontSize: 15, fontWeight: '600', color: colors.danger, flexShrink: 1 },
+    chevron: { fontSize: 20, color: colors.textSecondary },
+    rowDescription: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    optionRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    optionCard: {
+      flex: 1,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth * 1.5,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surface,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+    },
+    optionCardActive: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accentMuted,
+    },
+    optionLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    optionLabelActive: {
+      color: colors.accent,
+    },
+    optionDescription: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
   });
 }
