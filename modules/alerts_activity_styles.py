@@ -1,29 +1,33 @@
 """Alerts / Activity route styles — square segmented controls, not APP_CSS."""
 
 ALERTS_ACTIVITY_CSS = """
-.dg-alerts-shell{
-    max-width:52rem;
-    min-width:0;
-    width:100%;
-}
-.dg-alerts-masthead{
-    align-items:baseline;
+.dg-alerts-group{
+    align-items:center;
+    color:var(--color-text-muted);
     display:flex;
-    gap:var(--space-sm);
-    margin:0 0 var(--space-xs);
-    padding:0;
-}
-.dg-alerts-kicker{
-    color:var(--color-text-primary);
-    font:var(--font-label);
-    letter-spacing:var(--letter-spacing-label);
-    margin:0;
+    font:var(--type-supporting-metadata);
+    gap:var(--space-xs);
+    letter-spacing:var(--letter-spacing-badge);
+    margin:var(--space-lg) 0 var(--space-xs);
     text-transform:uppercase;
 }
-.dg-alerts-lede{
+.dg-alerts-group__bar{
+    background:currentColor;
+    display:inline-block;
+    height:0.8rem;
+    width:3px;
+}
+.dg-alerts-group--injury{
+    color:var(--color-danger);
+}
+.dg-alerts-group--transaction{
+    color:var(--color-accent);
+}
+.dg-alerts-group--role{
+    color:var(--color-success);
+}
+.dg-alerts-group--other{
     color:var(--color-text-muted);
-    font:var(--font-caption);
-    margin:0;
 }
 .dg-alerts-row{
     border-bottom:var(--border-width-default) solid var(--color-border);
@@ -60,6 +64,14 @@ ALERTS_ACTIVITY_CSS = """
 }
 .dg-alerts-row--urgent .dg-alerts-portrait{
     border-color:var(--color-warning);
+}
+.dg-alerts-row--urgent.dg-alerts-row--injury{
+    background:color-mix(in srgb,var(--color-danger) 8%,transparent);
+    border-color:var(--color-danger);
+    border-left-color:var(--color-danger);
+}
+.dg-alerts-row--urgent.dg-alerts-row--injury .dg-alerts-portrait{
+    border-color:var(--color-danger);
 }
 div[class*="st-key-alerts_item_"]{
     border-bottom:var(--border-width-default) solid var(--color-border);
@@ -110,6 +122,10 @@ div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
     border-color:var(--color-warning);
     color:var(--color-warning);
 }
+.dg-alerts-row--urgent.dg-alerts-row--injury .dg-alerts-glyph{
+    border-color:var(--color-danger);
+    color:var(--color-danger);
+}
 .dg-alerts-row--news:not(.dg-alerts-row--urgent){
     opacity:0.88;
 }
@@ -122,8 +138,8 @@ div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
 .dg-alerts-badge{
     border:var(--border-width-default) solid var(--color-border);
     color:var(--color-text-secondary);
-    font:var(--font-label);
-    letter-spacing:var(--letter-spacing-label);
+    font:var(--type-supporting-metadata);
+    letter-spacing:var(--letter-spacing-badge);
     padding:0.15rem var(--space-xs);
 }
 .dg-alerts-badge--my{
@@ -131,8 +147,8 @@ div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
     color:var(--color-accent);
 }
 .dg-alerts-badge--risk{
-    border-color:var(--color-warning);
-    color:var(--color-warning);
+    border-color:var(--color-danger);
+    color:var(--color-danger);
 }
 .dg-alerts-glyph{
     align-items:center;
@@ -149,24 +165,25 @@ div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
 }
 .dg-alerts-headline{
     color:var(--color-text-primary);
-    font:var(--font-body-strong);
+    font:var(--type-card-title);
     margin:0;
 }
 .dg-alerts-context{
     color:var(--color-text-secondary);
-    font:var(--font-caption);
+    font:var(--type-caption-emphasis);
     margin:var(--space-2xs) 0 0;
 }
 .dg-alerts-meta{
     color:var(--color-text-muted);
     display:flex;
     flex-wrap:wrap;
+    font:var(--type-supporting-metadata);
     gap:var(--space-xs);
     margin:var(--space-2xs) 0 0;
 }
 .dg-alerts-source{
     color:var(--color-text-secondary);
-    font:var(--font-caption);
+    font:var(--type-supporting-metadata);
 }
 .dg-alerts-unread{
     background:var(--color-accent);

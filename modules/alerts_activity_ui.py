@@ -79,6 +79,55 @@ def _safe_source_url(value: object) -> str:
     return candidate if parsed.scheme in {"http", "https"} and bool(parsed.netloc) else ""
 
 
+# Presentation-only grouping taxonomy — mirrors the mobile Alerts screen's
+# injury/status, transaction, role/depth, off-field buckets so alert TYPE
+# reads via color (and a shared group header) instead of a flat stack of
+# identically-weighted rows. Reads only the already-computed `event_type`
+# field; does not alter alert generation, matching, or eligibility logic.
+_BUCKET_INJURY_EVENTS = frozenset(
+    {
+        "INJURY",
+        "INACTIVE",
+        "IR_PUP_NFI",
+        "INJURY_SEVERITY_UPDATE",
+        "RETURN_TO_PLAY",
+        "RETURN_TO_PRACTICE",
+        "ACTIVE",
+    }
+)
+_BUCKET_TRANSACTION_EVENTS = frozenset(
+    {"TRADE", "SIGNING", "RELEASE", "SUSPENSION", "RETIREMENT"}
+)
+_BUCKET_ROLE_EVENTS = frozenset(
+    {
+        "STARTER_CHANGE",
+        "ROLE_INCREASE",
+        "ROLE_DECREASE",
+        "POSITION_BATTLE",
+        "DEPTH_CHART_CHANGE",
+    }
+)
+_ALERT_GROUP_LABELS = {
+    "injury": "Injury / Status",
+    "transaction": "Transaction",
+    "role": "Role / Depth Chart",
+    "other": "Updates",
+}
+
+
+def alert_category_bucket(row: Mapping[str, Any]) -> str:
+    """Presentation-only bucket for grouping/coloring; not a business signal."""
+
+    event_type = str(row.get("event_type") or "").strip().upper()
+    if event_type in _BUCKET_INJURY_EVENTS:
+        return "injury"
+    if event_type in _BUCKET_TRANSACTION_EVENTS:
+        return "transaction"
+    if event_type in _BUCKET_ROLE_EVENTS:
+        return "role"
+    return "other"
+
+
 def timeline_row_html(row: Mapping[str, Any]) -> str:
     glyph = escape(str(row.get("glyph") or "NEWS")[:10])
     headline = escape(alerts_activity.humanize_headline(row))
@@ -97,6 +146,8 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     player_id = str(row.get("player_id") or "").strip()
     if player_id:
         row_classes.append("dg-alerts-row--player")
+    if alert_category_bucket(row) == "injury":
+        row_classes.append("dg-alerts-row--injury")
     if is_urgent:
         row_classes.extend(("dg-alerts-row--urgent", "dg-alerts-row--my-player"))
     elif kind == alerts_activity.KIND_MY_TEAMMATE:
@@ -354,8 +405,17 @@ def render_alerts_page(
         return
     clicked_actions: list[dict[str, Any]] = []
     painted_actions: list[dict[str, Any]] = []
+    current_bucket = None
     with st.container(key=f"{key}_timeline"):
         for index, row in enumerate(visible):
+            bucket = alert_category_bucket(row)
+            if bucket != current_bucket:
+                current_bucket = bucket
+                render_html_fragment(
+                    f"<div class='dg-alerts-group dg-alerts-group--{bucket}'>"
+                    "<span class='dg-alerts-group__bar'></span>"
+                    f"{escape(_ALERT_GROUP_LABELS[bucket])}</div>"
+                )
             with st.container(key=f"alerts_item_{league_id}_{index}"):
                 render_html_fragment(timeline_row_html(row))
                 attention_id = str(
