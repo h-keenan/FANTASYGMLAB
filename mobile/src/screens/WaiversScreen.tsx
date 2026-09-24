@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -10,7 +11,6 @@ import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
@@ -21,11 +21,14 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import OverallRatingBadge from '../components/OverallRatingBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PremiumLock from '../components/PremiumLock';
 import PlayerAvatar from '../components/PlayerAvatar';
-import PositionBadge from '../components/PositionBadge';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import TierBadge from '../components/TierBadge';
+import WaiverRecommendationCard, {
+  waiverInjuryDisplay,
+  waiverOpponentContext,
+} from '../components/WaiverRecommendationCard';
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -38,22 +41,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Waivers'>;
 
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
 const BEST_AVAILABLE_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K'];
-
-const INJURY_RISK_STATUSES = new Set(['out', 'ir', 'doubtful', 'pup', 'suspended']);
-const INJURY_WATCH_STATUSES = new Set(['questionable', 'sus']);
-
-function injuryPillColor(status: string | null, colors: ThemeColors): string | null {
-  const normalized = (status ?? '').trim().toLowerCase();
-  if (!normalized) return null;
-  if (INJURY_RISK_STATUSES.has(normalized)) return colors.danger;
-  if (INJURY_WATCH_STATUSES.has(normalized)) return colors.premium;
-  return null;
-}
-
-function opponentLabel(player: Pick<WaiverPlayer, 'opponent' | 'opponent_is_home'>): string | null {
-  if (!player.opponent) return null;
-  return `${player.opponent_is_home ? 'vs' : '@'} ${player.opponent}`;
-}
 
 const NO_LEAGUE_REASONS = new Set([
   'no_sleeper_username_linked',
@@ -72,6 +59,21 @@ function reasonMessage(reason: string): string | null {
     return "Player data isn't available right now — try again in a bit.";
   }
   return null;
+}
+
+/** Section header used across every board on this screen — a plain
+ * uppercase kicker plus an optional one-line caption underneath, replacing
+ * a mix of ad hoc labels so "Priority Adds," "Best Available by Position,"
+ * and "All Free Agents" all read as one family of section boundary. */
+function SectionHeader({ label, caption }: { label: string; caption?: string | null }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.sectionHeaderWrap}>
+      <AppText style={styles.sectionLabel}>{label}</AppText>
+      {caption ? <AppText style={styles.sectionCaption}>{caption}</AppText> : null}
+    </View>
+  );
 }
 
 export default function WaiversScreen({ route, navigation }: Props) {
@@ -160,6 +162,18 @@ export default function WaiversScreen({ route, navigation }: Props) {
     }).filter((entry): entry is { position: string; player: WaiverPlayer; count: number } => entry !== null);
   }, [freeAgents]);
 
+  const openPlayer = useCallback(
+    (player: WaiverPlayer) => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName }),
+    [navigation, leagueId, leagueName],
+  );
+
+  const topPriority = priorityAdds[0] ?? null;
+  const secondaryPriority = priorityAdds.length > 1 ? priorityAdds.slice(1) : [];
+  const priorityCaption =
+    neededPositions.length > 0
+      ? `Personalized for your needs at ${neededPositions.join(', ')}`
+      : 'Personalized for your roster';
+
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
@@ -173,7 +187,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
-      <View style={styles.filterRow}>
+      <View style={styles.discoveryCard}>
         <TextInput
           style={styles.searchInput}
           placeholder="Search free agents"
@@ -182,17 +196,17 @@ export default function WaiversScreen({ route, navigation }: Props) {
           autoCapitalize="none"
           placeholderTextColor={colors.textTertiary}
         />
-      </View>
-      <View style={styles.pillRow}>
-        {POSITIONS.map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[styles.pill, position === option && styles.pillActive]}
-            onPress={() => setPosition(option)}
-          >
-            <AppText style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</AppText>
-          </TouchableOpacity>
-        ))}
+        <View style={styles.pillRow}>
+          {POSITIONS.map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={[styles.pill, position === option && styles.pillActive]}
+              onPress={() => setPosition(option)}
+            >
+              <AppText style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</AppText>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {loading ? (
@@ -202,50 +216,51 @@ export default function WaiversScreen({ route, navigation }: Props) {
           data={filtered}
           keyExtractor={(item) => item.player_id}
           ListHeaderComponent={
-            bestAvailable.length > 0 || priorityAdds.length > 0 ? (
-              <View>
-                {bestAvailable.length > 0 ? (
-                  <View style={styles.bestAvailableBlock}>
-                    <AppText style={styles.sectionLabel}>Best Available</AppText>
-                    <View style={styles.bestAvailableRow}>
-                      {bestAvailable.map(({ position: pos, player, count }) => (
-                        <BestAvailableCard
-                          key={pos}
-                          position={pos}
+            <View>
+              {topPriority ? (
+                <View style={styles.sectionBlock}>
+                  <SectionHeader label="Priority Adds" caption={priorityCaption} />
+                  <WaiverRecommendationCard
+                    player={topPriority}
+                    variant="primary"
+                    onPress={() => openPlayer(topPriority)}
+                  />
+                  {secondaryPriority.length > 0 ? (
+                    <AnimatedCard style={styles.compactGroupCard}>
+                      {secondaryPriority.map((player, index) => (
+                        <WaiverRecommendationCard
+                          key={player.player_id}
                           player={player}
-                          count={count}
-                          onPress={() =>
-                            navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })
-                          }
+                          variant="compact"
+                          showDivider={index < secondaryPriority.length - 1}
+                          onPress={() => openPlayer(player)}
                         />
                       ))}
-                    </View>
-                  </View>
-                ) : null}
-                {priorityAdds.length > 0 ? (
-                  <View style={styles.priorityBlock}>
-                    <AppText style={styles.sectionLabel}>Priority Adds</AppText>
-                    {priorityAdds.map((player) => (
-                      <PriorityAddCard
-                        key={player.player_id}
-                        player={player}
-                        onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
-                      />
+                    </AnimatedCard>
+                  ) : null}
+                </View>
+              ) : null}
+              {bestAvailable.length > 0 ? (
+                <View style={styles.sectionBlock}>
+                  <SectionHeader label="Best Available by Position" />
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
+                    {bestAvailable.map(({ position: pos, player, count }) => (
+                      <BestAvailableCard key={pos} position={pos} player={player} count={count} onPress={() => openPlayer(player)} />
                     ))}
-                  </View>
-                ) : null}
-                <AppText style={styles.sectionLabel}>All Free Agents</AppText>
-              </View>
-            ) : null
+                  </ScrollView>
+                </View>
+              ) : null}
+              <SectionHeader label="All Free Agents" />
+            </View>
           }
           contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-          ListHeaderComponentStyle={styles.listHeader}
           renderItem={({ item, index }) => (
-            <WaiverCard
+            <FreeAgentRow
               player={item}
               rank={index + 1}
-              topOfBoard={index === 0 && !search.trim()}
-              onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(item), leagueId, leagueName })}
+              isFirst={index === 0}
+              isLast={index === filtered.length - 1}
+              onPress={() => openPlayer(item)}
             />
           )}
           ListEmptyComponent={
@@ -261,9 +276,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               stashCandidates={stashCandidates}
               watchlistCandidates={watchlistCandidates}
               faabTargets={faabTargets}
-              leagueId={leagueId}
-              leagueName={leagueName}
-              navigation={navigation}
+              onPressPlayer={openPlayer}
             />
           }
         />
@@ -300,17 +313,13 @@ function SecondaryWaiverBoard({
   stashCandidates,
   watchlistCandidates,
   faabTargets,
-  leagueId,
-  leagueName,
-  navigation,
+  onPressPlayer,
 }: {
   isPremium: boolean;
   stashCandidates: WaiverPlayer[];
   watchlistCandidates: WaiverPlayer[];
   faabTargets: WaiverPlayer[];
-  leagueId: string;
-  leagueName: string;
-  navigation: Props['navigation'];
+  onPressPlayer: (player: WaiverPlayer) => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -327,37 +336,34 @@ function SecondaryWaiverBoard({
   if (stashCandidates.length === 0 && watchlistCandidates.length === 0 && faabTargets.length === 0) {
     return null;
   }
-  const openPlayer = (player: WaiverPlayer) =>
-    navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName });
+  const groups: Array<{ label: string; players: WaiverPlayer[] }> = [
+    { label: 'Stash Candidates', players: stashCandidates },
+    { label: 'Watchlist Depth', players: watchlistCandidates },
+    { label: 'FAAB Shortlist', players: faabTargets },
+  ].filter((group) => group.players.length > 0);
   return (
     <View style={styles.secondaryBoard}>
       <AppText style={styles.secondaryCaption}>
         Upside stashes, watchlist depth, and a quick FAAB shortlist — check these after Priority Adds.
       </AppText>
-      {stashCandidates.length > 0 ? (
-        <View style={styles.priorityBlock}>
-          <AppText style={styles.sectionLabel}>Stash Candidates</AppText>
-          {stashCandidates.map((player, index) => (
-            <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
-          ))}
+      {groups.map((group) => (
+        <View key={group.label} style={styles.sectionBlock}>
+          <SectionHeader label={group.label} />
+          <AnimatedCard style={styles.compactGroupCard}>
+            {group.players.map((player, index) => (
+              <FreeAgentRow
+                key={player.player_id}
+                player={player}
+                rank={index + 1}
+                isFirst={index === 0}
+                isLast={index === group.players.length - 1}
+                bare
+                onPress={() => onPressPlayer(player)}
+              />
+            ))}
+          </AnimatedCard>
         </View>
-      ) : null}
-      {watchlistCandidates.length > 0 ? (
-        <View style={styles.priorityBlock}>
-          <AppText style={styles.sectionLabel}>Watchlist Depth</AppText>
-          {watchlistCandidates.map((player, index) => (
-            <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
-          ))}
-        </View>
-      ) : null}
-      {faabTargets.length > 0 ? (
-        <View style={styles.priorityBlock}>
-          <AppText style={styles.sectionLabel}>FAAB Shortlist</AppText>
-          {faabTargets.map((player, index) => (
-            <WaiverCard key={player.player_id} player={player} rank={index + 1} onPress={() => openPlayer(player)} />
-          ))}
-        </View>
-      ) : null}
+      ))}
     </View>
   );
 }
@@ -391,121 +397,71 @@ function BestAvailableCard({
   );
 }
 
-function PriorityAddCard({ player, onPress }: { player: WaiverPriorityAdd; onPress: () => void }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const injuryColor = injuryPillColor(player.injury_status, colors);
-  return (
-    <AnimatedCard style={styles.priorityCard} onPress={onPress}>
-      <View style={styles.priorityTopRow}>
-        <Ionicons name="swap-horizontal-outline" size={14} color={colors.premium} />
-        <AppText style={styles.priorityLabel}>{player.recommendation_label}</AppText>
-      </View>
-      <View style={styles.cardTopRow}>
-        <PlayerAvatar playerId={player.player_id} size={44} tier={player.tier} style={styles.avatarWrap} />
-        <View style={styles.nameColumn}>
-          <AppText style={styles.name} numberOfLines={1}>
-            {player.name ?? 'Unknown'}
-          </AppText>
-          <View style={styles.metaRow}>
-            <PositionBadge position={player.position} />
-            <AppText style={styles.meta} numberOfLines={1}>{player.team}</AppText>
-            {opponentLabel(player) ? (
-              <AppText style={styles.meta} numberOfLines={1}>{opponentLabel(player)}</AppText>
-            ) : null}
-          </View>
-          {player.injury_replacement_fit ? (
-            <AppText style={styles.injuryFitText}>{player.injury_replacement_note}</AppText>
-          ) : injuryColor ? (
-            <View style={styles.injuryRow}>
-              <Ionicons name="medkit-outline" size={11} color={injuryColor} />
-              <AppText style={[styles.injuryText, { color: injuryColor }]}>{player.injury_status}</AppText>
-            </View>
-          ) : null}
-        </View>
-        <View style={styles.valueColumn}>
-          <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-          <TierBadge storedTier={player.tier} />
-        </View>
-      </View>
-      <View style={styles.faabRow}>
-        <View style={styles.faabInfo}>
-          <Ionicons name="cash-outline" size={13} color={colors.textSecondary} />
-          <AppText style={styles.faabText}>{player.faab.label}</AppText>
-        </View>
-        <View style={styles.detailPill}>
-          <Ionicons name="information-circle-outline" size={12} color={colors.accentSoft} />
-          <AppText style={styles.detailPillText}>Full breakdown</AppText>
-        </View>
-      </View>
-    </AnimatedCard>
-  );
-}
-
-function WaiverCard({
+/**
+ * Dense free-agent row shared by "All Free Agents" and the secondary
+ * Stash/Watchlist/FAAB boards below it — canonical PlayerIdentityRow for
+ * identity, a slot chip carrying this list's own rank, and a trailing
+ * value/position-rank column. `bare` drops the rank slot + grouped-table
+ * edge borders for the secondary board, whose rows already sit inside their
+ * own labeled AnimatedCard group rather than a single continuous table.
+ */
+function FreeAgentRow({
   player,
   rank,
-  topOfBoard = false,
+  isFirst,
+  isLast,
+  bare = false,
   onPress,
 }: {
   player: WaiverPlayer;
   rank: number;
-  /** Top of the All Free Agents board (a position filter still yields a
-   * real #1 at that position; a search query doesn't) — gets the gold #1
-   * rank badge (same premium hue as Teams' #1 power rank). Off for the
-   * secondary Stash/Watchlist/FAAB lists, which each restart at 1. */
-  topOfBoard?: boolean;
+  isFirst: boolean;
+  isLast: boolean;
+  bare?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const injuryColor = injuryPillColor(player.injury_status, colors);
+  const injury = waiverInjuryDisplay(player.injury_status);
+  const contextLine = player.injury_replacement_fit ? player.injury_replacement_note : waiverOpponentContext(player);
   return (
-    <AnimatedCard
-      style={StyleSheet.flatten([styles.card, player.stale_free_agent && styles.cardStale])}
-      onPress={onPress}
+    <View
+      style={[
+        bare ? styles.freeAgentRowBare : styles.freeAgentRow,
+        !bare && isFirst && styles.freeAgentRowFirst,
+        !bare && isLast && styles.freeAgentRowLast,
+        !isLast && styles.freeAgentDivider,
+        player.stale_free_agent && styles.freeAgentStale,
+      ]}
     >
-      <View style={styles.cardTopRow}>
-        <View style={styles.avatarWrap}>
-          <PlayerAvatar playerId={player.player_id} size={44} tier={player.tier} />
-          <View style={[styles.rankBadge, topOfBoard && styles.rankBadgeFirst]}>
-            <AppText style={[styles.rankText, topOfBoard && styles.rankTextFirst]}>{rank}</AppText>
-          </View>
-        </View>
-        <View style={styles.nameColumn}>
-          <AppText style={styles.name} numberOfLines={1}>
-            {player.name ?? 'Unknown'}
-          </AppText>
-          <View style={styles.metaRow}>
-            <PositionBadge position={player.position} />
-            <AppText style={styles.meta} numberOfLines={1}>{player.team}</AppText>
-            {opponentLabel(player) ? (
-              <AppText style={styles.meta} numberOfLines={1}>{opponentLabel(player)}</AppText>
-            ) : null}
-            {player.position_rank ? (
-              <View style={styles.positionRankPill}>
-                <AppText style={styles.positionRankText}>
-                  {player.position}{player.position_rank}
-                </AppText>
-              </View>
-            ) : null}
-          </View>
-          {player.injury_replacement_fit ? (
-            <AppText style={styles.injuryFitText} numberOfLines={1}>{player.injury_replacement_note}</AppText>
-          ) : injuryColor ? (
-            <View style={styles.injuryRow}>
-              <Ionicons name="medkit-outline" size={11} color={injuryColor} />
-              <AppText style={[styles.injuryText, { color: injuryColor }]}>{player.injury_status}</AppText>
-            </View>
-          ) : null}
-        </View>
-        <View style={styles.valueColumn}>
-          <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-          <AppText style={styles.valueLabel}>VALUE</AppText>
-          <TierBadge storedTier={player.tier} />
-        </View>
+      <View style={styles.freeAgentIdentity}>
+        <PlayerIdentityRow
+          playerId={player.player_id}
+          name={player.name}
+          position={player.position}
+          team={player.team}
+          tier={player.tier}
+          slot={bare ? undefined : String(rank)}
+          injuryLabel={injury.label}
+          injuryTone={injury.tone}
+          ruledOut={injury.ruledOut}
+          contextLine={contextLine}
+          onPress={onPress}
+          showDivider={false}
+        />
       </View>
-    </AnimatedCard>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.freeAgentTrailing}>
+        <AppText style={styles.freeAgentValue}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        {player.position_rank ? (
+          <View style={styles.positionRankPill}>
+            <AppText style={styles.positionRankText}>
+              {player.position}
+              {player.position_rank}
+            </AppText>
+          </View>
+        ) : null}
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -513,13 +469,6 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
-  disclaimer: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    lineHeight: 16,
-  },
   notice: {
     fontSize: 13,
     color: colors.textSecondary,
@@ -527,33 +476,36 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
     lineHeight: 18,
   },
-  searchInput: {
-    flex: 1,
-    borderWidth: 1,
+  discoveryCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
     borderColor: colors.cardBorder,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     fontSize: 15,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     color: colors.textPrimary,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
   },
   pillRow: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
+    flexWrap: 'wrap',
     gap: spacing.xs,
-    marginBottom: spacing.sm,
   },
   pill: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
@@ -561,17 +513,26 @@ function createStyles(colors: ThemeColors) {
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   pillTextActive: { color: '#fff', fontWeight: '700' },
   loading: { marginTop: spacing.xl },
-  listHeader: { marginBottom: spacing.sm },
-  listContent: { padding: spacing.lg, paddingTop: 0, gap: spacing.sm },
-  bestAvailableBlock: { gap: spacing.sm },
-  bestAvailableRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  sectionBlock: { marginBottom: spacing.lg },
+  sectionHeaderWrap: { marginBottom: spacing.sm, gap: 2 },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionCaption: { fontSize: 11.5, color: colors.textTertiary },
+  compactGroupCard: { marginTop: spacing.sm, padding: spacing.sm },
+  bestAvailableRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
   bestAvailableCard: {
-    flexBasis: '30%',
-    flexGrow: 1,
+    width: 112,
     padding: spacing.sm,
     alignItems: 'center',
     gap: 2,
   },
+  avatarWrap: { marginRight: spacing.md },
   bestAvailablePosBadge: {
     backgroundColor: colors.badgeBackground,
     borderRadius: radii.sm,
@@ -583,77 +544,37 @@ function createStyles(colors: ThemeColors) {
   bestAvailableName: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.xs },
   bestAvailableScore: { fontSize: 14, fontWeight: '700', color: colors.accent },
   bestAvailableCount: { fontSize: 10, color: colors.textTertiary },
-  priorityBlock: { gap: spacing.sm },
   secondaryLockWrap: { marginTop: spacing.lg },
-  secondaryBoard: { marginTop: spacing.lg, gap: spacing.md },
-  secondaryCaption: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
-  priorityCard: { padding: spacing.md, borderColor: colors.premium, borderWidth: 1 },
-  priorityTopRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
-  priorityLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.premium,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  faabRow: {
+  secondaryBoard: { marginTop: spacing.lg },
+  secondaryCaption: { fontSize: 12, color: colors.textSecondary, lineHeight: 16, marginBottom: spacing.md },
+  freeAgentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
+    borderRightWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
   },
-  faabInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  faabText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
-  // "Tap for full breakdown" affordance — makes it clear this priority-add
-  // card leads to Player Quick View, not just a static reasoning label.
-  detailPill: {
+  freeAgentRowBare: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.accentMuted,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
   },
-  detailPillText: { fontSize: 10, fontWeight: '700', color: colors.accentSoft, letterSpacing: 0.2 },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+  freeAgentRowFirst: {
+    borderTopWidth: StyleSheet.hairlineWidth * 1.5,
+    borderTopLeftRadius: radii.md,
+    borderTopRightRadius: radii.md,
   },
-  card: { padding: spacing.md },
-  cardStale: { opacity: 0.55 },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center' },
-  avatarWrap: { marginRight: spacing.md },
-  rankBadge: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.badgeBackground,
-    borderWidth: 2,
-    borderColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+  freeAgentRowLast: {
+    borderBottomWidth: StyleSheet.hairlineWidth * 1.5,
+    borderBottomLeftRadius: radii.md,
+    borderBottomRightRadius: radii.md,
   },
-  rankText: { color: colors.badgeText, fontSize: 10, fontWeight: '700' },
-  // #1 on the wire gets the premium/gold treatment (mirrors Teams' top
-  // power rank) so the single best add reads at a glance in a long list.
-  rankBadgeFirst: { backgroundColor: colors.premium },
-  rankTextFirst: { color: colors.background },
-  nameColumn: { flex: 1, marginRight: spacing.sm },
-  name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
+  freeAgentDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  freeAgentStale: { opacity: 0.55 },
+  freeAgentIdentity: { flex: 1 },
+  freeAgentTrailing: { alignItems: 'flex-end', gap: 2, paddingLeft: spacing.sm },
+  freeAgentValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
   positionRankPill: {
     backgroundColor: colors.backgroundElevated,
     borderRadius: radii.pill,
@@ -661,13 +582,6 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 1,
   },
   positionRankText: { fontSize: 10, fontWeight: '700', color: colors.textSecondary },
-  injuryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  injuryText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
-  injuryFitText: { fontSize: 11, fontWeight: '600', color: colors.accent, marginTop: 4 },
-  valueColumn: { alignItems: 'flex-end', gap: 2 },
-  valueNumber: { fontSize: 18, fontWeight: '700', color: colors.accent },
-  valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
-  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }

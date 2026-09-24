@@ -1,0 +1,172 @@
+import React, { useMemo } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import AnimatedCard from './AnimatedCard';
+import AppText from './AppText';
+import FAABGuidance from './FAABGuidance';
+import PlayerIdentityRow from './PlayerIdentityRow';
+import { useThemeMode } from '../context/ThemeModeContext';
+import type { WaiverPriorityAdd } from '../lib/api';
+import { radii, spacing, type ThemeColors } from '../theme';
+
+const INJURY_RISK_STATUSES = new Set(['out', 'ir', 'doubtful', 'pup', 'suspended']);
+const INJURY_WATCH_STATUSES = new Set(['questionable', 'sus']);
+
+/** Same risk-vs-watch split WaiversScreen has always used, just relocated
+ * next to the card that now owns injury presentation — "Out"-caliber
+ * statuses get the solid/urgent pill (via PlayerIdentityRow's `ruledOut`),
+ * "Questionable"-caliber statuses get the quieter amber `watch` tone, and
+ * everything else renders no pill at all. Exported so WaiversScreen's plain
+ * (non-priority) free-agent rows share the exact same classification
+ * instead of re-deriving it. */
+export function waiverInjuryDisplay(status: string | null): { label: string | null; tone: 'risk' | 'watch'; ruledOut: boolean } {
+  const normalized = (status ?? '').trim().toLowerCase();
+  if (!normalized) return { label: null, tone: 'risk', ruledOut: false };
+  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : null;
+  if (INJURY_RISK_STATUSES.has(normalized)) return { label, tone: 'risk', ruledOut: true };
+  if (INJURY_WATCH_STATUSES.has(normalized)) return { label, tone: 'watch', ruledOut: false };
+  return { label: null, tone: 'risk', ruledOut: false };
+}
+
+export function waiverOpponentContext(player: {
+  opponent: string | null;
+  opponent_is_home: boolean | null;
+  opportunity_label?: string | null;
+}): string | null {
+  if (player.opponent) return `${player.opponent_is_home ? 'vs' : '@'} ${player.opponent}`;
+  return player.opportunity_label ?? null;
+}
+
+/**
+ * Canonical waiver recommendation card — backs both the single "Top Waiver
+ * Target" (variant="primary": full glowing AnimatedCard, the loudest thing
+ * on the screen) and every subsequent Priority Add (variant="compact": a
+ * plain dense row meant to sit inside one shared surface with other compact
+ * rows, separated by `showDivider`, so a run of recommendations doesn't
+ * repeat a bordered card per player). Both variants share identical data
+ * plumbing (identity, value, injury, FAAB, Full Breakdown) so they can never
+ * drift apart on what a recommendation actually shows.
+ */
+export default function WaiverRecommendationCard({
+  player,
+  onPress,
+  variant = 'compact',
+  showDivider = false,
+}: {
+  player: WaiverPriorityAdd;
+  onPress: () => void;
+  variant?: 'primary' | 'compact';
+  showDivider?: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const injury = waiverInjuryDisplay(player.injury_status);
+  const contextLine = player.injury_replacement_fit ? player.injury_replacement_note : waiverOpponentContext(player);
+  const isPrimary = variant === 'primary';
+
+  const identity = (
+    <PlayerIdentityRow
+      playerId={player.player_id}
+      name={player.name}
+      position={player.position}
+      team={player.team}
+      tier={player.tier}
+      injuryLabel={injury.label}
+      injuryTone={injury.tone}
+      ruledOut={injury.ruledOut}
+      contextLine={contextLine}
+      showDivider={false}
+    />
+  );
+
+  if (isPrimary) {
+    return (
+      <AnimatedCard glow style={styles.primaryCard} onPress={onPress}>
+        <View style={styles.actionRow}>
+          <Ionicons name="swap-horizontal-outline" size={13} color={colors.premium} />
+          <AppText style={styles.actionLabel}>{player.recommendation_label} · Top Waiver Target</AppText>
+        </View>
+        <View style={styles.identityWrap}>{identity}</View>
+        <View style={styles.metricsRow}>
+          <View style={styles.scoreBlock}>
+            <AppText style={styles.scoreNumberPrimary}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+            <AppText style={styles.scoreLabel}>VALUE</AppText>
+          </View>
+          <View style={styles.metricsDivider} />
+          <FAABGuidance faab={player.faab} size="prominent" />
+        </View>
+        <View style={styles.breakdownRow}>
+          <AppText style={styles.breakdownText}>Full breakdown</AppText>
+          <Ionicons name="chevron-forward" size={14} color={colors.accentSoft} />
+        </View>
+      </AnimatedCard>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      style={[styles.compactRow, showDivider && styles.compactDivider]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.compactIdentity}>{identity}</View>
+      <View style={styles.compactTrailing}>
+        <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <FAABGuidance faab={player.faab} size="compact" />
+      </View>
+      <View style={styles.compactBreakdown}>
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    primaryCard: { padding: spacing.lg },
+    actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
+    actionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.premium,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    identityWrap: { marginBottom: spacing.sm },
+    metricsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingTop: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    scoreBlock: { alignItems: 'flex-start', gap: 1 },
+    scoreNumberPrimary: { fontSize: 22, fontWeight: '800', color: colors.accent },
+    scoreNumberCompact: { fontSize: 16, fontWeight: '700', color: colors.accent },
+    scoreLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
+    metricsDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: colors.border },
+    breakdownRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 2,
+      marginTop: spacing.sm,
+    },
+    breakdownText: { fontSize: 12, fontWeight: '700', color: colors.accentSoft },
+    compactRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.xs,
+      gap: spacing.sm,
+    },
+    compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    compactIdentity: { flex: 1 },
+    compactTrailing: { alignItems: 'flex-end', gap: 2 },
+    // Same bare chevron-forward "tap for details" idiom AlertsScreen/
+    // DraftCenterScreen/LeagueDetailScreen already use for a row's
+    // secondary detail action — this row's Full Breakdown affordance.
+    compactBreakdown: { marginLeft: spacing.xs },
+  });
+}
