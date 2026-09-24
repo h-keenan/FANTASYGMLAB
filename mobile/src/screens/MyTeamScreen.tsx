@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
+import AnalyticsSection from '../components/AnalyticsSection';
 import AnimatedCard from '../components/AnimatedCard';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -13,16 +14,14 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
-import IconCircle from '../components/IconCircle';
+import MetricCard from '../components/MetricCard';
 import OverallRatingBadge from '../components/OverallRatingBadge';
-import PlayerAvatar from '../components/PlayerAvatar';
-import { resolvePlayerTier } from '../lib/playerTier';
-import PositionBadge from '../components/PositionBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
-import { percentileFromRank } from '../lib/percentile';
+import { percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -65,13 +64,6 @@ function toRankedPlayer(player: LineupPlayer) {
     rank_unavailable_reason: null,
     opportunity_label: player.opportunity_label,
   };
-}
-
-function percentileLabel(percentile: number | null): string {
-  if (percentile == null) return '—';
-  if (percentile >= 67) return 'Strong';
-  if (percentile >= 34) return 'Average';
-  return 'Light';
 }
 
 // Same three buckets PlayersScreen.tsx's own age filter already uses
@@ -179,25 +171,35 @@ export default function MyTeamScreen({ route, navigation }: Props) {
         {myTeam ? <TeamAnalyticsSection team={myTeam} leagueSize={leagueSize} /> : null}
 
         <AppText style={styles.sectionLabel}>Starters</AppText>
-        {starters.map((player) => (
-          <LineupRow
-            key={player.player_id}
-            player={player}
-            onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
-          />
-        ))}
+        {starters.length === 0 ? (
+          <AppText style={styles.emptyBench}>No suggested starters yet.</AppText>
+        ) : (
+          <AnimatedCard style={styles.groupCard}>
+            {starters.map((player, index) => (
+              <LineupRow
+                key={player.player_id}
+                player={player}
+                showDivider={index < starters.length - 1}
+                onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
+              />
+            ))}
+          </AnimatedCard>
+        )}
 
         <AppText style={styles.sectionLabel}>Bench</AppText>
         {bench.length === 0 ? (
           <AppText style={styles.emptyBench}>No bench players.</AppText>
         ) : (
-          bench.map((player) => (
-            <LineupRow
-              key={player.player_id}
-              player={player}
-              onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
-            />
-          ))
+          <AnimatedCard style={styles.groupCard}>
+            {bench.map((player, index) => (
+              <LineupRow
+                key={player.player_id}
+                player={player}
+                showDivider={index < bench.length - 1}
+                onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
+              />
+            ))}
+          </AnimatedCard>
         )}
       </ScrollView>
     </View>
@@ -207,31 +209,28 @@ export default function MyTeamScreen({ route, navigation }: Props) {
 /**
  * The concept sheet's Panel 4 ("MY TEAM") leads with a team-value ring plus
  * a Key Metrics readout — this screen had no equivalent team-level summary
- * at all before, only the lineup. Every number here is real: Team Value and
- * Draft Capital are percentiles derived from modules/league_rankings.py's
- * own dense ranks (best team in the league -> 100), Roster Age is the real
- * average, and Overall Outlook is the archetype/strategy label
- * modules/team_eval.py already assigns per roster. Two panel-7 items
- * ("Contender Window", a multi-year projected/ceiling/floor chart) are
- * deliberately NOT here — nothing in the backend computes either, and
- * showing invented numbers next to real ones would be worse than showing
- * nothing.
+ * at all before, only the lineup. Every number here is real: Team Value,
+ * Starter Strength and Draft Capital are percentiles derived from
+ * modules/league_rankings.py's own dense ranks (best team in the league ->
+ * 100), Roster Age is the real average, and Overall Outlook is the
+ * archetype/strategy label modules/team_eval.py already assigns per roster.
+ * Two panel-7 items ("Contender Window", a multi-year projected/ceiling/
+ * floor chart) are deliberately NOT here — nothing in the backend computes
+ * either, and showing invented numbers next to real ones would be worse
+ * than showing nothing.
+ *
+ * Built on the same MetricCard/AnalyticsSection primitives Dashboard's
+ * League Snapshot and Player Detail's Stats tab use (rather than this
+ * screen's own icon-cell grid + a second, page-local percentile bar), so
+ * "how good is this number" reads through one shared percentile scale
+ * (lib/percentile.ts) everywhere in the app instead of two. Draft Capital
+ * previously appeared twice — once as an icon cell, once as a percentile
+ * bar — collapsed here into the single MetricCard tile.
  */
-/** Green/amber/red by percentile instead of one fixed hue per row — a weak
- * metric (e.g. 9% draft capital) used to render in the same "good" green as
- * a strong one, which read as flat/uninformative. coridian_: "we need to
- * include colors ... for things like roster age draft capital team value,
- * starter strength ... it's not scannable." */
-function percentileColor(percentile: number | null, colors: ThemeColors): string {
-  if (percentile == null) return colors.textTertiary;
-  if (percentile >= 60) return colors.success;
-  if (percentile >= 30) return colors.premium;
-  return colors.danger;
-}
-
 /** Young/Prime/Aging isn't itself good/bad, but Prime is the ideal state,
  * Aging carries real roster risk, and Young is still "not there yet" —
- * distinct from a plain percentile tier. */
+ * distinct from a plain percentile tier, so this stays a page-local
+ * mapping rather than being forced through the shared percentile ramp. */
 function ageColor(averageAge: number | null, colors: ThemeColors): string {
   if (averageAge == null) return colors.textTertiary;
   if (averageAge <= 28) return colors.success;
@@ -246,33 +245,17 @@ function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueS
   const draftCapitalPercentile = percentileFromRank(team.draft_capital_rank, leagueSize);
   const starterPercentile = percentileFromRank(team.starter_rank, leagueSize);
   const outlook = team.archetype_label || team.strategy_label;
-
-  const metrics: { label: string; value: string; note: string; icon: React.ComponentProps<typeof IconCircle>['name']; color: string }[] = [
-    {
-      label: 'Roster Age',
-      value: team.average_age != null ? team.average_age.toFixed(1) : '—',
-      note: ageLabel(team.average_age),
-      icon: 'calendar-outline',
-      color: ageColor(team.average_age, colors),
-    },
-    {
-      label: 'Draft Capital',
-      value: team.draft_capital_rank != null ? `#${team.draft_capital_rank}` : '—',
-      note: percentileLabel(draftCapitalPercentile),
-      icon: 'albums-outline',
-      color: percentileColor(draftCapitalPercentile, colors),
-    },
-  ];
+  const ringColor = valuePercentile != null ? percentileColor(valuePercentile, colors) : colors.accent;
 
   return (
-    <View style={styles.analyticsCard}>
+    <AnalyticsSection title="Team Snapshot" icon="podium-outline">
       <View style={styles.analyticsHeaderRow}>
         <View style={styles.analyticsRingWrap}>
           <CircularProgressRing
             percent={valuePercentile ?? 0}
             size={72}
             strokeWidth={7}
-            color={colors.accent}
+            color={ringColor}
             valueLabel={valuePercentile != null ? String(valuePercentile) : '—'}
           />
           <AppText style={styles.analyticsRingCaption}>TEAM VALUE</AppText>
@@ -294,88 +277,69 @@ function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueS
         </View>
       </View>
       <View style={styles.analyticsMetricsRow}>
-        {metrics.map((metric) => (
-          <View key={metric.label} style={styles.analyticsMetric}>
-            <IconCircle name={metric.icon} color={metric.color} size={28} iconSize={15} style={styles.analyticsMetricIcon} />
-            <AppText style={[styles.analyticsMetricValue, { color: metric.color }]}>{metric.value}</AppText>
-            <AppText style={styles.analyticsMetricLabel}>{metric.label}</AppText>
-            <AppText style={styles.analyticsMetricNote}>{metric.note}</AppText>
-          </View>
-        ))}
+        <MetricCard
+          label="Starter Strength"
+          value={team.starter_rank != null ? `#${team.starter_rank}` : '—'}
+          percentile={starterPercentile}
+          valueColor={starterPercentile != null ? percentileColor(starterPercentile, colors) : undefined}
+        />
+        <MetricCard
+          label="Draft Capital"
+          value={team.draft_capital_rank != null ? `#${team.draft_capital_rank}` : '—'}
+          percentile={draftCapitalPercentile}
+          valueColor={draftCapitalPercentile != null ? percentileColor(draftCapitalPercentile, colors) : undefined}
+        />
+        <MetricCard
+          label="Roster Age"
+          value={team.average_age != null ? team.average_age.toFixed(1) : '—'}
+          note={ageLabel(team.average_age)}
+          valueColor={ageColor(team.average_age, colors)}
+        />
       </View>
-      <View style={styles.analyticsBars}>
-        <PercentileBar label="Team Value" percentile={valuePercentile} />
-        <PercentileBar label="Starter Strength" percentile={starterPercentile} />
-        <PercentileBar label="Draft Capital" percentile={draftCapitalPercentile} />
-      </View>
-    </View>
+    </AnalyticsSection>
   );
 }
 
-function PercentileBar({ label, percentile }: { label: string; percentile: number | null }) {
+function LineupRow({
+  player,
+  onPress,
+  showDivider,
+}: {
+  player: LineupPlayer;
+  onPress: () => void;
+  showDivider: boolean;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const width = percentile ?? 0;
-  const color = percentileColor(percentile, colors);
   return (
-    <View style={styles.percentileBarRow}>
-      <AppText style={styles.percentileBarLabel} numberOfLines={1}>
-        {label}
-      </AppText>
-      <View style={styles.percentileBarTrack}>
-        <View style={[styles.percentileBarFill, { width: `${width}%`, backgroundColor: color }]} />
+    <TouchableOpacity
+      style={[styles.compactRow, showDivider && styles.compactDivider]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.compactIdentity}>
+        <PlayerIdentityRow
+          playerId={player.player_id}
+          name={player.name}
+          position={player.position}
+          team={player.team}
+          tier={player.tier}
+          slot={player.slot === 'BENCH' ? player.position : player.slot}
+          opportunityLabel={player.opportunity_label}
+          // injury_label, not injury_status: IR/PUP/season-ending arrives on
+          // `status` with `injury_status` blank, and an injury_status-driven
+          // pill hides exactly those players. See LineupPlayer.injury_label.
+          injuryLabel={player.injury_label}
+          ruledOut={player.ruled_out}
+          showDivider={false}
+        />
       </View>
-      <AppText style={styles.percentileBarValue}>{percentile != null ? `${percentile}%` : '—'}</AppText>
-    </View>
-  );
-}
-
-function LineupRow({ player, onPress }: { player: LineupPlayer; onPress: () => void }) {
-  const { colors, isDark } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <AnimatedCard style={styles.card} onPress={onPress}>
-      <View style={styles.slotBadge}>
-        <AppText style={styles.slotText}>{player.slot === 'BENCH' ? player.position ?? '—' : player.slot}</AppText>
-      </View>
-      <PlayerAvatar playerId={player.player_id} size={40} tier={player.tier} style={styles.avatar} />
-      <View style={styles.nameColumn}>
-        <AppText style={styles.name} numberOfLines={1}>
-          {player.name ?? 'Unknown player'}
-        </AppText>
-        <View style={styles.metaRow}>
-          <PositionBadge position={player.position} />
-          <AppText style={styles.meta} numberOfLines={1}>
-            {!player.team && !player.opportunity_label ? (
-              '—'
-            ) : (
-              <>
-                {player.team}
-                {player.team && player.opportunity_label ? ' · ' : ''}
-                {player.opportunity_label ? (
-                  <AppText style={[styles.meta, { color: resolvePlayerTier(player.tier, isDark).color }]}>
-                    {player.opportunity_label}
-                  </AppText>
-                ) : null}
-              </>
-            )}
-          </AppText>
-        </View>
-      </View>
-      {/* injury_label, not injury_status: IR/PUP/season-ending arrives on
-          `status` with `injury_status` blank, and an injury_status-driven
-          pill hides exactly those players. See LineupPlayer.injury_label. */}
-      {player.injury_label ? (
-        <View style={[styles.injuryPill, player.ruled_out && styles.injuryPillOut]}>
-          <AppText style={[styles.injuryText, player.ruled_out && styles.injuryTextOut]}>{player.injury_label}</AppText>
-        </View>
-      ) : null}
       <View style={styles.valueColumn}>
         <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
         <AppText style={styles.valueLabel}>VALUE</AppText>
         <OverallRatingBadge rating={player.overall_rating} />
       </View>
-    </AnimatedCard>
+    </TouchableOpacity>
   );
 }
 
@@ -393,14 +357,6 @@ function createStyles(colors: ThemeColors) {
     padding: spacing.xl,
   },
   disclaimer: { fontSize: 12, color: colors.textTertiary, lineHeight: 17, marginBottom: spacing.md },
-  analyticsCard: {
-    backgroundColor: colors.backgroundElevated,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
   analyticsHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   analyticsRingWrap: { alignItems: 'center' },
   analyticsRingCaption: {
@@ -423,41 +379,13 @@ function createStyles(colors: ThemeColors) {
   analyticsRankLine: { fontSize: 13, color: colors.textSecondary },
   analyticsMetricsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  analyticsMetric: { flex: 1, alignItems: 'center' },
-  analyticsMetricIcon: { marginBottom: 4 },
-  analyticsMetricValue: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  analyticsMetricLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textTertiary,
-    marginTop: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  analyticsMetricNote: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  analyticsBars: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    gap: spacing.sm,
-  },
-  percentileBarRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  percentileBarLabel: { fontSize: 12, color: colors.textSecondary, width: 96 },
-  percentileBarTrack: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.background,
-    overflow: 'hidden',
-  },
-  percentileBarFill: { height: '100%', borderRadius: 4 },
-  percentileBarValue: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, width: 36, textAlign: 'right' },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
@@ -468,33 +396,20 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
   },
   emptyBench: { fontSize: 13, color: colors.textSecondary },
-  card: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, marginBottom: spacing.sm },
-  slotBadge: {
-    width: 40,
-    height: 26,
-    borderRadius: radii.sm,
-    backgroundColor: colors.badgeBackground,
+  // One grouped surface per lineup section (Starters, Bench) with a
+  // PlayerIdentityRow per player and hairline dividers between them,
+  // instead of a separately bordered/backgrounded card per player — see
+  // Magna Carta §12 (card philosophy) and MatchupScreen's StarterSection,
+  // which established this exact grouped-card pattern first.
+  groupCard: { padding: spacing.md, paddingVertical: spacing.xs },
+  compactRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
+    paddingVertical: spacing.xs,
+    gap: spacing.sm,
   },
-  slotText: { color: colors.badgeText, fontSize: 10, fontWeight: '700' },
-  avatar: { marginRight: spacing.sm },
-  nameColumn: { flex: 1, marginRight: spacing.sm },
-  name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-  injuryPill: {
-    backgroundColor: colors.dangerMuted,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  injuryText: { fontSize: 11, fontWeight: '700', color: colors.danger },
-  // Ruled out (Out/IR/PUP) — a solid pill, because this player is only in
-  // the suggested lineup when nothing available could fill the slot.
-  injuryPillOut: { backgroundColor: colors.danger },
-  injuryTextOut: { color: colors.badgeText },
+  compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  compactIdentity: { flex: 1 },
   valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm, gap: 2 },
   valueNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },

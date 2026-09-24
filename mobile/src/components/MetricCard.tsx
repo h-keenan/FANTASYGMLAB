@@ -24,6 +24,7 @@ export default function MetricCard({
   value,
   percentile,
   valueColor,
+  note,
   onPress,
 }: {
   label: string;
@@ -33,6 +34,12 @@ export default function MetricCard({
    * important or abnormal reading (e.g. a non-zero injury count in
    * `colors.danger`) without a one-off card style just for that metric. */
   valueColor?: string;
+  /** Short qualitative caption shown under the value (e.g. "Prime",
+   * "Aging") for a metric that has no percentile to render — omitted
+   * whenever `percentile` produces a pctl row, so a tile never shows two
+   * competing caption lines. Added for My Team's Roster Age tile, which
+   * has a semantic age bucket but no rank-derived percentile. */
+  note?: string | null;
   /** Makes the whole tile tappable (e.g. Dashboard's Power/Franchise rank
    * tiles, which drill into the Teams screen) while leaving every other
    * caller — anything that omits this — a plain, non-interactive View. */
@@ -58,6 +65,10 @@ export default function MetricCard({
             {pctl}
           </AppText>
         </View>
+      ) : note ? (
+        <AppText style={[styles.noteText, { color: valueColor ?? colors.textTertiary }]} numberOfLines={1}>
+          {note}
+        </AppText>
       ) : null}
       <PercentileBar percentile={percentile} />
     </>
@@ -92,5 +103,6 @@ function createStyles(colors: ThemeColors) {
     value: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
     pctlRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 3 },
     pctlText: { fontSize: 10, fontWeight: '600', letterSpacing: 0.2 },
+    noteText: { fontSize: 10, fontWeight: '600', letterSpacing: 0.2, marginTop: 3 },
   });
 }
