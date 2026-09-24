@@ -815,6 +815,7 @@ class EnrichedTargetCard:
     created_ts: float
     has_action: bool
     has_material_change: bool
+    untouchable: bool = False
 
 
 def enrich_target(
@@ -863,6 +864,7 @@ def enrich_target(
         created_ts=float(target.created_ts or 0.0),
         has_action=bool(_safe_text(action.get("action"))),
         has_material_change=bool(_safe_text(change.get("label"))),
+        untouchable=bool(target.untouchable),
     )
 
 

@@ -19,15 +19,26 @@ GM_TARGETS_CSS = """
 <style>
 .dg-gm-targets-badge{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .dg-gm-targets-shell{display:flex;flex-direction:column;gap:var(--space-sm);max-width:40rem}
+/* One grouped surface with hairline row dividers per group — matches the
+   dashboard/My Team Magna Carta pattern (a single bordered panel, not a
+   bordered card per player). */
+div[class*="st-key-dg_gm_targets_group_"]{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);margin-bottom:var(--space-md);max-width:40rem;padding:var(--space-2xs) var(--space-md) var(--space-sm)}
+div[class*="st-key-dg_gm_targets_group_untouchable"]{border-inline-start:var(--border-width-semantic) solid var(--color-premium)}
 .dg-gm-target-card{border-block-end:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-2xs) var(--space-sm);grid-template-columns:minmax(0,1fr) auto;padding-block:var(--space-sm)}
+.dg-gm-target-card:last-of-type{border-block-end:0}
 .dg-gm-target-identity{align-items:center;display:flex;gap:var(--space-sm);min-width:0}
 .dg-gm-target-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
 .dg-gm-target-name{color:var(--color-text-primary);font:var(--font-card-title)}
-.dg-gm-target-rank{color:var(--color-text-primary);font:var(--type-primary-metric);font-variant-numeric:tabular-nums;justify-self:end;text-align:right}
+/* Rank is reference metadata, not the decision — it no longer competes with
+   the action/why below for the strongest type treatment in the system. */
+.dg-gm-target-rank{color:var(--color-text-secondary);font:var(--type-caption-emphasis);font-variant-numeric:tabular-nums;justify-self:end;text-align:right}
 .dg-gm-target-status,.dg-gm-target-action,.dg-gm-target-change{grid-column:1/-1}
 .dg-gm-target-status{color:var(--color-text-secondary);font:var(--type-supporting-metadata)}
-.dg-gm-target-action{color:var(--color-text-primary);font:var(--type-caption-emphasis)}
-.dg-gm-target-change{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
+/* The canonical "what to do" call — same weight as the player's name and the
+   same accent (primary/interactive) color the Waivers card action row uses,
+   so this is the strongest, most legible line on the card. */
+.dg-gm-target-action{color:var(--color-accent);font:var(--font-card-title)}
+.dg-gm-target-change{color:var(--color-text-secondary);font:var(--type-supporting-metadata)}
 .dg-gm-targets-quiet{display:flex;flex-direction:column}
 .dg-gm-targets-quiet strong{color:var(--color-text-muted);font:var(--font-card-title)}
 .dg-gm-targets-quiet span{color:var(--color-text-secondary);font:var(--font-body);max-width:40rem}
@@ -228,7 +239,7 @@ def render_gm_targets_workspace(
     cap = gm_targets.max_targets_for_session(session)
     st.caption(f"{len(ordered)} / {cap} targets saved for this league.")
 
-    for card in ordered:
+    def _render_target_card(card: gm_targets.EnrichedTargetCard) -> None:
         image_url = ""
         if cached_headshot_data_url is not None:
             try:
@@ -280,7 +291,7 @@ def render_gm_targets_workspace(
             f"{change_html}"
             "</article>"
         )
-        cols = st.columns(2)
+        cols = st.columns(3)
         with cols[0]:
             if open_player_quick_view is not None:
                 if st.button(
@@ -290,6 +301,25 @@ def render_gm_targets_workspace(
                 ):
                     open_player_quick_view(card.player_id)
         with cols[1]:
+
+            def _toggle_untouchable(
+                player_id: str = card.player_id, next_state: bool = not card.untouchable
+            ) -> None:
+                gm_targets.set_untouchable(
+                    session,
+                    league_id=league_key,
+                    player_id=player_id,
+                    untouchable=next_state,
+                )
+
+            st.button(
+                "Remove untouchable" if card.untouchable else "Mark untouchable",
+                key=f"gm_targets_untouchable_{card.player_id}",
+                use_container_width=True,
+                type="primary" if card.untouchable else "secondary",
+                on_click=_toggle_untouchable,
+            )
+        with cols[2]:
 
             def _remove_target(player_id: str = card.player_id) -> None:
                 gm_targets.remove_target(
@@ -311,3 +341,29 @@ def render_gm_targets_workspace(
                 use_container_width=True,
             ):
                 open_destination(dest_key)
+
+    # Untouchable is the one real GM decision already encoded on a saved
+    # target (modules/gm_targets.py GmTarget.untouchable, read directly by
+    # the trade engine) — group by it so "who's protected from a trade"
+    # outranks "who am I just watching," matching the same real backend
+    # distinction mobile's GM Targets screen groups by (PR #697). No
+    # fabricated categories: everything else here already comes straight off
+    # the enriched card.
+    untouchable_cards = tuple(card for card in ordered if card.untouchable)
+    watching_cards = tuple(card for card in ordered if not card.untouchable)
+
+    if untouchable_cards:
+        with st.container(key="dg_gm_targets_group_untouchable"):
+            ui_primitives.render_section_header(
+                "Untouchable", heading_level=3, weight="secondary"
+            )
+            for card in untouchable_cards:
+                _render_target_card(card)
+
+    if watching_cards:
+        with st.container(key="dg_gm_targets_group_watching"):
+            ui_primitives.render_section_header(
+                "Watching", heading_level=3, weight="secondary"
+            )
+            for card in watching_cards:
+                _render_target_card(card)
