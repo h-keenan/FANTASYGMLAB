@@ -6333,7 +6333,7 @@ def render_home_dashboard(
                     "label": "Trade Surface",
                     "value": "Locked",
                     "note": "Trade tools stay gated until the startup draft completes.",
-                    "tone": "risk",
+                    "tone": "draft",
                 },
                 {
                     "label": "Draft Surface",
