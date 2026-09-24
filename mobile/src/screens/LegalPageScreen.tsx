@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
+import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
@@ -8,7 +9,7 @@ import ContentSections, { type ContentSection } from '../components/ContentSecti
 import legalContent from '../data/legalContent.json';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { spacing, type ThemeColors } from '../theme';
+import { spacing, typography, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LegalPage'>;
@@ -36,51 +37,55 @@ export default function LegalPageScreen({ route, navigation }: Props) {
 
   if (!page) {
     return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>This page isn't available.</AppText>
+      <View style={styles.root}>
+        <GridBackground />
+        <View style={[styles.center, { paddingTop: headerHeight }]}>
+          <AppText style={styles.error}>This page isn't available.</AppText>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight + spacing.xl }]}>
-      <AppText style={styles.kicker}>{page.kicker}</AppText>
-      <AppText style={styles.note}>{page.note}</AppText>
+    <View style={styles.root}>
+      <GridBackground />
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight + spacing.xl }]}>
+        <AppText style={styles.kicker}>{page.kicker}</AppText>
+        <AppText style={styles.note}>{page.note}</AppText>
 
-      <ContentSections sections={page.sections} />
+        <ContentSections sections={page.sections} />
 
-      <AppText style={styles.lastUpdated}>Last updated {LAST_UPDATED}</AppText>
-    </ScrollView>
+        <AppText style={styles.lastUpdated}>Last updated {LAST_UPDATED}</AppText>
+      </ScrollView>
+    </View>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
     center: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.background,
       padding: spacing.xl,
     },
     kicker: {
-      fontSize: 12,
-      fontWeight: '700',
+      ...typography.kicker,
       color: colors.accent,
       textTransform: 'uppercase',
-      letterSpacing: 0.5,
       marginBottom: spacing.xs,
     },
     note: {
-      fontSize: 15,
+      ...typography.body,
       color: colors.textSecondary,
       marginBottom: spacing.xl,
-      lineHeight: 21,
+      lineHeight: 22,
     },
     lastUpdated: {
-      fontSize: 12,
+      ...typography.caption,
       color: colors.textSecondary,
       marginTop: spacing.lg,
       textAlign: 'center',

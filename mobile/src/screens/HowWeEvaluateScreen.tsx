@@ -8,7 +8,7 @@ import ContentSections, { type ContentSection } from '../components/ContentSecti
 import methodologyContent from '../data/methodologyContent.json';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { spacing, type ThemeColors } from '../theme';
+import { spacing, typography, type ThemeColors } from '../theme';
 
 interface MethodologyContent {
   title: string;
@@ -39,22 +39,24 @@ export default function HowWeEvaluateScreen() {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1 },
-    container: { flex: 1, backgroundColor: colors.background },
+    root: { flex: 1, backgroundColor: colors.background },
+    // Was solid `colors.background` here, which fully covered GridBackground
+    // and left the screen with no visible wash — matches the transparent
+    // pattern Dashboard/MyTeam/TradeHub/Teams already use so the shared
+    // backdrop actually renders instead of being painted over.
+    container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
     kicker: {
-      fontSize: 12,
-      fontWeight: '700',
+      ...typography.kicker,
       color: colors.accent,
       textTransform: 'uppercase',
-      letterSpacing: 0.5,
       marginBottom: spacing.xs,
     },
     note: {
-      fontSize: 15,
+      ...typography.body,
       color: colors.textSecondary,
       marginBottom: spacing.xl,
-      lineHeight: 21,
+      lineHeight: 22,
     },
   });
 }
