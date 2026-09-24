@@ -7,18 +7,18 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import AnimatedCard from '../components/AnimatedCard';
+import BrandedSpinner from '../components/BrandedSpinner';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
-import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
+import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import OverallRatingBadge from '../components/OverallRatingBadge';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PositionBadge from '../components/PositionBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import TierBadge from '../components/TierBadge';
+import SectionHeading from '../components/SectionHeading';
+import UsageTrendPill from '../components/UsageTrendPill';
+import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -31,6 +31,94 @@ type Props = NativeStackScreenProps<RootStackParamList, 'GmTargets'>;
 interface TargetRow {
   target: GmTarget;
   player: RankedPlayer | null;
+}
+
+/**
+ * One row of a GM Targets group — canonical PlayerIdentityRow for identity
+ * (tier, opportunity classification, injury pill, same language every other
+ * ranked list in the app now uses) plus a trailing value column matching
+ * PlayersScreen's PlayerRankRow, and the two actions this screen owns:
+ * toggling "untouchable" and removing the target. Rows sit inside one
+ * continuous bordered surface with hairline dividers per group rather than
+ * each being its own card (Magna Carta §12), matching PlayersScreen's
+ * grouped-table treatment.
+ */
+function TargetGroupRow({
+  row,
+  isFirst,
+  isLast,
+  onPress,
+  onToggleUntouchable,
+  onRemove,
+}: {
+  row: TargetRow;
+  isFirst: boolean;
+  isLast: boolean;
+  onPress: () => void;
+  onToggleUntouchable: (playerId: string, next: boolean) => void;
+  onRemove: (playerId: string) => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { target, player } = row;
+  const injury = waiverInjuryDisplay(player?.injury_status ?? null);
+
+  return (
+    <View
+      style={[
+        styles.row,
+        isFirst && styles.rowFirst,
+        isLast && styles.rowLast,
+        !isLast && styles.rowDivider,
+      ]}
+    >
+      <View style={styles.identity}>
+        <PlayerIdentityRow
+          playerId={target.player_id}
+          name={player?.name ?? `Player ${target.player_id}`}
+          position={player?.position}
+          team={player?.team}
+          tier={player?.tier}
+          opportunityLabel={player?.opportunity_label}
+          contextLine={player ? null : 'Not on the current rankings board'}
+          injuryLabel={injury.label}
+          injuryTone={injury.tone}
+          ruledOut={injury.ruledOut}
+          onPress={player ? onPress : undefined}
+          showDivider={false}
+        />
+      </View>
+      <View style={styles.trailing}>
+        <AppText style={styles.score}>{player?.score != null ? Math.round(player.score) : '—'}</AppText>
+        <View style={styles.trailingChips}>
+          <OverallRatingBadge rating={player?.overall_rating} />
+          {player?.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
+        </View>
+      </View>
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.iconButton, target.untouchable && styles.iconButtonActive]}
+          onPress={() => onToggleUntouchable(target.player_id, !target.untouchable)}
+          hitSlop={8}
+          accessibilityLabel={target.untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
+        >
+          <Ionicons
+            name={target.untouchable ? 'lock-closed' : 'lock-open-outline'}
+            size={15}
+            color={target.untouchable ? colors.premium : colors.textSecondary}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => onRemove(target.player_id)}
+          hitSlop={8}
+          accessibilityLabel="Remove from GM Targets"
+        >
+          <Ionicons name="trash-outline" size={15} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 }
 
 export default function GmTargetsScreen({ route, navigation }: Props) {
@@ -120,6 +208,25 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
     [rows],
   );
 
+  // Untouchable is the one real GM decision already encoded on a target
+  // (modules/gm_targets.py), so it's the natural grouping per Magna Carta
+  // §4 — "who's protected from a trade" outranks "who am I just watching."
+  // GM Targets itself has no server-side category/reasoning field to group
+  // by beyond that; per-player "why" comes from the same RankedPlayer
+  // opportunity/injury/trend signal every other list screen already
+  // surfaces through PlayerIdentityRow.
+  const untouchableRows = useMemo(() => sorted.filter((row) => row.target.untouchable), [sorted]);
+  const watchingRows = useMemo(() => sorted.filter((row) => !row.target.untouchable), [sorted]);
+
+  const openPlayer = useCallback(
+    (row: TargetRow) => {
+      if (row.player) {
+        navigation.navigate('PlayerDetail', { player: row.player, leagueId, leagueName });
+      }
+    },
+    [navigation, leagueId, leagueName],
+  );
+
   if (loading) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
@@ -135,76 +242,49 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <FlatList
-        data={sorted}
+        data={watchingRows}
         keyExtractor={(row) => row.target.player_id}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
-        ListEmptyComponent={
-          <EmptyState
-            icon="star-outline"
-            title="No targets yet"
-            subtitle='Open a player and tap "Add to GM Targets" to start watching them.'
-          />
-        }
-        renderItem={({ item }) => (
-          <AnimatedCard
-            style={StyleSheet.flatten([styles.card, item.target.untouchable ? styles.cardUntouchable : null])}
-            onPress={() =>
-              item.player
-                ? navigation.navigate('PlayerDetail', { player: item.player, leagueId, leagueName })
-                : undefined
-            }
-          >
-            <PlayerAvatar playerId={item.target.player_id} size={40} tier={item.player?.tier} style={styles.avatar} />
-            <View style={styles.nameColumn}>
-              <AppText style={styles.name} numberOfLines={1}>
-                {item.player?.name ?? `Player ${item.target.player_id}`}
-              </AppText>
-              <View style={styles.metaRow}>
-                {item.player ? (
-                  <>
-                    <PositionBadge position={item.player.position} />
-                    <AppText style={styles.meta} numberOfLines={1}>
-                      {item.player.team}
-                    </AppText>
-                    <TierBadge storedTier={item.player.tier} />
-                  </>
-                ) : (
-                  <AppText style={styles.meta} numberOfLines={1}>
-                    Not on the current rankings board
-                  </AppText>
-                )}
+        ListHeaderComponent={
+          <View>
+            {untouchableRows.length > 0 ? (
+              <View style={styles.sectionBlock}>
+                <SectionHeading title="Untouchable" icon="lock-closed" />
+                {untouchableRows.map((row, index) => (
+                  <TargetGroupRow
+                    key={row.target.player_id}
+                    row={row}
+                    isFirst={index === 0}
+                    isLast={index === untouchableRows.length - 1}
+                    onPress={() => openPlayer(row)}
+                    onToggleUntouchable={toggleUntouchable}
+                    onRemove={removeTarget}
+                  />
+                ))}
               </View>
-              {item.target.untouchable ? (
-                <AppText style={styles.untouchableLabel}>Untouchable — never offered in a trade</AppText>
-              ) : null}
-            </View>
-            <View style={styles.scoreColumn}>
-              <AppText style={styles.score}>
-                {item.player?.score != null ? Math.round(item.player.score) : '—'}
-              </AppText>
-              <OverallRatingBadge rating={item.player?.overall_rating} />
-            </View>
-            <TouchableOpacity
-              style={[styles.iconButton, item.target.untouchable ? styles.iconButtonActive : null]}
-              onPress={() => toggleUntouchable(item.target.player_id, !item.target.untouchable)}
-              hitSlop={8}
-              accessibilityLabel={item.target.untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
-            >
-              <Ionicons
-                name={item.target.untouchable ? 'lock-closed' : 'lock-open-outline'}
-                size={16}
-                color={item.target.untouchable ? colors.premium : colors.textSecondary}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() => removeTarget(item.target.player_id)}
-              hitSlop={8}
-            >
-              <AppText style={styles.removeButtonText}>Remove</AppText>
-            </TouchableOpacity>
-          </AnimatedCard>
+            ) : null}
+            {watchingRows.length > 0 ? <SectionHeading title="Watching" icon="eye-outline" /> : null}
+          </View>
+        }
+        ListEmptyComponent={
+          sorted.length === 0 ? (
+            <EmptyState
+              icon="star-outline"
+              title="No targets yet"
+              subtitle='Open a player and tap "Add to GM Targets" to start watching them.'
+            />
+          ) : undefined
+        }
+        renderItem={({ item, index }) => (
+          <TargetGroupRow
+            row={item}
+            isFirst={index === 0}
+            isLast={index === watchingRows.length - 1}
+            onPress={() => openPlayer(item)}
+            onToggleUntouchable={toggleUntouchable}
+            onRemove={removeTarget}
+          />
         )}
       />
     </View>
@@ -213,47 +293,46 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  disclaimer: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    lineHeight: 16,
-  },
-  listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
-  card: { flexDirection: 'row', alignItems: 'center', padding: spacing.md },
-  cardUntouchable: { borderLeftWidth: 4, borderLeftColor: colors.premium },
-  avatar: { marginRight: spacing.sm },
-  nameColumn: { flex: 1, marginRight: spacing.sm },
-  name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
-  untouchableLabel: { fontSize: 11, fontWeight: '600', color: colors.premium, marginTop: 3 },
-  scoreColumn: { alignItems: 'flex-end', gap: 2, marginRight: spacing.sm },
-  score: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  iconButton: {
-    width: 30,
-    height: 30,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  iconButtonActive: { borderColor: colors.premium, backgroundColor: colors.premiumMuted },
-  removeButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  removeButtonText: { fontSize: 11, fontWeight: '600', color: colors.danger },
-  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl, paddingHorizontal: spacing.xl },
-  error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
+    headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+    listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+    sectionBlock: { marginBottom: spacing.md },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      paddingHorizontal: spacing.md,
+      borderLeftWidth: StyleSheet.hairlineWidth * 1.5,
+      borderRightWidth: StyleSheet.hairlineWidth * 1.5,
+      borderColor: colors.cardBorder,
+    },
+    rowFirst: {
+      borderTopWidth: StyleSheet.hairlineWidth * 1.5,
+      borderTopLeftRadius: radii.md,
+      borderTopRightRadius: radii.md,
+    },
+    rowLast: {
+      borderBottomWidth: StyleSheet.hairlineWidth * 1.5,
+      borderBottomLeftRadius: radii.md,
+      borderBottomRightRadius: radii.md,
+    },
+    rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    identity: { flex: 1 },
+    trailing: { alignItems: 'flex-end', gap: 3, paddingLeft: spacing.sm },
+    score: { fontSize: 16, fontWeight: '700', color: colors.accent },
+    trailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingLeft: spacing.sm },
+    iconButton: {
+      width: 30,
+      height: 30,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconButtonActive: { borderColor: colors.premium, backgroundColor: colors.premiumMuted },
+    error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }
