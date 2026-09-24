@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,10 +9,12 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor } from '../lib/playerTier';
@@ -212,31 +214,21 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
         {picks.length ? (
           <>
             <AppText style={styles.sectionLabel}>Pick Values</AppText>
-            <View style={styles.scopeRow}>
-              <TouchableOpacity
-                style={[styles.scopePill, pickScope === 'mine' && styles.scopePillActive]}
-                onPress={() => setPickScope('mine')}
-                disabled={!myRosterId}
-              >
-                <AppText
-                  style={[
-                    styles.scopePillText,
-                    pickScope === 'mine' && styles.scopePillTextActive,
-                    !myRosterId && styles.scopePillTextDisabled,
+            {/* Only worth a toggle once there's a resolved roster to scope
+                to — otherwise pickScope is already pinned to 'league' and a
+                one-option control would just be dead chrome. */}
+            {myRosterId ? (
+              <View style={styles.scopeRow}>
+                <SegmentedTabBar<PickScope>
+                  options={[
+                    { key: 'mine', label: 'My Picks' },
+                    { key: 'league', label: 'League' },
                   ]}
-                >
-                  My Picks
-                </AppText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.scopePill, pickScope === 'league' && styles.scopePillActive]}
-                onPress={() => setPickScope('league')}
-              >
-                <AppText style={[styles.scopePillText, pickScope === 'league' && styles.scopePillTextActive]}>
-                  League
-                </AppText>
-              </TouchableOpacity>
-            </View>
+                  active={pickScope}
+                  onChange={setPickScope}
+                />
+              </View>
+            ) : null}
             {pickSeasons.length ? (
               pickSeasons.map(([season, seasonPicks]) => (
                 <View key={season}>
@@ -246,15 +238,26 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
                       AnimatedCard would spring the whole season group on
                       every row tap. */}
                   <View style={styles.pickCard}>
-                    {seasonPicks.map((pick, index) => (
-                      <PickRow
-                        key={pick.pick_id}
-                        pick={pick}
-                        showOwner={pickScope === 'league'}
-                        first={index === 0}
-                        onPress={() => navigation.navigate('PickDetail', { pick, leagueId, leagueName })}
-                      />
-                    ))}
+                    {seasonPicks.map((pick, index) => {
+                      const confidence =
+                        typeof pick.projection_confidence === 'number' ? pick.projection_confidence : null;
+                      return (
+                        <DraftPickAssetRow
+                          key={pick.pick_id}
+                          pickId={pick.pick_id}
+                          round={pick.round}
+                          label={pick.label}
+                          projectedRange={pick.projected_pick_range}
+                          pickTier={pick.pick_tier}
+                          contextLine={pickScope === 'league' ? pick.owner_team_name : null}
+                          trailingValue={pick.score != null ? String(Math.round(pick.score)) : '—'}
+                          trailingCaption={confidence !== null ? `${Math.round(confidence * 100)}% conf` : null}
+                          showChevron
+                          onPress={() => navigation.navigate('PickDetail', { pick, leagueId, leagueName })}
+                          showDivider={index < seasonPicks.length - 1}
+                        />
+                      );
+                    })}
                   </View>
                 </View>
               ))
@@ -269,14 +272,22 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
         ) : null}
 
         <AppText style={styles.sectionLabel}>League Draft Decision Signals</AppText>
-        {decisionCards.map((card) => (
-          <DraftInsightCard key={card.label} card={card} />
-        ))}
+        {decisionCards.length ? (
+          <AnimatedCard style={styles.insightGroupCard}>
+            {decisionCards.map((card, index) => (
+              <DraftInsightBlock key={card.label} card={card} showDivider={index < decisionCards.length - 1} />
+            ))}
+          </AnimatedCard>
+        ) : null}
 
         <AppText style={styles.sectionLabel}>Draft Partner Discovery</AppText>
-        {partnerCards.map((card) => (
-          <DraftInsightCard key={card.label} card={card} />
-        ))}
+        {partnerCards.length ? (
+          <AnimatedCard style={styles.insightGroupCard}>
+            {partnerCards.map((card, index) => (
+              <DraftInsightBlock key={card.label} card={card} showDivider={index < partnerCards.length - 1} />
+            ))}
+          </AnimatedCard>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -303,51 +314,21 @@ function PostureTile({ label, value, note, first }: { label: string; value: stri
   );
 }
 
-function PickRow({
-  pick,
-  showOwner,
-  first,
-  onPress,
-}: {
-  pick: DraftPickAsset;
-  showOwner: boolean;
-  first?: boolean;
-  onPress: () => void;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const meta = [pick.pick_tier, pick.projected_pick_range].filter(Boolean).join(' · ');
-  const confidence = typeof pick.projection_confidence === 'number' ? pick.projection_confidence : null;
-  return (
-    <TouchableOpacity style={[styles.pickRow, first && styles.pickRowFirst]} onPress={onPress}>
-      <View style={styles.pickBadge}>
-        <AppText style={styles.pickBadgeText}>R{pick.round ?? '—'}</AppText>
-      </View>
-      <View style={styles.pickInfo}>
-        <AppText style={styles.pickLabel} numberOfLines={1}>
-          {pick.label ?? 'Draft pick'}
-        </AppText>
-        <AppText style={styles.pickMeta} numberOfLines={1}>
-          {[showOwner ? pick.owner_team_name : null, meta].filter(Boolean).join(' · ') || '—'}
-        </AppText>
-      </View>
-      <View style={styles.pickValueBlock}>
-        <AppText style={styles.pickScore}>{pick.score != null ? Math.round(pick.score) : '—'}</AppText>
-        {confidence !== null ? (
-          <AppText style={styles.pickConfidence}>{Math.round(confidence * 100)}% conf</AppText>
-        ) : null}
-      </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-    </TouchableOpacity>
-  );
-}
-
-function DraftInsightCard({ card }: { card: DraftCard }) {
+/**
+ * One classification block ("Best Pick Buyers", "Pick-Rich Teams", ...)
+ * inside the League Draft Decision Signals / Draft Partner Discovery
+ * surfaces. Previously each block was its own separately-bordered
+ * AnimatedCard — five-plus identical card shells stacked back to back is
+ * exactly the "card → card → card" pattern the Magna Carta calls out (§12);
+ * these now render as internal rows of one grouped surface, separated by a
+ * hairline divider, the same way PickRow-family lists are grouped.
+ */
+function DraftInsightBlock({ card, showDivider }: { card: DraftCard; showDivider: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const toneColor = toneColorMap(colors)[card.tone] ?? colors.accent;
   return (
-    <AnimatedCard style={styles.insightCard}>
+    <View style={showDivider ? styles.insightBlockDivider : undefined}>
       <View style={[styles.insightBadge, { backgroundColor: `${toneColor}26` }]}>
         <AppText style={[styles.insightBadgeText, { color: toneColor }]}>{card.label}</AppText>
       </View>
@@ -358,7 +339,7 @@ function DraftInsightCard({ card }: { card: DraftCard }) {
           <AppText style={styles.insightItemText}>{item}</AppText>
         </View>
       ))}
-    </AnimatedCard>
+    </View>
   );
 }
 
@@ -435,19 +416,7 @@ function createStyles(colors: ThemeColors) {
   postureLabel: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
   postureNote: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   postureMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
-  scopeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
-  scopePill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surface,
-  },
-  scopePillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
-  scopePillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  scopePillTextActive: { color: colors.accent },
-  scopePillTextDisabled: { color: colors.textTertiary },
+  scopeRow: { marginBottom: spacing.sm },
   pickSeasonLabel: {
     fontSize: 11,
     fontWeight: '700',
@@ -464,31 +433,13 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
   },
-  pickRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
+  insightGroupCard: { padding: spacing.lg, marginBottom: spacing.sm },
+  insightBlockDivider: {
+    paddingBottom: spacing.md,
+    marginBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
   },
-  pickRowFirst: { borderTopWidth: 0 },
-  pickBadge: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.md,
-    backgroundColor: colors.badgeBackground,
-  },
-  pickBadgeText: { fontSize: 12, fontWeight: '800', color: colors.badgeText },
-  pickInfo: { flex: 1 },
-  pickLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  pickMeta: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
-  pickValueBlock: { alignItems: 'flex-end' },
-  pickScore: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  pickConfidence: { fontSize: 10, color: colors.textTertiary, marginTop: 1 },
-  insightCard: { padding: spacing.lg, marginBottom: spacing.sm },
   insightBadge: {
     alignSelf: 'flex-start',
     borderRadius: radii.pill,

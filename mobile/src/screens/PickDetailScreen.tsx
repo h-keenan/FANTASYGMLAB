@@ -12,6 +12,7 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
+import SectionHeading from '../components/SectionHeading';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -19,8 +20,6 @@ import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PickDetail'>;
-
-type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /** Same three round-slot buckets modules/trade_ideas.py projects over, in
  * board order (a pick that lands early in the round is the valuable one). */
@@ -97,17 +96,6 @@ function BucketBar({ label, percent, color }: { label: string; percent: number; 
         <View style={[styles.bucketFill, { width: `${Math.max(2, percent)}%`, backgroundColor: color }]} />
       </View>
       <AppText style={styles.bucketPercent}>{Math.round(percent)}%</AppText>
-    </View>
-  );
-}
-
-function SectionHeading({ title, icon }: { title: string; icon: IoniconName }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.sectionHeadingRow}>
-      <Ionicons name={icon} size={15} color={colors.accent} style={styles.sectionHeadingIcon} />
-      <AppText style={styles.sectionTitle}>{title}</AppText>
     </View>
   );
 }
@@ -363,11 +351,8 @@ function createStyles(colors: ThemeColors) {
   },
   heroRange: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.sm },
   card: { padding: spacing.lg, marginBottom: spacing.sm },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-  sectionHeadingIcon: { marginRight: spacing.xs },
-  // SectionHeading / StatGrid mirror Player Detail's (this is the pick-side
-  // sibling of that screen), so the heading and tile styles match it too.
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  // StatGrid mirrors Player Detail's (this is the pick-side sibling of that
+  // screen); SectionHeading itself is the shared component now.
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   statCell: {
     minWidth: '46%',
