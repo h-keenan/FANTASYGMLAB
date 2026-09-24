@@ -284,7 +284,7 @@ def premium_page_html(
         f"{future_rows}"
         "<div class='premium-plan-row-body'>These are roadmap candidates, not guaranteed deliverables or billing terms.</div>"
         "</div>"
-        "<div class='premium-billing-note dg-preset-diagnostic'>"
+        "<div class='premium-billing-note'>"
         "<div class='premium-billing-note-title'>Billing</div>"
         f"<div class='premium-billing-note-body'>{escape(billing_body)}</div>"
         f"{local_override_note}"

@@ -6586,7 +6586,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 div[class*="st-key-premium_plan_purchase"] {
     background: var(--color-surface-primary);
-    border: 1px solid var(--color-border-subtle);
+    border: 1px solid var(--color-border);
     border-left: 3px solid var(--color-accent);
     border-radius: var(--radius-none);
     margin: var(--space-lg) 0;
@@ -6614,7 +6614,7 @@ div[class*="st-key-premium_plan_purchase"] [data-testid="stColumn"] > [data-test
 }
 .premium-checkout-option {
     background: var(--color-surface-secondary);
-    border: 1px solid var(--color-border-subtle);
+    border: 1px solid var(--color-border);
     border-left: 3px solid var(--color-border-strong);
     border-radius: var(--radius-none);
     min-height: 9rem;
@@ -6638,7 +6638,6 @@ div[class*="st-key-premium_plan_purchase"] [data-testid="stColumn"] > [data-test
 }
 .premium-checkout-option-name {
     color: var(--color-text-primary);
-    font-size: var(--font-size-card-title);
     font-weight: var(--font-weight-title);
     font-size: clamp(1.15rem, 1.8vw, 1.4rem);
     margin-top: var(--space-md);
