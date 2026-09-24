@@ -90,7 +90,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-side-receive { border-left-color: var(--color-accent-strong); }
-.toa-side-send { border-left-color: #ef4444; }
+.toa-side-send { border-left-color: var(--color-danger, #ef4444); }
 
 .toa-side-label {
   color: var(--color-text-secondary, #9ca3af);

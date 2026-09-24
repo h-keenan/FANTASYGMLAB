@@ -8,7 +8,7 @@ BRAND_IDENTITY_CSS = """
 
 .dg-brand-mark{align-items:center;box-sizing:border-box;display:inline-flex;justify-content:center;line-height:0;overflow:hidden}
 .dg-brand-plate{background:var(--color-surface-primary,#0f1114);border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
-.dg-brand-plate--light{background:#f8fafc}
+.dg-brand-plate--light{background:var(--color-text-primary, #f8fafc)}
 .dg-brand-plate__arcs{inset:4% 2% 32% 4%;pointer-events:none;position:absolute}
 .dg-brand-plate__arcs i{border:solid transparent;border-radius:0 100% 0 0;border-right-color:var(--color-brand-accent,#22d3ee);border-top-color:var(--color-brand-accent,#22d3ee);border-width:calc(var(--dg-mark-size,28px)*.055);bottom:0;box-sizing:border-box;height:72%;left:0;position:absolute;width:96%}
 .dg-brand-plate__arcs i:nth-child(2){border-right-color:var(--color-brand-trajectory-project,#facc15);border-top-color:var(--color-brand-trajectory-project,#facc15);bottom:10%;height:74%;width:82%}
@@ -55,7 +55,7 @@ BRAND_IDENTITY_CSS = """
 }
 
 .dg-founder-badge__mark {
-    background: #f8fafc;
+    background: var(--color-text-primary, #f8fafc);
     color: #0b1220;
     font-size: 0.58rem;
     font-weight: 900;
@@ -70,7 +70,7 @@ BRAND_IDENTITY_CSS = """
 }
 
 .dg-founder-badge__copy strong {
-    color: #f8fafc;
+    color: var(--color-text-primary, #f8fafc);
     font-size: 0.68rem;
     font-weight: 850;
     letter-spacing: 0.01em;
@@ -180,7 +180,7 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 
 .dg-premium-chip,.dg-experimental-chip{align-items:center;display:inline-flex;font-size:.58rem;font-weight:850;letter-spacing:.08em;line-height:1;padding:.28rem .42rem;text-transform:uppercase}
 .dg-premium-chip{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.4);color:#fde68a}
-.dg-experimental-chip{background:rgba(139,147,255,.12);border:1px solid rgba(139,147,255,.38);color:#c7d2fe}
+.dg-experimental-chip{background:var(--color-diagnostic-soft, rgba(139,147,255,.12));border:1px solid rgba(139,147,255,.38);color:#c7d2fe}
 
 .trade-summary-footer {
     align-items: center;
@@ -274,7 +274,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .dg-feedback-brand__title {
-    color: #f8fafc;
+    color: var(--color-text-primary, #f8fafc);
     font-size: 0.78rem;
     font-weight: 850;
     line-height: 1.2;

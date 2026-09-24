@@ -31,7 +31,7 @@ LIVE_DRAFT_CSS = """
 
 .live-draft-title,
 .live-draft-command-title {
-    color: #f8fafc;
+    color: var(--color-text-primary, #f8fafc);
     font-size: 1.08rem;
     font-weight: 900;
     line-height: 1.08;
@@ -89,7 +89,7 @@ LIVE_DRAFT_CSS = """
 }
 
 .live-draft-section-head span {
-    color: #f8fafc;
+    color: var(--color-text-primary, #f8fafc);
     font-size: 0.9rem;
     font-weight: 900;
 }
