@@ -14,6 +14,8 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
+import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
+import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type DashboardItem } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
@@ -39,6 +41,29 @@ interface MyTeamInfo {
   playerCount: number;
   playerIds: string[];
   rosterId: string;
+}
+
+// Same icon/color per destination GmOrb's own "Where to Go" sheet already
+// uses for these routes (Matchup/Waivers = success, Teams = violet,
+// Alerts = danger) — one semantic mapping app-wide, not a fresh set of
+// colors invented for this screen. My Team and Recap are deliberately left
+// out: they already have their own richer strip cards below (real roster
+// data / "week N recap ready"), so a plain nav tile for the same
+// destination would just be a second, weaker way to do the same thing.
+function leagueQuickActions(
+  colors: ThemeColors,
+): Array<{
+  label: string;
+  route: 'Matchup' | 'Alerts' | 'Waivers' | 'Teams';
+  icon: React.ComponentProps<typeof IconCircle>['name'];
+  color: string;
+}> {
+  return [
+    { label: 'Matchup', route: 'Matchup', icon: 'american-football-outline', color: colors.success },
+    { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', color: colors.danger },
+    { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
+    { label: 'Teams', route: 'Teams', icon: 'people-circle-outline', color: colors.violet },
+  ];
 }
 
 function scoringLabel(scoringSettings: Record<string, unknown> | undefined): string {
@@ -167,6 +192,9 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.list} contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+      <ScreenInfoNote
+        text={`League Overview is home base for ${leagueName} — league context and quick access to everything else. For personalized recommendations, see Next Move.`}
+      />
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}
@@ -191,6 +219,18 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           </AppText>
         </View>
       ) : null}
+
+      <QuickActionsGrid
+        actions={leagueQuickActions(colors).map(
+          (action): QuickAction => ({
+            key: action.route,
+            label: action.label,
+            icon: action.icon,
+            color: action.color,
+            onPress: () => navigation.navigate(action.route, { leagueId, leagueName }),
+          }),
+        )}
+      />
 
       {myTeam ? (
         <AnimatedCard
