@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,6 +8,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import AnimatedCard from '../components/AnimatedCard';
+import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -18,7 +20,10 @@ import MetricCard from '../components/MetricCard';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SegmentedTabBar from '../components/SegmentedTabBar';
+import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysisPanel';
 import TeamAvatar from '../components/TeamAvatar';
+import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { percentileColor, percentileFromRank } from '../lib/percentile';
@@ -76,6 +81,38 @@ function ageLabel(averageAge: number | null): string {
   return 'Aging';
 }
 
+/**
+ * My Team's local subnav — coridian_'s "roster command center" brief:
+ * Overview (identity/value + a condensed starters preview), Starters (full
+ * lineup + a real aggregate), Bench (full bench, visually quieter), Analysis
+ * (the real TeamRanking rank matrix + archetype narrative, via
+ * TeamAnalysisPanel). Keeps every roster concept reachable without forcing
+ * Team Snapshot + Starters + Bench + Analysis into one endless scroll — see
+ * SegmentedTabBar (built for Player Detail's Stats/Trends/... tabs), reused
+ * here rather than a My-Team-specific tab control.
+ */
+type TeamTab = 'overview' | 'starters' | 'bench' | 'analysis';
+
+const TEAM_TABS: Array<{ key: TeamTab; label: string }> = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'starters', label: 'Starters' },
+  { key: 'bench', label: 'Bench' },
+  { key: 'analysis', label: 'Analysis' },
+];
+
+function infoNoteText(tab: TeamTab, leagueName: string): string {
+  switch (tab) {
+    case 'starters':
+      return `Your suggested starting lineup for ${leagueName} — the same optimal-lineup logic the web app's Dashboard and My Team pages use.`;
+    case 'bench':
+      return `Every other rostered player in ${leagueName} not currently in your suggested starting lineup.`;
+    case 'analysis':
+      return `Real roster analytics for ${leagueName} — the same team-evaluation model used across FantasyGM Lab.`;
+    default:
+      return `Your roster snapshot for ${leagueName} — strength, identity, and starting lineup at a glance.`;
+  }
+}
+
 export default function MyTeamScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
@@ -89,6 +126,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [myTeam, setMyTeam] = useState<TeamRanking | null>(null);
   const [leagueSize, setLeagueSize] = useState(0);
+  const [activeTab, setActiveTab] = useState<TeamTab>('overview');
 
   useScreenHeaderTitle(navigation, 'My Team', leagueName);
 
@@ -139,6 +177,18 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     }, [leagueId]),
   );
 
+  const totalStartersValue = useMemo(
+    () => starters.reduce((sum, player) => sum + (player.score ?? 0), 0),
+    [starters],
+  );
+
+  const goToPlayer = useCallback(
+    (player: LineupPlayer) => {
+      navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName });
+    },
+    [navigation, leagueId, leagueName],
+  );
+
   if (loading) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
@@ -164,43 +214,51 @@ export default function MyTeamScreen({ route, navigation }: Props) {
       <GridBackground />
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <ScreenInfoNote
-          text={`Your suggested starting lineup for ${leagueName} — the same optimal-lineup logic the web app's Dashboard and My Team pages use.`}
-        />
+        <View style={styles.tabBar}>
+          <SegmentedTabBar options={TEAM_TABS} active={activeTab} onChange={setActiveTab} />
+        </View>
+        <ScreenInfoNote text={infoNoteText(activeTab, leagueName)} />
 
-        {myTeam ? <TeamAnalyticsSection team={myTeam} leagueSize={leagueSize} /> : null}
-
-        <AppText style={styles.sectionLabel}>Starters</AppText>
-        {starters.length === 0 ? (
-          <AppText style={styles.emptyBench}>No suggested starters yet.</AppText>
-        ) : (
-          <AnimatedCard style={styles.groupCard}>
-            {starters.map((player, index) => (
-              <LineupRow
-                key={player.player_id}
-                player={player}
-                showDivider={index < starters.length - 1}
-                onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
+        {activeTab === 'overview' ? (
+          <>
+            {myTeam ? (
+              <TeamAnalyticsSection
+                team={myTeam}
+                leagueSize={leagueSize}
+                onViewAnalysis={hasRosterAnalysis(myTeam) ? () => setActiveTab('analysis') : undefined}
               />
-            ))}
-          </AnimatedCard>
-        )}
-
-        <AppText style={styles.sectionLabel}>Bench</AppText>
-        {bench.length === 0 ? (
-          <AppText style={styles.emptyBench}>No bench players.</AppText>
-        ) : (
-          <AnimatedCard style={styles.groupCard}>
-            {bench.map((player, index) => (
-              <LineupRow
-                key={player.player_id}
-                player={player}
-                showDivider={index < bench.length - 1}
-                onPress={() => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName })}
+            ) : null}
+            {starters.length > 0 ? (
+              <StartersPreviewSection
+                starters={starters}
+                onPressPlayer={goToPlayer}
+                onViewAll={() => setActiveTab('starters')}
               />
-            ))}
-          </AnimatedCard>
-        )}
+            ) : null}
+          </>
+        ) : null}
+
+        {activeTab === 'starters' ? (
+          <StartersFullSection starters={starters} totalValue={totalStartersValue} onPressPlayer={goToPlayer} />
+        ) : null}
+
+        {activeTab === 'bench' ? <BenchFullSection bench={bench} onPressPlayer={goToPlayer} /> : null}
+
+        {activeTab === 'analysis' ? (
+          myTeam ? (
+            <TeamAnalysisPanel
+              team={myTeam}
+              leagueSize={leagueSize}
+              onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
+            />
+          ) : (
+            <EmptyState
+              icon="stats-chart-outline"
+              title="Analysis unavailable"
+              subtitle="Team analytics aren't available for this roster right now."
+            />
+          )
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -226,6 +284,11 @@ export default function MyTeamScreen({ route, navigation }: Props) {
  * (lib/percentile.ts) everywhere in the app instead of two. Draft Capital
  * previously appeared twice — once as an icon cell, once as a percentile
  * bar — collapsed here into the single MetricCard tile.
+ *
+ * `onViewAnalysis`, when provided, renders a compact "View Full Roster
+ * Analysis" link into the Analysis tab (coridian_'s roster-command-center
+ * brief §6) — only ever passed when TeamAnalysisPanel actually has real
+ * content to show (see `hasRosterAnalysis`), never as a dead affordance.
  */
 /** Young/Prime/Aging isn't itself good/bad, but Prime is the ideal state,
  * Aging carries real roster risk, and Young is still "not there yet" —
@@ -238,7 +301,15 @@ function ageColor(averageAge: number | null, colors: ThemeColors): string {
   return colors.danger;
 }
 
-function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueSize: number }) {
+function TeamAnalyticsSection({
+  team,
+  leagueSize,
+  onViewAnalysis,
+}: {
+  team: TeamRanking;
+  leagueSize: number;
+  onViewAnalysis?: () => void;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const valuePercentile = percentileFromRank(team.power_rank, leagueSize);
@@ -296,21 +367,190 @@ function TeamAnalyticsSection({ team, leagueSize }: { team: TeamRanking; leagueS
           valueColor={ageColor(team.average_age, colors)}
         />
       </View>
+      {onViewAnalysis ? <LinkRow label="View Full Roster Analysis" onPress={onViewAnalysis} /> : null}
     </AnalyticsSection>
   );
 }
 
+/**
+ * Overview's "condensed preview" (brief §2): the first few starters plus a
+ * link into the full Starters tab, instead of always rendering the entire
+ * lineup on Overview too — the full list (with its own aggregate) lives on
+ * the Starters tab so Overview stays a quick glance, not a second copy of
+ * the same long list.
+ */
+function StartersPreviewSection({
+  starters,
+  onPressPlayer,
+  onViewAll,
+}: {
+  starters: LineupPlayer[];
+  onPressPlayer: (player: LineupPlayer) => void;
+  onViewAll: () => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const preview = starters.slice(0, 3);
+  return (
+    <View>
+      <AppText style={styles.sectionLabel}>Starters</AppText>
+      <AnimatedCard style={styles.groupCard}>
+        {preview.map((player, index) => (
+          <LineupRow
+            key={player.player_id}
+            player={player}
+            showDivider={index < preview.length - 1}
+            onPress={() => onPressPlayer(player)}
+          />
+        ))}
+        <LinkRow label={`View all ${starters.length} Starters`} onPress={onViewAll} />
+      </AnimatedCard>
+    </View>
+  );
+}
+
+/**
+ * Section 7: a real "Total Starters Value" aggregate — the sum of the exact
+ * per-starter `score` values already rendered in each row below, never a
+ * fabricated number the app has no inputs for.
+ */
+function StartersFullSection({
+  starters,
+  totalValue,
+  onPressPlayer,
+}: {
+  starters: LineupPlayer[];
+  totalValue: number;
+  onPressPlayer: (player: LineupPlayer) => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View>
+      <SectionHeaderRow
+        label="Starters"
+        total={totalValue > 0 ? `${Math.round(totalValue).toLocaleString()} TOTAL VALUE` : null}
+      />
+      {starters.length === 0 ? (
+        <EmptyState icon="people-outline" title="No suggested starters yet." />
+      ) : (
+        <AnimatedCard style={styles.groupCard}>
+          {starters.map((player, index) => (
+            <LineupRow
+              key={player.player_id}
+              player={player}
+              showDivider={index < starters.length - 1}
+              onPress={() => onPressPlayer(player)}
+            />
+          ))}
+        </AnimatedCard>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Bench keeps the exact same PlayerIdentityRow family and roster structure
+ * (brief §14 — never remove bench players), just a touch quieter than
+ * Starters: the trailing value number drops from the cyan accent to a plain
+ * secondary tone so cyan stays reserved for the roster's actual starting
+ * value (Magna Carta §2 — "cyan second"), not a completely different row
+ * design.
+ */
+function BenchFullSection({
+  bench,
+  onPressPlayer,
+}: {
+  bench: LineupPlayer[];
+  onPressPlayer: (player: LineupPlayer) => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View>
+      <SectionHeaderRow label="Bench" />
+      {bench.length === 0 ? (
+        <EmptyState icon="people-outline" title="No bench players." />
+      ) : (
+        <AnimatedCard style={styles.groupCard}>
+          {bench.map((player, index) => (
+            <LineupRow
+              key={player.player_id}
+              player={player}
+              showDivider={index < bench.length - 1}
+              onPress={() => onPressPlayer(player)}
+              muted
+            />
+          ))}
+        </AnimatedCard>
+      )}
+    </View>
+  );
+}
+
+function SectionHeaderRow({ label, total }: { label: string; total?: string | null }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.sectionHeaderRow}>
+      <AppText style={styles.sectionHeaderLabel}>{label}</AppText>
+      {total ? <AppText style={styles.sectionTotal}>{total}</AppText> : null}
+    </View>
+  );
+}
+
+/** One shared "go deeper" affordance (icon-free text + chevron, top hairline
+ * to read as a natural extension of the surface above it) — backs both
+ * Team Snapshot's "View Full Roster Analysis" and the Starters preview's
+ * "View all N Starters", instead of two one-off tappable text styles. */
+function LinkRow({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity style={styles.linkRow} onPress={onPress} activeOpacity={0.7}>
+      <AppText style={styles.linkRowText}>{label}</AppText>
+      <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+    </TouchableOpacity>
+  );
+}
+
+/**
+ * One roster row — canonical PlayerIdentityRow for identity plus a trailing
+ * Value/OVR column, matching TeamRosterScreen's RosterPlayerRow exactly
+ * (Magna Carta §19, §47) rather than a third bespoke player-row layout.
+ *
+ * Injury severity: `injury_label`/`ruled_out` stay server-resolved (IR/PUP
+ * arrives on `status` with `injury_status` blank — see LineupPlayer's own
+ * doc comment — and `ruled_out` already encodes the roster-context nuance
+ * of "kept as a starter because nothing else was available"), but the
+ * risk-vs-watch *tone* is derived the same way Waivers/Players/GmTargets/
+ * TeamRoster already derive it (`waiverInjuryDisplay`) instead of always
+ * defaulting to the harsher 'risk' red. Brief §12 asks specifically whether
+ * an injury pill and a red-toned tier badge (IMPACT STARTER) could read as
+ * the same thing: PlayerIdentityRow's TierBadge is a bordered, translucent
+ * chip in the meta row and the injury pill is a borderless solid chip in
+ * the name row (different shape, different row, different hex — EF4444 vs
+ * FF4D4D dark / B91C1C vs D92D2D light) so they were already visually
+ * distinct; the real gap here was "Questionable" always rendering in the
+ * same red family as a genuine Out/IR status instead of the calmer amber
+ * `watch` tone the semantic color system calls for. MatchupScreen's
+ * lineup rows share this exact LineupPlayer shape and have the identical
+ * gap — worth the same fix there in a follow-up pass.
+ */
 function LineupRow({
   player,
   onPress,
   showDivider,
+  muted = false,
 }: {
   player: LineupPlayer;
   onPress: () => void;
   showDivider: boolean;
+  muted?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const injuryTone = waiverInjuryDisplay(player.injury_status).tone;
   return (
     <TouchableOpacity
       style={[styles.compactRow, showDivider && styles.compactDivider]}
@@ -331,11 +571,14 @@ function LineupRow({
           // pill hides exactly those players. See LineupPlayer.injury_label.
           injuryLabel={player.injury_label}
           ruledOut={player.ruled_out}
+          injuryTone={injuryTone}
           showDivider={false}
         />
       </View>
       <View style={styles.valueColumn}>
-        <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <AppText style={[styles.valueNumber, muted && styles.valueNumberMuted]}>
+          {player.score != null ? Math.round(player.score) : '—'}
+        </AppText>
         <AppText style={styles.valueLabel}>VALUE</AppText>
         <OverallRatingBadge rating={player.overall_rating} />
       </View>
@@ -349,6 +592,7 @@ function createStyles(colors: ThemeColors) {
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
+  tabBar: { marginBottom: spacing.sm },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -395,7 +639,21 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
-  emptyBench: { fontSize: 13, color: colors.textSecondary },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  sectionHeaderLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionTotal: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
   // One grouped surface per lineup section (Starters, Bench) with a
   // PlayerIdentityRow per player and hairline dividers between them,
   // instead of a separately bordered/backgrounded card per player — see
@@ -412,7 +670,18 @@ function createStyles(colors: ThemeColors) {
   compactIdentity: { flex: 1 },
   valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm, gap: 2 },
   valueNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  valueNumberMuted: { color: colors.textSecondary },
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  linkRowText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
   });
