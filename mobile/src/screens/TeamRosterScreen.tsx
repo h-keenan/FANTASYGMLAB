@@ -1,20 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
+import AnalyticsSection from '../components/AnalyticsSection';
 import AnimatedCard from '../components/AnimatedCard';
+import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
+import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import PlayerAvatar from '../components/PlayerAvatar';
-import { resolvePlayerTier } from '../lib/playerTier';
+import MetricCard from '../components/MetricCard';
+import OverallRatingBadge from '../components/OverallRatingBadge';
+import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import ScreenInfoNote from '../components/ScreenInfoNote';
+import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
+import { percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -47,26 +54,24 @@ function positionSortKey(position: string | null): number {
   return index === -1 ? POSITION_ORDER.length : index;
 }
 
-interface RankTile {
+interface RankMetric {
+  key: string;
   label: string;
-  value: string;
+  rank: number | null;
   /** Power/Franchise link out to the full league rankings (Teams screen) —
-   * the other tiles here have no equivalent standalone screen to open. */
+   * the other metrics here have no equivalent standalone screen to open. */
   tappable?: boolean;
 }
 
-function buildRankTiles(ranking: TeamRanking): RankTile[] {
-  const tiles: RankTile[] = [];
-  const push = (label: string, value: number | null, tappable = false) => {
-    if (value != null) tiles.push({ label, value: `#${value}`, tappable });
-  };
-  push('Power', ranking.power_rank, true);
-  push('Franchise', ranking.franchise_rank, true);
-  push('Draft Capital', ranking.draft_capital_rank);
-  push('Starters', ranking.starter_rank);
-  push('Bench', ranking.bench_rank);
-  push('Age', ranking.age_rank);
-  return tiles;
+function buildRankMetrics(ranking: TeamRanking): RankMetric[] {
+  return [
+    { key: 'power', label: 'Power', rank: ranking.power_rank, tappable: true },
+    { key: 'franchise', label: 'Franchise', rank: ranking.franchise_rank, tappable: true },
+    { key: 'draft', label: 'Draft Capital', rank: ranking.draft_capital_rank },
+    { key: 'starters', label: 'Starters', rank: ranking.starter_rank },
+    { key: 'bench', label: 'Bench', rank: ranking.bench_rank },
+    { key: 'age', label: 'Age', rank: ranking.age_rank },
+  ].filter((metric) => metric.rank != null);
 }
 
 type RosterSection = { title: string; data: RankedPlayer[] };
@@ -74,11 +79,12 @@ type RosterSection = { title: string; data: RankedPlayer[] };
 export default function TeamRosterScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
-  const { colors, isDark } = useThemeMode();
+  const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { ownerName, playerIds, leagueId, leagueName, rosterId } = route.params;
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [ranking, setRanking] = useState<TeamRanking | null>(null);
+  const [leagueSize, setLeagueSize] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,6 +122,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
             .sort((a, b) => positionSortKey(a.position) - positionSortKey(b.position));
           setPlayers(rows);
 
+          setLeagueSize(teamRankingsResult.teams.length);
           const matchedRanking = teamRankingsResult.teams.find((team) => team.roster_id === rosterId) ?? null;
           setRanking(matchedRanking);
         } catch (err) {
@@ -159,135 +166,130 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
     );
   }
 
-  const rankTiles = ranking ? buildRankTiles(ranking) : [];
-
   return (
     <View style={styles.root}>
       <GridBackground />
-      <SectionList
-        style={styles.list}
-        sections={sections}
-        stickySectionHeadersEnabled={false}
-        keyExtractor={(item) => item.player_id}
-        contentContainerStyle={
-          sections.length === 0
-            ? [styles.emptyContainer, { paddingTop: headerHeight }]
-            : [styles.listContent, { paddingBottom: orbClearance, paddingTop: headerHeight }]
-        }
-        ListEmptyComponent={
-          <AppText style={styles.empty}>
-            No player data available for this roster (Sleeper doesn't have
-            records for these player ids, or the roster is empty).
-          </AppText>
-        }
-        ListHeaderComponent={
-          ranking ? (
-            <View style={styles.headerGroup}>
-              {ranking.record_label ? <AppText style={styles.recordLabel}>{ranking.record_label}</AppText> : null}
-              {rankTiles.length > 0 ? (
-                <View style={styles.tileRow}>
-                  {rankTiles.map((tile) =>
-                    tile.tappable ? (
-                      <TouchableOpacity
-                        key={tile.label}
-                        style={[styles.tile, styles.tileTappable]}
-                        onPress={() => navigation.navigate('Teams', { leagueId, leagueName })}
-                      >
-                        <AppText style={styles.tileValue} numberOfLines={1}>
-                          {tile.value}
-                        </AppText>
-                        <AppText style={styles.tileLabel}>{tile.label}</AppText>
-                      </TouchableOpacity>
-                    ) : (
-                      <View key={tile.label} style={styles.tile}>
-                        <AppText style={styles.tileValue} numberOfLines={1}>
-                          {tile.value}
-                        </AppText>
-                        <AppText style={styles.tileLabel}>{tile.label}</AppText>
-                      </View>
-                    ),
-                  )}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+      >
+        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+        <ScreenInfoNote text={`${ownerName}'s full roster in ${leagueName} — real value, rank, and role data for every player they own, grouped by position.`} />
+
+        {ranking ? (
+          <TeamSnapshotSection
+            ranking={ranking}
+            leagueSize={leagueSize}
+            onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
+          />
+        ) : null}
+
+        {sections.length === 0 ? (
+          <EmptyState
+            icon="people-outline"
+            title="No roster data available"
+            subtitle="Sleeper doesn't have records for these player ids, or this roster is empty."
+          />
+        ) : (
+          <>
+            <AppText style={styles.sectionLabel}>Roster</AppText>
+            {sections.map((section) => (
+              <View key={section.title} style={styles.positionGroup}>
+                <AppText style={styles.positionLabel}>{section.title}</AppText>
+                <AnimatedCard style={styles.groupCard}>
+                  {section.data.map((player, index) => (
+                    <RosterPlayerRow
+                      key={player.player_id}
+                      player={player}
+                      showDivider={index < section.data.length - 1}
+                      onPress={() => navigation.navigate('PlayerDetail', { player, leagueId, leagueName })}
+                    />
+                  ))}
+                </AnimatedCard>
+              </View>
+            ))}
+          </>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * Team-level header for someone else's roster — same MetricCard/percentile
+ * primitives MyTeamScreen's TeamAnalyticsSection and Player Detail's Stats
+ * tab already use (Magna Carta §25-27), rather than this screen's old
+ * bespoke bordered-tile grid with no percentile framing at all. Shows all
+ * six TeamRanking rank fields (MyTeam's own snapshot only needs three, since
+ * a viewer already knows their own team) plus the fuller archetype
+ * breakdown this screen has always carried — strengths/risks/recommendations
+ * text a quick "my team" glance doesn't need.
+ */
+function TeamSnapshotSection({
+  ranking,
+  leagueSize,
+  onOpenTeams,
+}: {
+  ranking: TeamRanking;
+  leagueSize: number;
+  onOpenTeams: () => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const metrics = useMemo(() => buildRankMetrics(ranking), [ranking]);
+  const outlook = ranking.archetype_label;
+
+  return (
+    <AnalyticsSection title="Team Snapshot" icon="podium-outline">
+      {ranking.record_label || outlook ? (
+        <View style={styles.snapshotHeaderRow}>
+          {ranking.record_label ? <AppText style={styles.recordLabel}>{ranking.record_label}</AppText> : null}
+          {outlook || ranking.strategy_label ? (
+            <View style={styles.outlookRow}>
+              {outlook ? (
+                <View style={styles.outlookBadge}>
+                  <AppText style={styles.outlookBadgeText}>{outlook.toUpperCase()}</AppText>
                 </View>
               ) : null}
-              {ranking.archetype_label ? (
-                <AnimatedCard style={styles.archetypeCard}>
-                  <View style={styles.archetypeHeaderRow}>
-                    <AppText style={styles.archetypeLabel}>{ranking.archetype_label}</AppText>
-                    {ranking.strategy_label ? (
-                      <View style={styles.strategyPill}>
-                        <AppText style={styles.strategyPillText}>{ranking.strategy_label}</AppText>
-                      </View>
-                    ) : null}
-                  </View>
-                  {ranking.archetype_explanation ? (
-                    <AppText style={styles.archetypeExplanation}>{ranking.archetype_explanation}</AppText>
-                  ) : null}
-                  {ranking.archetype_strengths.length > 0 ? (
-                    <ArchetypeDetailList label="Strengths" items={ranking.archetype_strengths} color={colors.success} />
-                  ) : null}
-                  {ranking.archetype_risks.length > 0 ? (
-                    <ArchetypeDetailList label="Risks" items={ranking.archetype_risks} color={colors.danger} />
-                  ) : null}
-                  {ranking.archetype_recommendations.length > 0 ? (
-                    <ArchetypeDetailList
-                      label="Recommendations"
-                      items={ranking.archetype_recommendations}
-                      color={colors.accent}
-                    />
-                  ) : null}
-                </AnimatedCard>
+              {ranking.strategy_label ? (
+                <View style={styles.strategyPill}>
+                  <AppText style={styles.strategyPillText}>{ranking.strategy_label}</AppText>
+                </View>
               ) : null}
-              {sections.length > 0 ? <AppText style={styles.sectionIntro}>Roster Core</AppText> : null}
             </View>
-          ) : null
-        }
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <AppText style={styles.sectionHeaderText}>{section.title}</AppText>
-          </View>
-        )}
-        renderItem={({ item }) => (
-          <AnimatedCard
-            style={styles.card}
-            onPress={() => navigation.navigate('PlayerDetail', { player: item, leagueId, leagueName })}
-          >
-            <PlayerAvatar playerId={item.player_id} size={40} tier={item.tier} style={styles.avatar} />
-            <View style={styles.nameColumn}>
-              <AppText style={styles.name} numberOfLines={1}>
-                {item.name ?? 'Unknown player'}
-              </AppText>
-              <AppText style={styles.meta}>
-                {!item.team && !item.opportunity_label && !item.status ? (
-                  '—'
-                ) : (
-                  <>
-                    {item.team}
-                    {item.team && (item.opportunity_label ?? item.status) ? ' · ' : ''}
-                    {item.opportunity_label ? (
-                      <AppText style={[styles.meta, { color: resolvePlayerTier(item.tier, isDark).color }]}>
-                        {item.opportunity_label}
-                      </AppText>
-                    ) : (
-                      item.status
-                    )}
-                  </>
-                )}
-              </AppText>
-            </View>
-            {item.overall_rank != null ? (
-              <View style={styles.rankPill}>
-                <AppText style={styles.rankValue}>#{item.overall_rank}</AppText>
-              </View>
-            ) : null}
-            {item.injury_status ? (
-              <View style={styles.injuryPill}>
-                <AppText style={styles.injuryText}>{item.injury_status}</AppText>
-              </View>
-            ) : null}
-          </AnimatedCard>
-        )}
-      />
-    </View>
+          ) : null}
+        </View>
+      ) : null}
+      {metrics.length > 0 ? (
+        <View style={styles.metricsRow}>
+          {metrics.map((metric) => {
+            const percentile = percentileFromRank(metric.rank, leagueSize);
+            return (
+              <MetricCard
+                key={metric.key}
+                label={metric.label}
+                value={metric.rank != null ? `#${metric.rank}` : null}
+                percentile={percentile}
+                valueColor={percentile != null ? percentileColor(percentile, colors) : undefined}
+                onPress={metric.tappable ? onOpenTeams : undefined}
+              />
+            );
+          })}
+        </View>
+      ) : null}
+      {ranking.archetype_explanation ? (
+        <AppText style={styles.archetypeExplanation}>{ranking.archetype_explanation}</AppText>
+      ) : null}
+      {ranking.archetype_strengths.length > 0 ? (
+        <ArchetypeDetailList label="Strengths" items={ranking.archetype_strengths} color={colors.success} />
+      ) : null}
+      {ranking.archetype_risks.length > 0 ? (
+        <ArchetypeDetailList label="Risks" items={ranking.archetype_risks} color={colors.danger} />
+      ) : null}
+      {ranking.archetype_recommendations.length > 0 ? (
+        <ArchetypeDetailList label="Recommendations" items={ranking.archetype_recommendations} color={colors.accent} />
+      ) : null}
+    </AnalyticsSection>
   );
 }
 
@@ -306,12 +308,64 @@ function ArchetypeDetailList({ label, items, color }: { label: string; items: st
   );
 }
 
+/**
+ * One roster row inside a position group's AnimatedCard — canonical
+ * PlayerIdentityRow (league-wide rank as the leading slot chip, tier +
+ * opportunity classification, injury pill) plus a trailing value column,
+ * matching MyTeamScreen's LineupRow and PlayersScreen's PlayerRankRow
+ * exactly rather than a third bespoke player-row layout (Magna Carta §19,
+ * §47). `waiverInjuryDisplay` — already shared by Waivers and Players — is
+ * reused here too since RankedPlayer only carries a raw `injury_status`
+ * string, not the pre-resolved injury_label/ruled_out pair LineupPlayer has.
+ */
+function RosterPlayerRow({
+  player,
+  onPress,
+  showDivider,
+}: {
+  player: RankedPlayer;
+  onPress: () => void;
+  showDivider: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const injury = waiverInjuryDisplay(player.injury_status);
+  return (
+    <TouchableOpacity
+      style={[styles.compactRow, showDivider && styles.compactDivider]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.compactIdentity}>
+        <PlayerIdentityRow
+          playerId={player.player_id}
+          name={player.name}
+          position={player.position}
+          team={player.team}
+          tier={player.tier}
+          slot={player.overall_rank != null ? String(player.overall_rank) : null}
+          opportunityLabel={player.opportunity_label}
+          injuryLabel={injury.label}
+          injuryTone={injury.tone}
+          ruledOut={injury.ruledOut}
+          showDivider={false}
+        />
+      </View>
+      <View style={styles.valueColumn}>
+        <AppText style={styles.valueNumber}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <AppText style={styles.valueLabel}>VALUE</AppText>
+        <OverallRatingBadge rating={player.overall_rating} />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
-  list: { backgroundColor: 'transparent' },
-  listContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3, gap: spacing.sm },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -319,48 +373,35 @@ function createStyles(colors: ThemeColors) {
     padding: spacing.xl,
     backgroundColor: colors.background,
   },
-  emptyContainer: { flex: 1, justifyContent: 'center' },
-  empty: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.xl,
-    lineHeight: 20,
-  },
-  headerGroup: { gap: spacing.md, marginBottom: spacing.sm },
+  snapshotHeaderRow: { gap: spacing.xs, marginBottom: spacing.sm },
   recordLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tile: {
-    flexBasis: '30%',
-    flexGrow: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
+  outlookRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs },
+  outlookBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.accentMuted,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
   },
-  tileTappable: { borderColor: colors.accentMuted },
-  tileValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
-  tileLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: 2,
-  },
-  archetypeCard: { padding: spacing.lg, gap: spacing.sm },
-  archetypeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  archetypeLabel: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
+  outlookBadgeText: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
   strategyPill: {
     backgroundColor: colors.badgeBackground,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
+    paddingVertical: 4,
   },
   strategyPillText: { fontSize: 11, fontWeight: '700', color: colors.badgeText },
-  archetypeExplanation: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  detailListGroup: { gap: 2 },
+  metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  archetypeExplanation: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  detailListGroup: { gap: 2, marginTop: spacing.sm },
   detailListLabel: {
     fontSize: 11,
     fontWeight: '700',
@@ -369,45 +410,40 @@ function createStyles(colors: ThemeColors) {
     marginBottom: 2,
   },
   detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  sectionIntro: {
-    fontSize: 13,
+  sectionLabel: {
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textTertiary,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: spacing.sm,
+    letterSpacing: 0.5,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
-  sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
-  sectionHeaderText: {
+  positionGroup: { marginBottom: spacing.md },
+  positionLabel: {
     fontSize: 11,
     fontWeight: '700',
     color: colors.textTertiary,
     letterSpacing: 0.4,
+    marginBottom: spacing.xs,
   },
-  card: {
+  // One grouped surface per position (QB, RB, WR, ...) with a
+  // PlayerIdentityRow per player and hairline dividers between them,
+  // instead of a separately bordered/backgrounded card per player — see
+  // Magna Carta §12 (card philosophy) and MyTeamScreen's Starters/Bench
+  // groupCard, which established this exact grouped-card pattern first.
+  groupCard: { padding: spacing.md, paddingVertical: spacing.xs },
+  compactRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingVertical: spacing.xs,
+    gap: spacing.sm,
   },
-  avatar: { marginRight: spacing.sm },
-  nameColumn: { flex: 1, marginRight: spacing.sm },
-  name: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  rankPill: {
-    backgroundColor: colors.background,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    marginRight: spacing.sm,
-  },
-  rankValue: { fontSize: 13, fontWeight: '700', color: colors.accent },
-  injuryPill: {
-    backgroundColor: colors.dangerMuted,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  injuryText: { fontSize: 11, fontWeight: '700', color: colors.danger },
+  compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  compactIdentity: { flex: 1 },
+  valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm, gap: 2 },
+  valueNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   error: { color: colors.danger, textAlign: 'center' },
   });
 }
