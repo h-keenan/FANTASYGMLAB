@@ -4,7 +4,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { StackActions } from '@react-navigation/routers';
 
-import { api } from './api';
+import { api, type RankedPlayer } from './api';
 import { navigationRef } from '../navigation/navigationRef';
 
 /**
@@ -96,18 +96,54 @@ export async function unregisterCurrentPushToken(): Promise<void> {
 }
 
 /**
- * Every push category (see modules/push_triggers.py) attaches
- * {league_id, league_name, category} as `data`. Tapping any of them lands
- * on that league's hub for now — specific per-category destinations (e.g.
- * Waivers for a waiver alert) can be added here as real routing needs come
- * up without changing what the backend sends.
+ * Every push category (see modules/push_triggers.py) attaches at least
+ * {league_id, league_name, category} as `data`. top_priority/watch items
+ * sourced from a headline idea with a route_player_id, and injury items,
+ * additionally carry player_id/player_name — those deep-link straight to
+ * that player's Player Detail screen. recap and gm_stance_reminder (and
+ * any payload missing player data) have no more-specific target than the
+ * league itself, so they fall back to that league's hub, same as before.
  */
+export interface PushNotificationData {
+  league_id?: string;
+  league_name?: string;
+  category?: string;
+  player_id?: string;
+  player_name?: string;
+}
+
 function routeNotificationTap(data: unknown): void {
-  if (!data || typeof data !== 'object') return;
-  const payload = data as Record<string, unknown>;
+  if (!data || typeof data !== 'object' || !navigationRef.isReady()) return;
+  const payload = data as PushNotificationData;
   const leagueId = typeof payload.league_id === 'string' ? payload.league_id : '';
   const leagueName = typeof payload.league_name === 'string' ? payload.league_name : '';
-  if (!leagueId || !navigationRef.isReady()) return;
+  if (!leagueId) return;
+
+  const playerId = typeof payload.player_id === 'string' ? payload.player_id : '';
+  if (playerId) {
+    // Same lean hand-built player pattern AlertsScreen/DashboardScreen use
+    // for their own player taps — Player Detail fetches everything else
+    // itself from player_id, so a full player fetch isn't needed here.
+    const playerName = typeof payload.player_name === 'string' ? payload.player_name : '';
+    const player: RankedPlayer = {
+      player_id: playerId,
+      name: playerName || null,
+      position: null,
+      team: null,
+      age: null,
+      status: null,
+      injury_status: null,
+      tier: null,
+      score: null,
+      overall_rank: null,
+      position_rank: null,
+      rank_unavailable_reason: null,
+      opportunity_label: null,
+    };
+    navigationRef.navigate('PlayerDetail', { player, leagueId, leagueName });
+    return;
+  }
+
   navigationRef.dispatch(StackActions.popTo('LeagueDetail', { leagueId, leagueName }));
 }
 
