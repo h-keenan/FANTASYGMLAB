@@ -3,9 +3,9 @@
 MY_TEAM_DECISION_CSS = """
 div[class*="st-key-my_team_alerted_player_focus"] {
     background: color-mix(in srgb, var(--color-warning) 7%, var(--color-surface));
-    border: 1px solid color-mix(in srgb, var(--color-warning) 52%, transparent);
+    border: var(--border-width-default) solid color-mix(in srgb, var(--color-warning) 52%, transparent);
     border-radius: var(--radius-panel);
-    padding: var(--space-3);
+    padding: var(--space-md);
 }
 div[class*="st-key-my_team_alerted_player_focus"] .player-support-chip-warning {
     background: color-mix(in srgb, var(--color-warning) 18%, transparent);

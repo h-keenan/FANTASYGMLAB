@@ -705,6 +705,9 @@ def render_my_team_workspace(
     immediate_note: str,
     immediate_tone: str,
     next_move_shop_player_id: str = "",
+    team_total_value: float = 0.0,
+    starters_total_value: float = 0.0,
+    acute_injury_pressure: bool = False,
     my_roster_limit: dict,
     core_assets_df: pd.DataFrame,
     untouchables_df: pd.DataFrame,
@@ -869,6 +872,13 @@ def render_my_team_workspace(
         league_settings
     )
     posture_items = [
+        {
+            "label": "Team Value",
+            "title": format_score(team_total_value),
+            "body": "Sum of current roster valuation under the active strategy lens.",
+            "tone": "power",
+            "hide_icon": True,
+        },
         {
             "label": "Power",
             "title": format_rank(team_row.get("power_rank")),
@@ -1185,7 +1195,11 @@ def render_my_team_workspace(
             "label": "Injury Alerts",
             "value": injury_alert_value,
             "note": injury_alert_note,
-            "tone": "risk",
+            # Escalate to the "need" (danger) tone only under genuine acute
+            # injury pressure; everyday/uncertain injury watch stays on the
+            # quieter "risk" (amber) tone instead of one flat harsh color for
+            # every status.
+            "tone": "need" if acute_injury_pressure else "risk",
         },
         {
             "label": biggest_need_label,
@@ -1260,8 +1274,16 @@ def render_my_team_workspace(
         render_roster_limit_alert(my_roster_limit, compact=True)
 
     _canonical_header("Roster Core")
+    starters_value_text = (
+        format_score(starters_total_value) if starters_total_value else ""
+    )
     st.caption(
-        "Projected roster core from existing player values and league roster settings — "
+        (
+            f"Total starters value {starters_value_text}. "
+            if starters_value_text
+            else ""
+        )
+        + "Projected roster core from existing player values and league roster settings — "
         "not a live Sleeper starting-lineup lock."
     )
     starter_groups = _starter_groups(starters)
