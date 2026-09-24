@@ -240,12 +240,14 @@ def render_player_asset_explorer(
 
     # Lazy CSS — keep PLAYER_ASSET_EXPLORER_CSS off cold APP_CSS / protobuf path.
     html_rendering.inject_global_styles(PLAYER_ASSET_EXPLORER_CSS)
+    # Search/filter chrome is supporting UI, not the decision-relevant content
+    # the user came here for — keep it quieter than the ranked results below
+    # (weight intentionally omitted; defaults to the lightest "context" tier).
     ui_primitives.render_section_header(
         product_copy.PLAYERS_EXPLORER_TITLE,
         eyebrow="Market Search",
         subtitle=product_copy.PLAYERS_EXPLORER_SUBTITLE,
         heading_level=2,
-        weight="secondary",
     )
     query = st.text_input(
         "Search players and picks",
@@ -450,11 +452,14 @@ def render_player_asset_explorer(
         return player_results
 
     if not player_results.empty:
+        # Ranked players are the decision-relevant content this page exists
+        # for — give the header more visual weight than the search chrome above.
         ui_primitives.render_section_header(
             "Players",
             eyebrow="Ranked Results",
             subtitle="Dynasty value, rank, and current context in one scan.",
             heading_level=3,
+            weight="secondary",
         )
 
         def player_context(row) -> str:
@@ -496,6 +501,7 @@ def render_player_asset_explorer(
             eyebrow="League Assets",
             subtitle="Current values and ownership context; pick valuation is unchanged.",
             heading_level=3,
+            weight="secondary",
         )
         st.markdown(
             "<div class='explorer-pick-grid'>"
