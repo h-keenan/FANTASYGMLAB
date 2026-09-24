@@ -19249,6 +19249,26 @@ def main():
                     )
                     starters = lineup_df[lineup_df["suggested_starter"]].copy()
                     bench = lineup_df[~lineup_df["suggested_starter"]].copy()
+                    # Presentation-only aggregates (sum of the same per-player score_field
+                    # values already shown on each player card) for the Roster Signals /
+                    # Roster Core headline display — no change to valuation or
+                    # roster-composition logic.
+                    starters_total_value = float(
+                        pd.to_numeric(
+                            starters.get(score_field, starters.get("value_score")),
+                            errors="coerce",
+                        )
+                        .fillna(0)
+                        .sum()
+                    )
+                    team_total_value = float(
+                        pd.to_numeric(
+                            my_team_df.get(score_field, my_team_df.get("value_score")),
+                            errors="coerce",
+                        )
+                        .fillna(0)
+                        .sum()
+                    )
 
                 profile["roles"] = {str(pid): role for pid, role in roles_state.items()}
                 profile["untouchables"] = untouchables
@@ -19961,6 +19981,9 @@ def main():
                         immediate_note=immediate_note,
                         immediate_tone=immediate_tone,
                         next_move_shop_player_id=next_move_shop_player_id,
+                        team_total_value=team_total_value,
+                        starters_total_value=starters_total_value,
+                        acute_injury_pressure=acute_injury_pressure,
                         my_roster_limit=my_roster_limit,
                         core_assets_df=core_assets_df,
                         untouchables_df=untouchables_df,
