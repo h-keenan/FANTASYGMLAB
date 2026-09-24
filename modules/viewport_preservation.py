@@ -187,6 +187,20 @@ VIEWPORT_PRESERVE_JS = """
           if ((Date.now() - last.t) > 5000) return
           const focused = event.target
           if (!(focused instanceof hostWindow.Element)) return
+          if (last.lockScroll) {
+            // A lockScroll anchor (the GM orb's fixed-position trigger) has a
+            // rect.top that stays visually constant regardless of the page's
+            // real scroll offset, so the geometry-delta branches below always
+            // compute ~0 for it and swallow the focusin event as a no-op —
+            // leaving whatever the DOM patch that opened the sheet left
+            // scrollTop at, uncorrected. Snap to the recorded absolute
+            // scrollTop instead, exactly like restore()'s own lockScroll path.
+            const root = pageScroller()
+            if (root && Math.abs(Number(root.scrollTop || 0) - last.scrollTop) > 4) {
+              root.scrollTop = last.scrollTop
+            }
+            return
+          }
           if (isOverlayChrome(focused)) {
             const root = pageScroller()
             if (root && Math.abs(Number(root.scrollTop || 0) - last.scrollTop) > 24) {
@@ -237,7 +251,22 @@ VIEWPORT_PRESERVE_JS = """
 """
 
 def render_viewport_preservation() -> None:
-    """Mount the once-per-run in-place viewport contract."""
+    """Mount the once-per-run in-place viewport contract.
+
+    ``data`` must change every rerun. With a constant payload (``{"v": 1}``)
+    the frontend treats this as the same component instance with unchanged
+    props and never re-invokes the JS module body past the very first mount
+    of a session — so the rAF/setTimeout restore ladder documented on
+    ``restore()`` (up to 1200ms of follow-up correction after a click) only
+    ever ran once, on first page load. Every later in-place action — every
+    ``click_in_place`` call and the GM orb — relied solely on
+    ``render_viewport_restore_kick()``'s single double-rAF call with no
+    follow-up, so a reflow that settled after those two frames (e.g. an
+    avatar/headshot image finishing load just after the kick) could leave
+    the scroll uncorrected with nothing left to fix it. Passing a
+    per-rerun token forces the module body — and its restore ladder — to
+    run again on every rerun, matching the documented behavior.
+    """
 
     inject_global_styles(VIEWPORT_PRESERVE_CSS)
     # Register on this script-run's component manager. AppTest rebuilds the
@@ -248,9 +277,11 @@ def render_viewport_preservation() -> None:
         js=VIEWPORT_PRESERVE_JS,
         isolate_styles=False,
     )
+    token = int(st.session_state.get("_viewport_preserve_mount_token", 0)) + 1
+    st.session_state["_viewport_preserve_mount_token"] = token
     preserve(
         key="dg_viewport_preserve",
-        data={"v": 1},
+        data={"v": token},
         width=1,
         height=1,
     )
