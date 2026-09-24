@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { Linking, RefreshControl, SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type NewsItem } from '../lib/api';
@@ -14,6 +15,11 @@ import { radii, spacing, type ThemeColors } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
+// Semantic mapping matches AlertsScreen's (adjacent, roster-tied feed) exactly:
+// red = injury/risk, cyan = transaction/GM intelligence, green = role upside,
+// gray = everything else. Per Magna Carta §3 an event-type badge must mean the
+// same class of thing everywhere in the app, so this stays in lockstep with
+// Alerts rather than inventing a News-specific palette.
 function eventBadgeColors(colors: ThemeColors): Record<string, string> {
   return {
     'injury/status': colors.danger,
@@ -29,6 +35,24 @@ const EVENT_BADGE_ICONS: Record<string, IconName> = {
   'role/depth chart': 'layers-outline',
   'off-field/drama': 'alert-circle-outline',
 };
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  'injury/status': 'Injury / Status',
+  transaction: 'Transaction',
+  'role/depth chart': 'Role / Depth Chart',
+  'off-field/drama': 'Off-Field',
+};
+
+function eventTypeLabel(eventType: string | null): string {
+  if (!eventType) return 'Update';
+  return (
+    EVENT_TYPE_LABELS[eventType] ??
+    eventType
+      .split('/')
+      .map((part) => part.replace(/\b\w/g, (c) => c.toUpperCase()))
+      .join(' / ')
+  );
+}
 
 function relativeTime(publishedTs: number | null): string {
   if (!publishedTs) return '';
@@ -56,7 +80,32 @@ function dateBucket(publishedTs: number | null): string {
   return 'Earlier';
 }
 
-function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsItem[] }> {
+interface NewsGroup {
+  eventType: string | null;
+  items: NewsItem[];
+}
+
+/**
+ * Clusters consecutive items that share the same event_type into one group,
+ * same pattern AlertsScreen uses for its roster-tied feed (Magna Carta §12):
+ * a burst of same-type news shares one surface with row dividers instead of
+ * repeating an identical bordered card per item. Chronological order within
+ * a date bucket is preserved — only adjacent runs merge.
+ */
+function groupByEventType(items: NewsItem[]): NewsGroup[] {
+  const groups: NewsGroup[] = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (last && last.eventType === item.event_type) {
+      last.items.push(item);
+    } else {
+      groups.push({ eventType: item.event_type, items: [item] });
+    }
+  }
+  return groups;
+}
+
+function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsGroup[] }> {
   const buckets = new Map<string, NewsItem[]>();
   for (const item of items) {
     const bucket = dateBucket(item.published_ts);
@@ -66,7 +115,7 @@ function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsItem[]
   }
   return DATE_BUCKET_ORDER.filter((bucket) => buckets.has(bucket)).map((bucket) => ({
     title: bucket,
-    data: buckets.get(bucket) ?? [],
+    data: groupByEventType(buckets.get(bucket) ?? []),
   }));
 }
 
@@ -106,7 +155,7 @@ export default function NewsScreen() {
 
       <SectionList
         sections={sections}
-        keyExtractor={(item, index) => item.link ?? `${item.title ?? 'item'}-${item.published_ts ?? 0}-${index}`}
+        keyExtractor={(group, index) => `${group.eventType ?? 'other'}-${group.items[0]?.link ?? group.items[0]?.title ?? index}`}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         stickySectionHeadersEnabled={false}
@@ -116,108 +165,113 @@ export default function NewsScreen() {
           </View>
         )}
         ListEmptyComponent={
-          !loading ? <AppText style={styles.empty}>No fantasy-relevant news right now.</AppText> : null
+          !loading ? (
+            <EmptyState
+              icon="newspaper-outline"
+              title="No news right now"
+              subtitle="Check back later for injury, role, transaction, and off-field updates."
+            />
+          ) : null
         }
-        renderItem={({ item }) => (
-          <AnimatedCard
-            style={StyleSheet.flatten([
-              styles.card,
-              { borderLeftWidth: 3, borderLeftColor: eventBadgeColors(colors)[item.event_type ?? ''] ?? colors.border },
-            ])}
-            onPress={() => {
-              if (item.link) void Linking.openURL(item.link);
-            }}
-          >
-            <View style={styles.headerRow}>
-              {item.event_type ? (
-                <View
-                  style={[
-                    styles.badge,
-                    { backgroundColor: eventBadgeColors(colors)[item.event_type] ?? colors.textSecondary },
-                  ]}
-                >
-                  <Ionicons
-                    name={EVENT_BADGE_ICONS[item.event_type] ?? 'information-circle-outline'}
-                    size={11}
-                    color="#fff"
-                    style={styles.badgeIcon}
+        renderItem={({ item: group }) => {
+          const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
+          const icon = EVENT_BADGE_ICONS[group.eventType ?? ''] ?? 'information-circle-outline';
+          return (
+            <View style={styles.group}>
+              <View style={styles.groupHeaderRow}>
+                <View style={[styles.groupAccentBar, { backgroundColor: accentColor }]} />
+                <Ionicons name={icon} size={13} color={accentColor} style={styles.groupIcon} />
+                <AppText style={[styles.groupLabel, { color: accentColor }]} numberOfLines={1}>
+                  {eventTypeLabel(group.eventType)}
+                </AppText>
+              </View>
+              <AnimatedCard style={styles.groupCard}>
+                {group.items.map((item, index) => (
+                  <NewsRow
+                    key={item.link ?? `${item.title ?? 'item'}-${item.published_ts ?? 0}-${index}`}
+                    item={item}
+                    showDivider={index < group.items.length - 1}
                   />
-                  <AppText style={styles.badgeText}>{item.event_type}</AppText>
-                </View>
-              ) : null}
-              <AppText style={styles.time}>{relativeTime(item.published_ts)}</AppText>
+                ))}
+              </AnimatedCard>
             </View>
-            <AppText style={styles.title} numberOfLines={2}>
-              {item.title}
-            </AppText>
-            {item.summary ? (
-              <AppText style={styles.summary} numberOfLines={3}>
-                {item.summary}
-              </AppText>
-            ) : null}
-            {item.speculative ? <AppText style={styles.speculative}>Unconfirmed / speculative</AppText> : null}
-            {item.source ? <AppText style={styles.source}>Source: {item.source}</AppText> : null}
-          </AnimatedCard>
-        )}
+          );
+        }}
       />
     </View>
   );
 }
 
+function NewsRow({ item, showDivider }: { item: NewsItem; showDivider: boolean }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createRowStyles(colors), [colors]);
+  const footerBits = [
+    item.speculative ? 'Unconfirmed / speculative' : null,
+    item.source ? `Source: ${item.source}` : null,
+  ].filter((bit): bit is string => Boolean(bit));
+
+  return (
+    <TouchableOpacity
+      style={[styles.row, showDivider && styles.rowDivider]}
+      onPress={() => {
+        if (item.link) void Linking.openURL(item.link);
+      }}
+      activeOpacity={item.link ? 0.7 : 1}
+      disabled={!item.link}
+    >
+      <AppText style={styles.time}>{relativeTime(item.published_ts)}</AppText>
+      <AppText style={styles.title} numberOfLines={2}>
+        {item.title}
+      </AppText>
+      {item.summary ? (
+        <AppText style={styles.summary} numberOfLines={3}>
+          {item.summary}
+        </AppText>
+      ) : null}
+      {footerBits.length > 0 ? <AppText style={styles.footerMeta}>{footerBits.join(' · ')}</AppText> : null}
+    </TouchableOpacity>
+  );
+}
+
+function createRowStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    row: { paddingVertical: spacing.sm + 2 },
+    rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    time: { fontSize: 11, color: colors.textTertiary, marginBottom: 3 },
+    title: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, marginBottom: 3 },
+    summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+    footerMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
+  });
+}
+
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
-  disclaimer: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    lineHeight: 16,
-  },
-  listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3, gap: spacing.sm },
-  sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
-  sectionHeaderText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  card: { padding: spacing.lg },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.pill,
-  },
-  badgeIcon: { marginRight: 4 },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  time: { fontSize: 12, color: colors.textSecondary },
-  title: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.xs },
-  summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  speculative: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: spacing.xs,
-  },
-  source: {
-    fontSize: 11,
-    color: colors.textTertiary,
-    marginTop: spacing.xs,
-  },
-  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl },
-  error: {
-    color: colors.danger,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
+    container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
+    listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3 },
+    sectionHeader: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
+    sectionHeaderText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textTertiary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    group: { marginBottom: spacing.md },
+    groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
+    groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
+    groupIcon: { marginLeft: -2 },
+    groupLabel: {
+      flex: 1,
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    groupCard: { padding: spacing.md, paddingVertical: spacing.xs },
+    error: {
+      color: colors.danger,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+    },
   });
 }
