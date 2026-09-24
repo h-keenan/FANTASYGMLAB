@@ -620,9 +620,24 @@ def render_summary_tiles(
                 (renderer or _render_summary_tile_detail_dialog)(clicked_item)
 
 
-def render_analysis_cards(cards: list[dict]):
+def render_analysis_cards(cards: list[dict], *, layout: str = "grid"):
+    """Render a list of {label, title, tone, items} analysis cards.
+
+    layout="grid" (default): each card is its own bordered card in a grid —
+    unchanged behavior, used by every existing caller.
+
+    layout="grouped": all cards render as internal rows of one bordered
+    surface, separated by a hairline divider, instead of N identically
+    bordered cards stacked back to back. Use this when the cards being
+    rendered are members of one repeated category (e.g. multiple
+    classification blocks under a single section header) rather than
+    distinct, unrelated panels — matching the grouped-list pattern already
+    established elsewhere (GM Targets, My Team) and mobile's DraftCenterScreen
+    DraftInsightBlock grouping.
+    """
+    grouped = layout == "grouped"
     html_cards = []
-    for card in cards:
+    for index, card in enumerate(cards):
         title = _safe_text(card.get("title"))
         label = _safe_text(card.get("label"))
         tone = _safe_text(card.get("tone"), "risk").lower()
@@ -639,11 +654,13 @@ def render_analysis_cards(cards: list[dict]):
             for item in items
             if _safe_text(item)
         ) or "<li>No notable signal yet.</li>"
+        card_class = "analysis-card dg-ui-card analysis-card-" + escape(tone) + semantic_class
+        if grouped:
+            card_class += " analysis-group-item"
+            if index == len(cards) - 1:
+                card_class += " analysis-group-item-last"
         html_cards.append(
-            "<div class='analysis-card dg-ui-card analysis-card-"
-            + escape(tone)
-            + semantic_class
-            + "'>"
+            f"<div class='{card_class}'>"
             + "<div class='analysis-card-top'><span class='analysis-card-dot'></span>"
             + f"<div class='analysis-card-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div></div>"
             + f"<div class='analysis-card-title'>{escape(title)}</div>"
@@ -652,8 +669,9 @@ def render_analysis_cards(cards: list[dict]):
             + "</ul></div>"
         )
     if html_cards:
+        wrapper_class = "analysis-group" if grouped else "analysis-grid"
         st.markdown(
-            "<div class='analysis-grid'>" + "".join(html_cards) + "</div>",
+            f"<div class='{wrapper_class}'>" + "".join(html_cards) + "</div>",
             unsafe_allow_html=True,
         )
 
