@@ -13,24 +13,27 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AgeGate from '../components/AgeGate';
+import BrandedSpinner from '../components/BrandedSpinner';
 import ContentSections, { type ContentSection } from '../components/ContentSections';
+import GridBackground from '../components/GridBackground';
 import legalContent from '../data/legalContent.json';
 import { useAuth } from '../context/AuthContext';
 import { hasPassedAgeGate } from '../lib/ageGate';
 import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { gradients, radii, spacing, typography, type ThemeColors } from '../theme';
+import { radii, spacing, typography, type ThemeColors } from '../theme';
 
 const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
 
 export default function LoginScreen() {
   const { signIn, signUp, signInAsGuest } = useAuth();
   const { colors } = useThemeMode();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -89,7 +92,14 @@ export default function LoginScreen() {
   };
 
   if (ageVerified === null) {
-    return <View style={styles.root} />;
+    return (
+      <View style={styles.root}>
+        <GridBackground />
+        <View style={styles.initialLoading}>
+          <BrandedSpinner />
+        </View>
+      </View>
+    );
   }
   if (!ageVerified) {
     return <AgeGate onPassed={() => setAgeVerified(true)} />;
@@ -97,7 +107,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.root}>
-      <LinearGradient colors={gradients.hero} style={styles.hero} />
+      <GridBackground />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -210,8 +220,9 @@ export default function LoginScreen() {
       </KeyboardAvoidingView>
 
       <Modal visible={legalPageKey !== null} animationType="slide" onRequestClose={() => setLegalPageKey(null)}>
-        <View style={[styles.root, styles.legalModal]}>
-          <View style={styles.legalModalHeader}>
+        <View style={styles.root}>
+          <GridBackground />
+          <View style={[styles.legalModalHeader, { paddingTop: insets.top + spacing.md }]}>
             <AppText style={styles.legalModalTitle}>{legalPageKey ? LEGAL_PAGES[legalPageKey]?.title : ''}</AppText>
             <Pressable onPress={() => setLegalPageKey(null)} hitSlop={12}>
               <AppText style={styles.legalModalClose}>Done</AppText>
@@ -229,7 +240,7 @@ export default function LoginScreen() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  hero: { position: 'absolute', top: 0, left: 0, right: 0, height: '55%' },
+  initialLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -264,7 +275,7 @@ function createStyles(colors: ThemeColors) {
     height: 48,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: colors.border,
     backgroundColor: colors.surfaceSolid,
     alignItems: 'center',
     justifyContent: 'center',
@@ -276,7 +287,7 @@ function createStyles(colors: ThemeColors) {
   dividerText: { color: colors.textTertiary, fontSize: 12, marginHorizontal: spacing.sm },
   input: {
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: colors.border,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -310,7 +321,7 @@ function createStyles(colors: ThemeColors) {
   guestButtonText: {
     color: colors.textSecondary,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   guestCaption: {
     color: colors.textTertiary,
@@ -335,7 +346,6 @@ function createStyles(colors: ThemeColors) {
     fontSize: 12,
     marginHorizontal: spacing.sm,
   },
-  legalModal: { paddingTop: spacing.xl * 2 },
   legalModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
