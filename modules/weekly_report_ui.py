@@ -3,6 +3,10 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
+from modules import ui_primitives
+from modules.html_rendering import inject_global_styles
+from modules.weekly_report_styles import WEEKLY_REPORT_CSS
+
 
 def _safe_text(value, default: str = "") -> str:
     if value is None:
@@ -15,6 +19,34 @@ def _safe_text(value, default: str = "") -> str:
     return str(value)
 
 
+def _movement_direction_badge_html(delta: object) -> str:
+    """Small colored up/down/flat glyph for one rank-movement tile.
+
+    The tile's own tone identifies *which metric* moved (power/franchise) and
+    a fall already resolves to the shared risk/danger tone, but a rise
+    resolves to that same category tone rather than a positive one, so
+    "Biggest Power Riser" and "Biggest Power Faller" read with no consistent
+    up=positive/down=negative signal between them. This adds that signal
+    through the tile's existing "graphic" slot (see workspace_ui.summary_tiles_html)
+    without touching the shared tile tone classes any other surface relies on.
+    """
+
+    try:
+        value = int(delta or 0)
+    except (TypeError, ValueError):
+        value = 0
+    if value > 0:
+        direction, arrow = "up", "&#9650;"
+    elif value < 0:
+        direction, arrow = "down", "&#9660;"
+    else:
+        direction, arrow = "flat", "&#8212;"
+    return (
+        f"<span class='wr-move-badge wr-move-badge--{direction}' aria-hidden='true'>"
+        f"<span class='wr-move-badge__arrow'>{arrow}</span></span>"
+    )
+
+
 def render_weekly_report(
     weekly_report: dict,
     movement: dict,
@@ -24,6 +56,7 @@ def render_weekly_report(
     render_summary_tiles: Callable,
     render_analysis_cards: Callable,
 ) -> None:
+    inject_global_styles(WEEKLY_REPORT_CSS)
     st.caption(
         f"Report week: {_safe_text(weekly_report.get('report_label'), 'No completed week yet')}. "
         "The page refreshes off the same cached league data used by the rest of the app."
@@ -40,7 +73,12 @@ def render_weekly_report(
     if weekly_report.get("highlights"):
         render_summary_tiles(weekly_report.get("highlights") or [])
     else:
-        st.info("No completed matchup week is available yet for weekly score highlights.")
+        ui_primitives.render_empty_state_panel(
+            "No weekly score highlights yet",
+            "No completed matchup week is available yet for weekly score highlights.",
+            kind="no-data",
+            recovery_guidance="Check back after this week's matchups finish.",
+        )
 
     render_section_header(
         "Power Movement",
@@ -63,6 +101,7 @@ def render_weekly_report(
                         f"{format_rank(power_riser.get('power_before'))} to {format_rank(power_riser.get('power_after'))}"
                     ),
                     "tone": "power",
+                    "graphic": _movement_direction_badge_html(power_riser.get("power_delta")),
                 },
                 {
                     "label": "Biggest Power Faller",
@@ -72,6 +111,7 @@ def render_weekly_report(
                         f"{format_rank(power_faller.get('power_before'))} to {format_rank(power_faller.get('power_after'))}"
                     ),
                     "tone": "risk",
+                    "graphic": _movement_direction_badge_html(power_faller.get("power_delta")),
                 },
                 {
                     "label": "Biggest Franchise Riser",
@@ -81,6 +121,7 @@ def render_weekly_report(
                         f"{format_rank(franchise_riser.get('franchise_before'))} to {format_rank(franchise_riser.get('franchise_after'))}"
                     ),
                     "tone": "franchise",
+                    "graphic": _movement_direction_badge_html(franchise_riser.get("franchise_delta")),
                 },
                 {
                     "label": "Biggest Franchise Faller",
@@ -90,6 +131,7 @@ def render_weekly_report(
                         f"{format_rank(franchise_faller.get('franchise_before'))} to {format_rank(franchise_faller.get('franchise_after'))}"
                     ),
                     "tone": "risk",
+                    "graphic": _movement_direction_badge_html(franchise_faller.get("franchise_delta")),
                 },
             ]
         )
@@ -115,7 +157,12 @@ def render_weekly_report(
                     hide_index=True,
                 )
     else:
-        st.info(_safe_text(movement.get("note")))
+        ui_primitives.render_empty_state_panel(
+            "No rank movement yet",
+            _safe_text(movement.get("note"), "Rank movement is not available yet."),
+            kind="no-data",
+            recovery_guidance="Movement appears automatically once the app has saved a second weekly snapshot.",
+        )
 
     render_section_header(
         "League Trends",
@@ -146,7 +193,12 @@ def render_weekly_report(
     if transaction_cards:
         render_analysis_cards(transaction_cards)
     else:
-        st.info("No completed weekly transactions were returned for the current report window.")
+        ui_primitives.render_empty_state_panel(
+            "No transactions yet",
+            "No completed weekly transactions were returned for the current report window.",
+            kind="no-data",
+            recovery_guidance="Check back once trades, waiver adds, or roster moves are completed for the report week.",
+        )
 
     render_section_header(
         "Team Notes",
@@ -157,4 +209,9 @@ def render_weekly_report(
     if weekly_report.get("team_note_cards"):
         render_analysis_cards(weekly_report.get("team_note_cards") or [])
     else:
-        st.info("No standout team notes were generated from the current league state.")
+        ui_primitives.render_empty_state_panel(
+            "No standout team notes yet",
+            "No standout team notes were generated from the current league state.",
+            kind="no-data",
+            recovery_guidance="Notes regenerate automatically as strategy, needs, and rank context change.",
+        )
