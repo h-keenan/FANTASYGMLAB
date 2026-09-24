@@ -53,7 +53,20 @@ NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
 # Pickens) got attributed to roster player Parker Washington purely because
 # "Washington" appeared somewhere in the text — almost certainly a reference
 # to the Commanders, not to him.
-TEAM_NAME_SURNAME_COLLISIONS = frozenset({"washington", "houston"})
+#
+# Also covers the first word of two-word city names when that first word is a
+# standalone, word-boundary-safe city reference reporters commonly use alone
+# (e.g. "Green Bay" -> "Green", "Tampa Bay" -> "Tampa") AND that word is a real
+# NFL player surname (roster-verified: A.J. Green / Mike Green for "green",
+# T.J. Tampa for "tampa", DeeJay Dallas for "dallas", Ezra Cleveland for
+# "cleveland"). Two-word city names whose first word is a generic filler
+# ("New York"/"New England"/"New Orleans" -> "New", "Los Angeles" -> "Los",
+# "San Francisco" -> "San", "Las Vegas" -> "Las", "Kansas City" -> "Kansas")
+# were checked against the current roster-name pool and found no real-player
+# collision, so they are deliberately left out.
+TEAM_NAME_SURNAME_COLLISIONS = frozenset(
+    {"washington", "houston", "green", "dallas", "cleveland", "tampa"}
+)
 
 CONTEXT_PHRASES: Dict[str, tuple[str, ...]] = {
     EVENT_INJURY: (

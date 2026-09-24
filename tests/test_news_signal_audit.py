@@ -237,6 +237,129 @@ def test_entity_match_blocks_team_name_surname_collision():
     assert matched[0]["matched_player"] == "Parker Washington"
 
 
+def test_entity_match_blocks_green_bay_surname_collision():
+    # Real player: A.J. Green. "Green Bay" is reporter shorthand ("Green")
+    # for the Packers, and "green" is also a real NFL surname.
+    roster = ["A.J. Green"]
+    team_reference = [
+        _article(
+            title="Bears' defense preps for a road test",
+            summary=(
+                "Chicago heads to Lambeau to face Green Bay, and the "
+                "Packers' passing attack is questionable heading into the "
+                "game with several injuries to monitor."
+            ),
+            link="https://example.test/bears-packers",
+        )
+    ]
+    filtered = my_news.filter_news_for_players(team_reference, roster, roster_teams=["CHI"])
+    assert filtered == []
+
+    # Full name still matches normally.
+    clear = [
+        _article(
+            title="A.J. Green (hamstring) questionable for Sunday",
+            summary="Team lists A.J. Green as questionable with a hamstring injury.",
+            link="https://example.test/green-q",
+        )
+    ]
+    matched = my_news.filter_news_for_players(clear, roster, roster_teams=["ARI"])
+    assert len(matched) == 1
+    assert matched[0]["matched_player"] == "A.J. Green"
+
+
+def test_entity_match_blocks_dallas_surname_collision():
+    # Real player: DeeJay Dallas. "Dallas" is the Cowboys' city name and also
+    # a real NFL surname.
+    roster = ["DeeJay Dallas"]
+    team_reference = [
+        _article(
+            title="Eagles' defense preps for a division rival",
+            summary=(
+                "Philadelphia hosts Dallas this week, and the Cowboys' "
+                "backfield is questionable with a hamstring injury to "
+                "monitor."
+            ),
+            link="https://example.test/eagles-cowboys",
+        )
+    ]
+    filtered = my_news.filter_news_for_players(team_reference, roster, roster_teams=["PHI"])
+    assert filtered == []
+
+    # Full name still matches normally.
+    clear = [
+        _article(
+            title="DeeJay Dallas (hamstring) questionable for Sunday",
+            summary="Team lists DeeJay Dallas as questionable with a hamstring injury.",
+            link="https://example.test/dallas-q",
+        )
+    ]
+    matched = my_news.filter_news_for_players(clear, roster, roster_teams=["JAX"])
+    assert len(matched) == 1
+    assert matched[0]["matched_player"] == "DeeJay Dallas"
+
+
+def test_entity_match_blocks_cleveland_surname_collision():
+    # Real player: Ezra Cleveland. "Cleveland" is the Browns' city name and
+    # also a real NFL surname.
+    roster = ["Ezra Cleveland"]
+    team_reference = [
+        _article(
+            title="Steelers' defense preps for a divisional test",
+            summary=(
+                "Pittsburgh travels to face Cleveland this week, and the "
+                "Browns' offensive line is questionable with an injury to "
+                "monitor."
+            ),
+            link="https://example.test/steelers-browns",
+        )
+    ]
+    filtered = my_news.filter_news_for_players(team_reference, roster, roster_teams=["PIT"])
+    assert filtered == []
+
+    # Full name still matches normally.
+    clear = [
+        _article(
+            title="Ezra Cleveland (knee) questionable for Sunday",
+            summary="Team lists Ezra Cleveland as questionable with a knee injury.",
+            link="https://example.test/cleveland-q",
+        )
+    ]
+    matched = my_news.filter_news_for_players(clear, roster, roster_teams=["JAX"])
+    assert len(matched) == 1
+    assert matched[0]["matched_player"] == "Ezra Cleveland"
+
+
+def test_entity_match_blocks_tampa_bay_surname_collision():
+    # Real player: T.J. Tampa. "Tampa Bay" is reporter shorthand ("Tampa")
+    # for the Buccaneers, and "tampa" is also a real NFL surname.
+    roster = ["T.J. Tampa"]
+    team_reference = [
+        _article(
+            title="Falcons' defense preps for a division test",
+            summary=(
+                "Atlanta hosts Tampa Bay this week, and the Buccaneers' "
+                "secondary is questionable with an injury to monitor."
+            ),
+            link="https://example.test/falcons-bucs",
+        )
+    ]
+    filtered = my_news.filter_news_for_players(team_reference, roster, roster_teams=["ATL"])
+    assert filtered == []
+
+    # Full name still matches normally.
+    clear = [
+        _article(
+            title="T.J. Tampa (ankle) questionable for Sunday",
+            summary="Team lists T.J. Tampa as questionable with an ankle injury.",
+            link="https://example.test/tampa-q",
+        )
+    ]
+    matched = my_news.filter_news_for_players(clear, roster, roster_teams=["BAL"])
+    assert len(matched) == 1
+    assert matched[0]["matched_player"] == "T.J. Tampa"
+
+
 def test_stale_and_duplicate_speculative_curation():
     now = time.time()
     stale_spec = _article(
