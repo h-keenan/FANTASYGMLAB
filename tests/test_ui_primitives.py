@@ -279,6 +279,7 @@ def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
         "player_asset_explorer_ui.py",
         "trade_hub_ui.py",
         "waivers_ui.py",
+        "weekly_report_ui.py",
         "workspace_notices.py",
         "workspace_ui.py",
     ]
