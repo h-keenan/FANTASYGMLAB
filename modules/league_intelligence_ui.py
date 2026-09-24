@@ -16,8 +16,33 @@ from modules.league_intelligence import (
     toggle_disclosure,
 )
 
-# Material signals get exception emphasis; routine Monitor stays quiet.
-_EXCEPTION_SIGNALS = frozenset({"Injury Monitor", "Waiver Watch"})
+# Only a true risk earns the danger-toned exception pill. Waiver Watch is an
+# opportunity (a roster-relevant player is available), not a concern, so it
+# must not share Injury Monitor's danger-red treatment (Magna Carta: semantic
+# color discipline — red is reserved for actual risk).
+_EXCEPTION_SIGNALS = frozenset({"Injury Monitor"})
+
+# Recommendation-label tone for the primary-metric slot. Injury Monitor reads
+# as risk (danger/red); Waiver Watch reads as an actionable opportunity
+# (accent); routine Monitor stays untoned so real signals still stand out.
+_SIGNAL_TONE_CLASS = {
+    "Injury Monitor": "dg-intelligence-signal--danger",
+    "Waiver Watch": "dg-intelligence-signal--opportunity",
+}
+
+
+def _recommendation_metric_html(recommendation_label: str) -> str:
+    """Primary-metric slot for the recommendation, toned by urgency/opportunity."""
+
+    text = recommendation_label or "Monitor"
+    tone_class = _SIGNAL_TONE_CLASS.get(text, "")
+    value_class = "dg-dense-metric__value" + (f" {tone_class}" if tone_class else "")
+    return (
+        "<div class='dg-dense-metric'>"
+        f"<span class='{value_class}'>{escape(text)}</span>"
+        "<span class='dg-dense-metric__label'>Signal</span>"
+        "</div>"
+    )
 
 
 def intelligence_item_html(
@@ -40,11 +65,7 @@ def intelligence_item_html(
         primary=item.player_name or "League update",
         secondary_html=headline_html,
     )
-    metric = dense_list_primitives.dense_metric_html(
-        item.recommendation_label or "Monitor",
-        "Signal",
-        compact_label=False,
-    )
+    metric = _recommendation_metric_html(item.recommendation_label)
     status = dense_list_primitives.dense_status_html(item.league_relevance or "")
     meta = dense_list_primitives.dense_meta_html(item.timestamp_label, item.source)
     exception = ""
