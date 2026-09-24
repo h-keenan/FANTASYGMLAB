@@ -92,43 +92,24 @@
           "idea_score": 0,
           "index": 0,
           "market": "Plausible",
-          "my_score": 2829,
+          "my_score": 3053,
           "partner": "Fixture Team 10",
           "receive": [
             "2026 Round 3"
           ],
           "section": "Headline Recommendation",
           "send": [
-            "F01-21"
-          ],
-          "their_score": 1905,
-          "trade_gain": -924,
-          "trust": "pass"
-        },
-        {
-          "confidence": "High",
-          "grade": "Strong",
-          "idea_score": 0,
-          "index": 1,
-          "market": "Plausible",
-          "my_score": 3053,
-          "partner": "Fixture Team 10",
-          "receive": [
-            "2026 Round 3"
-          ],
-          "section": "Draft Capital",
-          "send": [
             "F01-20"
           ],
-          "their_score": 1905,
-          "trade_gain": -1148,
+          "their_score": 1849,
+          "trade_gain": -1204,
           "trust": "pass"
         },
         {
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 2,
+          "index": 1,
           "market": "Likely",
           "my_score": 3849,
           "partner": "Fixture Team 04",
@@ -147,7 +128,7 @@
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 3,
+          "index": 2,
           "market": "Likely",
           "my_score": 3625,
           "partner": "Fixture Team 04",
@@ -166,7 +147,7 @@
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 4,
+          "index": 3,
           "market": "Plausible",
           "my_score": 3401,
           "partner": "Fixture Team 04",
@@ -185,7 +166,7 @@
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 5,
+          "index": 4,
           "market": "Plausible",
           "my_score": 3401,
           "partner": "Fixture Team 02",
@@ -204,7 +185,7 @@
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 6,
+          "index": 5,
           "market": "Plausible",
           "my_score": 3625,
           "partner": "Fixture Team 03",
@@ -223,7 +204,7 @@
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 7,
+          "index": 6,
           "market": "Plausible",
           "my_score": 3625,
           "partner": "Fixture Team 02",
@@ -242,7 +223,7 @@
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 8,
+          "index": 7,
           "market": "Plausible",
           "my_score": 3849,
           "partner": "Fixture Team 03",
@@ -261,7 +242,7 @@
           "confidence": "High",
           "grade": "Strong",
           "idea_score": 0,
-          "index": 9,
+          "index": 8,
           "market": "Plausible",
           "my_score": 3849,
           "partner": "Fixture Team 04",
@@ -273,8 +254,28 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 4066,
-          "trade_gain": 217,
+          "their_score": 4185,
+          "trade_gain": 336,
+          "trust": "pass"
+        },
+        {
+          "confidence": "High",
+          "grade": "Strong",
+          "idea_score": 0,
+          "index": 9,
+          "market": "Plausible",
+          "my_score": 3849,
+          "partner": "Fixture Team 04",
+          "receive": [
+            "F04-21",
+            "2026 Round 3"
+          ],
+          "section": "Draft Capital",
+          "send": [
+            "F01-17"
+          ],
+          "their_score": 3961,
+          "trade_gain": 112,
           "trust": "pass"
         },
         {
@@ -286,15 +287,15 @@
           "my_score": 3849,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-21",
+            "F04-22",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-17"
           ],
-          "their_score": 3842,
-          "trade_gain": -7,
+          "their_score": 3737,
+          "trade_gain": -112,
           "trust": "pass"
         },
         {
@@ -306,15 +307,15 @@
           "my_score": 3625,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-20",
+            "F04-21",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-18"
           ],
-          "their_score": 4066,
-          "trade_gain": 441,
+          "their_score": 3961,
+          "trade_gain": 336,
           "trust": "pass"
         },
         {
@@ -326,15 +327,15 @@
           "my_score": 3625,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-21",
+            "F04-22",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-18"
           ],
-          "their_score": 3842,
-          "trade_gain": 217,
+          "their_score": 3737,
+          "trade_gain": 112,
           "trust": "pass"
         },
         {
@@ -346,15 +347,15 @@
           "my_score": 3625,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-22",
+            "F04-23",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-18"
           ],
-          "their_score": 3618,
-          "trade_gain": -7,
+          "their_score": 3513,
+          "trade_gain": -112,
           "trust": "pass"
         },
         {
@@ -366,15 +367,15 @@
           "my_score": 3401,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-21",
+            "F04-22",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-19"
           ],
-          "their_score": 3842,
-          "trade_gain": 441,
+          "their_score": 3737,
+          "trade_gain": 336,
           "trust": "pass"
         },
         {
@@ -386,26 +387,6 @@
           "my_score": 3401,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-22",
-            "2026 Round 3"
-          ],
-          "section": "Draft Capital",
-          "send": [
-            "F01-19"
-          ],
-          "their_score": 3618,
-          "trade_gain": 217,
-          "trust": "pass"
-        },
-        {
-          "confidence": "High",
-          "grade": "Strong",
-          "idea_score": 0,
-          "index": 16,
-          "market": "Plausible",
-          "my_score": 3401,
-          "partner": "Fixture Team 04",
-          "receive": [
             "F04-23",
             "2026 Round 3"
           ],
@@ -413,15 +394,15 @@
           "send": [
             "F01-19"
           ],
-          "their_score": 3394,
-          "trade_gain": -7,
+          "their_score": 3513,
+          "trade_gain": 112,
           "trust": "pass"
         },
         {
           "confidence": "High",
           "grade": "Strong",
           "idea_score": 0,
-          "index": 17,
+          "index": 16,
           "market": "Plausible",
           "my_score": 3849,
           "partner": "Fixture Team 03",
@@ -432,8 +413,27 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 2858,
-          "trade_gain": -991,
+          "their_score": 2898,
+          "trade_gain": -951,
+          "trust": "pass"
+        },
+        {
+          "confidence": "High",
+          "grade": "Strong",
+          "idea_score": 0,
+          "index": 17,
+          "market": "Plausible",
+          "my_score": 3625,
+          "partner": "Fixture Team 03",
+          "receive": [
+            "2026 Round 2"
+          ],
+          "section": "Draft Capital",
+          "send": [
+            "F01-18"
+          ],
+          "their_score": 2898,
+          "trade_gain": -727,
           "trust": "pass"
         },
         {
@@ -452,28 +452,28 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 3882,
-          "trade_gain": 33,
+          "their_score": 3936,
+          "trade_gain": 87,
           "trust": "pass"
         },
         {
           "confidence": "High",
-          "grade": "Strong",
+          "grade": "Solid",
           "idea_score": 0,
           "index": 19,
           "market": "Plausible",
-          "my_score": 3625,
-          "partner": "Fixture Team 03",
+          "my_score": 3849,
+          "partner": "Fixture Team 02",
           "receive": [
-            "F03-21",
-            "2026 Round 3"
+            "F02-26",
+            "2026 Round 2"
           ],
           "section": "Draft Capital",
           "send": [
-            "F01-18"
+            "F01-17"
           ],
-          "their_score": 3882,
-          "trade_gain": 257,
+          "their_score": 4323,
+          "trade_gain": 474,
           "trust": "pass"
         }
       ]
@@ -630,7 +630,7 @@
           "idea_score": 0,
           "index": 7,
           "market": "Plausible",
-          "my_score": 7816,
+          "my_score": 7694,
           "partner": "Fixture Team 05",
           "receive": [
             "F05-05"
@@ -641,7 +641,7 @@
             "2026 Round 2"
           ],
           "their_score": 6721,
-          "trade_gain": -1095,
+          "trade_gain": -973,
           "trust": "pass"
         },
         {
@@ -717,8 +717,8 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 4140,
-          "trade_gain": 291,
+          "their_score": 4195,
+          "trade_gain": 346,
           "trust": "pass"
         },
         {
@@ -832,8 +832,8 @@
           "send": [
             "F01-13"
           ],
-          "their_score": 5941,
-          "trade_gain": 1072,
+          "their_score": 5905,
+          "trade_gain": 1036,
           "trust": "pass"
         },
         {
@@ -842,7 +842,7 @@
           "idea_score": 0,
           "index": 18,
           "market": "Thin",
-          "my_score": 7816,
+          "my_score": 7694,
           "partner": "Fixture Team 06",
           "receive": [
             "F06-05"
@@ -853,7 +853,7 @@
             "2026 Round 2"
           ],
           "their_score": 6674,
-          "trade_gain": -1142,
+          "trade_gain": -1020,
           "trust": "pass"
         },
         {
@@ -872,8 +872,8 @@
           "send": [
             "F01-18"
           ],
-          "their_score": 4140,
-          "trade_gain": 515,
+          "their_score": 4195,
+          "trade_gain": 570,
           "trust": "pass"
         }
       ]
@@ -1002,8 +1002,8 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 4111,
-          "trade_gain": 262,
+          "their_score": 4201,
+          "trade_gain": 352,
           "trust": "pass"
         },
         {
@@ -1022,8 +1022,8 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 3887,
-          "trade_gain": 38,
+          "their_score": 3977,
+          "trade_gain": 128,
           "trust": "pass"
         },
         {
@@ -1035,15 +1035,15 @@
           "my_score": 3625,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-20",
+            "F04-21",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-18"
           ],
-          "their_score": 4111,
-          "trade_gain": 486,
+          "their_score": 3977,
+          "trade_gain": 352,
           "trust": "pass"
         },
         {
@@ -1055,15 +1055,15 @@
           "my_score": 3625,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-21",
+            "F04-22",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-18"
           ],
-          "their_score": 3887,
-          "trade_gain": 262,
+          "their_score": 3753,
+          "trade_gain": 128,
           "trust": "pass"
         },
         {
@@ -1072,7 +1072,7 @@
           "idea_score": 0,
           "index": 9,
           "market": "Plausible",
-          "my_score": 3625,
+          "my_score": 3401,
           "partner": "Fixture Team 04",
           "receive": [
             "F04-22",
@@ -1080,10 +1080,10 @@
           ],
           "section": "Draft Capital",
           "send": [
-            "F01-18"
+            "F01-19"
           ],
-          "their_score": 3663,
-          "trade_gain": 38,
+          "their_score": 3753,
+          "trade_gain": 352,
           "trust": "pass"
         },
         {
@@ -1095,15 +1095,15 @@
           "my_score": 3401,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-21",
+            "F04-23",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-19"
           ],
-          "their_score": 3887,
-          "trade_gain": 486,
+          "their_score": 3529,
+          "trade_gain": 128,
           "trust": "pass"
         },
         {
@@ -1112,7 +1112,7 @@
           "idea_score": 0,
           "index": 11,
           "market": "Plausible",
-          "my_score": 3401,
+          "my_score": 3849,
           "partner": "Fixture Team 04",
           "receive": [
             "F04-22",
@@ -1120,10 +1120,10 @@
           ],
           "section": "Draft Capital",
           "send": [
-            "F01-19"
+            "F01-17"
           ],
-          "their_score": 3663,
-          "trade_gain": 262,
+          "their_score": 3753,
+          "trade_gain": -96,
           "trust": "pass"
         },
         {
@@ -1132,7 +1132,7 @@
           "idea_score": 0,
           "index": 12,
           "market": "Plausible",
-          "my_score": 3401,
+          "my_score": 3625,
           "partner": "Fixture Team 04",
           "receive": [
             "F04-23",
@@ -1140,10 +1140,10 @@
           ],
           "section": "Draft Capital",
           "send": [
-            "F01-19"
+            "F01-18"
           ],
-          "their_score": 3439,
-          "trade_gain": 38,
+          "their_score": 3529,
+          "trade_gain": -96,
           "trust": "pass"
         },
         {
@@ -1162,8 +1162,8 @@
           "send": [
             "F01-13"
           ],
-          "their_score": 5801,
-          "trade_gain": 932,
+          "their_score": 5816,
+          "trade_gain": 947,
           "trust": "pass"
         },
         {
@@ -1172,7 +1172,7 @@
           "idea_score": 0,
           "index": 14,
           "market": "Plausible",
-          "my_score": 7869,
+          "my_score": 7745,
           "partner": "Fixture Team 05",
           "receive": [
             "F05-05"
@@ -1183,7 +1183,7 @@
             "2026 Round 2"
           ],
           "their_score": 6721,
-          "trade_gain": -1148,
+          "trade_gain": -1024,
           "trust": "pass"
         },
         {
@@ -1202,8 +1202,8 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 3928,
-          "trade_gain": 79,
+          "their_score": 3965,
+          "trade_gain": 116,
           "trust": "pass"
         },
         {
@@ -1222,8 +1222,8 @@
           "send": [
             "F01-18"
           ],
-          "their_score": 3928,
-          "trade_gain": 303,
+          "their_score": 3965,
+          "trade_gain": 340,
           "trust": "pass"
         },
         {
@@ -1242,8 +1242,8 @@
           "send": [
             "F01-13"
           ],
-          "their_score": 5952,
-          "trade_gain": 1083,
+          "their_score": 5846,
+          "trade_gain": 977,
           "trust": "pass"
         },
         {
@@ -1252,7 +1252,7 @@
           "idea_score": 0,
           "index": 18,
           "market": "Thin",
-          "my_score": 7869,
+          "my_score": 7745,
           "partner": "Fixture Team 06",
           "receive": [
             "F06-05"
@@ -1263,7 +1263,7 @@
             "2026 Round 2"
           ],
           "their_score": 6674,
-          "trade_gain": -1195,
+          "trade_gain": -1071,
           "trust": "pass"
         },
         {
@@ -1282,8 +1282,8 @@
           "send": [
             "F01-15"
           ],
-          "their_score": 5855,
-          "trade_gain": 1434,
+          "their_score": 5878,
+          "trade_gain": 1457,
           "trust": "pass"
         }
       ]
@@ -1450,8 +1450,8 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 4340,
-          "trade_gain": 491,
+          "their_score": 4282,
+          "trade_gain": 433,
           "trust": "pass"
         },
         {
@@ -1470,8 +1470,8 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 4116,
-          "trade_gain": 267,
+          "their_score": 4058,
+          "trade_gain": 209,
           "trust": "pass"
         },
         {
@@ -1490,8 +1490,8 @@
           "send": [
             "F01-18"
           ],
-          "their_score": 4116,
-          "trade_gain": 491,
+          "their_score": 4058,
+          "trade_gain": 433,
           "trust": "pass"
         },
         {
@@ -1500,7 +1500,7 @@
           "idea_score": 0,
           "index": 10,
           "market": "Plausible",
-          "my_score": 7510,
+          "my_score": 7387,
           "partner": "Fixture Team 05",
           "receive": [
             "F05-05"
@@ -1511,7 +1511,7 @@
             "2026 Round 2"
           ],
           "their_score": 6721,
-          "trade_gain": -789,
+          "trade_gain": -666,
           "trust": "pass"
         },
         {
@@ -1530,8 +1530,8 @@
           "send": [
             "F01-18"
           ],
-          "their_score": 4340,
-          "trade_gain": 715,
+          "their_score": 4282,
+          "trade_gain": 657,
           "trust": "pass"
         },
         {
@@ -1550,8 +1550,8 @@
           "send": [
             "F01-19"
           ],
-          "their_score": 4340,
-          "trade_gain": 939,
+          "their_score": 4282,
+          "trade_gain": 881,
           "trust": "pass"
         },
         {
@@ -1570,8 +1570,8 @@
           "send": [
             "F01-19"
           ],
-          "their_score": 4116,
-          "trade_gain": 715,
+          "their_score": 4058,
+          "trade_gain": 657,
           "trust": "pass"
         },
         {
@@ -1618,6 +1618,26 @@
           "idea_score": 0,
           "index": 16,
           "market": "Plausible",
+          "my_score": 3849,
+          "partner": "Fixture Team 03",
+          "receive": [
+            "F03-21",
+            "2026 Round 3"
+          ],
+          "section": "Draft Capital",
+          "send": [
+            "F01-17"
+          ],
+          "their_score": 3970,
+          "trade_gain": 121,
+          "trust": "pass"
+        },
+        {
+          "confidence": "Medium",
+          "grade": "Thin",
+          "idea_score": 0,
+          "index": 17,
+          "market": "Plausible",
           "my_score": 3625,
           "partner": "Fixture Team 03",
           "receive": [
@@ -1628,28 +1648,8 @@
           "send": [
             "F01-18"
           ],
-          "their_score": 3846,
-          "trade_gain": 221,
-          "trust": "pass"
-        },
-        {
-          "confidence": "Medium",
-          "grade": "Thin",
-          "idea_score": 0,
-          "index": 17,
-          "market": "Plausible",
-          "my_score": 3401,
-          "partner": "Fixture Team 03",
-          "receive": [
-            "F03-21",
-            "2026 Round 3"
-          ],
-          "section": "Draft Capital",
-          "send": [
-            "F01-19"
-          ],
-          "their_score": 3846,
-          "trade_gain": 445,
+          "their_score": 3970,
+          "trade_gain": 345,
           "trust": "pass"
         },
         {
@@ -1668,8 +1668,8 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 4070,
-          "trade_gain": 221,
+          "their_score": 4194,
+          "trade_gain": 345,
           "trust": "pass"
         },
         {
@@ -1678,7 +1678,7 @@
           "idea_score": 0,
           "index": 19,
           "market": "Thin",
-          "my_score": 7510,
+          "my_score": 7387,
           "partner": "Fixture Team 06",
           "receive": [
             "F06-05"
@@ -1689,7 +1689,7 @@
             "2026 Round 2"
           ],
           "their_score": 6674,
-          "trade_gain": -836,
+          "trade_gain": -713,
           "trust": "pass"
         }
       ]
@@ -1792,15 +1792,15 @@
           "my_score": 3849,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-21",
+            "F04-20",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-17"
           ],
-          "their_score": 4157,
-          "trade_gain": 308,
+          "their_score": 4322,
+          "trade_gain": 473,
           "trust": "pass"
         },
         {
@@ -1808,6 +1808,46 @@
           "grade": "Solid",
           "idea_score": 0,
           "index": 5,
+          "market": "Plausible",
+          "my_score": 3849,
+          "partner": "Fixture Team 04",
+          "receive": [
+            "F04-21",
+            "2026 Round 3"
+          ],
+          "section": "Draft Capital",
+          "send": [
+            "F01-17"
+          ],
+          "their_score": 4098,
+          "trade_gain": 249,
+          "trust": "pass"
+        },
+        {
+          "confidence": "High",
+          "grade": "Solid",
+          "idea_score": 0,
+          "index": 6,
+          "market": "Plausible",
+          "my_score": 3625,
+          "partner": "Fixture Team 04",
+          "receive": [
+            "F04-21",
+            "2026 Round 3"
+          ],
+          "section": "Draft Capital",
+          "send": [
+            "F01-18"
+          ],
+          "their_score": 4098,
+          "trade_gain": 473,
+          "trust": "pass"
+        },
+        {
+          "confidence": "High",
+          "grade": "Solid",
+          "idea_score": 0,
+          "index": 7,
           "market": "Plausible",
           "my_score": 4073,
           "partner": "Fixture Team 03",
@@ -1826,9 +1866,9 @@
           "confidence": "High",
           "grade": "Strong",
           "idea_score": 0,
-          "index": 6,
+          "index": 8,
           "market": "Plausible",
-          "my_score": 7627,
+          "my_score": 7513,
           "partner": "Fixture Team 05",
           "receive": [
             "F05-05"
@@ -1839,14 +1879,14 @@
             "2026 Round 2"
           ],
           "their_score": 6721,
-          "trade_gain": -906,
+          "trade_gain": -792,
           "trust": "pass"
         },
         {
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 7,
+          "index": 9,
           "market": "Plausible",
           "my_score": 4073,
           "partner": "Fixture Team 04",
@@ -1865,60 +1905,20 @@
           "confidence": "High",
           "grade": "Solid",
           "idea_score": 0,
-          "index": 8,
-          "market": "Plausible",
-          "my_score": 3849,
-          "partner": "Fixture Team 04",
-          "receive": [
-            "F04-20",
-            "2026 Round 3"
-          ],
-          "section": "Draft Capital",
-          "send": [
-            "F01-17"
-          ],
-          "their_score": 4381,
-          "trade_gain": 532,
-          "trust": "pass"
-        },
-        {
-          "confidence": "High",
-          "grade": "Solid",
-          "idea_score": 0,
-          "index": 9,
-          "market": "Plausible",
-          "my_score": 3625,
-          "partner": "Fixture Team 04",
-          "receive": [
-            "F04-20",
-            "2026 Round 3"
-          ],
-          "section": "Draft Capital",
-          "send": [
-            "F01-18"
-          ],
-          "their_score": 4381,
-          "trade_gain": 756,
-          "trust": "pass"
-        },
-        {
-          "confidence": "High",
-          "grade": "Solid",
-          "idea_score": 0,
           "index": 10,
           "market": "Plausible",
           "my_score": 3625,
           "partner": "Fixture Team 04",
           "receive": [
-            "F04-21",
+            "F04-20",
             "2026 Round 3"
           ],
           "section": "Draft Capital",
           "send": [
             "F01-18"
           ],
-          "their_score": 4157,
-          "trade_gain": 532,
+          "their_score": 4322,
+          "trade_gain": 697,
           "trust": "pass"
         },
         {
@@ -1937,8 +1937,8 @@
           "send": [
             "F01-19"
           ],
-          "their_score": 4381,
-          "trade_gain": 980,
+          "their_score": 4322,
+          "trade_gain": 921,
           "trust": "pass"
         },
         {
@@ -1957,8 +1957,8 @@
           "send": [
             "F01-19"
           ],
-          "their_score": 4157,
-          "trade_gain": 756,
+          "their_score": 4098,
+          "trade_gain": 697,
           "trust": "pass"
         },
         {
@@ -2015,8 +2015,8 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 3878,
-          "trade_gain": 29,
+          "their_score": 4006,
+          "trade_gain": 157,
           "trust": "pass"
         },
         {
@@ -2035,37 +2035,17 @@
           "send": [
             "F01-17"
           ],
-          "their_score": 4102,
-          "trade_gain": 253,
-          "trust": "pass"
-        },
-        {
-          "confidence": "Medium",
-          "grade": "Thin",
-          "idea_score": 0,
-          "index": 17,
-          "market": "Plausible",
-          "my_score": 3625,
-          "partner": "Fixture Team 03",
-          "receive": [
-            "F03-20",
-            "2026 Round 3"
-          ],
-          "section": "Draft Capital",
-          "send": [
-            "F01-18"
-          ],
-          "their_score": 4102,
-          "trade_gain": 477,
+          "their_score": 4230,
+          "trade_gain": 381,
           "trust": "pass"
         },
         {
           "confidence": "Medium",
           "grade": "Strong",
           "idea_score": 0,
-          "index": 18,
+          "index": 17,
           "market": "Thin",
-          "my_score": 7627,
+          "my_score": 7513,
           "partner": "Fixture Team 06",
           "receive": [
             "F06-05"
@@ -2076,7 +2056,27 @@
             "2026 Round 2"
           ],
           "their_score": 6674,
-          "trade_gain": -953,
+          "trade_gain": -839,
+          "trust": "pass"
+        },
+        {
+          "confidence": "Medium",
+          "grade": "Thin",
+          "idea_score": 0,
+          "index": 18,
+          "market": "Thin",
+          "my_score": 3625,
+          "partner": "Fixture Team 03",
+          "receive": [
+            "F03-20",
+            "2026 Round 3"
+          ],
+          "section": "Draft Capital",
+          "send": [
+            "F01-18"
+          ],
+          "their_score": 4230,
+          "trade_gain": 605,
           "trust": "pass"
         },
         {
@@ -2095,8 +2095,8 @@
           "send": [
             "F01-13"
           ],
-          "their_score": 6452,
-          "trade_gain": 1583,
+          "their_score": 6416,
+          "trade_gain": 1547,
           "trust": "pass"
         }
       ]
