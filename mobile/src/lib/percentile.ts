@@ -62,6 +62,19 @@ export function percentileColor(percentile: number | null | undefined, colors: T
   return mixHex(colors.premium, colors.successBright, (clamped - 50) / 50);
 }
 
+/** Best team in a group -> 100, worst -> 0. Several backend rank fields
+ * (league_rankings.py's power_rank/draft_capital_rank/starter_rank/etc.)
+ * only expose a dense rank (1 = best), never a raw 0-100 score, so this is
+ * the honest way to turn "rank #3 of 12" into a percentile for the shared
+ * percentile color ramp instead of fabricating a score. Originally lived
+ * only in MyTeamScreen; promoted here once TeamsScreen needed the exact
+ * same rank-to-percentile transform for every team in the league, not just
+ * the caller's own. */
+export function percentileFromRank(rank: number | null | undefined, totalTeams: number): number | null {
+  if (rank == null || totalTeams <= 1) return null;
+  return Math.round(((totalTeams - rank) / (totalTeams - 1)) * 100);
+}
+
 /** Real, not fabricated: the same percentile the badge text already shows,
  * just given a direction — at/above the 50th percentile reads as a trend
  * up, below it a trend down. Never a week-over-week delta (this app has no

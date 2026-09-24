@@ -22,6 +22,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
+import { percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -64,15 +65,6 @@ function toRankedPlayer(player: LineupPlayer) {
     rank_unavailable_reason: null,
     opportunity_label: player.opportunity_label,
   };
-}
-
-/** Best team in the league -> 100, worst -> 0. modules/league_rankings.py
- * only exposes a dense rank (1 = best), never a raw 0-100 score, so a
- * percentile derived from rank position is the honest way to turn "Power
- * Rank #3 of 12" into a ring fill — not a fabricated score. */
-function percentileFromRank(rank: number | null, totalTeams: number): number | null {
-  if (rank == null || totalTeams <= 1) return null;
-  return Math.round(((totalTeams - rank) / (totalTeams - 1)) * 100);
 }
 
 function percentileLabel(percentile: number | null): string {
