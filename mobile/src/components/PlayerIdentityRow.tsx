@@ -199,8 +199,15 @@ function createStyles(colors: ThemeColors) {
     // injuryTone/ruledOut — see the component body — since they vary per
     // player, not per theme, and this StyleSheet is memoized on colors
     // alone.
+    // flexShrink+maxWidth (not the old flexShrink: 0) so a long label like
+    // "Questionable" can't claim unbounded width and squeeze `name` down to
+    // one or two letters in a narrow context (e.g. Trade Hub's two-column
+    // exchange rows) — coridian_ reported a player name reading as just
+    // "C." next to a Questionable pill (screenshot, 2026-09-23). The pill's
+    // own text still has numberOfLines={1}, so it now ellipsizes instead.
     injuryPill: {
-      flexShrink: 0,
+      flexShrink: 1,
+      maxWidth: '50%',
       borderRadius: radii.pill,
       paddingHorizontal: spacing.sm,
       paddingVertical: 2,
