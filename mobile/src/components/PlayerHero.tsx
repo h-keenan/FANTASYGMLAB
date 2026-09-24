@@ -9,15 +9,15 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
 
 /**
- * Rebuilt player identity block — photo, "N OVR" ring, name and
- * position/team sit side-by-side (photo left, identity right) instead of
- * the old fully-centered stack, matching the concept sheet's hierarchy:
- * "who is this player, how valuable are they" answered in one glance
- * instead of after scrolling past a centered column. Classification tags,
- * actions, roster recommendation, and news alerts are NOT this component's
- * job — PlayerDetailScreen renders those below as `children` so this stays
- * a single-purpose identity header, reusable anywhere a compact player
- * portrait+rating+name is needed.
+ * Rebuilt player identity block — photo left, name/position/team next to
+ * it, and the "N OVR" ring anchored at the far right edge of the row
+ * (opposite the photo) per coridian_'s explicit "option a" pick (Discord,
+ * 2026-09-23) — the ring used to sit directly above the name, immediately
+ * next to the photo. Classification tags, actions, roster recommendation,
+ * and news alerts are NOT this component's job — PlayerDetailScreen
+ * renders those below as `children` so this stays a single-purpose
+ * identity header, reusable anywhere a compact player portrait+rating+name
+ * is needed.
  */
 export default function PlayerHero({
   playerId,
@@ -55,17 +55,6 @@ export default function PlayerHero({
           <PlayerAvatar playerId={playerId} size={100} tier={tier} style={styles.avatar} />
         </View>
         <View style={styles.infoCol}>
-          {overallRating !== null ? (
-            <CircularProgressRing
-              percent={overallRating}
-              size={68}
-              strokeWidth={6}
-              valueLabel={String(overallRating)}
-              valueFontScale={0.36}
-              color={ringColor}
-              label="OVR"
-            />
-          ) : null}
           <AppText style={styles.name} numberOfLines={2}>
             {name}
           </AppText>
@@ -74,6 +63,17 @@ export default function PlayerHero({
             {team ? <AppText style={styles.team}>{team}</AppText> : null}
           </View>
         </View>
+        {overallRating !== null ? (
+          <CircularProgressRing
+            percent={overallRating}
+            size={68}
+            strokeWidth={6}
+            valueLabel={String(overallRating)}
+            valueFontScale={0.36}
+            color={ringColor}
+            label="OVR"
+          />
+        ) : null}
       </View>
       {children}
     </View>
