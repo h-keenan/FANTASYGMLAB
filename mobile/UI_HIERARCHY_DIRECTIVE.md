@@ -201,3 +201,9 @@ or authentication. UI hierarchy work should consume existing data and logic.
 bad layouts. Make every screen communicate: what matters? Why does it matter? What can I do about
 it? Everything else should support those three questions. FantasyGM Lab should feel like one
 cohesive mobile GM command system, not a collection of legacy pages with updated colors.
+
+## 25. No page-specific color patching
+
+Added per coridian_'s color-system audit (see `UI_COLOR_SYSTEM_AUDIT.md`): if a color fails —
+disappears, loses contrast, collides with another semantic meaning — in more than one place, fix
+the shared token. Do not patch it locally on the one screen that surfaced it.
