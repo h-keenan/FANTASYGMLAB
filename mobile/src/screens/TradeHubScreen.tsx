@@ -489,6 +489,13 @@ function TradeHubGateCard({
  * slot), picks via DraftPickAssetRow — never a malformed player row for a
  * pick. Order is preserved exactly as the API returned it; only the
  * per-asset presentation differs by `asset_type`.
+ *
+ * Team and age are combined into PlayerIdentityRow's single `team` slot
+ * (e.g. "NO · Age 30") rather than passed separately (team) + via
+ * `contextLine` (age) — the concept mockups show these on one meta line
+ * under the position badge, not a whole extra row. This is a page-local
+ * prop composition, not a change to PlayerIdentityRow itself: every other
+ * screen using the shared row is unaffected.
  */
 function ExchangeAssetList({
   assets,
@@ -517,16 +524,18 @@ function ExchangeAssetList({
             />
           );
         }
+        const teamAgeLine = [asset.team, asset.age != null ? `Age ${asset.age}` : null]
+          .filter(Boolean)
+          .join(' · ');
         return (
           <PlayerIdentityRow
             key={`player-${asset.player_id ?? index}`}
             playerId={asset.player_id}
             name={asset.name}
             position={asset.position}
-            team={asset.team}
+            team={teamAgeLine || null}
             tier={asset.tier}
             opportunityLabel={asset.role}
-            contextLine={asset.age != null ? `Age ${asset.age}` : null}
             injuryLabel={asset.injury_status}
             onPress={asset.player_id ? () => onPressPlayer(asset) : undefined}
             showDivider={showDivider}
@@ -639,11 +648,10 @@ function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
 
   return (
     <View style={styles.summaryBlock}>
-      <AppText style={styles.summaryKicker}>TRADE INTELLIGENCE SUMMARY</AppText>
       <View style={styles.summaryRow}>
         {tiles.map((tile) => (
           <View key={tile.key} style={styles.summaryTile}>
-            <Ionicons name={tile.icon} size={14} color={tile.color} />
+            <Ionicons name={tile.icon} size={16} color={tile.color} />
             <AppText style={styles.summaryValue}>{tile.value}</AppText>
             <AppText style={styles.summaryLabel} numberOfLines={1}>{tile.label}</AppText>
           </View>
@@ -768,12 +776,18 @@ function TradeIdeaCard({
           FOR {idea.source_team_name.toUpperCase()}
         </AppText>
       ) : null}
-      {/* Header hierarchy per the redesign brief: recommendation type (the
-          category/impact badges above) -> team name + fairness pill on one
-          line -> value-change number prominently on its own line below.
-          The fairness pill used to live next to the value number; it's a
-          secondary quality indicator (section 12), so it now rides with the
-          team identity instead of competing with the headline value. */}
+      {/* Header hierarchy: recommendation type (the category/impact badges
+          above) -> team name + share action on one line -> value-change
+          number prominently, paired with the fairness pill on its own row
+          below. The original text-only redesign brief's suggested layout
+          (section 5) put the fairness pill next to the team name, reasoning
+          it as "secondary" (section 12) so it shouldn't compete with the
+          headline value. The concept mockups (unavailable to that pass)
+          consistently show it differently: a plain team-name+share row with
+          no pill, and "Fair"/etc. riding right alongside the value number
+          instead. Both mockups agree on this, so fidelity to the actual
+          visual reference wins here — the pill stays small/quiet per
+          section 12's intent, just relocated to match the images. */}
       <View style={styles.partnerRow}>
         {idea.partner_team_avatar_url ? (
           <TeamAvatar avatarId={idea.partner_team_avatar_url} size={36} />
@@ -787,13 +801,6 @@ function TradeIdeaCard({
             <AppText style={styles.partnerName} numberOfLines={1}>
               {idea.partner_team_name}
             </AppText>
-            {idea.value_edge_band ? (
-              <View style={[styles.fairnessPill, { borderColor: bandColor }]}>
-                <AppText style={[styles.fairnessPillText, { color: bandColor }]} numberOfLines={1}>
-                  {idea.value_edge_band}
-                </AppText>
-              </View>
-            ) : null}
           </View>
           {idea.partner_team_archetype_label ? (
             <AppText style={styles.partnerArchetype} numberOfLines={1}>
@@ -820,11 +827,20 @@ function TradeIdeaCard({
           ) : null}
         </View>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
-          <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
+          <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
-      <TradeValueHero delta={idea.trade_gain} size="sm" style={styles.valueHero} />
+      <View style={styles.valueRow}>
+        <TradeValueHero delta={idea.trade_gain} size="md" style={styles.valueHero} />
+        {idea.value_edge_band ? (
+          <View style={[styles.fairnessPill, { borderColor: bandColor }]}>
+            <AppText style={[styles.fairnessPillText, { color: bandColor }]} numberOfLines={1}>
+              {idea.value_edge_band}
+            </AppText>
+          </View>
+        ) : null}
+      </View>
 
       <TradeSharePreviewModal
         visible={shareOpen}
@@ -961,22 +977,18 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 3,
   },
   impactBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  // Deliberately quiet per the redesign brief: no border/card fill, just a
-  // hairline top rule under the kicker so it reads as ambient context above
-  // the feed rather than a competing card of its own.
+  // Both concept mockups show this as a quiet, thin-bordered box (no fill,
+  // no title inside) rather than the hairline-top-rule-only treatment this
+  // screen originally shipped with tonight — "keep the section visually
+  // quiet" (brief section 3) still holds with an outline; it's the absence
+  // of a heavy fill/shadow that keeps it quiet, not the absence of a border.
   summaryBlock: {
     marginTop: spacing.sm,
     marginBottom: spacing.md,
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-  },
-  summaryKicker: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    letterSpacing: 0.6,
-    marginBottom: spacing.xs,
+    paddingVertical: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.hairline,
   },
   summaryRow: { flexDirection: 'row' },
   summaryTile: { flex: 1, alignItems: 'center', gap: 2 },
@@ -1010,19 +1022,27 @@ function createStyles(colors: ThemeColors) {
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  // The value-change number now stands alone on its own row (section 5:
-  // "value-change number prominently") — the fairness pill moved up next
-  // to the team name (see `fairnessPill` below) since it's a secondary
-  // quality indicator, not part of the headline value.
-  valueHero: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  // Value-change number + fairness pill share one row (per both concept
+  // mockups: the pill rides alongside the value, not the team name) —
+  // `valueRow` owns the card's horizontal padding so `valueHero` itself
+  // stays unpadded and free to sit flush against the pill.
+  valueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  valueHero: { flexShrink: 1 },
   fairnessPill: {
     flexShrink: 0,
     borderWidth: 1,
     borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
   },
-  fairnessPillText: { fontSize: 10, fontWeight: '700' },
+  fairnessPillText: { fontSize: 12, fontWeight: '700' },
   partnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1045,11 +1065,11 @@ function createStyles(colors: ThemeColors) {
   partnerArchetype: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, marginTop: 1 },
   tendencyChip: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
   tendencyChipText: { fontSize: 11, fontWeight: '600' },
+  // Plain icon per the concept mockups — no filled circular backdrop
+  // (that read as an extra decorative surface neither concept image has).
+  // hitSlop on the TouchableOpacity keeps the tap target comfortable
+  // without a visible background box.
   shareButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.backgroundElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
