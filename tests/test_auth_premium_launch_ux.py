@@ -225,7 +225,7 @@ def test_checkout_failure_remains_honest_and_does_not_render_navigation():
         premium_page.render_premium_page(entitlement=premium.FREE)
 
     assert warnings == [
-        "Checkout is not available right now. Check billing configuration and try again."
+        "Checkout is not available right now. Please try again in a moment."
     ]
     assert premium_page.CHECKOUT_REDIRECT_KEY not in state
 

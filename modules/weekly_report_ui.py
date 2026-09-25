@@ -19,6 +19,129 @@ def _safe_text(value, default: str = "") -> str:
     return str(value)
 
 
+# Plain-language "what this means" text for tiles whose label alone doesn't
+# make the metric obvious, keyed by the tile's own label (casefolded). Wired
+# through render_summary_tiles' existing detail/supporting_context fields —
+# the same tap-to-detail affordance tests/test_workspace_ui.py already
+# exercises for a non-comparison "detail" tile — so no new component or
+# navigation is introduced, only an explanation of an already-rendered tile.
+# Presentation only: never changes a tile's label/value/note/tone.
+_HIGHLIGHT_TILE_CONTEXT: dict[str, tuple[str, str]] = {
+    "highest score": (
+        "The team that scored the most fantasy points among this week's completed matchups.",
+        "",
+    ),
+    "lowest score": (
+        "The team that scored the fewest fantasy points among this week's completed matchups.",
+        "Check Team Notes below for injury or lineup context behind a quiet week.",
+    ),
+    "closest matchup": (
+        "The week's matchup decided by the smallest point margin.",
+        "",
+    ),
+    "largest blowout": (
+        "The week's matchup decided by the largest point margin.",
+        "",
+    ),
+    "biggest upset": (
+        "The winning team was ranked lower in Power Rank than the team it beat this week.",
+        "See Power Movement above for how this result may have shifted both teams' rank.",
+    ),
+    "team of the week": (
+        "This week's single highest scorer — the same team as Highest Score above, using "
+        "the app's own rank tiebreak. The two tiles will usually agree.",
+        "",
+    ),
+    "disappointment": (
+        "A team ranked well in Power Rank that scored well below its usual output this week.",
+        "Check Team Notes below for what might be driving the dip.",
+    ),
+    "most active manager": (
+        "The team with the most total completed transactions — trades plus waiver/free-agent "
+        "claims — so far this season.",
+        "",
+    ),
+    "most waiver moves": (
+        "The team with the most completed waiver and free-agent claims so far this season.",
+        "",
+    ),
+    "most trades": (
+        "The team involved in the most completed trades so far this season.",
+        "",
+    ),
+    "most roster churn": (
+        "The team with the most total roster adds and drops combined so far this season.",
+        "",
+    ),
+}
+
+# Short next-step pointer appended to a League Trends card's own bullet list
+# when the card has a real signal to point at (not a "no data yet" placeholder).
+_TREND_TILE_FOLLOWUP: dict[str, str] = {
+    "hottest team": "See Team Notes below for the roster story behind the streak.",
+    "coldest team": "See Team Notes below for what might be behind the skid.",
+}
+_TREND_NO_SIGNAL_TITLES = {"", "No clear leader", "No clear skid"}
+
+
+def _with_tile_context(items: list[dict]) -> list[dict]:
+    """Attach a "what this means" explanation to tiles that don't already
+    carry one, matched by the tile's own label. Every other field is passed
+    through unchanged."""
+
+    enriched: list[dict] = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        item = dict(item)
+        context = _HIGHLIGHT_TILE_CONTEXT.get(_safe_text(item.get("label")).strip().casefold())
+        if context and not item.get("detail"):
+            detail, supporting = context
+            item["detail"] = detail
+            if supporting and not item.get("supporting_context"):
+                item["supporting_context"] = supporting
+        enriched.append(item)
+    return enriched
+
+
+def _with_trend_followup(cards: list[dict]) -> list[dict]:
+    """Append an on-page next-step bullet to a trend card that has a real
+    signal to point at. Every other field is passed through unchanged."""
+
+    enriched: list[dict] = []
+    for card in cards or []:
+        if not isinstance(card, dict):
+            continue
+        card = dict(card)
+        followup = _TREND_TILE_FOLLOWUP.get(_safe_text(card.get("label")).strip().casefold())
+        if followup and _safe_text(card.get("title")) not in _TREND_NO_SIGNAL_TITLES:
+            items = list(card.get("items") or [])
+            if followup not in items:
+                card["items"] = items + [followup]
+        enriched.append(card)
+    return enriched
+
+
+def _movement_tile_context(*, scope: str, rising: bool) -> tuple[str, str]:
+    """"What this means" + "what to check next" text for one Power/Franchise
+    movement tile. ``scope`` is "power" or "franchise"."""
+
+    if scope == "power":
+        what = (
+            "Power Rank is the app's read on which teams are currently strongest — "
+            "who you'd expect to win on the field right now."
+        )
+    else:
+        what = (
+            "Franchise Rank is the app's read on total asset base — roster plus draft "
+            "capital value — independent of this week's score."
+        )
+    direction = "climbed" if rising else "dropped"
+    detail = f"{what} This team {direction} the most of anyone in the league this week."
+    supporting = "See Transaction Summary and Team Notes below for what may be behind the move."
+    return detail, supporting
+
+
 def _movement_direction_badge_html(delta: object) -> str:
     """Small colored up/down/flat glyph for one rank-movement tile.
 
@@ -67,11 +190,11 @@ def render_weekly_report(
     render_section_header(
         "Weekly Highlights",
         kicker="Scoreboard",
-        note="The clearest results from the latest week with matchup data.",
+        note="The clearest results from the latest week with matchup data. Tap a tile for what it means.",
         compact=True,
     )
     if weekly_report.get("highlights"):
-        render_summary_tiles(weekly_report.get("highlights") or [])
+        render_summary_tiles(_with_tile_context(weekly_report.get("highlights") or []))
     else:
         ui_primitives.render_empty_state_panel(
             "No weekly score highlights yet",
@@ -83,7 +206,11 @@ def render_weekly_report(
     render_section_header(
         "Power Movement",
         kicker="Rank Drift",
-        note="Power Rank tracks current strength. Franchise Rank tracks total asset base. Exact week-over-week movement starts once the app has saved at least one earlier weekly snapshot.",
+        note=(
+            "Power Rank tracks current strength. Franchise Rank tracks total asset base. Exact "
+            "week-over-week movement starts once the app has saved at least one earlier weekly "
+            "snapshot. Tap a tile for what moved and why."
+        ),
         compact=True,
     )
     if movement.get("available"):
@@ -91,6 +218,10 @@ def render_weekly_report(
         power_faller = movement.get("power_faller") or {}
         franchise_riser = movement.get("franchise_riser") or {}
         franchise_faller = movement.get("franchise_faller") or {}
+        power_rise_detail, power_rise_context = _movement_tile_context(scope="power", rising=True)
+        power_fall_detail, power_fall_context = _movement_tile_context(scope="power", rising=False)
+        franchise_rise_detail, franchise_rise_context = _movement_tile_context(scope="franchise", rising=True)
+        franchise_fall_detail, franchise_fall_context = _movement_tile_context(scope="franchise", rising=False)
         render_summary_tiles(
             [
                 {
@@ -102,6 +233,8 @@ def render_weekly_report(
                     ),
                     "tone": "power",
                     "graphic": _movement_direction_badge_html(power_riser.get("power_delta")),
+                    "detail": power_rise_detail,
+                    "supporting_context": power_rise_context,
                 },
                 {
                     "label": "Biggest Power Faller",
@@ -112,6 +245,8 @@ def render_weekly_report(
                     ),
                     "tone": "risk",
                     "graphic": _movement_direction_badge_html(power_faller.get("power_delta")),
+                    "detail": power_fall_detail,
+                    "supporting_context": power_fall_context,
                 },
                 {
                     "label": "Biggest Franchise Riser",
@@ -122,6 +257,8 @@ def render_weekly_report(
                     ),
                     "tone": "franchise",
                     "graphic": _movement_direction_badge_html(franchise_riser.get("franchise_delta")),
+                    "detail": franchise_rise_detail,
+                    "supporting_context": franchise_rise_context,
                 },
                 {
                     "label": "Biggest Franchise Faller",
@@ -132,6 +269,8 @@ def render_weekly_report(
                     ),
                     "tone": "risk",
                     "graphic": _movement_direction_badge_html(franchise_faller.get("franchise_delta")),
+                    "detail": franchise_fall_detail,
+                    "supporting_context": franchise_fall_context,
                 },
             ]
         )
@@ -170,16 +309,15 @@ def render_weekly_report(
         note="Recent streaks and current temperature, using weekly results where Sleeper exposes them.",
         compact=True,
     )
-    render_analysis_cards(weekly_report.get("trend_cards") or [])
+    render_analysis_cards(_with_trend_followup(weekly_report.get("trend_cards") or []))
 
-    render_section_header(
-        "Manager Activity",
-        kicker="Moves",
-        note="Season-to-date transaction volume through the report week.",
-        compact=True,
-    )
-    render_summary_tiles(weekly_report.get("activity_tiles") or [])
-
+    # Transaction Summary (this report week's specific moves) is rendered
+    # ahead of Manager Activity (season-to-date totals): this page is a
+    # per-week report, so the week-specific "what happened" belongs before
+    # the cumulative reference leaderboard it contextualizes, per the
+    # decision-importance hierarchy rule — not backend build order. See
+    # tests/test_weekly_report_ui.py for the characterization test updated
+    # alongside this reorder.
     render_section_header(
         "Transaction Summary",
         kicker="This Week's Moves",
@@ -199,6 +337,14 @@ def render_weekly_report(
             kind="no-data",
             recovery_guidance="Check back once trades, waiver adds, or roster moves are completed for the report week.",
         )
+
+    render_section_header(
+        "Manager Activity",
+        kicker="Moves",
+        note="Season-to-date context for the moves above. Tap a tile for what it counts.",
+        compact=True,
+    )
+    render_summary_tiles(_with_tile_context(weekly_report.get("activity_tiles") or []))
 
     render_section_header(
         "Team Notes",
