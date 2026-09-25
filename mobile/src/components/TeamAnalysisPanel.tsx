@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import AnalyticsSection from './AnalyticsSection';
 import AppText from './AppText';
+import InsightRow from './InsightRow';
 import MetricCard from './MetricCard';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { TeamRanking } from '../lib/api';
@@ -63,13 +64,28 @@ export default function TeamAnalysisPanel({
         <AppText style={styles.explanation}>{team.archetype_explanation}</AppText>
       ) : null}
       {team.archetype_strengths.length > 0 ? (
-        <DetailList label="Strengths" items={team.archetype_strengths} color={colors.success} />
+        <DetailList
+          label="Strengths"
+          items={team.archetype_strengths}
+          color={colors.success}
+          icon="checkmark-circle-outline"
+        />
       ) : null}
       {team.archetype_risks.length > 0 ? (
-        <DetailList label="Risks" items={team.archetype_risks} color={colors.danger} />
+        <DetailList
+          label="Risks"
+          items={team.archetype_risks}
+          color={colors.danger}
+          icon="alert-circle-outline"
+        />
       ) : null}
       {team.archetype_recommendations.length > 0 ? (
-        <DetailList label="Recommendations" items={team.archetype_recommendations} color={colors.accent} />
+        <DetailList
+          label="Recommendations"
+          items={team.archetype_recommendations}
+          color={colors.accent}
+          icon="bulb-outline"
+        />
       ) : null}
       {hasTradeContext ? (
         <AppText style={styles.tradeLine}>
@@ -114,16 +130,38 @@ function buildRankMetrics(team: TeamRanking): RankMetric[] {
   ].filter((metric) => metric.rank != null);
 }
 
-function DetailList({ label, items, color }: { label: string; items: string[]; color: string }) {
+/**
+ * Strengths/Risks/Recommendations, previously a plain "• text" bullet list —
+ * now a shared section label plus grouped `InsightRow`s (Magna Carta §28:
+ * "short analytical conclusions should use one reusable component... do not
+ * put every insight into a giant alert card"). One label per group instead
+ * of per row (InsightRow's `label` is optional for exactly this case) since
+ * every row in a group already shares the same category/icon/color.
+ */
+function DetailList({
+  label,
+  items,
+  color,
+  icon,
+}: {
+  label: string;
+  items: string[];
+  color: string;
+  icon: React.ComponentProps<typeof InsightRow>['icon'];
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.detailGroup}>
       <AppText style={[styles.detailLabel, { color }]}>{label}</AppText>
       {items.map((item, index) => (
-        <AppText key={`${label}-${index}`} style={styles.detailItem}>
-          {'•'} {item}
-        </AppText>
+        <InsightRow
+          key={`${label}-${index}`}
+          icon={icon}
+          color={color}
+          headline={item}
+          last={index === items.length - 1}
+        />
       ))}
     </View>
   );
@@ -141,7 +179,7 @@ function createStyles(colors: ThemeColors) {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     },
-    detailGroup: { gap: 2, marginTop: spacing.sm },
+    detailGroup: { marginTop: spacing.sm },
     detailLabel: {
       fontSize: 11,
       fontWeight: '700',
@@ -149,7 +187,6 @@ function createStyles(colors: ThemeColors) {
       letterSpacing: 0.4,
       marginBottom: 2,
     },
-    detailItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
     tradeLine: {
       fontSize: 12,
       color: colors.textTertiary,

@@ -14,12 +14,18 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
  * Insight Row ("icon, insight headline, optional supporting context,
  * optional chevron... do not put every insight into a giant alert card").
  *
- * Introduced for the Dashboard V2 rebuild: Watch/Waiver Opportunity/League
- * Movement items previously each rendered as their own full AnimatedCard —
- * identical visual weight to the Top Priority hero card, which is exactly
- * the "too many cards feel visually similar" problem coridian_ flagged.
- * Callers now group several InsightRows inside one AnimatedCard surface
- * with internal dividers (§12) instead of card-per-item.
+ * Introduced for the Dashboard V2 rebuild (PR #754): Watch/Waiver
+ * Opportunity/League Movement items previously each rendered as their own
+ * full AnimatedCard — identical visual weight to the Top Priority hero card,
+ * which is exactly the "too many cards feel visually similar" problem
+ * coridian_ flagged. Callers now group several InsightRows inside one
+ * AnimatedCard surface with internal dividers (§12) instead of card-per-item.
+ *
+ * `label` is optional (extended for My Team's Analysis tab, which groups
+ * several rows under one external section header — "Strengths"/"Risks"/
+ * "Recommendations" — rather than repeating the same eyebrow on every row in
+ * the group). Dashboard's existing callers always pass `label`, so that
+ * usage is unaffected.
  *
  * Two independent tap targets, same nesting AlertsScreen's own AlertRow /
  * the pre-rebuild BriefingCard already relied on: the row itself (drill-down
@@ -44,8 +50,10 @@ export default function InsightRow({
   icon: IconName;
   /** Semantic accent for the icon/label — never a one-off hue per screen. */
   color: string;
-  /** Eyebrow category, e.g. "WATCH" / "WAIVER OPPORTUNITY". */
-  label: string;
+  /** Eyebrow category, e.g. "WATCH" / "WAIVER OPPORTUNITY". Omit when the
+   * caller already renders a shared section header above a group of rows
+   * that all belong to the same category. */
+  label?: string | null;
   headline: string;
   /** Optional supporting explanation, shown only when provided. */
   detail?: string | null;
@@ -72,12 +80,14 @@ export default function InsightRow({
     >
       <Ionicons name={icon} size={16} color={color} style={styles.icon} />
       <View style={styles.textGroup}>
-        <View style={styles.labelRow}>
-          <AppText style={[styles.label, { color }]} numberOfLines={1}>
-            {label.toUpperCase()}
-          </AppText>
-          {isNew ? <NewBadge /> : null}
-        </View>
+        {label ? (
+          <View style={styles.labelRow}>
+            <AppText style={[styles.label, { color }]} numberOfLines={1}>
+              {label.toUpperCase()}
+            </AppText>
+            {isNew ? <NewBadge /> : null}
+          </View>
+        ) : null}
         <AppText style={styles.headline} numberOfLines={2}>
           {headline}
         </AppText>
