@@ -22,6 +22,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
 import PlayerAvatar from '../components/PlayerAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -39,7 +40,13 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Waivers'>;
 
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
+// K joins the filter chips alongside the four skill positions — the waiver
+// pool already ranks kickers (see BEST_AVAILABLE_POSITIONS and the backend's
+// own ["QB","RB","WR","TE","K"] enumeration in modules/waivers_ui.py), it was
+// just missing from this chip row. DEF/DST is deliberately left out: the
+// waiver pipeline doesn't surface team defenses at all, so a "DEF" chip
+// would always render an empty list.
+const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K'];
 const BEST_AVAILABLE_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K'];
 
 const NO_LEAGUE_REASONS = new Set([
@@ -383,8 +390,15 @@ function BestAvailableCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <AnimatedCard style={styles.bestAvailableCard} onPress={onPress}>
-      <View style={styles.bestAvailablePosBadge}>
-        <AppText style={styles.bestAvailablePosText}>{position}</AppText>
+      {/* Shared PositionBadge (per-position semantic color, e.g. RB green /
+          WR blue / TE orange) instead of a flat neutral pill — the concept
+          gives each mini-card's position tag a distinct color, and
+          PositionBadge is the app's one canonical source for that mapping
+          (theme.ts positionColors), already used by every other player row
+          on this same screen via PlayerIdentityRow. Wrapped so its own
+          alignSelf:'flex-start' doesn't fight this card's centered layout. */}
+      <View style={styles.bestAvailablePosBadgeWrap}>
+        <PositionBadge position={position} size="md" />
       </View>
       <PlayerAvatar playerId={player.player_id} size={36} tier={player.tier} style={styles.avatarWrap} />
       <AppText style={styles.bestAvailableName} numberOfLines={1}>
@@ -533,14 +547,7 @@ function createStyles(colors: ThemeColors) {
     gap: 2,
   },
   avatarWrap: { marginRight: spacing.md },
-  bestAvailablePosBadge: {
-    backgroundColor: colors.badgeBackground,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    marginBottom: spacing.xs,
-  },
-  bestAvailablePosText: { fontSize: 10, fontWeight: '700', color: colors.badgeText },
+  bestAvailablePosBadgeWrap: { alignSelf: 'center', marginBottom: spacing.xs },
   bestAvailableName: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.xs },
   bestAvailableScore: { fontSize: 14, fontWeight: '700', color: colors.accent },
   bestAvailableCount: { fontSize: 10, color: colors.textTertiary },
