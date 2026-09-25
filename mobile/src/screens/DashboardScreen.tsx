@@ -13,6 +13,8 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
+import InsightRow from '../components/InsightRow';
+import NewBadge from '../components/NewBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import {
@@ -91,15 +93,30 @@ function bestByRank(teams: TeamRanking[], rankKey: 'power_rank' | 'draft_capital
   return best;
 }
 
+function bestByActivity(teams: TeamRanking[]): TeamRanking | null {
+  let best: TeamRanking | null = null;
+  for (const team of teams) {
+    const count = team.transaction_activity_count ?? 0;
+    if (count <= 0) continue;
+    if (best == null || count > (best.transaction_activity_count ?? 0)) best = team;
+  }
+  return best;
+}
+
 /**
  * A lighter-weight adaptation of the web app's League Pulse
  * (app.py's build_home_league_pulse_items) using only what mobile's
  * /team-rankings endpoint already computes — not a byte-for-byte port.
- * "Most Active Manager" is deliberately omitted: it needs a full-season
- * Sleeper transaction scan that doesn't exist anywhere in modules/ yet
- * (web's own version depends on app.py-only intelligence-frame logic that
- * was never ported to modules/ either), so it would take real new backend
- * work rather than reusing existing data.
+ * "Most Active Manager" reuses modules.manager_activity's real
+ * season-to-date Sleeper transaction scan (trades + waiver claims +
+ * free-agent moves), surfaced on /team-rankings as
+ * `transaction_activity_count` per roster — see that module's docstring
+ * for why this is a pure move count rather than a value read. Web's own
+ * Home "Most Active Manager" tile still reads a narrower trade-only count
+ * (df_intel's trade_count); unifying the two touches a broadly-shared
+ * intelligence frame used across many web features and is a deliberate,
+ * separate follow-up rather than something bundled into this mobile-only
+ * rebuild (see this PR's description).
  */
 function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): LeaguePulseTile[] {
   const contenders = teams.filter((t) => t.strategy === 'contender');
@@ -107,6 +124,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
   const contender = bestByRank(contenders, 'power_rank');
   const rebuilder = bestByRank(rebuilders, 'draft_capital_rank');
   const draftLeader = bestByRank(teams, 'draft_capital_rank');
+  const mostActive = bestByActivity(teams);
 
   const tiles: LeaguePulseTile[] = [
     {
@@ -132,8 +150,68 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
       icon: 'layers',
       color: colors.success,
     },
+    {
+      label: 'Most Active Manager',
+      value: mostActive?.team_name ?? 'Quiet market',
+      note:
+        mostActive && mostActive.transaction_activity_count > 0
+          ? `${mostActive.transaction_activity_count} move${mostActive.transaction_activity_count === 1 ? '' : 's'} this season`
+          : 'No transaction activity tracked yet.',
+      icon: 'repeat',
+      color: colors.violet,
+    },
   ];
   return tiles;
+}
+
+/** Partitions a dashboard item's route_player_id into the same
+ * player-stub shape Player Detail needs to fetch everything else itself —
+ * shared by the Hero card and the compact InsightRow rows below it. */
+function playerStubFromItem(item: DashboardItem): RankedPlayer {
+  return {
+    player_id: item.route_player_id,
+    name: item.route_player_name || null,
+    position: null,
+    team: null,
+    age: null,
+    status: null,
+    injury_status: null,
+    tier: null,
+    score: null,
+    overall_rank: null,
+    position_rank: null,
+    rank_unavailable_reason: null,
+    opportunity_label: null,
+  };
+}
+
+/** Splits the briefing feed into the three UI_MAGNA_CARTA.md §33 tiers —
+ * Top Priority / urgent risks (Watch) / opportunities (Waiver Opportunity +
+ * League Movement) — while preserving the server's own within-category
+ * ordering. Category is an explicit field already computed server-side
+ * (modules.dashboard_workflow); this never re-derives priority itself. */
+function groupDashboardItems(items: DashboardItem[]): {
+  topPriority: DashboardItem[];
+  watch: DashboardItem[];
+  opportunity: DashboardItem[];
+} {
+  const topPriority: DashboardItem[] = [];
+  const watch: DashboardItem[] = [];
+  const opportunity: DashboardItem[] = [];
+  for (const item of items) {
+    if (item.category === 'top_priority') topPriority.push(item);
+    else if (item.category === 'watch') watch.push(item);
+    else opportunity.push(item); // waiver_opportunity, league_movement
+  }
+  return { topPriority, watch, opportunity };
+}
+
+function hasHealthContext(snapshot: TeamSnapshot | null): boolean {
+  if (!snapshot) return false;
+  const players = snapshot.top_injury_impact_players ?? [];
+  const keyInjuries = snapshot.key_injuries_summary?.trim() ?? '';
+  const fallbackSummary = snapshot.top_injury_impact_summary?.trim() ?? '';
+  return players.length > 0 || Boolean(keyInjuries) || Boolean(fallbackSummary);
 }
 
 export default function DashboardScreen({ route, navigation }: Props) {
@@ -261,6 +339,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
     );
   }
 
+  // `quiet` is a server-side override that suppresses the whole feed (even
+  // if `items` technically has entries) in favor of a single steady-state
+  // message — same all-or-nothing contract the pre-rebuild screen used, so
+  // grouping is computed off an effectively-empty list rather than the raw
+  // `items` whenever this is true.
+  const showEmptyState = quiet || !items || items.length === 0;
+  const grouped = groupDashboardItems(showEmptyState ? [] : items!);
+
   return (
     <View style={styles.root}>
       <GridBackground />
@@ -269,7 +355,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
       <ScreenInfoNote
         text={`The real Next Move briefing for ${leagueName} — the same roster-pressure, injury, need, and waiver signals the web app's Dashboard uses.`}
       />
-      <DashboardQuickActions leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
       {!isFirstVisit && newRecommendationIds.size > 0 ? (
         <View style={styles.checkInBanner}>
           <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
@@ -279,26 +364,11 @@ export default function DashboardScreen({ route, navigation }: Props) {
           </AppText>
         </View>
       ) : null}
-      {teamSnapshot ? (
-        <>
-          <TeamSnapshotRow
-            snapshot={teamSnapshot}
-            leagueId={leagueId}
-            leagueName={leagueName}
-            navigation={navigation}
-          />
-          <TeamHealthContextCard snapshot={teamSnapshot} />
-        </>
-      ) : null}
-      {matchup ? (
-        <WeeklyMatchupCard
-          matchup={matchup}
-          leagueId={leagueId}
-          leagueName={leagueName}
-          navigation={navigation}
-        />
-      ) : null}
-      {quiet || !items || items.length === 0 ? (
+
+      {/* HERO — the single answer to "what should I do next?" (Magna Carta
+          §33/§4). Everything below this supports it; nothing above it but
+          the global header and the tiny "about this screen" affordance. */}
+      {showEmptyState ? (
         <View style={styles.emptyCard}>
           <TrajectoryArcs width={120} height={82} />
           <AppText style={styles.emptyText}>
@@ -306,9 +376,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
           </AppText>
         </View>
       ) : (
-        items.map((item, index) => (
+        grouped.topPriority.map((item, index) => (
           <BriefingCard
-            key={`${item.category}-${index}`}
+            key={`top-priority-${index}`}
             item={item}
             leagueId={leagueId}
             leagueName={leagueName}
@@ -318,6 +388,28 @@ export default function DashboardScreen({ route, navigation }: Props) {
           />
         ))
       )}
+
+      {/* Urgent risks. */}
+      <NeedsAttentionSection
+        snapshot={teamSnapshot}
+        items={grouped.watch}
+        leagueId={leagueId}
+        leagueName={leagueName}
+        navigation={navigation}
+        newRecommendationIds={newRecommendationIds}
+        showExplanations={showExplanations}
+      />
+
+      {/* Opportunities. */}
+      <OpportunitiesSection
+        items={grouped.opportunity}
+        leagueId={leagueId}
+        leagueName={leagueName}
+        navigation={navigation}
+        newRecommendationIds={newRecommendationIds}
+        showExplanations={showExplanations}
+      />
+
       {entitlement && !entitlement.is_premium && entitlement.hidden_count > 0 ? (
         <View style={styles.lockWrap}>
           <PremiumLock
@@ -326,12 +418,36 @@ export default function DashboardScreen({ route, navigation }: Props) {
           />
         </View>
       ) : null}
+
+      {/* Secondary context — useful, but not the answer to "what should I
+          do next," so it sits below the actionable feed rather than
+          pushing it under the fold. */}
+      {matchup ? (
+        <WeeklyMatchupCard
+          matchup={matchup}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          navigation={navigation}
+        />
+      ) : null}
+      {teamSnapshot ? (
+        <TeamSnapshotRow
+          snapshot={teamSnapshot}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          navigation={navigation}
+        />
+      ) : null}
+      <View style={styles.quickActionsSection}>
+        <SectionHeading title="Quick Actions" icon="apps-outline" />
+        <DashboardQuickActions leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
+      </View>
       {teamRankings && teamRankings.length > 0 ? (
         entitlement && !entitlement.is_premium ? (
           <View style={styles.lockWrap}>
             <PremiumLock
               title="Full League Pulse"
-              description="See contender, rebuilder, and draft-capital leaders across the whole league."
+              description="See contender, rebuilder, draft-capital, and activity leaders across the whole league."
             />
           </View>
         ) : (
@@ -398,13 +514,11 @@ function quickActions(colors: ThemeColors): Array<{
   ];
 }
 
-/** The concept sheet's Dashboard panel leads with a 2x2 "Quick Actions"
- * shortcut grid (Trade Hub/Rankings/Waivers/Draft Picks) above the daily
- * briefing feed — this app's Dashboard had no equivalent shortcut row at
- * all, only the deeper GM Orb menu and per-tile destination buttons. Renders
- * through the shared QuickActionsGrid component so any other hub-style
- * screen (League Detail) gets the exact same tile affordance rather than a
- * page-specific reimplementation. */
+/** Navigation shortcuts to the app's other hubs — secondary context, not
+ * the answer to "what should I do next," so it lives below the actionable
+ * feed. Renders through the shared QuickActionsGrid component so any other
+ * hub-style screen (League Detail) gets the exact same tile affordance
+ * rather than a page-specific reimplementation. */
 function DashboardQuickActions({
   leagueId,
   leagueName,
@@ -488,16 +602,6 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
   );
 }
 
-function NewBadge() {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.newBadge}>
-      <AppText style={styles.newBadgeText}>NEW</AppText>
-    </View>
-  );
-}
-
 /**
  * League Snapshot, rebuilt on MetricCard (the same compact-tile primitive
  * PR #682 introduced for Player Detail's Stats tab) instead of a
@@ -505,8 +609,9 @@ function NewBadge() {
  * percentiles, so MetricCard's percentile prop is simply omitted (it
  * already renders fine as plain label+value in that case). Power/Franchise
  * stay tappable through to Teams; Injuries stays deliberately non-tappable
- * (the health context card immediately below is already "the why"), and
- * gets `valueColor` emphasis when non-zero instead of a one-off danger tile.
+ * (the Needs Attention section below already carries "the why" when there
+ * is one), and gets `valueColor` emphasis when non-zero instead of a
+ * one-off danger tile.
  */
 function TeamSnapshotRow({
   snapshot,
@@ -572,9 +677,12 @@ function TeamSnapshotRow({
 }
 
 /**
- * Dashboard entry point for the weekly matchup — "who am I playing and who
- * should I start" is the most time-sensitive thing on this screen, so it
- * sits directly under the team snapshot rather than behind the orb only.
+ * Dashboard entry point for the weekly matchup. Demoted from its old
+ * "second card on the screen" position into secondary context — "who am I
+ * playing" is useful, but it isn't the answer to "what should I do next,"
+ * which the Hero above now owns outright (Magna Carta §33/§4). No longer
+ * `glow`'d for the same reason: §15 reserves the restrained glow treatment
+ * for the one module that actually dominates the page.
  *
  * Shows the season-value edge, NOT a points projection: the app has no
  * weekly-projection feed (see services/mobile_api_service.py's
@@ -608,7 +716,6 @@ function WeeklyMatchupCard({
 
   return (
     <AnimatedCard
-      glow
       style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.accent } as ViewStyle])}
       onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
     >
@@ -678,23 +785,28 @@ function injuryImpactLine(player: InjuryImpactPlayer): string {
   return detail ? `${who} — ${detail}` : who;
 }
 
-/** The "why" behind the Health tile: which injuries, and which players are
- * actually carrying the impact. Same already-computed fields web shows as its
- * "Key injuries:" caption plus the injury impact note — rendered here in the
- * bulleted label/items style TeamRosterScreen already uses for archetype
- * strengths and risks. */
-function TeamHealthContextCard({ snapshot }: { snapshot: TeamSnapshot }) {
+/** The "why" behind an injury-driven Watch flag: which injuries, and which
+ * players are actually carrying the impact. Same already-computed fields
+ * web shows as its "Key injuries:" caption plus the injury impact note —
+ * rendered in the bulleted label/items style TeamRosterScreen already uses
+ * for archetype strengths and risks.
+ *
+ * Folded into the Needs Attention grouped surface (as its own leading
+ * block, not a separate bordered card) rather than standing alone the way
+ * it used to — same "urgent risk" tier as the Watch rows next to it, so it
+ * no longer competes with them for identical visual weight (Magna Carta
+ * §12: one grouped surface with internal dividers, not card-per-item).
+ * Caller (`NeedsAttentionSection`) already checks `hasHealthContext` before
+ * rendering this. */
+function TeamHealthContextBlock({ snapshot, last }: { snapshot: TeamSnapshot; last: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const players = snapshot.top_injury_impact_players ?? [];
   const keyInjuries = snapshot.key_injuries_summary?.trim() ?? '';
   const fallbackSummary = snapshot.top_injury_impact_summary?.trim() ?? '';
-  if (players.length === 0 && !keyInjuries && !fallbackSummary) return null;
 
   return (
-    <AnimatedCard
-      style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.danger, gap: spacing.sm } as ViewStyle])}
-    >
+    <View style={[styles.healthBlock, !last && styles.groupDivider]}>
       <View style={styles.cardHeaderRow}>
         <Ionicons name="pulse-outline" size={15} color={colors.danger} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: colors.danger }]} numberOfLines={1}>
@@ -714,7 +826,7 @@ function TeamHealthContextCard({ snapshot }: { snapshot: TeamSnapshot }) {
       ) : fallbackSummary ? (
         <AppText style={styles.detailListItem}>{fallbackSummary}</AppText>
       ) : null}
-    </AnimatedCard>
+    </View>
   );
 }
 
@@ -815,6 +927,12 @@ function TopPriorityTradeCard({
   );
 }
 
+/** The Hero card for any Top Priority item — trade-shaped ones get the rich
+ * send/receive treatment above; anything else (e.g. a "Roster Pressure" or
+ * "Injury Alert" tile promoted to top priority with no trade attached)
+ * still gets full-card, glow-eligible-by-category emphasis rather than
+ * shrinking to an InsightRow, since this is literally the screen's single
+ * most important answer. */
 function BriefingCard({
   item,
   leagueId,
@@ -850,27 +968,11 @@ function BriefingCard({
   // pattern AlertsScreen already uses for its own matched-player taps, since
   // Player Detail fetches everything else itself from player_id.
   const openPlayer = item.route_player_id
-    ? () => {
-        const player: RankedPlayer = {
-          player_id: item.route_player_id,
-          name: item.route_player_name || null,
-          position: null,
-          team: null,
-          age: null,
-          status: null,
-          injury_status: null,
-          tier: null,
-          score: null,
-          overall_rank: null,
-          position_rank: null,
-          rank_unavailable_reason: null,
-          opportunity_label: null,
-        };
-        navigation.navigate('PlayerDetail', { player, leagueId, leagueName });
-      }
+    ? () => navigation.navigate('PlayerDetail', { player: playerStubFromItem(item), leagueId, leagueName })
     : undefined;
   return (
     <AnimatedCard
+      glow
       style={StyleSheet.flatten([styles.card, { borderLeftColor: meta.color } as ViewStyle])}
       onPress={openPlayer}
     >
@@ -883,6 +985,182 @@ function BriefingCard({
       {showExplanations && item.reason ? <AppText style={styles.cardReason}>{item.reason}</AppText> : null}
       <DestinationButton item={item} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
     </AnimatedCard>
+  );
+}
+
+/** Compact row rendering for a non-hero Watch/Waiver Opportunity/League
+ * Movement item — see components/InsightRow.tsx. Preserves every
+ * interaction the old per-item AnimatedCard had (player drill-down via row
+ * press, destination CTA via the trailing action chip), just at the
+ * "short analytical conclusion" visual weight Magna Carta §28 calls for. */
+function DashboardInsightRow({
+  item,
+  leagueId,
+  leagueName,
+  navigation,
+  isNew,
+  showExplanations,
+  last,
+}: {
+  item: DashboardItem;
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+  isNew: boolean;
+  showExplanations: boolean;
+  last: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const meta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
+  const routeName = DESTINATION_ROUTE[item.destination];
+  const actionLabel = DESTINATION_BUTTON_LABEL[item.destination];
+  const onActionPress = routeName
+    ? () => (navigation.navigate as (name: string, params?: object) => void)(routeName, { leagueId, leagueName })
+    : undefined;
+  const onPress = item.route_player_id
+    ? () => navigation.navigate('PlayerDetail', { player: playerStubFromItem(item), leagueId, leagueName })
+    : undefined;
+
+  return (
+    <InsightRow
+      icon={meta.icon}
+      color={meta.color}
+      label={meta.label}
+      headline={item.headline}
+      detail={showExplanations ? item.reason : null}
+      isNew={isNew}
+      actionLabel={onActionPress ? actionLabel : null}
+      onActionPress={onActionPress}
+      onPress={onPress}
+      last={last}
+    />
+  );
+}
+
+/**
+ * "Urgent risks" tier of the Next Move hierarchy (Magna Carta §33: Top
+ * Priority -> urgent risks -> opportunities -> secondary context). Folds
+ * the old standalone injury-detail card in as this group's leading block —
+ * same information, no longer a separate bordered card sitting apart from
+ * the Watch items it elaborates on.
+ */
+function NeedsAttentionSection({
+  snapshot,
+  items,
+  leagueId,
+  leagueName,
+  navigation,
+  newRecommendationIds,
+  showExplanations,
+}: {
+  snapshot: TeamSnapshot | null;
+  items: DashboardItem[];
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+  newRecommendationIds: Set<string>;
+  showExplanations: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const showHealth = hasHealthContext(snapshot);
+  if (!showHealth && items.length === 0) return null;
+
+  // Defensive only: category assignment is server-side, and a trade-shaped
+  // item should always land in top_priority in practice — but if one ever
+  // doesn't, it still gets the full send/receive treatment rather than
+  // being squeezed into a two-line row that would drop its trade package.
+  const richItems = items.filter((item) => item.presentation?.trade_package);
+  const rowItems = items.filter((item) => !item.presentation?.trade_package);
+
+  return (
+    <View style={styles.groupSection}>
+      <SectionHeading title="Needs Attention" icon="eye-outline" />
+      {richItems.map((item, index) => (
+        <TopPriorityTradeCard
+          key={`watch-trade-${index}`}
+          item={item}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          navigation={navigation}
+          isNew={newRecommendationIds.has(item.recommendation_id)}
+          showExplanations={showExplanations}
+        />
+      ))}
+      {showHealth || rowItems.length > 0 ? (
+        <AnimatedCard style={styles.groupCard}>
+          {showHealth ? <TeamHealthContextBlock snapshot={snapshot!} last={rowItems.length === 0} /> : null}
+          {rowItems.map((item, index) => (
+            <DashboardInsightRow
+              key={`watch-${index}`}
+              item={item}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+              isNew={newRecommendationIds.has(item.recommendation_id)}
+              showExplanations={showExplanations}
+              last={index === rowItems.length - 1}
+            />
+          ))}
+        </AnimatedCard>
+      ) : null}
+    </View>
+  );
+}
+
+/** "Opportunities" tier — Waiver Opportunity + League Movement items. */
+function OpportunitiesSection({
+  items,
+  leagueId,
+  leagueName,
+  navigation,
+  newRecommendationIds,
+  showExplanations,
+}: {
+  items: DashboardItem[];
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+  newRecommendationIds: Set<string>;
+  showExplanations: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  if (items.length === 0) return null;
+  const richItems = items.filter((item) => item.presentation?.trade_package);
+  const rowItems = items.filter((item) => !item.presentation?.trade_package);
+
+  return (
+    <View style={styles.groupSection}>
+      <SectionHeading title="Opportunities" icon="swap-horizontal-outline" />
+      {richItems.map((item, index) => (
+        <TopPriorityTradeCard
+          key={`opportunity-trade-${index}`}
+          item={item}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          navigation={navigation}
+          isNew={newRecommendationIds.has(item.recommendation_id)}
+          showExplanations={showExplanations}
+        />
+      ))}
+      {rowItems.length > 0 ? (
+        <AnimatedCard style={styles.groupCard}>
+          {rowItems.map((item, index) => (
+            <DashboardInsightRow
+              key={`opportunity-${index}`}
+              item={item}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+              isNew={newRecommendationIds.has(item.recommendation_id)}
+              showExplanations={showExplanations}
+              last={index === rowItems.length - 1}
+            />
+          ))}
+        </AnimatedCard>
+      ) : null}
+    </View>
   );
 }
 
@@ -902,9 +1180,19 @@ function createStyles(colors: ThemeColors) {
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.lg, lineHeight: 16, textAlign: 'center' },
   // Dashboard's content container has no `gap` (everything else here relies
   // on manual marginBottom), so the shared grid's own spacing is overridden
-  // here rather than the grid inventing an opinion about screen spacing.
-  quickActionsGrid: { marginBottom: spacing.lg },
-  lockWrap: { marginTop: spacing.md },
+  // here rather than the grid inventing an opinion about screen spacing —
+  // the wrapping `quickActionsSection` (below) now owns that spacing since
+  // the grid sits under its own SectionHeading in secondary context.
+  quickActionsGrid: { marginBottom: 0 },
+  quickActionsSection: { marginTop: spacing.lg, marginBottom: spacing.md },
+  lockWrap: { marginTop: spacing.md, marginBottom: spacing.md },
+  // Shared "grouped surface" wrapper for the Needs Attention / Opportunities
+  // tiers — one AnimatedCard containing several InsightRows with internal
+  // dividers, per Magna Carta §12, instead of a full card per item.
+  groupSection: { marginBottom: spacing.md },
+  groupCard: { padding: spacing.lg, paddingVertical: spacing.xs },
+  groupDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
+  healthBlock: { paddingVertical: spacing.md, gap: spacing.sm },
   pulseSection: { marginTop: spacing.lg },
   pulseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   pulseTile: {
@@ -974,14 +1262,6 @@ function createStyles(colors: ThemeColors) {
     marginBottom: 2,
   },
   detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  newBadge: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 2,
-    marginLeft: spacing.xs,
-  },
-  newBadgeText: { fontSize: 8, fontWeight: '800', color: colors.background, letterSpacing: 0.4 },
   card: {
     borderLeftWidth: 4,
     padding: spacing.lg,

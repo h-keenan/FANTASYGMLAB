@@ -198,6 +198,11 @@ export interface TeamRanking {
   trade_tendency: string;
   trade_tendency_sell_count: number;
   trade_tendency_buy_count: number;
+  // Real season-to-date move count off actual Sleeper transaction history
+  // (modules.manager_activity) — trades + waiver claims + free-agent moves
+  // this roster has been party to so far this season. Powers the Dashboard
+  // League Pulse "Most Active Manager" tile.
+  transaction_activity_count: number;
 }
 
 export interface LeagueTeamRankingsResponse {
