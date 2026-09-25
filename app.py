@@ -4454,39 +4454,41 @@ def render_player_quick_view_content(
         risk_copy = _safe_text(row.get("injury_replacement_note"))
     if player_quick_view.is_trade_package_copy(risk_copy):
         risk_copy = ""
-    player_read = player_quick_view.canonical_player_read_copy(
-        why_candidates=(why_statement, _safe_text(row.get("opportunity_explanation"))),
-        fit_candidates=(fit_copy,),
-        risk_candidates=(risk_copy,),
-        blocked_values=(
-            pqv_story.get("summary", ""),
-            pqv_story.get("context", ""),
-            bound_narrative.reason if bound_narrative is not None else "",
-            bound_narrative.risk if bound_narrative is not None else "",
-            bound_narrative.confidence_wording if bound_narrative is not None else "",
-            bound_narrative.expected_outcome if bound_narrative is not None else "",
-        ),
-    )
-    why_factors = player_quick_view.compose_fantasygm_read_factors(
-        why=player_read["why"],
-        team_fit=player_read["fit"],
-        risk=player_read["risk"],
-        skip_values=(
-            opportunity_label,
-            fantasy_ppg,
-            roster_classification,
-            overall_rank_label,
-            position_rank_label,
-            tier_label,
-            role_label,
-            pqv_story.get("summary", ""),
-            concise_rationale,
-        ),
-    )
     with _pqv_exclusive("pqv_evidence_prepare"):
-        player_quick_view.why_this_recommendation_html(
-            why_factors,
-            skip_values=(opportunity_label,),
+        # Why/Fit/Risk evidence for the Decision panel below. This used to
+        # also render its own standalone "Why" section via
+        # why_this_recommendation_html(), but that call's return value was
+        # discarded — the Decision panel builder already renders the same
+        # why_factors internally via its own factors grid, so the separate
+        # call was pure dead computation, never painted anywhere.
+        player_read = player_quick_view.canonical_player_read_copy(
+            why_candidates=(why_statement, _safe_text(row.get("opportunity_explanation"))),
+            fit_candidates=(fit_copy,),
+            risk_candidates=(risk_copy,),
+            blocked_values=(
+                pqv_story.get("summary", ""),
+                pqv_story.get("context", ""),
+                bound_narrative.reason if bound_narrative is not None else "",
+                bound_narrative.risk if bound_narrative is not None else "",
+                bound_narrative.confidence_wording if bound_narrative is not None else "",
+                bound_narrative.expected_outcome if bound_narrative is not None else "",
+            ),
+        )
+        why_factors = player_quick_view.compose_fantasygm_read_factors(
+            why=player_read["why"],
+            team_fit=player_read["fit"],
+            risk=player_read["risk"],
+            skip_values=(
+                opportunity_label,
+                fantasy_ppg,
+                roster_classification,
+                overall_rank_label,
+                position_rank_label,
+                tier_label,
+                role_label,
+                pqv_story.get("summary", ""),
+                concise_rationale,
+            ),
         )
     award_index = None
     award_position_lookup: dict[str, str] = {}

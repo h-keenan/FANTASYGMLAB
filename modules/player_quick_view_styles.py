@@ -32,7 +32,7 @@ PLAYER_QUICK_VIEW_CSS = """
 .player-quick-view-header-band.player-quick-view-hero,div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero{align-items:start !important;display:grid;grid-template-columns:auto minmax(0,1fr) !important;justify-content:start;max-width:none;min-height:0}
 .pqv-workspace{display:grid;gap:var(--space-sm);max-width:54rem;min-width:0;width:100%}
 .pqv-workspace-top{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);min-width:0}
-.pqv-workspace-top--with-season{grid-template-areas:"identity" "season" "decision"}
+.pqv-workspace-top--with-season{grid-template-areas:"identity" "decision" "season"}
 .pqv-workspace-top--with-season .pqv-identity{grid-area:identity}
 .pqv-workspace-top--with-season .pqv-evidence-season{grid-area:season;min-width:0}
 .pqv-workspace-top--with-season .pqv-decision-panel{grid-area:decision}
@@ -40,7 +40,11 @@ PLAYER_QUICK_VIEW_CSS = """
 .pqv-compact-model,.pqv-compact-career{min-width:0}
 .pqv-evidence-season .player-dossier-section-heading,.pqv-compact-model .player-dossier-section-heading,.pqv-compact-career .player-dossier-section-heading{border:0;margin:0;padding:0 0 var(--space-2xs)}
 .pqv-evidence-season .pqv-glance-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-.pqv-decision-panel{display:grid;gap:var(--space-sm);min-width:0}
+/* Decision is the strongest-emphasis module on this screen (Magna Carta
+   §14/§29) at every width, not only the ≥1024px two-column layout — every
+   other analytical module in this file (player-dossier-decision, pqv-why-
+   factor, pqv-signal-badge) already carries this same accent border. */
+.pqv-decision-panel{border-left:var(--border-width-semantic) solid var(--color-information);display:grid;gap:var(--space-sm);min-width:0;padding-left:var(--space-md)}
 .pqv-identity{margin:0}
 .pqv-decision-row,.pqv-evidence-row{align-items:start;display:grid;gap:var(--space-md);grid-template-columns:minmax(0,1fr);min-width:0}
 .pqv-decision-primary .player-dossier-context-summary,.pqv-decision-primary .player-dossier-context-note,.pqv-why-factor strong{overflow-wrap:anywhere;white-space:normal}
@@ -261,7 +265,7 @@ div[class*="st-key-pqv_actions_strip"]{max-width:54rem}
 .pqv-hero-portrait{--pqv-portrait-size:clamp(4.75rem,7vw,6.25rem)}
 .pqv-workspace-top{align-items:stretch;grid-template-columns:minmax(16rem,0.95fr) minmax(0,1.05fr)}
 .pqv-workspace-top--with-season{grid-template-areas:"identity decision" "season season";grid-template-columns:minmax(16rem,0.95fr) minmax(0,1.05fr)}
-.pqv-decision-panel{align-content:start;border-left:var(--border-width-semantic) solid var(--color-information);padding-left:var(--space-md)}
+.pqv-decision-panel{align-content:start}
 .player-dossier-rank-strip{display:grid;gap:var(--space-sm) var(--space-lg);grid-template-columns:repeat(3,minmax(0,max-content))}
 .pqv-evidence-season,.pqv-compact-model,.pqv-compact-career{border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;min-width:0;padding:var(--space-sm) var(--space-md)}
 .pqv-evidence-season .pqv-glance-grid{grid-template-columns:repeat(6,minmax(4.5rem,6.5rem));justify-content:start;max-width:max-content}

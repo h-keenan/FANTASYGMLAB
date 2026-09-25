@@ -65,7 +65,13 @@ def test_dossier_hierarchy_is_explicit_in_shared_renderer():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     identity = source.index("player_quick_view.pqv_hero_html")
     context = source.index("player_quick_view.recommendation_context_html", identity)
-    why = source.index("player_quick_view.why_this_recommendation_html")
+    # Why/Fit/Risk evidence (compose_fantasygm_read_factors) is prepared
+    # before identity/context render — it feeds recommendation_context_html's
+    # own factors grid directly. A separate why_this_recommendation_html()
+    # call used to sit here too, but its return value was always discarded
+    # (recommendation_context_html already renders the same factors), so it
+    # was removed as dead code rather than kept as a second, unused render.
+    why = source.index('_pqv_exclusive("pqv_evidence_prepare")')
     workspace = source.index("player_quick_view.pqv_primary_workspace_html", context)
     first_useful = source.index("pqv_first_useful", workspace)
     actions = source.index('st.container(key=f"pqv_actions_{player_id}")', first_useful)
