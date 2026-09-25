@@ -424,6 +424,7 @@ def generate_trade_idea_records(
     untouchable_player_ids: tuple[str, ...] = (),
     gm_target_player_ids: tuple[str, ...] = (),
     trade_block_player_ids: tuple[str, ...] = (),
+    team_stance: str = "",
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_ui already work with (trade_confidence_label,
@@ -444,6 +445,12 @@ def generate_trade_idea_records(
     build_trade_ideas' own `trade_block_names` parameter already supports
     this restriction, it just wasn't wired up outside the web app before.
     Resolved to names for the same reason untouchables are.
+
+    `team_stance` is the caller's OWN declared Team Situation
+    (modules.team_stance: "rebuilding"/"competing"/"balanced", or "" for
+    none set) — applied last, via modules.trade_ideas.apply_team_stance_framing,
+    which only appends a short clause to each idea's rationale text. It
+    never changes which ideas are generated, their scores, or their order.
 
     `generate_trade_ideas` narrows these to TradeIdeaCard for the mobile
     Trade Hub card UI; callers that need the raw engine fields — ranking via
@@ -521,7 +528,7 @@ def generate_trade_idea_records(
         list(enforced),
         gm_target_player_ids=frozenset(str(pid) for pid in gm_target_player_ids if str(pid)),
     )
-    return tagged
+    return trade_ideas_module.apply_team_stance_framing(tagged, team_stance)
 
 
 # Idea generation re-applies the valuation lens across the whole players
@@ -592,6 +599,7 @@ def generate_trade_idea_records_cached(
     players_db_path: str,
     untouchable_player_ids: tuple[str, ...] = (),
     gm_target_player_ids: tuple[str, ...] = (),
+    team_stance: str = "",
 ) -> list[dict[str, Any]]:
     """Cached front door for `generate_trade_idea_records` — resolves its
     own players_df/settings/rosters from just (league_id, lens) rather than
@@ -603,9 +611,14 @@ def generate_trade_idea_records_cached(
     `untouchable_player_ids`/`gm_target_player_ids` are per-user GM Targets
     state, so they're part of the cache key (sorted for a stable key
     regardless of input order) — two users sharing a roster with different
-    GM Targets never see each other's untouchable/target tagging."""
+    GM Targets never see each other's untouchable/target tagging.
 
-    return _generate_trade_idea_records_cached(
+    `team_stance` (the caller's own declared Team Situation) is applied
+    OUTSIDE the lru_cache boundary — a stance-aware rationale clause is a
+    cheap string append, not worth invalidating/duplicating the expensive
+    search cache entry over. See modules.trade_ideas.apply_team_stance_framing."""
+
+    records = _generate_trade_idea_records_cached(
         league_id,
         roster_id,
         strategy,
@@ -615,6 +628,7 @@ def generate_trade_idea_records_cached(
         tuple(sorted({str(pid) for pid in gm_target_player_ids if str(pid)})),
         _trade_hub_ideas_cache_bucket(),
     )
+    return trade_ideas_module.apply_team_stance_framing(records, team_stance)
 
 
 def generate_trade_finder_records(
@@ -627,6 +641,7 @@ def generate_trade_finder_records(
     trade_block_player_ids: tuple[str, ...],
     untouchable_player_ids: tuple[str, ...] = (),
     gm_target_player_ids: tuple[str, ...] = (),
+    team_stance: str = "",
 ) -> list[dict[str, Any]]:
     """Trade Finder: "select these specific players/picks, find who'd want
     them" — the same idea-generation engine as the passive Trade Hub board
@@ -672,6 +687,7 @@ def generate_trade_finder_records(
         league_settings=settings,
         score_field=score_field,
         team_strategy=strategy,
+        team_stance=team_stance,
     )
 
 
@@ -685,12 +701,16 @@ def generate_trade_ideas(
     score_field: str,
     team_strategy: str = "retool",
     max_ideas: int = MAX_TRADE_IDEAS,
+    team_stance: str = "",
 ) -> list[TradeIdeaCard]:
     """The mobile Trade Hub board — same engine call as the web app's Trade
     Hub (modules.trade_ideas.build_trade_ideas) and the same production
     Trust enforcement boundary, fed by a fresh per-request league summary
     (modules.team_eval.build_league_summary) rather than app.py's
-    Streamlit-session-cached version — see module docstring for why."""
+    Streamlit-session-cached version — see module docstring for why.
+
+    `team_stance` is the caller's declared Team Situation; see
+    generate_trade_idea_records' docstring — presentation-only rationale bias."""
 
     enforced = generate_trade_idea_records(
         league_id=league_id,
@@ -701,5 +721,6 @@ def generate_trade_ideas(
         score_field=score_field,
         team_strategy=team_strategy,
         max_ideas=max_ideas,
+        team_stance=team_stance,
     )
     return [project_trade_idea_card(idea) for idea in enforced]

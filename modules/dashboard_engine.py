@@ -323,6 +323,7 @@ def compose_next_move_briefing(
     roster_df: pd.DataFrame | None = None,
     lineup_df: pd.DataFrame | None = None,
     injury_context: dict[str, Any] | None = None,
+    team_stance: str = "",
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
@@ -395,6 +396,7 @@ def compose_next_move_briefing(
                 league_settings=league_settings,
                 score_field=score_field,
                 team_strategy=team_strategy,
+                team_stance=team_stance,
             )
         )
         ranked_records = trade_hub_ui.order_trade_hub_visible_ideas(list(records))

@@ -13,6 +13,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { isShowcaseModeAvailable } from '../lib/showcaseMode';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { currentLeagueContext } from '../navigation/navigationRef';
 import { useAuth } from '../context/AuthContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
@@ -146,6 +147,15 @@ export default function MoreScreen({ navigation }: Props) {
     void Linking.openURL(url);
   };
 
+  const onOpenTeamStance = () => {
+    const league = currentLeagueContext();
+    if (!league) {
+      Alert.alert('Select a league first', 'Open a league from Home, then come back to set your Team Situation.');
+      return;
+    }
+    navigation.navigate('TeamStance', league);
+  };
+
   const onDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
@@ -202,6 +212,18 @@ export default function MoreScreen({ navigation }: Props) {
             />
           ))}
         </View>
+
+        <AppText style={styles.sectionLabel}>Your Team</AppText>
+        <AnimatedCard style={styles.groupCard}>
+          <SettingsRow
+            icon="compass-outline"
+            iconColor={colors.accent}
+            label="Team Situation"
+            description="Declare Rebuilding / Competing / Balanced and manage protected players"
+            onPress={onOpenTeamStance}
+            showDivider={false}
+          />
+        </AnimatedCard>
 
         <AppText style={styles.sectionLabel}>Notifications</AppText>
         <AnimatedCard style={styles.groupCard}>
