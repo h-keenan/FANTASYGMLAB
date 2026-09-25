@@ -1,14 +1,25 @@
 # Launch Analytics Foundation Contract
 
+> **Update (storage migration):** Persistence is now the durable Supabase
+> table `analytics_events` (`docs/supabase_analytics_events.sql`),
+> write-through from `track_event` on a background thread (never blocks the
+> caller) and read-through for Founder Analytics
+> (`modules.launch_analytics.read_events_with_source`). The local JSONL file
+> below is unchanged in every other respect and remains a fail-open
+> cache/fallback: it is still written on every event, and every read path
+> falls back to it automatically when Supabase is unconfigured or
+> unreachable. Event taxonomy, privacy model, and everything else in this
+> contract are unchanged — this was a storage-backend migration only.
+
 | Field | Value |
 | --- | --- |
 | Module | `modules/launch_analytics.py` (canonical owner) |
 | Kill switch | `DYNASTYGM_LAUNCH_ANALYTICS=1` (default **off**) |
 | Environment stamp | `DYNASTYGM_ANALYTICS_ENV` or auto: `production` / `development` / `test` |
-| Persistence | Local JSONL (`data/launch_analytics.jsonl`) |
-| Retention | **120 days** raw events (`prune_expired_events`) |
+| Persistence | Supabase `analytics_events` (durable, cross-instance) + local JSONL fallback/cache (`data/launch_analytics.jsonl`) |
+| Retention | **120 days** raw events (`prune_expired_events`, JSONL side; no automatic prune on the Supabase table yet — see `docs/supabase_analytics_events.sql`) |
 | Event envelope version | `event_version: 2` |
-| Provider decision | **No new external vendor** — extend JSONL + Founder Ops |
+| Provider decision | **No new external vendor** — extend the existing owner with durable Supabase storage + Founder Ops |
 
 ## Architecture map
 
@@ -20,26 +31,35 @@ modules/launch_analytics.py   ← ONLY application analytics interface
   track_event / track_page_view / track_feature_use
   track_error / track_performance / track_session_started
         │
-        ▼
-JSONL append (fail-soft, locked)
-        │
-        ▼
-Founder Ops read models
-  funnel_summary · retention_summary
-  feature_adoption_summary · health_summary
+        ├──────────────────────────────┐
+        ▼                              ▼
+JSONL append (fail-soft, locked)   Supabase analytics_events insert
+  — cache/fallback, unchanged        (background thread, best-effort,
+                                       service-role — see
+                                       docs/supabase_analytics_events.sql)
+        │                              │
+        └──────────────┬───────────────┘
+                        ▼
+        read_events_with_source (Supabase-first,
+        JSONL fallback on outage/misconfig)
+                        │
+                        ▼
+        Founder Ops read models
+          funnel_summary · retention_summary
+          feature_adoption_summary · health_summary
 ```
 
-No route imports a vendor SDK. Provider adapter (JSONL today) stays behind this owner.
+No route imports a vendor SDK. Provider adapter (Supabase + JSONL fallback) stays behind this owner.
 
 ## Provider decision
 
 | Option | Verdict |
 | --- | --- |
-| Existing JSONL + Founder Ops | **Chosen for launch foundation** |
+| Supabase `analytics_events` + JSONL fallback + Founder Ops | **Chosen** — durable, survives redeploys/restarts, readable cross-instance; JSONL remains the fail-open cache |
 | PostHog / Amplitude / Mixpanel / GA | Not introduced — privacy, Streamlit rerun semantics, and cost complexity outweigh benefit before product-market proof |
-| Supabase analytics tables | Deferred — adds RLS/service-role surface without unlocking founder questions beyond JSONL |
+| Supabase analytics tables | ~~Deferred~~ **Implemented** — see `docs/supabase_analytics_events.sql`. Service-role only; no per-user RLS (events include anonymous/guest sessions and Founder Analytics reads across every account) |
 
-**Rationale:** The repo already had a privacy-conscious, fail-soft, kill-switched analytics owner. Extending it answers launch questions without a second vendor. At ~10k+ DAU, plan a durable warehouse drain; do not dual-write now.
+**Rationale:** The repo already had a privacy-conscious, fail-soft, kill-switched analytics owner. This migration gives it durable, cross-instance storage without a second vendor, while keeping the local JSONL as an unconditional fallback so an outage never breaks tracking. At ~10k+ DAU, still plan a proper warehouse — this table's read path is bounded the same way the old JSONL path was (see `VOLUME_MODEL` in `modules/launch_analytics.py`).
 
 ## Privacy model — must NOT track
 

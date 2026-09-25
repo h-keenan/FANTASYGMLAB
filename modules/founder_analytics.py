@@ -92,7 +92,20 @@ def _unique_ids(rows: list[dict[str, Any]], *, field: str) -> int:
     return len(values)
 
 
-def _storage_honesty(*, writes_enabled: bool, path: Path) -> dict[str, Any]:
+def _storage_honesty(*, writes_enabled: bool, path: Path, source: str = "local_jsonl") -> dict[str, Any]:
+    if source == "supabase":
+        return {
+            "kind": "supabase",
+            "file_name": la.ANALYTICS_SUPABASE_TABLE,
+            "directory": "supabase",
+            "exists": True,
+            "size_bytes": 0,
+            "writes_enabled": writes_enabled,
+            "retention_days": la.RETENTION_DAYS,
+            "survives_render_deploy": True,
+            "multi_instance": "Durable Supabase table — counts are cluster-wide across every instance.",
+            "scope_label": "All app instances (Supabase-backed) — not host-local.",
+        }
     exists = path.is_file()
     size_bytes = path.stat().st_size if exists else 0
     return {
@@ -105,7 +118,7 @@ def _storage_honesty(*, writes_enabled: bool, path: Path) -> dict[str, Any]:
         "retention_days": la.RETENTION_DAYS,
         "survives_render_deploy": False,
         "multi_instance": "Each Render instance has its own disk file. Totals are not cluster-wide.",
-        "scope_label": "This host file only — not all users across workers",
+        "scope_label": "This host file only — Supabase not available; not all-user totals.",
     }
 
 
@@ -116,10 +129,14 @@ def build_report(
     now: float | None = None,
     writes_enabled: bool | None = None,
 ) -> dict[str, Any]:
-    target = path or la.analytics_path()
+    local_path = path or la.analytics_path()
     enabled = la.analytics_enabled() if writes_enabled is None else bool(writes_enabled)
     since = window_since_ts(window_key, now=now)
-    rows = la._iter_events(path=target, since_ts=since)
+    # Supabase-first, local-JSONL-fallback — see
+    # modules.launch_analytics.read_events_with_source. Fetch once and reuse
+    # the same rows for adoption/health below rather than issuing a second
+    # (and third) Supabase round trip for the same report.
+    rows, source = la.read_events_with_source(path=path, since_ts=since)
     event_counts: dict[str, int] = {}
     for row in rows:
         event = la.normalize_event_name(str(row.get("event") or ""))
@@ -127,14 +144,14 @@ def build_report(
             event_counts[event] = event_counts.get(event, 0) + 1
 
     modules = []
-    adoption = la.feature_adoption_summary(path=target, since_ts=since)
+    adoption = la.feature_adoption_summary(rows=rows)
     for name, stats in sorted(
         adoption.items(),
         key=lambda item: (-int(item[1].get("views") or 0), item[0]),
     ):
         modules.append({"module": name, **stats})
 
-    health = la.health_summary(path=target, since_ts=since)
+    health = la.health_summary(rows=rows)
     buckets: dict[str, int] = {}
     for row in rows:
         event = la.normalize_event_name(str(row.get("event") or ""))
@@ -161,11 +178,18 @@ def build_report(
         "error_sessions": health.get("error_sessions") or 0,
         "performance": health.get("performance") or {},
         "startup_latency_buckets": buckets,
-        "storage": _storage_honesty(writes_enabled=enabled, path=target),
-        "unavailable": [] if rows or target.is_file() else ["No analytics file on this host yet."],
+        "storage": _storage_honesty(writes_enabled=enabled, path=local_path, source=source),
+        "unavailable": (
+            []
+            if rows or source == "supabase" or local_path.is_file()
+            else ["No analytics file on this host yet."]
+        ),
         "partial_notes": [
-            "Counts are measured events on this instance's JSONL.",
-            "Conversion rates are omitted because host-local files cannot represent all users.",
+            "Counts are measured events" + (
+                " from the durable Supabase log." if source == "supabase"
+                else " on this instance's JSONL."
+            ),
+            "Conversion rates are omitted because these counts cannot represent all users.",
             "Enable DYNASTYGM_LAUNCH_ANALYTICS=1 on FANTASYGMLAB to record new events.",
         ],
     }
