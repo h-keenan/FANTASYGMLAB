@@ -41,8 +41,15 @@ def build(items):
     )
 
 
-def news(name, timestamp, *, reason="player mention", link="https://example.com/item"):
-    return {
+def news(
+    name,
+    timestamp,
+    *,
+    reason="player mention",
+    link="https://example.com/item",
+    speculative=False,
+):
+    item = {
         "title": f"{name} update",
         "matched_player": name,
         "published_ts": timestamp,
@@ -52,6 +59,9 @@ def news(name, timestamp, *, reason="player mention", link="https://example.com/
         "relative": "recently",
         "link": link,
     }
+    if speculative:
+        item["signal_speculative"] = True
+    return item
 
 
 def test_feed_is_chronological_and_builds_player_index_once():
@@ -173,6 +183,18 @@ def test_disclosure_keys_are_stable_namespaced_and_independent():
     assert league_intelligence.disclosure_state_key(second.item_id) not in state
     league_intelligence.toggle_disclosure(first.item_id, state=state)
     assert state[league_intelligence.disclosure_state_key(first.item_id)] is False
+
+
+def test_speculative_flag_passes_through_from_upstream_signal_classification():
+    """Already-computed signal_speculative (modules.news_signal.enrich_news_item)
+    must survive into the presentation model instead of being silently dropped —
+    that drop previously let rumor-sourced reports read with the same confidence
+    as confirmed ones (the same class of gap fixed for Alerts in PR #767)."""
+
+    confirmed = build([news("My Player", NOW - 60)]).items[0]
+    rumor = build([news("My Player", NOW - 60, speculative=True)]).items[0]
+    assert confirmed.speculative is False
+    assert rumor.speculative is True
 
 
 def test_repeated_build_is_deterministic():

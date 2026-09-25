@@ -30,6 +30,53 @@ _SIGNAL_TONE_CLASS = {
     "Waiver Watch": "dg-intelligence-signal--opportunity",
 }
 
+# Decision-tier grouping (Magna Carta §4: organize by user decision, not backend
+# taxonomy). Replaces the prior calendar-day section headers (Today/Yesterday/
+# date) — per-item recency is unchanged and still shown via timestamp_label in
+# the meta trail, so no information is lost, only reordered. Item order within
+# a tier is exactly the existing chronological feed order; only bucketing
+# changes here, mirroring the Alerts V2 restructure (Needs Your Attention ->
+# My Players -> Around the League), with a Waiver Watch tier inserted per the
+# Waiver UI rule (personalized/actionable before generic market context).
+_TIER_ATTENTION = "attention"
+_TIER_ROSTER = "roster"
+_TIER_WAIVER = "waiver"
+_TIER_LEAGUE = "league"
+_TIER_ORDER = (_TIER_ATTENTION, _TIER_ROSTER, _TIER_WAIVER, _TIER_LEAGUE)
+_TIER_LABELS = {
+    _TIER_ATTENTION: "Needs Your Attention",
+    _TIER_ROSTER: "Your Roster",
+    _TIER_WAIVER: "Waiver Watch",
+    _TIER_LEAGUE: "Around the League",
+}
+
+
+def _decision_tier(item: LeagueIntelligenceItem) -> str:
+    """Presentation-only decision-priority bucket; never touches ranking/sort."""
+
+    if item.league_relevance == "Owned by you":
+        if item.recommendation_label == "Injury Monitor":
+            return _TIER_ATTENTION
+        return _TIER_ROSTER
+    if item.recommendation_label == "Waiver Watch":
+        return _TIER_WAIVER
+    return _TIER_LEAGUE
+
+
+def _unconfirmed_badge_html(item: LeagueIntelligenceItem) -> str:
+    """Amber 'Unconfirmed' badge for speculative/rumor-sourced reports.
+
+    Surfaces `item.speculative` (already computed upstream by
+    modules.news_signal.enrich_news_item and passed through by
+    build_league_intelligence_feed) so a rumor no longer reads with the same
+    confidence as a confirmed report — matching the fix already applied to
+    Alerts (PR #767).
+    """
+
+    if not item.speculative:
+        return ""
+    return " " + ui_primitives.status_badge_html("Unconfirmed", variant="caution")
+
 
 def _recommendation_metric_html(recommendation_label: str) -> str:
     """Primary-metric slot for the recommendation, toned by urgency/opportunity."""
@@ -61,6 +108,7 @@ def intelligence_item_html(
         if item.external_url
         else headline
     )
+    headline_html += _unconfirmed_badge_html(item)
     identity = dense_list_primitives.dense_identity_html(
         primary=item.player_name or "League update",
         secondary_html=headline_html,
@@ -128,53 +176,60 @@ def render_league_intelligence_feed(
     # player_card_builder retained for call-site compatibility; dense rows use identity only.
     del score_field, score_label, player_card_builder
 
-    current_group = ""
-    for item_index, item in enumerate(feed.items):
-        if item.timeline_group != current_group:
-            current_group = item.timeline_group
-            st.markdown(
-                f"<div class='dg-intelligence-group'>{escape(current_group)}</div>",
-                unsafe_allow_html=True,
-            )
+    grouped: dict[str, list[LeagueIntelligenceItem]] = {tier: [] for tier in _TIER_ORDER}
+    for item in feed.items:
+        grouped[_decision_tier(item)].append(item)
 
-        item_html = intelligence_item_html(
-            item,
-            primary=item_index == 0,
+    rendered_index = 0
+    for tier in _TIER_ORDER:
+        tier_items = grouped[tier]
+        if not tier_items:
+            continue
+        st.markdown(
+            f"<div class='dg-intelligence-group dg-intelligence-group--{tier}'>"
+            f"{escape(_TIER_LABELS[tier])}</div>",
+            unsafe_allow_html=True,
         )
-        clicked_player_id = render_tappable_player_html(
-            html=item_html,
-            key_prefix=f"league_intelligence_{item.item_id}",
-        )
-        if clicked_player_id and clicked_player_id == item.player_id:
-            open_player_quick_view(
-                clicked_player_id,
-                source_label="News",
-                source_note=item.summary,
-                status_label=item.recommendation_label,
+        for item in tier_items:
+            item_html = intelligence_item_html(
+                item,
+                primary=rendered_index == 0,
             )
+            clicked_player_id = render_tappable_player_html(
+                html=item_html,
+                key_prefix=f"league_intelligence_{item.item_id}",
+            )
+            if clicked_player_id and clicked_player_id == item.player_id:
+                open_player_quick_view(
+                    clicked_player_id,
+                    source_label="News",
+                    source_note=item.summary,
+                    status_label=item.recommendation_label,
+                )
+            rendered_index += 1
 
-        state_key = disclosure_state_key(item.item_id)
-        expanded = bool(st.session_state.get(state_key, False))
-        st.button(
-            f"{'▾' if expanded else '▸'} Why this matters",
-            key=f"league_intelligence_{item.item_id}_control",
-            help=(
-                "Collapse the league-specific explanation"
-                if expanded
-                else "Expand the league-specific explanation"
-            ),
-            on_click=toggle_disclosure,
-            kwargs={"item_id": item.item_id, "state": st.session_state},
-            type="tertiary",
-            width="content",
-        )
-        if expanded:
-            prose = escape(item.summary)
-            explanation = escape(item.explanation)
-            st.markdown(
-                f"<div class='dg-intelligence-explanation' role='note'>"
-                f"<p class='dg-intelligence-explanation__summary'>{prose}</p>"
-                f"<p>{explanation}</p>"
-                f"</div>",
-                unsafe_allow_html=True,
+            state_key = disclosure_state_key(item.item_id)
+            expanded = bool(st.session_state.get(state_key, False))
+            st.button(
+                f"{'▾' if expanded else '▸'} Why this matters",
+                key=f"league_intelligence_{item.item_id}_control",
+                help=(
+                    "Collapse the league-specific explanation"
+                    if expanded
+                    else "Expand the league-specific explanation"
+                ),
+                on_click=toggle_disclosure,
+                kwargs={"item_id": item.item_id, "state": st.session_state},
+                type="tertiary",
+                width="content",
             )
+            if expanded:
+                prose = escape(item.summary)
+                explanation = escape(item.explanation)
+                st.markdown(
+                    f"<div class='dg-intelligence-explanation' role='note'>"
+                    f"<p class='dg-intelligence-explanation__summary'>{prose}</p>"
+                    f"<p>{explanation}</p>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )

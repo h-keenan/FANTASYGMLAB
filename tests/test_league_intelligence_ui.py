@@ -80,6 +80,60 @@ def test_renderer_lazily_omits_explanation_while_collapsed():
     assert not any("dg-intelligence-explanation" in str(call.args[0]) for call in markdown.call_args_list)
 
 
+def test_speculative_item_renders_unconfirmed_badge_confirmed_item_does_not():
+    speculative_item = build([news("My Player", NOW - 60, speculative=True)]).items[0]
+    confirmed_item = build([news("Their Player", NOW - 60)]).items[0]
+    speculative_html = league_intelligence_ui.intelligence_item_html(speculative_item)
+    confirmed_html = league_intelligence_ui.intelligence_item_html(confirmed_item)
+    assert "Unconfirmed" in speculative_html
+    assert "dg-ui-badge--caution" in speculative_html
+    assert "Unconfirmed" not in confirmed_html
+
+
+def test_decision_tiers_replace_calendar_grouping_and_preserve_all_items():
+    """Magna Carta §4 / UI V2 reset: group by decision importance, not backend
+    calendar structure. Mirrors the Alerts V2 restructure (Needs Your Attention
+    -> My Players -> Around the League), with a Waiver Watch tier inserted."""
+
+    feed = build(
+        [
+            news("My Player", NOW - 60, reason="injury/status"),  # mine + injury
+            news("Their Player", NOW - 120, reason="transaction"),  # someone else's
+            news("Free Player", NOW - 180, reason="role/depth chart"),  # waiver watch
+        ]
+    )
+    group_labels = []
+    rendered = []
+    with (
+        patch.object(
+            league_intelligence_ui.st,
+            "markdown",
+            side_effect=lambda html, **_kwargs: group_labels.append(html)
+            if "dg-intelligence-group" in html
+            else None,
+        ),
+        patch.object(league_intelligence_ui.st, "button"),
+        patch.object(league_intelligence_ui.st, "session_state", {}),
+    ):
+        league_intelligence_ui.render_league_intelligence_feed(
+            feed,
+            score_field="value_score",
+            score_label="Value",
+            player_card_builder=lambda *_args, **_kwargs: "",
+            render_tappable_player_html=lambda **kwargs: rendered.append(kwargs["html"]) or "",
+            open_player_quick_view=lambda *_args, **_kwargs: None,
+        )
+    assert len(rendered) == len(feed.items) == 3
+    assert "Today" not in "".join(group_labels)
+    assert "Needs Your Attention" in group_labels[0]
+    assert "Waiver Watch" in group_labels[1]
+    assert "Around the League" in group_labels[2]
+    # My urgent injury item is the single most decision-relevant row, so it is
+    # both the first group and the visually primary row.
+    assert "dg-intelligence-item--primary" in rendered[0]
+    assert all("dg-intelligence-item--primary" not in item for item in rendered[1:])
+
+
 def test_first_intelligence_item_is_visually_primary_without_removing_items():
     feed = build([news("My Player", NOW - 60), news("Other Player", NOW - 120)])
     rendered = []
