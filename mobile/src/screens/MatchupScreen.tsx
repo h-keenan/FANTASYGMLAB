@@ -195,7 +195,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
             <View style={styles.versusSide}>
               <TeamAvatar
                 avatarId={mine.avatar_url}
-                size={44}
+                size={52}
                 style={StyleSheet.flatten([styles.versusAvatar, { borderColor: colors.accent }])}
               />
               <AppText style={styles.versusTeam} numberOfLines={2}>
@@ -210,7 +210,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
             <View style={styles.versusSide}>
               <TeamAvatar
                 avatarId={opponent.avatar_url}
-                size={44}
+                size={52}
                 style={StyleSheet.flatten([styles.versusAvatar, { borderColor: colors.violet }])}
               />
               <AppText style={styles.versusTeam} numberOfLines={2}>
@@ -287,7 +287,7 @@ function StarterSection({
         <AppText style={styles.sectionLabel} numberOfLines={1}>
           {title.toUpperCase()}
         </AppText>
-        <AppText style={[styles.sectionTotal, { color: accent }]}>
+        <AppText style={[styles.sectionTotal, { color: accent }]} numberOfLines={1}>
           {Math.round(side.season_value_total).toLocaleString()} SEASON VALUE
         </AppText>
       </View>
@@ -376,7 +376,7 @@ function createStyles(colors: ThemeColors) {
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  sectionTotal: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+  sectionTotal: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
   sectionCard: { padding: spacing.md, paddingVertical: spacing.xs },
   emptySection: { fontSize: 13, color: colors.textSecondary, paddingVertical: spacing.sm },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
