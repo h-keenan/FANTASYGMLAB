@@ -76,14 +76,19 @@ class TestWeeklyReportUI(unittest.TestCase):
                 render_analysis_cards=analysis_cards,
             )
 
+        # Transaction Summary (this report week's specific moves) now renders
+        # ahead of Manager Activity (season-to-date totals): this is a
+        # per-week report, so the week-specific "what happened" belongs
+        # before the cumulative reference leaderboard it contextualizes —
+        # a deliberate hierarchy reorder, not the prior build order.
         self.assertEqual(
             [call.args[0] for call in section_header.call_args_list],
             [
                 "Weekly Highlights",
                 "Power Movement",
                 "League Trends",
-                "Manager Activity",
                 "Transaction Summary",
+                "Manager Activity",
                 "Team Notes",
             ],
         )
@@ -97,6 +102,13 @@ class TestWeeklyReportUI(unittest.TestCase):
         self.assertIn("wr-move-badge--down", movement_tiles[1]["graphic"])
         self.assertIn("wr-move-badge--up", movement_tiles[2]["graphic"])
         self.assertIn("wr-move-badge--down", movement_tiles[3]["graphic"])
+        # Each movement tile now carries a plain-language explanation and an
+        # on-page next-step pointer through the existing tap-to-detail
+        # affordance (see test_workspace_ui.py's non-comparison "detail" tile
+        # case) — a clarity fix, not a new component or navigation target.
+        self.assertIn("Power Rank", movement_tiles[0]["detail"])
+        self.assertIn("Transaction Summary", movement_tiles[0]["supporting_context"])
+        self.assertIn("Franchise Rank", movement_tiles[2]["detail"])
         columns = list(dataframe.call_args.args[0].columns)
         self.assertEqual(
             columns,
@@ -171,6 +183,38 @@ class TestWeeklyReportUI(unittest.TestCase):
         for call in empty_state.call_args_list:
             self.assertEqual(call.kwargs.get("kind"), "no-data")
             self.assertTrue(call.kwargs.get("recovery_guidance"))
+
+
+    def test_with_tile_context_adds_detail_for_known_labels_only(self):
+        items = [
+            {"label": "Highest Score", "value": "150", "note": "Team A"},
+            {"label": "Some Unmapped Tile", "value": "1", "note": "Team B"},
+            {"label": "Team of the Week", "value": "150", "note": "Team A", "detail": "Already set"},
+        ]
+        enriched = weekly_report_ui._with_tile_context(items)
+        self.assertIn("detail", enriched[0])
+        self.assertIn("scored the most fantasy points", enriched[0]["detail"])
+        self.assertNotIn("detail", enriched[1])
+        # An existing caller-provided "detail" is never overwritten.
+        self.assertEqual(enriched[2]["detail"], "Already set")
+        # Original inputs are untouched (no in-place mutation).
+        self.assertNotIn("detail", items[0])
+
+    def test_with_trend_followup_only_appends_when_there_is_a_real_signal(self):
+        cards = [
+            {"label": "Hottest Team", "title": "Team A", "items": ["3-game win streak"]},
+            {"label": "Coldest Team", "title": "No clear skid", "items": ["Need completed matchup history first."]},
+            {"label": "Win Streaks", "title": "Current heaters", "items": ["Team A: 3 straight wins"]},
+        ]
+        enriched = weekly_report_ui._with_trend_followup(cards)
+        self.assertEqual(
+            enriched[0]["items"],
+            ["3-game win streak", "See Team Notes below for the roster story behind the streak."],
+        )
+        # A "no clear skid" placeholder card gets no followup pointer appended.
+        self.assertEqual(enriched[1]["items"], ["Need completed matchup history first."])
+        # A card with no mapped followup (Win Streaks) is passed through as-is.
+        self.assertEqual(enriched[2]["items"], ["Team A: 3 straight wins"])
 
 
 if __name__ == "__main__":
