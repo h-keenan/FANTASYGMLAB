@@ -63,10 +63,11 @@ interface Destination {
 // Split into two groups (was one flat 15-item list) so the sheet can render
 // LEAGUE and GM TOOLS as distinct labeled sections per coridian_'s "GM Tools
 // should plausibly be Trade Hub/Trade Finder/Trade Analyzer/Trade
-// Calculator/GM Targets/Draft Center" taxonomy. Every destination below is
+// Calculator/GM Targets/Draft Center" taxonomy, and per the redesign brief's
+// own written §4 INFORMATION ARCHITECTURE list, which places these two
+// groups in this exact order/membership. Every destination below is
 // unchanged from the prior single list — same routes, icons, colors,
-// subtitles, `needsLeague` — only the grouping and Recap's position (now
-// trailing the core group instead of the trade-tool group) changed.
+// subtitles, `needsLeague`.
 function coreLeagueDestinations(colors: ThemeColors): Destination[] {
   return [
     {
@@ -135,14 +136,6 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       color: colors.violet,
       subtitle: 'Search, rankings, and player insights',
     },
-    {
-      label: 'Recap',
-      route: 'Recap',
-      icon: 'newspaper-outline',
-      needsLeague: true,
-      color: colors.violet,
-      subtitle: 'Weekly league recap and stories',
-    },
   ];
 }
 
@@ -195,6 +188,20 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       needsLeague: true,
       color: colors.premium,
       subtitle: 'Picks, order, and draft tools',
+    },
+    // Trails GM Tools, not the League group — both the brief's own written
+    // §4 IA list and all three concept screenshots (Recap sits immediately
+    // after Draft Center, right before "SWITCH LEAGUE") show it here. An
+    // earlier pass (PR #740) had moved it to trail the League group instead;
+    // re-checking the concept images directly (not from memory) during the
+    // V2 restructure pass showed that was a mistake, so it's restored here.
+    {
+      label: 'Recap',
+      route: 'Recap',
+      icon: 'newspaper-outline',
+      needsLeague: true,
+      color: colors.violet,
+      subtitle: 'Weekly league recap and stories',
     },
   ];
 }
@@ -730,10 +737,6 @@ export default function GmOrb() {
           <AppText style={styles.sheetTitle}>Where to go</AppText>
 
           <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
-            {league || savedLeagues.length > 1 ? (
-              <LeagueSwitcher league={league} savedLeagues={savedLeagues} onSwitch={switchToLeague} />
-            ) : null}
-
             {league ? (
               <>
                 {/* Concept sheet labels this section with the actual league
@@ -742,7 +745,11 @@ export default function GmOrb() {
                     sheet, which already shows the same name as its
                     subtitle. Falls back to the generic label only in the
                     (practically unreachable, since this whole branch is
-                    gated on `league`) case of a blank name. */}
+                    gated on `league`) case of a blank name. This also
+                    satisfies the brief's "surface current league context
+                    near the top" ask (§3) without a separate chip: the very
+                    first thing in the list is already labeled with the
+                    active league's name. */}
                 <NavSection label={league.leagueName || 'League'}>
                   {coreLeagueDestinations(colors).map((destination) => (
                     <NavRow
@@ -750,7 +757,6 @@ export default function GmOrb() {
                       destination={destination}
                       isCurrent={destination.route === currentRouteName}
                       unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
-                      hasNew={destination.route === 'Recap' ? recapReady : false}
                       onPress={() => go(destination)}
                     />
                   ))}
@@ -762,7 +768,13 @@ export default function GmOrb() {
                       key={destination.route}
                       destination={destination}
                       isCurrent={destination.route === currentRouteName}
-                      hasNew={destination.route === 'TradeHub' ? tradeHubHasNew : false}
+                      hasNew={
+                        destination.route === 'TradeHub'
+                          ? tradeHubHasNew
+                          : destination.route === 'Recap'
+                            ? recapReady
+                            : false
+                      }
                       onPress={() => go(destination)}
                     />
                   ))}
@@ -773,6 +785,18 @@ export default function GmOrb() {
                 Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
               </AppText>
             )}
+
+            {/* Switch League moved here — trailing GM Tools, ahead of General
+                — to match the structural order shown in all three concept
+                screenshots (League destinations -> GM Tools ending in Recap
+                -> SWITCH LEAGUE -> GENERAL). Previously this rendered first,
+                above every destination, which none of the concept images
+                actually show; re-inspecting them directly during the V2
+                restructure pass caught the mismatch. Purely a position
+                change — same component, same props, same switching logic. */}
+            {league || savedLeagues.length > 1 ? (
+              <LeagueSwitcher league={league} savedLeagues={savedLeagues} onSwitch={switchToLeague} />
+            ) : null}
 
             <NavSection label="General">
               {generalDestinations(colors).map((destination) => (
@@ -902,7 +926,11 @@ function createStyles(colors: ThemeColors) {
   // distinct card-like surface, deliberately not styled like the plain
   // destRow/leagueAltRow rows. Unused (and no longer rendered) once there's
   // more than one saved league — see leagueAltRow below.
-  leagueModule: { marginBottom: spacing.md },
+  // marginTop matches NavSection's sectionLabel spacing above it — this
+  // card no longer sits first in the sheet (see the restructure note at its
+  // call site), so it needs the same breathing room every other mid-list
+  // group gets instead of relying on being first.
+  leagueModule: { marginTop: spacing.md, marginBottom: spacing.md },
   leagueBar: { padding: spacing.md },
   leagueBarRow: { flexDirection: 'row', alignItems: 'center' },
   leagueBarText: { flex: 1, marginLeft: spacing.md, marginRight: spacing.sm },
