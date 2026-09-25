@@ -129,38 +129,73 @@ def recap_story_html(story: Mapping[str, Any], *, lead: bool = False) -> str:
     )
 
 
-def _grouped_stories_html(stories: Sequence[Mapping[str, Any]]) -> str:
-    """Renders every story after the lead as labeled category sections —
-    consecutive same-category stories share one group (header + dividers)
-    instead of each repeating as its own identically-bordered card. Mirrors
-    the grouping already shipped for Alerts (alert_category_bucket in
-    modules/alerts_activity_ui.py) and the mobile RecapScreen's groupStories."""
-    parts: list[str] = []
+def _story_groups(stories: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Buckets stories into consecutive same-category groups — one group per
+    run of stories sharing a category (mirrors alert_category_bucket in
+    modules/alerts_activity_ui.py and the mobile RecapScreen's groupStories).
+
+    Returned as structured groups, not a single HTML string, so the live page
+    (render_league_recaps_page) can render one group at a time and put a
+    deep-link button directly beneath the stories it belongs to instead of
+    collecting every button below the entire board (see that function for
+    why — a reader previously had to scroll past every other story to find
+    the control matching the one they just read)."""
+    groups: list[dict[str, Any]] = []
     current_category: str | None = None
-    group_open = False
     for story in stories:
         category = recap_story_category(_text(story.get("story_type")))
-        if category != current_category:
-            if group_open:
-                parts.append("</div>")
-            label = escape(_RECAP_CATEGORY_LABELS.get(category, "Storylines"))
-            parts.append(
-                f"<div class='dg-recap-group dg-recap-group--{escape(category)}'>"
-                "<span class='dg-recap-group__bar'></span>"
-                f"{label}</div>"
-                "<div class='dg-recap-group-body'>"
+        if not groups or category != current_category:
+            groups.append(
+                {
+                    "category": category,
+                    "label": _RECAP_CATEGORY_LABELS.get(category, "Storylines"),
+                    "stories": [],
+                }
             )
             current_category = category
-            group_open = True
-        parts.append(recap_story_html(story))
-    if group_open:
-        parts.append("</div>")
-    return "".join(parts)
+        groups[-1]["stories"].append(story)
+    return groups
+
+
+def _group_html(group: Mapping[str, Any]) -> str:
+    category = escape(_text(group.get("category"), "other"))
+    label = escape(_text(group.get("label"), "Storylines"))
+    body = "".join(recap_story_html(story) for story in group.get("stories") or ())
+    return (
+        f"<div class='dg-recap-group dg-recap-group--{category}'>"
+        "<span class='dg-recap-group__bar'></span>"
+        f"{label}</div>"
+        f"<div class='dg-recap-group-body'>{body}</div>"
+    )
+
+
+def _grouped_stories_html(stories: Sequence[Mapping[str, Any]]) -> str:
+    """Static concatenation of every category group — used by the
+    non-interactive full-board preview (recap_edition_html) and the QA
+    harness. The live page renders each _story_groups() entry as its own
+    fragment instead; see render_league_recaps_page."""
+    return "".join(_group_html(group) for group in _story_groups(stories))
+
+
+def recap_masthead_html(recap: Mapping[str, Any]) -> str:
+    week = _text(recap.get("week") or recap.get("period_key"), "—")
+    headline = escape(_text(recap.get("headline"), f"Week {week} recap"))
+    return (
+        "<header class='dg-recap-masthead'>"
+        f"<p class='dg-recap-kicker'>{glyph_html('history', size='kicker')}League Memory</p>"
+        f"<h2>Week {escape(str(week))} recap</h2>"
+        f"<p class='dg-recap-headline'>{headline}</p>"
+        "</header>"
+    )
 
 
 def recap_edition_html(recap: Mapping[str, Any]) -> str:
-    week = _text(recap.get("week") or recap.get("period_key"), "—")
-    headline = escape(_text(recap.get("headline"), f"Week {week} recap"))
+    """Full, non-interactive recap board as one HTML string — used by the QA
+    validation harness and tests. The live app route
+    (render_league_recaps_page) builds the same content from
+    recap_masthead_html/recap_story_html/_story_groups directly so it can
+    interleave real deep-link buttons; keep this function's output in sync
+    with that structure even though it never renders live."""
     stories = [story for story in recap.get("stories") or () if isinstance(story, Mapping)]
     if stories:
         # The lead story (stories[0], the same story the masthead headline
@@ -172,11 +207,7 @@ def recap_edition_html(recap: Mapping[str, Any]) -> str:
         body = "<p class='dg-recap-empty'>Not enough historical data for a recap this week.</p>"
     return (
         "<section class='dg-recap-edition' aria-label='Weekly recap'>"
-        "<header class='dg-recap-masthead'>"
-        f"<p class='dg-recap-kicker'>{glyph_html('history', size='kicker')}League Memory</p>"
-        f"<h2>Week {escape(str(week))} recap</h2>"
-        f"<p class='dg-recap-headline'>{headline}</p>"
-        "</header>"
+        f"{recap_masthead_html(recap)}"
         f"<div class='dg-recap-board'>{body}</div>"
         "</section>"
     )
@@ -208,19 +239,22 @@ def memory_view_key(league_id: str) -> str:
 
 
 def history_deep_link_label(story: Mapping[str, Any]) -> str:
+    """CTA label for a story's follow-up action — only for story types where
+    History actually has matching content. History (league_history_ui) is a
+    transaction-only timeline: trades, waiver claims, free-agent adds, pick
+    changes. It has no matchup/score records at all. Performance and matchup
+    stories previously also offered "Open League History", which routed a
+    reader who just read "Highest team score" or "Biggest matchup" to a page
+    listing unrelated trades/waivers — a broken affordance, not a working
+    feature, so it is not preserved. Activity stories are still linked
+    because their metric (roster-move count) *is* literally the filtered
+    transaction feed."""
     kind = _text(story.get("story_type"))
     if kind == league_recaps.STORY_TRADE:
         return "View Trade History"
     if kind in {league_recaps.STORY_WAIVER, league_recaps.STORY_WAIVER_LOW}:
         return "View waiver history"
-    if kind in {
-        league_recaps.STORY_ACTIVITY,
-        league_recaps.STORY_ACTIVITY_LOW,
-        league_recaps.STORY_PERFORMANCE,
-        league_recaps.STORY_PERFORMANCE_LOW,
-        league_recaps.STORY_MATCHUP,
-        league_recaps.STORY_MATCHUP_CLOSE,
-    }:
+    if kind in {league_recaps.STORY_ACTIVITY, league_recaps.STORY_ACTIVITY_LOW}:
         return "Open League History"
     return ""
 
@@ -417,21 +451,55 @@ def render_league_recaps_page(
         )
         if report:
             story["grade"] = report
-    render_html_fragment(recap_edition_html(recap))
-    for index, story in enumerate(recap.get("stories") or ()):
-        label = history_deep_link_label(story)
-        if not label or open_history is None:
-            continue
-        # Every card that opens a deep link now says so in its own body (see
-        # recap_story_html's dg-recap-affordance line), but the actual button
-        # still renders below the whole board — name it after its story so
-        # two cards sharing a category (e.g. two waiver stories) don't render
-        # two identical, unattributable "View waiver history" buttons.
-        story_title = _text(story.get("title"))
-        button_label = f"{label} — {story_title}" if story_title else label
-        if st.button(
-            button_label,
-            key=f"league_recap_history_{home_league_id}_{selected_week}_{index}",
-            use_container_width=False,
-        ):
-            open_history(_text(story.get("history_filter")) or league_history.FILTER_ALL)
+    render_html_fragment(recap_masthead_html(recap))
+    stories = [story for story in recap.get("stories") or () if isinstance(story, Mapping)]
+    if not stories:
+        render_html_fragment(
+            "<p class='dg-recap-empty'>Not enough historical data for a recap this week.</p>"
+        )
+        return
+    # Each section (the lead story, then one per story category) renders as
+    # its own fragment immediately followed by its own deep-link button(s),
+    # instead of the previous single HTML fragment for the whole board with
+    # every button collected below it and matched back to its story only by
+    # title text. A reader had to scroll past every other story to find the
+    # control for the one they had just read — the same "reasoning severed
+    # from what it explains" gap fixed elsewhere by keeping a recommendation
+    # and its action together. Mirrors the established per-row pattern in
+    # alerts_activity_ui (render a row, then render that row's actions,
+    # inside the same loop iteration) rather than inventing a new one.
+    story_index = 0
+
+    def _render_story_actions(items: Sequence[Mapping[str, Any]]) -> None:
+        nonlocal story_index
+        for story in items:
+            index = story_index
+            story_index += 1
+            label = history_deep_link_label(story)
+            if not label or open_history is None:
+                continue
+            # Name the button after its story so two cards sharing a
+            # category (e.g. two waiver stories) don't render two identical,
+            # unattributable "View waiver history" buttons.
+            story_title = _text(story.get("title"))
+            button_label = f"{label} — {story_title}" if story_title else label
+            with st.container(key=f"league_recap_action_{home_league_id}_{selected_week}_{index}"):
+                if st.button(
+                    button_label,
+                    key=f"league_recap_history_{home_league_id}_{selected_week}_{index}",
+                    use_container_width=False,
+                ):
+                    open_history(_text(story.get("history_filter")) or league_history.FILTER_ALL)
+
+    lead = stories[0]
+    with st.container(key=f"league_recap_lead_{home_league_id}_{selected_week}"):
+        render_html_fragment(
+            f"<div class='dg-recap-section dg-recap-board'>{recap_story_html(lead, lead=True)}</div>"
+        )
+    _render_story_actions([lead])
+    for group_index, group in enumerate(_story_groups(stories[1:]), start=1):
+        with st.container(key=f"league_recap_group_{home_league_id}_{selected_week}_{group_index}"):
+            render_html_fragment(
+                f"<div class='dg-recap-section dg-recap-board'>{_group_html(group)}</div>"
+            )
+        _render_story_actions(group["stories"])
