@@ -24,15 +24,21 @@ GM_TARGETS_CSS = """
    bordered card per player). */
 div[class*="st-key-dg_gm_targets_group_"]{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);margin-bottom:var(--space-md);max-width:40rem;padding:var(--space-2xs) var(--space-md) var(--space-sm)}
 div[class*="st-key-dg_gm_targets_group_untouchable"]{border-inline-start:var(--border-width-semantic) solid var(--color-premium)}
-.dg-gm-target-card{border-block-end:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-2xs) var(--space-sm);grid-template-columns:minmax(0,1fr) auto;padding-block:var(--space-sm)}
+/* Card is a simple top row (identity + reference rank) over a stacked body
+   (decision info, in priority order) — replaces the old two-column CSS grid,
+   whose implicit auto-placement made "what to do" order-dependent on rank's
+   markup position. Flex stacking lets render order alone express hierarchy. */
+.dg-gm-target-card{border-block-end:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-2xs);padding-block:var(--space-sm)}
 .dg-gm-target-card:last-of-type{border-block-end:0}
-.dg-gm-target-identity{align-items:center;display:flex;gap:var(--space-sm);min-width:0}
+.dg-gm-target-top{align-items:flex-start;display:flex;gap:var(--space-sm);justify-content:space-between}
+.dg-gm-target-identity{align-items:center;display:flex;flex:1 1 auto;gap:var(--space-sm);min-width:0}
+.dg-gm-target-body{display:flex;flex-direction:column;gap:var(--space-2xs)}
 .dg-gm-target-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
 .dg-gm-target-name{color:var(--color-text-primary);font:var(--font-card-title)}
-/* Rank is reference metadata, not the decision — it no longer competes with
-   the action/why below for the strongest type treatment in the system. */
-.dg-gm-target-rank{color:var(--color-text-secondary);font:var(--type-caption-emphasis);font-variant-numeric:tabular-nums;justify-self:end;text-align:right}
-.dg-gm-target-status,.dg-gm-target-action,.dg-gm-target-change{grid-column:1/-1}
+/* Rank is reference metadata, not the decision — it sits in the top row next
+   to identity but never competes with the action/why below for the
+   strongest type treatment in the system. */
+.dg-gm-target-rank{color:var(--color-text-secondary);flex-shrink:0;font:var(--type-caption-emphasis);font-variant-numeric:tabular-nums;text-align:right}
 .dg-gm-target-status{color:var(--color-text-secondary);font:var(--type-supporting-metadata)}
 /* The canonical "what to do" call — same weight as the player's name and the
    same accent (primary/interactive) color the Waivers card action row uses,
@@ -56,6 +62,26 @@ def _workflow_handoff_destination(ownership: str) -> tuple[str, str] | None:
     if "rostered by" in text:
         return ("trade_hub", "Open Trade Hub")
     return None
+
+
+# Recommendation-clarity audit (same class of finding as mobile PR #761):
+# GmTarget.source_surface already tells the story of *why* a player is on
+# this list, was already fetched by enrich_target, and was never rendered —
+# every card looked identical regardless of how it got here. The only two
+# real callers today are render_pqv_target_control ("Player Quick View", the
+# web add/remove pill wired from app.py's PQV dialog) and team_stance_ui's
+# "Protect" checklist. Mirrors mobile's TARGET_ORIGIN_LABEL exactly for the
+# team_stance copy so the same real backend distinction reads identically on
+# both platforms. Unknown/legacy values render nothing rather than a guess.
+TARGET_ORIGIN_LABELS: dict[str, str] = {
+    "player_quick_view": "Added from Player Quick View",
+    "team_stance": "Protected via Team Situation",
+    "gm_targets": "Added from GM Targets",
+}
+
+
+def _target_origin_label(source_surface: str) -> str:
+    return TARGET_ORIGIN_LABELS.get(str(source_surface or "").strip(), "")
 
 
 def _player_row_lookup(
@@ -254,6 +280,16 @@ def render_gm_targets_workspace(
         identity_bits = " · ".join(
             part for part in (card.position, card.team) if part
         )
+        # Recommendation gets the strongest hierarchy (Magna Carta §29) — the
+        # action line stays the loudest text on the card. Origin caption
+        # reuses .dg-gm-target-meta (same weight as team/position — real
+        # rationale, not a headline claim).
+        origin_label = _target_origin_label(card.source_surface)
+        origin_html = (
+            f"<div class='dg-gm-target-meta'>{escape(origin_label)}</div>"
+            if origin_label
+            else ""
+        )
         action_html = (
             f"<div class='dg-gm-target-action'>{escape(card.action)}"
             + (
@@ -276,32 +312,42 @@ def render_gm_targets_workspace(
             if card.material_label
             else ""
         )
+        # Body order follows decision importance (Magna Carta §4): what to do
+        # → what changed → reference ownership context, last. Rank is
+        # reference metadata and lives in the top row next to identity, not
+        # stacked ahead of the actual decision info.
         html_rendering.render_html_fragment(
             "<article class='dg-gm-target-card' "
             f"data-gm-target='1' data-gm-target-player-id='{escape(card.player_id)}'>"
+            "<div class='dg-gm-target-top'>"
             "<div class='dg-gm-target-identity'>"
             f"{avatar}"
             "<div>"
             f"<div class='dg-gm-target-name'>{escape(card.name)}</div>"
             f"<div class='dg-gm-target-meta'>{escape(identity_bits)}</div>"
+            f"{origin_html}"
             "</div></div>"
             f"<div class='dg-gm-target-rank'>{escape(card.rank_line)}</div>"
-            f"<div class='dg-gm-target-status'>{escape(card.ownership)}</div>"
+            "</div>"
+            "<div class='dg-gm-target-body'>"
             f"{action_html}"
             f"{change_html}"
+            f"<div class='dg-gm-target-status'>{escape(card.ownership)}</div>"
+            "</div>"
             "</article>"
         )
-        cols = st.columns(3)
-        with cols[0]:
-            if open_player_quick_view is not None:
-                if st.button(
-                    "Open player",
-                    key=f"gm_targets_open_{card.player_id}",
-                    use_container_width=True,
-                ):
-                    open_player_quick_view(card.player_id)
-        with cols[1]:
 
+        def _open_player_action() -> None:
+            if open_player_quick_view is None:
+                return
+            if st.button(
+                "Open player",
+                key=f"gm_targets_open_{card.player_id}",
+                use_container_width=True,
+            ):
+                open_player_quick_view(card.player_id)
+
+        def _toggle_untouchable_action() -> None:
             def _toggle_untouchable(
                 player_id: str = card.player_id, next_state: bool = not card.untouchable
             ) -> None:
@@ -312,25 +358,54 @@ def render_gm_targets_workspace(
                     untouchable=next_state,
                 )
 
+            # Reversible flag toggle — deliberately distinct wording from the
+            # destructive "Remove from GM Targets" label one action over, so
+            # the two "Remove ___" verbs are never sitting side by side.
             st.button(
-                "Remove untouchable" if card.untouchable else "Mark untouchable",
+                "Unmark untouchable" if card.untouchable else "Mark untouchable",
                 key=f"gm_targets_untouchable_{card.player_id}",
                 use_container_width=True,
                 type="primary" if card.untouchable else "secondary",
                 on_click=_toggle_untouchable,
             )
-        with cols[2]:
 
+        def _remove_target_action() -> None:
             def _remove_target(player_id: str = card.player_id) -> None:
                 gm_targets.remove_target(
                     session, league_id=league_key, player_id=player_id
                 )
 
-            st.button(
-                gm_targets.REMOVE_ACTION_LABEL,
-                key=f"gm_targets_remove_{card.player_id}",
-                use_container_width=True,
-                on_click=_remove_target,
+            # Canonical destructive-CTA tier (component_family_styles.py) —
+            # same danger-red convention as account_ui.py's "Log out" — so
+            # this irreversible action is never visually indistinguishable
+            # from the reversible untouchable toggle beside it (recommendation-
+            # clarity audit finding, same class as mobile PR #761).
+            with st.container(
+                key=f"dg_cta_destructive_gm_targets_remove_{card.player_id}"
+            ):
+                st.button(
+                    gm_targets.REMOVE_ACTION_LABEL,
+                    key=f"gm_targets_remove_{card.player_id}",
+                    use_container_width=True,
+                    on_click=_remove_target,
+                )
+
+        if open_player_quick_view is not None:
+            ui_primitives.render_action_row(
+                _open_player_action,
+                key=f"gm_targets_actions_{card.player_id}",
+                secondary_action=_toggle_untouchable_action,
+                destructive_action=_remove_target_action,
+                primary_first=True,
+                horizontal_alignment="distribute",
+            )
+        else:
+            ui_primitives.render_action_row(
+                _toggle_untouchable_action,
+                key=f"gm_targets_actions_{card.player_id}",
+                destructive_action=_remove_target_action,
+                primary_first=True,
+                horizontal_alignment="distribute",
             )
         handoff = _workflow_handoff_destination(card.ownership)
         if handoff is not None and open_destination is not None:
@@ -357,6 +432,11 @@ def render_gm_targets_workspace(
             ui_primitives.render_section_header(
                 "Untouchable", heading_level=3, weight="secondary"
             )
+            # Recommendation-clarity audit: a bare "Untouchable" heading
+            # doesn't tell a new user what the flag actually does. This is
+            # the real backend behavior it triggers (modules/trade_ideas.py
+            # _is_core_or_protected_starter) stated in one plain sentence.
+            st.caption("Kept out of auto-generated trade suggestions.")
             for card in untouchable_cards:
                 _render_target_card(card)
 
@@ -365,5 +445,6 @@ def render_gm_targets_workspace(
             ui_primitives.render_section_header(
                 "Watching", heading_level=3, weight="secondary"
             )
+            st.caption("Tracked here — no trade protection applied.")
             for card in watching_cards:
                 _render_target_card(card)
