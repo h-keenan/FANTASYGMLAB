@@ -14,39 +14,40 @@ DOC = ROOT / "docs" / "fantasygm-lab-brand-identity.md"
 
 def test_brand_doc_locks_permanent_mark():
     text = DOC.read_text(encoding="utf-8")
-    assert "FGL Arc Monogram" in text
+    assert "FantasyGM Lab Symbol" in text
+    assert "FGL Arc Monogram" in text  # retired mark, referenced for history
     assert "command-plate" in text  # archived / legacy reference
-    assert "Trajectory motif usage" in text
+    assert "no-swoop football" in text.casefold()
     assert "Product-semantic separation" in text
-    assert brand_identity.BRAND_MARK_NAME == "FGL Arc Monogram"
-    assert brand_identity.BRAND_MARK_GEOMETRY == "fgl-arc-monogram"
-    assert brand_identity.BRAND_MARK_LEGACY_GEOMETRY == "command-plate"
+    assert brand_identity.BRAND_MARK_NAME == "FantasyGM Lab Symbol"
+    assert brand_identity.BRAND_MARK_GEOMETRY == "fantasygmlab-football-symbol"
+    assert brand_identity.BRAND_MARK_LEGACY_GEOMETRY == "fgl-arc-monogram"
 
 
 def test_asset_inventory_exists():
     required = (
-        "fantasygm-lab-mark.svg",
-        "fantasygm-lab-mark-light.svg",
-        "fantasygm-lab-mark-dark.svg",
-        "fantasygm-lab-mark-mono-light.svg",
-        "fantasygm-lab-mark-compact.svg",
-        "fantasygm-lab-primary.svg",
-        "fantasygm-lab-primary-light.svg",
-        "fantasygm-lab-primary-dark.svg",
-        "fantasygm-lab-founder-beta.svg",
-        "fantasygm-lab-mark.png",
+        "fantasygmlab-symbol.png",
+        "fantasygmlab-symbol-mono-white.png",
+        "fantasygmlab-symbol-mono-navy.png",
+        "fantasygmlab-symbol-compact.png",
+        "fantasygmlab-logo-horizontal.png",
+        "fantasygmlab-founder-beta.png",
         "share-card-mark.png",
         "favicon.png",
         "favicon.ico",
+        "favicon-16.png",
+        "favicon-32.png",
         "og-founder-beta.png",
         "icons/icon-512.png",
         "icons/icon-256.png",
         "icons/icon-192.png",
         "icons/icon-180.png",
         "icons/icon-128.png",
-        "icons/favicon-64.png",
-        "icons/favicon-32.png",
-        "icons/favicon-16.png",
+        "source/fantasygmlab-symbol-master.png",
+        "source/fantasygmlab-symbol-mono-navy-master.png",
+        "source/fantasygmlab-symbol-mono-white-master.png",
+        "source/fantasygmlab-logo-horizontal-master.png",
+        "source/fantasygmlab-app-icon-master.png",
         "archive/b-signal-grid.svg",
         "archive/c-ledger-bars.svg",
         "archive/a-command-plate-source.svg",
@@ -63,25 +64,27 @@ def test_asset_inventory_exists():
 def test_brand_api_paths_and_helpers():
     assert brand_identity.PRODUCT_NAME == "FantasyGM Lab"
     assert brand_identity.PRODUCT_DOMAIN == "fantasygmlab.com"
-    assert brand_identity.asset_path("brand_compact").name == "fantasygm-lab-mark.svg"
-    assert brand_identity.asset_path("mark_compact").name == "fantasygm-lab-mark-compact.svg"
+    assert brand_identity.asset_path("brand_compact").name == "fantasygmlab-symbol.png"
+    assert brand_identity.asset_path("mark_compact").name == "fantasygmlab-symbol-compact.png"
     assert brand_identity.asset_path("share_card_mark").exists()
     assert brand_identity.asset_path("og_image").exists()
     assert brand_identity.asset_path("favicon").exists()
     assert brand_identity.asset_path("icon_512").exists()
     html = brand_identity.mark_img_html(size_px=28)
     assert "dg-brand-plate" in html
-    assert "dg-brand-plate__fgl" in html
-    assert "FGL" in html
-    assert "FantasyGM Lab" in html or "aria-label='FantasyGM Lab'" in html
-    assert brand_identity.asset_path("brand_compact").read_text(encoding="utf-8").startswith("<svg")
-    assert "FGL" in brand_identity.asset_path("brand_compact").read_text(encoding="utf-8")
+    assert "<img" in html
+    assert "data:image/png;base64," in html
+    assert "aria-label='FantasyGM Lab'" in html
+    assert brand_identity.asset_path("brand_compact").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert "FantasyGM Lab" in brand_identity.founder_beta_badge_html(compact=False)
     assert "Founder Beta" in brand_identity.founder_beta_badge_html(compact=True)
     assert brand_identity.GM_ORB_LABEL == "GM"
     assert "Open GM menu" in brand_identity.GM_ORB_ARIA_LABEL
-    # Trajectory colors are brand constants, not product decision logic
-    assert brand_identity.BRAND_TRAJECTORY_ANALYZE == brand_identity.BRAND_ACCENT
+    # Retired Arc Monogram trajectory colors no longer exist as brand constants —
+    # they described that mark's three arcs only and had no other consumer.
+    assert not hasattr(brand_identity, "BRAND_TRAJECTORY_ANALYZE")
+    assert not hasattr(brand_identity, "BRAND_TRAJECTORY_PROJECT")
+    assert not hasattr(brand_identity, "BRAND_TRAJECTORY_EXECUTE")
     assert "valuation" not in Path(brand_identity.__file__).read_text(encoding="utf-8").casefold()
 
 
@@ -139,10 +142,11 @@ def test_favicon_sizes_exist_and_are_square():
             assert img.size == (expected, expected)
 
 
-def test_compact_mark_differs_from_large_svg():
-    large = (BRAND / "fantasygm-lab-mark.svg").read_text(encoding="utf-8")
-    compact = (BRAND / "fantasygm-lab-mark-compact.svg").read_text(encoding="utf-8")
+def test_compact_mark_differs_from_large_mark():
+    large = (BRAND / "fantasygmlab-symbol.png").read_bytes()
+    compact = (BRAND / "fantasygmlab-symbol-compact.png").read_bytes()
     assert large != compact
-    assert "FGL" in compact
-    # Compact omits arrowhead polygons used in the large cut
-    assert compact.count("<path d=\"M") >= 3 or compact.count("stroke=") >= 3
+    assert compact.startswith(b"\x89PNG\r\n\x1a\n")
+    # Compact is a small, single-color cut optimized for the GM control —
+    # meaningfully smaller than the full-color primary symbol.
+    assert len(compact) < len(large)

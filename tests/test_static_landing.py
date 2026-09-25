@@ -34,7 +34,7 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "waiver analysis" in html
     assert "league insights" in html
     assert "dynasty and redraft" in html
-    assert (LANDING / "assets" / "fantasygm-lab-mark-compact.svg").exists()
+    assert (LANDING / "assets" / "fantasygmlab-symbol-compact.png").exists()
     assert (LANDING / "assets" / "favicon.png").exists()
     # Premium included-now advertises graduated Premium depth (#232).
     premium_block = html.split("Included now with Premium", 1)[1].split("</ul>", 1)[0]
@@ -50,7 +50,7 @@ def test_static_landing_first_fold_transfer_budget():
     first_fold = [
         LANDING / "index.html",
         LANDING / "landing.css",
-        LANDING / "assets" / "fantasygm-lab-mark-compact.svg",
+        LANDING / "assets" / "fantasygmlab-symbol-compact.png",
         LANDING / "assets" / "favicon.png",
     ]
     total = sum(path.stat().st_size for path in first_fold)

@@ -9,17 +9,7 @@ BRAND_IDENTITY_CSS = """
 .dg-brand-mark{align-items:center;box-sizing:border-box;display:inline-flex;justify-content:center;line-height:0;overflow:hidden}
 .dg-brand-plate{background:var(--color-surface-primary,#0f1114);border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
 .dg-brand-plate--light{background:var(--color-text-primary, #f8fafc)}
-.dg-brand-plate__arcs{inset:4% 2% 32% 4%;pointer-events:none;position:absolute}
-.dg-brand-plate__arcs i{border:solid transparent;border-radius:0 100% 0 0;border-right-color:var(--color-brand-accent,#22d3ee);border-top-color:var(--color-brand-accent,#22d3ee);border-width:calc(var(--dg-mark-size,28px)*.055);bottom:0;box-sizing:border-box;height:72%;left:0;position:absolute;width:96%}
-.dg-brand-plate__arcs i:nth-child(2){border-right-color:var(--color-brand-trajectory-project,#facc15);border-top-color:var(--color-brand-trajectory-project,#facc15);bottom:10%;height:74%;width:82%}
-.dg-brand-plate__arcs i:nth-child(3){border-right-color:var(--color-brand-trajectory-execute,#ef4444);border-top-color:var(--color-brand-trajectory-execute,#ef4444);bottom:20%;height:70%;width:68%}
-.dg-brand-plate--light .dg-brand-plate__arcs i{border-right-color:#0891b2;border-top-color:#0891b2}
-.dg-brand-plate--light .dg-brand-plate__arcs i:nth-child(2){border-right-color:#ca8a04;border-top-color:#ca8a04}
-.dg-brand-plate--light .dg-brand-plate__arcs i:nth-child(3){border-right-color:#b91c1c;border-top-color:#b91c1c}
-.dg-brand-plate--compact .dg-brand-plate__arcs i{border-width:calc(var(--dg-mark-size,28px)*.08)}
-.dg-brand-plate__fgl{bottom:8%;color:#f2f4f7;font-family:Segoe UI,system-ui,sans-serif;font-size:calc(var(--dg-mark-size,28px)*.34);font-weight:800;left:10%;letter-spacing:-.06em;line-height:1;position:absolute}
-.dg-brand-plate--compact .dg-brand-plate__fgl{bottom:6%;font-size:calc(var(--dg-mark-size,28px)*.4);left:9%}
-.dg-brand-plate--light .dg-brand-plate__fgl{color:#0f172a}
+.dg-brand-plate__img{display:block;height:100%;object-fit:contain;width:100%}
 .dg-brand-mark--sm{height:1.75rem;min-width:1.75rem;width:1.75rem}
 .dg-brand-mark--md{height:2.75rem;min-width:2.75rem;width:2.75rem}
 .dg-brand-mark--lg{height:4rem;min-width:4rem;width:4rem}

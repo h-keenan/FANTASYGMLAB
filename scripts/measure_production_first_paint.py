@@ -226,7 +226,7 @@ def static_transfer_budget(landing_dir: Path) -> dict[str, Any]:
     first_fold = [
         landing_dir / "index.html",
         landing_dir / "landing.css",
-        landing_dir / "assets" / "fantasygm-lab-mark-compact.svg",
+        landing_dir / "assets" / "fantasygmlab-symbol-compact.png",
         landing_dir / "assets" / "favicon.png",
     ]
     lazy = list((landing_dir / "assets" / "web").glob("*.jpg"))

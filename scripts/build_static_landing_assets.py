@@ -19,7 +19,7 @@ MARKETING = ROOT / "assets" / "marketing"
 OUT = ROOT / "static" / "landing" / "assets"
 WEB = OUT / "web"
 
-MARK_SRC = BRAND / "fantasygm-lab-mark-compact.svg"
+MARK_SRC = BRAND / "fantasygmlab-symbol-compact.png"
 FAVICON_SRC = BRAND / "favicon.png"
 OG_CANDIDATES = (
     BRAND / "og-founder-beta.png",
@@ -81,7 +81,7 @@ def main() -> int:
     if not FAVICON_SRC.is_file():
         raise FileNotFoundError(FAVICON_SRC)
 
-    _copy_file(MARK_SRC, OUT / "fantasygm-lab-mark-compact.svg")
+    _copy_file(MARK_SRC, OUT / "fantasygmlab-symbol-compact.png")
     _copy_file(FAVICON_SRC, OUT / "favicon.png")
     og = _resolve_og()
     _copy_file(og, OUT / "og-founder-beta.png")

@@ -51,10 +51,6 @@ DESIGN_TOKEN_CSS = """
     --color-brand-accent: #22d3ee;
     --color-brand-bg: #050607;
     --color-brand-surface: #0f1114;
-    /* Trajectory motif (brand language only — do not map to Trust/rank/advice) */
-    --color-brand-trajectory-analyze: #22d3ee;
-    --color-brand-trajectory-project: #facc15;
-    --color-brand-trajectory-execute: #ef4444;
 
     /* Interaction and meaning */
     --color-accent: #67e8f9;

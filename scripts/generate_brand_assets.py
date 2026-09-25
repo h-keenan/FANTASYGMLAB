@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
-"""Deterministic FantasyGM Lab brand assets — FGL Arc Monogram (Pillow + SVG).
+"""Deterministic FGL Arc Monogram assets (Pillow + SVG) — RETIRED production mark.
 
-Regenerate production rasters/vectors:
+The FGL Arc Monogram drawn here was replaced as the production FantasyGM Lab
+identity by the vendor "no-swoop football" brand pack (see
+docs/fantasygm-lab-brand-identity.md). `modules/brand_identity.ASSET_PATHS`
+no longer points at this script's output — production marks now live under
+`assets/brand/` as PNGs derived from `assets/brand/source/` vendor masters.
+
+This module is kept only because `scripts/generate_launch_marketing_assets.py`
+and `scripts/generate_brand_qa_board.py` still import `draw_brand_mark()` for
+the (also legacy, Arc-Monogram-themed) launch marketing kit and local QA
+board. Do NOT wire this script's `main()` output into new production asset
+keys — running it manually re-writes the retired *.svg/*.png files directly
+into assets/brand/, which is harmless (nothing reads them) but confusing.
+
+Regenerate the legacy rasters/vectors (marketing-kit/QA-board support only):
     python scripts/generate_brand_assets.py
 
 Requires only Pillow (and stdlib). No proprietary desktop software.
