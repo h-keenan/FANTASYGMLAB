@@ -350,7 +350,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
     table_response.json.return_value = [{"user_id": "user-123"}]
 
     # auth fetch, then one requests.get per table in _EXPORTABLE_USER_TABLES.
-    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 7):
+    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 8):
         response = client.get("/v1/me/export", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
@@ -365,6 +365,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
         "mobile_alert_reads",
         "trade_outcomes",
         "push_tokens",
+        "team_stance",
     }
     assert body["tables"]["profiles"] == [{"user_id": "user-123"}]
 
@@ -4391,12 +4392,15 @@ def test_trade_hub_gates_free_entitlement_to_two_ideas_and_reveals_via_ads(monke
     fake_cards = [_fake_idea_record(f"Rival {i}", gain=10 - i) for i in range(4)]
     gm_targets_response = Mock(status_code=200)
     gm_targets_response.json.return_value = []
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = []
 
     # Two full requests, each: require_user's auth check + one profile fetch
     # shared between entitlement and _resolve_my_roster (no double-fetch),
-    # plus the GM Targets lookup that feeds untouchable/landed-target state
-    # into idea generation.
-    responses = [auth_user_response, profile_response, gm_targets_response] * 2
+    # the GM Targets lookup that feeds untouchable/landed-target state into
+    # idea generation, and the Team Situation lookup that feeds
+    # presentation-only rationale framing.
+    responses = [auth_user_response, profile_response, gm_targets_response, team_stance_response] * 2
     with patch("requests.get", side_effect=responses):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(

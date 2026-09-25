@@ -47,6 +47,13 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         category="CONDITIONAL",
     ),
     PageDefinition(
+        "team_stance",
+        "Team Situation",
+        "SUPPORT",
+        "Declare your team's stance (Rebuilding/Competing/Balanced) and manage protected players — biases trade-idea language only, never valuation.",
+        category="CONDITIONAL",
+    ),
+    PageDefinition(
         "player_detail",
         "Player Detail",
         "ROSTER",

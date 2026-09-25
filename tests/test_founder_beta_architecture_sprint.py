@@ -150,7 +150,10 @@ def test_secondary_work_is_behind_explicit_interaction_boundaries():
 def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysis():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert source.count("include_intelligence=False") == 7
+    # Team Situation (#232 follow-up) is a new lightweight, non-deep-analysis
+    # route (modules.team_stance_ui) — same reduced-context shape GM Targets
+    # already uses, so the budget grows by exactly one.
+    assert source.count("include_intelligence=False") == 8
     assert "league_context = get_shared_league_context(include_trust=False)" in source
     assert "trade_hub_context = get_shared_league_context(" in source
     assert "include_intelligence=False" in source[

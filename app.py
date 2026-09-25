@@ -125,6 +125,7 @@ from modules.roster_needs import (
     assess_team_needs,
 )
 from modules import team_eval as team_eval_module
+from modules import team_stance
 from modules import trade_ideas as trade_ideas_module
 from modules.draft_prospects import draft_watch_positions, prospects_for_positions
 from modules.player_images import fetch_player_headshot_bytes, headshot_data_url
@@ -11128,8 +11129,17 @@ def enforce_cached_trade_ideas(
     focused_player_ids: tuple[str, ...] = (),
     explicit_acquisition_target: bool = False,
     diagnostics: dict | None = None,
+    team_stance: str = "",
 ) -> list[dict]:
-    """Apply Trust enforcement to raw cached output at the production boundary."""
+    """Apply Trust enforcement to raw cached output at the production boundary.
+
+    `team_stance` (the caller's own declared Team Situation — see
+    modules.team_stance) is applied LAST, via
+    modules.trade_ideas.apply_team_stance_framing, which only appends a short
+    clause to each idea's rationale text. It never affects Trust enforcement,
+    ordering, or any field above. Defaults to "" (no-op) so every existing
+    caller is unaffected unless it opts in.
+    """
 
     trust_context = trade_trust.hydrate_trade_trust_context(trust_context)
     canonical_players: dict[str, dict] = {}
@@ -11202,7 +11212,7 @@ def enforce_cached_trade_ideas(
             blocked_reason_counts=dict(board.blocked_reason_counts),
             trust_elapsed_ms=round((time.perf_counter() - trust_started) * 1000, 3),
         )
-    return recommendations
+    return trade_ideas_module.apply_team_stance_framing(recommendations, team_stance)
 
 
 def cached_player_trade_hub_ideas(
@@ -11739,6 +11749,15 @@ def render_executive_profile_control(
                     on_click=_commit_platform_destination,
                     args=("premium",),
                     kwargs={"source": "profile_premium"},
+                )
+            if identity["signed_in"] and selected_league_id:
+                st.button(
+                    "Team Situation",
+                    key=f"{key_prefix}_open_team_stance",
+                    use_container_width=True,
+                    on_click=_commit_platform_destination,
+                    args=("team_stance",),
+                    kwargs={"source": "profile_team_stance"},
                 )
             active_context = st.session_state.get("active_league_context", {})
             if not isinstance(active_context, dict):
@@ -18298,6 +18317,53 @@ def main():
             render_premium_lock=render_premium_lock,
         )
 
+    # TEAM SITUATION (Decision Memory v1 gap, #232) — standalone, not embedded
+    # in My Team or Dashboard. Presentation-only stance + reuses GM Targets'
+    # existing untouchable flag for "protect this player" (see
+    # modules.team_stance_ui / modules.team_stance).
+    if current_page == "team_stance":
+        from modules import team_stance_ui
+
+        render_page_shell(
+            page_key="team_stance",
+            title="Team Situation",
+            subtitle="Declare Rebuilding, Competing, or Balanced — biases trade-idea language only, never valuation.",
+            meta_items=[
+                (selected_league_name or "League", "success"),
+            ],
+        )
+        stance_context = (
+            get_shared_league_context(
+                include_intelligence=False,
+                include_trust=False,
+                include_maturity=False,
+            )
+            if selected_league_id and my_roster_id is not None and not startup_mode
+            else {}
+        )
+        stance_roster_player_map = stance_context.get("roster_player_map", {}) or {}
+        stance_mapped_ids = (
+            stance_roster_player_map.get(str(my_roster_id), ())
+            if my_roster_id is not None
+            else ()
+        )
+        if stance_mapped_ids:
+            stance_my_ids = {str(pid) for pid in stance_mapped_ids}
+        elif selected_league_id and my_roster_id is not None:
+            stance_my_ids = {
+                str(pid)
+                for pid in (get_roster_player_ids(selected_league_id, my_roster_id) or [])
+            }
+        else:
+            stance_my_ids = set()
+
+        team_stance_ui.render_team_stance_workspace(
+            session=st.session_state,
+            league_id=_safe_text(selected_league_id),
+            my_roster_player_ids=stance_my_ids,
+            df_players=df_players,
+        )
+
     # ALL PLAYERS
     if current_page == "players":
         render_page_shell(
@@ -21905,6 +21971,9 @@ def main():
                             my_roster_id=my_roster_id,
                             untouchables=trade_hub_untouchables_key,
                             trust_context=trade_hub_context.get("trade_trust_context"),
+                            team_stance=team_stance.fetch_stance_for_league(
+                                st.session_state, league_id=_safe_text(selected_league_id)
+                            ),
                         )
                     # Manager tendencies are presentation enrichment only; they do
                     # not affect Trust, scores, or ordering. Still applied before

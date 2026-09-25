@@ -33,6 +33,7 @@ DESTINATION_CONCEPT = {
     "my_team": "roster",
     "players": "rankings",
     "gm_targets": "roster",
+    "team_stance": "roster",
     "rankings": "league",
     "league_recaps": "history",
     "trade_hub": "trade",

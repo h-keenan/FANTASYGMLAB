@@ -29,6 +29,7 @@ import TradeAnalyzerScreen from '../screens/TradeAnalyzerScreen';
 import RecapScreen from '../screens/RecapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import GmTargetsScreen from '../screens/GmTargetsScreen';
+import TeamStanceScreen from '../screens/TeamStanceScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import TradeHubScreen from '../screens/TradeHubScreen';
 import TradeFinderScreen from '../screens/TradeFinderScreen';
@@ -53,6 +54,7 @@ export type RootStackParamList = {
   PlayerDetail: { player: RankedPlayer; leagueId: string; leagueName: string };
   PlayerCompare: { player: RankedPlayer; leagueId: string; leagueName: string };
   GmTargets: { leagueId: string; leagueName: string };
+  TeamStance: { leagueId: string; leagueName: string };
   Waivers: { leagueId: string; leagueName: string };
   TradeAnalyzer: { leagueId: string; leagueName: string };
   Recap: { leagueId: string; leagueName: string };
@@ -170,6 +172,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Matchup" component={MatchupScreen} />
           <AppStack.Screen name="Alerts" component={AlertsScreen} />
           <AppStack.Screen name="GmTargets" component={GmTargetsScreen} />
+          <AppStack.Screen name="TeamStance" component={TeamStanceScreen} />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}

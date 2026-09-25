@@ -115,6 +115,7 @@ from modules import (
     sleeper,
     sleeper_leagues,
     startup_cold_path,
+    team_stance,
     team_trade_history,
     trade_analyzer_fit,
     trade_hub_engine,
@@ -416,6 +417,7 @@ _EXPORTABLE_USER_TABLES = (
     "mobile_alert_reads",
     "trade_outcomes",
     "push_tokens",
+    "team_stance",
 )
 
 
@@ -2943,6 +2945,87 @@ def update_gm_stance(
     return {"ok": True, "strategy": resolved, "is_set": not clearing}
 
 
+# Team Situation (Decision Memory v1 gap, #232 follow-up): a SEPARATE
+# mechanism from GM Stance above. GM Stance (contender/fringe_contender/
+# retool/rebuild/tank) already feeds modules.team_eval's age-curve, which
+# rewrites the active score_field — it changes valuation. Team Situation is
+# a plain, fixed three-way declaration (Rebuilding/Competing/Balanced),
+# stored in its own dedicated table (modules.team_stance, RLS-scoped like
+# gm_targets — not the user_settings JSON blob GM Stance uses), and it is
+# ONLY ever allowed to append a short clause to trade-idea rationale TEXT
+# (modules.trade_ideas.apply_team_stance_framing). It never touches
+# value_score, composite scoring, or rankings.
+def _fetch_team_stance(config: dict, user_id: str, access_token: str, league_id: str) -> str:
+    """Best-effort read — any failure/missing row/missing table returns ""
+    (no stance declared), never raises. A Team Situation outage must never
+    block Trade Hub, Trade Finder, or the Dashboard trade tile."""
+
+    if not user_id:
+        return ""
+    rows, error = account_store.fetch_rows(
+        config,
+        access_token,
+        team_stance.STANCE_TABLE,
+        user_id=user_id,
+        extra_query=f"league_id=eq.{league_id}&select=stance&limit=1",
+    )
+    if error or not rows:
+        return ""
+    return team_stance.normalize_stance(rows[0].get("stance"))
+
+
+@app.get("/v1/leagues/{league_id}/team-stance")
+def get_team_stance(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """The caller's declared Team Situation for this league — "" when unset.
+
+    Presentation-only preference (see module docstring above); fails soft to
+    "" rather than erroring the screen if storage isn't reachable.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    stance = _fetch_team_stance(config, user_id, access_token, league_id)
+    return {"ok": True, "stance": stance, "options": list(team_stance.STANCE_OPTIONS)}
+
+
+class SetTeamStanceRequest(BaseModel):
+    stance: str
+
+
+@app.post("/v1/leagues/{league_id}/team-stance")
+def set_team_stance(
+    league_id: str,
+    body: SetTeamStanceRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Set (upsert) the caller's declared Team Situation for this league."""
+
+    stance_key = team_stance.normalize_stance(body.stance)
+    if not stance_key:
+        raise HTTPException(
+            status_code=422,
+            detail="stance must be one of: " + ", ".join(team_stance.STANCE_OPTIONS),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    ok, error = account_store.upsert_row(
+        config,
+        access_token,
+        team_stance.STANCE_TABLE,
+        {"user_id": user_id, "league_id": league_id, "stance": stance_key},
+        on_conflict="user_id,league_id",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "stance": stance_key}
+
+
 def _project_briefing_item(item: Any) -> dict[str, Any]:
     payload = item.to_dict()
     return {
@@ -3037,6 +3120,9 @@ def get_league_dashboard(
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    declared_team_stance = _fetch_team_stance(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
     trade_idea_records = None
     try:
         trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
@@ -3047,6 +3133,7 @@ def get_league_dashboard(
             players_db_path=PLAYERS_DB_PATH,
             untouchable_player_ids=gm_untouchable_ids,
             gm_target_player_ids=gm_target_ids,
+            team_stance=declared_team_stance,
         )
     except (TypeError, ValueError):
         pass
@@ -4016,6 +4103,9 @@ def get_trade_hub_ideas(
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    declared_team_stance = _fetch_team_stance(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
     records = trade_hub_engine.generate_trade_idea_records_cached(
         league_id=league_id,
         roster_id=int(roster_id),
@@ -4024,6 +4114,7 @@ def get_trade_hub_ideas(
         players_db_path=PLAYERS_DB_PATH,
         untouchable_player_ids=gm_untouchable_ids,
         gm_target_player_ids=gm_target_ids,
+        team_stance=declared_team_stance,
     )
 
     is_premium = str(profile.get("entitlement") or "free") == "premium"
@@ -4101,6 +4192,9 @@ def get_trade_finder_ideas(
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    declared_team_stance = _fetch_team_stance(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
     records = trade_hub_engine.generate_trade_finder_records(
         league_id=league_id,
         roster_id=int(roster_id),
@@ -4110,6 +4204,7 @@ def get_trade_finder_ideas(
         trade_block_player_ids=selected_ids,
         untouchable_player_ids=gm_untouchable_ids,
         gm_target_player_ids=gm_target_ids,
+        team_stance=declared_team_stance,
     )
     ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
     return {"ok": True, "ideas": ranked, "reason": ""}
@@ -4174,6 +4269,9 @@ def get_league_all_trades(
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    declared_team_stance = _fetch_team_stance(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
     roster_profiles = sleeper.get_league_roster_profiles(league_id)
     avatar_by_team_name = {
         str(p.get("team_name") or "").strip().lower(): p.get("avatar_url") for p in roster_profiles.values()
@@ -4216,6 +4314,7 @@ def get_league_all_trades(
                 players_db_path=PLAYERS_DB_PATH,
                 untouchable_player_ids=gm_untouchable_ids if is_my_roster else (),
                 gm_target_player_ids=gm_target_ids if is_my_roster else (),
+                team_stance=declared_team_stance if is_my_roster else "",
             )
         except Exception:
             continue

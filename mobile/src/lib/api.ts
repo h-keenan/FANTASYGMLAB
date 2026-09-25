@@ -527,6 +527,27 @@ export const TEAM_STRATEGY_OPTIONS: Array<{ value: TeamStrategy; label: string }
   { value: 'tank', label: 'Tank' },
 ];
 
+/**
+ * Team Situation — a SEPARATE, simpler declaration from GM Stance above.
+ * GM Stance feeds the age-curve valuation (it changes scoring); Team
+ * Situation is a fixed three-way pick that only ever biases trade-idea
+ * rationale TEXT server-side (modules.trade_ideas.apply_team_stance_framing)
+ * — it never changes a value, a rank, or which ideas are generated.
+ */
+export type TeamStance = 'rebuilding' | 'competing' | 'balanced';
+
+export const TEAM_STANCE_OPTIONS: Array<{ value: TeamStance; label: string; description: string }> = [
+  { value: 'rebuilding', label: 'Rebuilding', description: 'Prioritize youth and future draft capital' },
+  { value: 'competing', label: 'Competing', description: 'Prioritize immediate roster impact' },
+  { value: 'balanced', label: 'Balanced', description: 'Keep both current value and future flexibility' },
+];
+
+export interface TeamStanceResponse {
+  ok: boolean;
+  stance: TeamStance | '';
+  options?: TeamStance[];
+}
+
 export interface TradeCounterAction {
   action: 'remove_from_send' | 'add_to_receive';
   player_id: string;
@@ -1336,6 +1357,10 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}/untouchable`,
       { untouchable },
     ),
+  getTeamStance: (leagueId: string) =>
+    authorizedFetch<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`),
+  setTeamStance: (leagueId: string, stance: TeamStance) =>
+    authorizedPost<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`, { stance }),
   registerPushToken: (expoPushToken: string, platform: string, deviceName = '') =>
     authorizedPost<PushMutationResponse>('/v1/push/register', {
       expo_push_token: expoPushToken,

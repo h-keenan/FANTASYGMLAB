@@ -40,6 +40,7 @@ from modules.rankings import (
 )
 from modules.performance import debug_enabled, record_timing
 from modules import runtime_trace
+from modules import team_stance as team_stance_module
 
 BASE_PICK_VALUES = {
     1: 6500,
@@ -2814,6 +2815,64 @@ def _apply_strategy_context_to_idea(
     idea["trade_guardrail_summary"] = str(reasoning.get("guardrail_summary") or "")
     idea["trade_guardrail_hard_fail"] = bool(reasoning.get("guardrail_hard_fail"))
     return idea
+
+
+# --- Team Situation stance framing (Decision Memory v1) -------------------
+#
+# `team_stance` is the user's own EXPLICIT declaration (modules.team_stance) —
+# "Rebuilding" / "Competing" / "Balanced" — never inferred from the roster.
+# The functions below are a pure, additive presentation layer: they append
+# one short clause to an already-built idea's rationale text. They never
+# read/write value_score, never change send/receive assets, never change
+# priority/ordering, and are safe to call on the output of build_trade_ideas /
+# build_player_trade_hub_ideas after everything else has already run.
+TEAM_STANCE_FRAMING_CLAUSES: dict[str, str] = {
+    team_stance_module.STANCE_REBUILDING: (
+        "This fits your declared rebuild: it leans into youth and future draft capital."
+    ),
+    team_stance_module.STANCE_COMPETING: (
+        "This fits your declared win-now stance: it prioritizes immediate roster impact."
+    ),
+    team_stance_module.STANCE_BALANCED: (
+        "This fits your balanced stance: it keeps both immediate value and future flexibility in play."
+    ),
+}
+
+
+def team_stance_framing_clause(team_stance: str) -> str:
+    """One short, additive framing sentence for a declared stance, or "" for none/unknown."""
+
+    key = team_stance_module.normalize_stance(team_stance)
+    return TEAM_STANCE_FRAMING_CLAUSES.get(key, "")
+
+
+def apply_team_stance_framing(
+    ideas: List[Dict[str, Any]],
+    team_stance: str,
+) -> List[Dict[str, Any]]:
+    """Append one stance-aware clause to each idea's rationale text.
+
+    Additive only: every other field on the idea (send_assets, receive_assets,
+    scores, priority, tags, etc.) passes through unchanged. Returns the same
+    list unchanged (same objects) when `team_stance` isn't one of the fixed
+    set, so calling this with "" (no declared stance) is always a no-op.
+    """
+
+    clause = team_stance_framing_clause(team_stance)
+    if not clause:
+        return ideas
+    stance_key = team_stance_module.normalize_stance(team_stance)
+    updated: List[Dict[str, Any]] = []
+    for idea in ideas:
+        if not isinstance(idea, dict):
+            updated.append(idea)
+            continue
+        new_idea = dict(idea)
+        rationale = str(new_idea.get("rationale") or "").strip()
+        new_idea["rationale"] = f"{rationale} {clause}".strip() if rationale else clause
+        new_idea["team_stance_applied"] = stance_key
+        updated.append(new_idea)
+    return updated
 
 
 def _trade_reasoning_context(
