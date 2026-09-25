@@ -27,6 +27,14 @@ AGE_FILTERS = ("All ages", "Under 23", "23–25", "26–28", "29+")
 STATUS_FILTERS = ("All statuses", "Active", "Injured", "Inactive")
 AVAILABILITY_FILTERS = ("All availability", "Rostered", "Available")
 
+# Scan cards are a curated top slice, not the full result set — the
+# "Detailed player table" expander (app.py) surfaces every matching player
+# from the same filtered frame this module returns. Picks have no such
+# fallback, so the result caption discloses truncation for both facets
+# rather than implying the full match count is on screen.
+MAX_VISIBLE_PLAYER_RESULTS = 20
+MAX_VISIBLE_PICK_RESULTS = 8
+
 
 def rostered_player_id_set(
     roster_player_map: dict[str, tuple[str, ...]] | None,
@@ -416,10 +424,19 @@ def render_player_asset_explorer(
         pick_results = pd.DataFrame()
 
     result_count = len(player_results) + len(pick_results)
-    st.caption(
-        f"{result_count} matching asset{'s' if result_count != 1 else ''}. "
-        "Results keep the existing search and value ordering."
+    visible_count = min(len(player_results), MAX_VISIBLE_PLAYER_RESULTS) + min(
+        len(pick_results), MAX_VISIBLE_PICK_RESULTS
     )
+    if visible_count < result_count:
+        st.caption(
+            f"Showing the top {visible_count} of {result_count} matching assets, "
+            "ranked by current value. Results keep the existing search and value ordering."
+        )
+    else:
+        st.caption(
+            f"{result_count} matching asset{'s' if result_count != 1 else ''}. "
+            "Results keep the existing search and value ordering."
+        )
     if result_count == 0:
         if query.strip():
             ui_primitives.render_empty_state_panel(
@@ -463,28 +480,27 @@ def render_player_asset_explorer(
         )
 
         def player_context(row) -> str:
+            # Rank only — player_tier and opportunity_label are already
+            # surfaced on this same row via the shared prestige badge and
+            # opportunity/status chips (player_cards.player_scan_tags).
+            # Repeating them here under a "Why:" label duplicated that
+            # signal in a second visual language and read as a
+            # recommendation rationale on what is a browse/search surface.
             from modules import canonical_player_ranking
 
-            compact = canonical_player_ranking.format_compact_rank(
+            return canonical_player_ranking.format_compact_rank(
                 row.get("canonical_overall_rank", row.get("overall_rank")),
                 row.get("canonical_position_rank", row.get("position_rank")),
                 row.get("position"),
                 unavailable_reason=row.get("rank_unavailable_reason"),
             )
-            context = _text(
-                row.get("opportunity_label")
-                or row.get("status")
-                or row.get("player_tier"),
-                "Current context unavailable",
-            )
-            return f"{compact} · {context}"
 
         render_player_scan_cards(
             player_results,
             score_field=score_field,
             title="Player results",
             note="Open any result for Player Quick View.",
-            max_items=20,
+            max_items=MAX_VISIBLE_PLAYER_RESULTS,
             compact=True,
             enable_quick_view=True,
             quick_view_source_label=product_copy.PLAYERS_SOURCE_LABEL,
@@ -507,7 +523,7 @@ def render_player_asset_explorer(
             "<div class='explorer-pick-grid'>"
             + "".join(
                 pick_card_html(row.to_dict(), score_label=score_label)
-                for _, row in pick_results.head(8).iterrows()
+                for _, row in pick_results.head(MAX_VISIBLE_PICK_RESULTS).iterrows()
             )
             + "</div>",
             unsafe_allow_html=True,
