@@ -19813,6 +19813,18 @@ def main():
                     )
                     injury_alert_value = injury_alert["value"]
                     injury_alert_note = injury_alert["note"]
+                    # Only wire a drill-down when the injury alert names exactly
+                    # one unambiguous starter (injury_ui.my_team_injury_alert's
+                    # own restriction) — otherwise the Injury Alerts tile stays
+                    # a plain info tile rather than guessing which player it means.
+                    injury_route_player_row = None
+                    _injury_route_player_id = _safe_text(injury_alert.get("route_player_id"))
+                    if _injury_route_player_id:
+                        _injury_route_rows = _rows_for_candidate_player_ids(
+                            my_team_df, [_injury_route_player_id]
+                        )
+                        if not _injury_route_rows.empty:
+                            injury_route_player_row = _injury_route_rows.iloc[0]
                     roster_limit_value = (
                         f"Over by {int(my_roster_limit.get('over_by') or 0)}"
                         if my_roster_limit.get("over_limit")
@@ -20068,6 +20080,7 @@ def main():
                         roster_limit_note=roster_limit_note,
                         injury_alert_value=injury_alert_value,
                         injury_alert_note=injury_alert_note,
+                        injury_route_player_row=injury_route_player_row,
                         immediate_value=immediate_value,
                         immediate_note=immediate_note,
                         immediate_tone=immediate_tone,
