@@ -975,9 +975,12 @@ function createStyles(colors: ThemeColors) {
   destTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   newDot: { width: 6, height: 6, borderRadius: 3 },
   destText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  destTextCurrent: { color: colors.accent },
+  // accentOnTint: both of these render inside the `destRowCurrent` row,
+  // whose background is accentMuted — plain `accent` falls under AA
+  // contrast on light mode there (color-system audit, 2026-09-25).
+  destTextCurrent: { color: colors.accentOnTint },
   destSubtitle: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
-  destCurrentBadge: { fontSize: 10, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
+  destCurrentBadge: { fontSize: 10, fontWeight: '700', color: colors.accentOnTint, letterSpacing: 0.6 },
   unreadCountBadge: {
     minWidth: 18,
     height: 18,

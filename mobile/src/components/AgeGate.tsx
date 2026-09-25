@@ -4,7 +4,7 @@ import AppText from './AppText';
 
 import { calculateAge, MINIMUM_AGE, setPassedAgeGate } from '../lib/ageGate';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, typography, type ThemeColors } from '../theme';
+import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
 
 /**
  * Neutral date-of-birth gate shown once per device before LoginScreen's
@@ -138,7 +138,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.md,
       alignItems: 'center',
     },
-    buttonDisabled: { opacity: 0.5 },
+    buttonDisabled: { opacity: disabledOpacity },
     buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });

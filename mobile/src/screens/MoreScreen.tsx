@@ -408,12 +408,26 @@ function SettingsRow({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // Color-system audit (2026-09-25): `disabled` previously reached
+  // TouchableOpacity only — it blocked the tap but changed nothing visible,
+  // so a disabled row was indistinguishable from an enabled one (the
+  // "disabled elements still look intentionally disabled" dark/light-mode
+  // check both brief's checklist and Magna Carta §48 call for). Label/icon
+  // now switch to the dedicated `textDisabled` token when disabled.
   const content = (
     <View style={[styles.row, showDivider && styles.rowDivider]}>
       <View style={styles.labelGroup}>
-        {icon ? <IconCircle name={icon} color={iconColor ?? colors.textSecondary} style={styles.icon} /> : null}
+        {icon ? (
+          <IconCircle
+            name={icon}
+            color={disabled ? colors.textDisabled : iconColor ?? colors.textSecondary}
+            style={styles.icon}
+          />
+        ) : null}
         <View style={styles.labelTextGroup}>
-          <AppText style={danger ? styles.dangerLabel : styles.label}>{label}</AppText>
+          <AppText style={[danger ? styles.dangerLabel : styles.label, disabled && styles.labelDisabled]}>
+            {label}
+          </AppText>
           {description ? <AppText style={styles.rowDescription}>{description}</AppText> : null}
         </View>
       </View>
@@ -472,6 +486,7 @@ function createStyles(colors: ThemeColors) {
     icon: { marginRight: spacing.md },
     labelTextGroup: { flexShrink: 1 },
     label: { fontSize: 15, color: colors.textPrimary, flexShrink: 1 },
+    labelDisabled: { color: colors.textDisabled },
     dangerLabel: { fontSize: 15, fontWeight: '600', color: colors.danger, flexShrink: 1 },
     chevron: { fontSize: 20, color: colors.textSecondary },
     rowDescription: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },

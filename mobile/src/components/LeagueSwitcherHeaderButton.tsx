@@ -138,6 +138,9 @@ function createStyles(colors: ThemeColors) {
     },
     optionIcon: { marginRight: spacing.sm },
     optionText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
-    optionTextActive: { color: colors.accent },
+    // accentOnTint: plain accent measures only 4.02:1 against this sheet's
+    // backgroundElevated surface on light mode, under AA (color-system
+    // audit, 2026-09-25).
+    optionTextActive: { color: colors.accentOnTint },
   });
 }

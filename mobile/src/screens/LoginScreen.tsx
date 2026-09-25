@@ -26,7 +26,7 @@ import { hasPassedAgeGate } from '../lib/ageGate';
 import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, typography, type ThemeColors } from '../theme';
+import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
 
 const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
 
@@ -303,7 +303,7 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     marginTop: spacing.xs,
   },
-  buttonDisabled: { opacity: 0.5 },
+  buttonDisabled: { opacity: disabledOpacity },
   buttonText: {
     color: '#fff',
     fontSize: 16,

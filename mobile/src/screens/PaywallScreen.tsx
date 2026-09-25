@@ -24,7 +24,7 @@ import {
   restorePurchases,
 } from '../lib/revenuecat';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
@@ -333,7 +333,7 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     marginTop: spacing.sm,
   },
-  primaryButtonDisabled: { opacity: 0.5 },
+  primaryButtonDisabled: { opacity: disabledOpacity },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   restoreButton: { alignItems: 'center', marginTop: spacing.lg },
   restoreButtonText: { color: colors.accent, fontSize: 14, fontWeight: '500' },
