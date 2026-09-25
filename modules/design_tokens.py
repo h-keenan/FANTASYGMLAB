@@ -23,7 +23,12 @@ DESIGN_TOKEN_CSS = """
     --color-text-secondary: #e5e7eb;
     --color-text-muted: #a8adb7;
     --color-border: #2a2e35;
-    --color-border-strong: #41464f;
+    /* WCAG 1.4.11 non-text contrast: #41464f only cleared 1.76-2.14:1 against
+       our surfaces (needs 3:1 for a boundary essential to identifying a
+       control). #64748b clears 3.46-4.26:1 across surface-raised/-secondary/
+       bg while staying in the same cool-slate family, so card and control
+       outlines read as intentional edges instead of a near-invisible line. */
+    --color-border-strong: #64748b;
     --border-width-default: 1px;
     --border-width-semantic: 3px;
 
@@ -51,6 +56,13 @@ DESIGN_TOKEN_CSS = """
     --color-brand-accent: #22d3ee;
     --color-brand-bg: #050607;
     --color-brand-surface: #0f1114;
+    /* Small inverted "founder badge" / brand-mark glyph: a fixed light chip
+       (--color-text-primary) with dark ink text, independent of the dark
+       theme's normal foreground/background pairing. Was copy-pasted as the
+       raw literal #0b1220 across trade_hub_ui, startup_coordinator, and
+       brand_identity_styles — promoted here so it has one source instead
+       of three. */
+    --color-brand-mark-ink: #0b1220;
 
     /* Interaction and meaning */
     --color-accent: #67e8f9;

@@ -25,7 +25,7 @@ BRAND_IDENTITY_CSS = """
     border: var(--border-width-default, 1px) solid color-mix(in srgb, var(--color-border, #2a2e35) 70%, transparent);
     border-inline-start: 2px solid color-mix(in srgb, var(--color-brand-accent, #22d3ee) 72%, transparent);
     box-sizing: border-box;
-    color: var(--color-text-secondary, #e2e8f0);
+    color: var(--color-text-secondary, #e5e7eb);
     display: inline-flex;
     gap: 0.55rem;
     max-width: 100%;
@@ -46,7 +46,7 @@ BRAND_IDENTITY_CSS = """
 
 .dg-founder-badge__mark {
     background: var(--color-text-primary, #f8fafc);
-    color: #0b1220;
+    color: var(--color-brand-mark-ink, #0b1220);
     font-size: 0.58rem;
     font-weight: 900;
     letter-spacing: 0.06em;
@@ -169,8 +169,8 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 }
 
 .dg-premium-chip,.dg-experimental-chip{align-items:center;display:inline-flex;font-size:.58rem;font-weight:850;letter-spacing:.08em;line-height:1;padding:.28rem .42rem;text-transform:uppercase}
-.dg-premium-chip{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.4);color:#fde68a}
-.dg-experimental-chip{background:var(--color-diagnostic-soft, rgba(139,147,255,.12));border:1px solid rgba(139,147,255,.38);color:#c7d2fe}
+.dg-premium-chip{background:var(--color-action-soft, rgba(250,204,21,.14));border:1px solid rgba(250,204,21,.4);color:var(--color-premium, #facc15)}
+.dg-experimental-chip{background:var(--color-diagnostic-soft, rgba(139,147,255,.12));border:1px solid rgba(139,147,255,.38);color:var(--color-experimental, #8b93ff)}
 
 .trade-summary-footer {
     align-items: center;
@@ -247,13 +247,13 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     border-inline-start: 2px solid color-mix(in srgb, var(--color-accent-strong) 70%, transparent) !important;
     border-radius: 2px !important;
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32) !important;
-    color: #e2e8f0 !important;
+    color: var(--color-text-secondary, #e5e7eb) !important;
     font-weight: 850 !important;
 }
 
 div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover"] > button:hover {
     border-color: color-mix(in srgb, var(--color-accent-strong) 55%, transparent) !important;
-    color: #ffffff !important;
+    color: var(--color-text-primary, #f8fafc) !important;
 }
 
 .dg-feedback-brand {

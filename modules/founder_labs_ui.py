@@ -30,7 +30,7 @@ FOUNDER_LABS_CSS = """
   padding:var(--space-sm) var(--space-xs); text-align:left; vertical-align:top;
 }
 .founder-labs-status { font-weight:var(--font-weight-title); letter-spacing:var(--letter-spacing-badge); }
-.founder-labs-warn { color:var(--color-warning, #fbbf24); }
+.founder-labs-warn { color:var(--color-warning, #f59e0b); }
 .founder-labs-note { color:var(--color-text-muted); margin-top:var(--space-md); }
 </style>
 """

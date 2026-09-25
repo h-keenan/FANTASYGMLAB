@@ -31,7 +31,7 @@ body:has(.fgl-landing) .dg-build-identity{
 .fgl-preview__kicker{color:var(--color-accent,#22d3ee);font-size:.68rem;font-weight:750;letter-spacing:.05em;text-transform:uppercase}
 .fgl-preview__rail{display:grid;gap:.45rem}
 .fgl-preview__card{background:color-mix(in srgb,var(--color-bg,#020617) 35%,transparent);border:1px solid var(--color-border,rgba(148,163,184,.16));border-radius:.5rem;display:grid;gap:.28rem;padding:.5rem .55rem}
-.fgl-preview__surface{color:var(--color-prestige-elite,#fbbf24);font-size:.72rem;font-weight:750;letter-spacing:.04em;text-transform:uppercase}
+.fgl-preview__surface{color:var(--color-prestige-elite,#d8b85a);font-size:.72rem;font-weight:750;letter-spacing:.04em;text-transform:uppercase}
 .fgl-preview__chips{display:flex;flex-wrap:wrap;gap:.28rem}
 .fgl-preview__chip{background:color-mix(in srgb,var(--color-accent-strong,#22d3ee) 14%,transparent);border:1px solid color-mix(in srgb,var(--color-accent,#22d3ee) 32%,transparent);border-radius:999px;color:var(--color-text-primary,#e5e7eb);font-size:.7rem;font-weight:650;line-height:1.2;padding:.12rem .45rem}
 .fgl-preview__note{color:var(--color-text-secondary,rgba(203,213,225,.9));font-size:.78rem;line-height:1.35;margin:0;overflow-wrap:anywhere}

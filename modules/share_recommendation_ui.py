@@ -265,11 +265,17 @@ def native_share_markup(
 <html><head><meta charset="utf-8">
 <style>
   html,body{{margin:0;background:transparent;font-family:system-ui,sans-serif}}
+  /* This is a standalone sandboxed document (its own <html>), so it has no
+     access to the parent page's :root custom properties and must hardcode
+     literals. Values below are pinned to match design_tokens.py's
+     --color-border (#2a2e35), --color-surface-secondary (#15171b),
+     --color-text-primary (#f8fafc), and --opacity-disabled (0.5) exactly —
+     keep them in sync if those tokens change. */
   button{{
-    width:100%;min-height:44px;border-radius:0;border:1px solid #2a2e36;
-    background:#15181d;color:#eceef2;font-size:15px;font-weight:650;cursor:pointer;
+    width:100%;min-height:44px;border-radius:0;border:1px solid #2a2e35;
+    background:#15171b;color:#f8fafc;font-size:15px;font-weight:650;cursor:pointer;
   }}
-  button[disabled]{{opacity:.45;cursor:default}}
+  button[disabled]{{opacity:.5;cursor:default}}
 </style></head><body>
 <button id="fglShare" type="button">{safe_button_label}</button>
 <script>

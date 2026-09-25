@@ -21,7 +21,12 @@ PREMIUM_PLAN_CTA_COMPONENT = st.components.v2.component(
       :root { color-scheme: dark; }
       body { margin: 0; overflow: hidden; }
       #plan-cta, #checkout-fallback {
-        align-items: center; background: #0a0c10; border: 1px solid #3b4452;
+        /* Isolated web component (its own shadow-root-like document) — no
+           access to the parent page's :root tokens. Border pinned to match
+           design_tokens.py's --color-border-strong (#64748b) so this CTA's
+           default outline clears WCAG 1.4.11 (3:1) instead of the previous
+           #3b4452, which was only ~1.4:1 against this button's background. */
+        align-items: center; background: #0a0c10; border: 1px solid #64748b;
         border-radius: 0; box-sizing: border-box; color: #f8fafc; display: flex;
         font: 750 12px/1.2 system-ui, sans-serif; justify-content: center;
         letter-spacing: .045em; min-height: 44px; padding: 10px 14px;

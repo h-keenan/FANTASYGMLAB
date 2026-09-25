@@ -142,7 +142,7 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
 {_GM_ORB_BLOCK} button[data-testid^="stBaseButton"],
 {_GM_ORB_KEY} button[data-testid^="stBaseButton"] {{
     align-items: center !important;
-    background-color: var(--color-shell, #0f1114) !important;
+    background-color: var(--color-shell, #090a0c) !important;
     background-origin: content-box !important;
     background-position: center !important;
     background-repeat: no-repeat !important;

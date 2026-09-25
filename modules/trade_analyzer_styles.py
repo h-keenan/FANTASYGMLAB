@@ -6,9 +6,9 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 /* Incoming-offer Trade Analyzer — uses design tokens only. */
 .toa-share-card {
   background: var(--surface-1, #0f1114);
-  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
+  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
   border-radius: var(--radius-panel, 0);
-  color: var(--color-text-primary, #eceef2);
+  color: var(--color-text-primary, #f8fafc);
   display: grid;
   gap: var(--space-sm, 0.65rem);
   margin: 0;
@@ -23,20 +23,20 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-brand-name {
-  color: var(--color-text-primary, #eceef2);
+  color: var(--color-text-primary, #f8fafc);
   font-size: var(--font-size-body, 0.95rem);
   font-weight: var(--font-weight-title, 700);
 }
 
 .toa-kicker {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: var(--font-size-metadata, 0.75rem);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .toa-partner {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: var(--font-size-body, 0.95rem);
 }
 
@@ -53,18 +53,18 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
    fair used to share one amber, making two distinct verdicts read as one. */
 .toa-tone-accept .toa-verdict { color: var(--color-success, #22c55e); }
 .toa-tone-counter .toa-verdict { color: var(--color-accent-strong, #22d3ee); }
-.toa-tone-fair .toa-verdict { color: var(--color-text-secondary, #9ca3af); }
+.toa-tone-fair .toa-verdict { color: var(--color-text-secondary, #e5e7eb); }
 .toa-tone-decline .toa-verdict { color: var(--color-danger, #ef4444); }
 
 .toa-band,
 .toa-confidence {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: var(--font-size-metadata, 0.75rem);
 }
 
 .toa-side {
-  background: var(--surface-2, #15181d);
-  border-left: 3px solid var(--border-standard, #2a2e36);
+  background: var(--surface-2, #15171b);
+  border-left: 3px solid var(--border-standard, #2a2e35);
   border-radius: var(--radius-control, 12px);
   padding: var(--space-sm, 0.65rem);
 }
@@ -78,7 +78,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 .toa-side-send { border-left-color: var(--color-danger, #ef4444); }
 
 .toa-side-label {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: var(--font-size-metadata, 0.72rem);
   letter-spacing: 0.05em;
   margin-bottom: 0.35rem;
@@ -99,12 +99,12 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 
 .toa-asset-meta,
 .toa-asset-empty {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: 0.78rem;
 }
 
 .toa-section-label {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: var(--font-size-metadata, 0.72rem);
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -117,7 +117,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 
 .toa-context,
 .toa-footer {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: 0.78rem;
 }
 
@@ -128,26 +128,26 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-value-edge:not(.tvl-edge) {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: var(--font-size-metadata, 0.75rem);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .toa-value-edge:not(.tvl-edge) strong {
-  color: var(--color-text-primary, #eceef2);
+  color: var(--color-text-primary, #f8fafc);
   font-size: var(--font-size-body, 0.95rem);
   letter-spacing: 0;
   text-transform: none;
 }
 
 .toa-more {
-  background: var(--surface-2, #15181d);
+  background: var(--surface-2, #15171b);
   padding: var(--space-xs, 0.35rem) var(--space-sm, 0.55rem);
 }
 
 .toa-more > summary {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   cursor: pointer;
   font-size: var(--font-size-metadata, 0.75rem);
   letter-spacing: 0.05em;
@@ -163,7 +163,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 .toa-block-kicker,
 .toa-toolbar-kicker,
 .toa-review-kicker {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: var(--font-size-metadata, 0.72rem);
   font-weight: 750;
   letter-spacing: 0.08em;
@@ -177,7 +177,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-workspace-swap {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: 0.78rem;
   margin: 0.15rem 0 0;
 }
@@ -195,7 +195,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 
 .toa-block {
   background: var(--surface-1, #0f1114);
-  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
+  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
   border-radius: var(--radius-panel, 0);
   margin: 0 0 var(--space-sm, 0.65rem);
   max-width: 100%;
@@ -204,7 +204,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 }
 
 .toa-block-title {
-  color: var(--color-text-primary, #eceef2);
+  color: var(--color-text-primary, #f8fafc);
   font-size: 0.95rem;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -221,8 +221,8 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 .toa-chip-list { display: grid; gap: 0.4rem; margin: 0.35rem 0 0.55rem; }
 
 .toa-chip {
-  background: var(--surface-2, #15181d);
-  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e36);
+  background: var(--surface-2, #15171b);
+  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
   min-width: 0;
   padding: var(--space-xs, 0.35rem) var(--space-sm, 0.55rem);
   width: max-content;
@@ -232,19 +232,19 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 .toa-chip-copy { min-width: 0; }
 
 .toa-chip-name {
-  color: var(--color-text-primary, #eceef2);
+  color: var(--color-text-primary, #f8fafc);
   font-size: 0.92rem;
   font-weight: 650;
   overflow-wrap: anywhere;
 }
 
 .toa-chip-meta {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: 0.75rem;
 }
 
 .toa-chip-value {
-  color: var(--color-text-muted, #9ca3af);
+  color: var(--color-text-muted, rgba(229, 231, 235, 0.52));
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -264,7 +264,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 }
 
 .toa-empty-package {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: 0.8rem;
   margin: 0.25rem 0 0.5rem;
 }
@@ -288,7 +288,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 }
 
 .toa-side-caption {
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text-secondary, #e5e7eb);
   font-size: 0.78rem;
   font-weight: 500;
   letter-spacing: 0;
