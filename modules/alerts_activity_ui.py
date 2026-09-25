@@ -79,11 +79,12 @@ def _safe_source_url(value: object) -> str:
     return candidate if parsed.scheme in {"http", "https"} and bool(parsed.netloc) else ""
 
 
-# Presentation-only grouping taxonomy — mirrors the mobile Alerts screen's
+# Presentation-only type taxonomy — mirrors the mobile Alerts screen's
 # injury/status, transaction, role/depth, off-field buckets so alert TYPE
-# reads via color (and a shared group header) instead of a flat stack of
-# identically-weighted rows. Reads only the already-computed `event_type`
-# field; does not alter alert generation, matching, or eligibility logic.
+# reads via a per-row color accent (border/glyph). Reads only the
+# already-computed `event_type` field; does not alter alert generation,
+# matching, or eligibility logic. Section GROUPING is decision-tier based
+# (see `alert_priority_tier` below), not type-based — see V2 restructure notes.
 _BUCKET_INJURY_EVENTS = frozenset(
     {
         "INJURY",
@@ -107,16 +108,10 @@ _BUCKET_ROLE_EVENTS = frozenset(
         "DEPTH_CHART_CHANGE",
     }
 )
-_ALERT_GROUP_LABELS = {
-    "injury": "Injury / Status",
-    "transaction": "Transaction",
-    "role": "Role / Depth Chart",
-    "other": "Updates",
-}
 
 
 def alert_category_bucket(row: Mapping[str, Any]) -> str:
-    """Presentation-only bucket for grouping/coloring; not a business signal."""
+    """Presentation-only bucket for a row's type-color accent; not a business signal."""
 
     event_type = str(row.get("event_type") or "").strip().upper()
     if event_type in _BUCKET_INJURY_EVENTS:
@@ -128,46 +123,132 @@ def alert_category_bucket(row: Mapping[str, Any]) -> str:
     return "other"
 
 
+# V2 restructure: sections are grouped by user decision-importance (urgency +
+# roster stakes), not by backend event-type taxonomy. `compose_activity_timeline`
+# already orders rows "mine" before "rest"; this tier split rides that existing
+# order (no new sort, no change to ranking/relevance logic) so groups never
+# interleave the way the old per-event-type buckets could when an injury row
+# and a transaction row about the same roster alternated in ranked order.
+_TIER_ATTENTION = "attention"
+_TIER_MY_PLAYERS = "my_players"
+_TIER_LEAGUE = "league"
+
+_ALERT_TIER_LABELS = {
+    _TIER_ATTENTION: "Needs Your Attention",
+    _TIER_MY_PLAYERS: "My Players",
+    _TIER_LEAGUE: "Around the League",
+}
+
+# Roster-relationship labels — shared by the priority-tier badge and the
+# unconfirmed-status context line so both surfaces agree on wording.
+_ROSTER_RELATIONSHIP_LABELS = {
+    "MY_STARTER": "Starter",
+    "MY_BENCH": "Bench",
+    "MY_TAXI": "Taxi squad",
+    "MY_IR": "IR",
+}
+
+# Injury/status event types where an unconfirmed report already gets a
+# dedicated, cautious context line (see `timeline_row_html`) instead of
+# parroting a possibly-premature reason. Kept as one constant so the
+# generalized "Unconfirmed" badge below never duplicates that treatment.
+_INJURY_STATUS_EVENT_TYPES = frozenset(
+    {"INJURY", "INACTIVE", "IR_PUP_NFI", "INJURY_SEVERITY_UPDATE"}
+)
+
+
+def _row_relationship_flags(row: Mapping[str, Any]) -> tuple[bool, bool, bool, str]:
+    """Return (is_my_player, is_teammate, is_urgent, relationship) for one row.
+
+    Single source of truth for both row styling (`timeline_row_html`) and
+    section grouping (`alert_priority_tier`) so the two can never disagree
+    about which tier/accent a row belongs to.
+    """
+
+    relationship = str(row.get("roster_relationship") or "").strip().upper()
+    severity = str(row.get("severity") or "").strip().upper()
+    is_my_player = relationship in alerts_activity._MY_REL
+    is_teammate = str(row.get("relationship_kind") or "") == alerts_activity.KIND_MY_TEAMMATE
+    if is_teammate:
+        is_my_player = False
+    is_urgent = severity in {"CRITICAL", "HIGH"} and relationship in alerts_activity._MY_REL
+    return is_my_player, is_teammate, is_urgent, relationship
+
+
+def alert_priority_tier(row: Mapping[str, Any]) -> str:
+    """Decision-importance tier used for section grouping (presentation only).
+
+    Urgent roster-relevant alerts lead, then other My Players activity, then
+    everything else — answering "what do I need to act on?" before "what
+    happened around the league?" per the app's information-hierarchy rule.
+    """
+
+    is_my_player, is_teammate, is_urgent, _relationship = _row_relationship_flags(row)
+    if is_urgent:
+        return _TIER_ATTENTION
+    if is_my_player or is_teammate:
+        return _TIER_MY_PLAYERS
+    return _TIER_LEAGUE
+
+
 def timeline_row_html(row: Mapping[str, Any]) -> str:
     glyph = escape(str(row.get("glyph") or "NEWS")[:10])
     headline = escape(alerts_activity.humanize_headline(row))
     context = escape(str(row.get("context") or ""))
     freshness = escape(str(row.get("freshness") or ""))
     unread = bool(row.get("unread"))
-    relationship = str(row.get("roster_relationship") or "").strip().upper()
     severity = str(row.get("severity") or "").strip().upper()
     event_type = str(row.get("event_type") or "").strip().upper()
-    is_my_player = relationship in alerts_activity._MY_REL
-    kind = str(row.get("relationship_kind") or "")
-    if kind == alerts_activity.KIND_MY_TEAMMATE:
-        is_my_player = False
-    is_urgent = severity in {"CRITICAL", "HIGH"} and relationship in alerts_activity._MY_REL
+    is_my_player, is_teammate, is_urgent, relationship = _row_relationship_flags(row)
+    bucket = alert_category_bucket(row)
     row_classes = ["dg-alerts-row"]
     player_id = str(row.get("player_id") or "").strip()
     if player_id:
         row_classes.append("dg-alerts-row--player")
-    if alert_category_bucket(row) == "injury":
+    if bucket == "injury":
         row_classes.append("dg-alerts-row--injury")
+    elif bucket == "transaction":
+        row_classes.append("dg-alerts-row--transaction")
+    elif bucket == "role":
+        row_classes.append("dg-alerts-row--role")
     if is_urgent:
         row_classes.extend(("dg-alerts-row--urgent", "dg-alerts-row--my-player"))
-    elif kind == alerts_activity.KIND_MY_TEAMMATE:
+    elif is_teammate:
         row_classes.append("dg-alerts-row--teammate")
     elif str(row.get("category") or "").upper() == "NEWS":
         row_classes.append("dg-alerts-row--news")
     if not unread:
         row_classes.append("dg-alerts-row--read")
+    status_unconfirmed = bool(row.get("status_unconfirmed"))
+    # An unconfirmed injury/status report on a My Player row gets its own
+    # cautious context line below (real reason text intentionally withheld —
+    # see that branch) instead of this generic badge, so the two treatments
+    # never both fire on the same row.
+    unconfirmed_has_dedicated_context = (
+        is_my_player and event_type in _INJURY_STATUS_EVENT_TYPES and status_unconfirmed
+    )
     badges: list[str] = []
     if is_my_player:
-        badges.append("<span class='dg-alerts-badge dg-alerts-badge--my'>MY PLAYER</span>")
-    elif kind == alerts_activity.KIND_MY_TEAMMATE:
+        relationship_suffix = _ROSTER_RELATIONSHIP_LABELS.get(relationship, "")
+        my_player_label = (
+            f"MY PLAYER · {relationship_suffix.upper()}" if relationship_suffix else "MY PLAYER"
+        )
+        badges.append(f"<span class='dg-alerts-badge dg-alerts-badge--my'>{my_player_label}</span>")
+    elif is_teammate:
         badges.append("<span class='dg-alerts-badge dg-alerts-badge--my'>TEAMMATE CONTEXT</span>")
-    if event_type in {"INJURY", "INACTIVE", "IR_PUP_NFI", "INJURY_SEVERITY_UPDATE"}:
+    if event_type in _INJURY_STATUS_EVENT_TYPES:
         event_label = (
             "POTENTIALLY SIGNIFICANT INJURY"
             if bool(row.get("significant_injury_event"))
             else "INJURY ALERT"
         )
         badges.append(f"<span class='dg-alerts-badge dg-alerts-badge--risk'>{event_label}</span>")
+    if status_unconfirmed and not unconfirmed_has_dedicated_context:
+        # Unconfirmed/speculative info must never read with the same
+        # confidence as a confirmed report — mirrors the fix already shipped
+        # on mobile (PR #761): give it its own distinct, amber "pending"
+        # treatment instead of blending it into ordinary metadata text.
+        badges.append("<span class='dg-alerts-badge dg-alerts-badge--pending'>UNCONFIRMED</span>")
     badges_html = (
         "<div class='dg-alerts-badges'>" + "".join(badges) + "</div>"
         if badges
@@ -175,23 +256,16 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     )
     unread_html = "<span class='dg-alerts-unread' aria-label='Unread'></span>" if unread else ""
     context = str(row.get("fantasygm_read") or row.get("context") or "")
-    if is_my_player and event_type in {
-        "INJURY",
-        "INACTIVE",
-        "IR_PUP_NFI",
-        "INJURY_SEVERITY_UPDATE",
-    } and bool(row.get("status_unconfirmed")):
-        relationship_label = {
-            "MY_STARTER": "Starter",
-            "MY_BENCH": "Bench",
-            "MY_TAXI": "Taxi squad",
-            "MY_IR": "IR",
-        }.get(relationship, "My roster")
+    context_pending = False
+    if unconfirmed_has_dedicated_context:
+        relationship_label = _ROSTER_RELATIONSHIP_LABELS.get(relationship, "My roster")
         context = " · ".join(
             part for part in (relationship_label, "Status not yet confirmed") if part
         )
+        context_pending = True
     context = escape(context)
-    context_html = f"<p class='dg-alerts-context'>{context}</p>" if context else ""
+    context_classes = "dg-alerts-context" + (" dg-alerts-context--pending" if context_pending else "")
+    context_html = f"<p class='{context_classes}'>{context}</p>" if context else ""
     event_label = event_type.replace("_", " ").title() if event_type else str(row.get("category") or "")
     source_name = str(row.get("source") or "").strip()
     meta_parts = [part for part in (event_label, source_name, freshness) if part]
@@ -405,16 +479,17 @@ def render_alerts_page(
         return
     clicked_actions: list[dict[str, Any]] = []
     painted_actions: list[dict[str, Any]] = []
-    current_bucket = None
+    current_tier = None
     with st.container(key=f"{key}_timeline"):
         for index, row in enumerate(visible):
-            bucket = alert_category_bucket(row)
-            if bucket != current_bucket:
-                current_bucket = bucket
+            tier = alert_priority_tier(row)
+            if tier != current_tier:
+                current_tier = tier
+                tier_css = tier.replace("_", "-")
                 render_html_fragment(
-                    f"<div class='dg-alerts-group dg-alerts-group--{bucket}'>"
+                    f"<div class='dg-alerts-group dg-alerts-group--{tier_css}'>"
                     "<span class='dg-alerts-group__bar'></span>"
-                    f"{escape(_ALERT_GROUP_LABELS[bucket])}</div>"
+                    f"{escape(_ALERT_TIER_LABELS[tier])}</div>"
                 )
             with st.container(key=f"alerts_item_{league_id}_{index}"):
                 render_html_fragment(timeline_row_html(row))
