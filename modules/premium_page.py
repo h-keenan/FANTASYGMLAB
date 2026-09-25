@@ -426,7 +426,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
                     )
                 except Exception:
                     st.warning(
-                        "Billing portal is not available right now. Check billing configuration and try again."
+                        "Billing portal is not available right now. Please try again in a moment."
                     )
         else:
             st.info("Premium is active. Billing management appears after Stripe links a customer id.")
@@ -463,7 +463,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             "<div class='premium-checkout-heading'>"
             "<div class='premium-page-kicker'>Choose your plan</div>"
             "<div class='premium-section-title'>Founder Premium pricing</div>"
-            "<div class='premium-checkout-support'>One plan click opens the existing secure Stripe checkout.</div>"
+            "<div class='premium-checkout-support'>One click takes you to Stripe's secure checkout page.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -572,7 +572,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
                 st.rerun()
             except Exception:
                 st.warning(
-                    "Checkout is not available right now. Check billing configuration and try again."
+                    "Checkout is not available right now. Please try again in a moment."
                 )
     if not user_id and premium_conversion.peek_checkout_intent().get("surface") == "premium_plan_card":
         st.caption("Create a free account or sign in before checkout — your Premium intent is saved.")
