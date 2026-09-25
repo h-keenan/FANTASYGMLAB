@@ -91,12 +91,16 @@ function NewsImpactBadge({ items, onPress }: { items: NewsItem[]; onPress: () =>
   const pending = top.speculative;
   const color = pending ? colors.premium : newsImpactColor(colors)[top.event_type ?? ''] ?? colors.textSecondary;
   const label = pending ? 'Pending' : NEWS_IMPACT_LABEL[top.event_type ?? ''] ?? 'In The News';
+  // "Pending" reads as an unresolved/awaiting-confirmation state (matches the
+  // concept sheet's action-row pill for this exact case) — a clock icon says
+  // that more clearly than the newspaper glyph confirmed news items keep.
+  const icon: IoniconName = pending ? 'time-outline' : 'newspaper-outline';
   return (
     <TouchableOpacity
       style={[styles.newsImpactBadge, { borderColor: color, backgroundColor: `${color}1F` }]}
       onPress={onPress}
     >
-      <Ionicons name="newspaper-outline" size={13} color={color} />
+      <Ionicons name={icon} size={13} color={color} />
       <AppText style={[styles.newsImpactText, { color }]}>{label}</AppText>
       <Ionicons name="chevron-forward" size={13} color={color} />
     </TouchableOpacity>
@@ -414,6 +418,24 @@ const STAT_GROUP_ORDER: Partial<Record<string, StatGroupKey[]>> = {
 
 function statGroupOrderForPosition(position: string): StatGroupKey[] {
   return STAT_GROUP_ORDER[position] ?? DEFAULT_STAT_GROUP_ORDER;
+}
+
+/**
+ * Fidelity fix vs. both concept sheets: neither ever wraps a 3-4 metric
+ * analytics group into a 2x2 grid — RB's Fantasy Scoring and Efficiency each
+ * render 4 cards in a single row, QB's Production renders 3 — whereas
+ * MetricCard's own default `minWidth: '46%'` (unchanged here, still used by
+ * every other caller — Dashboard, My Team, Team Roster, Player Compare)
+ * always wraps a group of 3+ into multiple rows. This only overrides sizing
+ * per-instance via the `style` prop MetricCard already documents for exactly
+ * this purpose, so no shared-component default changes. Groups of 1-2 keep
+ * the original two-up sizing; 5+ (none currently exist) falls back to it too
+ * rather than squeezing five cards into an unreadable single row.
+ */
+function metricGroupCardStyle(count: number): { minWidth: number; flexBasis: `${number}%` } {
+  if (count === 3) return { minWidth: 88, flexBasis: '31%' };
+  if (count === 4) return { minWidth: 76, flexBasis: '23%' };
+  return { minWidth: 120, flexBasis: '46%' };
 }
 
 // Mirrors services/mobile_api_service.py's MAX_WEEKLY_STATS_SEASONS_BACK —
@@ -1291,6 +1313,11 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       const position = (player.position ?? '').toUpperCase();
       const isQB = position === 'QB';
       const { primary: productionItems, secondary: secondaryItems } = splitKeyStats(position, season.key_stats);
+      // Decided up front (not just at ordering time) so Efficiency's own
+      // card sizing below can size for a half-width column when this will
+      // actually apply — see the ordering step further down for why this is
+      // gated to small groups only.
+      const canPairUsageEfficiency = season.usage.length <= 2 && season.efficiency.length <= 2;
 
       // One group -> one rendered node, keyed by the same StatGroupKey the
       // position-aware order table above uses to sequence them — this is the
@@ -1299,11 +1326,12 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       const groupNodes: Partial<Record<StatGroupKey, React.ReactNode>> = {};
 
       if (season.fantasy.length > 0) {
+        const cardStyle = metricGroupCardStyle(season.fantasy.length);
         groupNodes.fantasy = (
           <AnalyticsSection key="fantasy" title="Fantasy Output" icon="american-football-outline">
             <View style={styles.metricGrid}>
               {season.fantasy.map((item, index) => (
-                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
               ))}
             </View>
           </AnalyticsSection>
@@ -1311,11 +1339,12 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       }
 
       if (productionItems.length > 0) {
+        const cardStyle = metricGroupCardStyle(productionItems.length);
         groupNodes.production = (
           <AnalyticsSection key="production" title={isQB ? 'Passing Production' : 'Production'} icon="bar-chart-outline">
             <View style={styles.metricGrid}>
               {productionItems.map((item, index) => (
-                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
               ))}
             </View>
           </AnalyticsSection>
@@ -1335,11 +1364,12 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             </AnalyticsSection>
           );
         } else {
+          const cardStyle = metricGroupCardStyle(secondaryItems.length);
           groupNodes.receiving = (
             <AnalyticsSection key="receiving" title="Receiving" icon="locate-outline">
               <View style={styles.metricGrid}>
                 {secondaryItems.map((item, index) => (
-                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
                 ))}
               </View>
             </AnalyticsSection>
@@ -1356,11 +1386,19 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       }
 
       if (season.efficiency.length > 0) {
+        // Halved-column sizing when this will render next to Usage (see
+        // canPairUsageEfficiency above) — the normal row-fill sizing assumes
+        // a full-width section and would force a 2-item group to wrap
+        // vertically inside a half-width card instead of sitting side by
+        // side the way the concept sheet shows it.
+        const cardStyle = canPairUsageEfficiency
+          ? { minWidth: 64, flexBasis: '46%' as const }
+          : metricGroupCardStyle(season.efficiency.length);
         groupNodes.efficiency = (
           <AnalyticsSection key="efficiency" title="Efficiency" icon="calculator-outline">
             <View style={styles.metricGrid}>
               {season.efficiency.map((item, index) => (
-                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
               ))}
             </View>
           </AnalyticsSection>
@@ -1368,20 +1406,51 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       }
 
       if (stats?.college_available && stats.college.length > 0) {
+        const cardStyle = metricGroupCardStyle(stats.college.length);
         groupNodes.college = (
           <AnalyticsSection key="college" title="College" icon="school-outline">
             <View style={styles.metricGrid}>
               {stats.college.map((item, index) => (
-                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} />
+                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
               ))}
             </View>
           </AnalyticsSection>
         );
       }
 
-      const orderedGroups = statGroupOrderForPosition(position)
-        .map((key) => groupNodes[key])
-        .filter((node): node is React.ReactNode => Boolean(node));
+      // Usage and Efficiency render side-by-side in one row, not stacked
+      // full-width — matching the QB concept sheet (Usage's Snap % module
+      // sits next to Efficiency's tiles at the same height) and reusing the
+      // exact paired-column pattern already established below for
+      // Awards+Bio (`awardsBioRow`/`awardsBioCol`) instead of inventing a
+      // second one. Gated (canPairUsageEfficiency, above) to when both groups
+      // are small (<=2 items each) — the RB concept sheet shows no Usage
+      // section at all, so there's no visual evidence a 4-item Efficiency
+      // group (RB's real shape) should ever be squeezed into a half-width
+      // column; large groups keep the original full-width stacked layout the
+      // density fix above already covers.
+      const orderKeys = statGroupOrderForPosition(position);
+      const orderedGroups: React.ReactNode[] = [];
+      for (let i = 0; i < orderKeys.length; i += 1) {
+        const key = orderKeys[i];
+        if (
+          key === 'usage' &&
+          orderKeys[i + 1] === 'efficiency' &&
+          groupNodes.usage &&
+          groupNodes.efficiency &&
+          canPairUsageEfficiency
+        ) {
+          orderedGroups.push(
+            <View key="usage-efficiency-row" style={styles.pairedRow}>
+              <View style={styles.pairedCol}>{groupNodes.usage}</View>
+              <View style={styles.pairedCol}>{groupNodes.efficiency}</View>
+            </View>,
+          );
+          i += 1;
+          continue;
+        }
+        if (groupNodes[key]) orderedGroups.push(groupNodes[key]);
+      }
 
       content.push(
         <View key="stats-tab">
@@ -1598,6 +1667,11 @@ function createStyles(colors: ThemeColors) {
   // full-width stack on a narrow phone instead of squeezing unreadably.
   awardsBioRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   awardsBioCol: { flex: 1, minWidth: '46%' },
+  // Usage+Efficiency side-by-side row — same paired-column shape as
+  // awardsBioRow/awardsBioCol above, kept as its own tokens since the two
+  // pairings sit in different parts of the page and may need to diverge.
+  pairedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  pairedCol: { flex: 1, minWidth: '46%' },
   insightChipsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   insightChip: {
     flex: 1,
