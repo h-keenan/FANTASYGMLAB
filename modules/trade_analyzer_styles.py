@@ -22,13 +22,6 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   gap: 0.55rem;
 }
 
-.toa-mark {
-  color: var(--color-accent-strong, #22d3ee);
-  font-size: var(--font-size-card-title, 1.05rem);
-  font-weight: var(--font-weight-title, 700);
-  letter-spacing: 0.04em;
-}
-
 .toa-brand-name {
   color: var(--color-text-primary, #eceef2);
   font-size: var(--font-size-body, 0.95rem);
@@ -67,23 +60,6 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 .toa-confidence {
   color: var(--color-text-secondary, #9ca3af);
   font-size: var(--font-size-metadata, 0.75rem);
-}
-
-.toa-rationale {
-  font-size: var(--font-size-body, 0.98rem);
-  line-height: 1.45;
-}
-
-.toa-sides {
-  display: grid;
-  gap: var(--space-sm, 0.65rem);
-  grid-template-columns: minmax(0, 1fr);
-}
-
-@media (min-width: 700px) {
-  .toa-sides {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
 }
 
 .toa-side {
@@ -181,12 +157,6 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-more > summary::-webkit-details-marker { display: none; }
-
-.toa-entry-note {
-  color: var(--color-text-secondary, #9ca3af);
-  font-size: 0.9rem;
-  margin: 0 0 var(--space-sm, 0.65rem);
-}
 
 .toa-stage-kicker,
 .toa-workspace-kicker,

@@ -17,7 +17,7 @@ BRAND_IDENTITY_CSS = """
 .dg-executive-shell__mark{height:28px;width:28px}
 .dg-startup-mark{align-items:center;display:inline-flex;justify-content:center;line-height:0}
 .dg-startup-mark-img{height:40px;width:40px}
-.launch-brand-mark-img,.home-hero-logo-img{display:inline-block}
+.home-hero-logo-img{display:inline-block}
 
 .dg-founder-badge {
     align-items: center;
