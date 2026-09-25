@@ -1,7 +1,7 @@
 """League Recaps / League Memory styles — injected on the Recaps route only."""
 
 LEAGUE_RECAPS_CSS = """
-.dg-recap-edition,.dg-recap-teaser{
+.dg-recap-edition,.dg-recap-teaser,.dg-recap-section{
     max-width:52rem;
     min-width:0;
     width:100%;
@@ -199,7 +199,34 @@ LEAGUE_RECAPS_CSS = """
 .dg-tx-grade--warning,.dg-tx-grade--risk{color:var(--color-warning)}
 .dg-tx-grade--pending{color:var(--color-text-muted)}
 @media (min-width:1024px){
-    .dg-recap-edition{max-width:none}
+    .dg-recap-edition,.dg-recap-section{max-width:none}
+}
+/* Deep-link button for one story/group — sits immediately beneath the
+   section it belongs to. Same tight-margin treatment as Alerts' per-row
+   action containers (div[class*="st-key-alerts_actions_"] in
+   alerts_activity_styles.py) so the control reads as attached to its story
+   rather than floating with Streamlit's default block spacing. */
+div[class*="st-key-league_recap_action_"]{
+    margin:var(--space-2xs) 0 var(--space-md);
+    max-width:100%;
+    min-width:0;
+    width:100%;
+}
+div[class*="st-key-league_recap_action_"] [data-testid="stButton"]{
+    display:block;
+    margin:0;
+    width:auto;
+}
+div[class*="st-key-league_recap_action_"] [data-testid="stButton"] > button{
+    font:var(--type-supporting-metadata)!important;
+    min-height:var(--touch-target-min);
+    padding:0 var(--space-sm)!important;
+    white-space:nowrap;
+    width:auto!important;
+}
+div[class*="st-key-league_recap_lead_"],
+div[class*="st-key-league_recap_group_"]{
+    margin:0 0 var(--space-sm);
 }
 div[class*="st-key-league_memory_view_"] [data-testid="stPills"],
 div[class*="st-key-league_memory_view_"] [data-testid="stButtonGroup"],
