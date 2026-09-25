@@ -302,10 +302,20 @@ function AlertRow({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createRowStyles(colors), [colors]);
   const relationshipColors = rosterRelationshipColor(colors);
-  const footerBits = [
-    alert.speculative ? 'Unconfirmed / speculative' : null,
-    alert.source ? `Source: ${alert.source}` : null,
-  ].filter((bit): bit is string => Boolean(bit));
+  // "Unconfirmed / speculative" used to sit in the same neutral gray line as
+  // "Source: X", so a rumor read with the same visual confidence as a
+  // confirmed report. Split out and given the same amber/bold caution
+  // treatment PlayerDetailScreen's own news modal already uses for the
+  // identical speculative flag (modalSpeculative) — not a new convention,
+  // just applied consistently here too.
+  const sourceBit = alert.source ? `Source: ${alert.source}` : null;
+  // Alert rows have no visible affordance today (no chevron, no icon) even
+  // though tapping one opens an external article — the Recap card in this
+  // same list already signals "tap to open" with a trailing chevron, so
+  // these rows looked like static text by comparison. Only show it when
+  // there's actually somewhere to go; a link-less alert still just marks
+  // read on tap.
+  const opensLink = Boolean(alert.link);
 
   return (
     <TouchableOpacity
@@ -331,6 +341,9 @@ function AlertRow({
         ) : null}
         <View style={styles.metaSpacer} />
         <AppText style={styles.time}>{relativeTime(alert.published_ts)}</AppText>
+        {opensLink ? (
+          <Ionicons name="chevron-forward" size={13} color={colors.textTertiary} style={styles.linkChevron} />
+        ) : null}
       </View>
       {alert.matched_player ? (
         <PlayerIdentityRow
@@ -347,7 +360,8 @@ function AlertRow({
           {alert.summary}
         </AppText>
       ) : null}
-      {footerBits.length > 0 ? <AppText style={styles.footerMeta}>{footerBits.join(' · ')}</AppText> : null}
+      {alert.speculative ? <AppText style={styles.speculative}>Unconfirmed / speculative</AppText> : null}
+      {sourceBit ? <AppText style={styles.footerMeta}>{sourceBit}</AppText> : null}
     </TouchableOpacity>
   );
 }
@@ -363,9 +377,14 @@ function createRowStyles(colors: ThemeColors) {
     relationshipPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
     metaSpacer: { flex: 1 },
     time: { fontSize: 11, color: colors.textTertiary },
+    linkChevron: { marginLeft: spacing.xs },
     title: { fontSize: 14.5, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.xs, marginBottom: 3 },
     titleRead: { fontWeight: '500', color: colors.textSecondary },
     summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+    // Matches PlayerDetailScreen's modalSpeculative treatment for the same
+    // flag — bold amber/"pending" tone (Magna Carta §3) rather than the
+    // plain gray metadata line below it.
+    speculative: { fontSize: 11, color: colors.premium, fontWeight: '700', marginTop: spacing.xs },
     footerMeta: { fontSize: 11, color: colors.textTertiary, marginTop: spacing.xs },
   });
 }

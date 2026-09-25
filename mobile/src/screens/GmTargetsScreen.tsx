@@ -33,6 +33,25 @@ interface TargetRow {
   player: RankedPlayer | null;
 }
 
+// GmTarget.source_surface already tells the story of *why* this player is on
+// the list — the only two real callers today are PlayerDetailScreen's
+// "Add to GM Targets" pill and TeamStanceScreen's "Protect" checklist (see
+// api.addGmTarget call sites) — but the field was fetched and never once
+// rendered, so every row looked identical regardless of how it got here.
+// Recommendation-clarity audit (explicit product-owner ask): this is real,
+// already-available "target rationale" data, not an invented one. Unknown/
+// legacy surface values fall back to no line at all rather than a guess.
+const TARGET_ORIGIN_LABEL: Record<string, string> = {
+  player_detail: 'Added from Player Detail',
+  team_stance: 'Protected via Team Situation',
+  gm_targets: 'Added from GM Targets',
+};
+
+function targetOriginLabel(sourceSurface: string | null | undefined): string | null {
+  const key = (sourceSurface ?? '').trim();
+  return key ? TARGET_ORIGIN_LABEL[key] ?? null : null;
+}
+
 /**
  * One row of a GM Targets group — canonical PlayerIdentityRow for identity
  * (tier, opportunity classification, injury pill, same language every other
@@ -62,6 +81,7 @@ function TargetGroupRow({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { target, player } = row;
   const injury = waiverInjuryDisplay(player?.injury_status ?? null);
+  const contextLine = player ? targetOriginLabel(target.source_surface) : 'Not on the current rankings board';
 
   return (
     <View
@@ -80,7 +100,7 @@ function TargetGroupRow({
           team={player?.team}
           tier={player?.tier}
           opportunityLabel={player?.opportunity_label}
-          contextLine={player ? null : 'Not on the current rankings board'}
+          contextLine={contextLine}
           injuryLabel={injury.label}
           injuryTone={injury.tone}
           ruledOut={injury.ruledOut}
@@ -114,7 +134,14 @@ function TargetGroupRow({
           hitSlop={8}
           accessibilityLabel="Remove from GM Targets"
         >
-          <Ionicons name="trash-outline" size={15} color={colors.textSecondary} />
+          {/* Recolored from neutral gray to colors.danger — this is the one
+              irreversible action on the row (re-adding means finding the
+              player again), and it previously rendered with the exact same
+              weight/color as the reversible untouchable toggle right next to
+              it, so the two were visually indistinguishable at a glance.
+              Matches the app's own destructive-icon convention (see
+              MoreScreen's "Delete account" trash icon, colors.danger). */}
+          <Ionicons name="trash-outline" size={15} color={colors.danger} />
         </TouchableOpacity>
       </View>
     </View>

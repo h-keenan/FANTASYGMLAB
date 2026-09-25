@@ -176,9 +176,17 @@ function findRosterRecommendation(
 function rosterRecommendationDetail(rec: RosterRecommendation): string {
   if (rec.isStarter) {
     const slot = rec.player.slot ? ` at ${rec.player.slot}` : '';
-    return `Suggested starter${slot} on your roster${
-      rec.player.opportunity_label ? ` — ${rec.player.opportunity_label}` : ''
-    }`;
+    // Recommendation-clarity audit: rosterRecTone (below) colors this whole
+    // card amber/red whenever the starter carries an injury_label (caution)
+    // or is ruled_out (danger) — but this line previously always showed
+    // opportunity_label instead, so a caution/danger-colored card could read
+    // with no visible reason at all, or a routine opportunity note that had
+    // nothing to do with the color. Prefer the injury reason — the actual
+    // thing driving the color — falling back to the opportunity note only
+    // for a clean, healthy (success/neutral) starter. Both fields were
+    // already fetched for this same object; no new data or computation.
+    const why = rec.player.injury_label || rec.player.opportunity_label;
+    return `Suggested starter${slot} on your roster${why ? ` — ${why}` : ''}`;
   }
   return `Not in your suggested starting lineup this week${
     rec.player.injury_label ? ` — ${rec.player.injury_label}` : ''
