@@ -25,10 +25,17 @@ def test_trade_summary_eye_flow_puts_value_before_package():
     # fairness pill, then the value-change number gets its own prominent row
     # ahead of the send/receive package; confidence moved after the package so
     # it reads as supporting detail rather than competing with the verdict.
+    #
+    # V2 architecture reset pass: Magna Carta's own Trade Hub example (§4) and
+    # Trade UI spec (§30) put rationale ("why does it work") ahead of
+    # confidence/realism ("how realistic is it"). The card now emits the why
+    # cue before the confidence block so reasoning precedes the confidence
+    # verdict, matching partner -> assets -> value -> reasoning -> confidence.
     css = TRADE_SUMMARY_COMPONENT_CSS
     assert ".trade-summary-value-row" in css and "order: 2" in css
     assert ".trade-summary-package" in css and "order: 3" in css
-    assert ".trade-summary-executive" in css and "order: 4" in css
+    assert ".trade-summary-why" in css and "order: 4" in css
+    assert ".trade-summary-executive" in css and "order: 5" in css
     assert "flex-direction: column" in css
     assert "opacity: 0.72" in css
     html_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
@@ -38,8 +45,8 @@ def test_trade_summary_eye_flow_puts_value_before_package():
     assert card.index("trade-summary-category") < card.index("trade-summary-title")
     assert card.index("trade-summary-title") < card.index("trade-summary-value-row")
     assert card.index("trade-summary-value-row") < card.index("trade-summary-package")
-    assert card.index("trade-summary-package") < card.index("trade-summary-executive")
-    assert card.index("trade-summary-executive") < card.index("trade-summary-why")
+    assert card.index("trade-summary-package") < card.index("trade-summary-why")
+    assert card.index("trade-summary-why") < card.index("trade-summary-executive")
 
 
 def test_dashboard_actions_precede_analysis_zones():

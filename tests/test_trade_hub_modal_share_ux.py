@@ -67,6 +67,24 @@ def test_modal_hierarchy_is_package_verdict_reason_share_then_secondary():
     assert "build_trade_share_card(\n                        idea," in dialog
 
 
+def test_share_control_is_explicitly_framed_as_the_real_action():
+    # Recommendation-clarity audit (UI_V2_ARCHITECTURE_RESET.md): Trade Hub has
+    # no in-app trade-submission API, so sharing the branded card is the real,
+    # working way a user acts on a recommendation here. That must be stated
+    # explicitly next to the control, not left implicit in a plain button
+    # label, mirroring the mobile Trade Hub clarity fix (PR #758).
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    dialog = source[
+        source.index("def _trade_detail_dialog()") : source.index(
+            'with performance.time_block("trade_hub_detail_modal"'
+        )
+    ]
+    caption_at = dialog.index("There's no in-app trade submission here")
+    share_at = dialog.index("render_share_controls")
+    assert caption_at < share_at
+    assert "how you actually send the offer" in dialog
+
+
 def test_compact_modal_assets_drop_redundant_role_chips():
     html = trade_hub_ui.trade_asset_html(
         {
