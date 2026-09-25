@@ -42,6 +42,30 @@ def test_included_now_lists_graduated_premium_depth():
     assert "GM Targets (limited)" in free
 
 
+def test_mobile_premium_benefit_lines_are_grounded_in_premium_included_now():
+    known_titles = {title for title, _ in premium_page.PREMIUM_INCLUDED_NOW}
+    for entry in premium_page.MOBILE_PREMIUM_BENEFIT_LINES:
+        assert entry["title"] in known_titles
+
+    lines = premium_page.mobile_premium_benefit_lines()
+    assert lines == [entry["line"] for entry in premium_page.MOBILE_PREMIUM_BENEFIT_LINES]
+    assert len(lines) == len(set(lines))
+
+
+def test_mobile_premium_benefit_lines_raises_on_drift_from_web_copy(monkeypatch):
+    stale_lines = premium_page.MOBILE_PREMIUM_BENEFIT_LINES + (
+        {"title": "A title that no longer exists in PREMIUM_INCLUDED_NOW", "line": "stale"},
+    )
+    monkeypatch.setattr(premium_page, "MOBILE_PREMIUM_BENEFIT_LINES", stale_lines)
+
+    try:
+        premium_page.mobile_premium_benefit_lines()
+    except ValueError as exc:
+        assert "unknown title" in str(exc)
+    else:
+        raise AssertionError("Expected a drifted mobile benefit title to raise ValueError.")
+
+
 def test_premium_lock_uses_upgrade_cta_and_included_line():
     html = premium.premium_lock_html(
         "Full trade board",

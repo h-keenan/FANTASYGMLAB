@@ -113,6 +113,51 @@ PREMIUM_INCLUDED_NOW = (
 PREMIUM_EXPERIMENTAL_WHEN_ENABLED: tuple[tuple[str, str], ...] = ()
 
 
+# Mobile Paywall's benefit checklist — grounded in PREMIUM_INCLUDED_NOW so web
+# and mobile can never describe two different sets of gated Premium features,
+# even though mobile's paywall wants short one-line copy instead of a
+# title+description row. Served to the app via GET /v1/me
+# (services/mobile_api_service.py), so a copy change here reaches mobile
+# without a client release. Mobile keeps a hardcoded copy of this exact list
+# as an offline/fetch-failure fallback only — see mobile/src/screens/PaywallScreen.tsx.
+MOBILE_PREMIUM_BENEFIT_LINES: tuple[dict[str, str], ...] = (
+    {"title": "More next moves", "line": "Your full Next Move briefing, not just the top 4"},
+    {
+        "title": "Full League Pulse",
+        "line": "Full League Pulse — see the whole league’s contenders and rebuilders",
+    },
+    {
+        "title": "Full waiver board",
+        "line": "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
+    },
+    {
+        "title": product_copy.PREMIUM_FULL_TRADE_HUB,
+        "line": "Every Trade Hub idea, not just the first 2 (skip the ads)",
+    },
+    {
+        "title": "GM Targets (full board)",
+        "line": "GM Targets watchlist up to 50 players (Free is capped at 3)",
+    },
+)
+
+
+def mobile_premium_benefit_lines() -> list[str]:
+    """Single-line Premium benefit copy for the mobile Paywall screen.
+
+    Every entry's `title` must exist in PREMIUM_INCLUDED_NOW, so this raises
+    if a future edit renames or removes a benefit here without updating the
+    other list — keeping web and mobile from silently drifting apart again.
+    """
+    known_titles = {title for title, _ in PREMIUM_INCLUDED_NOW}
+    lines: list[str] = []
+    for entry in MOBILE_PREMIUM_BENEFIT_LINES:
+        title = entry["title"]
+        if title not in known_titles:
+            raise ValueError(f"Mobile Premium benefit line references unknown title: {title!r}")
+        lines.append(entry["line"])
+    return lines
+
+
 POSSIBLE_FUTURE_FEATURES = (
     ("Weekly reports", "Possible recurring league summaries and movement tracking."),
     ("Historical franchise tracking", "Possible long-term snapshots for team direction and roster value changes."),
@@ -125,10 +170,12 @@ def plan_status_label(entitlement: str) -> str:
     return "Premium" if entitlement == premium.PREMIUM else "Free"
 
 
-PLAN_DETAILS = {
-    stripe_billing.MONTHLY: ("Monthly", "$3.99", "per month"),
-    stripe_billing.ANNUAL: ("Annual", "$19.99", "per year"),
-}
+# Static fallback used for interval validation and whenever no live-fetched
+# pricing is supplied (e.g. direct calls to _plan_option_html in tests). The
+# real display values shown to users come from stripe_billing.plan_display_details,
+# which fetches the actual Stripe Price objects with a short cache and falls
+# back to this same dict on any failure — see Gap 1 in the Premium pricing audit.
+PLAN_DETAILS = stripe_billing.DEFAULT_PLAN_DETAILS
 
 
 CAPABILITY_GLYPHS = {
@@ -156,8 +203,14 @@ def normalize_checkout_interval(value: object) -> str:
     return interval if interval in PLAN_DETAILS else stripe_billing.MONTHLY
 
 
-def _plan_option_html(interval: str, *, selected: bool) -> str:
-    label, price, cadence = PLAN_DETAILS[normalize_checkout_interval(interval)]
+def _plan_option_html(
+    interval: str,
+    *,
+    selected: bool,
+    plan_details: dict[str, tuple[str, str, str]] | None = None,
+) -> str:
+    details = plan_details or PLAN_DETAILS
+    label, price, cadence = details[normalize_checkout_interval(interval)]
     selected_class = " premium-checkout-option-selected" if selected else ""
     selected_text = "Selected plan" if selected else "Available plan"
     return (
@@ -414,6 +467,10 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             "</div>",
             unsafe_allow_html=True,
         )
+        # Live-sourced from the real Stripe Price objects when reachable
+        # (briefly cached), falling back to PLAN_DETAILS on any failure — see
+        # stripe_billing.plan_display_details.
+        plan_details = stripe_billing.plan_display_details(config)
         selected_interval = normalize_checkout_interval(st.session_state.get(interval_key))
         plan_columns = st.columns(2, gap="small")
         clicked_interval = ""
@@ -428,10 +485,10 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
             (stripe_billing.MONTHLY, stripe_billing.ANNUAL),
         ):
             selected = selected_interval == plan_interval
-            label, price, cadence = PLAN_DETAILS[plan_interval]
+            label, price, cadence = plan_details[plan_interval]
             with column:
                 st.markdown(
-                    _plan_option_html(plan_interval, selected=selected),
+                    _plan_option_html(plan_interval, selected=selected, plan_details=plan_details),
                     unsafe_allow_html=True,
                 )
                 redirect_for_plan = (

@@ -88,6 +88,12 @@ export interface MeResponse {
     // rather than hardcoded here so the cap lives in exactly one place.
     league_cap: number;
   };
+  // Canonical Premium benefit copy — sourced from modules/premium_page.py
+  // (PREMIUM_INCLUDED_NOW / MOBILE_PREMIUM_BENEFIT_LINES), the same list web's
+  // Premium page renders. PaywallScreen renders these instead of an
+  // independently-authored local copy; see its own hardcoded fallback for
+  // when this request fails.
+  premium_benefits?: string[];
 }
 
 /** One Sleeper league behind a username, for the add-league picker. */

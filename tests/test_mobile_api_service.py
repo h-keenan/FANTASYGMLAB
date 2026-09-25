@@ -280,6 +280,55 @@ def test_me_returns_user_and_entitlement(monkeypatch):
     assert body["user"]["profile_status"] == "ok"
 
 
+def test_me_includes_canonical_premium_benefits(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    # Same canonical list web's Premium page renders from — see
+    # modules.premium_page.PREMIUM_INCLUDED_NOW / mobile_premium_benefit_lines.
+    from modules import premium_page
+
+    assert body["premium_benefits"] == premium_page.mobile_premium_benefit_lines()
+    assert len(body["premium_benefits"]) > 0
+
+
+def test_me_falls_back_to_hardcoded_benefits_if_canonical_lookup_breaks(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free"}]
+
+    with (
+        patch("requests.get", side_effect=[auth_user_response, profile_response]),
+        patch.object(
+            mobile_api_service.premium_page,
+            "mobile_premium_benefit_lines",
+            side_effect=RuntimeError("desynced benefit copy"),
+        ),
+    ):
+        response = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+
+    # A broken canonical lookup must never 500 the whole endpoint — the
+    # server-side fallback list keeps the paywall non-empty either way.
+    assert response.status_code == 200
+    body = response.json()
+    assert body["premium_benefits"] == mobile_api_service._FALLBACK_PREMIUM_BENEFIT_LINES
+
+
 def test_me_returns_linked_sleeper_username(monkeypatch):
     client = _client(monkeypatch)
 

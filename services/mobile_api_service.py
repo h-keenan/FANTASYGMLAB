@@ -108,6 +108,7 @@ from modules import (
     player_quick_view,
     player_state_authority,
     players_refresh_flight,
+    premium_page,
     push_tokens,
     push_triggers,
     rankings,
@@ -376,6 +377,28 @@ def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict
     return {"entitlement": "free", "sleeper_username": "", "status": "ok"}
 
 
+# Mirrors modules.premium_page.MOBILE_PREMIUM_BENEFIT_LINES exactly — used only
+# if that module raises (e.g. a future edit desyncs it from PREMIUM_INCLUDED_NOW),
+# so /v1/me still returns something rather than a 500. Mobile has its own
+# equivalent hardcoded fallback in PaywallScreen.tsx for when the request itself
+# fails, so this is strictly a server-side belt-and-suspenders default.
+_FALLBACK_PREMIUM_BENEFIT_LINES = [
+    "Your full Next Move briefing, not just the top 4",
+    "Full League Pulse — see the whole league’s contenders and rebuilders",
+    "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
+    "Every Trade Hub idea, not just the first 2 (skip the ads)",
+    "GM Targets watchlist up to 50 players (Free is capped at 3)",
+]
+
+
+def _premium_benefit_lines() -> list[str]:
+    try:
+        lines = premium_page.mobile_premium_benefit_lines()
+        return lines if lines else list(_FALLBACK_PREMIUM_BENEFIT_LINES)
+    except Exception:
+        return list(_FALLBACK_PREMIUM_BENEFIT_LINES)
+
+
 @app.get("/v1/me")
 def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     config = auth_supabase.get_supabase_config()
@@ -400,6 +423,11 @@ def get_me(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
             # number in two places.
             "league_cap": saved_leagues.max_leagues_for_entitlement(profile["entitlement"]),
         },
+        # Canonical Premium benefit copy — single source of truth is
+        # modules.premium_page (PREMIUM_INCLUDED_NOW / MOBILE_PREMIUM_BENEFIT_LINES),
+        # the same list web's Premium page renders. The mobile Paywall fetches
+        # this instead of keeping its own independently-authored copy.
+        "premium_benefits": _premium_benefit_lines(),
     }
 
 
