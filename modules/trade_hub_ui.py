@@ -310,8 +310,8 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
 }
 .trade-summary-brand__mark {
     align-items: center;
-    background: #f8fafc;
-    color: #0b1220;
+    background: var(--color-text-primary);
+    color: var(--color-brand-mark-ink);
     display: inline-flex;
     font-size: 0.42rem;
     font-weight: 900;

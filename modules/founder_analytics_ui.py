@@ -22,7 +22,7 @@ FOUNDER_ANALYTICS_CSS = """
 }
 .founder-analytics-warn {
   border:var(--border-width-default) solid var(--color-border);
-  border-inline-start:var(--border-width-semantic) solid var(--color-warning, #fbbf24);
+  border-inline-start:var(--border-width-semantic) solid var(--color-warning, #f59e0b);
   padding:var(--space-sm) var(--space-md); font-size:var(--font-size-caption);
   color:var(--color-text-secondary);
 }

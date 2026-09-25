@@ -203,8 +203,8 @@ _SHELL_CSS = """
 }
 .dg-startup-badge-wrap .dg-founder-badge__mark {
     align-items: center;
-    background: #f8fafc;
-    color: #0b1220;
+    background: var(--color-text-primary, #f8fafc);
+    color: var(--color-brand-mark-ink, #0b1220);
     display: inline-flex;
     font-size: 0.52rem;
     font-weight: 900;
@@ -234,7 +234,7 @@ _SHELL_CSS = """
     text-transform: uppercase;
 }
 .dg-startup-status {
-    color: #e2e8f0;
+    color: var(--color-text-secondary, #e5e7eb);
     font-size: clamp(0.9rem, 2.4vw, 1rem);
     font-weight: 650;
     letter-spacing: 0.01em;

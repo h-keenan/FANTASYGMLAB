@@ -89,7 +89,7 @@ FOUNDER_OPS_CSS = """
     padding: var(--space-sm) 0;
 }
 .founder-ops-warning--critical { color: var(--color-danger); }
-.founder-ops-warning--warning { color: var(--color-warning, #fbbf24); }
+.founder-ops-warning--warning { color: var(--color-warning, #f59e0b); }
 .founder-ops-warning--info { color: var(--color-text-muted); }
 @media (max-width: 900px) {
     .founder-ops-grid { grid-template-columns: 1fr; }
