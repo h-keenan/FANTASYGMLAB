@@ -82,34 +82,46 @@ function ageLabel(averageAge: number | null): string {
 }
 
 /**
- * My Team's local subnav — coridian_'s "roster command center" brief:
- * Overview (identity/value + a condensed starters preview), Starters (full
- * lineup + a real aggregate), Bench (full bench, visually quieter), Analysis
- * (the real TeamRanking rank matrix + archetype narrative, via
- * TeamAnalysisPanel). Keeps every roster concept reachable without forcing
- * Team Snapshot + Starters + Bench + Analysis into one endless scroll — see
- * SegmentedTabBar (built for Player Detail's Stats/Trends/... tabs), reused
- * here rather than a My-Team-specific tab control.
+ * My Team's local subnav — UI_V2_ARCHITECTURE_RESET.md restructure.
+ *
+ * Previously four tabs: Overview (identity/value + a 3-row starters
+ * "preview"), Starters (the identical full lineup, reached via the preview's
+ * "View all" link), Bench, Analysis. That preview/full split was an
+ * artificial screen-local construct — coridian_'s concept mockup shows Team
+ * Snapshot flowing directly into the *complete* starting lineup as one
+ * continuous view, never a truncated teaser gated behind a second tab. Once
+ * Overview shows every starter, a separate "Starters" tab is 100% duplicate
+ * content, so it's removed rather than left active alongside the new
+ * Overview (Magna Carta §12 / V2 doc §5 — don't leave both the old and new
+ * pattern live). No information or interaction is lost: every starter row,
+ * the total-value aggregate, and drill-down-to-player all still exist,
+ * simply on Overview directly instead of gated behind a tap. See this
+ * screen's PR description for the explicit feature-parity callout.
+ *
+ * Three tabs remain: Overview (identity/value snapshot + complete starting
+ * lineup — the concept's single continuous view), Bench (full bench,
+ * visually quieter — not part of the concept mockup, kept as reference
+ * information per Magna Carta's hierarchy rule), Analysis (the real
+ * TeamRanking rank matrix + archetype narrative, via TeamAnalysisPanel).
+ * SegmentedTabBar (built for Player Detail's Stats/Trends/... tabs) is
+ * reused here rather than a My-Team-specific tab control.
  */
-type TeamTab = 'overview' | 'starters' | 'bench' | 'analysis';
+type TeamTab = 'overview' | 'bench' | 'analysis';
 
 const TEAM_TABS: Array<{ key: TeamTab; label: string }> = [
   { key: 'overview', label: 'Overview' },
-  { key: 'starters', label: 'Starters' },
   { key: 'bench', label: 'Bench' },
   { key: 'analysis', label: 'Analysis' },
 ];
 
 function infoNoteText(tab: TeamTab, leagueName: string): string {
   switch (tab) {
-    case 'starters':
-      return `Your suggested starting lineup for ${leagueName} — the same optimal-lineup logic the web app's Dashboard and My Team pages use.`;
     case 'bench':
       return `Every other rostered player in ${leagueName} not currently in your suggested starting lineup.`;
     case 'analysis':
       return `Real roster analytics for ${leagueName} — the same team-evaluation model used across FantasyGM Lab.`;
     default:
-      return `Your roster snapshot for ${leagueName} — strength, identity, and starting lineup at a glance.`;
+      return `Your roster snapshot for ${leagueName} — strength, identity, and complete starting lineup at a glance.`;
   }
 }
 
@@ -228,19 +240,8 @@ export default function MyTeamScreen({ route, navigation }: Props) {
                 onViewAnalysis={hasRosterAnalysis(myTeam) ? () => setActiveTab('analysis') : undefined}
               />
             ) : null}
-            {starters.length > 0 ? (
-              <StartersPreviewSection
-                starters={starters}
-                totalValue={totalStartersValue}
-                onPressPlayer={goToPlayer}
-                onViewAll={() => setActiveTab('starters')}
-              />
-            ) : null}
+            <StartersSection starters={starters} totalValue={totalStartersValue} onPressPlayer={goToPlayer} />
           </>
-        ) : null}
-
-        {activeTab === 'starters' ? (
-          <StartersFullSection starters={starters} totalValue={totalStartersValue} onPressPlayer={goToPlayer} />
         ) : null}
 
         {activeTab === 'bench' ? <BenchFullSection bench={bench} onPressPlayer={goToPlayer} /> : null}
@@ -380,64 +381,23 @@ function TeamAnalyticsSection({
   );
 }
 
-/**
- * Overview's "condensed preview" (brief §2): the first few starters plus a
- * link into the full Starters tab, instead of always rendering the entire
- * lineup on Overview too — the full list (with its own aggregate) lives on
- * the Starters tab so Overview stays a quick glance, not a second copy of
- * the same long list. Header row now also carries the real "Total Starters
- * Value" aggregate (concept mockup shows this directly under Team Snapshot,
- * on the Overview tab itself, not only once a user drills into the full
- * Starters tab) — same `totalStartersValue` sum MyTeamScreen already
- * computes for the Starters tab, just surfaced here too.
- */
-function StartersPreviewSection({
-  starters,
-  totalValue,
-  onPressPlayer,
-  onViewAll,
-}: {
-  starters: LineupPlayer[];
-  totalValue: number;
-  onPressPlayer: (player: LineupPlayer) => void;
-  onViewAll: () => void;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const preview = starters.slice(0, 3);
-  return (
-    <View>
-      <SectionHeaderRow label="Starters" total={formatTotalStartersValue(totalValue)} />
-      <AnimatedCard style={styles.groupCard}>
-        {preview.map((player, index) => (
-          <LineupRow
-            key={player.player_id}
-            player={player}
-            showDivider={index < preview.length - 1}
-            onPress={() => onPressPlayer(player)}
-          />
-        ))}
-        <LinkRow label={`View all ${starters.length} Starters`} onPress={onViewAll} />
-      </AnimatedCard>
-    </View>
-  );
-}
-
 /** "Total Starters Value 48,123" — label-then-number, matching coridian_'s
  * concept mockup exactly (previously rendered as "48,123 TOTAL VALUE",
- * number-then-label). Shared by the Overview preview header and the full
- * Starters tab header so the two never drift into two different phrasings
- * of the same real aggregate. */
+ * number-then-label). */
 function formatTotalStartersValue(totalValue: number): string | null {
   return totalValue > 0 ? `Total Starters Value ${Math.round(totalValue).toLocaleString()}` : null;
 }
 
 /**
- * Section 7: a real "Total Starters Value" aggregate — the sum of the exact
- * per-starter `score` values already rendered in each row below, never a
- * fabricated number the app has no inputs for.
+ * The complete starting lineup, directly on Overview — coridian_'s concept
+ * mockup shows Team Snapshot flowing straight into every starter, never a
+ * truncated preview gated behind a second tab (see this file's TeamTab doc
+ * comment for why the old "Starters" tab was removed). A real "Total
+ * Starters Value" aggregate — the sum of the exact per-starter `score`
+ * values already rendered in each row below, never a fabricated number the
+ * app has no inputs for.
  */
-function StartersFullSection({
+function StartersSection({
   starters,
   totalValue,
   onPressPlayer,
@@ -571,22 +531,7 @@ function SectionHeaderRow({ label, total }: { label: string; total?: string | nu
   );
 }
 
-/** One shared "go deeper" affordance (icon-free text + chevron, top hairline
- * to read as a natural extension of the surface above it) — backs the
- * Starters preview's "View all N Starters", instead of a one-off tappable
- * text style. */
-function LinkRow({ label, onPress }: { label: string; onPress: () => void }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <TouchableOpacity style={styles.linkRow} onPress={onPress} activeOpacity={0.7}>
-      <AppText style={styles.linkRowText}>{label}</AppText>
-      <Ionicons name="chevron-forward" size={14} color={colors.accent} />
-    </TouchableOpacity>
-  );
-}
-
-/** Same tappable text-plus-chevron affordance as `LinkRow`, but borderless
+/** Tappable text-plus-chevron affordance, borderless
  * and untethered from block flow — for sitting inline inside a card's own
  * header row (`AnalyticsSection`'s `footer` slot) next to the section
  * title, e.g. Team Snapshot's "View Analysis" in coridian_'s concept
@@ -771,15 +716,6 @@ function createStyles(colors: ThemeColors) {
   valueNumber: { fontSize: 19, fontWeight: '800', color: colors.accent },
   valueNumberMuted: { color: colors.textSecondary },
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
   linkRowText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   error: { color: colors.danger, textAlign: 'center' },
