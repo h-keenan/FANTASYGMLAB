@@ -5,19 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { PlayerAward } from '../lib/api';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { awardTierColor, radii, spacing, type ThemeColors } from '../theme';
 
-// Previous bronze (#9DA4AE) was a blue-gray, not remotely bronze-colored —
-// on a small icon at dark-mode contrast, all three tiers read as "plain
-// gray". These are closer to actual metallic gold/silver/bronze. Untiered
-// awards (some achievements have no tier — see modules/player_awards.py's
-// tier=None cases) fall back to a visible neutral accent instead of the
-// near-invisible border color.
-const AWARD_TIER_COLORS: Record<string, string> = {
-  gold: '#FFD700',
-  silver: '#D9DFE6',
-  bronze: '#CD7F32',
-};
+// Tier -> color mapping (gold/silver/bronze, with a visible neutral-accent
+// fallback for untiered awards — modules/player_awards.py's tier=None case)
+// lives in theme.ts as `awardTierColors`/`awardTierColorsLight` so it has a
+// real light-mode counterpart: this component used to carry its own
+// dark-only constant, which put gold/silver text at ~1.4:1/~1.3:1 contrast
+// on a light-mode card (color-system audit, 2026-09-25).
 
 /** Above this many awards, the horizontal strip gets a "View All" link that
  * opens the full vertical list — otherwise everything already fits in the
@@ -31,9 +26,9 @@ function AwardDetailSheet({
   award: PlayerAward | null;
   onClose: () => void;
 }) {
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const tierColor = award ? (award.tier && AWARD_TIER_COLORS[award.tier]) || colors.accentSoft : colors.accentSoft;
+  const tierColor = award ? awardTierColor(award.tier, isDark, colors.accentSoft) : colors.accentSoft;
   return (
     <Modal visible={award !== null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
@@ -62,9 +57,9 @@ function AwardDetailSheet({
 }
 
 function AwardChip({ award, onPress }: { award: PlayerAward; onPress: () => void }) {
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const tierColor = (award.tier && AWARD_TIER_COLORS[award.tier]) || colors.accentSoft;
+  const tierColor = awardTierColor(award.tier, isDark, colors.accentSoft);
   return (
     <TouchableOpacity style={[styles.chip, { borderLeftColor: tierColor }]} onPress={onPress}>
       <View style={[styles.medal, { backgroundColor: `${tierColor}26` }]}>
@@ -90,7 +85,7 @@ function AwardChip({ award, onPress }: { award: PlayerAward; onPress: () => void
  * how it's laid out.
  */
 export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [selectedAward, setSelectedAward] = useState<PlayerAward | null>(null);
   const [viewAllOpen, setViewAllOpen] = useState(false);
@@ -131,7 +126,7 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
             </View>
             <ScrollView style={styles.listScroll}>
               {awards.map((award) => {
-                const tierColor = (award.tier && AWARD_TIER_COLORS[award.tier]) || colors.accentSoft;
+                const tierColor = awardTierColor(award.tier, isDark, colors.accentSoft);
                 return (
                   <TouchableOpacity
                     key={award.badge_id}

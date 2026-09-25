@@ -99,7 +99,9 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 5,
     maxWidth: 150,
   },
-  buttonText: { fontSize: 12, fontWeight: '700', color: colors.accent, flexShrink: 1 },
+  // accentOnTint: sits on this button's own accentMuted fill, where plain
+  // accent falls under AA on light mode (color-system audit, 2026-09-25).
+  buttonText: { fontSize: 12, fontWeight: '700', color: colors.accentOnTint, flexShrink: 1 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -124,7 +126,10 @@ function createStyles(colors: ThemeColors) {
     borderBottomColor: colors.border,
   },
   optionText: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-  optionTextActive: { color: colors.accent },
+  // accentOnTint: plain accent measures only 4.02:1 against this sheet's
+  // backgroundElevated surface on light mode, under AA (color-system
+  // audit, 2026-09-25).
+  optionTextActive: { color: colors.accentOnTint },
   divider: {
     height: 1,
     backgroundColor: colors.borderStrong,

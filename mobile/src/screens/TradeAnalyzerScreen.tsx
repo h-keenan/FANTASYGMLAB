@@ -38,7 +38,7 @@ import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeAnalyzer'>;
@@ -797,7 +797,7 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  analyzeButtonDisabled: { opacity: 0.5 },
+  analyzeButtonDisabled: { opacity: disabledOpacity },
   analyzeButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   // AnimatedCard already supplies the surface fill/radius/border/shadow —
   // this just adds the tone-colored left rail and the card's own spacing.

@@ -290,7 +290,10 @@ function createStyles(colors: ThemeColors) {
     },
     stanceCardActive: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
     stanceLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
-    stanceLabelActive: { color: colors.accent },
+    // accentOnTint: sits on stanceCardActive's own accentMuted fill, where
+    // plain accent falls under AA on light mode (color-system audit,
+    // 2026-09-25).
+    stanceLabelActive: { color: colors.accentOnTint },
     stanceDescription: { fontSize: 12, color: colors.textSecondary },
     savingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
     savingText: { fontSize: 12, color: colors.textSecondary },

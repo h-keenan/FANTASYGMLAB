@@ -76,6 +76,9 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.accent,
     },
     label: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-    labelActive: { color: colors.accent, fontWeight: '700' },
+    // accentOnTint, not accent: this label sits directly on `segmentActive`'s
+    // accentMuted fill, where light mode's plain accent falls under AA
+    // contrast (color-system audit, 2026-09-25 — see theme.ts).
+    labelActive: { color: colors.accentOnTint, fontWeight: '700' },
   });
 }

@@ -50,10 +50,34 @@ const darkColors = {
   hairline: 'rgba(255,255,255,0.08)',
   textPrimary: '#F2F4F7',
   textSecondary: '#A6B0BB',
-  textTertiary: '#6F7A87',
+  // Color-system audit (2026-09-25): raised from #6F7A87 — that value only
+  // hit 3.79:1 against `backgroundElevated` (fails WCAG AA's 4.5:1 for
+  // normal text; MetricCard's note text and InsightRow-style secondary
+  // captions render at this size). #7F8A97 clears 4.72:1 against
+  // backgroundElevated and 5.39:1 against surface while staying a visible
+  // step below textSecondary (8.61:1/7.53:1) — the muted-text-unreadable
+  // dark-mode failure mode the audit brief calls out by name. The old value
+  // didn't disappear: it's `textDisabled` below, since a WaiverRecommendationCard
+  // comment on file documented exactly this token being read as "inert/disabled"
+  // when used for merely-secondary copy — the two meanings needed separate colors.
+  textTertiary: '#7F8A97',
+  // Genuinely inactive/disabled content (distinct from textTertiary's
+  // "readable but secondary" role). WCAG's contrast minimums don't apply to
+  // disabled UI text, so this intentionally sits below AA (3.79:1 on
+  // backgroundElevated, 4.33:1 on surface) — legible enough to read the
+  // label, dim enough to unambiguously signal "not interactive right now."
+  textDisabled: '#6F7A87',
   accent: '#00D4FF',
   accentSoft: '#5CE4FF',
   accentMuted: 'rgba(0,212,255,0.14)',
+  // On-tint text/icon variant — for cyan content painted directly over an
+  // `accentMuted` fill (selected segment labels, "CURRENT" nav badge, GM
+  // Stance's active pill). Dark mode's plain `accent` already clears AA by
+  // a wide margin there (~9.8:1 against accentMuted-over-black), so this is
+  // an alias today; it exists so components can consistently reach for
+  // "the color for cyan text on a cyan tint" and get the light-mode-correct
+  // answer for free (see lightColors.accentOnTint, which is NOT an alias).
+  accentOnTint: '#00D4FF',
   danger: '#FF4D4D',
   dangerMuted: 'rgba(255,77,77,0.14)',
   success: '#22C55E',
@@ -85,16 +109,47 @@ const lightColors = {
   hairline: 'rgba(10,30,45,0.08)',
   textPrimary: '#0B1D26',
   textSecondary: '#3E5867',
-  textTertiary: '#6B8494',
+  // Color-system audit (2026-09-25): darkened from #6B8494 — that value hit
+  // only 3.13:1 against `backgroundElevated` and 3.92:1 against `surface`,
+  // both under WCAG AA's 4.5:1 (this is the light-mode "secondary text is
+  // too faint" failure mode named in the audit brief). #4F6878 clears
+  // 4.67:1 / 5.86:1 on those two surfaces (4.91:1 further down on
+  // `background`) while staying a visible step above the new `textDisabled`
+  // below and a visible step below `textSecondary`. Old value preserved as
+  // `textDisabled` rather than discarded — same rationale as darkColors.
+  textTertiary: '#4F6878',
+  // Genuinely inactive/disabled content — see darkColors.textDisabled for
+  // the split rationale. Intentionally under AA (3.13-3.92:1 depending on
+  // surface): WCAG's text-contrast minimums don't apply to disabled
+  // controls, and this needs to read as dimmer than textTertiary.
+  textDisabled: '#6B8494',
   accent: '#0077A3',
   accentSoft: '#00A6CC',
   accentMuted: 'rgba(0,119,163,0.12)',
+  // On-tint text/icon variant for cyan content painted over an
+  // `accentMuted` fill or the pale `backgroundElevated` sheet surface.
+  // NOT an alias in light mode: plain `accent` (#0077A3) only reaches
+  // ~3.8-4.3:1 against an accentMuted-tinted background and 4.02:1 against
+  // `backgroundElevated` — under AA in both cases, which is exactly why
+  // several shared components' "selected"/"current" label text (segmented
+  // tabs, GM Orb's current nav row, GM Stance's active option) read as
+  // washed-out on the light theme despite dark mode looking fine with the
+  // same code. #00597A clears 5.9-6.6:1 against those same backgrounds.
+  accentOnTint: '#00597A',
   danger: '#D92D2D',
   dangerMuted: 'rgba(217,45,45,0.12)',
   success: '#178A43',
   successBright: '#22C55E',
   successMuted: 'rgba(23,138,67,0.12)',
-  premium: '#B8860B',
+  // Color-system audit (2026-09-25): darkened from #B8860B, which measured
+  // only 3.25:1 on a plain white surface (fails AA's 4.5:1) and a
+  // near-invisible 2.86:1 when used as chip text directly on its own
+  // `premiumMuted` fill (PlayerIdentityRow's "watch" injury pill) — the
+  // brief's explicit "amber has sufficient contrast" light-mode check.
+  // #8A6508 clears 5.32:1 on white and 4.68:1 on the premiumMuted-tinted
+  // composite, matching the ~AA-plus target `danger`/`success` already hit
+  // as plain text (4.81:1 / 4.42:1) without drifting the hue toward brown.
+  premium: '#8A6508',
   premiumMuted: 'rgba(184,134,11,0.12)',
   badgeBackground: 'rgba(0,119,163,0.12)',
   badgeText: '#0077A3',
@@ -165,6 +220,42 @@ export function positionColor(
   return table[(position ?? '').toUpperCase()] ?? fallback;
 }
 
+/**
+ * Award tier identity (gold/silver/bronze) — promoted out of AwardsStrip's
+ * own module-scope constant during the color-system audit (2026-09-25).
+ * That component was the one place in the app still hardcoding a
+ * dark-tuned-only palette with no light-mode counterpart (every other
+ * tier/position table above already learned this lesson): gold #FFD700 and
+ * silver #D9DFE6 measured ~1.4:1 and ~1.3:1 against a white card — both
+ * catastrophically under WCAG AA, i.e. functionally invisible chip
+ * text/icons in light mode. Dark values are unchanged from AwardsStrip's
+ * original constant (they were fine — legible metallic hues on near-black).
+ */
+export const awardTierColors: Record<string, string> = {
+  gold: '#FFD700',
+  silver: '#D9DFE6',
+  bronze: '#CD7F32',
+};
+
+// Same darken-and-saturate treatment as positionColorsLight/TIER_COLOR_LIGHT
+// (playerTier.ts) applied to the same three hues: #8A6508 (5.32:1 on white),
+// #57606F (6.35:1), #8B4E1D (6.55:1) — all comfortably clear AA while still
+// reading as gold/silver/bronze rather than becoming generic grays.
+export const awardTierColorsLight: Record<string, string> = {
+  gold: '#8A6508',
+  silver: '#57606F',
+  bronze: '#8B4E1D',
+};
+
+export function awardTierColor(
+  tier: string | null | undefined,
+  isDark = true,
+  fallback: string = colors.accentSoft,
+): string {
+  const table = isDark ? awardTierColors : awardTierColorsLight;
+  return (tier && table[tier]) || fallback;
+}
+
 export const gradients = {
   hero: ['#16202C', '#000000'] as const,
   accent: ['#5CE4FF', '#00D4FF'] as const,
@@ -174,6 +265,17 @@ export const lightGradients = {
   hero: ['#FFFFFF', '#EAF3F8'] as const,
   accent: ['#00A6CC', '#0077A3'] as const,
 };
+
+/**
+ * Shared disabled-control opacity — color-system audit (2026-09-25) found
+ * four screens each hardcoding their own disabled-button opacity
+ * independently (LoginScreen, PaywallScreen, TradeAnalyzerScreen, AgeGate
+ * all used 0.5; TradeFinderScreen alone used 0.4, for no documented reason
+ * — an unintentional drift, not a deliberate variant). One canonical value
+ * so a disabled primary button reads the same way everywhere, per
+ * UI_MAGNA_CARTA.md §45 ("no duplicated design systems").
+ */
+export const disabledOpacity = 0.5;
 
 export const spacing = {
   xs: 4,
