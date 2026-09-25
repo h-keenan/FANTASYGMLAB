@@ -168,7 +168,7 @@ export default function WaiverRecommendationCard({
       </View>
       <View style={styles.compactBreakdown}>
         <AppText style={styles.compactBreakdownText}>Full breakdown</AppText>
-        <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+        <Ionicons name="chevron-forward" size={14} color={colors.accentSoft} />
       </View>
     </TouchableOpacity>
   );
@@ -225,7 +225,19 @@ function createStyles(colors: ThemeColors) {
     // Plain text + a small chevron (not a filled pill, unlike the primary
     // card's more prominent breakdownRow) keeps it a quiet, secondary
     // control per that instruction.
+    //
+    // Recommendation-clarity audit (product-owner ask, this pass): this was
+    // previously colors.textTertiary at 10px — the same muted gray as
+    // disabled/metadata text elsewhere in the app, which read as inert
+    // rather than as "here is the real, working action for this
+    // recommendation." Waivers has no in-app claim/add button (see
+    // ScreenInfoNote below), so this chevron+label genuinely *is* the
+    // action affordance for every secondary Priority Add — it needed to be
+    // legible as one. Recolored to accentSoft (the same interactive-affordance
+    // tone the primary card's own breakdownRow already uses) without
+    // changing size/weight/shape, so it stays a quiet secondary control,
+    // just no longer indistinguishable from static metadata.
     compactBreakdown: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: spacing.xs },
-    compactBreakdownText: { fontSize: 10, fontWeight: '700', color: colors.textTertiary },
+    compactBreakdownText: { fontSize: 10.5, fontWeight: '700', color: colors.accentSoft },
   });
 }

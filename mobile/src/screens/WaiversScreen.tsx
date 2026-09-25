@@ -185,10 +185,19 @@ export default function WaiversScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+      {/* Recommendation-clarity audit (product-owner ask, this pass): Waivers
+          has no in-app waiver-claim/add API (deliberately, see PR #747), so
+          "what should I do about this" wasn't answered anywhere on screen —
+          a user could reasonably look for an ADD button and not find one.
+          Extended this note's body (still tucked behind the ⓘ tap, per brief
+          item 17: stays secondary, doesn't interrupt the workflow) to state
+          the actual action model once: tap a recommendation for the full
+          breakdown, then place the claim in Sleeper — this app never submits
+          it for you. */}
       <ScreenInfoNote
         text={`Free agents ranked for your roster — ordered by fit for ${
           neededPositions.length > 0 ? `your needs at ${neededPositions.join(', ')}` : 'your team'
-        }, not just raw value.`}
+        }, not just raw value. Tap any recommendation for the full breakdown — that's where you decide. FantasyGM Lab doesn't submit waiver claims for you; place the claim from your Sleeper league once you've decided.`}
       />
 
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
@@ -247,6 +256,28 @@ export default function WaiversScreen({ route, navigation }: Props) {
                   ) : null}
                 </View>
               ) : null}
+              {/* Structural reorder (this pass): Stash Candidates / Watchlist
+                  Depth / FAAB Shortlist — and the Free-tier upsell for them —
+                  used to render as the very last thing on the whole screen,
+                  after the full "All Free Agents" table (see the ListFooterComponent
+                  this replaced). That buried genuinely personalized,
+                  roster-aware recommendations behind a page of generic
+                  browsing, contradicting both Magna Carta §31 ("Personalized
+                  Priority Adds should normally appear before generic Best
+                  Available browsing") and this board's own caption text below
+                  ("check these after Priority Adds" — which wasn't true of
+                  its old position). Moved here, immediately after Priority
+                  Adds, so every personalized recommendation lives in one
+                  place before the market-snapshot/generic-browsing sections
+                  that follow. No content, gating, or data changed — only
+                  where it renders. */}
+              <SecondaryWaiverBoard
+                isPremium={isPremium}
+                stashCandidates={stashCandidates}
+                watchlistCandidates={watchlistCandidates}
+                faabTargets={faabTargets}
+                onPressPlayer={openPlayer}
+              />
               {bestAvailable.length > 0 ? (
                 <View style={styles.sectionBlock}>
                   <SectionHeader label="Best Available by Position" />
@@ -275,15 +306,6 @@ export default function WaiversScreen({ route, navigation }: Props) {
               icon="search-outline"
               title="No free agents match"
               subtitle="Try a different search term or position filter."
-            />
-          }
-          ListFooterComponent={
-            <SecondaryWaiverBoard
-              isPremium={isPremium}
-              stashCandidates={stashCandidates}
-              watchlistCandidates={watchlistCandidates}
-              faabTargets={faabTargets}
-              onPressPlayer={openPlayer}
             />
           }
         />
@@ -551,8 +573,14 @@ function createStyles(colors: ThemeColors) {
   bestAvailableName: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.xs },
   bestAvailableScore: { fontSize: 14, fontWeight: '700', color: colors.accent },
   bestAvailableCount: { fontSize: 10, color: colors.textTertiary },
-  secondaryLockWrap: { marginTop: spacing.lg },
-  secondaryBoard: { marginTop: spacing.lg },
+  // No marginTop here (unlike when this board rendered as the list's own
+  // ListFooterComponent, trailing the whole page): it now sits directly
+  // after Priority Adds' own sectionBlock, which already contributes
+  // marginBottom: spacing.lg — an explicit top margin here would double that
+  // gap into an oversized empty band between the two personalized-recommendation
+  // sections (Magna Carta §7: avoid gaps with no information).
+  secondaryLockWrap: { marginTop: 0, marginBottom: spacing.lg },
+  secondaryBoard: { marginTop: 0 },
   secondaryCaption: { fontSize: 12, color: colors.textSecondary, lineHeight: 16, marginBottom: spacing.md },
   freeAgentRow: {
     flexDirection: 'row',
