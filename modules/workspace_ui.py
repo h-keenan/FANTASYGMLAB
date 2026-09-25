@@ -1052,8 +1052,11 @@ def render_home_command_tiles(
                 + "<div class='home-command-card-top'><span class='home-command-card-dot'></span>"
                 + f"<div class='home-command-card-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div>"
                 + (
+                    # Any route-linked tile is actually tappable — show the same
+                    # visible affordance for all of them (waivers, my_team, etc.),
+                    # not only trade_hub, so the drill-down isn't a hidden feature.
                     "<div class='home-command-card-cta' aria-hidden='true'>→</div>"
-                    if route_key == "trade_hub"
+                    if route_key
                     else ""
                 )
                 + "</div>"
@@ -1091,7 +1094,7 @@ def render_home_command_tiles(
             + f"<div class='home-command-card-label'>{semantic_icon_html(tone or label, label=label)}{escape(label)}</div>"
             + (
                 "<div class='home-command-card-cta' aria-hidden='true'>→</div>"
-                if route_key == "trade_hub"
+                if route_key
                 else ""
             )
             + "</div>"

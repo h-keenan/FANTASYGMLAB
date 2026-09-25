@@ -33,11 +33,18 @@ def test_valuation_lens_header_is_selector_not_duplicate_badge():
     assert "text-transform: uppercase" in DASHBOARD_WORKFLOW_CSS
 
 
-def test_dashboard_insights_snapshot_stack_on_mobile():
-    assert "st-key-dashboard_context_pair" in DASHBOARD_WORKFLOW_CSS
+def test_dashboard_insights_and_snapshot_are_independent_full_width_sections():
+    # V2 restructure: League Insights (opportunities) and Team Snapshot
+    # (reference) no longer share a paired two-column row at any width — the
+    # old pairing container/CSS is gone, and each renders full width so the
+    # actionable surface isn't visually equal-weighted with static reference
+    # tiles. Narrow-viewport text-wrap safety for both still holds.
+    assert "st-key-dashboard_context_pair" not in DASHBOARD_WORKFLOW_CSS
+    assert "st-key-dashboard_league_insights" in DASHBOARD_WORKFLOW_CSS
+    assert "st-key-dashboard_team_snapshot" in DASHBOARD_WORKFLOW_CSS
     stacked = DASHBOARD_WORKFLOW_CSS.split("@media (max-width: 700px)", 1)[1]
+    assert "overflow-wrap: anywhere" in stacked
     assert "flex-direction: column" in stacked
-    assert "stHorizontalBlock" in stacked
 
 
 def test_roster_cards_use_standard_football_asset_density():

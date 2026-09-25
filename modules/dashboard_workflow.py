@@ -219,45 +219,56 @@ def render_dashboard_workflow(
             if render_full_recommendations_lock is not None:
                 render_full_recommendations_lock()
 
-            with st.container(key="dashboard_context_pair"):
-                insight_col, snapshot_col = st.columns(2, gap="large")
-                insight_count = len(intelligence_tiles)
-                snapshot_count = len(snapshot_tiles)
-                with insight_col:
-                    with st.container(key="dashboard_league_insights"):
-                        ui_primitives.render_section_header("League Insights", weight="secondary")
-                        st.caption(
-                            "Market and league signals that may change your next move. "
-                            "Uses already-computed tiles — not a new analysis pass."
-                            + (
-                                f" {insight_count} signal"
-                                + ("s" if insight_count != 1 else "")
-                                + " ready."
-                                if insight_count
-                                else " No extra market signal beyond Game Plan."
-                            )
-                        )
-                        if intelligence_tiles:
-                            render_tiles(
-                                intelligence_tiles,
-                                key_prefix="dashboard_intelligence",
-                            )
-                        else:
-                            st.caption(
-                                "No separate market signal is stronger than your current Game Plan."
-                            )
-                with snapshot_col:
-                    with st.container(key="dashboard_team_snapshot"):
-                        ui_primitives.render_section_header("Team Snapshot", weight="secondary")
-                        st.caption(
-                            "Record, health, and construction at a glance."
-                            + (
-                                f" {snapshot_count} snapshot tiles."
-                                if snapshot_count
-                                else ""
-                            )
-                        )
-                        render_snapshot(snapshot_tiles)
+            # League Insights is still an actionable-opportunity signal (the next
+            # best trade/waiver idea after the one Game Plan already surfaced) —
+            # it stays full width and ahead of pure-reference content instead of
+            # being squeezed into an equal-weight column next to Team Snapshot.
+            # Splitting it out of the former paired columns removes an inversion
+            # where a recommendation surface and a static reference surface read
+            # as equally important (Magna Carta §12/§33).
+            insight_count = len(intelligence_tiles)
+            snapshot_count = len(snapshot_tiles)
+            with st.container(key="dashboard_league_insights"):
+                ui_primitives.render_section_header("League Insights", weight="secondary")
+                st.caption(
+                    "Market and league signals that may change your next move. "
+                    "Uses already-computed tiles — not a new analysis pass."
+                    + (
+                        f" {insight_count} signal"
+                        + ("s" if insight_count != 1 else "")
+                        + " ready."
+                        if insight_count
+                        else " No extra market signal beyond Game Plan."
+                    )
+                )
+                if intelligence_tiles:
+                    render_tiles(
+                        intelligence_tiles,
+                        key_prefix="dashboard_intelligence",
+                    )
+                else:
+                    st.caption(
+                        "No separate market signal is stronger than your current Game Plan."
+                    )
+            _log_dashboard_milestone("dashboard_summary_tiles_complete")
+
+            if render_orientation is not None:
+                render_orientation()
+
+            # Secondary context, demoted below the actionable feed: Team Snapshot
+            # (pure record/health/construction reference) now sits with the league
+            # recap nudge and Quick Actions rather than beside League Insights.
+            with st.container(key="dashboard_team_snapshot"):
+                ui_primitives.render_section_header("Team Snapshot", weight="secondary")
+                st.caption(
+                    "Record, health, and construction at a glance."
+                    + (
+                        f" {snapshot_count} snapshot tiles."
+                        if snapshot_count
+                        else ""
+                    )
+                )
+                render_snapshot(snapshot_tiles)
             if _teaser:
                 _render_html_fragment(_teaser_html)
                 if st.button(
@@ -266,10 +277,6 @@ def render_dashboard_workflow(
                     use_container_width=False,
                 ):
                     st.session_state["platform_nav_page"] = "league_recaps"
-            _log_dashboard_milestone("dashboard_summary_tiles_complete")
-
-            if render_orientation is not None:
-                render_orientation()
 
             ui_primitives.render_section_header(
                 "Explore",
