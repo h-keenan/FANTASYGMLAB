@@ -20,7 +20,7 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import IconCircle from '../components/IconCircle';
+import InsightRow from '../components/InsightRow';
 import MetricCard from '../components/MetricCard';
 import PlayerHero from '../components/PlayerHero';
 import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnapshotCard';
@@ -793,48 +793,54 @@ function UsageTrendChip({ trend }: { trend: UsageTrend }) {
 
 /** Two real signals already computed server-side — model.workload_trend
  * (role direction) and model.usage_trend (weekly-recency read, with its own
- * confidence label) — restyled as the concept sheet's icon/title/subtitle
- * insight chips instead of the plain text line this data used to render as
- * on the Model tab only. Never invents a third chip to fill the row. */
+ * confidence label). Renders each as the shared `InsightRow` (Magna Carta
+ * §28's "short analytical conclusion" component — icon, eyebrow label,
+ * headline, optional detail, optional chevron) grouped inside one surface
+ * with an internal divider, rather than the page-local icon-circle chip
+ * pair this used to be — the exact same "grouped rows, not card-per-item"
+ * pattern InsightRow already formalizes for Dashboard/My Team. Never invents
+ * a third row to fill the group. */
 function InsightChipsRow({ model }: { model: QuickViewModel }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const trendKey = (model.workload_trend ?? '').toLowerCase();
   const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
   const trendUp = trendKey === 'rising' || trendKey === 'climbing' || trendKey === 'increasing';
-  const chips: Array<{ icon: IoniconName; color: string; title: string; detail: string }> = [];
+  const rows: Array<{ key: string; icon: IoniconName; color: string; label: string; headline: string; detail: string }> = [];
   if (model.workload_trend) {
-    chips.push({
+    rows.push({
+      key: 'role',
       icon: trendUp ? 'trending-up' : 'trending-down',
       color: trendColor,
-      title: `Role trending ${trendUp ? 'up' : 'down'}`,
+      label: 'Role',
+      headline: `Role trending ${trendUp ? 'up' : 'down'}`,
       detail: model.workload_trend,
     });
   }
   if (model.usage_trend) {
     const rising = model.usage_trend.direction === 'up';
-    chips.push({
+    rows.push({
+      key: 'usage',
       icon: rising ? 'flame' : 'alert-circle-outline',
       color: rising ? colors.success : colors.danger,
-      title: model.usage_trend.label,
+      label: 'Usage',
+      headline: model.usage_trend.label,
       detail: model.usage_trend.detail,
     });
   }
-  if (chips.length === 0) return null;
+  if (rows.length === 0) return null;
   return (
-    <View style={styles.insightChipsRow}>
-      {chips.map((chip, index) => (
-        <View key={index} style={styles.insightChip}>
-          <IconCircle name={chip.icon} color={chip.color} size={30} iconSize={15} />
-          <View style={styles.insightChipTextGroup}>
-            <AppText style={styles.insightChipTitle} numberOfLines={1}>
-              {chip.title}
-            </AppText>
-            <AppText style={styles.insightChipDetail} numberOfLines={2}>
-              {chip.detail}
-            </AppText>
-          </View>
-        </View>
+    <View style={[styles.card, styles.cardSpaced]}>
+      {rows.map((row, index) => (
+        <InsightRow
+          key={row.key}
+          icon={row.icon}
+          color={row.color}
+          label={row.label}
+          headline={row.headline}
+          detail={row.detail}
+          last={index === rows.length - 1}
+        />
       ))}
     </View>
   );
@@ -1285,18 +1291,34 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       {heroActions}
     </PlayerHero>,
   );
-  content.push(<PlayerSnapshotCard key="snapshot" valueScore={player.score != null ? Math.round(player.score) : null} items={snapshotItems} />);
-  if (rank.rank_unavailable_reason) {
-    content.push(
-      <AppText key="rank-note" style={styles.notice}>
-        {rank.rank_unavailable_reason}
-      </AppText>,
-    );
-  }
+
+  // Snapshot (+ its rank-unavailable note) is tab-agnostic — same info
+  // regardless of which tab is active — but per the more-authoritative QB
+  // concept sheet (coridian_, 2026-09-25 follow-up), it renders BELOW the
+  // segmented tab bar, not above it as the RB concept/previous fidelity pass
+  // had it. Built once here and pushed at the right spot in each branch
+  // below rather than duplicated.
+  const snapshotNode = (
+    <PlayerSnapshotCard
+      key="snapshot"
+      valueScore={player.score != null ? Math.round(player.score) : null}
+      items={snapshotItems}
+    />
+  );
+  const rankNoteNode = rank.rank_unavailable_reason ? (
+    <AppText key="rank-note" style={styles.notice}>
+      {rank.rank_unavailable_reason}
+    </AppText>
+  ) : null;
 
   let tabBarIndex: number | null = null;
 
   if (loading) {
+    // No tab bar exists yet during the initial fetch, so there's nothing
+    // for Snapshot to sit "below" — render it right after the hero same as
+    // before.
+    content.push(snapshotNode);
+    if (rankNoteNode) content.push(rankNoteNode);
     content.push(<ActivityIndicator key="loading" style={styles.loader} color={colors.accent} />);
   } else {
     const showTabs = Boolean(stats?.seasons.length || model);
@@ -1308,6 +1330,10 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         </View>,
       );
     }
+    // Below the tab bar (or right after the hero when there's no stats/model
+    // to build tabs from at all) — see the QB-concept note above.
+    content.push(snapshotNode);
+    if (rankNoteNode) content.push(rankNoteNode);
 
     if (activeTab === 'stats' && season) {
       const position = (player.position ?? '').toUpperCase();
@@ -1672,21 +1698,6 @@ function createStyles(colors: ThemeColors) {
   // pairings sit in different parts of the page and may need to diverge.
   pairedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   pairedCol: { flex: 1, minWidth: '46%' },
-  insightChipsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  insightChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    padding: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    backgroundColor: colors.surface,
-  },
-  insightChipTextGroup: { flex: 1 },
-  insightChipTitle: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
-  insightChipDetail: { fontSize: 10, color: colors.textSecondary, marginTop: 1, lineHeight: 13 },
   trendRow: {
     flexDirection: 'row',
     alignItems: 'center',
