@@ -816,6 +816,11 @@ class EnrichedTargetCard:
     has_action: bool
     has_material_change: bool
     untouchable: bool = False
+    # Real GmTarget.source_surface, carried through for display — recommendation-
+    # clarity audit finding (mirrors mobile PR #761): this was already fetched
+    # but silently dropped before reaching presentation, so every card looked
+    # identical regardless of how it got onto the list.
+    source_surface: str = ""
 
 
 def enrich_target(
@@ -865,6 +870,7 @@ def enrich_target(
         has_action=bool(_safe_text(action.get("action"))),
         has_material_change=bool(_safe_text(change.get("label"))),
         untouchable=bool(target.untouchable),
+        source_surface=_safe_text(target.source_surface),
     )
 
 
