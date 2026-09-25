@@ -28,6 +28,10 @@ from modules import player_images
 EXPERIMENT_ENV_KEY = "DYNASTYGM_EXPERIMENTAL_SHARE_CARDS"
 FEATURE_LABEL = "Share Recommendation"
 TRADE_HUB_SHARE_LABEL = "Share Trade Idea"
+# Trade Analyzer evaluates an incoming offer (not a Trade Hub-generated idea),
+# so its share affordance names what it actually produces: a card carrying
+# this verdict, for the user to send to their trade partner or a friend.
+TRADE_ANALYZER_SHARE_LABEL = "Share Verdict"
 EXPERIMENTAL_LABEL = ""  # graduated — no experimental badge
 
 CARD_TYPE_TRADE = "trade"
