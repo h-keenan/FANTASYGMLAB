@@ -35,34 +35,6 @@ div[class*="st-key-dashboard_page_context"] [data-testid="element-container"] {
     width: 100%;
 }
 
-.dg-dashboard-page-context {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xs);
-    max-width: 100%;
-    min-width: 0;
-    padding-bottom: 0;
-    position: relative;
-    width: 100%;
-}
-
-.dg-dashboard-page-identity,
-.dg-dashboard-page-meta {
-    color: var(--color-text-muted);
-    font: var(--type-supporting-metadata);
-    letter-spacing: var(--letter-spacing-badge);
-    line-height: var(--line-height-caption);
-    overflow-wrap: anywhere;
-    text-align: left;
-}
-
-.dg-dashboard-page-kicker {
-    color: var(--color-text-muted);
-    font: var(--type-supporting-metadata);
-    letter-spacing: var(--letter-spacing-badge);
-    text-transform: uppercase;
-}
-
 .st-key-dashboard_workflow > div {
     max-width: none;
     width: 100%;
