@@ -17,16 +17,13 @@ ALERTS_ACTIVITY_CSS = """
     height:0.8rem;
     width:3px;
 }
-.dg-alerts-group--injury{
-    color:var(--color-danger);
+.dg-alerts-group--attention{
+    color:var(--color-warning);
 }
-.dg-alerts-group--transaction{
+.dg-alerts-group--my-players{
     color:var(--color-accent);
 }
-.dg-alerts-group--role{
-    color:var(--color-success);
-}
-.dg-alerts-group--other{
+.dg-alerts-group--league{
     color:var(--color-text-muted);
 }
 .dg-alerts-row{
@@ -42,6 +39,23 @@ ALERTS_ACTIVITY_CSS = """
     border-left:0.3rem solid var(--color-warning);
     margin:var(--space-xs) 0;
     padding:var(--space-sm);
+}
+/* Row-level type accent — moved here from the old per-type group header so
+   "what kind of event is this" still reads via color at a glance now that
+   sections group by decision-tier (Needs Your Attention / My Players /
+   Around the League) instead of by event type. More-specific urgent+injury
+   rules above/below still win when both apply. */
+.dg-alerts-row--injury{
+    border-left:0.2rem solid var(--color-danger);
+    padding-left:var(--space-xs);
+}
+.dg-alerts-row--transaction{
+    border-left:0.2rem solid var(--color-accent);
+    padding-left:var(--space-xs);
+}
+.dg-alerts-row--role{
+    border-left:0.2rem solid var(--color-success);
+    padding-left:var(--space-xs);
 }
 .dg-alerts-row--player{
     grid-template-columns:3.25rem minmax(0,1fr);
@@ -150,6 +164,10 @@ div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
     border-color:var(--color-danger);
     color:var(--color-danger);
 }
+.dg-alerts-badge--pending{
+    border-color:var(--color-warning);
+    color:var(--color-warning);
+}
 .dg-alerts-glyph{
     align-items:center;
     border:var(--border-width-default) solid var(--color-border);
@@ -172,6 +190,9 @@ div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
     color:var(--color-text-secondary);
     font:var(--type-caption-emphasis);
     margin:var(--space-2xs) 0 0;
+}
+.dg-alerts-context--pending{
+    color:var(--color-warning);
 }
 .dg-alerts-meta{
     color:var(--color-text-muted);
