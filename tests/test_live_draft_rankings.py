@@ -374,17 +374,23 @@ class TestLiveDraftRankings(unittest.TestCase):
 
 
     def test_actual_startup_mode_board_uses_shared_tappable_cards(self):
+        # V2 restructure moved the Best-Player/Best-Fit `render_analysis_cards`
+        # reasoning block to sit directly under the recommendation tiles and
+        # button grid (before the Draft Board list), instead of after it —
+        # so the boundary this test checks is now the "Draft Board" section
+        # itself, not "everything after the button grid up to the next
+        # render_analysis_cards(" call.
         app_source = Path("app.py").read_text(encoding="utf-8")
-        legacy_board = app_source.split(
-            'title="Recommended player profiles"', 1
-        )[1].split("render_analysis_cards(", 1)[0]
+        board_section = app_source.split(
+            'render_section_header(\n        "Draft Board"', 1
+        )[1].split('with st.expander("Drafted players and exclusions"', 1)[0]
 
-        self.assertIn("draft_center_ui._available_card_board", legacy_board)
-        self.assertIn("live_draft_ui._ranking_row_html", legacy_board)
-        self.assertIn("_render_tappable_player_html", legacy_board)
-        self.assertIn("open_player_quick_view", legacy_board)
-        self.assertNotIn("st.dataframe(", legacy_board)
-        self.assertNotIn("render_player_detail_picker(", legacy_board)
+        self.assertIn("draft_center_ui._available_card_board", board_section)
+        self.assertIn("live_draft_ui._ranking_row_html", board_section)
+        self.assertIn("_render_tappable_player_html", board_section)
+        self.assertIn("open_player_quick_view", board_section)
+        self.assertNotIn("st.dataframe(", board_section)
+        self.assertNotIn("render_player_detail_picker(", board_section)
 
     def test_startup_card_board_preserves_existing_startup_score(self):
         from modules import draft_center_ui

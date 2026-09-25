@@ -8559,61 +8559,10 @@ def render_startup_draft_center(
         open_mode="quick_view",
     )
 
-    render_section_header(
-        "Draft Board",
-        kicker="Available Players",
-        note=f"Draft slot {int(draft_slot)} | Round {int(current_round)} | Pick {int(current_pick)} | Strategy {startup_strategy}",
-    )
-    card_score_field = "startup_score" if "startup_score" in board.columns else score_field
-    card_board = draft_center_ui._available_card_board(
-        board.head(120).reset_index(drop=True),
-        card_score_field,
-    )
-    if not card_board.empty:
-        card_board.loc[0, "recommendation_label"] = "Best Available"
-        card_board.loc[0, "recommendation_reason"] = _safe_text(
-            card_board.loc[0].get("opportunity_explanation")
-            or card_board.loc[0].get("opportunity_label"),
-            "Highest player on the existing Startup Draft Center board.",
-        )
-        label_targets = (
-            (best_available, "Best Fit"),
-            (best_positional, "Position Need"),
-        )
-        for target, label in label_targets:
-            target_id = _safe_text(target.get("player_id"))
-            if not target_id:
-                continue
-            matches = card_board.index[card_board["player_id"].astype(str) == target_id].tolist()
-            if not matches:
-                continue
-            row_index = matches[0]
-            if not _safe_text(card_board.loc[row_index].get("recommendation_label")):
-                card_board.loc[row_index, "recommendation_label"] = label
-            card_board.loc[row_index, "recommendation_reason"] = _safe_text(
-                card_board.loc[row_index].get("opportunity_explanation")
-                or card_board.loc[row_index].get("opportunity_label"),
-                "Existing Startup Draft Center recommendation.",
-            )
-        st.markdown(live_draft_ui.ranking_card_styles_html(), unsafe_allow_html=True)
-        board_html = "<div class='live-rank-list'>" + "".join(
-            live_draft_ui._ranking_row_html(row)
-            for row in card_board.to_dict("records")
-        ) + "</div>"
-        clicked_player_id = _render_tappable_player_html(
-            html=board_html,
-            key_prefix=f"startup_ranked_board_{startup_context.get('league_id')}",
-        )
-        if clicked_player_id:
-            open_player_quick_view(
-                clicked_player_id,
-                source_label="Startup Draft Center",
-                source_note="Startup Draft Center available-player board.",
-            )
-    else:
-        st.info("No available players match the current startup draft board.")
-
-
+    # V2: the "why" for the two headline recommendations now sits directly
+    # beneath them, instead of after the full 120-row Draft Board. Grouped
+    # layout (one bordered surface, internal divider) instead of two more
+    # separately-bordered cards stacked under the tile grid above.
     render_analysis_cards(
         [
             {
@@ -8634,8 +8583,67 @@ def render_startup_draft_center(
                 ],
                 "tone": "opportunity",
             },
-        ]
+        ],
+        layout="grouped",
     )
+
+    render_section_header(
+        "Draft Board",
+        kicker="Available Players",
+        note=f"Draft slot {int(draft_slot)} | Round {int(current_round)} | Pick {int(current_pick)} | Strategy {startup_strategy}",
+    )
+    card_score_field = "startup_score" if "startup_score" in board.columns else score_field
+    card_board = draft_center_ui._available_card_board(
+        board.head(120).reset_index(drop=True),
+        card_score_field,
+    )
+    if not card_board.empty:
+        # Tag rows by matching the actual computed recommendation (by
+        # player_id) rather than always forcing the badge onto row 0. Row 0
+        # is the literal top of the strategy-weighted board; best_raw can
+        # diverge from it (e.g. an injury-preference substitution upstream),
+        # and previously row 0 was unconditionally labeled "Best Available"
+        # even when it wasn't the same player as the "Best Player Available"
+        # tile above. This keeps the badge terminology tied to the same
+        # recommendation it names everywhere else on the page.
+        label_targets = (
+            (best_raw, "Best Available"),
+            (best_available, "Best Fit"),
+            (best_positional, "Position Need"),
+        )
+        for target, label in label_targets:
+            target_id = _safe_text(target.get("player_id"))
+            if not target_id:
+                continue
+            matches = card_board.index[card_board["player_id"].astype(str) == target_id].tolist()
+            if not matches:
+                continue
+            row_index = matches[0]
+            if not _safe_text(card_board.loc[row_index].get("recommendation_label")):
+                card_board.loc[row_index, "recommendation_label"] = label
+            card_board.loc[row_index, "recommendation_reason"] = _safe_text(
+                card_board.loc[row_index].get("opportunity_explanation")
+                or card_board.loc[row_index].get("opportunity_label"),
+                "Existing Startup Draft Center recommendation.",
+            )
+        st.markdown(live_draft_ui.ranking_card_styles_html(), unsafe_allow_html=True)
+        st.caption("Tap any player below to view their profile.")
+        board_html = "<div class='live-rank-list'>" + "".join(
+            live_draft_ui._ranking_row_html(row)
+            for row in card_board.to_dict("records")
+        ) + "</div>"
+        clicked_player_id = _render_tappable_player_html(
+            html=board_html,
+            key_prefix=f"startup_ranked_board_{startup_context.get('league_id')}",
+        )
+        if clicked_player_id:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="Startup Draft Center",
+                source_note="Startup Draft Center available-player board.",
+            )
+    else:
+        st.info("No available players match the current startup draft board.")
 
     with st.expander("Drafted players and exclusions", expanded=False):
         st.caption(
