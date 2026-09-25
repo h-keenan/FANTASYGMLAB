@@ -38,6 +38,54 @@ export function waiverOpponentContext(player: {
   return player.opportunity_label ?? null;
 }
 
+// Concept-image fidelity: the concept shows a small colored classification
+// pill (its mock copy: "IMPACT"/"STARTER") next to every recommendation's
+// value number, including the secondary/compact rows below the top target.
+// This app has no IMPACT/STARTER classification — waiver_recommendation_label
+// in modules/waivers_ui.py only ever returns "Add"/"Stash"/"Watch" with tones
+// "opportunity"/"information"/"neutral" — so the compact row below renders
+// that real, already-fetched field/tone instead of inventing the mock's
+// literal copy. (The primary/top-target card already surfaces this same
+// field as its amber actionRow headline above, so it's deliberately not
+// re-shown as a second pill there — that would just be the same
+// classification said twice on the one card meant to say the least, loudest.)
+// Tone -> color follows the Magna Carta semantic map: amber for
+// "opportunity" (Section 3's "FAAB/acquisition context" bucket — a distinct
+// use of amber from FAABGuidance's own dollar figure below, which is
+// deliberately green per coridian_'s 2026-09-23 complaint that a bid read as
+// a caution flag; this pill is the row's *action classification*, not the
+// bid amount), cyan for "information" (analytical/GM-intelligence, e.g.
+// "Stash"), and neutral slate as the fallback (e.g. "Watch").
+function recommendationToneColor(tone: string, colors: ThemeColors): string {
+  if (tone === 'opportunity') return colors.premium;
+  if (tone === 'information') return colors.accent;
+  return colors.textSecondary;
+}
+
+function RecommendationPill({ label, tone }: { label: string | null; tone: string | null }) {
+  const { colors } = useThemeMode();
+  if (!label) return null;
+  const color = recommendationToneColor(tone ?? 'neutral', colors);
+  return (
+    <View style={[pillStyles.badge, { backgroundColor: `${color}26`, borderColor: `${color}70` }]}>
+      <AppText style={[pillStyles.text, { color }]} numberOfLines={1}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+const pillStyles = StyleSheet.create({
+  badge: {
+    alignSelf: 'flex-start',
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 1,
+  },
+  text: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' },
+});
+
 /**
  * Canonical waiver recommendation card — backs both the single "Top Waiver
  * Target" (variant="primary": full glowing AnimatedCard, the loudest thing
@@ -112,11 +160,15 @@ export default function WaiverRecommendationCard({
     >
       <View style={styles.compactIdentity}>{identity}</View>
       <View style={styles.compactTrailing}>
-        <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <View style={styles.compactValueRow}>
+          <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+          <RecommendationPill label={player.recommendation_label} tone={player.recommendation_tone} />
+        </View>
         <FAABGuidance faab={player.faab} size="compact" />
       </View>
       <View style={styles.compactBreakdown}>
-        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        <AppText style={styles.compactBreakdownText}>Full breakdown</AppText>
+        <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
       </View>
     </TouchableOpacity>
   );
@@ -146,6 +198,7 @@ function createStyles(colors: ThemeColors) {
     scoreNumberPrimary: { fontSize: 22, fontWeight: '800', color: colors.accent },
     scoreNumberCompact: { fontSize: 16, fontWeight: '700', color: colors.accent },
     scoreLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
+    compactValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     metricsDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: colors.border },
     breakdownRow: {
       flexDirection: 'row',
@@ -164,9 +217,15 @@ function createStyles(colors: ThemeColors) {
     compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     compactIdentity: { flex: 1 },
     compactTrailing: { alignItems: 'flex-end', gap: 2 },
-    // Same bare chevron-forward "tap for details" idiom AlertsScreen/
-    // DraftCenterScreen/LeagueDetailScreen already use for a row's
-    // secondary detail action — this row's Full Breakdown affordance.
-    compactBreakdown: { marginLeft: spacing.xs },
+    // A bare chevron read as an unlabeled affordance — the concept image
+    // and the redesign brief (§7: "Preserve the current Full Breakdown
+    // functionality... treat it as a secondary detail action rather than a
+    // giant pill") both call for this to stay visible but lightweight on
+    // every priority row, not just the top target's own labeled row above.
+    // Plain text + a small chevron (not a filled pill, unlike the primary
+    // card's more prominent breakdownRow) keeps it a quiet, secondary
+    // control per that instruction.
+    compactBreakdown: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: spacing.xs },
+    compactBreakdownText: { fontSize: 10, fontWeight: '700', color: colors.textTertiary },
   });
 }
