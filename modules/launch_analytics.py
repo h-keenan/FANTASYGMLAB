@@ -2,9 +2,15 @@
 
 Application code calls this module only — never a vendor SDK.
 
-Persistence: privacy-conscious local JSONL (Founder Ops). Kill switch
+Persistence: durable Supabase table (``analytics_events`` — see
+``docs/supabase_analytics_events.sql``), write-through, service-role only,
+best-effort and fully asynchronous (never blocks the caller). Local JSONL
+(privacy-conscious, host-local) remains a fail-open cache/fallback: it is
+still written on every event and is what read paths fall back to when
+Supabase is unconfigured or unreachable. Kill switch
 ``DYNASTYGM_LAUNCH_ANALYTICS`` defaults off. Fail-soft: never raises into
-the product path. No synchronous network I/O on the Dashboard critical path.
+the product path. No synchronous network I/O on the Dashboard critical path
+— the Supabase write happens on a background thread.
 
 See ``docs/founder-beta-product-analytics-contract.md``.
 """
@@ -18,12 +24,15 @@ import threading
 import time
 import uuid
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping
 
+import requests
+
 from modules import build_identity
-from modules.app_config import config_bool, is_managed_cloud_host
+from modules.app_config import config_bool, config_value, is_managed_cloud_host
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -354,6 +363,167 @@ ENABLED = str(os.environ.get(ANALYTICS_ENV_KEY, "")).strip().casefold() in {
 ANALYTICS_PATH = str(
     Path(os.environ.get(ANALYTICS_PATH_ENV_KEY, str(_DEFAULT_PATH))).expanduser()
 )
+
+# --- Durable Supabase storage (write-through + read-through) ---------------
+# See docs/supabase_analytics_events.sql. Service-role only (never a user's
+# own JWT — analytics events come from anonymous/guest sessions as often as
+# authenticated ones, and Founder Analytics reads must see every account's
+# events, so this cannot be an RLS-scoped per-user table). Mirrors the same
+# config/header pattern as modules.push_triggers / modules.stripe_webhook /
+# modules.revenuecat_webhook.
+ANALYTICS_SUPABASE_TABLE = "analytics_events"
+
+
+@dataclass(frozen=True)
+class AnalyticsSupabaseConfig:
+    url: str = ""
+    service_role_key: str = ""
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.url and self.service_role_key)
+
+
+def load_analytics_supabase_config(
+    *, environ: Mapping[str, str] | None = None, secrets: Any = None
+) -> AnalyticsSupabaseConfig:
+    return AnalyticsSupabaseConfig(
+        url=config_value("SUPABASE_URL", environ=environ, secrets=secrets),
+        service_role_key=config_value(
+            "SUPABASE_SERVICE_ROLE_KEY", environ=environ, secrets=secrets
+        ),
+    )
+
+
+def _analytics_supabase_headers(
+    config: AnalyticsSupabaseConfig, *, prefer: str = ""
+) -> dict[str, str]:
+    headers = {
+        "apikey": config.service_role_key,
+        "Authorization": f"Bearer {config.service_role_key}",
+        "Content-Type": "application/json",
+    }
+    if prefer:
+        headers["Prefer"] = prefer
+    return headers
+
+
+def _supabase_row_from_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Map the JSONL event payload 1:1 onto analytics_events columns."""
+
+    row: dict[str, Any] = {
+        "event": payload.get("event"),
+        "event_version": payload.get("event_version"),
+        "ts": payload.get("ts"),
+        "build": payload.get("build"),
+        "environment": payload.get("environment"),
+        "session_key": payload.get("session_key"),
+        "anon_id": payload.get("anon_id"),
+        "user_key": payload.get("user_key"),
+        "account_hash": payload.get("account_hash"),
+        "props": payload.get("props") or {},
+    }
+    try:
+        row["occurred_at"] = datetime.fromtimestamp(
+            float(payload.get("ts")), tz=timezone.utc
+        ).isoformat()
+    except (TypeError, ValueError, OSError, OverflowError):
+        pass
+    return row
+
+
+def _write_event_supabase(config: AnalyticsSupabaseConfig, row: Mapping[str, Any]) -> bool:
+    """Single best-effort insert. Never raises — caller already fired this on
+    a background thread so a hang here cannot block the product path."""
+
+    if not config.configured:
+        return False
+    try:
+        response = requests.post(
+            f"{config.url}/rest/v1/{ANALYTICS_SUPABASE_TABLE}",
+            headers=_analytics_supabase_headers(config, prefer="return=minimal"),
+            json=dict(row),
+            timeout=8,
+        )
+    except Exception:
+        return False
+    return response.status_code < 400
+
+
+def _spawn_background(fn) -> None:
+    """Fire-and-forget seam. Real runtime: a daemon thread, so the Supabase
+    write-through never adds synchronous network I/O to the caller's path
+    (see module docstring). Tests monkeypatch this to run ``fn`` inline.
+    """
+
+    threading.Thread(target=fn, daemon=True).start()
+
+
+def _queue_supabase_write(payload: Mapping[str, Any]) -> None:
+    """Best-effort, non-blocking write-through. Never raises, never blocks.
+
+    An unreachable/misconfigured Supabase is silently a no-op — the local
+    JSONL write in track_event() already happened (or was itself attempted)
+    independently of this, so an outage here never breaks the calling code
+    path or drops the event from the local fallback/cache.
+    """
+
+    try:
+        config = load_analytics_supabase_config()
+        if not config.configured:
+            return
+        row = _supabase_row_from_payload(payload)
+        _spawn_background(lambda: _write_event_supabase(config, row))
+    except Exception:
+        return
+
+
+def _fetch_events_supabase(
+    config: AnalyticsSupabaseConfig,
+    *,
+    since_ts: float | None = None,
+    limit: int = 20_000,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Cross-instance read of the durable event log.
+
+    Returns ``(rows, ok)`` — ``ok`` is False on any failure (network, HTTP,
+    parse) so the caller can fall back to the local JSONL file; never raises.
+    ``limit`` bounds one Founder Analytics page load the same way the
+    existing JSONL path is only viable up to ~10k DAU (see VOLUME_MODEL) —
+    beyond that scale this needs a warehouse, not a bigger limit.
+    """
+
+    if not config.configured:
+        return [], False
+    params: dict[str, str] = {
+        "select": "event,event_version,ts,build,environment,session_key,anon_id,user_key,account_hash,props",
+        "order": "ts.asc",
+        "limit": str(max(1, int(limit))),
+    }
+    if since_ts is not None:
+        try:
+            params["ts"] = f"gte.{float(since_ts)}"
+        except (TypeError, ValueError):
+            pass
+    try:
+        response = requests.get(
+            f"{config.url}/rest/v1/{ANALYTICS_SUPABASE_TABLE}",
+            headers=_analytics_supabase_headers(config),
+            params=params,
+            timeout=15,
+        )
+    except Exception:
+        return [], False
+    if response.status_code >= 400:
+        return [], False
+    try:
+        parsed = response.json()
+    except Exception:
+        return [], False
+    if not isinstance(parsed, list):
+        return [], False
+    return [dict(row) for row in parsed if isinstance(row, Mapping)], True
+
 
 SESSION_ANON_KEY = "_launch_analytics_anon_id"
 SESSION_SCOPE_KEY = "_launch_analytics_account_scope"
@@ -699,6 +869,7 @@ def track_event(
         "account_hash": account_hash,
         "props": _safe_props(props),
     }
+    wrote_local = False
     try:
         target = analytics_path()
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -706,9 +877,19 @@ def track_event(
         with _LOCK:
             with target.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
-        return True
+        wrote_local = True
     except Exception:
-        return False
+        wrote_local = False
+
+    # Durable write-through — best-effort, asynchronous, independent of the
+    # local write above (an outage on either side never affects the other,
+    # and never affects this function's return value or raises here).
+    try:
+        _queue_supabase_write(payload)
+    except Exception:
+        pass
+
+    return wrote_local
 
 
 def track_page_view(
@@ -967,6 +1148,46 @@ def _iter_events(
     return rows
 
 
+def read_events_with_source(
+    *,
+    path: Path | None = None,
+    since_ts: float | None = None,
+    environment: str | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    """Founder Analytics read path: durable Supabase first, local JSONL
+    fallback. Returns ``(rows, source)`` where ``source`` is
+    ``"supabase"`` or ``"local_jsonl"`` — fail-open, never raises.
+
+    Passing an explicit ``path`` always reads that JSONL file only (used by
+    tests and any caller that wants a specific host file rather than the
+    cross-instance durable log); Supabase is only attempted when ``path`` is
+    left as the default ``None``.
+    """
+
+    if path is None:
+        try:
+            config = load_analytics_supabase_config()
+        except Exception:
+            config = None
+        if config is not None and config.configured:
+            rows, ok = _fetch_events_supabase(config, since_ts=since_ts)
+            if ok:
+                return rows, "supabase"
+    return _iter_events(path=path, since_ts=since_ts, environment=environment), "local_jsonl"
+
+
+def read_events(
+    *,
+    path: Path | None = None,
+    since_ts: float | None = None,
+    environment: str | None = None,
+) -> list[dict[str, Any]]:
+    """Rows only — see read_events_with_source for the fallback contract."""
+
+    rows, _source = read_events_with_source(path=path, since_ts=since_ts, environment=environment)
+    return rows
+
+
 def _identity_key(row: Mapping[str, Any]) -> str:
     return (
         _safe_text(row.get("user_key"))
@@ -981,10 +1202,10 @@ def read_event_counts(
     path: Path | None = None,
     since_ts: float | None = None,
 ) -> dict[str, int]:
-    """Count events from JSONL; map legacy names onto canonical keys."""
+    """Count events (Supabase-first, JSONL fallback); map legacy names onto canonical keys."""
 
     counts: dict[str, int] = {name: 0 for name in sorted(TRACKED_EVENTS)}
-    for row in _iter_events(path=path, since_ts=since_ts):
+    for row in read_events(path=path, since_ts=since_ts):
         event = normalize_event_name(_safe_text(row.get("event")))
         if event in counts:
             counts[event] += 1
@@ -1030,7 +1251,7 @@ def retention_summary(
 
     now_ts = float(now if now is not None else time.time())
     day = 86400.0
-    rows = _iter_events(path=path)
+    rows = read_events(path=path)
     by_day: dict[str, set[str]] = defaultdict(set)
     meaningful_day: dict[str, set[str]] = defaultdict(set)
     first_seen: dict[str, float] = {}
@@ -1124,10 +1345,16 @@ def feature_adoption_summary(
     *,
     path: Path | None = None,
     since_ts: float | None = None,
+    rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, int]]:
-    """Per-feature users / sessions / views / meaningful interactions."""
+    """Per-feature users / sessions / views / meaningful interactions.
 
-    rows = _iter_events(path=path, since_ts=since_ts)
+    ``rows`` lets a caller (e.g. founder_analytics.build_report) reuse an
+    already-fetched, already-window-filtered event list instead of issuing a
+    second Supabase/JSONL read for the same report.
+    """
+
+    rows = read_events(path=path, since_ts=since_ts) if rows is None else rows
     out: dict[str, dict[str, int]] = {}
     for feature, events in FEATURE_EVENT_MAP.items():
         users: set[str] = set()
@@ -1160,10 +1387,15 @@ def health_summary(
     *,
     path: Path | None = None,
     since_ts: float | None = None,
+    rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Error / performance aggregates for Founder Ops HEALTH view."""
+    """Error / performance aggregates for Founder Ops HEALTH view.
 
-    rows = _iter_events(path=path, since_ts=since_ts)
+    ``rows`` lets a caller reuse an already-fetched event list — see
+    feature_adoption_summary's docstring for why.
+    """
+
+    rows = read_events(path=path, since_ts=since_ts) if rows is None else rows
     error_events = {
         "application_error",
         "provider_error",
