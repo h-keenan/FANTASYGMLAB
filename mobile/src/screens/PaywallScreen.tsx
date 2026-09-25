@@ -16,6 +16,7 @@ import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
+import { api } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import {
   getCurrentOffering,
@@ -28,10 +29,15 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 
-// Every line here corresponds to a real, server-enforced gate — see the
-// paywall audit (2026-09-18). Don't add a benefit unless something in
+// Canonical source is modules/premium_page.py (PREMIUM_INCLUDED_NOW /
+// MOBILE_PREMIUM_BENEFIT_LINES) — the same benefit list web's Premium page
+// renders — fetched from GET /v1/me at render time. This copy is only the
+// fallback for when that request fails, so it stays a plain string list that
+// exactly matches the server's current canonical copy. Every line here
+// corresponds to a real, server-enforced gate — see the paywall audit
+// (2026-09-18). Don't add a benefit unless something in
 // services/mobile_api_service.py actually withholds it from a Free account.
-const FEATURES = [
+const FALLBACK_FEATURES = [
   'Your full Next Move briefing, not just the top 4',
   'Full League Pulse — see the whole league’s contenders and rebuilders',
   'The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist',
@@ -45,6 +51,7 @@ export default function PaywallScreen({ navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
+  const [features, setFeatures] = useState<string[]>(FALLBACK_FEATURES);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -77,22 +84,38 @@ export default function PaywallScreen({ navigation }: Props) {
     }
   }, []);
 
+  // Independent of loadOffering: the benefit copy comes from the FantasyGM
+  // Lab API (shared with web's Premium page), not the store, so one failing
+  // shouldn't block the other. Any failure — network, auth, empty list —
+  // silently keeps FALLBACK_FEATURES so the paywall never renders empty.
+  const loadFeatures = useCallback(async () => {
+    try {
+      const me = await api.getMe();
+      if (!mountedRef.current) return;
+      if (Array.isArray(me.premium_benefits) && me.premium_benefits.length > 0) {
+        setFeatures(me.premium_benefits);
+      }
+    } catch {
+      // Keep FALLBACK_FEATURES.
+    }
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     (async () => {
-      await loadOffering();
+      await Promise.allSettled([loadOffering(), loadFeatures()]);
       if (mountedRef.current) setLoading(false);
     })();
     return () => {
       mountedRef.current = false;
     };
-  }, [loadOffering]);
+  }, [loadOffering, loadFeatures]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadOffering();
+    await Promise.allSettled([loadOffering(), loadFeatures()]);
     if (mountedRef.current) setRefreshing(false);
-  }, [loadOffering]);
+  }, [loadOffering, loadFeatures]);
 
   const packages = offering?.availablePackages ?? [];
   const selected = packages.find((p) => p.identifier === selectedId) ?? null;
@@ -165,7 +188,7 @@ export default function PaywallScreen({ navigation }: Props) {
 
       <SectionHeading title="What's Included" icon="checkmark-done" />
       <View style={styles.featuresCard}>
-        {FEATURES.map((feature, index) => (
+        {features.map((feature, index) => (
           <View key={feature} style={[styles.featureRow, index > 0 && styles.featureRowDivider]}>
             <Ionicons name="checkmark-circle" size={18} color={colors.success} style={styles.featureIcon} />
             <AppText style={styles.featureText}>{feature}</AppText>

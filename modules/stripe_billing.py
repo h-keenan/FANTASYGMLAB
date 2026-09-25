@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from threading import Lock
 from typing import Any
 
 from modules import app_config
@@ -23,6 +26,22 @@ CONFIG_KEYS = (
 
 MONTHLY = "monthly"
 ANNUAL = "annual"
+
+# Fallback display values only — used whenever a live Stripe Price lookup is
+# unavailable (billing not configured, package missing, or the API call
+# fails). plan_display_details() always prefers the real Price objects when
+# it can reach them; this dict exists so a pricing-display hiccup never
+# breaks the Premium page. Keep these roughly in sync with the real Stripe
+# Dashboard prices, but they are not the source of truth for what is charged.
+DEFAULT_PLAN_DETAILS: dict[str, tuple[str, str, str]] = {
+    MONTHLY: ("Monthly", "$3.99", "per month"),
+    ANNUAL: ("Annual", "$19.99", "per year"),
+}
+
+_PRICE_DISPLAY_CACHE_TTL_SECONDS = 5 * 60
+_price_display_cache: dict[str, tuple[float, dict[str, tuple[str, str, str]]]] = {}
+_price_display_cache_lock = Lock()
+
 ACTIVE_ENTITLEMENT_EVENTS = {
     "checkout.session.completed",
     "customer.subscription.created",
@@ -153,6 +172,94 @@ def _stripe_module():
     except Exception as exc:
         raise BillingUnavailableError("Stripe package is not installed in this environment.") from exc
     return stripe
+
+
+def _price_field(price_obj: Any, name: str) -> Any:
+    if isinstance(price_obj, dict):
+        return price_obj.get(name)
+    return getattr(price_obj, name, None)
+
+
+def _format_price_amount(unit_amount: Any, currency: str) -> str:
+    try:
+        amount = int(unit_amount) / 100
+    except (TypeError, ValueError):
+        return ""
+    currency_code = _safe_text(currency).upper() or "USD"
+    symbol = "$" if currency_code == "USD" else f"{currency_code} "
+    return f"{symbol}{amount:,.2f}"
+
+
+def _price_display_tuple(label: str, price_obj: Any, fallback_cadence: str) -> tuple[str, str, str]:
+    price_text = _format_price_amount(
+        _price_field(price_obj, "unit_amount"),
+        _safe_text(_price_field(price_obj, "currency")),
+    )
+    if not price_text:
+        raise BillingUnavailableError("Stripe price is missing a usable unit amount.")
+    recurring = _price_field(price_obj, "recurring")
+    interval = _safe_text(_price_field(recurring, "interval")) if recurring is not None else ""
+    cadence = f"per {interval}" if interval else fallback_cadence
+    return (label, price_text, cadence)
+
+
+def _price_cache_key(config: StripeBillingConfig) -> str:
+    # Hash the secret key rather than storing it verbatim as a cache key.
+    secret_fingerprint = hashlib.sha256(config.secret_key.encode("utf-8")).hexdigest()[:16]
+    return f"{config.billing_mode}:{secret_fingerprint}:{config.price_monthly}:{config.price_annual}"
+
+
+def fetch_live_plan_details(
+    config: StripeBillingConfig,
+    *,
+    now: float | None = None,
+) -> dict[str, tuple[str, str, str]] | None:
+    """Real Stripe Price objects (label, price, cadence) for display.
+
+    Cached in-process for a few minutes per (mode, secret, price-id) so this
+    never hits Stripe on every page render. Returns None — and never raises —
+    when Stripe isn't configured, the package is unavailable, or the API call
+    fails for any reason; callers must fall back to a hardcoded default so a
+    pricing-display hiccup never breaks the Premium page.
+    """
+    if not config.secret_mode_configured or not config.price_monthly or not config.price_annual:
+        return None
+    cache_key = _price_cache_key(config)
+    current_time = now if now is not None else datetime.now(timezone.utc).timestamp()
+    with _price_display_cache_lock:
+        cached = _price_display_cache.get(cache_key)
+        if cached and current_time - cached[0] < _PRICE_DISPLAY_CACHE_TTL_SECONDS:
+            return cached[1]
+    try:
+        stripe = _stripe_module()
+        stripe.api_key = config.secret_key
+        monthly_price = stripe.Price.retrieve(config.price_monthly)
+        annual_price = stripe.Price.retrieve(config.price_annual)
+        details = {
+            MONTHLY: _price_display_tuple("Monthly", monthly_price, "per month"),
+            ANNUAL: _price_display_tuple("Annual", annual_price, "per year"),
+        }
+    except Exception:
+        return None
+    with _price_display_cache_lock:
+        _price_display_cache[cache_key] = (current_time, details)
+    return details
+
+
+def plan_display_details(config: StripeBillingConfig) -> dict[str, tuple[str, str, str]]:
+    """(label, price, cadence) per billing interval for the Premium page.
+
+    Prefers the real Stripe Price objects (`fetch_live_plan_details`, briefly
+    cached) so displayed pricing cannot silently drift from what Stripe
+    actually charges; falls back to DEFAULT_PLAN_DETAILS whenever the live
+    lookup is unavailable. Never raises.
+    """
+    return fetch_live_plan_details(config) or dict(DEFAULT_PLAN_DETAILS)
+
+
+def reset_price_display_cache_for_tests() -> None:
+    with _price_display_cache_lock:
+        _price_display_cache.clear()
 
 
 def create_checkout_session(

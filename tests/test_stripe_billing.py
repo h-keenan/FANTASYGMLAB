@@ -147,6 +147,116 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(kwargs["client_reference_id"], "user-1")
         self.assertTrue(str(kwargs["idempotency_key"]).startswith("fgl-checkout-user-1-annual"))
 
+    def test_fetch_live_plan_details_returns_none_when_not_configured(self):
+        stripe_billing.reset_price_display_cache_for_tests()
+        config = stripe_billing.StripeBillingConfig()
+
+        self.assertIsNone(stripe_billing.fetch_live_plan_details(config))
+        self.assertEqual(
+            stripe_billing.plan_display_details(config),
+            stripe_billing.DEFAULT_PLAN_DETAILS,
+        )
+
+    def test_fetch_live_plan_details_reads_real_price_objects(self):
+        stripe_billing.reset_price_display_cache_for_tests()
+        retrieve = Mock(
+            side_effect=lambda price_id: {
+                "price_month": SimpleNamespace(
+                    unit_amount=499, currency="usd", recurring=SimpleNamespace(interval="month")
+                ),
+                "price_year": SimpleNamespace(
+                    unit_amount=2499, currency="usd", recurring=SimpleNamespace(interval="year")
+                ),
+            }[price_id]
+        )
+        fake_stripe = SimpleNamespace(api_key="", Price=SimpleNamespace(retrieve=retrieve))
+        config = stripe_billing.StripeBillingConfig(
+            secret_key="sk_test_live_fetch",
+            price_monthly="price_month",
+            price_annual="price_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            details = stripe_billing.fetch_live_plan_details(config)
+
+        self.assertEqual(details[stripe_billing.MONTHLY], ("Monthly", "$4.99", "per month"))
+        self.assertEqual(details[stripe_billing.ANNUAL], ("Annual", "$24.99", "per year"))
+        self.assertEqual(retrieve.call_count, 2)
+
+    def test_fetch_live_plan_details_caches_within_ttl(self):
+        stripe_billing.reset_price_display_cache_for_tests()
+        retrieve = Mock(
+            return_value=SimpleNamespace(
+                unit_amount=499, currency="usd", recurring=SimpleNamespace(interval="month")
+            )
+        )
+        fake_stripe = SimpleNamespace(api_key="", Price=SimpleNamespace(retrieve=retrieve))
+        config = stripe_billing.StripeBillingConfig(
+            secret_key="sk_test_cache",
+            price_monthly="price_month",
+            price_annual="price_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            first = stripe_billing.fetch_live_plan_details(config, now=1_000.0)
+            second = stripe_billing.fetch_live_plan_details(config, now=1_000.0 + 60)
+
+        self.assertEqual(first, second)
+        # One call per price on the first fetch only — the second fetch, well
+        # inside the TTL, must be served from cache rather than hitting Stripe
+        # again on every page render.
+        self.assertEqual(retrieve.call_count, 2)
+
+    def test_fetch_live_plan_details_refetches_after_ttl_expires(self):
+        stripe_billing.reset_price_display_cache_for_tests()
+        retrieve = Mock(
+            return_value=SimpleNamespace(
+                unit_amount=499, currency="usd", recurring=SimpleNamespace(interval="month")
+            )
+        )
+        fake_stripe = SimpleNamespace(api_key="", Price=SimpleNamespace(retrieve=retrieve))
+        config = stripe_billing.StripeBillingConfig(
+            secret_key="sk_test_ttl",
+            price_monthly="price_month",
+            price_annual="price_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            stripe_billing.fetch_live_plan_details(config, now=1_000.0)
+            stripe_billing.fetch_live_plan_details(config, now=1_000.0 + 10 * 60)
+
+        self.assertEqual(retrieve.call_count, 4)
+
+    def test_plan_display_details_falls_back_when_stripe_api_call_fails(self):
+        stripe_billing.reset_price_display_cache_for_tests()
+        fake_stripe = SimpleNamespace(
+            api_key="",
+            Price=SimpleNamespace(retrieve=Mock(side_effect=RuntimeError("network unreachable"))),
+        )
+        config = stripe_billing.StripeBillingConfig(
+            secret_key="sk_test_failure",
+            price_monthly="price_month",
+            price_annual="price_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            details = stripe_billing.plan_display_details(config)
+
+        self.assertEqual(details, stripe_billing.DEFAULT_PLAN_DETAILS)
+
+    def test_plan_display_details_falls_back_when_stripe_package_missing(self):
+        stripe_billing.reset_price_display_cache_for_tests()
+        config = stripe_billing.StripeBillingConfig(
+            secret_key="sk_test_missing_pkg",
+            price_monthly="price_month",
+            price_annual="price_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": None}):
+            details = stripe_billing.plan_display_details(config)
+
+        self.assertEqual(details, stripe_billing.DEFAULT_PLAN_DETAILS)
+
     def test_live_checkout_requires_explicit_live_mode_and_keeps_server_identity(self):
         created = Mock(return_value=SimpleNamespace(url="https://checkout.stripe.com/session"))
         fake_stripe = SimpleNamespace(
