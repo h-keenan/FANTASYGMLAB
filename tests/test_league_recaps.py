@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from modules import league_history as history
 from modules import league_recaps
@@ -519,6 +519,12 @@ def test_league_recaps_page_header_has_single_owner():
     class _Session(dict):
         pass
 
+    def _container(*_args, **_kwargs):
+        ctx = MagicMock()
+        ctx.__enter__ = MagicMock(return_value=ctx)
+        ctx.__exit__ = MagicMock(return_value=False)
+        return ctx
+
     session = _Session()
     opened: list[str] = []
     with (
@@ -527,6 +533,7 @@ def test_league_recaps_page_header_has_single_owner():
         patch.object(league_recaps_ui, "render_html_fragment", side_effect=lambda html: html_chunks.append(html)),
         patch.object(league_recaps_ui.st, "caption"),
         patch.object(league_recaps_ui.st, "pills", side_effect=["Recaps", "This week · 7", "Recaps", "Recaps"]),
+        patch.object(league_recaps_ui.st, "container", side_effect=_container),
         patch.object(league_recaps_ui.st, "button", return_value=True),
         patch.object(league_recaps_ui.deferred_rendering, "mark_deferred_section_ready"),
         patch.object(
@@ -537,7 +544,10 @@ def test_league_recaps_page_header_has_single_owner():
         patch.object(
             league_recaps_ui.league_history,
             "normalize_season_payload",
-            return_value=[],
+            # A waiver transaction (not empty) so the recap includes a story
+            # type that still keeps a genuine deep link post-fix (see
+            # history_deep_link_label) — Performance/Matchup no longer do.
+            return_value=[_waiver()],
         ),
     ):
         league_recaps_ui.render_league_recaps_page(
@@ -577,10 +587,19 @@ def test_league_recaps_page_header_has_single_owner():
     assert headers == ["League Recaps / History"]
     assert incomplete_headers == ["League Recaps / History"]
     assert empty_headers == ["League Recaps / History"]
-    assert opened
+    # Only the waiver story keeps a deep link now — Performance/Matchup
+    # stories no longer offer "Open League History" (history_deep_link_label):
+    # History has no matchup/score records, so that affordance previously
+    # routed a reader to unrelated trade/waiver content.
+    assert opened == [history.FILTER_WAIVERS]
     joined = "\n".join(html_chunks)
-    assert joined.count("dg-recap-edition") == 1
     assert joined.count("dg-recap-masthead") == 1
+    # The board renders as separate fragments (lead, then one per story
+    # category) instead of a single wrapper, so each can carry its own
+    # deep-link button directly beneath it rather than all buttons being
+    # collected below the entire board.
+    assert joined.count("dg-recap-story--lead") == 1
+    assert joined.count("dg-recap-section") >= 1
     assert "No completed week is ready for a recap yet." in joined
     assert "Load league recaps" not in joined.casefold()
 
