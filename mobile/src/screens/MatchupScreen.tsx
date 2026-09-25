@@ -13,9 +13,11 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandedSpinner from '../components/BrandedSpinner';
 import GridBackground from '../components/GridBackground';
+import InsightRow from '../components/InsightRow';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
+import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type MatchupComparison, type MatchupResponse, type MatchupSide, type MatchupStarter } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -56,6 +58,43 @@ function edgeColor(colors: ThemeColors): Record<MatchupComparison['edge'], strin
     opponent: colors.danger,
     even: colors.textSecondary,
   };
+}
+
+/** Icon paired with the verdict headline — same trending-up/down language
+ * used for value-change indicators elsewhere in the app, so "the edge" reads
+ * at a glance instead of only through color. */
+function edgeIcon(edge: MatchupComparison['edge']): React.ComponentProps<typeof Ionicons>['name'] {
+  if (edge === 'you') return 'trending-up';
+  if (edge === 'opponent') return 'trending-down';
+  return 'remove';
+}
+
+type InjuryWatchItem = {
+  key: string;
+  player: MatchupStarter;
+  sideLabel: string;
+};
+
+/**
+ * Pulls every flagged starter (either side) into one flat list so risk is
+ * visible near the top of the screen instead of only surfacing wherever that
+ * player's row happens to fall in a long lineup scroll — the brief's "make
+ * injury/risk states immediately obvious" requirement, applied at the page
+ * level rather than only the row level. Purely a client-side presentation
+ * grouping of data already on the response; no new business logic.
+ */
+function collectInjuryWatch(mine: MatchupSide, opponent: MatchupSide): InjuryWatchItem[] {
+  const items: InjuryWatchItem[] = [];
+  const pushFrom = (side: MatchupSide, sideLabel: string) => {
+    side.starters.forEach((player) => {
+      if (player.injury_label) {
+        items.push({ key: `${side.roster_id}-${player.player_id}`, player, sideLabel });
+      }
+    });
+  };
+  pushFrom(mine, 'Your lineup');
+  pushFrom(opponent, opponent.team_name);
+  return items;
 }
 
 function recordLabel(side: MatchupSide): string {
@@ -228,15 +267,20 @@ export default function MatchupScreen({ route, navigation }: Props) {
           <ValueSplitBar comparison={comparison} />
 
           <View style={styles.verdictBlock}>
-            <AppText style={[styles.edgeHeadline, { color: edgeColor(colors)[comparison.edge] }]}>
-              {comparison.headline}
-              {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
-            </AppText>
+            <View style={styles.verdictHeadlineRow}>
+              <Ionicons name={edgeIcon(comparison.edge)} size={17} color={edgeColor(colors)[comparison.edge]} />
+              <AppText style={[styles.edgeHeadline, { color: edgeColor(colors)[comparison.edge] }]} numberOfLines={2}>
+                {comparison.headline}
+                {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
+              </AppText>
+            </View>
             {/* Rendered straight from the API so this line can never drift
                 into claiming more than the data behind it. */}
             <AppText style={styles.basisLabel}>{comparison.basis_label}</AppText>
           </View>
         </AnimatedCard>
+
+        <InjuryWatchSection mine={mine} opponent={opponent} onPressPlayer={openPlayer} />
 
         <ScreenInfoNote
           text="Starters on both sides are each roster's best available lineup by season-long value — the same optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. It isn't necessarily the lineup they've set in Sleeper, and it doesn't account for this week's opponent defenses or weather."
@@ -263,6 +307,55 @@ function ValueSplitBar({ comparison }: { comparison: MatchupComparison }) {
     <View style={styles.splitBar}>
       <View style={[styles.splitFill, { flex: mineShare, backgroundColor: colors.accent }]} />
       <View style={[styles.splitFill, { flex: 1 - mineShare, backgroundColor: colors.violet }]} />
+    </View>
+  );
+}
+
+/**
+ * Compact risk summary — one InsightRow per flagged starter across both
+ * lineups, grouped under a single "INJURY WATCH" header exactly like the
+ * shared section-header treatment `StarterSection` uses below. Renders
+ * nothing when neither lineup has a flagged starter, so a clean matchup
+ * never shows an empty alert module (Magna Carta §36).
+ */
+function InjuryWatchSection({
+  mine,
+  opponent,
+  onPressPlayer,
+}: {
+  mine: MatchupSide;
+  opponent: MatchupSide;
+  onPressPlayer: (player: MatchupStarter) => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const items = useMemo(() => collectInjuryWatch(mine, opponent), [mine, opponent]);
+  if (items.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeaderRow}>
+        <View style={[styles.sectionAccentBar, { backgroundColor: colors.danger }]} />
+        <AppText style={styles.sectionLabel} numberOfLines={1}>
+          INJURY WATCH
+        </AppText>
+      </View>
+      <AnimatedCard style={styles.sectionCard}>
+        {items.map((item, index) => {
+          const { tone } = waiverInjuryDisplay(item.player.injury_status);
+          const color = item.player.ruled_out ? colors.danger : tone === 'watch' ? colors.premium : colors.danger;
+          return (
+            <InsightRow
+              key={item.key}
+              icon="medkit-outline"
+              color={color}
+              headline={`${item.player.name ?? 'Unknown player'} — ${item.player.injury_label}`}
+              detail={`${item.sideLabel} · ${item.player.position ?? item.player.slot ?? ''}`}
+              onPress={() => onPressPlayer(item.player)}
+              last={index === items.length - 1}
+            />
+          );
+        })}
+      </AnimatedCard>
     </View>
   );
 }
@@ -306,8 +399,15 @@ function StarterSection({
               slot={player.slot ?? player.position}
               opportunityLabel={player.opportunity_label}
               contextLine={deriveContextLine(player)}
+              // injury_label, not injury_status: IR/PUP/season-ending arrives
+              // on `status` with `injury_status` blank. Tone still comes from
+              // injury_status/waiverInjuryDisplay so "Questionable" reads as
+              // the calmer amber `watch` tone instead of the same red as a
+              // genuine Out/IR status (see LineupRow's identical fix in
+              // MyTeamScreen.tsx, which flagged this as a Matchup follow-up).
               injuryLabel={player.injury_label}
               ruledOut={player.ruled_out}
+              injuryTone={waiverInjuryDisplay(player.injury_status).tone}
               onPress={() => onPressPlayer(player)}
               showDivider={index < side.starters.length - 1}
             />
@@ -358,7 +458,14 @@ function createStyles(colors: ThemeColors) {
   },
   splitFill: { height: '100%' },
   verdictBlock: { marginTop: spacing.md },
-  edgeHeadline: { fontSize: 14, fontWeight: '700' },
+  verdictHeadlineRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  // Deliberately the most prominent text treatment in the hero after the
+  // season-value numbers themselves: this line is the direct answer to
+  // "how do these two teams compare," so it needs more weight than the
+  // ordinary-metadata size (14pt) it shipped at — see brief §2 ("give this
+  // verdict slightly more visual prominence than ordinary metadata... it
+  // should read like FantasyGM Lab's analysis of the matchup").
+  edgeHeadline: { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: 0.1 },
   basisLabel: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
   section: { marginTop: spacing.md },
   sectionHeaderRow: {
