@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import TrajectoryArcs from '../components/TrajectoryArcs';
+import BrandMark from '../components/BrandMark';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -21,10 +21,10 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * of real seconds waiting on the auth check, and a fully static screen in
  * that window reads as frozen/broken rather than working.
  *
- * Uses the live TrajectoryArcs mark (not the static icon PNG) — the concept
- * sheet's splash/loading panel shows the arc motif directly rather than a
- * boxed app-icon tile, and this is the first of several surfaces (empty
- * states, success confirmations) meant to share this same drawn mark.
+ * Uses the shared BrandMark (the transparent-background splash-icon.png
+ * mark) rather than a boxed app-icon tile, so this screen and the GM orb /
+ * dashboard empty state all share the same current brand mark instead of
+ * each carrying their own copy that can drift out of date.
  */
 export default function LoadingScreen({ status = 'Loading…' }: { status?: string }) {
   const { colors } = useThemeMode();
@@ -43,7 +43,7 @@ export default function LoadingScreen({ status = 'Loading…' }: { status?: stri
   return (
     <View style={styles.container}>
       <Animated.View style={markStyle}>
-        <TrajectoryArcs width={180} height={122} />
+        <BrandMark width={180} height={122} />
       </Animated.View>
       <AppText style={styles.title}>FantasyGM Lab</AppText>
       <View style={styles.badge}>
