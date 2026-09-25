@@ -114,7 +114,11 @@ def test_trade_idea_card_hierarchy_is_partner_then_value_then_exchange_then_why(
     # the strongest visual weight and lead the card (right after the partner
     # name), ahead of the send/receive package — matching the mobile Trade
     # Hub redesign's header order (recommendation type -> team + fairness
-    # pill -> value-change number -> assets -> quieter confidence -> why).
+    # pill -> value-change number -> assets -> why -> quieter confidence).
+    # V2 architecture reset pass: rationale ("why") now precedes the quieter
+    # confidence block, matching Magna Carta's Trade Hub hierarchy (partner ->
+    # assets -> value -> reasoning -> confidence/realism), rather than the
+    # other way around.
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     start = source.index('<div class="trade-summary-title">{partner}</div>')
     end = source.index("Review package</div>") + len("Review package")

@@ -218,7 +218,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     max-width: 100%;
     min-width: 0;
     opacity: var(--opacity-secondary);
-    order: 4;
+    order: 5;
 }
 .trade-summary-executive .tvl-conf-ring { height: 2rem; width: 2rem; }
 .trade-summary-executive .tvl-conf-ring-value { font-size: var(--font-size-badge); }
@@ -227,7 +227,7 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     font: var(--type-supporting-metadata);
     line-height: var(--line-height-body);
     margin: 0;
-    order: 5;
+    order: 4;
 }
 .trade-summary-secondary {
     color: var(--color-text-muted);
@@ -1997,6 +1997,15 @@ def render_trade_idea_card(
     # -> value-change number) instead of burying the verdict below the assets.
     # Derive the pill from the same formatted delta_text that value_edge_html
     # buckets internally, so the two never disagree on the band for one idea.
+    #
+    # V2 architecture reset (UI_V2_ARCHITECTURE_RESET.md): the Magna Carta's
+    # own Trade Hub example (§4) and Trade UI spec (§30) both put rationale
+    # ("why does it work") ahead of confidence/realism ("how realistic is
+    # it"). The prior pass demoted confidence below the send/receive package
+    # but left it ahead of the "why" cue, which still inverted that order.
+    # Below, the why cue is emitted (and CSS-ordered) before the confidence
+    # block so a reader sees the reasoning before the confidence verdict,
+    # matching partner -> assets -> value -> reasoning -> confidence -> action.
     fairness_pill_html = trade_fairness_pill_html(delta_text)
     summary_html = textwrap.dedent(
         f"""
@@ -2017,8 +2026,8 @@ def render_trade_idea_card(
                 <div class="trade-summary-for" data-trade-chrome="1" aria-hidden="true">{exchange_marker_html()}</div>
                 <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You get</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
-            <div class="trade-summary-executive">{confidence_html}</div>
             <div class="trade-summary-why">{cue_html("why", why_raw)}</div>
+            <div class="trade-summary-executive">{confidence_html}</div>
             {confidence_note_html}
             <div class="trade-summary-footer">
                 <div class="trade-summary-affordance" aria-hidden="true">Review package</div>
@@ -2203,6 +2212,17 @@ def render_trade_idea_card(
                         my_team_name=authenticated_team_display_name(
                             st.session_state, idea=idea
                         ),
+                    )
+                    # Recommendation-clarity audit (UI_V2_ARCHITECTURE_RESET.md):
+                    # Trade Hub has no in-app trade-submission API, so sending
+                    # this card to the partner is the real, working action a
+                    # user can take on a recommendation here — not just an
+                    # export/screenshot convenience. Say that explicitly so the
+                    # button doesn't read as a secondary, easy-to-skip extra.
+                    st.caption(
+                        "There's no in-app trade submission here — sharing "
+                        "this card is how you actually send the offer to "
+                        "your partner."
                     )
                     share_recommendation_ui.render_share_controls(
                         share_card,
