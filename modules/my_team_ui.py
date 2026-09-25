@@ -701,6 +701,7 @@ def render_my_team_workspace(
     roster_limit_note: str,
     injury_alert_value: str,
     injury_alert_note: str,
+    injury_route_player_row=None,
     immediate_value: str,
     immediate_note: str,
     immediate_tone: str,
@@ -940,7 +941,8 @@ def render_my_team_workspace(
     show_generic_roster_decisions = not my_roster_limit.get("over_limit")
     if not show_generic_roster_decisions:
         st.caption(
-            "Urgent move, trade-away, and cut recommendations are owned by the roster-limit alert above until you are back under the Sleeper limit."
+            "Urgent move, trade-away, and cut recommendations are owned by the roster-limit "
+            "alert in Roster Actions below until you are back under the Sleeper limit."
         )
 
     with st.container(key="my_team_roster_decisions"):
@@ -1200,6 +1202,20 @@ def render_my_team_workspace(
             # quieter "risk" (amber) tone instead of one flat harsh color for
             # every status.
             "tone": "need" if acute_injury_pressure else "risk",
+            # A single unambiguous injured starter (resolved by
+            # injury_ui.my_team_injury_alert) becomes a tappable player card
+            # into Quick View, matching Next Move/Trade/Waiver below —
+            # otherwise this tile named a problem with no way to see who it
+            # meant, a dead end.
+            **(
+                {
+                    "player_row": injury_route_player_row,
+                    "recommendation_label": "Injury Watch",
+                    "score_field": score_field,
+                }
+                if injury_route_player_row is not None
+                else {}
+            ),
         },
         {
             "label": biggest_need_label,
