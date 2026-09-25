@@ -28,6 +28,7 @@ class LeagueIntelligenceItem:
     league_relevance: str
     recommendation_label: str
     external_url: str
+    speculative: bool = False
 
 
 @dataclass(frozen=True)
@@ -210,6 +211,11 @@ def build_league_intelligence_feed(
                 league_relevance=league_relevance,
                 recommendation_label=_recommendation_label(reason, league_relevance),
                 external_url=_safe_external_url(raw_item.get("link")),
+                # Already computed upstream (modules/news_signal.enrich_news_item)
+                # for every item that reaches this builder; previously discarded
+                # here, so speculative reports read with the same confidence as
+                # confirmed ones. Pass-through only — no new classification.
+                speculative=bool(raw_item.get("signal_speculative")),
             )
         )
 
