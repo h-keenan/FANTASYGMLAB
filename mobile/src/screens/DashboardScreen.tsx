@@ -532,18 +532,39 @@ function TeamSnapshotRow({
     <View style={styles.snapshotSection}>
       <SectionHeading title="League Snapshot" icon="stats-chart" />
       <View style={styles.snapshotRow}>
-        <MetricCard label="Record" value={record} />
+        {/* Concept sheet groups these as a 3-up row (Record/Power/Franchise)
+         * over a 2-up row (Avg Age/Injuries) rather than an even wrap — a
+         * per-instance flexBasis override on MetricCard's existing `style`
+         * prop (same override mechanism PR #743 used for PlayerDetail),
+         * not a change to MetricCard's own shared default sizing, so no
+         * other MetricCard consumer is affected. */}
+        <MetricCard label="Record" value={record} style={styles.snapshotTileThird} />
         {snapshot.power_rank != null ? (
-          <MetricCard label="Power" value={`#${snapshot.power_rank}`} onPress={goToTeams} />
+          <MetricCard
+            label="Power"
+            value={`#${snapshot.power_rank}`}
+            onPress={goToTeams}
+            style={styles.snapshotTileThird}
+          />
         ) : null}
         {snapshot.franchise_rank != null ? (
-          <MetricCard label="Franchise" value={`#${snapshot.franchise_rank}`} onPress={goToTeams} />
+          <MetricCard
+            label="Franchise"
+            value={`#${snapshot.franchise_rank}`}
+            onPress={goToTeams}
+            style={styles.snapshotTileThird}
+          />
         ) : null}
-        <MetricCard label="Avg Age" value={snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—'} />
+        <MetricCard
+          label="Avg Age"
+          value={snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—'}
+          style={styles.snapshotTileHalf}
+        />
         <MetricCard
           label="Injuries"
           value={injuredCount != null ? String(injuredCount) : '—'}
           valueColor={injuredCount != null && injuredCount > 0 ? colors.danger : undefined}
+          style={styles.snapshotTileHalf}
         />
       </View>
     </View>
@@ -937,6 +958,10 @@ function createStyles(colors: ThemeColors) {
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
+  // Per-instance MetricCard sizing overrides (Dashboard's League Snapshot
+  // only) — see the comment at the call site.
+  snapshotTileThird: { minWidth: '30%', flexBasis: '30%' },
+  snapshotTileHalf: { minWidth: '48%', flexBasis: '48%' },
   healthSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   // Matches TeamRosterScreen's archetype strengths/risks list styling.
   detailListGroup: { gap: 2 },

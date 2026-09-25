@@ -19,13 +19,22 @@ export interface QuickAction {
 }
 
 /**
- * Shared 2-column shortcut-tile grid — originally Dashboard's own
+ * Shared single-row shortcut-tile grid — originally Dashboard's own
  * "Quick Actions" row (PR #683, Trade Hub/Rankings/Waivers/Draft Picks),
  * promoted into a shared component so any hub-style screen (Dashboard,
  * League Detail) renders the exact same tile affordance instead of a
  * page-specific reimplementation. Built on AnimatedCard so every tile gets
  * the same press-scale + resting shadow every other card in the app has.
  * Callers own their own action list/colors/destinations; this only renders.
+ *
+ * Tile count: both current callers always pass exactly 4 actions, so the
+ * default lays out one compact row of 4 rather than wrapping to 2x2. This
+ * intentionally keeps the *smaller* icon size and tighter padding coridian_
+ * asked for after flagging an earlier 4-per-row/44pt-icon version as "way
+ * too big" (screenshot, 2026-09-23) — narrowing the tiles to fit 4 across
+ * makes them read as compact/scannable rather than large, so it satisfies
+ * that complaint at least as well as the 2-per-row layout did, while also
+ * matching the concept sheet's single-row Quick Actions treatment.
  */
 export default function QuickActionsGrid({
   actions,
@@ -65,19 +74,18 @@ function createStyles(colors: ThemeColors) {
       flexWrap: 'wrap',
       gap: spacing.sm,
     },
-    // 2-per-row — still a comfortable tap target (the whole card is
-    // tappable), but compact: coridian_ flagged the original lg-padded,
-    // 44pt-icon version as "way too big" for a 4-tile row (screenshot,
-    // 2026-09-23).
+    // 4-per-row, sized to stay compact rather than large — the whole card
+    // is still a comfortable tap target, just narrow. See the component
+    // doc comment for why this is 4-across instead of 2x2.
     cell: {
-      flexBasis: '47%',
+      flexBasis: '22%',
       flexGrow: 1,
       alignItems: 'center',
-      paddingVertical: spacing.sm + 2,
-      paddingHorizontal: spacing.sm,
-      gap: spacing.xs,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.xs,
+      gap: 4,
       borderWidth: 1,
     },
-    label: { fontSize: 12, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+    label: { fontSize: 11, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   });
 }
