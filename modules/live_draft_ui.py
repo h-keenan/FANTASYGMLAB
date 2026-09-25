@@ -141,13 +141,19 @@ def _recommendation_html(rec: dict[str, Any], *, primary: bool = False) -> str:
     confidence = _text(rec.get("confidence"), "Moderate")
     need = _text(rec.get("position_need_impact"))
     reason = _concise_reason(rec.get("recommendation_reason") or rec.get('reason'))
+    # Confidence is a judgment ABOUT the rationale below it, so on the primary
+    # card it renders after the "why" copy (Magna Carta §29: what -> why -> how
+    # confident), matching the same confidence-after-rationale fix already
+    # applied to Trade Hub / Waivers / GM Targets / Alerts / Trade Analyzer.
+    # Alternates carry no rationale block on-page (tap through for that), so
+    # there is no ordering to invert there — confidence stays in the badge row.
+    tag_items = [(role, "information")]
+    if not primary:
+        tag_items.append((f"{confidence} confidence", "neutral"))
+    tag_items.append((need, "success"))
     tags = "".join(
         football_assets.status_chip_html(label, tone=tone)
-        for label, tone in (
-            (role, "information"),
-            (f"{confidence} confidence", "neutral"),
-            (need, "success"),
-        )
+        for label, tone in tag_items
         if label
     )
     # Only the single primary recommendation carries the full why/analysis
@@ -160,6 +166,7 @@ def _recommendation_html(rec: dict[str, Any], *, primary: bool = False) -> str:
         "<div class='live-draft-rec-analysis'>"
         f"<span><strong>Roster impact</strong>{escape(_text(rec.get('immediate_roster_impact')))}</span>"
         f"<span><strong>Value vs ADP</strong>{escape(adp_text)}</span>"
+        f"<span><strong>Confidence</strong>{escape(confidence)}</span>"
         "</div>"
         "</div>"
         if primary
@@ -197,7 +204,9 @@ def _render_recommendations(
 ) -> None:
     recs = state.get("recommendations") or []
     st.markdown(
-        "<div class='live-draft-section-head'><span>Who should I draft next?</span><small>Primary pick first: why, impact, then supporting board context.</small></div>",
+        "<div class='live-draft-section-head'><span>Who should I draft next?</span>"
+        "<small>Primary pick first: why, impact, then supporting board context. "
+        "Tap any player card to open their full profile.</small></div>",
         unsafe_allow_html=True,
     )
     if not recs:
@@ -446,6 +455,9 @@ def _render_live_rankings(
     *,
     score_label: str,
     open_trade_hub_for_player: Callable[[str], None] | None = None,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
+    draft_id: str = "",
 ) -> None:
     board = state.get("rankings")
     st.markdown(
@@ -470,12 +482,31 @@ def _render_live_rankings(
     elif selection == "Veterans":
         display = display[~display["is_rookie"].astype(bool)]
     visible_board = display.head(120)
-    st.markdown(
-        "<div class='live-rank-list'>" + "".join(
-            _ranking_row_html(row) for row in visible_board.to_dict("records")
-        ) + "</div>",
-        unsafe_allow_html=True,
+    visible_rows = visible_board.to_dict("records")
+    board_html = (
+        "<div class='live-rank-list'>"
+        + "".join(_ranking_row_html(row) for row in visible_rows)
+        + "</div>"
     )
+    if render_tappable_player_html and open_player_quick_view:
+        st.caption("Tap any player below to open their full profile.")
+        clicked = render_tappable_player_html(
+            html=board_html,
+            key_prefix=f"live_draft_available_rankings_{draft_id or 'active'}",
+        )
+        if clicked:
+            selected_row = next(
+                (row for row in visible_rows if _text(row.get("player_id")) == clicked),
+                {},
+            )
+            open_player_quick_view(
+                clicked,
+                source_label="Live Draft Assistant",
+                source_note=_text(selected_row.get("recommendation_reason")),
+                status_label=_text(selected_row.get("recommendation_label")),
+            )
+    else:
+        st.markdown(board_html, unsafe_allow_html=True)
     if len(display) > len(visible_board):
         st.caption(
             f"Showing the top {len(visible_board)} of {len(display)} ranked players. "
@@ -525,9 +556,13 @@ def _render_live_rankings(
         for row in display.head(75).to_dict("records")
     }
     if player_options:
-        selected = st.selectbox("Player Quick View", list(player_options), key="live_draft_quick_view")
+        st.caption(
+            "Need the exact score breakdown for one player? Look them up here — "
+            "tapping a row above opens their full profile instead."
+        )
+        selected = st.selectbox("Score Breakdown Lookup", list(player_options), key="live_draft_quick_view")
         row = player_options[selected]
-        with st.expander(f"Quick View · {_text(row.get('name'), 'Player')}", expanded=False):
+        with st.expander(f"Score Breakdown · {_text(row.get('name'), 'Player')}", expanded=False):
             st.caption(
                 f"Board {canonical_player_ranking.format_local_board_rank(row.get('overall_rank'))} · "
                 f"{_text(row.get('position')).upper()} board "
@@ -801,12 +836,21 @@ def render_live_draft_page(
                 open_player_quick_view=open_player_quick_view,
                 draft_id=draft_id,
             )
-            _render_live_team_rankings(state)
+            # Available Player Rankings is the board that directly supports the
+            # current-pick decision; Live Team Rankings is league-standings
+            # context that does not drive this pick, so it now renders after
+            # the decision-relevant board rather than ahead of it (Magna Carta
+            # §4: hierarchy follows user decision importance, not the order
+            # sections happened to be built in).
             _render_live_rankings(
                 state,
                 score_label=score_label,
                 open_trade_hub_for_player=open_trade_hub_for_player,
+                render_tappable_player_html=render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
+                draft_id=draft_id,
             )
+            _render_live_team_rankings(state)
             _render_pick_board(state)
             _render_team_boards(state)
 

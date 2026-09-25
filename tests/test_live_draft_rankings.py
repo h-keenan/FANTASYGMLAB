@@ -274,13 +274,18 @@ class TestLiveDraftRankings(unittest.TestCase):
         active_board = source.split('"Available Board"', 1)[1].split("return {", 1)[0]
         self.assertNotIn("st.dataframe(", active_board)
 
-    def test_live_team_rankings_are_rendered_before_available_players(self):
+    def test_available_player_rankings_are_rendered_before_live_team_rankings(self):
+        # UI V2 Architecture Reset: hierarchy follows user decision importance,
+        # not incidental build order. Available Player Rankings directly
+        # supports the current-pick decision; Live Team Rankings is
+        # league-standings context that does not drive this pick, so it now
+        # renders after the decision-relevant board.
         source = Path("modules/live_draft_ui.py").read_text(encoding="utf-8")
         self.assertIn("Live Team Rankings", source)
         snapshot = source.split("def render_snapshot()", 1)[1]
         self.assertLess(
-            snapshot.index("_render_live_team_rankings(state)"),
             snapshot.index("_render_live_rankings("),
+            snapshot.index("_render_live_team_rankings(state)"),
         )
 
 

@@ -20,8 +20,7 @@ LIVE_DRAFT_CSS = """
     padding: var(--space-md) var(--space-lg);
 }
 
-.live-draft-kicker,
-.live-draft-rec-label {
+.live-draft-kicker {
     color: rgba(103, 232, 249, 0.92);
     font-size: 0.68rem;
     font-weight: 800;
@@ -38,9 +37,7 @@ LIVE_DRAFT_CSS = """
 }
 
 .live-draft-copy,
-.live-draft-command-meta,
-.live-draft-rec-meta,
-.live-draft-rec-reason {
+.live-draft-command-meta {
     color: rgba(226, 232, 240, 0.70);
     font-size: 0.78rem;
     line-height: 1.28;
@@ -155,11 +152,6 @@ LIVE_DRAFT_CSS = """
 
 .live-draft-rec-alt-group .live-draft-rec-alt-card:last-child {
     border-bottom: none;
-}
-
-.live-draft-rec-name {
-    color: var(--color-text-primary);
-    font: var(--font-card-title);
 }
 
 .live-draft-rec-executive {
