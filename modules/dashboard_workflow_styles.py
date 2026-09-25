@@ -221,20 +221,10 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
 }
 
 @media (max-width: 700px) {
-    div[class*="st-key-dashboard_context_pair"] [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: column !important;
-        flex-wrap: nowrap !important;
-        gap: var(--space-md) !important;
-        width: 100% !important;
-    }
-    div[class*="st-key-dashboard_context_pair"] [data-testid="stHorizontalBlock"] > div,
-    div[class*="st-key-dashboard_context_pair"] [data-testid="column"] {
-        flex: 1 1 auto !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        width: 100% !important;
-    }
+    /* League Insights and Team Snapshot are independent full-width sections
+       now (no shared horizontal-block pairing to collapse) — see
+       dashboard_workflow.py. Long identity/label text still needs to wrap
+       safely at narrow widths regardless of section width. */
     div[class*="st-key-dashboard_league_insights"] .home-command-card-value,
     div[class*="st-key-dashboard_league_insights"] .home-command-card-note,
     div[class*="st-key-dashboard_team_snapshot"] .summary-tile-value,

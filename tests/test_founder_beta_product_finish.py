@@ -19,10 +19,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_dashboard_insights_use_usable_minmax_not_character_wrap():
-    pair = DESKTOP_EXECUTIVE_LAYOUT_CSS
-    assert "minmax(22rem, 1.35fr) minmax(18rem, 0.9fr)" in pair.replace(" ", "") or (
-        "minmax(22rem, 1.35fr)" in pair and "minmax(18rem, 0.9fr)" in pair
-    )
+    # League Insights no longer shares a fixed-ratio paired column with Team
+    # Snapshot (V2 restructure: it's a standalone full-width section instead),
+    # so the old two-column minmax split is gone rather than dead CSS.
+    assert "dashboard_context_pair" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     css = DASHBOARD_WORKFLOW_CSS
     assert "word-break: normal" in css
     assert "word-break:anywhere" not in css.replace(" ", "").casefold()

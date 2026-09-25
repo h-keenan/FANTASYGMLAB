@@ -94,7 +94,7 @@ PRESENTATION_STABILITY_PROBE = st.components.v2.component(
               }
               const late = (el.matches && (
                 el.matches('[data-testid="stExpander"]')
-                || el.matches('.st-key-dashboard_context_pair')
+                || el.matches('.st-key-dashboard_team_snapshot')
                 || el.matches('[data-fgl-surface-pending]')
               ))
               if (late) bag.lateSections += 1

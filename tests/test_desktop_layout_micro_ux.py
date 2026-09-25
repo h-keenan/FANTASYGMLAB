@@ -13,7 +13,10 @@ def test_desktop_content_max_uses_more_horizontal_space():
     assert "--dg-exec-content-max: 1360px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "--dg-exec-content-max-wide: 1520px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "--dg-exec-content-max-ultra: 1680px" in DESKTOP_EXECUTIVE_LAYOUT_CSS
-    assert "dashboard_context_pair" in DESKTOP_EXECUTIVE_LAYOUT_CSS
+    # League Insights and Team Snapshot no longer share a paired two-column
+    # row (V2 restructure: opportunities promoted, reference demoted next to
+    # Quick Actions) — the dedicated pair geometry rule is gone.
+    assert "dashboard_context_pair" not in DESKTOP_EXECUTIVE_LAYOUT_CSS
     assert "@media (max-width: 760px)" in DESKTOP_EXECUTIVE_LAYOUT_CSS
     styles = (ROOT / "modules" / "dashboard_workflow_styles.py").read_text(encoding="utf-8")
     assert "flex-direction: column" in styles
@@ -56,10 +59,20 @@ def test_trade_harness_includes_auto_help_affordance():
     assert 'key="ci_trade_strategy"' in source
 
 
-def test_dashboard_secondary_context_is_paired_on_desktop():
+def test_dashboard_secondary_context_regroups_by_actionability_not_pairing():
+    """V2 restructure: League Insights (still-actionable opportunities) is a
+    standalone full-width section promoted ahead of pure reference content;
+    Team Snapshot (record/health reference) is demoted next to Quick Actions
+    instead of sharing equal-weight columns with an actionable surface."""
+
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
-    assert 'key="dashboard_context_pair"' in source
+    assert 'key="dashboard_context_pair"' not in source
+    assert 'key="dashboard_league_insights"' in source
+    assert 'key="dashboard_team_snapshot"' in source
     insights = source.index('render_section_header("League Insights"')
     snapshot = source.index('render_section_header("Team Snapshot"')
-    pair = source.index('key="dashboard_context_pair"')
-    assert pair < insights < snapshot
+    explore = source.index('"Explore"')
+    orientation = source.index("render_orientation()")
+    # League Insights leads (opportunities); Team Snapshot and Quick Actions
+    # (Explore) form the demoted secondary-context tail, in that order.
+    assert insights < orientation < snapshot < explore
