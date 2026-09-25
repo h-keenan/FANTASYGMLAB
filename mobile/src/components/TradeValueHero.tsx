@@ -5,13 +5,20 @@ import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { ThemeColors } from '../theme';
 
-type HeroSize = 'sm' | 'lg';
+type HeroSize = 'sm' | 'md' | 'lg';
 
 const SIZES: Record<HeroSize, { value: number; label: number; tracking: number }> = {
   // Feed density: Trade Hub stacks many of these, so `sm` is deliberately
   // smaller than the share PNG's 40pt hero while still reading as the
   // card's headline number rather than a metadata chip.
   sm: { value: 26, label: 9, tracking: -0.6 },
+  // Trade Hub's concept mockups (not available when `sm` above was chosen)
+  // show the value-change number as the clear focal point of the card —
+  // closer to the share PNG's 40pt hero than the original 26pt feed size.
+  // `md` splits the difference: still a step down from `lg` so a dense feed
+  // of cards doesn't balloon in height, but sized so the number reads as
+  // "the strongest visual element" the way the concept renders it.
+  md: { value: 34, label: 10, tracking: -0.8 },
   lg: { value: 40, label: 12, tracking: -1 },
 };
 
