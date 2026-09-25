@@ -24,6 +24,9 @@ body:has(.fgl-landing) .dg-build-identity{
 .fgl-landing__value{color:var(--color-text-primary,#f8fafc);font-size:clamp(1.2rem,4.6vw,1.55rem);font-weight:800;hyphens:none;line-height:1.2;margin:0;max-width:36rem;overflow-wrap:break-word;word-break:normal}
 .fgl-landing__support{color:var(--color-text-secondary,rgba(203,213,225,.92));font-size:.95rem;line-height:1.4;margin:0;max-width:34rem}
 .fgl-landing__trust{color:var(--color-text-muted,rgba(148,163,184,.95));font-size:.78rem;line-height:1.35;margin:.05rem 0 .1rem;max-width:34rem}
+.fgl-landing__mobile-badge{align-items:center;background:color-mix(in srgb,var(--color-shell,#090a0c) 72%,transparent);border:1px solid color-mix(in srgb,var(--color-border,#2a2e35) 70%,transparent);border-inline-start:2px solid color-mix(in srgb,var(--color-brand-accent,#22d3ee) 72%,transparent);border-radius:999px;box-sizing:border-box;display:inline-flex;gap:.35rem;margin-top:.2rem;padding:.22rem .65rem .22rem .55rem;width:fit-content}
+.fgl-landing__mobile-badge em{color:var(--color-text-muted,rgba(148,163,184,.95));font-size:.62rem;font-style:normal;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.fgl-landing__mobile-badge span{color:var(--color-text-secondary,rgba(226,232,240,.92));font-size:.72rem;font-weight:650}
 .fgl-preview{background:var(--color-surface-primary,rgba(15,23,42,.55));border:1px solid color-mix(in srgb,var(--color-accent-strong,#22d3ee) 22%,transparent);border-radius:.7rem;box-sizing:border-box;display:grid;gap:.55rem;min-width:0;padding:.7rem .75rem .65rem;box-shadow:inset 3px 0 0 var(--color-accent,#22d3ee)}
 .fgl-preview__kicker{color:var(--color-accent,#22d3ee);font-size:.68rem;font-weight:750;letter-spacing:.05em;text-transform:uppercase}
 .fgl-preview__rail{display:grid;gap:.45rem}
