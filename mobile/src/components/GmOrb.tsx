@@ -26,7 +26,7 @@ import { StackActions } from '@react-navigation/routers';
 
 import AnimatedCard from './AnimatedCard';
 import IconCircle from './IconCircle';
-import TrajectoryArcs from './TrajectoryArcs';
+import BrandMark from './BrandMark';
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
@@ -696,14 +696,16 @@ export default function GmOrb() {
               // than sitting exactly on the line.
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              {/* The vector brand mark, not the flat app-icon PNG: that PNG
-                  is a fully opaque square with its own baked-in dark-navy
-                  fill, so it always shows through as a "grey" disc no
-                  matter what this circle's own backgroundColor is set to.
-                  TrajectoryArcs has no background of its own, so the disc's
-                  real backgroundColor (colors.background, matching where
-                  the screen's own wash ends) shows through correctly. */}
-              <TrajectoryArcs width={34} height={23} />
+              {/* BrandMark renders assets/splash-icon.png, not the flat
+                  assets/icon.png: icon.png is a fully opaque square with its
+                  own baked-in dark-navy fill, so it always shows through as
+                  a "grey" disc no matter what this circle's own
+                  backgroundColor is set to. splash-icon.png is the same
+                  mark cropped to a transparent-background PNG, so the
+                  disc's real backgroundColor (colors.background, matching
+                  where the screen's own wash ends) shows through correctly
+                  around it. */}
+              <BrandMark width={34} height={23} />
             </TouchableOpacity>
           </Animated.View>
         </GestureDetector>

@@ -36,7 +36,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import TeamAvatar from '../components/TeamAvatar';
-import TrajectoryArcs from '../components/TrajectoryArcs';
+import BrandMark from '../components/BrandMark';
 import { useOrbClearance } from '../lib/orbLayout';
 import { getCachedDashboard, setCachedDashboard } from '../lib/dashboardCache';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
@@ -370,7 +370,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           the global header and the tiny "about this screen" affordance. */}
       {showEmptyState ? (
         <View style={styles.emptyCard}>
-          <TrajectoryArcs width={120} height={82} />
+          <BrandMark width={120} height={82} />
           <AppText style={styles.emptyText}>
             {quietReason || 'Nothing urgent right now — your roster looks steady.'}
           </AppText>
