@@ -100,7 +100,11 @@ def test_active_css_drops_known_legacy_sky_and_streamlit_blues():
 def test_intentional_brand_cyan_and_light_mark_contrast_are_retained():
     assert "--color-accent: #67e8f9;" in DESIGN_TOKEN_CSS
     assert "--color-brand-accent: #22d3ee;" in DESIGN_TOKEN_CSS
-    assert "#0891b2" in BRAND_IDENTITY_CSS
+    # #0891B2 was a CSS light-surface contrast tweak for the retired FGL Arc
+    # Monogram's cyan arc (drawn in pure CSS). The current mark is real PNG
+    # artwork, not a CSS-colored shape, so light-surface contrast is now
+    # handled by asset selection (a navy monochrome cut) rather than a CSS
+    # hex — see modules/brand_identity.ASSET_PATHS["mark_mono_light"].
     assert "var(--color-brand-accent,#22d3ee)" in BRAND_IDENTITY_CSS.replace(" ", "")
     assert "--color-success: #22c55e;" in DESIGN_TOKEN_CSS
     assert "--color-warning: #f59e0b;" in DESIGN_TOKEN_CSS
