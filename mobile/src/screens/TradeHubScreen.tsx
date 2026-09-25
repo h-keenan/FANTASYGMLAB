@@ -591,13 +591,28 @@ function CategoryBadge({ category }: { category: string }) {
   );
 }
 
+// Semantic-color fix (recommendation-clarity audit, this pass): `sell_high`
+// previously rendered in `colors.danger` (red). Per UI_MAGNA_CARTA.md §3,
+// red is reserved app-wide for "injury, urgent risk, negative value, serious
+// concern, unavailable/out states" — a Sell High tag is the opposite of
+// that: it flags a *positive* strategic opportunity (this asset is
+// appreciating, move it now), the same family as Buy Low. Coloring it red
+// made a good-news recommendation look like a warning at a glance, directly
+// undercutting "is it obvious what this recommendation is suggesting."
+// `high_impact` moves from amber to cyan (primary GM-intelligence emphasis,
+// matching the brief's "cyan = primary GM recommendation/intelligence") so
+// it no longer collides with Sell High's new amber ("strategic
+// opportunity/moderate caution," the same bucket Draft Capital already
+// uses for a timing-sensitive move). Buy Low is unchanged — green already
+// matched the spec. No underlying impact_tag/category values changed, only
+// their display colors.
 function impactTagConfig(
   colors: ThemeColors,
 ): Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> {
   return {
-    high_impact: { label: 'High Impact', icon: 'flash', color: colors.premium },
+    high_impact: { label: 'High Impact', icon: 'flash', color: colors.accent },
     buy_low: { label: 'Buy Low', icon: 'trending-down', color: colors.success },
-    sell_high: { label: 'Sell High', icon: 'trending-up', color: colors.danger },
+    sell_high: { label: 'Sell High', icon: 'trending-up', color: colors.premium },
   };
 }
 
@@ -621,7 +636,10 @@ function ImpactBadge({ impactTag }: { impactTag: string }) {
  * concept sheet's Trade Hub summary row. Every count is real (impact_tag
  * is computed server-side from confidence_label/opportunity_label, not
  * invented here), so an idea with no tag just doesn't count toward any of
- * the three impact buckets — the total is still every idea's real total. */
+ * the three impact buckets — the total is still every idea's real total.
+ *
+ * Colors here intentionally match `impactTagConfig` below (see that
+ * function's comment for the semantic-color fix applied in this pass). */
 function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -641,9 +659,9 @@ function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
 
   const tiles: Array<{ key: string; value: number; label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = [
     { key: 'total', value: counts.total, label: 'Trade Ideas', icon: 'bulb-outline', color: colors.accent },
-    { key: 'high_impact', value: counts.highImpact, label: 'High Impact', icon: 'flash', color: colors.premium },
+    { key: 'high_impact', value: counts.highImpact, label: 'High Impact', icon: 'flash', color: colors.accent },
     { key: 'buy_low', value: counts.buyLow, label: 'Buy Low', icon: 'trending-down', color: colors.success },
-    { key: 'sell_high', value: counts.sellHigh, label: 'Sell High', icon: 'trending-up', color: colors.danger },
+    { key: 'sell_high', value: counts.sellHigh, label: 'Sell High', icon: 'trending-up', color: colors.premium },
   ];
 
   return (
@@ -763,18 +781,31 @@ function TradeIdeaCard({
           <ImpactBadge impactTag={idea.impact_tag} />
         </View>
       ) : null}
-      {landedTargetNames.length > 0 ? (
-        <View style={styles.landedTargetRow}>
-          <Ionicons name="locate" size={13} color={colors.premium} />
-          <AppText style={styles.landedTargetText} numberOfLines={1}>
-            Lands your target: {landedTargetNames.join(', ')}
-          </AppText>
+      {/* Density fix (card-height audit, this pass): "Lands your target" and
+          "FOR <team>" (All Trades mode only) previously each carried their
+          own top padding as fully independent rows, stacking up to two
+          extra half-rows of whitespace above the partner row before any
+          trade content appeared. Both are lightweight context lines about
+          who/why this idea exists, so they now share one tightly-spaced
+          wrapper — still two distinct lines when both are present, nothing
+          removed or merged in meaning, just less dead vertical space
+          between them and above the partner identity that follows. */}
+      {landedTargetNames.length > 0 || idea.source_team_name ? (
+        <View style={styles.contextBlock}>
+          {landedTargetNames.length > 0 ? (
+            <View style={styles.landedTargetRow}>
+              <Ionicons name="locate" size={13} color={colors.premium} />
+              <AppText style={styles.landedTargetText} numberOfLines={1}>
+                Lands your target: {landedTargetNames.join(', ')}
+              </AppText>
+            </View>
+          ) : null}
+          {idea.source_team_name ? (
+            <AppText style={styles.sourceTeamLabel} numberOfLines={1}>
+              FOR {idea.source_team_name.toUpperCase()}
+            </AppText>
+          ) : null}
         </View>
-      ) : null}
-      {idea.source_team_name ? (
-        <AppText style={styles.sourceTeamLabel} numberOfLines={1}>
-          FOR {idea.source_team_name.toUpperCase()}
-        </AppText>
       ) : null}
       {/* Header hierarchy: recommendation type (the category/impact badges
           above) -> team name + share action on one line -> value-change
@@ -826,7 +857,13 @@ function TradeIdeaCard({
             </View>
           ) : null}
         </View>
-        <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+        <TouchableOpacity
+          style={styles.shareButton}
+          onPress={() => setShareOpen(true)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Share this trade"
+        >
           <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -896,6 +933,32 @@ function TradeIdeaCard({
         <MeterRow label="CONFIDENCE" value={idea.confidence_label} level={confidenceLevel} color={colors.accent} />
         <MeterRow label="REALISM" value={idea.market_realism_label} level={realismLevel} color={colors.premium} />
       </View>
+
+      {/* Recommendation-clarity fix (this pass): every other required field
+          on this card — partner, assets, value, rationale, confidence,
+          realism — was already legible without an extra tap, but the card
+          had no explicit, labeled action telling the user what to actually
+          *do* about it. The only affordance for acting on an idea was the
+          unlabeled share icon in the header above, which reads as "export a
+          screenshot," not "this is how you propose this trade" — and
+          nothing else on the card hints that sharing is the intended next
+          step (Trade Hub can't submit a trade through Sleeper's API on the
+          user's behalf, so a shareable trade card sent to the partner is
+          the real, working path to actually act on a recommendation here).
+          This button calls the exact same `setShareOpen` handler as the
+          header icon — no new logic — just makes that path an explicit,
+          full-width, clearly-labeled primary affordance at the natural end
+          of the card, after the reasoning that justifies it. */}
+      <TouchableOpacity
+        style={styles.proposeButton}
+        onPress={() => setShareOpen(true)}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Share this trade to propose it"
+      >
+        <Ionicons name="paper-plane-outline" size={15} color={colors.background} />
+        <AppText style={styles.proposeButtonText}>Share to Propose</AppText>
+      </TouchableOpacity>
     </AnimatedCard>
   );
 }
@@ -994,22 +1057,10 @@ function createStyles(colors: ThemeColors) {
   summaryTile: { flex: 1, alignItems: 'center', gap: 2 },
   summaryValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
   summaryLabel: { fontSize: 10, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
-  landedTargetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-  },
+  contextBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, gap: 2 },
+  landedTargetRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   landedTargetText: { fontSize: 11, fontWeight: '600', color: colors.premium, flexShrink: 1 },
-  sourceTeamLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    letterSpacing: 0.6,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-  },
+  sourceTeamLabel: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.6 },
   categoryBadge: {
     alignSelf: 'flex-start',
     borderRadius: radii.sm,
@@ -1168,5 +1219,25 @@ function createStyles(colors: ThemeColors) {
   meterSegments: { flexDirection: 'row', gap: 3 },
   meterSegment: { width: 14, height: 4, borderRadius: 2 },
   meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+  // Primary CTA (recommendation-clarity fix): the one clearly-labeled,
+  // real action affordance on the card. Reuses the same primary-button
+  // visual language as `gatePrimaryButton` above (cyan fill, dark text) so
+  // Trade Hub doesn't invent a second button style — cyan here reads as
+  // "primary interaction" per Magna Carta §3/§17, not a value judgment on
+  // the trade itself (a bad-value trade gets this exact same button; the
+  // button proposes it, it doesn't endorse it).
+  proposeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.md,
+    backgroundColor: colors.accent,
+  },
+  proposeButtonText: { fontSize: 13, fontWeight: '700', color: colors.background },
   });
 }
