@@ -279,24 +279,37 @@ class TestWaiversUI(unittest.TestCase):
         )
         self.assertEqual(kwargs["key_prefix"], "test")
 
-    def test_waiver_workspace_collapses_secondary_mobile_sections(self):
+    def test_waiver_workspace_surfaces_personalized_board_before_snapshot(self):
         source = Path("modules/waivers_ui.py").read_text(encoding="utf-8")
 
         priority_idx = source.index('"Priority Adds"')
+        beyond_idx = source.index('"Beyond Priority Adds"')
+        stash_idx = source.index('"Stash Candidates"')
+        watchlist_idx = source.index('"Watchlist Depth"')
+        faab_idx = source.index('"FAAB Shortlist"')
         snapshot_idx = source.index('"Waiver Snapshot"')
-        secondary_idx = source.index('with st.expander("Secondary waiver board", expanded=False):')
         detailed_idx = source.index('with st.expander("Detailed Table View", expanded=False):')
 
-        self.assertLess(priority_idx, snapshot_idx)
-        self.assertLess(snapshot_idx, secondary_idx)
-        self.assertLess(priority_idx, secondary_idx)
-        self.assertLess(secondary_idx, detailed_idx)
+        # Personalized, roster-aware content (the Premium secondary board)
+        # must render before the generic Best Available/Snapshot browsing —
+        # Magna Carta §31 — and must not be hidden behind a click-to-open
+        # expander the way the legacy V1 "Secondary waiver board" was.
+        self.assertLess(priority_idx, beyond_idx)
+        self.assertLess(beyond_idx, stash_idx)
+        self.assertLess(stash_idx, watchlist_idx)
+        self.assertLess(watchlist_idx, faab_idx)
+        self.assertLess(faab_idx, snapshot_idx)
+        self.assertLess(snapshot_idx, detailed_idx)
+        self.assertNotIn('with st.expander("Secondary waiver board"', source)
         self.assertIn("Waiver Snapshot", source)
         self.assertIn("FAAB Shortlist", source)
         self.assertIn("waiver_section_header_html", source)
         self.assertNotIn("<span class='dg-semantic-icon' aria-hidden='true'>+</span>Waiver Snapshot", source)
         self.assertNotIn("<span class='dg-semantic-icon' aria-hidden='true'>+</span>Priority Adds", source)
-        self.assertIn("Open this after checking the priority adds.", source)
+        # Recommendation-clarity: the page must explain that there is no
+        # in-app waiver-claim submission, and where the real action happens.
+        self.assertIn("does not submit waiver claims for you", source)
+        self.assertIn("Sleeper", source)
         self.assertIn("waivers_priority_adds_emit", source)
         self.assertIn("waiver_card_render", source)
         self.assertIn("waiver_action_controls_emit", source)
