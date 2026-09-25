@@ -98,6 +98,7 @@ from modules import (
     league_recaps,
     league_standings,
     league_value_settings,
+    manager_activity,
     my_news,
     news as news_cache,
     news_signal,
@@ -691,9 +692,7 @@ def get_league_team_rankings(
     # see modules.team_eval._rank_strength's fallback), so it's safe to run
     # directly on the cheap rankings_frame rather than needing the heavier
     # per-roster injury-summary pass web's cached_league_intelligence_frame
-    # does. Manager tendencies (trading style, activity level) are NOT here —
-    # those need a full-season Sleeper transaction scan that doesn't exist
-    # in modules/ yet; a real, separate follow-up.
+    # does.
     rankings_frame = refine_team_directions(rankings_frame)
 
     rosters = sleeper.get_rosters(league_id)
@@ -720,6 +719,16 @@ def get_league_team_rankings(
     except Exception:
         trade_tendencies = {}
 
+    # Real per-manager activity count off actual Sleeper transaction history
+    # (modules.manager_activity) — how many completed moves (trades, waiver
+    # claims, free-agent adds/drops) each roster has made this season so
+    # far. Same best-effort contract as trade_tendencies above: a scan
+    # failure just leaves every team at 0 rather than failing the endpoint.
+    try:
+        activity_counts = manager_activity.manager_activity_counts_cached(league_id)
+    except Exception:
+        activity_counts = {}
+
     teams: list[dict[str, Any]] = []
     for _, row in rankings_frame.iterrows():
         roster_id = str(row.get("roster_id"))
@@ -728,12 +737,17 @@ def get_league_team_rankings(
             tendency = trade_tendencies.get(int(roster_id), {})
         except (TypeError, ValueError):
             tendency = {}
+        try:
+            activity_count = int(activity_counts.get(int(roster_id), 0))
+        except (TypeError, ValueError):
+            activity_count = 0
         teams.append(
             {
                 "roster_id": roster_id,
                 "trade_tendency": tendency.get("tendency", team_trade_history.NEUTRAL),
                 "trade_tendency_sell_count": int(tendency.get("sell_count") or 0),
                 "trade_tendency_buy_count": int(tendency.get("buy_count") or 0),
+                "transaction_activity_count": activity_count,
                 "team_name": _clean_json_value(row.get("team_name")),
                 "owner_name": _clean_json_value(standing.get("owner_name") or row.get("owner_name")),
                 "owner_username": _clean_json_value(standing.get("owner_username")),
