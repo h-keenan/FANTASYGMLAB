@@ -24,8 +24,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 
 .dg-ui-card-title,
 .trade-summary-title,
-.home-command-card-value,
-.waiver-player-name{
+.home-command-card-value{
     font: var(--type-card-title) !important;
 }
 

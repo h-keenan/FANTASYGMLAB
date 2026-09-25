@@ -259,7 +259,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     box-shadow: none !important;
 }
 
-.dg-ui-caption,
 .stCaptionContainer p,
 [data-testid="stCaptionContainer"] p {
     color: var(--color-text-muted) !important;

@@ -92,8 +92,6 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .pqv-why-factor--risk{border-left-color:var(--color-warning)}
 .pqv-why-factor strong{color:var(--color-text-primary);font-size:var(--font-size-body);font-weight:var(--font-weight-body);line-height:1.25;overflow-wrap:anywhere}
 .pqv-glance-grid{display:grid;gap:var(--space-xs) var(--space-sm);grid-template-columns:repeat(auto-fit,minmax(5.25rem,1fr));min-width:0}
-.pqv-more-group{margin:0 0 var(--space-md);max-width:48rem}
-.pqv-more-group-title{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-xs);text-transform:uppercase}
 .pqv-model-matrix{display:grid;gap:var(--space-xs);grid-template-columns:repeat(2,minmax(0,1fr));margin:0 0 var(--space-sm);max-width:48rem}
 .pqv-model-cell:last-child:nth-child(odd){grid-column:1/-1}
 .pqv-model-cell{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:1px;min-width:0;padding:var(--space-xs) var(--space-sm)}
@@ -273,7 +271,7 @@ div[class*="st-key-pqv_actions_strip"]{max-width:54rem}
 .pqv-compact-model,.pqv-compact-career{display:grid;align-content:start;gap:var(--space-xs)}
 .pqv-model-summary-cell strong,.pqv-career-glance-cell strong{font-size:var(--font-size-card-title);line-height:var(--line-height-card)}
 .pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
-.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-summary,.pqv-model-summary,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.pqv-more-group,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
+.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-summary,.pqv-model-summary,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
 .pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
 .pqv-glance-grid{grid-template-columns:repeat(6,minmax(4.5rem,6.5rem));justify-content:start}
 .pqv-model-matrix{grid-template-columns:repeat(5,minmax(0,1fr));max-width:56rem}
