@@ -23140,6 +23140,7 @@ def main():
                 show_debug_breakdown=bool(st.session_state.get("dg_show_dev_diagnostics")),
             )
             try:
+                from modules import share_recommendation_cards as share_cards
                 from modules import share_recommendation_ui
 
                 share_card = offer_analyzer.build_offer_eval_share_card(
@@ -23150,10 +23151,21 @@ def main():
                     format_label=format_label,
                     strategy_label=team_strategy_label(trade_analyzer_strategy),
                 )
+                # This surface evaluates an offer someone else already sent —
+                # there is no in-app accept/decline/counter. State that plainly
+                # (same gap Trade Hub's action-clarity audit found and fixed)
+                # instead of leaving a generically-labeled share button to
+                # imply an action that doesn't exist here.
+                st.caption(
+                    "There's no in-app accept, decline, or counter here — reply to "
+                    "your trade partner directly (Sleeper, group chat, etc.). "
+                    "Share Verdict turns this read into a card you can send them."
+                )
                 share_recommendation_ui.render_share_controls(
                     share_card,
                     key="trade_analyzer_share",
                     state=st.session_state,
+                    button_label=share_cards.TRADE_ANALYZER_SHARE_LABEL,
                 )
             except Exception:
                 pass

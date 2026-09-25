@@ -9,7 +9,7 @@ import re
 from html import escape
 from typing import Literal
 
-CueKind = Literal["why", "risk", "fit", "evidence", "market"]
+CueKind = Literal["why", "risk", "fit", "evidence", "market", "action"]
 
 _EDGE_NUM = re.compile(r"([+\-]?\d+(?:\.\d+)?)")
 
@@ -50,6 +50,9 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-cue--market{border-inline-start-color:var(--color-text-muted)}
 .tvl-cue--market .tvl-cue-mark{background:var(--color-text-muted);border-radius:0}
 .tvl-cue--market .tvl-cue-kicker{color:var(--color-text-muted)}
+.tvl-cue--action{border-inline-start-color:var(--color-action)}
+.tvl-cue--action .tvl-cue-mark{background:var(--color-action);border-radius:0}
+.tvl-cue--action .tvl-cue-kicker{color:var(--color-action)}
 .tvl-cue--fit .tvl-cue-mark{background:transparent;border:2px solid var(--color-information);border-radius:0;box-sizing:border-box}
 .tvl-cue-kicker{color:var(--color-text-muted);font:var(--type-supporting-metadata);grid-column:2;letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .tvl-cue-body{color:var(--color-text-secondary);font:var(--type-supporting-metadata);grid-column:2;line-height:var(--line-height-body);margin:0}
@@ -215,6 +218,7 @@ def cue_html(kind: CueKind, text: object) -> str:
         "fit": "Team fit",
         "evidence": "Evidence",
         "market": "Market",
+        "action": "Next move",
     }[kind]
     return (
         f"<div class='tvl-cue tvl-cue--{kind}'>"

@@ -446,14 +446,20 @@ def build_offer_result_card_html(
     )
     risk_cue = cue_html("risk", verdict.risk_summary)
     why_cue = cue_html("why", verdict.rationale)
+    # The one thing a COUNTER/DECLINE/FAIR-with-counter reader actually needs
+    # to act — what to ask for or trim — must be visible without a tap, not
+    # buried in the same collapsed drawer as restated reference detail.
+    action_cue = cue_html("action", verdict.counter_guidance)
+    # Roster impact / strategy fit / the plain-English value restatement are
+    # secondary reference, not required to reach a decision — fine collapsed.
+    # Risk and Counter are NOT repeated here: both already render visibly
+    # above (risk_cue, action_cue), and showing the same sentence twice
+    # doesn't add clarity, only clutter.
     details_sections = [
         ("Value balance", value_summary),
         ("Roster impact", escape(verdict.roster_summary)),
         ("Strategy fit", escape(verdict.strategy_summary)),
-        ("Risk", escape(verdict.risk_summary)),
     ]
-    if verdict.counter_guidance:
-        details_sections.append(("Counter", escape(verdict.counter_guidance)))
     details_html = "".join(
         (
             "<div class='toa-section'>"
@@ -465,6 +471,14 @@ def build_offer_result_card_html(
         if body
     )
 
+    # Order follows the canonical Trade UI hierarchy (Magna Carta §30):
+    # partner -> assets sent/received -> value change -> rationale ->
+    # confidence/realism. The verdict word itself is the direct answer to
+    # "what should I do here" and stays with the partner line at the top,
+    # matching Trade Hub's fairness pill placement. Confidence used to sit
+    # ahead of the assets and the rationale that justifies it — the same
+    # hierarchy inversion fixed on Trade Hub — so it now follows rationale
+    # instead of leading it.
     return f"""
 <div class="toa-share-card toa-tone-{tone}" data-toa-share="1">
   <div class="toa-brand">
@@ -475,10 +489,11 @@ def build_offer_result_card_html(
   {partner_line}
   <div class="toa-verdict" aria-label="Trade verdict {ui}">{ui}</div>
   {band_note}
-  {confidence_indicator_html(verdict.confidence, extra_class="toa-confidence")}
   {matchup}
   {value_edge_html(edge_label, extra_class="toa-value-edge")}
   {why_cue}
+  {action_cue}
+  {confidence_indicator_html(verdict.confidence, extra_class="toa-confidence")}
   {risk_cue}
   <details class="toa-more">
     <summary>More detail</summary>
