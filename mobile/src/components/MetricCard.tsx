@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -26,6 +26,7 @@ export default function MetricCard({
   valueColor,
   note,
   onPress,
+  style,
 }: {
   label: string;
   value: string | number | null;
@@ -44,6 +45,11 @@ export default function MetricCard({
    * tiles, which drill into the Teams screen) while leaving every other
    * caller — anything that omits this — a plain, non-interactive View. */
   onPress?: () => void;
+  /** Overrides the tile's own sizing (e.g. a fixed one-third `flexBasis`
+   * for a caller that always renders exactly three tiles in one compact
+   * row) without touching the default `minWidth: '46%'` two-up layout every
+   * other caller relies on. Merged after the base card style. */
+  style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -75,12 +81,12 @@ export default function MetricCard({
   );
   if (onPress) {
     return (
-      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+      <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.7}>
         {content}
       </TouchableOpacity>
     );
   }
-  return <View style={styles.card}>{content}</View>;
+  return <View style={[styles.card, style]}>{content}</View>;
 }
 
 function createStyles(colors: ThemeColors) {

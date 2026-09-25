@@ -231,6 +231,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
             {starters.length > 0 ? (
               <StartersPreviewSection
                 starters={starters}
+                totalValue={totalStartersValue}
                 onPressPlayer={goToPlayer}
                 onViewAll={() => setActiveTab('starters')}
               />
@@ -285,10 +286,11 @@ export default function MyTeamScreen({ route, navigation }: Props) {
  * previously appeared twice — once as an icon cell, once as a percentile
  * bar — collapsed here into the single MetricCard tile.
  *
- * `onViewAnalysis`, when provided, renders a compact "View Full Roster
- * Analysis" link into the Analysis tab (coridian_'s roster-command-center
- * brief §6) — only ever passed when TeamAnalysisPanel actually has real
- * content to show (see `hasRosterAnalysis`), never as a dead affordance.
+ * `onViewAnalysis`, when provided, renders a compact "View Analysis" link
+ * into the card's own header row, next to the "Team Snapshot" title
+ * (matching coridian_'s concept mockup exactly) — only ever passed when
+ * TeamAnalysisPanel actually has real content to show (see
+ * `hasRosterAnalysis`), never as a dead affordance.
  */
 /** Young/Prime/Aging isn't itself good/bad, but Prime is the ideal state,
  * Aging carries real roster risk, and Young is still "not there yet" —
@@ -319,20 +321,24 @@ function TeamAnalyticsSection({
   const ringColor = valuePercentile != null ? percentileColor(valuePercentile, colors) : colors.accent;
 
   return (
-    <AnalyticsSection title="Team Snapshot" icon="podium-outline">
+    <AnalyticsSection
+      title="Team Snapshot"
+      icon="bar-chart-outline"
+      footer={onViewAnalysis ? <HeaderLink label="View Analysis" onPress={onViewAnalysis} /> : undefined}
+    >
       <View style={styles.analyticsHeaderRow}>
         <View style={styles.analyticsRingWrap}>
           <CircularProgressRing
             percent={valuePercentile ?? 0}
-            size={72}
-            strokeWidth={7}
+            size={84}
+            strokeWidth={8}
             color={ringColor}
             valueLabel={valuePercentile != null ? String(valuePercentile) : '—'}
           />
           <AppText style={styles.analyticsRingCaption}>TEAM VALUE</AppText>
         </View>
         {team.avatar_url ? (
-          <TeamAvatar avatarId={team.avatar_url} size={40} style={styles.analyticsTeamAvatar} />
+          <TeamAvatar avatarId={team.avatar_url} size={52} style={styles.analyticsTeamAvatar} />
         ) : null}
         <View style={styles.analyticsHeaderText}>
           {outlook ? (
@@ -353,21 +359,23 @@ function TeamAnalyticsSection({
           value={team.starter_rank != null ? `#${team.starter_rank}` : '—'}
           percentile={starterPercentile}
           valueColor={starterPercentile != null ? percentileColor(starterPercentile, colors) : undefined}
+          style={styles.analyticsMetricTile}
         />
         <MetricCard
           label="Draft Capital"
           value={team.draft_capital_rank != null ? `#${team.draft_capital_rank}` : '—'}
           percentile={draftCapitalPercentile}
           valueColor={draftCapitalPercentile != null ? percentileColor(draftCapitalPercentile, colors) : undefined}
+          style={styles.analyticsMetricTile}
         />
         <MetricCard
           label="Roster Age"
           value={team.average_age != null ? team.average_age.toFixed(1) : '—'}
           note={ageLabel(team.average_age)}
           valueColor={ageColor(team.average_age, colors)}
+          style={styles.analyticsMetricTile}
         />
       </View>
-      {onViewAnalysis ? <LinkRow label="View Full Roster Analysis" onPress={onViewAnalysis} /> : null}
     </AnalyticsSection>
   );
 }
@@ -377,14 +385,20 @@ function TeamAnalyticsSection({
  * link into the full Starters tab, instead of always rendering the entire
  * lineup on Overview too — the full list (with its own aggregate) lives on
  * the Starters tab so Overview stays a quick glance, not a second copy of
- * the same long list.
+ * the same long list. Header row now also carries the real "Total Starters
+ * Value" aggregate (concept mockup shows this directly under Team Snapshot,
+ * on the Overview tab itself, not only once a user drills into the full
+ * Starters tab) — same `totalStartersValue` sum MyTeamScreen already
+ * computes for the Starters tab, just surfaced here too.
  */
 function StartersPreviewSection({
   starters,
+  totalValue,
   onPressPlayer,
   onViewAll,
 }: {
   starters: LineupPlayer[];
+  totalValue: number;
   onPressPlayer: (player: LineupPlayer) => void;
   onViewAll: () => void;
 }) {
@@ -393,7 +407,7 @@ function StartersPreviewSection({
   const preview = starters.slice(0, 3);
   return (
     <View>
-      <AppText style={styles.sectionLabel}>Starters</AppText>
+      <SectionHeaderRow label="Starters" total={formatTotalStartersValue(totalValue)} />
       <AnimatedCard style={styles.groupCard}>
         {preview.map((player, index) => (
           <LineupRow
@@ -407,6 +421,15 @@ function StartersPreviewSection({
       </AnimatedCard>
     </View>
   );
+}
+
+/** "Total Starters Value 48,123" — label-then-number, matching coridian_'s
+ * concept mockup exactly (previously rendered as "48,123 TOTAL VALUE",
+ * number-then-label). Shared by the Overview preview header and the full
+ * Starters tab header so the two never drift into two different phrasings
+ * of the same real aggregate. */
+function formatTotalStartersValue(totalValue: number): string | null {
+  return totalValue > 0 ? `Total Starters Value ${Math.round(totalValue).toLocaleString()}` : null;
 }
 
 /**
@@ -427,10 +450,7 @@ function StartersFullSection({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View>
-      <SectionHeaderRow
-        label="Starters"
-        total={totalValue > 0 ? `${Math.round(totalValue).toLocaleString()} TOTAL VALUE` : null}
-      />
+      <SectionHeaderRow label="Starters" total={formatTotalStartersValue(totalValue)} />
       {starters.length === 0 ? (
         <EmptyState icon="people-outline" title="No suggested starters yet." />
       ) : (
@@ -552,9 +572,9 @@ function SectionHeaderRow({ label, total }: { label: string; total?: string | nu
 }
 
 /** One shared "go deeper" affordance (icon-free text + chevron, top hairline
- * to read as a natural extension of the surface above it) — backs both
- * Team Snapshot's "View Full Roster Analysis" and the Starters preview's
- * "View all N Starters", instead of two one-off tappable text styles. */
+ * to read as a natural extension of the surface above it) — backs the
+ * Starters preview's "View all N Starters", instead of a one-off tappable
+ * text style. */
 function LinkRow({ label, onPress }: { label: string; onPress: () => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -562,6 +582,22 @@ function LinkRow({ label, onPress }: { label: string; onPress: () => void }) {
     <TouchableOpacity style={styles.linkRow} onPress={onPress} activeOpacity={0.7}>
       <AppText style={styles.linkRowText}>{label}</AppText>
       <Ionicons name="chevron-forward" size={14} color={colors.accent} />
+    </TouchableOpacity>
+  );
+}
+
+/** Same tappable text-plus-chevron affordance as `LinkRow`, but borderless
+ * and untethered from block flow — for sitting inline inside a card's own
+ * header row (`AnalyticsSection`'s `footer` slot) next to the section
+ * title, e.g. Team Snapshot's "View Analysis" in coridian_'s concept
+ * mockup, rather than as a separate row beneath the card's content. */
+function HeaderLink({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <TouchableOpacity style={styles.headerLink} onPress={onPress} activeOpacity={0.7} hitSlop={6}>
+      <AppText style={styles.linkRowText}>{label}</AppText>
+      <Ionicons name="chevron-forward" size={13} color={colors.accent} />
     </TouchableOpacity>
   );
 }
@@ -664,24 +700,34 @@ function createStyles(colors: ThemeColors) {
   },
   analyticsTeamAvatar: { borderWidth: 2, borderColor: colors.accent },
   analyticsHeaderText: { flex: 1, gap: spacing.xs },
+  // Solid cyan fill + near-black text, matching coridian_'s concept mockup
+  // exactly (a translucent accentMuted chip with cyan text read as a plain
+  // outline pill there, not the bold filled badge the concept shows) — same
+  // solid-accent-pill pattern LeagueDetailScreen's "YOU" badge already uses
+  // (Magna Carta §3: cyan = GM intelligence/analytical emphasis, at its
+  // strongest here since the archetype label is this card's headline call-out).
   outlookBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.accentMuted,
+    backgroundColor: colors.accent,
     borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
   },
-  outlookBadgeText: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
+  outlookBadgeText: { fontSize: 11, fontWeight: '800', color: colors.background, letterSpacing: 0.4 },
   analyticsRankLine: { fontSize: 13, color: colors.textSecondary },
   analyticsMetricsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: spacing.sm,
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
+  // Forces exactly three tiles into one compact row (concept mockup) instead
+  // of MetricCard's default `minWidth: '46%'`, which is tuned for a 2-up
+  // grid and would wrap a 3rd tile onto its own oversized row here.
+  analyticsMetricTile: { flexBasis: 0, flexGrow: 1, minWidth: 0, paddingHorizontal: spacing.sm },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
@@ -706,6 +752,7 @@ function createStyles(colors: ThemeColors) {
     letterSpacing: 0.5,
   },
   sectionTotal: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.4 },
+  headerLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   // One grouped surface per lineup section (Starters, Bench) with a
   // PlayerIdentityRow per player and hairline dividers between them,
   // instead of a separately bordered/backgrounded card per player — see
@@ -721,7 +768,7 @@ function createStyles(colors: ThemeColors) {
   compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   compactIdentity: { flex: 1 },
   valueColumn: { alignItems: 'flex-end', marginLeft: spacing.sm, gap: 2 },
-  valueNumber: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  valueNumber: { fontSize: 19, fontWeight: '800', color: colors.accent },
   valueNumberMuted: { color: colors.textSecondary },
   valueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   linkRow: {
