@@ -11,10 +11,12 @@ import time
 import streamlit as st
 
 from modules import alerts_activity
+from modules import player_cards
 from modules import player_images
 from modules import player_profile_ui
 from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
+from modules.player_tier_identity import portrait_frame_classes, resolve_player_tier_identity
 
 
 def widget_safe_key(value: object) -> str:
@@ -282,13 +284,40 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     player_name = str(row.get("player_name") or headline or "Player").strip()
     initials = "".join(part[:1] for part in player_name.split()[:2]).upper() or "?"
     visual_html = f"<div class='dg-alerts-glyph'>{glyph}</div>"
+    identity_html = ""
     if player_id:
+        # Position/team/tier come from alert_presentation.attach_player_identity_fields
+        # (already-loaded player universe frame) — absent when the matched
+        # player isn't resolvable there, never fabricated. Mirrors mobile's
+        # Alerts fix (PR #786): prestige ring on the portrait, position
+        # badge, team abbreviation, reusing the same shared identity
+        # primitives every other player row uses (player_tier_identity,
+        # player_cards.player_position_badge_html) rather than a one-off.
+        matched_position = str(row.get("matched_player_position") or "").strip()
+        matched_team = str(row.get("matched_player_team") or "").strip()
+        matched_tier = str(row.get("matched_player_tier") or "").strip()
+        tier_identity = resolve_player_tier_identity({"player_tier": matched_tier}) if matched_tier else None
+        portrait_class = portrait_frame_classes(
+            tier_identity, base="dg-alerts-portrait", frame_mode="ring"
+        )
         portrait = player_profile_ui.avatar_html(
             player_images.get_player_image_url(player_id),
             initials,
-            css_class="dg-alerts-portrait",
+            css_class=portrait_class,
         )
         visual_html = portrait
+        if matched_position or matched_team:
+            chips = []
+            if matched_position:
+                chips.append(
+                    player_cards.player_position_badge_html(
+                        matched_position,
+                        css_class="player-position-badge dg-alerts-position-badge",
+                    )
+                )
+            if matched_team:
+                chips.append(f"<span class='dg-alerts-team'>{escape(matched_team.upper())}</span>")
+            identity_html = f"<div class='dg-alerts-identity'>{''.join(chips)}</div>"
     article_open = f"<article class='{' '.join(row_classes)}'"
     article_open += " aria-label='URGENT player alert'>" if is_urgent else ">"
     return (
@@ -296,6 +325,7 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
         + visual_html
         + "<div>"
         f"{headline_html}"
+        f"{identity_html}"
         f"{badges_html}"
         f"{context_html}"
         f"<div class='dg-alerts-meta'>{unread_html}<span>{meta}</span>{source_link_html}</div>"
@@ -352,6 +382,7 @@ def render_alerts_page(
         session=target,
         league_id=league_id,
         entitlement=entitlement,
+        players_df=players_df,
     )
     render_started = time.perf_counter()
     refresh_scheduled = False
