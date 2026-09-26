@@ -19,7 +19,14 @@ export interface PlayerIdentityRowProps {
    * the app (see lib/playerTier.ts). */
   tier?: string | null;
   /** Lineup slot label (QB/RB/FLEX/...) shown as a small chip on the left —
-   * omit for contexts with no lineup slot (e.g. a plain roster list). */
+   * omit for contexts with no lineup slot (e.g. a plain roster list). When
+   * `slot` is a single-position label that exactly matches `position`
+   * (case-insensitively — e.g. slot "QB" + position "QB"), this component
+   * suppresses the slot chip itself rather than showing the same text twice
+   * next to the colored PositionBadge. Multi-position slots (FLEX,
+   * SUPER_FLEX, WR/RB, ...) never equal a single real position, so they
+   * always render both chips — that combination is the actually-informative
+   * one and must never be collapsed. */
   slot?: string | null;
   /** Workload/opportunity classification, e.g. "Elite Opportunity",
    * "Starter At Risk" — rendered alongside the tier in the compact label
@@ -109,6 +116,18 @@ export default function PlayerIdentityRow({
   if (tierIdentity) labelBits.push(tierIdentity.shortLabel);
   if (opportunityLabel) labelBits.push(opportunityLabel.toUpperCase());
 
+  // A single-position lineup slot (QB/RB/WR/TE/K/DEF/...) renders the exact
+  // same text as PositionBadge two inches to its right — pure duplication
+  // (coridian_, My Team Overview screenshot, 2026-09-26). A multi-position
+  // slot (FLEX, SUPER_FLEX, WR/RB, ...) never collides with a real position
+  // string, so this simple equality check naturally leaves those — the only
+  // combination that's actually informative — untouched without needing an
+  // explicit slot-name whitelist. The colored PositionBadge wins the
+  // dedup (it's the consistently-styled, app-wide identity chip); the slot
+  // chip is the one suppressed.
+  const slotRedundant =
+    !!slot && !!position && slot.trim().toUpperCase() === position.trim().toUpperCase();
+
   return (
     <TouchableOpacity
       style={[styles.row, showDivider && styles.divider, style]}
@@ -116,7 +135,7 @@ export default function PlayerIdentityRow({
       activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress}
     >
-      {slot ? (
+      {slot && !slotRedundant ? (
         <View style={styles.slotBadge}>
           <AppText style={styles.slotText} numberOfLines={1}>
             {slot}
