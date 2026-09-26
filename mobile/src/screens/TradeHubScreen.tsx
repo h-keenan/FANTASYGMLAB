@@ -18,6 +18,7 @@ import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
+import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
 import {
   type AllTradesEntitlement,
@@ -878,6 +879,10 @@ function TradeIdeaCard({
           </View>
         ) : null}
       </View>
+      {/* Visual "who's winning" reinforcement for the number+pill above —
+          same delta, same tradeValueColor mapping, just shape instead of
+          just digits (UI_HIERARCHY_DIRECTIVE.md's "pair color with shape"). */}
+      <TradeValueBar delta={idea.trade_gain} style={styles.valueBar} />
 
       <TradeSharePreviewModal
         visible={shareOpen}
@@ -1082,10 +1087,11 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.xs,
     gap: spacing.sm,
   },
   valueHero: { flexShrink: 1 },
+  valueBar: { marginHorizontal: spacing.md, marginBottom: spacing.sm },
   fairnessPill: {
     flexShrink: 0,
     borderWidth: 1,

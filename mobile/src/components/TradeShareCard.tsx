@@ -8,6 +8,7 @@ import { colors, radii, spacing } from '../theme';
 import PlayerAvatar from './PlayerAvatar';
 import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
+import TradeValueBar from './TradeValueBar';
 
 const CARD_WIDTH = 360;
 const CARD_HEIGHT = 540;
@@ -145,6 +146,10 @@ const TradeShareCard = forwardRef<View, {
 
       <AppText style={[styles.gainValue, { color: gainColor }]}>{gainLabel}</AppText>
       <AppText style={styles.gainLabel}>Value Change</AppText>
+      {/* Fixed-palette `colors` (not useThemeMode) — this card's look must
+          stay identical regardless of the viewer's light/dark setting, same
+          as every other color on this exported graphic. */}
+      <TradeValueBar delta={gain} colors={colors} style={styles.gainBar} />
 
       <View style={styles.hairline} />
 
@@ -246,6 +251,7 @@ const styles = StyleSheet.create({
   confidenceText: { fontSize: 11, color: colors.textSecondary },
   gainValue: { fontSize: 40, fontWeight: '800', letterSpacing: -1, marginTop: spacing.md },
   gainLabel: { fontSize: 12, color: colors.textSecondary, marginTop: -2 },
+  gainBar: { marginTop: spacing.sm },
   exchangeRow: { flexDirection: 'row', gap: spacing.md },
   exchangeSide: { flex: 1, gap: 6 },
   exchangeKickerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
