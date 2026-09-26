@@ -18,7 +18,15 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
-import { api, type MatchupComparison, type MatchupResponse, type MatchupSide, type MatchupStarter } from '../lib/api';
+import {
+  api,
+  type MatchupComparison,
+  type MatchupRealComparison,
+  type MatchupRealStarter,
+  type MatchupResponse,
+  type MatchupSide,
+  type MatchupStarter,
+} from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -28,14 +36,29 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Matchup'>;
 
 /**
- * This week's head-to-head, ranked by SEASON-LONG value/opportunity signal.
+ * This week's head-to-head: two distinct, clearly-labeled views.
  *
- * Not a points projection, and the copy on this screen must never imply one:
- * the app has no weekly-projection feed and no opponent-defense-strength
- * data, so every "why" here is season form (tier, workload/opportunity
- * label, season-value rank on that roster, injury tag). The API says the
- * same thing in `basis_label`, which this screen renders verbatim rather
- * than paraphrasing into something stronger than the data supports.
+ * 1. REAL current-week lineup/points (`real_starters` / `real_points` /
+ *    `real_comparison`) — Sleeper's own actual data for what each manager
+ *    has started this week and how many points they've actually scored so
+ *    far. Genuine, not computed by this app. Only rendered once Sleeper has
+ *    populated it (`has_live_data`); this screen never fabricates a live
+ *    score before then.
+ * 2. SUGGESTED season-value lineup (`starters` / `season_value_total` /
+ *    `comparison`) — this app's own best-available-lineup recommendation,
+ *    ranked by SEASON-LONG value/opportunity signal, unchanged from before.
+ *    Not a points projection, and the copy here must never imply one: the
+ *    app has no weekly-projection feed and no opponent-defense-strength
+ *    data, so every "why" is season form (tier, workload/opportunity label,
+ *    season-value rank on that roster, injury tag). The API says the same
+ *    thing in `basis_label`, rendered verbatim rather than paraphrased into
+ *    something stronger than the data supports.
+ *
+ * Whichever view answers "what matters right now" gets the hero treatment:
+ * once Sleeper reports live data for both sides, the hero numbers/verdict
+ * switch to the real comparison (with the season-value comparison folded in
+ * underneath, still visible, not removed); before that, the season-value
+ * comparison is the hero exactly as it always was.
  */
 
 const NOT_READY_MESSAGES: Record<string, string> = {
@@ -67,6 +90,15 @@ function edgeIcon(edge: MatchupComparison['edge']): React.ComponentProps<typeof 
   if (edge === 'you') return 'trending-up';
   if (edge === 'opponent') return 'trending-down';
   return 'remove';
+}
+
+/** Headline for the REAL (live points) comparison — mirrors `comparison.headline`'s
+ * tone but is composed client-side since the API's `real_comparison` intentionally
+ * carries no headline field of its own (there's no "why" to explain, just a score). */
+function realHeadline(realComparison: MatchupRealComparison): string {
+  if (realComparison.edge === 'you') return "You're ahead on live points";
+  if (realComparison.edge === 'opponent') return 'Your opponent is ahead on live points';
+  return "It's tied on live points right now";
 }
 
 type InjuryWatchItem = {
@@ -102,7 +134,11 @@ function recordLabel(side: MatchupSide): string {
   return `${side.wins}-${side.losses}${side.ties ? `-${side.ties}` : ''}`;
 }
 
-function toRankedPlayer(player: MatchupStarter) {
+/** Same shape both `MatchupStarter` (suggested) and `MatchupRealStarter`
+ * (actual) satisfy — one converter for either lineup's row into PlayerDetail's
+ * navigation param, so opening a player detail behaves identically no matter
+ * which of the two lineup views the user tapped from. */
+function toRankedPlayer(player: MatchupStarter | MatchupRealStarter) {
   return {
     player_id: player.player_id,
     name: player.name,
@@ -215,9 +251,14 @@ export default function MatchupScreen({ route, navigation }: Props) {
     );
   }
 
-  const { my_team: mine, opponent, comparison, week } = matchup;
-  const openPlayer = (player: MatchupStarter) =>
+  const { my_team: mine, opponent, comparison, real_comparison: realComparison, week } = matchup;
+  const openPlayer = (player: MatchupStarter | MatchupRealStarter) =>
     navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName });
+
+  // Once Sleeper has real live data for BOTH sides, the hero leads with it —
+  // that's the direct answer to "what matters right now." Until then, the
+  // hero is exactly the season-value comparison it always was.
+  const heroEdge = realComparison ? realComparison.edge : comparison.edge;
 
   return (
     <View style={styles.root}>
@@ -228,6 +269,12 @@ export default function MatchupScreen({ route, navigation }: Props) {
           <View style={styles.weekRow}>
             <Ionicons name="american-football-outline" size={14} color={colors.accent} />
             <AppText style={styles.weekLabel}>{week != null ? `WEEK ${week}` : 'THIS WEEK'}</AppText>
+            {realComparison ? (
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <AppText style={styles.liveBadgeText}>LIVE</AppText>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.versusRow}>
@@ -241,9 +288,14 @@ export default function MatchupScreen({ route, navigation }: Props) {
                 {mine.team_name}
               </AppText>
               <AppText style={styles.versusRecord}>{recordLabel(mine)}</AppText>
-              <AppText style={[styles.versusValue, { color: edgeColor(colors)[comparison.edge === 'you' ? 'you' : 'even'] }]}>
-                {Math.round(comparison.my_season_value).toLocaleString()}
+              <AppText style={[styles.versusValue, { color: edgeColor(colors)[heroEdge === 'you' ? 'you' : 'even'] }]}>
+                {realComparison ? realComparison.my_points.toFixed(1) : Math.round(comparison.my_season_value).toLocaleString()}
               </AppText>
+              {realComparison ? (
+                <AppText style={styles.versusSecondaryValue}>
+                  {Math.round(comparison.my_season_value).toLocaleString()} season value
+                </AppText>
+              ) : null}
             </View>
             <AppText style={styles.versusDivider}>VS</AppText>
             <View style={styles.versusSide}>
@@ -257,33 +309,74 @@ export default function MatchupScreen({ route, navigation }: Props) {
               </AppText>
               <AppText style={styles.versusRecord}>{recordLabel(opponent)}</AppText>
               <AppText
-                style={[styles.versusValue, { color: edgeColor(colors)[comparison.edge === 'opponent' ? 'you' : 'even'] }]}
+                style={[styles.versusValue, { color: edgeColor(colors)[heroEdge === 'opponent' ? 'you' : 'even'] }]}
               >
-                {Math.round(comparison.opponent_season_value).toLocaleString()}
+                {realComparison
+                  ? realComparison.opponent_points.toFixed(1)
+                  : Math.round(comparison.opponent_season_value).toLocaleString()}
               </AppText>
+              {realComparison ? (
+                <AppText style={styles.versusSecondaryValue}>
+                  {Math.round(comparison.opponent_season_value).toLocaleString()} season value
+                </AppText>
+              ) : null}
             </View>
           </View>
 
-          <ValueSplitBar comparison={comparison} />
+          <ValueSplitBar comparison={comparison} realComparison={realComparison} />
 
-          <View style={styles.verdictBlock}>
-            <View style={styles.verdictHeadlineRow}>
-              <Ionicons name={edgeIcon(comparison.edge)} size={17} color={edgeColor(colors)[comparison.edge]} />
-              <AppText style={[styles.edgeHeadline, { color: edgeColor(colors)[comparison.edge] }]} numberOfLines={2}>
-                {comparison.headline}
+          {realComparison ? (
+            <View style={styles.verdictBlock}>
+              <View style={styles.verdictHeadlineRow}>
+                <Ionicons name={edgeIcon(realComparison.edge)} size={17} color={edgeColor(colors)[realComparison.edge]} />
+                <AppText style={[styles.edgeHeadline, { color: edgeColor(colors)[realComparison.edge] }]} numberOfLines={2}>
+                  {realHeadline(realComparison)}
+                  {realComparison.edge === 'even' ? '' : ` (${realComparison.margin > 0 ? '+' : ''}${realComparison.margin.toFixed(1)})`}
+                </AppText>
+              </View>
+              {/* Rendered straight from the API so this line can never drift
+                  into claiming more than the data behind it. */}
+              <AppText style={styles.basisLabel}>{realComparison.basis_label}</AppText>
+              {/* Season-value comparison stays visible, just folded in as
+                  supporting context underneath the live one — never buried. */}
+              <AppText style={styles.secondaryBasisLabel}>
+                By season value: {comparison.headline}
                 {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
               </AppText>
             </View>
-            {/* Rendered straight from the API so this line can never drift
-                into claiming more than the data behind it. */}
-            <AppText style={styles.basisLabel}>{comparison.basis_label}</AppText>
-          </View>
+          ) : (
+            <View style={styles.verdictBlock}>
+              <View style={styles.verdictHeadlineRow}>
+                <Ionicons name={edgeIcon(comparison.edge)} size={17} color={edgeColor(colors)[comparison.edge]} />
+                <AppText style={[styles.edgeHeadline, { color: edgeColor(colors)[comparison.edge] }]} numberOfLines={2}>
+                  {comparison.headline}
+                  {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
+                </AppText>
+              </View>
+              {/* Rendered straight from the API so this line can never drift
+                  into claiming more than the data behind it. */}
+              <AppText style={styles.basisLabel}>{comparison.basis_label}</AppText>
+            </View>
+          )}
         </AnimatedCard>
+
+        <RealLineupSection
+          title="Your actual lineup this week"
+          side={mine}
+          onPressPlayer={openPlayer}
+          accent={colors.accent}
+        />
+        <RealLineupSection
+          title={`${opponent.team_name}'s actual lineup`}
+          side={opponent}
+          onPressPlayer={openPlayer}
+          accent={colors.violet}
+        />
 
         <InjuryWatchSection mine={mine} opponent={opponent} onPressPlayer={openPlayer} />
 
         <ScreenInfoNote
-          text="Starters on both sides are each roster's best available lineup by season-long value — the same optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. It isn't necessarily the lineup they've set in Sleeper, and it doesn't account for this week's opponent defenses or weather."
+          text="The suggested starters below are each roster's best available lineup by season-long value — the same optimal-lineup logic My Team uses, run for your opponent too so the comparison is apples to apples. This is a recommendation, not necessarily the lineup either manager has actually set in Sleeper, and it doesn't account for this week's opponent defenses or weather."
         />
 
         <StarterSection title="Your suggested starters" side={mine} onPressPlayer={openPlayer} accent={colors.accent} />
@@ -298,11 +391,22 @@ export default function MatchupScreen({ route, navigation }: Props) {
   );
 }
 
-function ValueSplitBar({ comparison }: { comparison: MatchupComparison }) {
+function ValueSplitBar({
+  comparison,
+  realComparison,
+}: {
+  comparison: MatchupComparison;
+  realComparison: MatchupRealComparison | null;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const total = comparison.my_season_value + comparison.opponent_season_value;
-  const mineShare = total > 0 ? Math.max(0.05, Math.min(0.95, comparison.my_season_value / total)) : 0.5;
+  // Mirrors the hero numbers above: the split reflects real live points once
+  // both sides have them, else falls back to the season-value split exactly
+  // as before.
+  const mineValue = realComparison ? realComparison.my_points : comparison.my_season_value;
+  const opponentValue = realComparison ? realComparison.opponent_points : comparison.opponent_season_value;
+  const total = mineValue + opponentValue;
+  const mineShare = total > 0 ? Math.max(0.05, Math.min(0.95, mineValue / total)) : 0.5;
   return (
     <View style={styles.splitBar}>
       <View style={[styles.splitFill, { flex: mineShare, backgroundColor: colors.accent }]} />
@@ -355,6 +459,70 @@ function InjuryWatchSection({
             />
           );
         })}
+      </AnimatedCard>
+    </View>
+  );
+}
+
+/**
+ * This roster's REAL current-week lineup — the players Sleeper says are
+ * actually starting, each with real points scored so far this week. Distinct
+ * component (not a `StarterSection` variant) because the row-level meaning is
+ * different enough to warrant its own trailing metric (real points, not a
+ * season-value score) and title language ("actual" vs. "suggested") — both
+ * still built on the same shared `PlayerIdentityRow` primitive.
+ *
+ * Renders nothing when Sleeper hasn't populated live data for this roster
+ * yet (`has_live_data: false`) — an empty/zero-filled card here would read
+ * as a real (if bad) score rather than "no data yet" (Magna Carta §36).
+ */
+function RealLineupSection({
+  title,
+  side,
+  onPressPlayer,
+  accent,
+}: {
+  title: string;
+  side: MatchupSide;
+  onPressPlayer: (player: MatchupRealStarter) => void;
+  accent: string;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  if (!side.has_live_data || side.real_starters.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeaderRow}>
+        <View style={[styles.sectionAccentBar, { backgroundColor: accent }]} />
+        <AppText style={styles.sectionLabel} numberOfLines={1}>
+          {title.toUpperCase()}
+        </AppText>
+        {side.real_points != null ? (
+          <AppText style={[styles.sectionTotal, { color: accent }]} numberOfLines={1}>
+            {side.real_points.toFixed(1)} PTS
+          </AppText>
+        ) : null}
+      </View>
+      <AnimatedCard style={styles.sectionCard}>
+        {side.real_starters.map((player, index) => (
+          <PlayerIdentityRow
+            key={`${side.roster_id}-real-${player.player_id}`}
+            playerId={player.player_id}
+            name={player.name}
+            position={player.position}
+            team={player.team}
+            tier={player.tier}
+            opportunityLabel={player.opportunity_label}
+            // Same injury_label/tone rule as the suggested lineup below —
+            // IR/PUP/season-ending arrives on `status`, not `injury_status`.
+            injuryLabel={player.injury_label}
+            injuryTone={waiverInjuryDisplay(player.injury_status).tone}
+            trailingValue={player.actual_points != null ? player.actual_points.toFixed(1) : '—'}
+            trailingCaption="PTS"
+            onPress={() => onPressPlayer(player)}
+            showDivider={index < side.real_starters.length - 1}
+          />
+        ))}
       </AnimatedCard>
     </View>
   );
@@ -434,12 +602,25 @@ function createStyles(colors: ThemeColors) {
   headlineCard: { padding: spacing.lg, marginBottom: spacing.md },
   weekRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
   weekLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, color: colors.accent },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accentMuted,
+  },
+  liveDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent },
+  liveBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.6, color: colors.accent },
   versusRow: { flexDirection: 'row', alignItems: 'flex-start' },
   versusSide: { flex: 1 },
   versusAvatar: { borderWidth: 2, marginBottom: spacing.xs },
   versusTeam: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   versusRecord: { fontSize: 12, color: colors.textTertiary, marginTop: 2 },
   versusValue: { fontSize: 22, fontWeight: '800', marginTop: spacing.xs },
+  versusSecondaryValue: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
   versusDivider: {
     fontSize: 11,
     fontWeight: '800',
@@ -467,6 +648,7 @@ function createStyles(colors: ThemeColors) {
   // should read like FantasyGM Lab's analysis of the matchup").
   edgeHeadline: { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: 0.1 },
   basisLabel: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
+  secondaryBasisLabel: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs / 2 },
   section: { marginTop: spacing.md },
   sectionHeaderRow: {
     flexDirection: 'row',

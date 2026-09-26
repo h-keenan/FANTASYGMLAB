@@ -5920,6 +5920,135 @@ def test_matchup_uses_the_leagues_current_week_for_the_live_sleeper_call(monkeyp
     assert calls == [("abc", 5)]
 
 
+def test_matchup_surfaces_real_sleeper_lineup_and_points_when_live(monkeypatch):
+    """The actual feature request: real current-week lineups/points from
+    Sleeper's own matchup payload, surfaced alongside (not instead of) the
+    unchanged suggested-lineup season-value comparison."""
+
+    client = _client(monkeypatch)
+    my_starters = [f"mine{i}" for i in range(1, 9)]
+    my_points = [20.5, 15.0, 10.2, 5.5, 8.0, 12.0, 9.0, 3.0]
+    opp_starters = [f"opp{i}" for i in range(1, 9)]
+    opp_points = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+
+    matchups = [
+        {
+            "roster_id": 1,
+            "matchup_id": 3,
+            "starters": my_starters,
+            "starters_points": my_points,
+            "points": sum(my_points),
+        },
+        {
+            "roster_id": 2,
+            "matchup_id": 3,
+            "starters": opp_starters,
+            "starters_points": opp_points,
+            "points": sum(opp_points),
+        },
+    ]
+
+    with _matchup_world(matchups):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    mine = body["my_team"]
+    theirs = body["opponent"]
+
+    # Real data, live.
+    assert mine["has_live_data"] is True
+    assert theirs["has_live_data"] is True
+    assert mine["real_points"] == round(sum(my_points), 2)
+    assert theirs["real_points"] == round(sum(opp_points), 2)
+    assert mine["real_starters_basis"] == "sleeper_actual_lineup"
+
+    real_starters = mine["real_starters"]
+    assert [p["player_id"] for p in real_starters] == my_starters
+    assert [p["actual_points"] for p in real_starters] == my_points
+    # Enriched via the same identity fields as the suggested lineup.
+    first = real_starters[0]
+    assert first["name"] == "Mine Player 1"
+    assert first["position"] == "QB"
+    assert first["team"] == "KC"
+    # tier is recomputed by the valuation lens (like the suggested lineup's
+    # `tier`), so only its presence/shape is asserted here.
+    assert isinstance(first["tier"], str) and first["tier"]
+
+    real_comparison = body["real_comparison"]
+    assert real_comparison["my_points"] == round(sum(my_points), 2)
+    assert real_comparison["opponent_points"] == round(sum(opp_points), 2)
+    assert real_comparison["edge"] == "you"
+    assert real_comparison["basis"] == "sleeper_actual_lineup"
+
+    # The suggested season-value comparison is untouched by any of the above.
+    assert mine["starters_basis"] == "suggested_optimal_lineup"
+    assert len(mine["starters"]) == 8
+    assert body["comparison"]["basis"] == "season_value"
+    assert body["comparison"]["my_season_value"] == mine["season_value_total"]
+
+
+def test_matchup_falls_back_gracefully_when_sleeper_has_no_live_data_yet(monkeypatch):
+    """Matchup hasn't started / Sleeper hasn't populated starters yet: no
+    fake zeros, just an honest has_live_data=False and empty real data."""
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3},
+        {"roster_id": 2, "matchup_id": 3, "starters": [], "starters_points": [], "points": 0},
+    ]
+
+    with _matchup_world(matchups):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    body = response.json()
+    mine = body["my_team"]
+    theirs = body["opponent"]
+
+    assert mine["has_live_data"] is False
+    assert mine["real_starters"] == []
+    assert mine["real_points"] is None
+    assert theirs["has_live_data"] is False
+    assert theirs["real_starters"] == []
+    assert theirs["real_points"] is None
+
+    # Neither side has live data, so no real comparison is synthesized.
+    assert body["real_comparison"] is None
+
+    # The suggested-lineup season-value comparison still works, unaffected.
+    assert len(mine["starters"]) == 8
+    assert body["comparison"]["edge"] == "you"
+
+
+def test_matchup_real_lineup_handles_a_starter_missing_from_the_valued_pool(monkeypatch):
+    """A real Sleeper starter (e.g. a team DEF) who isn't in players_df/
+    valued still gets his real points reported, just without season-value
+    enrichment — never silently dropped."""
+
+    client = _client(monkeypatch)
+    matchups = [
+        {
+            "roster_id": 1,
+            "matchup_id": 3,
+            "starters": ["mine1", "DEN"],
+            "starters_points": [20.5, 6.0],
+            "points": 26.5,
+        },
+        {"roster_id": 2, "matchup_id": 3},
+    ]
+
+    with _matchup_world(matchups):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    mine = response.json()["my_team"]
+    assert mine["has_live_data"] is True
+    by_id = {p["player_id"]: p for p in mine["real_starters"]}
+    assert by_id["mine1"]["name"] == "Mine Player 1"
+    assert by_id["mine1"]["actual_points"] == 20.5
+    assert by_id["DEN"]["name"] is None
+    assert by_id["DEN"]["actual_points"] == 6.0
+
+
 def test_trade_outcomes_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     assert client.post("/v1/leagues/abc/trade-outcomes", json={}).status_code == 401
