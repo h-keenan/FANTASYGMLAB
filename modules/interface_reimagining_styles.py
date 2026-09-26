@@ -7,16 +7,10 @@ INTERFACE_REIMAGINING_CSS = """
     --ops-panel-raised: color-mix(in srgb, var(--color-surface-raised) 78%, var(--color-bg));
     --ops-text-dim: color-mix(in srgb, var(--color-text-muted) 78%, transparent);
     --ops-column: minmax(0, 1fr);
-    color-scheme: dark;
 }
 
 .stApp {
-    --ops-grid-line: color-mix(in srgb, var(--color-border) 62%, transparent);
-    background:
-        linear-gradient(90deg, transparent 0, transparent calc(100% - 1px), var(--ops-grid-line) 100%),
-        linear-gradient(180deg, transparent 0, transparent calc(100% - 1px), var(--ops-grid-line) 100%),
-        var(--color-bg) !important;
-    background-size: 72px 72px !important;
+    background: var(--color-bg) !important;
 }
 
 [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {
