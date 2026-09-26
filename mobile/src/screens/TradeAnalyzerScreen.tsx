@@ -26,6 +26,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import CircularProgressRing from '../components/CircularProgressRing';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
+import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
 import {
   api,
@@ -627,6 +628,10 @@ function VerdictCard({
           </AppText>
         </View>
       </View>
+      {/* Same "who's winning" shape-reinforcement TradeValueBar gives Trade
+          Hub's cards, applied to the verdict's own value_delta so the two
+          surfaces agree on what a value edge looks like. */}
+      <TradeValueBar delta={verdict.value_delta} style={styles.verdictValueBar} />
       <AppText style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</AppText>
 
       <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
@@ -837,6 +842,7 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
   },
   verdictValueHero: { flex: 1 },
+  verdictValueBar: { marginBottom: spacing.md },
   verdictRingGroup: { alignItems: 'center', gap: 4 },
   verdictRingCaption: {
     fontSize: 10,
