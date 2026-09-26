@@ -252,6 +252,9 @@ export default function MyTeamScreen({ route, navigation }: Props) {
               team={myTeam}
               leagueSize={leagueSize}
               onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
+              onOpenDraftCenter={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
+              onOpenStarters={() => setActiveTab('overview')}
+              onOpenBench={() => setActiveTab('bench')}
             />
           ) : (
             <EmptyState
