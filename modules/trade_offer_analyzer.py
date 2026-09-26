@@ -12,10 +12,12 @@ from typing import Any, Mapping, Sequence
 
 from modules import brand_identity
 from modules.compact_fantasy_assets import compact_matchup_html
+from modules.trade_analyzer_fit import score_asset_value
 from modules.trade_visual_language import (
     confidence_indicator_html,
     cue_html,
     value_edge_html,
+    value_edge_lean_bar_html,
 )
 
 
@@ -436,6 +438,16 @@ def build_offer_result_card_html(
         edge_label = f"-{abs(delta)}"
     else:
         edge_label = "Even"
+    # Full, untruncated per-side totals — send_assets/receive_assets here are
+    # the actual user-entered offer (no compact_package truncation), and
+    # score_asset_value is the exact same per-asset scorer value_delta is
+    # itself summed from (modules/trade_analyzer_fit.py). So this bar can use
+    # the real send/receive split rather than mobile's net-delta-only
+    # approximation (mobile's API truncates each side to 3 assets before
+    # scoring reaches the client).
+    send_total = sum(score_asset_value(asset) for asset in send_assets)
+    receive_total = sum(score_asset_value(asset) for asset in receive_assets)
+    lean_bar_html = value_edge_lean_bar_html(send_total, receive_total, extra_class="toa-value-lean")
     matchup = compact_matchup_html(
         send_assets,
         receive_assets,
@@ -491,6 +503,7 @@ def build_offer_result_card_html(
   {band_note}
   {matchup}
   {value_edge_html(edge_label, extra_class="toa-value-edge")}
+  {lean_bar_html}
   {why_cue}
   {action_cue}
   {confidence_indicator_html(verdict.confidence, extra_class="toa-confidence")}

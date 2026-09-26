@@ -529,6 +529,11 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("Improves the weakest starting position", captured["html"])
         self.assertIn("tvl-conf", captured["html"])
         self.assertIn("tvl-edge", captured["html"])
+        # Shape-based reinforcement of the Balance number/fairness pill above
+        # (web's counterpart to mobile's TradeValueBar, PR #784) — driven by
+        # the real my_score/their_score split, not just the net delta.
+        self.assertIn("tvl-lean", captured["html"])
+        self.assertIn("trade-summary-lean-row", captured["html"])
         # A fairness pill (Favorable/Fair/Slight Overpay/Major Overpay) rides
         # next to the partner name using the shared dg-ui-badge system — the
         # Magna Carta pass added this so "is this good for me" is scannable
