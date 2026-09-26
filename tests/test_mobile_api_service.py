@@ -1871,6 +1871,11 @@ def test_alerts_returns_real_roster_relevant_news(monkeypatch):
     assert len(items) == 1
     assert items[0]["matched_player"] == "Star Wideout"
     assert items[0]["matched_player_id"] == "9001"
+    # Position/team/tier come straight from the same roster slice
+    # matched_player_id resolves against (_fake_players_frame), not a
+    # fresh/invented lookup.
+    assert items[0]["matched_player_position"] == "WR"
+    assert items[0]["matched_player_team"] == "KC"
     assert "ankle" in items[0]["title"].casefold()
     assert items[0]["read"] is False
     assert items[0]["alert_key"]

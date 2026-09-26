@@ -349,6 +349,9 @@ function AlertRow({
         <PlayerIdentityRow
           playerId={alert.matched_player_id}
           name={alert.matched_player}
+          position={alert.matched_player_position}
+          team={alert.matched_player_team}
+          tier={alert.matched_player_tier}
           onPress={alert.matched_player_id ? onPressPlayer : undefined}
         />
       ) : null}

@@ -545,6 +545,12 @@ export interface AlertItem extends NewsItem {
   read: boolean;
   matched_player: string | null;
   matched_player_id: string | null;
+  // Sourced from the same roster slice matched_player_id resolves against
+  // — null whenever the matched name isn't resolvable against the current
+  // roster (e.g. a name-matched player no longer rostered), never guessed.
+  matched_player_position: string | null;
+  matched_player_team: string | null;
+  matched_player_tier: string | null;
   relevance_reason: string | null;
   roster_relationship: RosterRelationship;
 }

@@ -1847,6 +1847,7 @@ def _project_alert_item(
     *,
     read_keys: set[str],
     player_ids_by_name: dict[str, str],
+    player_info_by_id: dict[str, dict[str, Any]],
     roster_relationship: dict[str, str],
 ) -> dict[str, Any]:
     payload = _project_news_item(item)
@@ -1857,6 +1858,14 @@ def _project_alert_item(
     matched_player_id = player_ids_by_name.get(matched_player)
     payload["matched_player"] = _clean_json_value(item.get("matched_player"))
     payload["matched_player_id"] = matched_player_id
+    # Sourced from the same roster slice player_ids_by_name comes from — not
+    # a fresh lookup — so a name-matched player absent from the current
+    # roster (already-dropped, etc.) just falls back to None below rather
+    # than fabricating a position/team/tier.
+    player_info = player_info_by_id.get(matched_player_id or "") or {}
+    payload["matched_player_position"] = player_info.get("position")
+    payload["matched_player_team"] = player_info.get("team")
+    payload["matched_player_tier"] = player_info.get("tier")
     payload["relevance_reason"] = _clean_json_value(item.get("relevance_reason"))
     payload["roster_relationship"] = roster_relationship.get(matched_player_id or "")
     return payload
@@ -1905,6 +1914,18 @@ def get_league_alerts(
         for _, row in mine.iterrows()
         if str(row.get("name") or "").strip()
     }
+    # Same roster slice already carries position/team/tier — just not
+    # discarded like player_ids_by_name; keyed by player_id so
+    # _project_alert_item can look it up alongside matched_player_id.
+    player_info_by_id = {
+        str(row["player_id"]): {
+            "position": _clean_json_value(row.get("position")),
+            "team": _clean_json_value(row.get("team")),
+            "tier": _clean_json_value(row.get("player_tier")),
+        }
+        for _, row in mine.iterrows()
+        if str(row.get("player_id") or "").strip()
+    }
 
     news_cache.schedule_news_cache_refresh()
     pool = news_cache.load_cached_news_pool()
@@ -1921,6 +1942,7 @@ def get_league_alerts(
             item,
             read_keys=read_keys,
             player_ids_by_name=player_ids_by_name,
+            player_info_by_id=player_info_by_id,
             roster_relationship=roster_relationship,
         )
         for item in curated
