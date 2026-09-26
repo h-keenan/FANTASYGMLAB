@@ -3286,10 +3286,8 @@ def get_league_dashboard(
 _LINEUP_SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX", "WR/RB", "K"]
 
 
-def _project_lineup_row(
-    row: pd.Series, score_field: str, *, reserve_ids: set[str], taxi_ids: set[str]
-) -> dict[str, Any]:
-    """One lineup row for the client.
+def _matchup_player_identity_fields(row: pd.Series, score_field: str) -> dict[str, Any]:
+    """Shared player identity/analytics fields for a matchup lineup row.
 
     injury_label, not raw injury_status, is what a client renders as the
     injury tag: unavailability lives in EITHER Sleeper field — a weekly
@@ -3300,18 +3298,15 @@ def _project_lineup_row(
     one place that resolution lives (the web dossier reads the same
     injury_level severity behind it).
 
-    `roster_slot` is a completely separate concept from injury_label: it's
-    WHERE the manager parked this player in Sleeper (starter/bench/taxi/
-    ir), resolved via `_roster_slot_for_player` — the same function
-    `_roster_relationship_map` uses — so a genuine IR/taxi placement and a
-    merely-scratched healthy bench player never collapse into one
-    indistinguishable "bench" bucket on the client.
+    The single place both the suggested-lineup projection
+    (`_project_lineup_row`) and the real-current-lineup projection
+    (`_project_real_starter_row`) build name/position/team/tier/injury
+    fields, so the two lineup views on the matchup screen can never drift
+    into showing different identity data for the same player.
     """
 
     status = _clean_json_value(row.get("status"))
     injury_status = _clean_json_value(row.get("injury_status"))
-    player_id = str(row.get("player_id") or "")
-    suggested_starter = bool(row.get("suggested_starter"))
     return {
         "player_id": _clean_json_value(row.get("player_id")),
         "name": _clean_json_value(row.get("name")),
@@ -3321,17 +3316,8 @@ def _project_lineup_row(
         "status": status,
         "injury_status": injury_status,
         "injury_label": rankings.injury_display_label(str(status or ""), str(injury_status or "")),
-        # The lineup builder's own availability call, so the client flags a
-        # ruled-out starter (only ever slotted when nothing healthy could
-        # fill the slot) instead of presenting him as a clean start.
-        "ruled_out": bool(row.get("ruled_out")),
         "tier": _clean_json_value(row.get("player_tier")),
         "score": _clean_json_value(row.get(score_field)),
-        "slot": _clean_json_value(row.get("slot")),
-        "suggested_starter": suggested_starter,
-        "roster_slot": _roster_slot_for_player(
-            player_id, reserve_ids=reserve_ids, taxi_ids=taxi_ids, is_starter=suggested_starter
-        ),
         "opportunity_label": _clean_json_value(row.get("opportunity_label")),
         # 0-99 "OVR" badge — see player_quick_view.overall_ratings_for_pool.
         # _suggested_lineup_split computes this over the FULL league pool
@@ -3339,6 +3325,38 @@ def _project_lineup_row(
         # dozen-odd players, and stashes it here before slicing to the roster.
         "overall_rating": _clean_json_value(row.get("_overall_rating_col")),
     }
+
+
+def _project_lineup_row(
+    row: pd.Series, score_field: str, *, reserve_ids: set[str], taxi_ids: set[str]
+) -> dict[str, Any]:
+    """One SUGGESTED (season-value) lineup row for the client.
+
+    `roster_slot` is a completely separate concept from injury_label: it's
+    WHERE the manager parked this player in Sleeper (starter/bench/taxi/
+    ir), resolved via `_roster_slot_for_player` — the same function
+    `_roster_relationship_map` uses — so a genuine IR/taxi placement and a
+    merely-scratched healthy bench player never collapse into one
+    indistinguishable "bench" bucket on the client.
+    """
+
+    player_id = str(row.get("player_id") or "")
+    suggested_starter = bool(row.get("suggested_starter"))
+    fields = _matchup_player_identity_fields(row, score_field)
+    fields.update(
+        {
+            # The lineup builder's own availability call, so the client flags
+            # a ruled-out starter (only ever slotted when nothing healthy
+            # could fill the slot) instead of presenting him as a clean start.
+            "ruled_out": bool(row.get("ruled_out")),
+            "slot": _clean_json_value(row.get("slot")),
+            "suggested_starter": suggested_starter,
+            "roster_slot": _roster_slot_for_player(
+                player_id, reserve_ids=reserve_ids, taxi_ids=taxi_ids, is_starter=suggested_starter
+            ),
+        }
+    )
+    return fields
 
 
 def _suggested_lineup_split(
@@ -3464,6 +3482,13 @@ def get_league_my_team(
 SEASON_VALUE_BASIS = "season_value"
 SEASON_VALUE_BASIS_LABEL = "Season-long value & opportunity signal — not a weekly points projection."
 
+# The label for the OTHER matchup view: Sleeper's own real current-week
+# lineup and live points (modules.sleeper.get_matchups' `starters` /
+# `starters_points` / `points` fields), as opposed to SEASON_VALUE_BASIS
+# above, which is this app's computed season-value lineup recommendation.
+REAL_LINEUP_BASIS = "sleeper_actual_lineup"
+REAL_LINEUP_BASIS_LABEL = "Your actual current-week lineup and live points, straight from Sleeper."
+
 # Below this relative gap the two lineups are called even rather than
 # implying a real edge — a season-value total is a coarse signal, and a
 # sub-3% difference is well inside its noise.
@@ -3557,6 +3582,116 @@ def _matchup_side(
     }
 
 
+def _project_real_starter_row(row: pd.Series, score_field: str, actual_points: Any) -> dict[str, Any]:
+    """One REAL current-week starter row: a player Sleeper says is actually
+    starting this week, enriched via the same identity helper the suggested
+    lineup uses, plus his real point total scored so far this week.
+    """
+
+    fields = _matchup_player_identity_fields(row, score_field)
+    fields["actual_points"] = round(float(actual_points), 2) if isinstance(actual_points, (int, float)) else None
+    return fields
+
+
+def _real_current_lineup(
+    matchup_entry: dict[str, Any], valued: pd.DataFrame, score_field: str
+) -> dict[str, Any]:
+    """This roster's ACTUAL current-week lineup and points, straight from Sleeper.
+
+    modules.sleeper.get_matchups already returns, per roster, `starters`
+    (the player_ids this manager genuinely has starting this week in
+    Sleeper — which may differ from `_suggested_lineup_split`'s season-value
+    recommendation above), `starters_points` (a parallel array — same index
+    order as `starters` — of each one's real point total scored so far this
+    week, live during in-progress games and final once the week completes),
+    and `points` (the roster's real total). Previously fetched and entirely
+    discarded; surfaced here as-is, additive to the suggested-lineup view.
+
+    `has_live_data` is False whenever Sleeper hasn't populated `starters`
+    yet for this roster this week (matchup not started / not yet locked),
+    so a client never renders a real-looking zero that is actually just
+    "no data yet." Once Sleeper does report starters, a 0.0 points value is
+    real (nobody has scored yet) and is reported as such.
+    """
+
+    starter_ids = [str(pid) for pid in (matchup_entry.get("starters") or []) if pid and str(pid) != "0"]
+    if not starter_ids:
+        return {"real_starters": [], "real_points": None, "has_live_data": False, "real_starters_basis": REAL_LINEUP_BASIS}
+
+    starters_points = matchup_entry.get("starters_points") or []
+
+    valued_by_id: dict[str, pd.Series] = {}
+    if "player_id" in valued.columns:
+        matching = valued[valued["player_id"].astype(str).isin(starter_ids)]
+        valued_by_id = {str(row["player_id"]): row for _, row in matching.iterrows()}
+
+    rows: list[dict[str, Any]] = []
+    for index, player_id in enumerate(starter_ids):
+        actual_points = starters_points[index] if index < len(starters_points) else None
+        row = valued_by_id.get(player_id)
+        if row is not None:
+            rows.append(_project_real_starter_row(row, score_field, actual_points))
+        else:
+            # A real Sleeper starter who isn't in our valued pool (e.g. a
+            # team DEF, or filtered out upstream) — still show his real
+            # points, just without season-value enrichment.
+            rows.append(
+                {
+                    "player_id": player_id,
+                    "name": None,
+                    "position": None,
+                    "team": None,
+                    "age": None,
+                    "status": None,
+                    "injury_status": None,
+                    "injury_label": "",
+                    "tier": None,
+                    "score": None,
+                    "opportunity_label": None,
+                    "overall_rating": None,
+                    "actual_points": round(float(actual_points), 2) if isinstance(actual_points, (int, float)) else None,
+                }
+            )
+
+    team_points = matchup_entry.get("points")
+    return {
+        "real_starters": rows,
+        "real_points": round(float(team_points), 2) if isinstance(team_points, (int, float)) else None,
+        "has_live_data": True,
+        "real_starters_basis": REAL_LINEUP_BASIS,
+    }
+
+
+def _real_matchup_comparison(my_side: dict[str, Any], opponent_side: dict[str, Any]) -> dict[str, Any] | None:
+    """This week's ACTUAL score comparison, from Sleeper's own live points.
+
+    Only produced once Sleeper has actually populated live data for BOTH
+    sides (`has_live_data`) — otherwise there is nothing real to compare yet
+    (matchup not started this week), and this deliberately returns None
+    rather than synthesizing a fake 0-0 tie.
+    """
+
+    if not my_side.get("has_live_data") or not opponent_side.get("has_live_data"):
+        return None
+    my_points = float(my_side.get("real_points") or 0.0)
+    opponent_points = float(opponent_side.get("real_points") or 0.0)
+    margin = round(my_points - opponent_points, 2)
+    if margin > 0:
+        edge = "you"
+    elif margin < 0:
+        edge = "opponent"
+    else:
+        edge = "even"
+    return {
+        "my_points": round(my_points, 2),
+        "opponent_points": round(opponent_points, 2),
+        "margin": margin,
+        "edge": edge,
+        "basis": REAL_LINEUP_BASIS,
+        "basis_label": REAL_LINEUP_BASIS_LABEL,
+    }
+
+
 def _matchup_comparison(my_total: float, opponent_total: float) -> dict[str, Any]:
     margin = round(my_total - opponent_total, 1)
     scale = max(abs(my_total), abs(opponent_total), 1.0)
@@ -3587,6 +3722,7 @@ def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
         "my_team": None,
         "opponent": None,
         "comparison": None,
+        "real_comparison": None,
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": reason,
@@ -3599,21 +3735,36 @@ def get_league_matchup(
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    """This week's head-to-head: your suggested starters vs. your opponent's.
+    """This week's head-to-head: two views, side by side, per roster.
 
-    Week comes from the league's own `settings.leg` (the same current-week
-    field the mobile League screen already reads), and the pairing from
-    modules.sleeper.get_matchups for that week — the live Sleeper endpoint,
-    so this works during an in-progress week, not just completed ones.
+    View 1 — REAL current lineup/points (`real_starters` / `real_points` /
+    `has_live_data` on each side, `real_comparison` at the top level): pulled
+    directly from modules.sleeper.get_matchups' live `/league/{id}/matchups/
+    {week}` payload — Sleeper's own `starters` (the player_ids this manager
+    ACTUALLY has starting this week), `starters_points` (each one's real
+    point total scored so far, live during in-progress games), and `points`
+    (the roster's real total). This is genuine already-fetched data that
+    used to be discarded entirely — not a projection of any kind.
+    `has_live_data` is False when Sleeper hasn't populated a roster's
+    starters yet this week (not started / not locked), so a client never
+    mistakes "no data yet" for a real 0.
 
-    HONEST SCOPE — read before extending: this is NOT a points projection.
-    No weekly-projection feed and no opponent-defense-strength data exist
-    anywhere in this codebase, so both sides are ranked by the same
-    season-long value/opportunity signal every other surface here uses
+    View 2 — SUGGESTED season-value lineup (`starters` / `season_value_total`
+    on each side, `comparison` at the top level, unchanged from before):
+    both sides run the SAME modules.team_eval.suggest_optimal_lineup pass, so
+    this is an apples-to-apples "best available lineup by season value/
+    opportunity" comparison — which may differ from what either manager has
+    actually set in Sleeper. No weekly-projection feed and no
+    opponent-defense-strength data exist anywhere in this codebase, so this
+    view intentionally ranks by season-long signal only
     (SEASON_VALUE_BASIS_LABEL), and each starter's `why` cites only real
     season-form fields (tier, workload/opportunity label, season-value rank
-    on that roster, injury tag). A true weekly projection would be a new
-    data source, not a relabel of this one.
+    on that roster, injury tag) — never this week's opponent or expected
+    points. A true weekly projection would be a new data source, not a
+    relabel of this one.
+
+    Week comes from the league's own `settings.leg` (the same current-week
+    field the mobile League screen already reads).
 
     Not-ready states return 200 with a `reason` (same contract as /my-team
     and the other league endpoints) rather than an HTTP error: the
@@ -3707,6 +3858,12 @@ def get_league_matchup(
     if not my_side["starters"] and not opponent_side["starters"]:
         return _empty_matchup("empty_roster", week=current_week)
 
+    # Additive: each side's REAL current-week lineup/points from Sleeper's
+    # own matchup entry, alongside the (unchanged) suggested season-value
+    # lineup already built into my_side/opponent_side above.
+    my_side.update(_real_current_lineup(my_entry, valued, score_field))
+    opponent_side.update(_real_current_lineup(opponent_entry, valued, score_field))
+
     return {
         "ok": True,
         "week": current_week,
@@ -3715,6 +3872,7 @@ def get_league_matchup(
         "comparison": _matchup_comparison(
             my_side["season_value_total"], opponent_side["season_value_total"]
         ),
+        "real_comparison": _real_matchup_comparison(my_side, opponent_side),
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": "",
