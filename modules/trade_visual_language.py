@@ -60,6 +60,15 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-count{display:inline-flex;gap:3px;margin-inline-start:var(--space-2xs);vertical-align:middle}
 .tvl-count>span{background:var(--color-text-muted);border-radius:50%;height:5px;width:5px}
 .tvl-sr{clip:rect(0 0 0 0);clip-path:inset(50%);height:1px;overflow:hidden;position:absolute;white-space:nowrap;width:1px}
+/* Center-anchored "who has the edge" lean bar — shape reinforcement of the
+   value_edge_html() number/band directly above it, never a competing signal
+   (same tvl-edge--pos/neg/even color story, just fill instead of digits). */
+.tvl-lean{max-width:100%}
+.tvl-lean-track{background:var(--color-border);border-radius:var(--radius-pill);display:block;height:4px;overflow:hidden;position:relative}
+.tvl-lean-tick{background:var(--color-text-muted);height:100%;left:50%;position:absolute;top:0;transform:translateX(-50%);width:2px;z-index:1}
+.tvl-lean-fill{height:100%;position:absolute;top:0}
+.tvl-lean--pos .tvl-lean-fill{background:var(--color-success);left:50%;width:var(--tvl-lean-fraction,0%)}
+.tvl-lean--neg .tvl-lean-fill{background:var(--color-danger);right:50%;width:var(--tvl-lean-fraction,0%)}
 .dg-gp-trade-side--give,.dg-trade-side--send,.toa-side-send{border-inline-start:var(--border-width-semantic) solid var(--color-danger);padding-inline-start:var(--space-xs)}
 .dg-gp-trade-side--get,.dg-trade-side--receive,.toa-side-receive{border-inline-start:var(--border-width-semantic) solid var(--color-success);padding-inline-start:var(--space-xs)}
 .dg-gp-trade-metrics{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-top:var(--space-2xs);max-width:40rem}
@@ -225,6 +234,88 @@ def cue_html(kind: CueKind, text: object) -> str:
         "<span class='tvl-cue-mark' aria-hidden='true'></span>"
         f"<span class='tvl-cue-kicker'>{kicker}</span>"
         f"<p class='tvl-cue-body'>{escape(body)}</p>"
+        "</div>"
+    )
+
+
+def value_edge_lean_bar_html(
+    send_total: object,
+    receive_total: object,
+    *,
+    extra_class: str = "",
+) -> str:
+    """Compact, center-anchored "who has the edge" bar for a trade's value split.
+
+    This is web's counterpart to mobile's ``TradeValueBar`` (PR #784) — same
+    shape-based reinforcement of the value-change number, placed directly
+    beside/under it, never disagreeing on sign or color. Mobile could only
+    drive its bar from the net delta because its API truncates each side's
+    asset list (to 3) before scoring reaches the client, so resumming
+    per-side totals there would misrepresent any trade with more assets.
+
+    Web has no such truncation: ``send_total``/``receive_total`` here are
+    expected to be the same full, untruncated per-side totals already
+    computed server-side for this trade (Trade Hub's ``my_score``/
+    ``their_score``, Trade Analyzer's summed ``score_asset_value`` per side)
+    that the existing ``trade_gain``/``value_delta`` numbers are derived
+    from. Because both totals are real, the fill fraction is a true ratio
+    (``|receive - send| / (receive + send)``) instead of an arbitrary
+    saturating curve over the magnitude alone — a more accurate lean than
+    mobile's net-delta-only bar can offer, using data web already has.
+
+    This never computes a new valuation: callers must pass the same totals
+    already backing the existing delta number, so the bar and the number
+    can never disagree.
+    """
+
+    try:
+        send = max(0.0, float(send_total or 0))
+    except (TypeError, ValueError):
+        send = 0.0
+    try:
+        receive = max(0.0, float(receive_total or 0))
+    except (TypeError, ValueError):
+        receive = 0.0
+
+    total = send + receive
+    imbalance = receive - send
+    if total <= 0 or abs(imbalance) < 1e-9:
+        polarity = "even"
+        fraction = 0.0
+    elif imbalance > 0:
+        polarity = "pos"
+        fraction = min(1.0, imbalance / total)
+    else:
+        polarity = "neg"
+        fraction = min(1.0, abs(imbalance) / total)
+
+    classes = f"tvl-lean tvl-lean--{polarity}"
+    if extra_class:
+        classes += f" {extra_class}"
+
+    if polarity == "pos":
+        conclusion = "You have the edge in this trade"
+    elif polarity == "neg":
+        conclusion = "Your opponent has the edge in this trade"
+    else:
+        conclusion = "Neither side has a clear value edge"
+    label = (
+        f"Value lean: you send {int(round(send)):,}, you receive {int(round(receive)):,}. "
+        f"{conclusion}."
+    )
+
+    fill_html = (
+        f"<span class='tvl-lean-fill' style='--tvl-lean-fraction:{fraction * 50:.1f}%'></span>"
+        if fraction > 0
+        else ""
+    )
+    return (
+        f"<div class='{classes}' data-tvl-lean='{polarity}' role='img' "
+        f"aria-label='{escape(label, quote=True)}'>"
+        "<span class='tvl-lean-track' aria-hidden='true'>"
+        "<span class='tvl-lean-tick'></span>"
+        f"{fill_html}"
+        "</span>"
         "</div>"
     )
 

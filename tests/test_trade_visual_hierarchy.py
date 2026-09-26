@@ -83,6 +83,41 @@ def test_value_edge_magnitude_is_bounded_directional_and_accessible():
     assert "Value difference -991, unfavorable" in overpay
 
 
+def test_value_edge_lean_bar_reflects_real_send_receive_split():
+    # Web's counterpart to mobile's TradeValueBar (PR #784) — unlike mobile,
+    # which can only use the net delta (its API truncates each side's asset
+    # list before scoring reaches the client), web has the real untruncated
+    # per-side totals, so the bar reflects the true ratio, not an arbitrary
+    # magnitude curve.
+    favorable = tvl.value_edge_lean_bar_html(300, 800)
+    unfavorable = tvl.value_edge_lean_bar_html(800, 300)
+    even = tvl.value_edge_lean_bar_html(500, 500)
+    no_value = tvl.value_edge_lean_bar_html(0, 0)
+
+    assert "tvl-lean--pos" in favorable
+    assert "You have the edge in this trade" in favorable
+    assert "you send 300, you receive 800" in favorable
+
+    assert "tvl-lean--neg" in unfavorable
+    assert "Your opponent has the edge in this trade" in unfavorable
+
+    assert "tvl-lean--even" in even
+    assert "Neither side has a clear value edge" in even
+    assert "tvl-lean-fill" not in even
+
+    assert "tvl-lean--even" in no_value
+    assert "tvl-lean-fill" not in no_value
+
+    def fraction(html: str) -> float:
+        return float(html.split("--tvl-lean-fraction:", 1)[1].split("%", 1)[0])
+
+    # A total blowout (all value on one side) saturates at half the track —
+    # mirroring TradeValueBar's own center-anchored fill semantics.
+    blowout = tvl.value_edge_lean_bar_html(0, 1000)
+    assert fraction(blowout) == 50.0
+    assert 0 < fraction(favorable) < 50.0
+
+
 def test_one_for_one_and_two_for_one_packages_keep_send_for_receive_order():
     one = compact.game_plan_trade_visual_html(
         {
@@ -192,13 +227,22 @@ def test_analyzer_result_reuses_trade_grammar_without_changing_verdict():
     )
     html = toa.build_offer_result_card_html(
         verdict,
-        send_assets=[_player()],
-        receive_assets=[_player("Recv B", "2", position="WR", team="BUF"), _pick("2027 1st", round="1")],
+        send_assets=[_player(score=300)],
+        receive_assets=[
+            _player("Recv B", "2", position="WR", team="BUF", score=600),
+            _pick("2027 1st", round="1", score=200),
+        ],
         partner_name="Rival FC",
     )
     assert verdict.ui_verdict == "ACCEPT"
     assert "tvl-edge" in html
     assert "tvl-conf" in html
+    # Lean bar reinforces the verdict's own value_edge_html number, driven by
+    # the real send/receive totals for these exact assets (300 send vs. 800
+    # combined receive, above) rather than a re-derived or invented value.
+    assert "tvl-lean" in html
+    assert "toa-value-lean" in html
+    assert "tvl-lean--pos" in html
     assert "You send" in html
     send_at = html.index("You send")
     assert send_at < html.index(">FOR<") < html.index("You receive")

@@ -39,6 +39,7 @@ from modules.trade_visual_language import (
     exchange_marker_html,
     trade_value_band,
     value_edge_html,
+    value_edge_lean_bar_html,
 )
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
 from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
@@ -141,6 +142,9 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
 .trade-summary-value-row .tvl-edge { column-gap: var(--space-sm); }
 .trade-summary-value-row .tvl-edge-num { font: var(--type-primary-metric); }
 .trade-summary-value-row .tvl-edge-cap { display: none; }
+/* Shape reinforcement of the Balance number directly above — same order as
+   the value row so it reads as one continuous statement before the package. */
+.trade-summary-lean-row { order: 2; }
 .trade-summary-package { border-block: var(--border-width-default) solid var(--color-border); display: grid; gap: var(--space-xs); grid-template-columns: minmax(0, 1fr); max-width: 100%; order: 3; overflow-x: clip; padding-block: var(--space-xs); width: 100%; }
 .trade-summary-for { align-items: center; color: var(--color-information); display: flex; font: var(--type-supporting-metadata); justify-content: flex-start; letter-spacing: var(--letter-spacing-badge); text-transform: uppercase; }
 .trade-summary-side { align-items: start; display: grid; gap: var(--space-2xs); grid-template-columns: minmax(0, 1fr); justify-content: start; min-width: 0; }
@@ -1942,6 +1946,13 @@ def render_trade_idea_card(
 
     confidence_html = confidence_indicator_html(confidence)
     edge_html = value_edge_html(delta_text)
+    # send_score/receive_score (my_score/their_score) are the full,
+    # untruncated per-side totals trade_gain is itself derived from — see
+    # modules/trade_ideas.py's _make_idea. Web renders directly from this
+    # dict, unlike mobile's API response (compact_package truncates each
+    # side to 3 assets before scoring reaches the client), so this bar can
+    # use the real split instead of mobile's net-delta-only approximation.
+    lean_bar_html = value_edge_lean_bar_html(send_score, receive_score)
     narrative = canonical_recommendation_narrative.build_trade_narrative(
         idea,
         league_id=_safe_text(idea.get("_narrative_league_id") or st.session_state.get("selected_league_id")),
@@ -2021,6 +2032,7 @@ def render_trade_idea_card(
                 </div>
             </header>
             <div class="trade-summary-value-row"><span class="trade-summary-side-label">Balance</span>{edge_html}</div>
+            <div class="trade-summary-lean-row">{lean_bar_html}</div>
             <div class="trade-summary-package">
                 <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You send</span>{_trade_summary_assets_html(send_assets)}</div>
                 <div class="trade-summary-for" data-trade-chrome="1" aria-hidden="true">{exchange_marker_html()}</div>
