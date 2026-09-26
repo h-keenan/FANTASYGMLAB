@@ -758,6 +758,7 @@ def compose_activity_timeline(
     league_id: str = "",
     entitlement: str = "free",
     news_events: Sequence[Mapping[str, Any]] | None = None,
+    players_df: Any | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Deeper timeline for the Alerts route. General news is included here."""
 
@@ -877,7 +878,20 @@ def compose_activity_timeline(
             seen_keys.add(key)
         ordered.append(row)
     ordered_rows, dedupe_stats = alert_presentation.merge_exact_article_rows(ordered)
-    capped = tuple(ordered_rows[:MAX_TIMELINE_ITEMS])
+    capped_rows = ordered_rows[:MAX_TIMELINE_ITEMS]
+    # Position/team/tier for each row's matched player, read from the same
+    # already-loaded player universe frame this composition already uses for
+    # roster-impact context — see alert_presentation.attach_player_identity_fields.
+    identity_frame = players_df
+    if identity_frame is None or getattr(identity_frame, "empty", True):
+        from modules import prepared_player_frame
+
+        identity_frame = prepared_player_frame.usable_player_frame_for_news(session)
+    capped = tuple(
+        alert_presentation.attach_player_identity_fields(
+            capped_rows, players_df=identity_frame
+        )
+    )
     record_pipeline_stats(
         session,
         my_players_visible_count=sum(1 for row in capped if _row_is_roster_relevant(row, mine_ids)),

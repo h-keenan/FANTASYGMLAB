@@ -891,6 +891,59 @@ def apply_roster_context_to_row(
     return payload
 
 
+def attach_player_identity_fields(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    players_df: Any | None = None,
+) -> list[dict[str, Any]]:
+    """Presentation-only position/team/tier lookup for each row's player_id.
+
+    Mirrors services/mobile_api_service.py's player_info_by_id fix (PR #786,
+    "Plumb position/team/tier through to Alerts player rows") for the
+    equivalent gap on the web Alerts timeline: a row already carries
+    `player_id` when a news event maps to a specific player, but nothing
+    downstream ever looked up that player's position/team/tier, so the
+    Alerts row rendered a bare portrait with no identity chips at all.
+
+    Reads only the already-loaded player universe frame Alerts composition
+    already reads for roster-impact context
+    (`prepared_player_frame.usable_player_frame_for_news`) — no new fetch,
+    and never `modules.rankings.load_players`/`build_players_table`. A
+    player_id absent from that frame (e.g. outside the current valued
+    universe) is simply left without these fields rather than guessed.
+    """
+
+    info_by_id: dict[str, dict[str, str]] = {}
+    has_frame = players_df is not None and not getattr(players_df, "empty", True)
+    if has_frame and "player_id" in players_df.columns:
+        position_col = "position" if "position" in players_df.columns else None
+        team_col = "team" if "team" in players_df.columns else None
+        tier_col = "player_tier" if "player_tier" in players_df.columns else None
+        for _, prow in players_df.iterrows():
+            pid = str(prow.get("player_id") or "").strip()
+            if not pid or pid in info_by_id:
+                continue
+            info_by_id[pid] = {
+                "position": str(prow.get(position_col) or "").strip() if position_col else "",
+                "team": str(prow.get(team_col) or "").strip() if team_col else "",
+                "tier": str(prow.get(tier_col) or "").strip() if tier_col else "",
+            }
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        payload = dict(row) if isinstance(row, Mapping) else {}
+        player_id = str(payload.get("player_id") or "").strip()
+        info = info_by_id.get(player_id) if player_id else None
+        if info:
+            if info.get("position"):
+                payload["matched_player_position"] = info["position"]
+            if info.get("team"):
+                payload["matched_player_team"] = info["team"]
+            if info.get("tier"):
+                payload["matched_player_tier"] = info["tier"]
+        out.append(payload)
+    return out
+
+
 def rank_timeline_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     ranked = [dict(row) for row in rows if isinstance(row, Mapping)]
     ranked.sort(key=lambda row: -relevance_score(row))

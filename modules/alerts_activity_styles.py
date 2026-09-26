@@ -186,6 +186,23 @@ div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
     font:var(--type-card-title);
     margin:0;
 }
+.dg-alerts-identity{
+    align-items:center;
+    display:flex;
+    flex-wrap:wrap;
+    gap:var(--space-2xs);
+    margin:var(--space-2xs) 0 0;
+}
+.dg-alerts-position-badge{
+    font-size:0.64rem;
+    min-height:1.18rem;
+}
+.dg-alerts-team{
+    color:var(--color-text-muted);
+    font:var(--type-supporting-metadata);
+    letter-spacing:var(--letter-spacing-badge);
+    text-transform:uppercase;
+}
 .dg-alerts-context{
     color:var(--color-text-secondary);
     font:var(--type-caption-emphasis);
