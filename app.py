@@ -158,6 +158,8 @@ from modules import player_history
 from modules import player_awards
 from modules import player_quick_view
 from modules import player_quick_view_bridge
+from modules import player_compare
+from modules.player_compare_styles import PLAYER_COMPARE_CSS
 from modules import weekly_points_chart
 from modules import canonical_recommendation_narrative
 from modules import trade_hub_ui
@@ -2354,6 +2356,33 @@ def _clear_player_quick_view() -> None:
         st.session_state.pop(key, None)
     canonical_recommendation_narrative.clear_narrative(st.session_state)
     canonical_recommendation_narrative.clear_pqv_owned_narrative(st.session_state)
+
+
+PLAYER_COMPARE_STATE_KEYS = (
+    "player_compare_player_a_id",
+    "player_compare_player_b_id",
+)
+
+
+def _clear_player_compare() -> None:
+    for key in PLAYER_COMPARE_STATE_KEYS:
+        st.session_state.pop(key, None)
+
+
+def open_player_compare(player_id: str) -> None:
+    """Open the head-to-head Compare dialog for ``player_id`` as side A —
+    the web equivalent of mobile's "Compare" button on Player Detail
+    (PlayerDetailScreen.tsx), reached here from the Player Quick View action
+    row. Closes Player Quick View first since only one app dialog is shown
+    at a time (same close-then-open pattern as
+    ``_open_trade_hub_for_player_focus``)."""
+
+    resolved_id = _safe_text(player_id).strip()
+    if not resolved_id:
+        return
+    _clear_player_quick_view()
+    st.session_state["player_compare_player_a_id"] = resolved_id
+    st.session_state.pop("player_compare_player_b_id", None)
 
 
 def _clear_league_switch_workflow_state(*, previous_league_id: str = "") -> None:
@@ -4751,6 +4780,15 @@ def render_player_quick_view_content(
                     enabled=True,
                     button_label="Feedback",
                 )
+        with st.container(key=f"pqv_actions_compare_{player_id}"):
+            st.button(
+                "Compare",
+                key=f"player_quick_view_compare_{player_id}",
+                use_container_width=False,
+                type="tertiary",
+                on_click=open_player_compare,
+                kwargs={"player_id": player_id},
+            )
         if on_roster:
             with st.container(key=f"pqv_actions_tertiary_{player_id}"):
                 untouchable_disabled = not (username and selected_league_id)
@@ -5412,6 +5450,132 @@ def render_player_quick_view_modal(
         )
 
     _player_quick_view_dialog()
+
+
+def render_player_compare_content(
+    *,
+    player_a_row: pd.Series,
+    df_players: pd.DataFrame,
+    score_field: str,
+) -> None:
+    """Head-to-head comparison — reached from the "Compare" action in the
+    Player Quick View dialog. Renders the same real value/model columns
+    Player Quick View already reads (never a new valuation computation);
+    see modules/player_compare.py for the row-building/highlight logic this
+    ports from mobile/src/screens/PlayerCompareScreen.tsx."""
+
+    from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
+
+    inject_global_styles(DECISION_SURFACE_DIALOG_CSS + PLAYER_QUICK_VIEW_CSS + PLAYER_COMPARE_CSS)
+
+    player_a_id = _safe_text(player_a_row.get("player_id")).strip()
+    score_label = league_score_label(score_field)
+
+    player_b_id = _safe_text(st.session_state.get("player_compare_player_b_id")).strip()
+    player_b_row = _player_detail_row(df_players, player_b_id) if player_b_id else None
+
+    st.markdown("<div class='pqv-compare-shell'>", unsafe_allow_html=True)
+
+    if player_b_row is None:
+        render_html_fragment(
+            _compact_player_row_html(
+                player_a_row,
+                score_field=score_field,
+                score_label=score_label,
+                note_text="Choose an opponent below.",
+            )
+        )
+
+        pool = df_players
+        if pool is not None and not pool.empty and "player_id" in pool.columns:
+            pool = pool[pool["player_id"].astype(str) != player_a_id]
+        option_map: dict[str, str] = {}
+        if pool is not None and not pool.empty:
+            sort_field = score_field if score_field in pool.columns else "value_score"
+            sorted_pool = (
+                pool.sort_values(sort_field, ascending=False) if sort_field in pool.columns else pool
+            )
+            for _, candidate_row in sorted_pool.head(300).iterrows():
+                candidate_id = _safe_text(candidate_row.get("player_id")).strip()
+                if candidate_id:
+                    option_map[player_trade_hub_option_label(candidate_row, score_field)] = candidate_id
+
+        if not option_map:
+            st.info("No other players are available to compare right now.")
+            st.markdown("</div>", unsafe_allow_html=True)
+            return
+
+        placeholder = "Search for a player to compare..."
+        selected_label = st.selectbox(
+            "Compare against",
+            [placeholder] + list(option_map.keys()),
+            key=f"player_compare_picker_{player_a_id}",
+            label_visibility="collapsed",
+        )
+        if selected_label == placeholder:
+            st.markdown("</div>", unsafe_allow_html=True)
+            return
+        player_b_id = option_map[selected_label]
+        st.session_state["player_compare_player_b_id"] = player_b_id
+        player_b_row = _player_detail_row(df_players, player_b_id)
+        if player_b_row is None:
+            st.markdown("</div>", unsafe_allow_html=True)
+            return
+
+    def _reset_player_b() -> None:
+        st.session_state.pop("player_compare_player_b_id", None)
+
+    st.button(
+        "Compare someone else",
+        key=f"pqv_compare_reset_{player_a_id}",
+        use_container_width=False,
+        type="tertiary",
+        on_click=_reset_player_b,
+    )
+
+    identity_cols = st.columns([5, 1, 5], gap="small")
+    with identity_cols[0]:
+        render_html_fragment(
+            _compact_player_row_html(player_a_row, score_field=score_field, score_label=score_label)
+        )
+    with identity_cols[1]:
+        st.markdown("<div class='pqv-compare-vs'>VS</div>", unsafe_allow_html=True)
+    with identity_cols[2]:
+        render_html_fragment(
+            _compact_player_row_html(player_b_row, score_field=score_field, score_label=score_label)
+        )
+
+    value_rows = player_compare.build_value_rows(player_a_row, player_b_row, score_field=score_field)
+    render_section_header("Value & Rank", kicker="Head-to-Head")
+    render_html_fragment(player_compare.compare_rows_html(value_rows))
+
+    model_rows = player_compare.build_model_rows(player_a_row, player_b_row)
+    if player_compare.has_any_value(model_rows):
+        render_section_header("Model Breakdown", kicker="Head-to-Head")
+        render_html_fragment(player_compare.compare_rows_html(model_rows))
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_player_compare_modal(*, df_players: pd.DataFrame, score_field: str) -> None:
+    player_a_id = _safe_text(st.session_state.get("player_compare_player_a_id")).strip()
+    if not player_a_id:
+        return
+    player_a_row = _player_detail_row(df_players, player_a_id)
+    if player_a_row is None:
+        _clear_player_compare()
+        return
+
+    @st.dialog("Compare Players", width="large", dismissible=True, on_dismiss=_clear_player_compare)
+    def _player_compare_dialog() -> None:
+        render_player_compare_content(
+            player_a_row=player_a_row,
+            df_players=df_players,
+            score_field=score_field,
+        )
+
+    _player_compare_dialog()
+
 
 render_section_header = workspace_ui.render_section_header
 render_summary_tiles = workspace_ui.render_summary_tiles
@@ -23302,6 +23466,8 @@ def main():
                     cache_status="",
                     exclusive=False,
                 )
+
+        render_player_compare_modal(df_players=df_players, score_field=score_field)
 
     from modules import warm_route_render as _wrr_tail
 
