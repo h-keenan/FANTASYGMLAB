@@ -24,6 +24,8 @@ from modules import account_ui
 from modules import application_shell
 from modules import brand_identity
 from modules import canonical_player_ranking
+from modules import design_tokens
+from modules import theme_mode
 from modules.app_styles import APP_CSS
 from modules.executive_command_header_styles import (
     COMMAND_COLUMN_WEIGHTS,
@@ -16091,6 +16093,9 @@ def main():
         pass
 
     inject_global_styles(APP_CSS)
+    theme_mode.sync_system_preference(st.session_state)
+    if not theme_mode.resolve_is_dark(st.session_state):
+        inject_global_styles(design_tokens.LIGHT_MODE_CSS)
     inject_global_styles(MOBILE_VISUAL_POLISH_CSS)
     inject_global_styles(FOUNDER_BETA_UX_CSS)
     inject_global_styles(DASHBOARD_WORKFLOW_CSS)

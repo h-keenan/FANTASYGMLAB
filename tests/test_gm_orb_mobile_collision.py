@@ -50,7 +50,7 @@ def test_reserved_orb_band_is_not_a_shortened_scrollport():
     assert ".stApp," not in media.split("[data-testid=\"stMain\"]", 1)[0]
     from modules.interface_reimagining_styles import INTERFACE_REIMAGINING_CSS
 
-    assert "background-size: 72px 72px !important" in INTERFACE_REIMAGINING_CSS
+    assert "background: var(--color-bg) !important;" in INTERFACE_REIMAGINING_CSS
     assert ".stApp {" in INTERFACE_REIMAGINING_CSS
 
 
@@ -169,10 +169,11 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
         viewImage: viewCs.backgroundImage,
         appImage: appCs.backgroundImage,
         appSize: appCs.backgroundSize,
+        appColor: appCs.backgroundColor,
         mainBg: cs.backgroundColor,
         exposedPx: innerHeight - (mainBox && mainBox.bottom),
         viewportH: innerHeight,
-        appHasGrid: (appCs.backgroundImage || '').includes('linear-gradient'),
+        appIsOpaque: appCs.backgroundColor !== 'rgba(0, 0, 0, 0)' && appCs.backgroundColor !== 'transparent',
         viewTransparent: viewCs.backgroundColor === 'rgba(0, 0, 0, 0)',
         mainTransparent: cs.backgroundColor === 'rgba(0, 0, 0, 0)',
         gap: (orb && cta) ? (orb.top - cta.bottom) : null,
@@ -212,12 +213,12 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
                 assert metrics["cta"]["bottom"] <= metrics["orb"]["top"] - 8, (
                     width, height, kind, metrics["cta"], metrics["orb"], metrics["gap"]
                 )
-                assert "linear-gradient" in (metrics["appImage"] or "")
-                assert metrics["appSize"].startswith("72px 72px")
+                assert (metrics["appImage"] or "none") in {"none", ""}
+                assert metrics["appIsOpaque"]
                 assert metrics["viewBg"] in {"rgba(0, 0, 0, 0)", "transparent"}
                 assert metrics["viewImage"] in {"none", ""}
                 assert metrics["mainBg"] in {"rgba(0, 0, 0, 0)", "transparent"}
-                assert metrics["appHasGrid"] and metrics["viewTransparent"] and metrics["mainTransparent"]
+                assert metrics["appIsOpaque"] and metrics["viewTransparent"] and metrics["mainTransparent"]
                 assert top_metrics["exposedPx"] < 2
         # Desktop: mobile inset must not apply.
         page = browser.new_page(viewport={"width": 1024, "height": 800})

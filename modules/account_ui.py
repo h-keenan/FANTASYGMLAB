@@ -15,6 +15,7 @@ from modules import auth_supabase
 from modules import saved_leagues
 from modules import startup_coordinator
 from modules import startup_critical_path
+from modules import theme_mode
 from modules import ui_primitives
 from modules import user_preferences
 
@@ -1018,6 +1019,47 @@ def _render_saved_league_cap_notice() -> None:
     )
 
 
+_THEME_MODE_OPTIONS: tuple[tuple[str, str, str], ...] = (
+    ("dark", "Night", "OLED-tuned dark theme — always dark"),
+    ("light", "Day", "Glacier ice white — always light"),
+    ("auto", "System", "Match this browser's OS-level setting"),
+)
+
+
+def _render_theme_mode_control(config: dict) -> None:
+    """Day/Night/System toggle — same three modes as mobile's More screen.
+
+    No explicit st.rerun(): this app caps total explicit rerun call sites
+    (scripts/measure_interaction_rerun_architecture.py), and none is needed —
+    st.radio's own widget-interaction rerun already re-executes app.py with
+    RADIO_WIDGET_KEY holding the new value *before* CSS is injected earlier
+    in that same script run (theme_mode.current_mode reads that widget key
+    first), so the new theme applies immediately without forcing a second one.
+    """
+
+    ui_primitives.render_section_header("Appearance", weight="context")
+    persisted = theme_mode.stored_mode(st.session_state.get("account_user_settings"))
+    local = st.session_state.get(theme_mode.LOCAL_OVERRIDE_KEY)
+    default_mode = local if local in theme_mode.THEME_MODE_VALUES else persisted
+    values = [value for value, _label, _desc in _THEME_MODE_OPTIONS]
+    labels = {value: label for value, label, _desc in _THEME_MODE_OPTIONS}
+    descriptions = {value: desc for value, _label, desc in _THEME_MODE_OPTIONS}
+    selected = st.radio(
+        "Theme",
+        values,
+        index=values.index(default_mode) if default_mode in values else 0,
+        format_func=lambda value: labels.get(value, value),
+        key=theme_mode.RADIO_WIDGET_KEY,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    st.caption(descriptions.get(selected, ""))
+    if selected != persisted and selected != local:
+        error = theme_mode.set_mode(config=config, session_state=st.session_state, mode=selected)
+        if error:
+            st.warning("Saved on this device. Could not sync this choice to your account right now.")
+
+
 def render_account_panel(
     *,
     config: dict,
@@ -1127,6 +1169,9 @@ def render_account_panel(
                     st.warning("Onboarding could not be reset right now. Please try again.")
                 else:
                     st.success("League Orientation will appear again.")
+
+            st.markdown("---")
+            _render_theme_mode_control(config)
 
         # Sign-out gets its own visually distinct (danger-toned) surface rather
         # than sitting next to routine actions like Save league — mirrors the
