@@ -263,6 +263,14 @@ export default function MoreScreen({ navigation }: Props) {
             iconColor={colors.violet}
             label="How We Evaluate"
             onPress={() => navigation.navigate('HowWeEvaluate')}
+            showDivider
+          />
+          <SettingsRow
+            icon="play-circle-outline"
+            iconColor={colors.accent}
+            label="Replay intro tutorial"
+            description="The 5-slide walkthrough shown the first time you signed in"
+            onPress={() => navigation.navigate('Onboarding')}
             showDivider={false}
           />
         </AnimatedCard>
