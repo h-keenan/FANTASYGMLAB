@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, TouchableOpacity, View } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -10,8 +10,10 @@ import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
 import { navigationRef } from './navigationRef';
 
 import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import LoginScreen from '../screens/LoginScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import HomeScreen from '../screens/HomeScreen';
 import LeagueDetailScreen from '../screens/LeagueDetailScreen';
 import TeamRosterScreen from '../screens/TeamRosterScreen';
@@ -42,6 +44,7 @@ import LoadingScreen from '../screens/LoadingScreen';
 
 export type RootStackParamList = {
   Home: undefined;
+  Onboarding: undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
   TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string; rosterId: string };
   Paywall: undefined;
@@ -74,7 +77,16 @@ const AuthStack = createNativeStackNavigator();
 
 export default function RootNavigator() {
   const { session, loading } = useAuth();
+  const { onboardingComplete } = useOnboarding();
   const { colors, isDark } = useThemeMode();
+  // Tracked purely so the GM orb / trade-outcome prompt can hide themselves
+  // while the first-launch tutorial is the active screen — slide 3 already
+  // explains the orb as a static stand-in, and letting the real (tappable,
+  // stateful) orb float over the other four slides would be a distracting
+  // duplicate of what the screen is teaching. Neither GmOrb nor
+  // TradeOutcomePrompt is otherwise touched.
+  const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(undefined);
+  const updateCurrentRoute = () => setCurrentRouteName(navigationRef.getCurrentRoute()?.name);
 
   const navigationTheme: Theme = {
     ...(isDark ? DarkTheme : DefaultTheme),
@@ -89,17 +101,38 @@ export default function RootNavigator() {
     },
   };
 
-  if (loading) {
+  // While signed in, also hold on LoadingScreen until the onboarding flag
+  // has been read from storage (see OnboardingContext) — otherwise the very
+  // first frame after sign-in would briefly assume "not completed" and
+  // flash the tutorial before the AsyncStorage read resolves.
+  if (loading || (session && onboardingComplete === null)) {
     return (
       <LoadingScreen />
     );
   }
 
+  // Drives the AppStack's initial screen only (see below) — a returning
+  // user with the flag already true is unaffected even while this is
+  // computed on every render.
+  const showOnboardingFirst = Boolean(session) && onboardingComplete === false;
+  const hideFloatingChrome = currentRouteName === 'Onboarding';
+
   return (
-    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navigationTheme}
+      onReady={updateCurrentRoute}
+      onStateChange={updateCurrentRoute}
+    >
       {session ? (
         <View style={{ flex: 1 }}>
         <AppStack.Navigator
+          // Remounts the stack (with a fresh initialRouteName) the moment
+          // onboardingComplete flips from false to true, so completing/
+          // skipping the tutorial lands on Home without any manual
+          // navigation.reset call from OnboardingScreen itself.
+          key={showOnboardingFirst ? 'onboarding-first' : 'app'}
+          initialRouteName={showOnboardingFirst ? 'Onboarding' : 'Home'}
           screenOptions={{
             // Default iOS behavior shows the previous screen's title next to
             // the back chevron — on a league-scoped stack that repeats the
@@ -122,6 +155,11 @@ export default function RootNavigator() {
             contentStyle: { backgroundColor: colors.background },
           }}
         >
+          <AppStack.Screen
+            name="Onboarding"
+            component={OnboardingScreen}
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
           <AppStack.Screen
             name="Home"
             component={HomeScreen}
@@ -179,8 +217,8 @@ export default function RootNavigator() {
             options={{ presentation: 'modal', title: 'Premium' }}
           />
         </AppStack.Navigator>
-        <GmOrb />
-        <TradeOutcomePrompt />
+        {hideFloatingChrome ? null : <GmOrb />}
+        {hideFloatingChrome ? null : <TradeOutcomePrompt />}
         </View>
       ) : (
         <AuthStack.Navigator screenOptions={{ headerShown: false }}>
