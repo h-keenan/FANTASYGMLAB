@@ -181,6 +181,20 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       color: colors.premium,
       subtitle: 'Your saved watchlist',
     },
+    // Discoverability audit (2026-09-26) found this had no path here at
+    // all — only a settings row under More → Your Team — even though it
+    // actively changes trade-recommendation framing app-wide (PR #753), not
+    // a preference like Theme/Density. Every other feature this consequential
+    // gets a one-tap orb entry; this now does too. More's row stays as a
+    // secondary path, not removed.
+    {
+      label: 'Team Situation',
+      route: 'TeamStance',
+      icon: 'compass-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Declare your rebuild/compete stance',
+    },
     {
       label: 'Draft Center',
       route: 'DraftCenter',
