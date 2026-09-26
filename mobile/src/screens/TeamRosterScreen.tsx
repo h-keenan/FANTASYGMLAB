@@ -58,8 +58,26 @@ interface RankMetric {
   key: string;
   label: string;
   rank: number | null;
-  /** Power/Franchise link out to the full league rankings (Teams screen) —
-   * the other metrics here have no equivalent standalone screen to open. */
+  /**
+   * Power/Franchise link out to the full league rankings (Teams screen) —
+   * the other metrics here have no equivalent standalone screen to open.
+   *
+   * TeamAnalysisPanel's own copy of this same rank matrix (My Team's
+   * Analysis tab, viewing *your own* roster) made Draft Capital/Starters/
+   * Bench tappable too — Draft Capital opens Draft Center (which shows the
+   * signed-in user's own draft-capital rank), and Starters/Bench switch
+   * that screen's own local Overview/Bench tabs. None of those translate
+   * here: this screen has no Overview/Bench tabs to switch to (it's one
+   * continuous roster grouped by position), and Draft Center's "mine" scope
+   * always resolves to the *signed-in user's* roster via their linked
+   * Sleeper account — it can't be pointed at an arbitrary `rosterId`, so
+   * wiring it here would show the viewer's own draft capital while
+   * captioned with someone else's team. Age still has no destination
+   * anywhere (see TeamAnalysisPanel's identical note). So this duplicate
+   * intentionally keeps only Power/Franchise tappable rather than forcing
+   * the other three into destinations that don't apply to a read-only
+   * league-mate view.
+   */
   tappable?: boolean;
 }
 

@@ -31,14 +31,34 @@ export default function TeamAnalysisPanel({
   team,
   leagueSize,
   onOpenTeams,
+  onOpenDraftCenter,
+  onOpenStarters,
+  onOpenBench,
 }: {
   team: TeamRanking;
   leagueSize: number;
   onOpenTeams?: () => void;
+  /** Draft Capital tile destination — Draft Center's own posture header
+   * surfaces this exact `draft_capital_rank` for the signed-in user's team,
+   * so it's a real drill-down, not a re-navigation to the same data. */
+  onOpenDraftCenter?: () => void;
+  /** Starters/Bench tiles switch this same screen's own local tab instead
+   * of navigating cross-screen — My Team's Overview tab already renders the
+   * complete starting lineup (merged in from the old separate Starters tab)
+   * and Bench renders the full bench, so drilling in means switching tabs,
+   * not opening a new route. Left undefined for TeamRosterScreen's
+   * page-local reuse of this same rank matrix (viewing a league-mate's
+   * roster, which has no Overview/Bench tabs of its own to switch to) —
+   * those two tiles simply stay non-tappable there. */
+  onOpenStarters?: () => void;
+  onOpenBench?: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const metrics = useMemo(() => buildRankMetrics(team), [team]);
+  const metrics = useMemo(
+    () => buildRankMetrics(team, { onOpenTeams, onOpenDraftCenter, onOpenStarters, onOpenBench }),
+    [team, onOpenTeams, onOpenDraftCenter, onOpenStarters, onOpenBench],
+  );
   const hasTradeContext = team.trade_tendency && team.trade_tendency !== 'Neutral';
 
   return (
@@ -54,7 +74,7 @@ export default function TeamAnalysisPanel({
                 value={metric.rank != null ? `#${metric.rank}` : null}
                 percentile={percentile}
                 valueColor={percentile != null ? percentileColor(percentile, colors) : undefined}
-                onPress={metric.tappable ? onOpenTeams : undefined}
+                onPress={metric.onPress}
               />
             );
           })}
@@ -116,16 +136,36 @@ interface RankMetric {
   key: string;
   label: string;
   rank: number | null;
-  tappable?: boolean;
+  /** Presence, not a separate boolean, is what makes a tile tappable — same
+   * `onPress`-driven pattern MetricCard/InsightRow already use elsewhere. */
+  onPress?: () => void;
 }
 
-function buildRankMetrics(team: TeamRanking): RankMetric[] {
+/**
+ * Age has no destination anywhere in the app — there's no standalone screen
+ * that shows "why is my roster's age rank what it is," and TeamRosterScreen
+ * (the one screen that lists this team's players individually) doesn't
+ * render per-player age at all (`PlayerIdentityRow` has no age slot), so
+ * routing there would land on a screen that doesn't actually answer the
+ * question. Left non-interactive deliberately rather than wired to a
+ * destination that doesn't show age, per this task's explicit guidance to
+ * prefer an honest exception over a bad drill-down.
+ */
+function buildRankMetrics(
+  team: TeamRanking,
+  callbacks: {
+    onOpenTeams?: () => void;
+    onOpenDraftCenter?: () => void;
+    onOpenStarters?: () => void;
+    onOpenBench?: () => void;
+  },
+): RankMetric[] {
   return [
-    { key: 'power', label: 'Power', rank: team.power_rank, tappable: true },
-    { key: 'franchise', label: 'Franchise', rank: team.franchise_rank, tappable: true },
-    { key: 'draft', label: 'Draft Capital', rank: team.draft_capital_rank },
-    { key: 'starters', label: 'Starters', rank: team.starter_rank },
-    { key: 'bench', label: 'Bench', rank: team.bench_rank },
+    { key: 'power', label: 'Power', rank: team.power_rank, onPress: callbacks.onOpenTeams },
+    { key: 'franchise', label: 'Franchise', rank: team.franchise_rank, onPress: callbacks.onOpenTeams },
+    { key: 'draft', label: 'Draft Capital', rank: team.draft_capital_rank, onPress: callbacks.onOpenDraftCenter },
+    { key: 'starters', label: 'Starters', rank: team.starter_rank, onPress: callbacks.onOpenStarters },
+    { key: 'bench', label: 'Bench', rank: team.bench_rank, onPress: callbacks.onOpenBench },
     { key: 'age', label: 'Age', rank: team.age_rank },
   ].filter((metric) => metric.rank != null);
 }

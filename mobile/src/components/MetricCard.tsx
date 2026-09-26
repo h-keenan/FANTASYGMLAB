@@ -58,9 +58,18 @@ export default function MetricCard({
   const trendIcon = percentileTrendIcon(percentile);
   const content = (
     <>
-      <AppText style={styles.label} numberOfLines={1}>
-        {label}
-      </AppText>
+      <View style={styles.labelRow}>
+        <AppText style={styles.label} numberOfLines={1}>
+          {label}
+        </AppText>
+        {/* Same chevron-forward + textTertiary affordance InsightRow/
+         * AwardsStrip/WaiverRecommendationCard already use to mark a row as
+         * tappable — reused here rather than inventing a card-specific
+         * tappability indicator, so every MetricCard with an `onPress`
+         * (Dashboard's Power/Franchise tiles included) now signals it the
+         * same way the rest of the app does. */}
+        {onPress ? <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} /> : null}
+      </View>
       <AppText style={[styles.value, valueColor ? { color: valueColor } : null]} numberOfLines={1}>
         {display}
       </AppText>
@@ -99,12 +108,19 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
     },
+    labelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.xs,
+      marginBottom: 3,
+    },
     label: {
+      flexShrink: 1,
       fontSize: 10,
       color: colors.textSecondary,
       textTransform: 'uppercase',
       letterSpacing: 0.3,
-      marginBottom: 3,
     },
     value: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
     pctlRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 3 },
