@@ -97,6 +97,44 @@ def test_top_waiver_uses_next_valid_candidate_and_pool_is_cache_stable():
     assert selected["player_id"] == "valid"
 
 
+def test_status_literally_injured_reserve_is_never_actionable_even_when_active_flag_is_true():
+    """Regression for the P0 incident where a push notification recommended
+    a real out-for-season rookie QB as a waiver add.
+
+    Sleeper's `active` boolean is not a reliable signal of availability on
+    its own: the live Sleeper record for that exact player (on IR for a
+    season-ending knee injury) still carries `active: True` alongside
+    `status: "Inactive"`. A player whose Sleeper `status` field literally
+    reads "Injured Reserve"/"IR"/"PUP"/"NFI" (season-ending or multi-week
+    unavailable) must never be ranked as a safe waiver add regardless of the
+    `active` flag or any other current-player signal (team, depth chart,
+    recent news, market value) — those used to incorrectly mark this status
+    "actionable", which is the class of bug that let this happen.
+    """
+
+    row = _player(
+        "hurt",
+        status="Injured Reserve",
+        active=True,
+        depth_chart_position="QB",
+        depth_chart_order=1,
+        dynasty_score=9000,
+        value_score=9000,
+    )
+    decision = player_state_authority.waiver_actionability(row)
+    assert decision == {"actionable": False, "reason": "non_actionable_nfl_status"}
+
+    ranked = waivers_ui.rank_priority_add_candidates(
+        pd.DataFrame([row, _player("healthy", dynasty_score=1700)]),
+        score_field="dynasty_score",
+        needed_positions=["WR"],
+        league_settings={"qb_format": "1QB"},
+        roster_df=pd.DataFrame(),
+        max_items=2,
+    )
+    assert "hurt" not in ranked["player_id"].astype(str).tolist()
+
+
 def test_league_ownership_is_recomputed_without_provider_calls():
     frame = pd.DataFrame([_player("a"), _player("b")])
     with patch("requests.sessions.Session.request", side_effect=AssertionError("network call")):

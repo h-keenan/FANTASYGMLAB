@@ -28,6 +28,7 @@ import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
+import { injuryTone } from '../lib/injuryDisplay';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
 import {
   api,
@@ -950,16 +951,9 @@ function statusTone(status: string | null | undefined): SnapshotItem['tone'] {
   return 'neutral';
 }
 
-/** Same read for the Injury Status cell — a null/absent value already means
- * "Healthy" everywhere else in this app (see the old Snapshot's own
- * `?? 'Healthy'` fallback), so that fallback keeps its green tone here too. */
-function injuryTone(injuryStatus: string | null | undefined): SnapshotItem['tone'] {
-  if (!injuryStatus) return 'success';
-  const normalized = injuryStatus.toLowerCase();
-  if (normalized.includes('healthy')) return 'success';
-  if (normalized.includes('out') || normalized.includes('ir') || normalized.includes('doubtful')) return 'danger';
-  return 'neutral';
-}
+// injuryTone (Injury Status cell color) now lives in ../lib/injuryDisplay —
+// pure and unit-tested there. See its docstring for why a null injury_status
+// must never read as a confirmed "Healthy" success tone.
 
 export default function PlayerDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
@@ -1233,7 +1227,13 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     {
       key: 'injury',
       label: 'Injury Status',
-      value: player.injury_status ?? 'Healthy',
+      // No fabricated 'Healthy' fallback: a null injury_status (e.g. a
+      // push-notification deep link, which only ever carries player_id/
+      // name — see pushNotifications.ts's hand-built RankedPlayer) means we
+      // have no injury data, not a confirmed clean bill of health.
+      // PlayerSnapshotCard already renders null as a plain "—", same as
+      // Status/Age/Rank above when unknown.
+      value: player.injury_status,
       tone: injuryTone(player.injury_status),
       emphasis: 'supporting',
     },

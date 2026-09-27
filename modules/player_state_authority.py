@@ -19,16 +19,22 @@ _NFL_ACTIONABLE_STATUSES = frozenset(
         "questionable",
         "probable",
         "doubtful",
-        "out",
-        "injured reserve",
-        "ir",
-        "pup",
-        "nfi",
-        "physically unable to perform",
-        "non-football injury",
         "suspended",
     }
 )
+# These represent genuine multi-week-to-season-ending unavailability. A
+# player whose Sleeper roster ``status`` field literally reads one of these
+# (as opposed to a short-term weekly ``injury_status`` tag like
+# "Questionable") is not "safe to rank as an NFL add" no matter how the
+# `active` flag reads — Sleeper's `active` boolean is not a reliable proxy
+# for availability on its own (confirmed live: a real 2025 rookie QB placed
+# on injured reserve for a season-ending injury still carried `active: True`
+# from Sleeper while `status` correctly read "Inactive"). Previously "out",
+# "injured reserve", "ir", "pup", and "nfi" were incorrectly listed as
+# ACTIONABLE here, which meant any player whose `status` field literally read
+# one of those values (currently ~80+ real skill-position players at any
+# given time) was treated as a safe waiver-add candidate purely because the
+# `active` flag happened to still read True.
 _NFL_NON_ACTIONABLE_STATUSES = frozenset(
     {
         "inactive",
@@ -37,6 +43,13 @@ _NFL_NON_ACTIONABLE_STATUSES = frozenset(
         "historical only",
         "deceased",
         "practice squad",
+        "out",
+        "injured reserve",
+        "ir",
+        "pup",
+        "nfi",
+        "physically unable to perform",
+        "non-football injury",
     }
 )
 
