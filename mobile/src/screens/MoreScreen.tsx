@@ -61,7 +61,7 @@ export default function MoreScreen({ navigation }: Props) {
   const { deleteAccount, session } = useAuth();
   const [deleting, setDeleting] = useState(false);
   const { showcaseMode, setShowcaseMode } = useShowcaseMode();
-  const { status: collegeInterestStatus } = useCollegeInterest();
+  const { status: collegeInterestStatus, respond: respondToCollegeInterest } = useCollegeInterest();
   // Dev/founder accounts only (lib/showcaseMode.ts allowlist) — the row
   // doesn't exist for anyone else, so there's nothing for a normal user to
   // stumble into.
@@ -245,6 +245,29 @@ export default function MoreScreen({ navigation }: Props) {
                 label="College Prospects"
                 description="Grade incoming prospects and follow your own watchlist"
                 onPress={() => navigation.navigate('CollegeProspects')}
+                showDivider={false}
+              />
+            </AnimatedCard>
+          </>
+        ) : null}
+
+        {/* Discoverability audit (2026-09-26): saying "Not for me" (or just
+            dismissing) the one-time Dashboard prompt permanently hid College
+            Prospects with no way back — the only revisit path in the whole
+            app was reinstalling. "Replay intro tutorial" below already
+            establishes the pattern of a small always-available link back to a
+            one-time choice; this mirrors it for the college-football opt-in
+            instead of inventing a new mechanism. */}
+        {collegeInterestStatus === 'no' ? (
+          <>
+            <AppText style={styles.sectionLabel}>Scouting</AppText>
+            <AnimatedCard style={styles.groupCard}>
+              <SettingsRow
+                icon="school-outline"
+                iconColor={colors.textSecondary}
+                label="Follow college football?"
+                description="You said this wasn't for you — tap to turn on prospect scouting"
+                onPress={() => respondToCollegeInterest(true)}
                 showDivider={false}
               />
             </AnimatedCard>
