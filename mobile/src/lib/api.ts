@@ -1,6 +1,9 @@
+import { AppState } from 'react-native';
+
 import { supabase } from './supabase';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled } from './showcaseMode';
+import { withBackgroundRetry } from './backgroundRetry';
 
 /**
  * Client for services/mobile_api_service.py. Every call attaches the current
@@ -18,19 +21,27 @@ export class ApiError extends Error {
   }
 }
 
-async function authorizedRequest<T>(
-  path: string,
-  init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown },
-): Promise<T> {
-  const { data, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError || !data.session) {
-    throw new ApiError(401, 'Not signed in.');
-  }
+// See backgroundRetry.ts for why this exists: a request mid-flight when the
+// app backgrounds can come back as a bare transport failure once the app
+// resumes, and nothing else re-triggers it (useFocusEffect is React
+// Navigation focus, not OS foreground/background). Tracking transitions
+// here — the single choke point every API call already funnels through —
+// lets authorizedRequest retry that one case transparently instead of every
+// screen's fetch needing its own AppState awareness.
+let backgroundTransitions = 0;
+AppState.addEventListener('change', (nextState) => {
+  if (nextState !== 'active') backgroundTransitions += 1;
+});
 
+async function performRequest<T>(
+  path: string,
+  init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown } | undefined,
+  accessToken: string,
+): Promise<T> {
   const response = await fetch(`${env.apiBaseUrl}${path}`, {
     method: init?.method ?? 'GET',
     headers: {
-      Authorization: `Bearer ${data.session.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
       ...(init?.jsonBody !== undefined ? { 'Content-Type': 'application/json' } : {}),
     },
     ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
@@ -50,6 +61,25 @@ async function authorizedRequest<T>(
         : `Request failed (${response.status}).`;
     throw new ApiError(response.status, message);
   }
+
+  return body as T;
+}
+
+async function authorizedRequest<T>(
+  path: string,
+  init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown },
+): Promise<T> {
+  const { data, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !data.session) {
+    throw new ApiError(401, 'Not signed in.');
+  }
+  const accessToken = data.session.access_token;
+
+  const backgroundSnapshot = backgroundTransitions;
+  const body = await withBackgroundRetry(
+    () => performRequest<T>(path, init, accessToken),
+    () => backgroundTransitions > backgroundSnapshot,
+  );
 
   // Single choke point for showcase mode (lib/showcaseMode.ts): every
   // successful response leaves through here, so masking identity fields at
