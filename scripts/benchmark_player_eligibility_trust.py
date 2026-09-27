@@ -173,12 +173,11 @@ def _base_with_snapshot_hydration(db_path: str, snapshot: pd.DataFrame) -> pd.Da
     base = rankings._load_snapshot_base_frame(db_path)
     if base is None:
         raise RuntimeError("public-player SQLite base is unavailable")
-    old_risk = pd.to_numeric(base.get("risk_multiplier"), errors="coerce").fillna(1.0)
     hydrated = base.copy()
     for column in snapshot.columns:
         if column != "player_id":
             hydrated[column] = snapshot[column].reset_index(drop=True)
-    return rankings._refresh_risk_adjusted_scores(hydrated, old_risk)
+    return rankings._refresh_risk_adjusted_scores(hydrated)
 
 
 def main() -> None:

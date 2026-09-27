@@ -107,6 +107,28 @@ def test_age_multiplier_continuous_and_position_aware():
     assert all(rb_curve[i] >= rb_curve[i + 1] for i in range(len(rb_curve) - 1))
 
 
+def test_rank_to_value_is_monotonic_across_tier_boundaries():
+    # Regression: rank_to_value used to reset to an independent constant at
+    # the start of each of its three tiers (251, 501), which made a *worse*
+    # search_rank score a much *higher* value than the rank right before it
+    # (e.g. #250 -> 188 but #251 -> 2600) — a direct violation of the
+    # function's own documented "should not tie with real starters"
+    # guarantee. The curve must now be non-increasing for every rank.
+    values = [rankings.rank_to_value(r) for r in range(1, 950)]
+    for rank in range(2, len(values) + 1):
+        prev_value = values[rank - 2]
+        curr_value = values[rank - 1]
+        assert curr_value <= prev_value, (
+            f"rank_to_value must not increase for a worse rank: "
+            f"rank {rank - 1}={prev_value}, rank {rank}={curr_value}"
+        )
+    # Specific before/after regression: the old code returned 188 then 2600.
+    assert rankings.rank_to_value(250) >= rankings.rank_to_value(251)
+    assert rankings.rank_to_value(251) < 2600
+    assert rankings.rank_to_value(500) >= rankings.rank_to_value(501)
+    assert rankings.rank_to_value(501) < 500
+
+
 def test_prime_window_derived_from_real_age_curve_not_invented():
     # Every position's window must fall inside its own tabulated age range
     # and start at (or before) its peak-multiplier age — the window is a
@@ -492,3 +514,59 @@ def test_market_weight_dominates_but_football_components_can_move_order():
         market=9500, position="WR", age=24, role=1600, opportunity=1600
     )
     assert elite_market > lower_market_starter
+
+
+def test_role_factor_is_injury_risk_adjusted_not_blind():
+    """role_score (see rankings.role_score) is purely depth-chart structural and
+    carries NO injury adjustment of its own — a fully healthy RB1 and an
+    Injured-Reserve RB1 at the same depth-chart slot get the identical
+    role_score. Unlike opportunity_score (which bakes its own injury haircut
+    into the score via opportunity_profile's "Starter At Risk" overlay),
+    compose_composite_score must therefore scale factor_role by the full,
+    injury-inclusive risk_multiplier — not by non_injury_risk_multiplier — or
+    an IR player's role contribution to the composite would be indistinguishable
+    from a fully healthy starter's.
+
+    This pins down a real bug found in an audit: the previous implementation
+    multiplied factor_role by non_injury_risk_multiplier (grouped with
+    factor_opportunity) on the mistaken premise, stated in its own comment,
+    that role_score "already carries its own injury adjustment" the way
+    opportunity_score does. It never did.
+    """
+
+    base_row = {
+        "market_score": 6000.0,
+        "age_curve_score": 6000.0,
+        "scarcity_score": 3000.0,
+        "production_score": 5000.0,
+        "role_score": 8500.0,
+        "opportunity_score": 6600.0,
+    }
+    healthy = pd.DataFrame(
+        [dict(base_row, risk_multiplier=1.0, non_injury_risk_multiplier=1.0)]
+    )
+    major_injury = pd.DataFrame(
+        # A major/season-ending injury: risk_multiplier=0.68 (injury-inclusive),
+        # non_injury_risk_multiplier=1.0 (roster/status risk alone is clean).
+        [dict(base_row, risk_multiplier=0.68, non_injury_risk_multiplier=1.0)]
+    )
+
+    healthy_out = rankings.compose_composite_score(healthy).iloc[0]
+    injured_out = rankings.compose_composite_score(major_injury).iloc[0]
+
+    # role_score itself never sees injury — confirms the premise above.
+    assert healthy_out["role_score"] == injured_out["role_score"] == 8500
+
+    risk_sensitive = (
+        healthy_out["factor_market"]
+        + healthy_out["factor_age"]
+        + healthy_out["factor_production"]
+        + healthy_out["factor_scarcity"]
+        + healthy_out["factor_role"]
+    )
+    expected_healthy = round(risk_sensitive * 1.0 + healthy_out["factor_opportunity"] * 1.0)
+    expected_injured = round(risk_sensitive * 0.68 + injured_out["factor_opportunity"] * 1.0)
+    assert healthy_out["score"] == expected_healthy == 5790
+    # Before the fix this scored 4312 (role escaped injury risk entirely).
+    assert injured_out["score"] == expected_injured == 4148
+    assert injured_out["score"] < healthy_out["score"]
