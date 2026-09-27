@@ -303,10 +303,13 @@ def build_construction_observations(
         and capital_rank <= 4
         and league_format_context.lead_with_franchise_construction(league_settings)
     ):
+        capital_rank_tied = bool(
+            team_row.get("draft_capital_rank_tied") if hasattr(team_row, "get") else False
+        )
         observations.append(
             {
                 "label": "Future flexibility",
-                "title": f"Draft capital {format_rank(capital_rank)}",
+                "title": f"Draft capital {format_rank(capital_rank, tied=capital_rank_tied)}",
                 "body": "Above-average owned picks give more roster optionality.",
                 "tone": "opportunity",
             }
@@ -376,10 +379,11 @@ def _draft_capital_html(
     *,
     draft_capital_rank,
     format_rank: Callable,
+    draft_capital_rank_tied: bool = False,
 ) -> str:
     if not capital_rows:
         rank_note = (
-            f" League draft-capital rank {escape(format_rank(draft_capital_rank))}."
+            f" League draft-capital rank {escape(format_rank(draft_capital_rank, tied=draft_capital_rank_tied))}."
             if _safe_positive_int(draft_capital_rank, 0)
             else ""
         )
@@ -403,7 +407,7 @@ def _draft_capital_html(
     if _safe_positive_int(draft_capital_rank, 0):
         rank_caption = (
             f"<p class='dg-client-disclosure-body'>Draft capital rank "
-            f"{escape(format_rank(draft_capital_rank))} in the league. "
+            f"{escape(format_rank(draft_capital_rank, tied=draft_capital_rank_tied))} in the league. "
             "Full board comparison lives on League Overview.</p>"
         )
     return "<div class='advice-grid'>" + "".join(rows_html) + "</div>" + rank_caption
@@ -882,8 +886,8 @@ def render_my_team_workspace(
         },
         {
             "label": "Power",
-            "title": format_rank(team_row.get("power_rank")),
-            "body": f"Starter unit {format_rank(team_row.get('starter_rank'))}",
+            "title": format_rank(team_row.get("power_rank"), tied=bool(team_row.get("power_rank_tied"))),
+            "body": f"Starter unit {format_rank(team_row.get('starter_rank'), tied=bool(team_row.get('starter_rank_tied')))}",
             "tone": "power",
             "comparison": posture_comparisons.get("Power Rank"),
             "tappable": bool(posture_comparisons.get("Power Rank")),
@@ -894,10 +898,10 @@ def render_my_team_workspace(
         posture_items.append(
             {
                 "label": "Franchise",
-                "title": format_rank(team_row.get("franchise_rank")),
+                "title": format_rank(team_row.get("franchise_rank"), tied=bool(team_row.get("franchise_rank_tied"))),
                 "body": (
-                    f"Draft capital {format_rank(team_row.get('draft_capital_rank'))}"
-                    f" · Age {format_rank(team_row.get('age_rank'))}"
+                    f"Draft capital {format_rank(team_row.get('draft_capital_rank'), tied=bool(team_row.get('draft_capital_rank_tied')))}"
+                    f" · Age {format_rank(team_row.get('age_rank'), tied=bool(team_row.get('age_rank_tied')))}"
                 ),
                 "tone": "franchise",
                 "comparison": posture_comparisons.get("Franchise Rank"),
@@ -1396,6 +1400,9 @@ def render_my_team_workspace(
             _draft_capital_html(
                 capital_rows,
                 draft_capital_rank=team_row.get("draft_capital_rank") if hasattr(team_row, "get") else None,
+                draft_capital_rank_tied=bool(
+                    team_row.get("draft_capital_rank_tied") if hasattr(team_row, "get") else False
+                ),
                 format_rank=format_rank,
             ),
             unsafe_allow_html=True,

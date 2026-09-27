@@ -3,6 +3,7 @@ from typing import Dict, Any, List, Mapping, Optional
 import pandas as pd
 
 from modules import runtime_trace
+from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.record_signal import blend_percentile_with_record, season_progress_fraction
 from modules.sleeper import get_league_roster_profiles
 from modules.platforms.sleeper import get_sleeper_adapter
@@ -544,6 +545,7 @@ def _assign_team_rankings(df_summary: pd.DataFrame) -> pd.DataFrame:
         .rank(method="dense", ascending=False)
         .astype(int)
     )
+    df_summary = add_rank_tie_metadata(df_summary, ["rank"])
     if len(df_summary) > 1:
         max_rank = int(df_summary["rank"].max())
         df_summary["percentile"] = (

@@ -21,7 +21,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
-import { percentileColor, percentileFromRank } from '../lib/percentile';
+import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -58,6 +58,9 @@ interface RankMetric {
   key: string;
   label: string;
   rank: number | null;
+  /** 2+ teams share this exact dense rank — renders "T4" instead of "#4"
+   * (see modules.league_rankings.add_rank_tie_metadata on the backend). */
+  tied: boolean;
   /**
    * Power/Franchise link out to the full league rankings (Teams screen) —
    * the other metrics here have no equivalent standalone screen to open.
@@ -83,12 +86,12 @@ interface RankMetric {
 
 function buildRankMetrics(ranking: TeamRanking): RankMetric[] {
   return [
-    { key: 'power', label: 'Power', rank: ranking.power_rank, tappable: true },
-    { key: 'franchise', label: 'Franchise', rank: ranking.franchise_rank, tappable: true },
-    { key: 'draft', label: 'Draft Capital', rank: ranking.draft_capital_rank },
-    { key: 'starters', label: 'Starters', rank: ranking.starter_rank },
-    { key: 'bench', label: 'Bench', rank: ranking.bench_rank },
-    { key: 'age', label: 'Age', rank: ranking.age_rank },
+    { key: 'power', label: 'Power', rank: ranking.power_rank, tied: ranking.power_rank_tied, tappable: true },
+    { key: 'franchise', label: 'Franchise', rank: ranking.franchise_rank, tied: ranking.franchise_rank_tied, tappable: true },
+    { key: 'draft', label: 'Draft Capital', rank: ranking.draft_capital_rank, tied: ranking.draft_capital_rank_tied },
+    { key: 'starters', label: 'Starters', rank: ranking.starter_rank, tied: ranking.starter_rank_tied },
+    { key: 'bench', label: 'Bench', rank: ranking.bench_rank, tied: ranking.bench_rank_tied },
+    { key: 'age', label: 'Age', rank: ranking.age_rank, tied: ranking.age_rank_tied },
   ].filter((metric) => metric.rank != null);
 }
 
@@ -286,7 +289,7 @@ function TeamSnapshotSection({
               <MetricCard
                 key={metric.key}
                 label={metric.label}
-                value={metric.rank != null ? `#${metric.rank}` : null}
+                value={metric.rank != null ? formatRank(metric.rank, metric.tied) : null}
                 percentile={percentile}
                 valueColor={percentile != null ? percentileColor(percentile, colors) : undefined}
                 onPress={metric.tappable ? onOpenTeams : undefined}

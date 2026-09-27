@@ -987,7 +987,7 @@ def render_draft_team_cards(
             + ">"
             + f"<div class='draft-team-kicker'>{escape(kicker)}</div>"
             + f"<div class='draft-team-name'>{escape(_safe_text(row.get('team_name')))}</div>"
-            + f"<div class='draft-team-meta'>Draft capital {format_score(row.get('draft_capital'))} | Rank {format_rank(row.get('draft_capital_rank'))}</div>"
+            + f"<div class='draft-team-meta'>Draft capital {format_score(row.get('draft_capital'))} | Rank {format_rank(row.get('draft_capital_rank'), tied=bool(row.get('draft_capital_rank_tied')))}</div>"
             + f"<div class='draft-team-note'>{escape(note_fn(row))}</div>"
             + "</div>"
         )

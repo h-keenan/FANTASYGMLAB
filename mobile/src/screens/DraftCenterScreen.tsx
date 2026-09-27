@@ -17,6 +17,7 @@ import GridBackground from '../components/GridBackground';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
+import { formatRank } from '../lib/percentile';
 import { contrastTextColor } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -173,20 +174,20 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
             <View style={styles.tileRow}>
               <PostureTile
                 label="Draft Capital"
-                value={posture.draft_capital_rank != null ? `#${posture.draft_capital_rank}` : '—'}
+                value={formatRank(posture.draft_capital_rank, posture.draft_capital_rank_tied)}
                 note={posture.draft_capital != null ? `${Math.round(posture.draft_capital)} total capital` : ''}
                 first={posture.draft_capital_rank === 1}
               />
               <PostureTile
                 label="Future Capital"
-                value={posture.future_draft_capital_rank != null ? `#${posture.future_draft_capital_rank}` : '—'}
+                value={formatRank(posture.future_draft_capital_rank, posture.future_draft_capital_rank_tied)}
                 note={posture.future_draft_capital != null ? `${Math.round(posture.future_draft_capital)} beyond this draft` : ''}
                 first={posture.future_draft_capital_rank === 1}
               />
               <PostureTile
                 label="Strategy"
                 value={posture.strategy_display || '—'}
-                note={`Power #${posture.power_rank ?? '—'} · Franchise #${posture.franchise_rank ?? '—'}`}
+                note={`Power ${formatRank(posture.power_rank, posture.power_rank_tied)} · Franchise ${formatRank(posture.franchise_rank, posture.franchise_rank_tied)}`}
               />
             </View>
             <AnimatedCard

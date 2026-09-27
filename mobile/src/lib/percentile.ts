@@ -75,6 +75,19 @@ export function percentileFromRank(rank: number | null | undefined, totalTeams: 
   return Math.round(((totalTeams - rank) / (totalTeams - 1)) * 100);
 }
 
+/** "#4" for a rank unique to one team, "T4" when 2+ teams share that exact
+ * dense rank (see modules.league_rankings.add_rank_tie_metadata /
+ * modules.league_workspace_ui._format_rank on the backend — the rank value
+ * itself is already correct dense-rank math, this only adds the tie label).
+ * Every screen that renders one of the league_rankings-derived team ranks
+ * (power/franchise/draft-capital/starter/bench/age/future-draft-capital)
+ * should format through this rather than building its own `#${n}` string, so
+ * the tie indicator can't drift out of sync between screens. */
+export function formatRank(rank: number | null | undefined, tied?: boolean): string {
+  if (rank == null || !Number.isFinite(rank) || rank <= 0) return '—';
+  return `${tied ? 'T' : '#'}${Math.round(rank)}`;
+}
+
 /** Real, not fabricated: the same percentile the badge text already shows,
  * just given a direction — at/above the 50th percentile reads as a trend
  * up, below it a trend down. Never a week-over-week delta (this app has no

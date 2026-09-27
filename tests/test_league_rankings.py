@@ -238,3 +238,174 @@ def test_build_draft_workspace_frame_merges_real_intel_when_provided():
     assert row["age_rank"] == 3
     assert row["avg_age"] == 26.5
     assert row["strategy_display"] == "Aggressive Rebuild"
+
+
+# --- add_rank_tie_metadata --------------------------------------------------
+#
+# The rank VALUES here are never touched — they already come from
+# Series.rank(method="dense", ...), which already makes tied entities share
+# one identical integer rank. add_rank_tie_metadata only adds the display
+# metadata (`<col>_tied` / `<col>_tie_count`) so a UI can render "T4" for a
+# shared rank instead of an equally-precise-looking bare "#4".
+
+
+def test_add_rank_tie_metadata_no_ties_are_all_plain():
+    df = pd.DataFrame({"power_rank": [1, 2, 3, 4]})
+    result = league_rankings.add_rank_tie_metadata(df, ["power_rank"])
+    assert list(result["power_rank_tied"]) == [False, False, False, False]
+    assert list(result["power_rank_tie_count"]) == [1, 1, 1, 1]
+
+
+def test_add_rank_tie_metadata_two_way_tie():
+    # Two rosters dense-ranked #2 (a genuine tie); #1 and #4 remain unique.
+    df = pd.DataFrame({"power_rank": [1, 2, 2, 3]})
+    result = league_rankings.add_rank_tie_metadata(df, ["power_rank"])
+    assert list(result["power_rank_tied"]) == [False, True, True, False]
+    assert list(result["power_rank_tie_count"]) == [1, 2, 2, 1]
+
+
+def test_add_rank_tie_metadata_three_plus_way_tie():
+    # Three rosters share dense rank #1; the rest are unique.
+    df = pd.DataFrame({"power_rank": [1, 1, 1, 2, 3]})
+    result = league_rankings.add_rank_tie_metadata(df, ["power_rank"])
+    assert list(result["power_rank_tied"]) == [True, True, True, False, False]
+    assert list(result["power_rank_tie_count"]) == [3, 3, 3, 1, 1]
+
+
+def test_add_rank_tie_metadata_every_team_tied_does_not_break():
+    # Edge case: every roster dense-ranked #1 (e.g. every score identical).
+    # Still must render tied for all, not crash or silently drop the column.
+    df = pd.DataFrame({"power_rank": [1, 1, 1, 1]})
+    result = league_rankings.add_rank_tie_metadata(df, ["power_rank"])
+    assert list(result["power_rank_tied"]) == [True, True, True, True]
+    assert list(result["power_rank_tie_count"]) == [4, 4, 4, 4]
+
+
+def test_add_rank_tie_metadata_handles_multiple_columns_independently():
+    df = pd.DataFrame(
+        {
+            "power_rank": [1, 1, 2],
+            "franchise_rank": [1, 2, 3],
+        }
+    )
+    result = league_rankings.add_rank_tie_metadata(df, ["power_rank", "franchise_rank"])
+    assert list(result["power_rank_tied"]) == [True, True, False]
+    assert list(result["franchise_rank_tied"]) == [False, False, False]
+
+
+def test_add_rank_tie_metadata_missing_column_is_skipped_not_errored():
+    df = pd.DataFrame({"power_rank": [1, 2]})
+    result = league_rankings.add_rank_tie_metadata(df, ["power_rank", "nonexistent_rank"])
+    assert "power_rank_tied" in result.columns
+    assert "nonexistent_rank_tied" not in result.columns
+
+
+def test_add_rank_tie_metadata_on_empty_frame_is_a_no_op():
+    empty = pd.DataFrame()
+    result = league_rankings.add_rank_tie_metadata(empty, ["power_rank"])
+    assert result.empty
+
+
+def test_build_draft_capital_summary_exposes_tie_metadata_for_a_two_way_tie():
+    df_summary = pd.DataFrame(
+        [
+            {"roster_id": 1, "team_name": "Alpha", "owner_name": "A", "avatar_url": "", "mode": "contend"},
+            {"roster_id": 2, "team_name": "Beta", "owner_name": "B", "avatar_url": "", "mode": "rebuild"},
+            {"roster_id": 3, "team_name": "Gamma", "owner_name": "C", "avatar_url": "", "mode": "retool"},
+        ]
+    )
+    draft_picks = [
+        {"owner_roster_id": 1, "round": 1, "season": 2027, "score": 6500},
+        {"owner_roster_id": 2, "round": 1, "season": 2027, "score": 6500},
+        {"owner_roster_id": 3, "round": 4, "season": 2027, "score": 650},
+    ]
+    result = league_rankings.build_draft_capital_summary(df_summary, draft_picks)
+    by_roster = {int(row["roster_id"]): row for _, row in result.iterrows()}
+    # Rosters 1 and 2 both hold 6500 draft capital -> tied for rank 1.
+    assert by_roster[1]["draft_capital_rank"] == 1
+    assert by_roster[2]["draft_capital_rank"] == 1
+    assert by_roster[1]["draft_capital_rank_tied"] is True
+    assert by_roster[2]["draft_capital_rank_tied"] is True
+    assert by_roster[1]["draft_capital_rank_tie_count"] == 2
+    assert by_roster[3]["draft_capital_rank_tied"] is False
+    assert by_roster[3]["draft_capital_rank_tie_count"] == 1
+
+
+def test_build_league_display_frame_exposes_tie_metadata_for_power_and_franchise_rank():
+    df_summary = pd.DataFrame(
+        [
+            {
+                "roster_id": 1,
+                "team_name": "Alpha",
+                "total_score": 9000,
+                "raw_roster_score": 9000,
+                "starter_score": 6000,
+                "bench_score": 3000,
+                "mode": "contend",
+            },
+            {
+                "roster_id": 2,
+                "team_name": "Beta",
+                "total_score": 9000,
+                "raw_roster_score": 9000,
+                "starter_score": 6000,
+                "bench_score": 3000,
+                "mode": "contend",
+            },
+            {
+                "roster_id": 3,
+                "team_name": "Gamma",
+                "total_score": 3000,
+                "raw_roster_score": 3000,
+                "starter_score": 2000,
+                "bench_score": 1000,
+                "mode": "rebuild",
+            },
+        ]
+    )
+    result = league_rankings.build_league_display_frame(df_summary, None, include_picks=False)
+    by_roster = {int(row["roster_id"]): row for _, row in result.iterrows()}
+    # Rosters 1 and 2 have identical total_score -> tied power_rank #1.
+    assert by_roster[1]["power_rank"] == by_roster[2]["power_rank"] == 1
+    assert by_roster[1]["power_rank_tied"] is True
+    assert by_roster[2]["power_rank_tied"] is True
+    assert by_roster[1]["power_rank_tie_count"] == 2
+    assert by_roster[3]["power_rank_tied"] is False
+    # include_picks=False means overall_rank aliases power_rank, tie info included.
+    assert by_roster[1]["overall_rank_tied"] is True
+    assert by_roster[3]["overall_rank_tied"] is False
+
+
+def test_add_league_detail_ranks_exposes_tie_metadata_for_a_three_way_tie():
+    df_display = pd.DataFrame(
+        [
+            {"roster_id": 1, "raw_roster_score": 5000, "current_roster_score": 5000, "starter_score": 3000, "bench_score": 2000, "avg_age": 25.0},
+            {"roster_id": 2, "raw_roster_score": 5000, "current_roster_score": 5000, "starter_score": 3000, "bench_score": 2000, "avg_age": 25.0},
+            {"roster_id": 3, "raw_roster_score": 5000, "current_roster_score": 5000, "starter_score": 3000, "bench_score": 2000, "avg_age": 25.0},
+            {"roster_id": 4, "raw_roster_score": 1000, "current_roster_score": 1000, "starter_score": 500, "bench_score": 500, "avg_age": 30.0},
+        ]
+    )
+    result = league_rankings.add_league_detail_ranks(df_display)
+    by_roster = {int(row["roster_id"]): row for _, row in result.iterrows()}
+    for roster_id in (1, 2, 3):
+        assert by_roster[roster_id]["starter_rank_tied"] is True
+        assert by_roster[roster_id]["starter_rank_tie_count"] == 3
+        assert by_roster[roster_id]["age_rank_tied"] is True
+    assert by_roster[4]["starter_rank_tied"] is False
+    assert by_roster[4]["age_rank_tied"] is False
+
+
+def test_build_draft_workspace_frame_exposes_future_draft_capital_rank_tie_metadata():
+    draft_capital_summary = pd.DataFrame(
+        [
+            {"roster_id": 1, "team_name": "Alpha", "mode": "rebuild", "draft_capital_rank": 1, "draft_capital": 6000, "pick_count": 2, "first_rounders": 1, "pick_value_2027": 4000},
+            {"roster_id": 2, "team_name": "Beta", "mode": "rebuild", "draft_capital_rank": 2, "draft_capital": 4000, "pick_count": 1, "first_rounders": 0, "pick_value_2027": 4000},
+        ]
+    )
+    result = league_rankings.build_draft_workspace_frame(draft_capital_summary, None, draft_year=2026)
+    by_roster = {int(row["roster_id"]): row for _, row in result.iterrows()}
+    # Both rosters hold identical 2027 (future) draft capital -> tied.
+    assert by_roster[1]["future_draft_capital_rank"] == by_roster[2]["future_draft_capital_rank"] == 1
+    assert by_roster[1]["future_draft_capital_rank_tied"] is True
+    assert by_roster[2]["future_draft_capital_rank_tied"] is True
+    assert by_roster[1]["future_draft_capital_rank_tie_count"] == 2

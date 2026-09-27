@@ -16,7 +16,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { api } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
-import { percentileColor, percentileFromRank } from '../lib/percentile';
+import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -31,6 +31,7 @@ interface TeamRow {
   playerIds: string[];
   isMine: boolean;
   powerRank: number | null;
+  powerRankTied: boolean;
   recordLabel: string | null;
   archetypeLabel: string | null;
   tradeTendency: string | null;
@@ -91,6 +92,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
               playerIds: players.map(String),
               isMine: Boolean(myRosterId) && rosterId === myRosterId,
               powerRank: ranking?.power_rank ?? null,
+              powerRankTied: Boolean(ranking?.power_rank_tied),
               recordLabel: ranking?.record_label ?? null,
               archetypeLabel: ranking?.archetype_label ?? null,
               tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
@@ -265,7 +267,7 @@ function TeamRowCard({
           ) : (
             <AppText style={styles.rankLabel}>POWER</AppText>
           )}
-          <AppText style={[styles.rankValue, { color: rankColor }]}>#{item.powerRank}</AppText>
+          <AppText style={[styles.rankValue, { color: rankColor }]}>{formatRank(item.powerRank, item.powerRankTied)}</AppText>
         </View>
       ) : (
         <View style={styles.countPill}>

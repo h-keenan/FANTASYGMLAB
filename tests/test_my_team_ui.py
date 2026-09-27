@@ -339,7 +339,7 @@ class TestMyTeamUI(unittest.TestCase):
             render_summary_tiles=render_summary_tiles,
             player_display_name=lambda player: str(player.get("name")),
             format_score=lambda value: str(value),
-            format_rank=lambda value: f"#{value}",
+            format_rank=lambda value, tied=False: f"#{value}",
             truncate_text=lambda value, limit: value[:limit],
                 team_strategy_label=lambda value: str(value).title(),
             )
@@ -453,7 +453,7 @@ class TestMyTeamUI(unittest.TestCase):
                 render_summary_tiles=Mock(),
                 player_display_name=lambda player: str(player.get("name")),
                 format_score=lambda value: str(value),
-                format_rank=lambda value: f"#{value}",
+                format_rank=lambda value, tied=False: f"#{value}",
                 truncate_text=lambda value, limit: value[:limit],
                 team_strategy_label=lambda value: str(value).title(),
                 league_settings={"league_format": "Redraft"},

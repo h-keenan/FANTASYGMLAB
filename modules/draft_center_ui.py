@@ -819,9 +819,9 @@ def _draft_workspace_team_lines(
             row.get("strategy_display"),
             tidy_label(row.get("mode", "unknown")),
         )
-        draft_rank = _format_rank(row.get("draft_capital_rank"))
-        future_rank = _format_rank(row.get("future_draft_capital_rank"))
-        power_rank = _format_rank(row.get("power_rank"))
+        draft_rank = _format_rank(row.get("draft_capital_rank"), tied=bool(row.get("draft_capital_rank_tied")))
+        future_rank = _format_rank(row.get("future_draft_capital_rank"), tied=bool(row.get("future_draft_capital_rank_tied")))
+        power_rank = _format_rank(row.get("power_rank"), tied=bool(row.get("power_rank_tied")))
         firsts = _safe_positive_int(row.get("first_rounders"), 0)
 
         if mode in {"pick_buyer", "buy_picks"}:
@@ -859,11 +859,11 @@ def _draft_workspace_team_lines(
             )
         if include_draft:
             details.append(
-                f"Draft {_format_rank(row.get('draft_capital_rank'))}"
+                f"Draft {_format_rank(row.get('draft_capital_rank'), tied=bool(row.get('draft_capital_rank_tied')))}"
             )
         if include_future:
             details.append(
-                f"Future {_format_rank(row.get('future_draft_capital_rank'))}"
+                f"Future {_format_rank(row.get('future_draft_capital_rank'), tied=bool(row.get('future_draft_capital_rank_tied')))}"
             )
         implication = (
             _recommendation_reason_text(
@@ -922,14 +922,18 @@ def render_your_draft_posture(
             },
             {
                 "label": "Draft Capital Rank",
-                "value": _format_rank(team_row.get("draft_capital_rank")),
+                "value": _format_rank(
+                    team_row.get("draft_capital_rank"),
+                    tied=bool(team_row.get("draft_capital_rank_tied")),
+                ),
                 "note": f"{_format_score(team_row.get('draft_capital'))} total capital",
                 "tone": "franchise",
             },
             {
                 "label": "Future Capital Rank",
                 "value": _format_rank(
-                    team_row.get("future_draft_capital_rank")
+                    team_row.get("future_draft_capital_rank"),
+                    tied=bool(team_row.get("future_draft_capital_rank_tied")),
                 ),
                 "note": f"{_format_score(team_row.get('future_draft_capital'))} beyond the current rookie draft",
                 "tone": "opportunity",
@@ -942,7 +946,10 @@ def render_your_draft_posture(
                         team_row.get("mode")
                     ),
                 ),
-                "note": f"Power {_format_rank(team_row.get('power_rank'))} | Franchise {_format_rank(team_row.get('franchise_rank'))}",
+                "note": (
+                    f"Power {_format_rank(team_row.get('power_rank'), tied=bool(team_row.get('power_rank_tied')))} | "
+                    f"Franchise {_format_rank(team_row.get('franchise_rank'), tied=bool(team_row.get('franchise_rank_tied')))}"
+                ),
                 "tone": "strategy",
             },
         ]
@@ -1815,7 +1822,7 @@ def render_draft_capital_dashboard(
         tap_class, tap_attrs = team_tap_markup(row)
         board_rows.append(
             league_workspace_ui.ranked_leaderboard_row_html(
-                rank_label=_format_rank(rank_value),
+                rank_label=_format_rank(rank_value, tied=bool(row.get("draft_capital_rank_tied"))),
                 team_name=_safe_text(row.get("team_name")),
                 owner_text=owner_text,
                 primary_metric=_format_score(row.get("draft_capital")),
@@ -1919,7 +1926,7 @@ def render_team_pick_expanders(
             ),
         )
         expander_label = (
-            f"#{int(row.get('draft_capital_rank') or 0)} {team_name} - "
+            f"{_format_rank(row.get('draft_capital_rank'), tied=bool(row.get('draft_capital_rank_tied')))} {team_name} - "
             f"{_format_score(row.get('draft_capital'))} value, {int(row.get('pick_count') or 0)} picks"
         )
         with st.expander(expander_label, expanded=False):

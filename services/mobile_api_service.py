@@ -759,11 +759,17 @@ def get_league_team_rankings(
                 "points_for": _clean_json_value(standing.get("points_for")),
                 "points_against": _clean_json_value(standing.get("points_against")),
                 "power_rank": _clean_json_value(row.get("power_rank")),
+                "power_rank_tied": bool(row.get("power_rank_tied")),
                 "franchise_rank": _clean_json_value(row.get("franchise_rank")),
+                "franchise_rank_tied": bool(row.get("franchise_rank_tied")),
                 "draft_capital_rank": _clean_json_value(row.get("draft_capital_rank")),
+                "draft_capital_rank_tied": bool(row.get("draft_capital_rank_tied")),
                 "starter_rank": _clean_json_value(row.get("starter_rank")),
+                "starter_rank_tied": bool(row.get("starter_rank_tied")),
                 "bench_rank": _clean_json_value(row.get("bench_rank")),
+                "bench_rank_tied": bool(row.get("bench_rank_tied")),
                 "age_rank": _clean_json_value(row.get("age_rank")),
+                "age_rank_tied": bool(row.get("age_rank_tied")),
                 "average_age": _clean_json_value(row.get("avg_age")),
                 "strategy": _clean_json_value(row.get("strategy")),
                 "strategy_label": _clean_json_value(row.get("strategy_label")),
@@ -900,12 +906,16 @@ def get_league_draft_center(
                 "note": profile_posture["note"],
                 "tone": profile_posture["tone"],
                 "draft_capital_rank": _clean_json_value(team_row.get("draft_capital_rank")),
+                "draft_capital_rank_tied": bool(team_row.get("draft_capital_rank_tied")),
                 "draft_capital": _clean_json_value(team_row.get("draft_capital")),
                 "future_draft_capital_rank": _clean_json_value(team_row.get("future_draft_capital_rank")),
+                "future_draft_capital_rank_tied": bool(team_row.get("future_draft_capital_rank_tied")),
                 "future_draft_capital": _clean_json_value(team_row.get("future_draft_capital")),
                 "strategy_display": _clean_json_value(team_row.get("strategy_display")),
                 "power_rank": _clean_json_value(team_row.get("power_rank")),
+                "power_rank_tied": bool(team_row.get("power_rank_tied")),
                 "franchise_rank": _clean_json_value(team_row.get("franchise_rank")),
+                "franchise_rank_tied": bool(team_row.get("franchise_rank_tied")),
                 "first_rounders": _clean_json_value(team_row.get("first_rounders")),
                 "pick_count": _clean_json_value(team_row.get("pick_count")),
             }
@@ -3244,7 +3254,9 @@ def get_league_dashboard(
     )
 
     power_rank = None
+    power_rank_tied = False
     franchise_rank = None
+    franchise_rank_tied = False
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
@@ -3253,7 +3265,9 @@ def get_league_dashboard(
         match = rankings_frame[rankings_frame["roster_id"].astype(str) == my_roster_id]
         if not match.empty:
             power_rank = _clean_json_value(match.iloc[0].get("power_rank"))
+            power_rank_tied = bool(match.iloc[0].get("power_rank_tied"))
             franchise_rank = _clean_json_value(match.iloc[0].get("franchise_rank"))
+            franchise_rank_tied = bool(match.iloc[0].get("franchise_rank_tied"))
 
     roster_settings = my_roster.get("settings") or {}
     team_snapshot = {
@@ -3274,7 +3288,9 @@ def get_league_dashboard(
         "injured_starters": _clean_json_value(injury_display_context.get("injured_starters")),
         "average_age": round(average_age, 1) if average_age is not None else None,
         "power_rank": power_rank,
+        "power_rank_tied": power_rank_tied,
         "franchise_rank": franchise_rank,
+        "franchise_rank_tied": franchise_rank_tied,
     }
 
     # Free-tier cap matches the web app's own gate (app.py:

@@ -177,11 +177,17 @@ export interface TeamRanking {
   points_for: number | null;
   points_against: number | null;
   power_rank: number | null;
+  power_rank_tied: boolean;
   franchise_rank: number | null;
+  franchise_rank_tied: boolean;
   draft_capital_rank: number | null;
+  draft_capital_rank_tied: boolean;
   starter_rank: number | null;
+  starter_rank_tied: boolean;
   bench_rank: number | null;
+  bench_rank_tied: boolean;
   age_rank: number | null;
+  age_rank_tied: boolean;
   average_age: number | null;
   strategy: string | null;
   strategy_label: string | null;
@@ -216,12 +222,16 @@ export interface DraftPosture {
   note: string;
   tone: string;
   draft_capital_rank: number | null;
+  draft_capital_rank_tied: boolean;
   draft_capital: number | null;
   future_draft_capital_rank: number | null;
+  future_draft_capital_rank_tied: boolean;
   future_draft_capital: number | null;
   strategy_display: string | null;
   power_rank: number | null;
+  power_rank_tied: boolean;
   franchise_rank: number | null;
+  franchise_rank_tied: boolean;
   first_rounders: number | null;
   pick_count: number | null;
 }
@@ -1086,7 +1096,9 @@ export interface TeamSnapshot {
   injured_starters: number | null;
   average_age: number | null;
   power_rank: number | null;
+  power_rank_tied: boolean;
   franchise_rank: number | null;
+  franchise_rank_tied: boolean;
 }
 
 export interface DashboardEntitlementInfo extends EntitlementGateInfo {

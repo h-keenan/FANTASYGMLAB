@@ -7,7 +7,7 @@ import InsightRow from './InsightRow';
 import MetricCard from './MetricCard';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { TeamRanking } from '../lib/api';
-import { percentileColor, percentileFromRank } from '../lib/percentile';
+import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { spacing, type ThemeColors } from '../theme';
 
 /**
@@ -71,7 +71,7 @@ export default function TeamAnalysisPanel({
               <MetricCard
                 key={metric.key}
                 label={metric.label}
-                value={metric.rank != null ? `#${metric.rank}` : null}
+                value={metric.rank != null ? formatRank(metric.rank, metric.tied) : null}
                 percentile={percentile}
                 valueColor={percentile != null ? percentileColor(percentile, colors) : undefined}
                 onPress={metric.onPress}
@@ -136,6 +136,9 @@ interface RankMetric {
   key: string;
   label: string;
   rank: number | null;
+  /** 2+ teams share this exact dense rank — renders "T4" instead of "#4"
+   * (see modules.league_rankings.add_rank_tie_metadata on the backend). */
+  tied: boolean;
   /** Presence, not a separate boolean, is what makes a tile tappable — same
    * `onPress`-driven pattern MetricCard/InsightRow already use elsewhere. */
   onPress?: () => void;
@@ -161,12 +164,12 @@ function buildRankMetrics(
   },
 ): RankMetric[] {
   return [
-    { key: 'power', label: 'Power', rank: team.power_rank, onPress: callbacks.onOpenTeams },
-    { key: 'franchise', label: 'Franchise', rank: team.franchise_rank, onPress: callbacks.onOpenTeams },
-    { key: 'draft', label: 'Draft Capital', rank: team.draft_capital_rank, onPress: callbacks.onOpenDraftCenter },
-    { key: 'starters', label: 'Starters', rank: team.starter_rank, onPress: callbacks.onOpenStarters },
-    { key: 'bench', label: 'Bench', rank: team.bench_rank, onPress: callbacks.onOpenBench },
-    { key: 'age', label: 'Age', rank: team.age_rank },
+    { key: 'power', label: 'Power', rank: team.power_rank, tied: team.power_rank_tied, onPress: callbacks.onOpenTeams },
+    { key: 'franchise', label: 'Franchise', rank: team.franchise_rank, tied: team.franchise_rank_tied, onPress: callbacks.onOpenTeams },
+    { key: 'draft', label: 'Draft Capital', rank: team.draft_capital_rank, tied: team.draft_capital_rank_tied, onPress: callbacks.onOpenDraftCenter },
+    { key: 'starters', label: 'Starters', rank: team.starter_rank, tied: team.starter_rank_tied, onPress: callbacks.onOpenStarters },
+    { key: 'bench', label: 'Bench', rank: team.bench_rank, tied: team.bench_rank_tied, onPress: callbacks.onOpenBench },
+    { key: 'age', label: 'Age', rank: team.age_rank, tied: team.age_rank_tied },
   ].filter((metric) => metric.rank != null);
 }
 
