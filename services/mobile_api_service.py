@@ -51,6 +51,11 @@ Deployment topology (Render):
   - POST /v1/preferences                        — partial update to those same preferences
   - GET  /v1/leagues/{id}/gm-stance             — the caller's remembered team strategy for this league
   - POST /v1/leagues/{id}/gm-stance             — set/update that stance (null strategy clears it)
+  - GET    /v1/scouting/prospects                    — shared college prospect catalog + aggregate + my report + watchlist flag
+  - POST   /v1/scouting/prospects/{id}/report        — upsert my own scouting grade/round projection/note
+  - DELETE /v1/scouting/prospects/{id}/report        — remove my own scouting report
+  - POST   /v1/scouting/watchlist/{id}                — follow a prospect (personal watchlist)
+  - DELETE /v1/scouting/watchlist/{id}                — unfollow a prospect
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -90,6 +95,7 @@ from modules import (
     account_store,
     auth_supabase,
     canonical_player_ranking,
+    college_scouting,
     dashboard_engine,
     draft_assistant,
     draft_center_ui,
@@ -927,7 +933,7 @@ def get_league_draft_center(
 def get_league_draft_picks(
     league_id: str,
     lens: str = "Dynasty",
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Every draft pick asset in the league, for the mobile Trade Analyzer's
     Players/Picks roster browser and the Draft Center's Pick Detail screen.
@@ -988,8 +994,26 @@ def get_league_draft_picks(
             )
         )
     )
+    # Crowdsourced college scouting signal (modules/college_scouting.py),
+    # cached ~10min since it's identical for every caller — see
+    # get_cached_crowd_class_strength_by_year's own docstring for why this
+    # isn't refetched per request. Gated by class_strength_signal_enabled()
+    # (default off — see that function's docstring); {} is always the safe
+    # "no crowd signal" value, which _rookie_class_strength_multiplier
+    # already treats as pure editorial class strength, unchanged.
+    crowd_class_strength = (
+        college_scouting.get_cached_crowd_class_strength_by_year(
+            auth_supabase.get_supabase_config(), str(user.get("_access_token") or "")
+        )
+        if college_scouting.class_strength_signal_enabled()
+        else {}
+    )
     picks = trade_ideas.list_draft_pick_assets(
-        league_id, df_summary, league_settings=settings, draft_status=draft_status
+        league_id,
+        df_summary,
+        league_settings=settings,
+        draft_status=draft_status,
+        crowd_class_strength_by_year=crowd_class_strength,
     )
     projected = [
         {
@@ -1605,7 +1629,19 @@ def post_trade_analyzer(
             valued, league_id, score_field=score_field, league_settings=settings
         )
         if not pick_summary.empty:
-            all_picks = trade_ideas.list_draft_pick_assets(league_id, pick_summary, league_settings=settings)
+            crowd_class_strength = (
+                college_scouting.get_cached_crowd_class_strength_by_year(
+                    auth_supabase.get_supabase_config(), str(user.get("_access_token") or "")
+                )
+                if college_scouting.class_strength_signal_enabled()
+                else {}
+            )
+            all_picks = trade_ideas.list_draft_pick_assets(
+                league_id,
+                pick_summary,
+                league_settings=settings,
+                crowd_class_strength_by_year=crowd_class_strength,
+            )
             picks_by_id = {
                 f"{pick.get('season')}:{pick.get('round')}:{pick.get('original_roster_id')}": pick
                 for pick in all_picks
@@ -2779,6 +2815,187 @@ def set_gm_target_untouchable(
             "untouchable": bool(payload.untouchable),
         },
         on_conflict="user_id,league_id,player_id",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+# ---------------------------------------------------------------------------
+# College Football Prospect Scouting — crowdsourced shared signal (all users
+# grade the same prospect pool; the aggregate feeds draft-class strength) +
+# a personal watchlist layered on top. See modules/college_scouting.py and
+# docs/supabase_college_scouting.sql (manual migration required — every
+# handler below fails soft to empty/no-op if it isn't applied yet).
+# ---------------------------------------------------------------------------
+
+
+@app.get("/v1/scouting/prospects")
+def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Shared prospect catalog + shared scouting aggregate + the caller's own
+    report and watchlist status, in one round trip (powers the mobile
+    College Prospects list screen).
+
+    Fails soft: if scouting_reports/prospect_watchlist aren't reachable yet
+    (migration not applied), this still returns the prospect catalog with
+    empty aggregates rather than erroring the whole screen — same posture as
+    every other Supabase-backed mobile feature in this file.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+
+    prospects, used_placeholder = college_scouting.fetch_all_prospects(config, access_token)
+    reports, reports_error = college_scouting.fetch_all_scouting_reports(config, access_token)
+    watchlist_ids: list[str] = []
+    if user_id:
+        watchlist_rows, _watchlist_error = account_store.fetch_rows(
+            config, access_token, college_scouting.WATCHLIST_TABLE, user_id=user_id
+        )
+        watchlist_ids = [str(row.get("prospect_id")) for row in watchlist_rows if row.get("prospect_id")]
+
+    rows = college_scouting.build_prospect_views(
+        prospects, reports, my_user_id=user_id, watchlist_prospect_ids=watchlist_ids
+    )
+    return {
+        "ok": True,
+        "prospects": rows,
+        "used_placeholder_catalog": used_placeholder,
+        "reason": "scouting_reports_not_available" if reports_error else "",
+    }
+
+
+class SubmitScoutingReportRequest(BaseModel):
+    grade: int
+    round_projection: int | None = None
+    note: str = ""
+
+
+@app.post("/v1/scouting/prospects/{prospect_id}/report")
+def submit_scouting_report(
+    prospect_id: str,
+    body: SubmitScoutingReportRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Upsert the caller's own scouting grade for one prospect.
+
+    Idempotent — one report per (user, prospect) (scouting_reports' primary
+    key), so re-submitting simply replaces the caller's prior grade/note.
+    Never writes any other user's row and never touches the aggregate
+    directly — the aggregate is always recomputed from every report by
+    modules.college_scouting.aggregate_prospect_scouting.
+    """
+
+    grade = college_scouting.normalize_grade(body.grade)
+    if grade is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"grade must be an integer {college_scouting.MIN_GRADE}-{college_scouting.MAX_GRADE}.",
+        )
+    round_projection = college_scouting.normalize_round_projection(body.round_projection)
+    if body.round_projection is not None and round_projection is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "round_projection must be an integer "
+                f"{college_scouting.MIN_ROUND_PROJECTION}-{college_scouting.MAX_ROUND_PROJECTION} or omitted."
+            ),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    payload: dict[str, Any] = {
+        "user_id": user_id,
+        "prospect_id": prospect_id,
+        "grade": grade,
+        "note": body.note.strip()[:280],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if round_projection is not None:
+        payload["round_projection"] = round_projection
+    ok, error = account_store.upsert_row(
+        config,
+        access_token,
+        college_scouting.SCOUTING_REPORTS_TABLE,
+        payload,
+        on_conflict="user_id,prospect_id",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+@app.delete("/v1/scouting/prospects/{prospect_id}/report")
+def delete_scouting_report(
+    prospect_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Remove the caller's own scouting report (their grade stops
+    contributing to the shared aggregate on the next read)."""
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+    ok, error = account_store.delete_rows(
+        config,
+        access_token,
+        college_scouting.SCOUTING_REPORTS_TABLE,
+        query=f"user_id=eq.{user_id}&prospect_id=eq.{prospect_id}",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+@app.post("/v1/scouting/watchlist/{prospect_id}")
+def add_prospect_to_watchlist(
+    prospect_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Follow a prospect on the caller's personal watchlist. Idempotent."""
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+    ok, error = account_store.upsert_row(
+        config,
+        access_token,
+        college_scouting.WATCHLIST_TABLE,
+        {"user_id": user_id, "prospect_id": prospect_id},
+        on_conflict="user_id,prospect_id",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+@app.delete("/v1/scouting/watchlist/{prospect_id}")
+def remove_prospect_from_watchlist(
+    prospect_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Unfollow a prospect. Never touches scouting_reports — removing a
+    watchlist follow does not delete the caller's scouting grade, if any."""
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+    ok, error = account_store.delete_rows(
+        config,
+        access_token,
+        college_scouting.WATCHLIST_TABLE,
+        query=f"user_id=eq.{user_id}&prospect_id=eq.{prospect_id}",
     )
     if not ok:
         return {"ok": False, "reason": "not_available"}

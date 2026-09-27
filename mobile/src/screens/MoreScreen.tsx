@@ -15,6 +15,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { currentLeagueContext } from '../navigation/navigationRef';
 import { useAuth } from '../context/AuthContext';
+import { useCollegeInterest } from '../context/CollegeInterestContext';
 import { useDensity, type UiDensity } from '../context/DensityContext';
 import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
@@ -60,6 +61,7 @@ export default function MoreScreen({ navigation }: Props) {
   const { deleteAccount, session } = useAuth();
   const [deleting, setDeleting] = useState(false);
   const { showcaseMode, setShowcaseMode } = useShowcaseMode();
+  const { status: collegeInterestStatus } = useCollegeInterest();
   // Dev/founder accounts only (lib/showcaseMode.ts allowlist) — the row
   // doesn't exist for anyone else, so there's nothing for a normal user to
   // stumble into.
@@ -232,6 +234,22 @@ export default function MoreScreen({ navigation }: Props) {
             showDivider={false}
           />
         </AnimatedCard>
+
+        {collegeInterestStatus === 'yes' ? (
+          <>
+            <AppText style={styles.sectionLabel}>Scouting</AppText>
+            <AnimatedCard style={styles.groupCard}>
+              <SettingsRow
+                icon="school-outline"
+                iconColor={colors.accent}
+                label="College Prospects"
+                description="Grade incoming prospects and follow your own watchlist"
+                onPress={() => navigation.navigate('CollegeProspects')}
+                showDivider={false}
+              />
+            </AnimatedCard>
+          </>
+        ) : null}
 
         <AppText style={styles.sectionLabel}>Notifications</AppText>
         <AnimatedCard style={styles.groupCard}>

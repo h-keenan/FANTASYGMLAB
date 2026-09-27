@@ -295,7 +295,7 @@ export default function PickDetailScreen({ route, navigation }: Props) {
               <MultiplierRow
                 label="Class strength"
                 multiplier={num(pick.class_strength_multiplier)}
-                note="How strong this draft class grades overall"
+                note="Editorial grade, blended with crowdsourced college scouting once enough scouts have weighed in"
               />
               <MultiplierRow
                 label="Prospect rankings"

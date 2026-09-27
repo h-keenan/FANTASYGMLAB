@@ -1055,6 +1055,60 @@ export interface PushMutationResponse {
   sent?: number;
 }
 
+// -----------------------------------------------------------------------
+// College Football Prospect Scouting — crowdsourced shared signal (every
+// signed-in user grades the same prospect pool; the aggregate feeds
+// draft-class strength) + a personal watchlist layered on top. See
+// modules/college_scouting.py and docs/supabase_college_scouting.sql.
+// -----------------------------------------------------------------------
+
+export interface ProspectScoutingAggregate {
+  /** null when nobody has scouted this prospect yet — never a fabricated 0. */
+  avg_grade: number | null;
+  scout_count: number;
+  avg_round_projection: number | null;
+}
+
+export interface MyScoutingReport {
+  grade: number | null;
+  round_projection: number | null;
+  note: string;
+}
+
+export interface CollegeProspect {
+  id: string;
+  name: string;
+  position: string;
+  school: string;
+  draft_year: number | null;
+  aggregate: ProspectScoutingAggregate;
+  my_report: MyScoutingReport | null;
+  on_watchlist: boolean;
+}
+
+export interface CollegeProspectsResponse {
+  ok: true;
+  prospects: CollegeProspect[];
+  // True when the real Supabase catalog wasn't reachable/migrated yet and
+  // this list is modules.college_scouting's placeholder fallback.
+  used_placeholder_catalog: boolean;
+  reason: string;
+}
+
+export interface ScoutingMutationResponse {
+  ok: boolean;
+  reason: string;
+}
+
+// Mirrors modules/college_scouting.py's MIN_GRADE/MAX_GRADE/
+// MIN_ROUND_PROJECTION/MAX_ROUND_PROJECTION exactly — the server is the
+// real source of truth (422s outside this range), these just keep the
+// grading UI's picker options in sync without a round trip.
+export const MIN_GRADE = 1;
+export const MAX_GRADE = 5;
+export const MIN_ROUND_PROJECTION = 1;
+export const MAX_ROUND_PROJECTION = 7;
+
 // Matches modules/push_triggers.py's TOGGLEABLE_PUSH_CATEGORIES.
 export type PushCategory = 'top_priority' | 'watch' | 'recap' | 'injury';
 
@@ -1469,6 +1523,28 @@ export const api = {
     authorizedPatch<GmTargetMutationResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}/untouchable`,
       { untouchable },
+    ),
+  getCollegeProspects: () => authorizedFetch<CollegeProspectsResponse>('/v1/scouting/prospects'),
+  submitScoutingReport: (
+    prospectId: string,
+    body: { grade: number; round_projection?: number | null; note?: string },
+  ) =>
+    authorizedPost<ScoutingMutationResponse>(
+      `/v1/scouting/prospects/${encodeURIComponent(prospectId)}/report`,
+      body,
+    ),
+  deleteScoutingReport: (prospectId: string) =>
+    authorizedDelete<ScoutingMutationResponse>(
+      `/v1/scouting/prospects/${encodeURIComponent(prospectId)}/report`,
+    ),
+  addProspectToWatchlist: (prospectId: string) =>
+    authorizedPost<ScoutingMutationResponse>(
+      `/v1/scouting/watchlist/${encodeURIComponent(prospectId)}`,
+      {},
+    ),
+  removeProspectFromWatchlist: (prospectId: string) =>
+    authorizedDelete<ScoutingMutationResponse>(
+      `/v1/scouting/watchlist/${encodeURIComponent(prospectId)}`,
     ),
   getTeamStance: (leagueId: string) =>
     authorizedFetch<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`),
