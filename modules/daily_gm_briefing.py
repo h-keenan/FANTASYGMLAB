@@ -76,6 +76,11 @@ class DailyBriefingItem:
     handoff_context: Mapping[str, Any] | None = None
     player_rank_context: str = ""
     presentation: Mapping[str, Any] | None = None
+    # Real, already-computed tier word for a Next Move priority-ladder tile
+    # (e.g. "Priority"/"Urgent"/"Watch"/"Opportunity" — see
+    # modules.dashboard_engine.NEED_TIER_LABELS). Empty for every other tile;
+    # never a fabricated confidence score.
+    tier_label: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         payload = {field.name: getattr(self, field.name) for field in fields(self)}
@@ -240,6 +245,7 @@ def _item_from_tile(
             tile, scoring_format=scoring_format
         ),
         presentation=_presentation_from_tile(tile),
+        tier_label=_text(tile.get("tier_label")),
     )
 
 

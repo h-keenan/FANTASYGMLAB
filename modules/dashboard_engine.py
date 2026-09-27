@@ -62,6 +62,24 @@ def _text(value: object, default: str = "") -> str:
     return text if text else default
 
 
+# Real, already-computed signal for the Next Move priority ladder (roster
+# need > injury pressure > future risk > upgrade opportunity — see
+# select_need_headline/app.py's team_need_display below). This is a strict
+# step-function, not a numeric confidence score, so rather than fabricate a
+# percentage the ladder doesn't produce, each rung gets an honest tier word
+# describing *why* it surfaced — shown next to the tile using the same
+# badge/label visual language as Trade Ideas' confidence chip (see
+# modules.trade_visual_language). Shared with app.py's team_need_display so
+# web and mobile agree on the wording for the identical category.
+NEED_TIER_LABELS: dict[str, str] = {
+    "true_need": "Priority",
+    "injury_pressure": "Urgent",
+    "future_risk": "Watch",
+    "upgrade": "Opportunity",
+    "balanced": "",
+}
+
+
 def select_need_headline(assessment: TeamNeedsAssessment) -> dict[str, str]:
     """Faithful copy of app.py's team_need_display — see module docstring."""
 
@@ -77,37 +95,47 @@ def select_need_headline(assessment: TeamNeedsAssessment) -> dict[str, str]:
     ]
     if current_needs:
         return {
+            "category": "true_need",
             "label": "Biggest Team Need",
             "value": current_needs[0],
             "note": "Starter and depth coverage identify this as the clearest current roster deficiency.",
             "tone": "need",
+            "tier_label": NEED_TIER_LABELS["true_need"],
         }
     if assessment.temporary_injury_pressures:
         return {
+            "category": "injury_pressure",
             "label": "Injury Pressure",
             "value": assessment.temporary_injury_pressures[0],
             "note": "Current availability is creating temporary pressure in this room.",
             "tone": "risk",
+            "tier_label": NEED_TIER_LABELS["injury_pressure"],
         }
     if assessment.future_risks:
         return {
+            "category": "future_risk",
             "label": "Future Roster Risk",
             "value": assessment.future_risks[0],
             "note": "Current coverage is playable, but future stability is limited.",
             "tone": "draft",
+            "tier_label": NEED_TIER_LABELS["future_risk"],
         }
     if assessment.upgrade_opportunities:
         return {
+            "category": "upgrade",
             "label": "Upgrade Opportunity",
             "value": assessment.upgrade_opportunities[0],
             "note": "This covered room trails the league baseline but is not a true roster need.",
             "tone": "need",
+            "tier_label": NEED_TIER_LABELS["upgrade"],
         }
     return {
+        "category": "balanced",
         "label": "Balanced Roster",
         "value": "No urgent need",
         "note": "No current roster deficiency is standing out under the canonical coverage policy.",
         "tone": "draft",
+        "tier_label": NEED_TIER_LABELS["balanced"],
     }
 
 

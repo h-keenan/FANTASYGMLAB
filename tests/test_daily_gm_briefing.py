@@ -82,6 +82,36 @@ def test_waiver_only_opportunity():
     assert plan.items[0].destination in {"waivers", "dashboard"}
 
 
+def test_compose_carries_the_real_need_tier_label_through():
+    """Next Move's priority-ladder tier word (modules.dashboard_engine's
+    NEED_TIER_LABELS) must survive tile -> DailyBriefingItem projection
+    verbatim, same contract "presentation" already has — no new football
+    logic here, just plumbing an already-computed real signal through."""
+
+    need = _tile(
+        "Biggest Team Need",
+        "RB",
+        rec_id="need-1",
+        tier_label="Priority",
+    )
+    briefing = dashboard_workflow.organize_dashboard_items([need])
+    plan = dgb.compose_daily_gm_briefing(briefing)
+    assert plan.items[0].tier_label == "Priority"
+    assert plan.items[0].to_dict()["tier_label"] == "Priority"
+
+
+def test_compose_defaults_tier_label_to_empty_for_untiered_tiles():
+    trade = _tile(
+        "Top Trade Opportunity",
+        "Acquire RB depth",
+        rec_id="trade-1",
+        route_key="trade_hub",
+    )
+    briefing = dashboard_workflow.organize_dashboard_items([trade])
+    plan = dgb.compose_daily_gm_briefing(briefing)
+    assert plan.items[0].tier_label == ""
+
+
 def test_roster_decision_only_watch_state():
     injury = _tile("Injury Alert", "2 injured starters", note="Starters out")
     briefing = dashboard_workflow.organize_dashboard_items(

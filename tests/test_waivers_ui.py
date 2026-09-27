@@ -434,6 +434,111 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn("&lt;script&gt;", html)
         self.assertNotIn("<b>Role</b>", html)
 
+    def test_waiver_confidence_label_reflects_real_need_fit_and_value_signals(self):
+        # High: a real, already-computed roster-need match (or an injury
+        # replacement fit) — the strongest signal rank_priority_add_candidates
+        # itself sorts on first.
+        self.assertEqual(
+            waivers_ui.waiver_confidence_label(
+                {"priority_need_fit": True, "priority_value_opportunity": False, "score": 40},
+                3,
+            ),
+            ("High", "Matches a real roster need on this roster."),
+        )
+        self.assertEqual(
+            waivers_ui.waiver_confidence_label(
+                {"priority_need_fit": False, "injury_replacement_fit": True, "score": 40},
+                5,
+            )[0],
+            "High",
+        )
+        # Medium: elite wire value, but not tied to a stated roster need.
+        self.assertEqual(
+            waivers_ui.waiver_confidence_label(
+                {"priority_need_fit": False, "priority_value_opportunity": True, "score": 40},
+                4,
+            )[0],
+            "Medium",
+        )
+        self.assertEqual(
+            waivers_ui.waiver_confidence_label(
+                {"priority_need_fit": False, "priority_value_opportunity": False, "score": 40},
+                1,
+            )[0],
+            "Medium",
+        )
+        # Low: stale or non-positive score under the current lens.
+        self.assertEqual(
+            waivers_ui.waiver_confidence_label(
+                {"priority_need_fit": True, "priority_value_opportunity": True, "score": 0},
+                1,
+            )[0],
+            "Low",
+        )
+        self.assertEqual(
+            waivers_ui.waiver_confidence_label(
+                {
+                    "priority_need_fit": True,
+                    "priority_value_opportunity": True,
+                    "score": 40,
+                    "stale_free_agent": True,
+                },
+                1,
+            )[0],
+            "Low",
+        )
+        # Depth-level add: neither a need match nor standout wire value.
+        self.assertEqual(
+            waivers_ui.waiver_confidence_label(
+                {"priority_need_fit": False, "priority_value_opportunity": False, "score": 40},
+                8,
+            )[0],
+            "Low",
+        )
+        # Rows that never went through the Priority Adds ranker (e.g. Stash/
+        # Watchlist/FAAB Shortlist) carry neither flag at all — an honest
+        # empty label rather than a fabricated one.
+        self.assertEqual(
+            waivers_ui.waiver_confidence_label({"score": 40}, 1),
+            ("", ""),
+        )
+
+    def test_priority_confidence_badge_renders_for_real_priority_adds_rows(self):
+        html, _, _ = self._render_card(
+            {
+                "player_id": "priority-1",
+                "name": "Priority Player",
+                "position": "RB",
+                "team": "SEA",
+                "age": 24,
+                "value_score": 55,
+                "position_rank": 2,
+                "stale_free_agent": False,
+                "priority_need_fit": True,
+                "priority_value_opportunity": False,
+            }
+        )
+        self.assertIn("tvl-conf--high", html)
+        self.assertIn("CONFIDENCE / High", html)
+
+    def test_priority_confidence_badge_absent_without_real_ranker_signals(self):
+        # Stash/Watchlist/FAAB Shortlist rows never went through
+        # rank_priority_add_candidates, so no priority_need_fit/
+        # priority_value_opportunity columns exist — no fabricated badge.
+        html, _, _ = self._render_card(
+            {
+                "player_id": "stash-1",
+                "name": "Stash Player",
+                "position": "WR",
+                "team": "SEA",
+                "age": 22,
+                "value_score": 30,
+                "position_rank": 9,
+                "stale_free_agent": False,
+            }
+        )
+        self.assertNotIn("tvl-conf", html)
+
     def test_empty_board_uses_canonical_empty_state(self):
         with patch.object(
             waivers_ui.ui_primitives,

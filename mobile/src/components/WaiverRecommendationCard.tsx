@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from './AnimatedCard';
 import AppText from './AppText';
+import MeterRow, { confidenceLevelFor } from './ConfidenceMeter';
 import FAABGuidance from './FAABGuidance';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -144,6 +145,20 @@ export default function WaiverRecommendationCard({
           <View style={styles.metricsDivider} />
           <FAABGuidance faab={player.faab} size="prominent" />
         </View>
+        {/* Real need-fit/standout-value confidence for this recommendation
+            (modules.waivers_ui.waiver_confidence_label) — the same signals
+            that ranked it into Priority Adds, shown with the exact same
+            segmented-meter pattern Trade Hub's own confidence display uses. */}
+        {player.confidence_label ? (
+          <View style={styles.confidenceRow}>
+            <MeterRow
+              label="CONFIDENCE"
+              value={player.confidence_label}
+              level={confidenceLevelFor(player.confidence_label)}
+              color={colors.premium}
+            />
+          </View>
+        ) : null}
         <View style={styles.breakdownRow}>
           <AppText style={styles.breakdownText}>Full breakdown</AppText>
           <Ionicons name="chevron-forward" size={14} color={colors.accentSoft} />
@@ -158,7 +173,17 @@ export default function WaiverRecommendationCard({
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles.compactIdentity}>{identity}</View>
+      <View style={styles.compactIdentity}>
+        {identity}
+        {player.confidence_label ? (
+          <MeterRow
+            label="CONFIDENCE"
+            value={player.confidence_label}
+            level={confidenceLevelFor(player.confidence_label)}
+            color={colors.premium}
+          />
+        ) : null}
+      </View>
       <View style={styles.compactTrailing}>
         <View style={styles.compactValueRow}>
           <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
@@ -194,6 +219,7 @@ function createStyles(colors: ThemeColors) {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.border,
     },
+    confidenceRow: { marginTop: spacing.sm },
     scoreBlock: { alignItems: 'flex-start', gap: 1 },
     scoreNumberPrimary: { fontSize: 22, fontWeight: '800', color: colors.accent },
     scoreNumberCompact: { fontSize: 16, fontWeight: '700', color: colors.accent },

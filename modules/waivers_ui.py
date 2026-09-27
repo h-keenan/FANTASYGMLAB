@@ -20,6 +20,7 @@ from modules import player_profile_ui
 from modules import player_state_authority
 from modules.faab import format_faab_block_html, recommend_faab_guidance
 from modules.html_rendering import inject_global_styles
+from modules.trade_visual_language import TRADE_VISUAL_LANGUAGE_CSS, confidence_indicator_html
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 
 
@@ -32,6 +33,49 @@ GENERIC_DYNASTY_VALUE_PREFIX = (
 
 def _inject_waivers_presentation_css() -> None:
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
+    # Trade Ideas' confidence-ring visual language (modules.trade_visual_language)
+    # so Priority Adds' confidence badge (see waiver_confidence_label below)
+    # matches Trade Hub's existing pattern instead of a one-off style.
+    inject_global_styles(f"<style>{TRADE_VISUAL_LANGUAGE_CSS}</style>")
+
+
+def waiver_confidence_label(row, position_rank: int) -> tuple[str, str]:
+    """Real recommendation-confidence signal for a Priority Adds candidate.
+
+    Not a new score: derived directly from the same already-computed signals
+    ``rank_priority_add_candidates`` uses to rank this exact row —
+    ``priority_need_fit`` / ``injury_replacement_fit`` (does this fill a real
+    roster need) and ``priority_value_opportunity`` (is this elite value on
+    the wire regardless of need) — mirroring Trade Ideas'
+    High/Medium/Low confidence language
+    (``modules.trade_ideas._trade_confidence_label``) so the same badge/label
+    visual pattern (``modules.trade_visual_language.confidence_indicator_html``)
+    reads consistently across both surfaces.
+
+    Rows that never went through ``rank_priority_add_candidates`` (no
+    ``priority_need_fit``/``priority_value_opportunity`` columns at all —
+    e.g. Stash Candidates/Watchlist Depth/FAAB Shortlist, which are sourced
+    from the raw wire, not the need-fit ranker) return an empty label rather
+    than fabricate one from signals that were never actually computed for
+    them.
+    """
+
+    if "priority_need_fit" not in row and "priority_value_opportunity" not in row:
+        return "", ""
+    stale = bool(row.get("stale_free_agent"))
+    try:
+        score = int(round(float(row.get("score", row.get("value_score", 0)) or 0)))
+    except Exception:
+        score = 0
+    if stale or score <= 0:
+        return "Low", "Stale or low-value under the current lens."
+    need_fit = bool(row.get("priority_need_fit")) or bool(row.get("injury_replacement_fit"))
+    value_opportunity = bool(row.get("priority_value_opportunity"))
+    if need_fit:
+        return "High", "Matches a real roster need on this roster."
+    if value_opportunity or int(position_rank or 99) <= 1:
+        return "Medium", "Elite wire value, but not tied to a stated roster need."
+    return "Low", "Depth-level add without a strong need or value signal."
 
 _safe_text = league_workspace_ui._safe_text
 _safe_positive_int = league_workspace_ui._safe_positive_int
@@ -873,6 +917,18 @@ def render_free_agent_cards(
                 recommendation_label,
                 variant=recommendation_variant,
             )
+            # Real need-fit/standout-value confidence for this recommendation
+            # (see waiver_confidence_label docstring) — empty, and so
+            # rendered as nothing, for rows that never went through the
+            # Priority Adds ranker (Stash/Watchlist/FAAB Shortlist).
+            priority_confidence_label, _priority_confidence_reason = waiver_confidence_label(
+                row, position_rank or 99
+            )
+            priority_confidence_html = (
+                confidence_indicator_html(priority_confidence_label, extra_class="waiver-priority-confidence")
+                if priority_confidence_label
+                else ""
+            )
             faab_guidance = waiver_faab_guidance_for_row(
                 row,
                 score_field=score_field,
@@ -895,6 +951,7 @@ def render_free_agent_cards(
                 "<div class='waiver-card-status'>"
                 "<div class='waiver-recommendation-row'>"
                 + recommendation_badge
+                + priority_confidence_html
                 + "</div>"
                 + "<div class='waiver-compact-metrics'>"
                 + (f"<span>{escape(confidence)} confidence</span>" if confidence else "")

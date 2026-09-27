@@ -14,6 +14,7 @@ from modules import compact_fantasy_assets
 from modules import ui_primitives
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.semantic_glyphs import glyph_html
+from modules.trade_visual_language import priority_tier_html
 
 
 # Scoped to Dashboard Game Plan renders — keep off the global cold-path CSS budget.
@@ -297,12 +298,18 @@ def render_todays_game_plan(
                     kicker_html = escape(kicker_raw)
             cta = _cta_label(item, is_primary=is_primary)
             tier = "primary" if is_primary else "secondary"
+            # Real, already-computed tier word for a Next Move priority-ladder
+            # tile (roster need > injury pressure > future risk > upgrade
+            # opportunity) — empty for every other tile. Not a fabricated
+            # confidence score; see modules.dashboard_engine.NEED_TIER_LABELS.
+            tier_badge_html = priority_tier_html(item.tier_label)
             with st.container(key=f"{key_prefix}_card_{index}"):
                 render_html_fragment(
                     f"<div class='{card_class}'>"
                     "<div class='dg-daily-briefing-kicker-row'>"
                     f"<div class='dg-daily-briefing-kicker'>{kicker_html}</div>"
                     f"{kind_html}"
+                    f"{tier_badge_html}"
                     "</div>"
                     f"{headline_html}"
                     f"{visual_html}"
