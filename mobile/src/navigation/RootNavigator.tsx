@@ -4,7 +4,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import type { DraftPickAsset, RankedPlayer } from '../lib/api';
+import type { CollegeProspect, DraftPickAsset, RankedPlayer } from '../lib/api';
 import GmOrb from '../components/GmOrb';
 import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
 import { navigationRef } from './navigationRef';
@@ -41,6 +41,8 @@ import PickDetailScreen from '../screens/PickDetailScreen';
 import MyTeamScreen from '../screens/MyTeamScreen';
 import MatchupScreen from '../screens/MatchupScreen';
 import LoadingScreen from '../screens/LoadingScreen';
+import CollegeProspectsScreen from '../screens/CollegeProspectsScreen';
+import ProspectScoutingDetailScreen from '../screens/ProspectScoutingDetailScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -70,6 +72,9 @@ export type RootStackParamList = {
   MyTeam: { leagueId: string; leagueName: string };
   Matchup: { leagueId: string; leagueName: string };
   Alerts: { leagueId: string; leagueName: string };
+  // Not league-scoped — shared prospect pool + personal watchlist span every league.
+  CollegeProspects: undefined;
+  CollegeProspectDetail: { prospect: CollegeProspect };
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -210,6 +215,8 @@ export default function RootNavigator() {
           <AppStack.Screen name="Matchup" component={MatchupScreen} />
           <AppStack.Screen name="Alerts" component={AlertsScreen} />
           <AppStack.Screen name="GmTargets" component={GmTargetsScreen} />
+          <AppStack.Screen name="CollegeProspects" component={CollegeProspectsScreen} />
+          <AppStack.Screen name="CollegeProspectDetail" component={ProspectScoutingDetailScreen} />
           <AppStack.Screen name="TeamStance" component={TeamStanceScreen} />
           <AppStack.Screen
             name="Paywall"

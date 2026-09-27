@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from './src/context/AuthContext';
+import { CollegeInterestProvider } from './src/context/CollegeInterestContext';
 import { DensityProvider } from './src/context/DensityContext';
 import { GmStanceProvider } from './src/context/GmStanceContext';
 import { OnboardingProvider } from './src/context/OnboardingContext';
@@ -66,9 +67,11 @@ export default function App() {
                     storage before the first authorized request goes out. */}
                 <ShowcaseModeProvider>
                   <OnboardingProvider>
-                    <AuthProvider>
-                      <RootNavigator />
-                    </AuthProvider>
+                    <CollegeInterestProvider>
+                      <AuthProvider>
+                        <RootNavigator />
+                      </AuthProvider>
+                    </CollegeInterestProvider>
                   </OnboardingProvider>
                 </ShowcaseModeProvider>
               </ValuationLensProvider>

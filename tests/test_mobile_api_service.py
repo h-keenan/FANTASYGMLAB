@@ -843,6 +843,55 @@ def test_draft_picks_returns_real_pick_assets(monkeypatch):
         assert isinstance(pick["score"], (int, float))
 
 
+def test_draft_picks_blends_crowd_scouting_signal_when_enabled(monkeypatch):
+    """The crowdsourced college-scouting signal (modules.college_scouting)
+    is gated off by default (class_strength_signal_enabled() — see its own
+    docstring on why). With the gate on, a real crowd multiplier for the
+    current draft year must actually change class_strength_multiplier on
+    picks for that season versus the gate-off (pure editorial) baseline."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_rosters, fake_users = _draft_picks_fixture_context()
+
+    def _fetch_picks():
+        with patch("requests.get", return_value=auth_user_response):
+            with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                    with patch("modules.sleeper.get_users", return_value=fake_users):
+                        with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    return client.get(
+                                        "/v1/leagues/abc/draft-picks",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    baseline_picks = _fetch_picks().json()["picks"]
+    baseline_2026 = [p for p in baseline_picks if p["season"] == 2026]
+    assert baseline_2026, "fixture must produce at least one 2026 pick for this test to mean anything"
+    baseline_multiplier = baseline_2026[0]["class_strength_multiplier"]
+
+    monkeypatch.setenv("DYNASTYGM_COLLEGE_SCOUTING_CLASS_STRENGTH_SIGNAL", "1")
+    with patch(
+        "modules.college_scouting.get_cached_crowd_class_strength_by_year",
+        return_value={2026: {"multiplier": 1.1, "confidence": "high", "scout_count": 12}},
+    ):
+        blended_picks = _fetch_picks().json()["picks"]
+    blended_2026 = [p for p in blended_picks if p["season"] == 2026]
+    assert blended_2026
+
+    assert blended_2026[0]["class_strength_multiplier"] != baseline_multiplier
+    assert blended_2026[0]["class_strength_multiplier"] == pytest.approx(
+        min(1.25, baseline_multiplier * 1.1), abs=1e-6
+    )
+
+
 def test_draft_picks_forward_the_full_valuation_breakdown(monkeypatch):
     """The Pick Detail ("PQV for a draft pick") screen renders the model's own
     multipliers and projected-range distribution, so the endpoint must forward
@@ -3121,6 +3170,147 @@ def test_set_gm_target_untouchable_upserts_the_flag_on_an_existing_target(monkey
         "player_id": "9001",
         "untouchable": True,
     }
+
+
+def test_scouting_prospects_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/scouting/prospects").status_code == 401
+    assert client.post("/v1/scouting/prospects/2026-qb-01/report", json={"grade": 3}).status_code == 401
+    assert client.delete("/v1/scouting/prospects/2026-qb-01/report").status_code == 401
+    assert client.post("/v1/scouting/watchlist/2026-qb-01").status_code == 401
+    assert client.delete("/v1/scouting/watchlist/2026-qb-01").status_code == 401
+
+
+def test_get_scouting_prospects_falls_back_to_placeholder_catalog_when_table_unreachable(monkeypatch):
+    """No migration applied yet -> college_prospects/scouting_reports 404s,
+    but the screen still gets a usable (placeholder) catalog rather than an
+    empty/broken response."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    not_found = Mock(status_code=404)
+    not_found.json.return_value = {"message": "relation does not exist"}
+
+    with patch("requests.get", side_effect=[auth_user_response, not_found, not_found, not_found]):
+        response = client.get("/v1/scouting/prospects", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["used_placeholder_catalog"] is True
+    assert len(body["prospects"]) == 16  # len(college_scouting.PLACEHOLDER_PROSPECTS)
+    for prospect in body["prospects"]:
+        assert prospect["aggregate"]["scout_count"] == 0
+        assert prospect["aggregate"]["avg_grade"] is None
+        assert prospect["my_report"] is None
+        assert prospect["on_watchlist"] is False
+
+
+def test_get_scouting_prospects_reflects_shared_aggregate_and_my_report(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    prospects_response = Mock(status_code=200)
+    prospects_response.json.return_value = [
+        {"id": "p1", "name": "Test Prospect", "position": "QB", "school": "Test U", "draft_year": 2026},
+    ]
+    reports_response = Mock(status_code=200)
+    reports_response.json.return_value = [
+        {"user_id": "user-123", "prospect_id": "p1", "grade": 4, "round_projection": 1, "note": "sleeper"},
+        {"user_id": "someone-else", "prospect_id": "p1", "grade": 2, "round_projection": 3, "note": ""},
+    ]
+    watchlist_response = Mock(status_code=200)
+    watchlist_response.json.return_value = [{"user_id": "user-123", "prospect_id": "p1"}]
+
+    with patch(
+        "requests.get",
+        side_effect=[auth_user_response, prospects_response, reports_response, watchlist_response],
+    ):
+        response = client.get("/v1/scouting/prospects", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["used_placeholder_catalog"] is False
+    [prospect] = body["prospects"]
+    assert prospect["id"] == "p1"
+    assert prospect["aggregate"] == {"avg_grade": 3.0, "scout_count": 2, "avg_round_projection": 2.0}
+    assert prospect["my_report"] == {"grade": 4, "round_projection": 1, "note": "sleeper"}
+    assert prospect["on_watchlist"] is True
+
+
+def test_submit_scouting_report_rejects_invalid_grade(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/scouting/prospects/2026-qb-01/report",
+            json={"grade": 9},
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_submit_scouting_report_upserts_my_grade(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    upsert_response = Mock(status_code=200)
+    upsert_response.json.return_value = [{}]
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/scouting/prospects/2026-qb-01/report",
+                json={"grade": 5, "round_projection": 1, "note": "big arm"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    sent_payload = mock_post.call_args.kwargs["json"]
+    assert sent_payload["user_id"] == "user-123"
+    assert sent_payload["prospect_id"] == "2026-qb-01"
+    assert sent_payload["grade"] == 5
+    assert sent_payload["round_projection"] == 1
+    assert sent_payload["note"] == "big arm"
+
+
+def test_add_and_remove_prospect_watchlist(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    upsert_response = Mock(status_code=200)
+    upsert_response.json.return_value = [{}]
+    delete_response = Mock(status_code=200)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            add_response = client.post(
+                "/v1/scouting/watchlist/2026-qb-01",
+                headers={"Authorization": "Bearer good-token"},
+            )
+        with patch("requests.delete", return_value=delete_response) as mock_delete:
+            remove_response = client.delete(
+                "/v1/scouting/watchlist/2026-qb-01",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert add_response.status_code == 200
+    assert add_response.json() == {"ok": True, "reason": ""}
+    assert mock_post.call_args.kwargs["json"] == {"user_id": "user-123", "prospect_id": "2026-qb-01"}
+
+    assert remove_response.status_code == 200
+    assert remove_response.json() == {"ok": True, "reason": ""}
+    assert "user_id=eq.user-123" in mock_delete.call_args.args[0]
+    assert "prospect_id=eq.2026-qb-01" in mock_delete.call_args.args[0]
 
 
 def test_player_awards_requires_auth(monkeypatch):
