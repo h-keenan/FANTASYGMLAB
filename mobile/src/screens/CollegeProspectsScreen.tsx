@@ -14,6 +14,7 @@ import PositionBadge from '../components/PositionBadge';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import { api, type CollegeProspect } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -109,7 +110,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
       const result = await api.getCollegeProspects();
       setProspects(result.prospects);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load prospects.');
+      setError(toUserErrorMessage(err, 'Failed to load prospects.'));
     } finally {
       setLoading(false);
     }

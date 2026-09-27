@@ -17,6 +17,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import UsageTrendPill from '../components/UsageTrendPill';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type RankedPlayer, type ValuationLens } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -200,7 +201,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
         const result = await api.getLeagueRankings(leagueId, { lens, limit: 300 });
         if (!cancelled) setPlayers(result.players);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load players.');
+        if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load players.'));
       } finally {
         if (!cancelled) setLoading(false);
       }

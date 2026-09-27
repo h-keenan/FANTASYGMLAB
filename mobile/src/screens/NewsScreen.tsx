@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type NewsItem } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -134,7 +135,7 @@ export default function NewsScreen() {
       const result = await api.getNews(30);
       setItems(result.items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load news.');
+      setError(toUserErrorMessage(err, 'Failed to load news.'));
     } finally {
       setLoading(false);
     }

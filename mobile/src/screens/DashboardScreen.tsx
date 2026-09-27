@@ -46,6 +46,7 @@ import { getCachedDashboard, setCachedDashboard } from '../lib/dashboardCache';
 import { formatRank } from '../lib/percentile';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -291,7 +292,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
             }
           }
         } catch (err) {
-          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load your Next Move briefing.');
+          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load your Next Move briefing.'));
         } finally {
           if (!cancelled) setLoading(false);
         }

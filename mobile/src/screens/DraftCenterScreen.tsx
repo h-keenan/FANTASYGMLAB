@@ -16,6 +16,7 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank } from '../lib/percentile';
 import { contrastTextColor } from '../lib/playerTier';
@@ -106,7 +107,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           // user on an empty "My Picks" tab they can't fill.
           if (!resolvedRosterId) setPickScope('league');
         } catch (err) {
-          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load Draft Center.');
+          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load Draft Center.'));
         } finally {
           if (!cancelled) setLoading(false);
         }

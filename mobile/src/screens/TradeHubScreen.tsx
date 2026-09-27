@@ -33,6 +33,7 @@ import {
   type ValuationLens,
 } from '../lib/api';
 import { api } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useDensity } from '../context/DensityContext';
 import { useGmStance } from '../context/GmStanceContext';
@@ -248,7 +249,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           void setSeenTradeIdeaCount(leagueId, result.ideas.length);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load Trade Hub ideas.');
+        setError(toUserErrorMessage(err, 'Failed to load Trade Hub ideas.'));
       } finally {
         setLoading(false);
       }
@@ -296,7 +297,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
         setAllTradesHasMore(result.has_more);
         setAllTradesEntitlement(result.entitlement);
       } catch (err) {
-        setAllTradesError(err instanceof Error ? err.message : 'Failed to load All Trades.');
+        setAllTradesError(toUserErrorMessage(err, 'Failed to load All Trades.'));
       } finally {
         setAllTradesLoading(false);
         setAllTradesLoadingMore(false);

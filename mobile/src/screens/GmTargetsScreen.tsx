@@ -20,6 +20,7 @@ import SectionHeading from '../components/SectionHeading';
 import UsageTrendPill from '../components/UsageTrendPill';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type GmTarget, type RankedPlayer } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -187,7 +188,7 @@ export default function GmTargetsScreen({ route, navigation }: Props) {
         })),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load GM Targets.');
+      setError(toUserErrorMessage(err, 'Failed to load GM Targets.'));
     } finally {
       setLoading(false);
     }

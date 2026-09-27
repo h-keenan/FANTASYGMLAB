@@ -38,6 +38,7 @@ import { useGmStance } from '../context/GmStanceContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -201,7 +202,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
 
         setRankings(rankingsResult.players);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load trade data.');
+        if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load trade data.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -322,7 +323,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         setAnalyzeError(NOT_READY_MESSAGES[result.reason] ?? 'Could not analyze this trade.');
       }
     } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : 'Could not analyze this trade.');
+      setAnalyzeError(toUserErrorMessage(err, 'Could not analyze this trade.'));
     } finally {
       setAnalyzing(false);
     }

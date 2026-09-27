@@ -13,6 +13,7 @@ import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import SectionHeading from '../components/SectionHeading';
 import { api, type GmPlanFocusArea, type GmPlanResponse } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -65,7 +66,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
         const result = await api.getGmPlan(leagueId, { lens: 'Dynasty' });
         setPlan(result);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load GM Plan.');
+        setError(toUserErrorMessage(err, 'Failed to load GM Plan.'));
       } finally {
         setLoading(false);
         setRefreshing(false);
