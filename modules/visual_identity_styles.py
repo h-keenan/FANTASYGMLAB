@@ -136,7 +136,7 @@ div[data-testid="stDialog"] div[role="dialog"]{
 
 /* Prestige is the only default player-card accent language. */
 .player-prestige,
-.player-status-pill,
+.dg-status-badge,
 .dg-ui-badge {
     background: var(--color-surface-muted) !important;
     border: var(--border-width-default) solid currentColor !important;

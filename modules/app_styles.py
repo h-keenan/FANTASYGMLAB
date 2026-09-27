@@ -95,17 +95,17 @@ main h4 {
 .dg-glyph-chip-success {
     background: rgba(20, 184, 166, 0.12);
     border-color: rgba(20, 184, 166, 0.26);
-    color: #99f6e4;
+    color: var(--color-opportunity);
 }
 .dg-glyph-chip-warning {
     background: rgba(245, 158, 11, 0.12);
     border-color: rgba(245, 158, 11, 0.26);
-    color: #fde68a;
+    color: var(--color-warning);
 }
 .dg-glyph-chip-premium {
     background: rgba(168, 85, 247, 0.12);
     border-color: rgba(168, 85, 247, 0.26);
-    color: #e9d5ff;
+    color: var(--color-diagnostic);
 }
 .dg-card-primary,
 .dg-card-secondary,
@@ -178,6 +178,12 @@ main h4 {
 }
 .app-degraded-state {
     border-color: rgba(245, 158, 11, 0.24);
+    /* Not a token-migration miss: every .app-degraded-state background rule in
+       this file (see the !important overrides below) is a fixed near-black
+       gradient in both themes -- this banner is intentionally always-dark, so
+       its text must stay a fixed light literal rather than the semantic
+       --color-warning token, which resolves dark in light mode and would go
+       unreadable against this permanently-dark card. */
     color: #fde68a;
 }
 .dg-tier-chip {
@@ -191,12 +197,12 @@ main h4 {
 .dg-tier-elite {
     background: linear-gradient(180deg, rgba(250, 204, 21, 0.22), rgba(217, 119, 6, 0.16));
     border-color: rgba(250, 204, 21, 0.34);
-    color: #fef08a;
+    color: var(--color-premium);
 }
 .dg-tier-star {
     background: linear-gradient(180deg, rgba(168, 85, 247, 0.2), rgba(99, 102, 241, 0.14));
     border-color: rgba(168, 85, 247, 0.3);
-    color: #e9d5ff;
+    color: var(--color-diagnostic);
 }
 .dg-tier-core-starter {
     background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
@@ -206,24 +212,24 @@ main h4 {
 .dg-tier-starter {
     background: rgba(20, 184, 166, 0.12);
     border-color: rgba(20, 184, 166, 0.28);
-    color: #99f6e4;
+    color: var(--color-opportunity);
 }
 .dg-tier-contributor {
     background: rgba(245, 158, 11, 0.12);
     border-color: rgba(245, 158, 11, 0.26);
-    color: #fde68a;
+    color: var(--color-warning);
 }
 .dg-tier-depth {
     background: rgba(148, 163, 184, 0.12);
     border-color: rgba(148, 163, 184, 0.24);
-    color: #cbd5e1;
+    color: var(--color-text-secondary);
 }
 .dg-tier-developmental {
     background: rgba(71, 85, 105, 0.28);
     border-color: rgba(100, 116, 139, 0.3);
-    color: #cbd5e1;
+    color: var(--color-text-secondary);
 }
-.player-status-pill {
+.dg-status-badge {
     align-items: center;
     backdrop-filter: blur(12px);
     border: 1px solid rgba(148, 163, 184, 0.2);
@@ -231,7 +237,7 @@ main h4 {
     box-shadow:
         inset 0 1px 0 rgba(248, 250, 252, 0.06),
         0 8px 18px rgba(2, 6, 23, 0.18);
-    color: #e2e8f0;
+    color: var(--color-text-secondary);
     display: inline-flex;
     font-size: 0.68rem;
     font-weight: 900;
@@ -255,67 +261,67 @@ main h4 {
     min-width: 1.16rem;
     padding: 0 0.18rem;
 }
-.player-status-pill-premium {
+.dg-status-badge-premium {
     background: linear-gradient(180deg, rgba(226, 232, 240, 0.2), rgba(148, 163, 184, 0.08));
     border-color: rgba(226, 232, 240, 0.34);
     color: var(--color-text-primary, #f8fafc);
 }
-.player-status-pill-elite {
+.dg-status-badge-elite {
     background: linear-gradient(180deg, rgba(250, 204, 21, 0.22), rgba(217, 119, 6, 0.1));
     border-color: rgba(250, 204, 21, 0.4);
-    color: #fef3c7;
+    color: var(--color-premium);
 }
-.player-status-pill-star {
+.dg-status-badge-star {
     background: linear-gradient(180deg, rgba(168, 85, 247, 0.22), rgba(99, 102, 241, 0.1));
     border-color: rgba(196, 181, 253, 0.36);
-    color: #f3e8ff;
+    color: var(--color-diagnostic);
 }
-.player-status-pill-core {
+.dg-status-badge-core {
     background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-strong) 20%, transparent), color-mix(in srgb, var(--color-accent-strong) 8%, transparent));
     border-color: color-mix(in srgb, var(--color-accent) 34%, transparent);
-    color: #dbeafe;
+    color: var(--color-accent);
 }
-.player-status-pill-starter,
-.player-status-pill-rise {
+.dg-status-badge-starter,
+.dg-status-badge-rise {
     background: linear-gradient(180deg, rgba(20, 184, 166, 0.18), rgba(15, 118, 110, 0.08));
     border-color: rgba(45, 212, 191, 0.32);
-    color: #ccfbf1;
+    color: var(--color-opportunity);
 }
-.player-status-pill-contributor {
+.dg-status-badge-contributor {
     background: linear-gradient(180deg, rgba(245, 158, 11, 0.18), rgba(180, 83, 9, 0.08));
     border-color: rgba(251, 191, 36, 0.32);
-    color: #fef3c7;
+    color: var(--color-warning);
 }
-.player-status-pill-move {
+.dg-status-badge-move {
     background: linear-gradient(180deg, rgba(249, 115, 22, 0.18), rgba(234, 88, 12, 0.08));
     border-color: rgba(251, 146, 60, 0.32);
-    color: #fde68a;
+    color: var(--color-warning);
 }
-.player-status-pill-hold {
+.dg-status-badge-hold {
     background: linear-gradient(180deg, rgba(71, 85, 105, 0.34), rgba(51, 65, 85, 0.2));
     border-color: rgba(148, 163, 184, 0.28);
-    color: #e2e8f0;
+    color: var(--color-text-secondary);
 }
-.player-status-pill-risk {
+.dg-status-badge-risk {
     background: rgba(127, 29, 29, 0.16);
     border-color: rgba(248, 113, 113, 0.34);
-    color: #fecaca;
+    color: var(--color-danger);
 }
-.player-status-pill-drop {
+.dg-status-badge-drop {
     background: linear-gradient(180deg, rgba(239, 68, 68, 0.2), rgba(185, 28, 28, 0.08));
     border-color: rgba(248, 113, 113, 0.36);
-    color: #fecaca;
+    color: var(--color-danger);
 }
-.player-status-pill-neutral {
-    background: rgba(30, 41, 59, 0.72);
+.dg-status-badge-neutral {
+    background: rgba(148, 163, 184, 0.12);
     border-color: rgba(148, 163, 184, 0.2);
-    color: #cbd5e1;
+    color: var(--color-text-secondary);
 }
 .player-support-chip {
-    background: rgba(30, 41, 59, 0.78);
+    background: rgba(148, 163, 184, 0.12);
     border: 1px solid rgba(148, 163, 184, 0.18);
     border-radius: var(--radius-pill);
-    color: #cbd5e1;
+    color: var(--color-text-secondary);
     display: inline-flex;
     font-size: 0.62rem;
     font-weight: 800;
@@ -326,27 +332,27 @@ main h4 {
 .player-support-chip-success {
     background: rgba(34, 197, 94, 0.12);
     border-color: rgba(74, 222, 128, 0.26);
-    color: #bbf7d0;
+    color: var(--color-success);
 }
 .player-support-chip-warning {
     background: rgba(249, 115, 22, 0.12);
     border-color: rgba(251, 146, 60, 0.28);
-    color: #fdba74;
+    color: var(--color-warning);
 }
 .player-support-chip-premium {
     background: rgba(250, 204, 21, 0.12);
     border-color: rgba(250, 204, 21, 0.24);
-    color: #fde68a;
+    color: var(--color-premium);
 }
 .player-support-chip-hold {
     background: rgba(71, 85, 105, 0.28);
     border-color: rgba(148, 163, 184, 0.24);
-    color: #e2e8f0;
+    color: var(--color-text-secondary);
 }
 .player-support-chip-risk {
     background: rgba(127, 29, 29, 0.2);
     border-color: rgba(248, 113, 113, 0.28);
-    color: #fecaca;
+    color: var(--color-danger);
 }
 .platform-sidebar-card {
     background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(9, 14, 26, 0.96));
@@ -1446,7 +1452,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .dg-glyph-chip,
 .dg-tier-chip,
 .player-support-chip,
-.player-status-pill,
+.dg-status-badge,
 .news-badge,
 .draft-review-chip,
 .home-status-pill,
@@ -1467,7 +1473,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .dg-alert-warning .dg-alert-kicker {
     color: #fde68a;
 }
-.decision-panel-grid-alert .player-status-pill {
+.decision-panel-grid-alert .dg-status-badge {
     flex: 0 0 auto;
     max-width: 100%;
 }
@@ -1911,7 +1917,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .free-agent-tag-emphasis {
     background: var(--color-opportunity-soft, rgba(20, 184, 166, 0.14));
     border-color: rgba(20, 184, 166, 0.34);
-    color: #99f6e4;
+    color: var(--color-opportunity);
 }
 .free-agent-tag-muted {
     background: rgba(239, 68, 68, 0.12);
@@ -2371,7 +2377,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     flex-direction: column;
     gap: 0.24rem;
 }
-.scan-card-topline .player-status-pill {
+.scan-card-topline .dg-status-badge {
     flex: 0 0 auto;
     max-width: 100%;
 }
@@ -2379,7 +2385,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     flex: 1 1 auto;
     min-width: 0;
 }
-.scan-card-compact .scan-card-topline .player-status-pill,
+.scan-card-compact .scan-card-topline .dg-status-badge,
 .scan-card-compact .scan-card-topline .scan-card-tags,
 .scan-card-compact .scan-card-info,
 .scan-card-compact .scan-card-score-meta {
@@ -2528,7 +2534,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     line-height: 1.38;
     margin-top: 0.44rem;
 }
-.scan-card-compact .player-status-pill {
+.scan-card-compact .dg-status-badge {
     font-size: 0.62rem;
     gap: 0.22rem;
     padding: 0.22rem 0.38rem;
@@ -3597,7 +3603,7 @@ button[data-testid="stBaseButton-primary"] {
     .dg-glyph-chip,
     .dg-tier-chip,
     .player-support-chip,
-    .player-status-pill,
+    .dg-status-badge,
     .news-badge,
     .draft-review-chip,
     .home-status-pill,
@@ -3738,7 +3744,7 @@ button[data-testid="stBaseButton-primary"] {
     .decision-panel-grid-alert {
         grid-template-columns: 1fr;
     }
-    .decision-panel-grid-alert .player-status-pill {
+    .decision-panel-grid-alert .dg-status-badge {
         align-self: flex-start;
     }
     .dg-intel-grid {
@@ -4070,7 +4076,7 @@ button[data-testid="stBaseButton-primary"] {
     .scan-card-tags .player-support-chip:nth-child(n+3) {
         display: none;
     }
-    .scan-card-compact .player-status-pill {
+    .scan-card-compact .dg-status-badge {
         font-size: 0.58rem;
         gap: 0.16rem;
         padding: 0.18rem 0.32rem;
@@ -4771,7 +4777,7 @@ div[data-testid="stExpander"],
 .dg-tier-chip,
 .player-support-chip,
 .account-status-chip,
-.player-status-pill {
+.dg-status-badge {
     border-radius: var(--radius-pill) !important;
     box-shadow: none !important;
 }
@@ -4905,7 +4911,7 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 .account-status-chip,
 .launch-league-chip,
 .compact-player-value,
-.player-status-pill,
+.dg-status-badge,
 .news-badge,
 .news-badge-warning {
     border-radius: var(--dg-radius-chip) !important;
@@ -5316,7 +5322,7 @@ div[data-testid="stExpander"] {
     .dg-tier-chip,
     .player-support-chip,
     .account-status-chip,
-    .player-status-pill {
+    .dg-status-badge {
         border-radius: var(--radius-pill) !important;
     }
     .roster-limit-strip {
@@ -5600,12 +5606,12 @@ main,
 .dg-glyph-chip-success {
     background: rgba(34, 197, 94, 0.12) !important;
     border-color: rgba(34, 197, 94, 0.28) !important;
-    color: #bbf7d0 !important;
+    color: var(--color-success) !important;
 }
 .draft-review-grade.grade-strong {
     background: rgba(34, 197, 94, 0.16) !important;
     border-color: rgba(34, 197, 94, 0.36) !important;
-    color: #bbf7d0 !important;
+    color: var(--color-success) !important;
 }
 .draft-review-grade.grade-solid {
     background: rgba(229, 231, 235, 0.12) !important;
@@ -5615,17 +5621,17 @@ main,
 .draft-review-grade.grade-watch {
     background: rgba(245, 158, 11, 0.15) !important;
     border-color: rgba(245, 158, 11, 0.34) !important;
-    color: #fde68a !important;
+    color: var(--color-warning) !important;
 }
 .draft-review-grade.grade-risk {
     background: rgba(239, 68, 68, 0.16) !important;
     border-color: rgba(239, 68, 68, 0.34) !important;
-    color: #fecaca !important;
+    color: var(--color-danger) !important;
 }
 .draft-review-grade.grade-muted {
     background: rgba(139, 147, 255, 0.1) !important;
     border-color: rgba(139, 147, 255, 0.22) !important;
-    color: #c7d2fe !important;
+    color: var(--color-experimental) !important;
 }
 
 @media (max-width: 900px) {
@@ -6913,8 +6919,17 @@ h3 .dg-semantic-icon {
 }
 .home-command-card-draft .dg-semantic-icon,
 .draft-review-pick-card .dg-semantic-icon,
-.app-degraded-state .dg-semantic-icon,
 .draft-review-chip.unmatched .dg-semantic-icon {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-experimental);
+}
+/* Split from the shared rule above: .app-degraded-state's own background is a
+   fixed near-black gradient in both themes (see the !important overrides on
+   .app-degraded-state itself), so this icon -- like that banner's text --
+   must keep a fixed light literal instead of --color-experimental, which
+   resolves to a dark purple in light mode and would go unreadable here. */
+.app-degraded-state .dg-semantic-icon {
     background: transparent;
     border-color: transparent;
     color: #c7d2fe;

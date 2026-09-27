@@ -28,6 +28,7 @@ Phases: ``idle`` → ``hydrating`` → ``useful``.
 from __future__ import annotations
 
 from collections.abc import MutableMapping
+from html import escape
 from typing import Any
 import time
 
@@ -177,10 +178,11 @@ def render_hydrate_placeholder(
     if state.get(PLACEHOLDER_RENDERED_KEY):
         return
     name = _text(league_name, "your league")
+    safe_name = escape(name)
     first_open = not _text(state.get(LAST_USEFUL_LEAGUE_KEY))
     kicker = "Your Game Plan" if first_open else "Updating Dashboard"
     copy = (
-        f"Building the Game Plan for {name}. Recommendations wait until this league is ready."
+        f"Building the Game Plan for {safe_name}. Recommendations wait until this league is ready."
         if first_open
         else (
             "Loading this league's Game Plan. Prior recommendations are cleared so they "
@@ -191,7 +193,7 @@ def render_hydrate_placeholder(
         "<div class='dashboard-hydrate-placeholder' data-fgl-dashboard-hydrating='1' "
         "role='status' aria-live='polite'>"
         f"<div class='dashboard-hydrate-kicker'>{kicker}</div>"
-        f"<div class='dashboard-hydrate-title'>{name}</div>"
+        f"<div class='dashboard-hydrate-title'>{safe_name}</div>"
         f"<div class='dashboard-hydrate-copy'>{copy}</div>"
         "<div class='dashboard-hydrate-skeleton' aria-hidden='true'>"
         "<div class='dashboard-hydrate-skeleton-row'></div>"
