@@ -842,7 +842,6 @@ def get_league_draft_center(
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
-    settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
     players_df = rankings.load_players(PLAYERS_DB_PATH)
     if players_df is None or players_df.empty:
@@ -860,11 +859,13 @@ def get_league_draft_center(
             "partner_cards": [],
         }
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
-    score_field = league_value_settings.valuation_score_field(lens)
-
-    df_summary, draft_capital_summary = league_rankings.build_league_summary_and_draft_capital(
-        valued, league_id, score_field=score_field, league_settings=settings
+    # Cached (30s live-time bucket, same idiom as
+    # build_league_rankings_frame_cached) — this is the same real
+    # per-roster Power/Franchise/Draft-Capital pass Team Rankings/Dashboard
+    # already share one cache entry for; Draft Center used to redo it from
+    # scratch on every request instead of sharing that cache too.
+    df_summary, draft_capital_summary = league_rankings.build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     if df_summary.empty or draft_capital_summary.empty:
         return {
@@ -984,11 +985,14 @@ def get_league_draft_picks(
     if players_df.empty:
         return {"ok": True, "picks": [], "reason": "no_player_data"}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
-    score_field = league_value_settings.valuation_score_field(lens)
-
-    df_summary, _ = league_rankings.build_league_summary_and_draft_capital(
-        valued, league_id, score_field=score_field, league_settings=settings
+    # Cached (30s live-time bucket, same idiom as
+    # build_league_rankings_frame_cached) — this endpoint and Draft Center
+    # both ask this exact question for the same league within seconds of
+    # each other on a typical session (open Draft Center, tap into Pick
+    # Detail), and each used to redo the full per-roster valuation pass
+    # from scratch instead of sharing one cache entry.
+    df_summary, _ = league_rankings.build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     if df_summary.empty:
         return {"ok": True, "picks": [], "reason": "no_rankings_data"}
@@ -1637,8 +1641,13 @@ def post_trade_analyzer(
     send_pick_assets: list[dict[str, Any]] = []
     receive_pick_assets: list[dict[str, Any]] = []
     if body.send_pick_ids or body.receive_pick_ids:
-        pick_summary, _ = league_rankings.build_league_summary_and_draft_capital(
-            valued, league_id, score_field=score_field, league_settings=settings
+        # Cached (30s live-time bucket) — the counter-package fallback
+        # below can call this exact (league_id, lens) computation again
+        # within the SAME request (send/receive picks present AND an
+        # unfavorable verdict), which used to mean running this full
+        # per-roster pass twice for identical inputs in one response.
+        pick_summary, _ = league_rankings.build_league_summary_and_draft_capital_cached(
+            league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
         )
         if not pick_summary.empty:
             crowd_class_strength = (
@@ -1725,8 +1734,12 @@ def post_trade_analyzer(
                 for _, row in my_team_df.iterrows()
             ]
             partner_asset_pool: list[dict[str, Any]] = list(partner_assets)
-            pick_summary, _ = league_rankings.build_league_summary_and_draft_capital(
-                valued, league_id, score_field=score_field, league_settings=settings
+            # Same cached front door as the send/receive-picks branch above
+            # — same (league_id, lens) question, so a request that hits
+            # both branches (picks proposed AND an unfavorable verdict)
+            # shares one cache entry instead of recomputing this twice.
+            pick_summary, _ = league_rankings.build_league_summary_and_draft_capital_cached(
+                league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
             )
             if not pick_summary.empty:
                 my_roster_id_str = str(my_roster.get("roster_id") or "")

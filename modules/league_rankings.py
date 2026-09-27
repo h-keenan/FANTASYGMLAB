@@ -311,6 +311,62 @@ def _league_rankings_frame_cache_bucket() -> int:
 
 
 @lru_cache(maxsize=256)
+def _build_league_summary_and_draft_capital_cached(
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+    _bucket: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    league = sleeper.get_league(league_id)
+    if not league:
+        return pd.DataFrame(), pd.DataFrame()
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(players_db_path)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(players_db_path)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="league_rankings_frame_cache"
+    )
+    if players_df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+    return build_league_summary_and_draft_capital(
+        valued, league_id, score_field=score_field, league_settings=settings
+    )
+
+
+def build_league_summary_and_draft_capital_cached(
+    *,
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Cached front door for `build_league_summary_and_draft_capital` — same
+    30s live-time-bucket idiom as `build_league_rankings_frame_cached`
+    below, for the same reason: this is the same real per-roster
+    Power/Franchise/Draft-Capital pass `build_league_rankings_frame` is
+    built on top of. Draft Center and Draft Picks each called the uncached
+    function directly, redoing this full-league pass from scratch on every
+    request even though the two screens are commonly opened seconds apart
+    in one session — the same class of problem
+    `build_league_rankings_frame_cached` already exists to solve for
+    Dashboard/Team Rankings. A separate cache entry from
+    `_build_league_rankings_frame_cached` below (not a shared one) — kept
+    that way deliberately so this addition can't change what Dashboard/Team
+    Rankings compute or how their existing cache-sharing test observes
+    `build_league_rankings_frame` being called. Returns copies so a caller
+    mutating either frame never corrupts the cached entry."""
+
+    df_summary, draft_capital_summary = _build_league_summary_and_draft_capital_cached(
+        league_id, lens, players_db_path, _league_rankings_frame_cache_bucket()
+    )
+    return df_summary.copy(), draft_capital_summary.copy()
+
+
+@lru_cache(maxsize=256)
 def _build_league_rankings_frame_cached(
     league_id: str,
     lens: str,
