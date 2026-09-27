@@ -158,6 +158,49 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 
 .toa-more > summary::-webkit-details-marker { display: none; }
 
+.toa-alt-packages {
+  display: grid;
+  gap: var(--space-xs, 0.4rem);
+}
+
+.toa-alt-packages-title {
+  color: var(--color-text-secondary, #e5e7eb);
+  font-size: var(--font-size-metadata, 0.72rem);
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.toa-alt-package {
+  background: var(--surface-2, #15171b);
+  border-inline-start: 3px solid var(--color-accent-strong, #22d3ee);
+  border-radius: var(--radius-card, 0);
+  display: grid;
+  gap: var(--space-2xs, 0.3rem);
+  padding: var(--space-xs, 0.4rem) var(--space-sm, 0.55rem);
+}
+
+.toa-alt-package-head {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2xs, 0.3rem);
+  justify-content: space-between;
+}
+
+.toa-alt-package-label {
+  color: var(--color-text-primary, #f8fafc);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.toa-alt-package-band {
+  color: var(--color-success, #22c55e);
+  font-size: var(--font-size-metadata, 0.72rem);
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .toa-stage-kicker,
 .toa-workspace-kicker,
 .toa-block-kicker,

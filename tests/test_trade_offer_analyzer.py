@@ -301,3 +301,259 @@ def test_add_asset_does_not_assign_search_widget_keys_inline():
 def test_trade_analyzer_package_clear_includes_search_reset_flags():
     assert "_reset_trade_send_search_query" in session_integrity.TRADE_ANALYZER_PACKAGE_KEYS
     assert "_reset_trade_receive_search_query" in session_integrity.TRADE_ANALYZER_PACKAGE_KEYS
+
+
+# --- Real counter-offer package generation ---------------------------------
+
+
+def _regrade_factory(fair_floor: int = -150, decline_floor: int = -400):
+    """A tiny stand-in for evaluate_trade_analyzer_fit + decide_offer_verdict:
+    classifies a candidate package purely by its own send/receive score sum,
+    same tone vocabulary (accept/fair/counter/decline) the real pipeline
+    uses. Good enough to exercise build_counter_offer_packages' own logic
+    (guardrails, ranking, dedup) without needing a real players DataFrame.
+    """
+
+    calls: list[tuple[list, list]] = []
+
+    def _score(assets):
+        return sum(int(a.get("score") or a.get("value_score") or 0) for a in assets)
+
+    def regrade(send_assets, receive_assets):
+        calls.append((list(send_assets), list(receive_assets)))
+        delta = _score(receive_assets) - _score(send_assets)
+        if delta >= 500:
+            band, ui, tone = toa.VERDICT_ACCEPT, toa.UI_VERDICT_ACCEPT, "accept"
+        elif delta >= fair_floor:
+            band, ui, tone = toa.VERDICT_FAIR, toa.UI_VERDICT_FAIR, "fair"
+        elif delta >= decline_floor:
+            band, ui, tone = toa.VERDICT_COUNTER, toa.UI_VERDICT_COUNTER, "counter"
+        else:
+            band, ui, tone = toa.VERDICT_DECLINE, toa.UI_VERDICT_DECLINE, "decline"
+        return toa.OfferVerdict(
+            band=band,
+            ui_verdict=ui,
+            confidence="Close call",
+            rationale="",
+            value_summary="",
+            roster_summary="",
+            strategy_summary="",
+            risk_summary="",
+            counter_guidance="",
+            fit_total=0,
+            value_delta=delta,
+            tone=tone,
+        )
+
+    regrade.calls = calls  # type: ignore[attr-defined]
+    return regrade
+
+
+def test_build_counter_offer_packages_trims_weakest_send_asset():
+    send = [
+        {"asset_type": "player", "player_id": "star", "name": "Star Player", "score": 6000, "position": "WR"},
+        {"asset_type": "player", "player_id": "depth", "name": "Depth Piece", "score": 400, "position": "RB"},
+    ]
+    receive = [{"asset_type": "player", "player_id": "mid", "name": "Mid Player", "score": 5500, "position": "WR"}]
+    regrade = _regrade_factory()
+
+    packages = toa.build_counter_offer_packages(
+        band=toa.VERDICT_COUNTER,
+        value_delta=-900,
+        send_assets=send,
+        receive_assets=receive,
+        my_asset_pool=send,
+        partner_asset_pool=[],
+        regrade=regrade,
+    )
+
+    assert packages
+    trimmed = packages[0]
+    assert "Star Player" in trimmed["label"] or "Depth Piece" in trimmed["label"]
+    assert trimmed["ui_verdict"] in {"FAIR", "ACCEPT"}
+    # Stays close to the original offer: the receive side is untouched, and
+    # send lost exactly one real asset that was actually in the original
+    # package (never an invented one).
+    assert len(trimmed["receive_assets"]) == 1
+    assert len(trimmed["send_assets"]) == 1
+    assert trimmed["send_assets"][0]["player_id"] in {"star", "depth"}
+
+
+def test_build_counter_offer_packages_adds_real_partner_sweetener():
+    send = [{"asset_type": "player", "player_id": "s1", "name": "Solid Send", "score": 5000, "position": "WR"}]
+    receive = [{"asset_type": "player", "player_id": "r1", "name": "Solid Receive", "score": 4700, "position": "WR"}]
+    partner_pool = [
+        {"asset_type": "player", "player_id": "r1", "name": "Solid Receive", "score": 4700, "position": "WR"},
+        {"asset_type": "player", "player_id": "sweet", "name": "Sweetener", "score": 320, "position": "RB"},
+    ]
+    regrade = _regrade_factory()
+
+    packages = toa.build_counter_offer_packages(
+        band=toa.VERDICT_COUNTER,
+        value_delta=-300,
+        send_assets=send,
+        receive_assets=receive,
+        my_asset_pool=send,
+        partner_asset_pool=partner_pool,
+        regrade=regrade,
+        my_needs=["RB"],
+    )
+
+    assert packages
+    sweetened = packages[0]
+    receive_ids = {a.get("player_id") for a in sweetened["receive_assets"]}
+    assert "sweet" in receive_ids
+    assert "r1" in receive_ids
+    # Original send side untouched — this strategy only adds, never removes.
+    assert sweetened["send_assets"] == send
+
+
+def test_build_counter_offer_packages_never_proposes_protected_partner_asset():
+    send = [{"asset_type": "player", "player_id": "s1", "name": "Solid Send", "score": 5000, "position": "WR"}]
+    receive = [{"asset_type": "player", "player_id": "r1", "name": "Solid Receive", "score": 4200, "position": "WR"}]
+    # A partner "core"/protected asset (score >= 6500 trips
+    # trade_ideas._is_core_or_protected_starter) sits CLOSER to the value
+    # gap than the legitimate sweetener, so a cruder "closest value" ranking
+    # would pick it first — it must never be the suggested add. A second,
+    # unprotected sweetener is included so a package can still be found
+    # (otherwise this would vacuously pass on an empty result).
+    partner_pool = [
+        {"asset_type": "player", "player_id": "r1", "name": "Solid Receive", "score": 4200, "position": "WR"},
+        {"asset_type": "player", "player_id": "franchise", "name": "Franchise QB", "score": 9000, "position": "QB"},
+        {"asset_type": "player", "player_id": "sweet", "name": "Legit Sweetener", "score": 700, "position": "WR"},
+    ]
+    regrade = _regrade_factory()
+
+    packages = toa.build_counter_offer_packages(
+        band=toa.VERDICT_COUNTER,
+        value_delta=-800,
+        send_assets=send,
+        receive_assets=receive,
+        my_asset_pool=send,
+        partner_asset_pool=partner_pool,
+        regrade=regrade,
+    )
+
+    assert packages
+    for pkg in packages:
+        assert "franchise" not in {a.get("player_id") for a in pkg["receive_assets"]}
+    assert any(
+        "sweet" in {a.get("player_id") for a in pkg["receive_assets"]} for pkg in packages
+    )
+
+
+def test_build_counter_offer_packages_falls_back_to_empty_when_no_clean_fix():
+    """No complementary assets anywhere — must not fabricate an 'improvement'."""
+
+    send = [{"asset_type": "player", "player_id": "only", "name": "Only Asset", "score": 5000, "position": "WR"}]
+    receive = [{"asset_type": "player", "player_id": "r1", "name": "Solid Receive", "score": 500, "position": "WR"}]
+    regrade = _regrade_factory()
+
+    packages = toa.build_counter_offer_packages(
+        band=toa.VERDICT_DECLINE,
+        value_delta=-4500,
+        send_assets=send,
+        receive_assets=receive,
+        my_asset_pool=send,
+        partner_asset_pool=[],
+        regrade=regrade,
+    )
+
+    assert packages == []
+
+
+def test_build_counter_offer_packages_skips_fair_and_accept_bands():
+    send = [{"asset_type": "player", "player_id": "s1", "name": "S", "score": 5000}]
+    receive = [{"asset_type": "player", "player_id": "r1", "name": "R", "score": 5000}]
+    regrade = _regrade_factory()
+
+    for band in (toa.VERDICT_FAIR, toa.VERDICT_ACCEPT, toa.VERDICT_SMASH_ACCEPT):
+        packages = toa.build_counter_offer_packages(
+            band=band,
+            value_delta=0,
+            send_assets=send,
+            receive_assets=receive,
+            my_asset_pool=send,
+            partner_asset_pool=[],
+            regrade=regrade,
+        )
+        assert packages == []
+    assert not regrade.calls  # never even attempted for a favorable band
+
+
+def test_offer_verdict_with_alternate_packages_round_trips_public_dict():
+    verdict = toa.decide_offer_verdict(
+        _fit(
+            value_delta=-900,
+            components={"value": -1, "lineup": 0, "needs": 0, "age": 0, "draft": 0, "strategy": 0, "injury": 0},
+        ),
+        send_assets=[{"asset_type": "player", "name": "Depth Piece", "score": 400, "owner_roster_id": "me"}],
+    )
+    assert verdict.alternate_packages == ()
+    assert verdict.to_public_dict()["alternate_packages"] == []
+
+    package = {
+        "label": "Remove Depth Piece from your side",
+        "send_assets": [],
+        "receive_assets": [{"asset_type": "player", "name": "Mid Player", "score": 5000}],
+        "band": toa.VERDICT_FAIR,
+        "ui_verdict": toa.UI_VERDICT_FAIR,
+        "confidence": "Close call",
+        "value_delta": 5000,
+    }
+    attached = verdict.with_alternate_packages([package])
+    assert attached.alternate_packages == (package,)
+    public = attached.to_public_dict()
+    assert public["alternate_packages"] == [package]
+    # Original verdict object is untouched — attaching packages never
+    # mutates the verdict math itself.
+    assert verdict.alternate_packages == ()
+
+
+def test_result_card_renders_try_this_instead_with_real_assets():
+    verdict = toa.decide_offer_verdict(
+        _fit(
+            value_delta=-900,
+            components={"value": -1, "lineup": 0, "needs": 0, "age": 0, "draft": 0, "strategy": 0, "injury": 0},
+        ),
+        send_assets=[{"asset_type": "player", "name": "Depth Piece", "score": 400, "owner_roster_id": "me"}],
+    )
+    package = {
+        "label": "Remove Depth Piece from your side",
+        "send_assets": [],
+        "receive_assets": [
+            {"asset_type": "player", "name": "Mid Player", "position": "WR", "team": "BUF", "score": 5000},
+        ],
+        "band": toa.VERDICT_FAIR,
+        "ui_verdict": toa.UI_VERDICT_FAIR,
+        "confidence": "Close call",
+        "value_delta": 5000,
+    }
+    verdict = verdict.with_alternate_packages([package])
+    html = toa.build_offer_result_card_html(
+        verdict,
+        send_assets=[{"asset_type": "player", "name": "Depth Piece", "position": "RB", "team": "DAL", "age": 24}],
+        receive_assets=[],
+        league_name="Dynasty League",
+        format_label="Superflex",
+        strategy_label="Contender",
+        partner_name="Rival FC",
+    )
+    assert "Try this instead" in html
+    assert "Mid Player" in html
+    assert "Remove Depth Piece from your side" in html
+
+
+def test_result_card_omits_try_this_instead_when_no_packages():
+    verdict = toa.decide_offer_verdict(
+        _fit(
+            value_delta=900,
+            components={"value": 2, "lineup": 1, "needs": 1, "age": 0, "draft": 0, "strategy": 1, "injury": 0},
+        ),
+    )
+    html = toa.build_offer_result_card_html(
+        verdict,
+        send_assets=[{"asset_type": "player", "name": "Send A", "position": "RB", "team": "DAL", "age": 27}],
+        receive_assets=[{"asset_type": "player", "name": "Recv B", "position": "WR", "team": "BUF", "age": 24}],
+    )
+    assert "Try this instead" not in html
