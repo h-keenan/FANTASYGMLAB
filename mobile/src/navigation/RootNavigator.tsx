@@ -30,6 +30,7 @@ import WaiversScreen from '../screens/WaiversScreen';
 import TradeAnalyzerScreen from '../screens/TradeAnalyzerScreen';
 import RecapScreen from '../screens/RecapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
+import GmPlanScreen from '../screens/GmPlanScreen';
 import GmTargetsScreen from '../screens/GmTargetsScreen';
 import TeamStanceScreen from '../screens/TeamStanceScreen';
 import TradeHistoryScreen from '../screens/TradeHistoryScreen';
@@ -61,6 +62,7 @@ export type RootStackParamList = {
   PlayerCompare: { player: RankedPlayer; leagueId: string; leagueName: string };
   GmTargets: { leagueId: string; leagueName: string };
   TeamStance: { leagueId: string; leagueName: string };
+  GmPlan: { leagueId: string; leagueName: string };
   TradeHistory: undefined;
   Waivers: { leagueId: string; leagueName: string };
   TradeAnalyzer: { leagueId: string; leagueName: string };
@@ -220,6 +222,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="CollegeProspects" component={CollegeProspectsScreen} />
           <AppStack.Screen name="CollegeProspectDetail" component={ProspectScoutingDetailScreen} />
           <AppStack.Screen name="TeamStance" component={TeamStanceScreen} />
+          <AppStack.Screen name="GmPlan" component={GmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
           <AppStack.Screen
             name="Paywall"

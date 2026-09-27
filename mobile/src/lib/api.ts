@@ -628,6 +628,71 @@ export interface TeamStanceResponse {
   options?: TeamStance[];
 }
 
+/**
+ * GM Plan — a season-arc roadmap layer, additive on top of the Dashboard's
+ * one-off "Next Move" tile. Conditioned on the declared Team Situation
+ * stance above (NOT the separate GM Stance/team-strategy system). Every
+ * item in a focus area traces to an already-computed signal server-side
+ * (a real trade idea, a real rank) — see modules.gm_plan on the backend.
+ */
+export type GmPlanSeasonPhase =
+  | 'early_season'
+  | 'trade_deadline_approach'
+  | 'playoff_push'
+  | 'offseason_adjacent';
+
+export type GmPlanFocusStatus = 'signal_found' | 'no_signal';
+
+export interface GmPlanRankItem {
+  label: string;
+  rank: number;
+  total_teams: number | null;
+  tied: boolean;
+  source: string;
+  relative_weak_spot?: boolean;
+}
+
+export interface GmPlanRecordItem {
+  label: 'Record';
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  source: string;
+}
+
+export interface GmPlanTradeItem {
+  partner_team_name: string;
+  my_player: string;
+  their_player: string;
+  rationale: string;
+  trade_confidence_label: string;
+  priority: number | null;
+  source: string;
+}
+
+export type GmPlanFocusItem = GmPlanRankItem | GmPlanRecordItem | GmPlanTradeItem;
+
+export interface GmPlanFocusArea {
+  key: 'standing' | 'trade_opportunities' | 'roster_construction';
+  title: string;
+  framing?: string;
+  status: GmPlanFocusStatus;
+  items: GmPlanFocusItem[];
+  watch_for: string;
+}
+
+export interface GmPlanResponse {
+  ok: boolean;
+  quiet: boolean;
+  reason: string;
+  season_phase?: GmPlanSeasonPhase;
+  season_phase_label?: string;
+  team_stance?: TeamStance | '';
+  team_stance_label?: string;
+  headline?: string;
+  focus_areas: GmPlanFocusArea[];
+}
+
 export interface TradeCounterAction {
   action: 'remove_from_send' | 'add_to_receive';
   player_id: string;
@@ -1562,6 +1627,14 @@ export const api = {
     authorizedFetch<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`),
   setTeamStance: (leagueId: string, stance: TeamStance) =>
     authorizedPost<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`, { stance }),
+  getGmPlan: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<GmPlanResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/gm-plan${query ? `?${query}` : ''}`,
+    );
+  },
   registerPushToken: (expoPushToken: string, platform: string, deviceName = '') =>
     authorizedPost<PushMutationResponse>('/v1/push/register', {
       expo_push_token: expoPushToken,

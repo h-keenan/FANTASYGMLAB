@@ -100,6 +100,7 @@ from modules import (
     draft_assistant,
     draft_center_ui,
     faab,
+    gm_plan,
     gm_targets,
     injury_ui,
     league_history,
@@ -3682,6 +3683,112 @@ def get_league_dashboard(
             "hidden_count": len(all_items) - len(visible_items),
         },
     }
+
+
+@app.get("/v1/leagues/{league_id}/gm-plan")
+def get_gm_plan(
+    league_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """A season-phase-aware roadmap, conditioned on the caller's declared
+    Team Situation stance (modules.team_stance — Rebuilding / Competing /
+    Balanced; NOT the older, valuation-affecting "GM Stance" team-strategy
+    system at /v1/leagues/{league_id}/gm-stance, which this endpoint never
+    reads for framing purposes beyond the pass-through `strategy` argument
+    the shared trade-idea search already requires).
+
+    A season-arc complement to the Dashboard's one-off "Next Move" tile
+    (get_league_dashboard) — not a replacement for it. Purely additive
+    aggregation: every module.gm_plan.build_gm_plan input below is an
+    ALREADY-COMPUTED output of an existing engine
+    (modules.league_rankings.build_league_rankings_frame_cached for
+    power/draft-capital/roster-construction ranks,
+    modules.trade_hub_engine.generate_trade_idea_records_cached for trade
+    ideas — the same stance-framed records the Dashboard's trade tile
+    uses). No new valuation math is introduced here.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return {"ok": True, "quiet": True, "focus_areas": [], "reason": reason}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    # Same "leg"/"week" field modules.league_standings already reads off
+    # Sleeper's raw league settings — reused, not recomputed.
+    raw_settings = league.get("settings") or {}
+    current_week = raw_settings.get("leg") or raw_settings.get("week")
+    playoff_week_start = raw_settings.get("playoff_week_start")
+    season_phase = gm_plan.derive_season_phase(current_week, playoff_week_start)
+
+    declared_team_stance = _fetch_team_stance(config, user_id, access_token, league_id)
+
+    rankings_row: dict[str, Any] | None = None
+    total_teams: int | None = None
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if not rankings_frame.empty:
+        total_teams = int(len(rankings_frame))
+        my_roster_id = str(my_roster.get("roster_id") or "")
+        match = rankings_frame[rankings_frame["roster_id"].astype(str) == my_roster_id]
+        if not match.empty:
+            rankings_row = {
+                key: _clean_json_value(value) for key, value in match.iloc[0].to_dict().items()
+            }
+
+    trade_idea_records: list[dict[str, Any]] = []
+    try:
+        team_strategy = _fetch_stored_gm_stance(
+            config, access_token, user_id=user_id, league_id=league_id
+        )
+        gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+            config, user_id, access_token, league_id
+        )
+        trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
+            league_id=league_id,
+            roster_id=int(my_roster.get("roster_id")),
+            strategy=team_strategy,
+            lens=lens,
+            players_db_path=PLAYERS_DB_PATH,
+            untouchable_player_ids=gm_untouchable_ids,
+            gm_target_player_ids=gm_target_ids,
+            team_stance=declared_team_stance,
+        )
+    except (TypeError, ValueError):
+        trade_idea_records = []
+
+    roster_settings = my_roster.get("settings") or {}
+    record = {
+        "wins": roster_settings.get("wins"),
+        "losses": roster_settings.get("losses"),
+        "ties": roster_settings.get("ties"),
+    }
+
+    plan = gm_plan.build_gm_plan(
+        team_stance=declared_team_stance,
+        season_phase=season_phase,
+        rankings_row=rankings_row,
+        total_teams=total_teams,
+        record=record,
+        trade_ideas=trade_idea_records,
+    )
+
+    return {"ok": True, "quiet": False, "reason": "", **plan}
 
 
 # Display order for My Team's starters section — matches
