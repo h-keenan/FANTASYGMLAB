@@ -713,6 +713,13 @@ export type TradeOutcomeAnswer = 'yes' | 'no' | 'didnt_send' | 'still_pending';
 export interface TradeOutcomeAssetSummary {
   name: string;
   position: string;
+  /** Present only for tracked assets (players, never draft picks) shared
+   * after the quiet Trade Outcomes result tracking landed. Absent on older
+   * rows and on picks — both simply can't be evaluated by the result sweep. */
+  player_id?: string;
+  /** The value_score visible on screen at share time, under whichever lens
+   * was active — the baseline the later result sweep compares against. */
+  value_score?: number | null;
 }
 
 export interface TradeOutcomeSummary {
@@ -720,6 +727,9 @@ export interface TradeOutcomeSummary {
   send: TradeOutcomeAssetSummary[];
   receive: TradeOutcomeAssetSummary[];
   value_edge_label: string;
+  /** Evaluation lens active at share time (e.g. "Dynasty") — the result
+   * sweep re-values under this same lens for an apples-to-apples compare. */
+  valuation_lens?: string;
 }
 
 export interface PendingTradeOutcome {
@@ -733,6 +743,39 @@ export interface PendingTradeOutcome {
 export interface PendingTradeOutcomesResponse {
   ok: true;
   outcomes: PendingTradeOutcome[];
+}
+
+/** modules.trade_outcome_results's computed "did it work?" snapshot — only
+ * ever present once a real signal exists; `verdict`/`verdict_label` are null
+ * whenever status is 'insufficient_data', never a fabricated call. */
+export interface TradeOutcomeResultSummary {
+  status: 'ready' | 'insufficient_data';
+  reason: string;
+  verdict: 'worked_out' | 'didnt_pan_out' | 'mixed' | 'neutral' | null;
+  verdict_label?: string;
+  confidence?: 'low' | 'medium' | 'high';
+  days_since_trade: number | null;
+  production?: { net_points_ppr: number; avg_net_per_week: number; weeks_counted: number } | null;
+  value?: { sent_delta_pct: number; received_delta_pct: number; net_delta_pct: number } | null;
+}
+
+/** One answered (non-pending) shared trade — powers the mobile Trade
+ * History screen (More > Trade History), pull-based only. */
+export interface PastTradeOutcome {
+  id: string;
+  league_id: string;
+  partner_team_name: string;
+  trade_summary: TradeOutcomeSummary;
+  outcome: 'yes' | 'no' | 'didnt_send';
+  shared_at: string;
+  outcome_recorded_at: string | null;
+  result_summary: TradeOutcomeResultSummary | null;
+  result_computed_at: string | null;
+}
+
+export interface TradeOutcomeHistoryResponse {
+  ok: true;
+  outcomes: PastTradeOutcome[];
 }
 
 export interface RecapTradeAsset {
@@ -1523,9 +1566,10 @@ export const api = {
     leagueId: string,
     body: {
       partnerTeamName?: string;
-      send: Array<{ name: string; position: string }>;
-      receive: Array<{ name: string; position: string }>;
+      send: Array<{ name: string; position: string; player_id?: string; value_score?: number | null }>;
+      receive: Array<{ name: string; position: string; player_id?: string; value_score?: number | null }>;
       valueEdgeLabel?: string;
+      valuationLens?: string;
     },
   ) =>
     authorizedPost<{ ok: boolean; reason: string }>(
@@ -1535,9 +1579,11 @@ export const api = {
         send: body.send,
         receive: body.receive,
         value_edge_label: body.valueEdgeLabel ?? '',
+        valuation_lens: body.valuationLens ?? '',
       },
     ),
   getPendingTradeOutcomes: () => authorizedFetch<PendingTradeOutcomesResponse>('/v1/trade-outcomes/pending'),
+  getTradeOutcomeHistory: () => authorizedFetch<TradeOutcomeHistoryResponse>('/v1/trade-outcomes/history'),
   answerTradeOutcome: (outcomeId: string, outcome: TradeOutcomeAnswer) =>
     authorizedPost<{ ok: boolean; reason: string }>(
       `/v1/trade-outcomes/${encodeURIComponent(outcomeId)}/answer`,

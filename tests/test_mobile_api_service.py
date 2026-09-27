@@ -6232,6 +6232,104 @@ def test_answer_trade_outcome_still_pending_only_snoozes(monkeypatch):
     assert "outcome_recorded_at" not in call_kwargs["json"]
 
 
+def test_record_trade_share_stores_player_id_value_score_and_lens(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    post_response = Mock(status_code=201)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=post_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/abc/trade-outcomes",
+                json={
+                    "partner_team_name": "Team Rocket",
+                    "send": [{"name": "Player A", "position": "RB", "player_id": "111", "value_score": 987.5}],
+                    "receive": [{"name": "Player B", "position": "WR"}],
+                    "value_edge_label": "+120",
+                    "valuation_lens": "Dynasty",
+                },
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = mock_post.call_args.kwargs["json"]
+    assert body["trade_summary"]["send"] == [
+        {"name": "Player A", "position": "RB", "player_id": "111", "value_score": 987.5}
+    ]
+    # No player_id supplied for the receive-side asset -> key omitted, not
+    # a fabricated empty string (keeps legacy shares byte-identical).
+    assert body["trade_summary"]["receive"] == [{"name": "Player B", "position": "WR"}]
+    assert body["trade_summary"]["valuation_lens"] == "Dynasty"
+
+
+def test_trade_outcome_history_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/trade-outcomes/history").status_code == 401
+
+
+def test_trade_outcome_history_returns_answered_trades_with_results(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    history_response = Mock(status_code=200)
+    history_response.json.return_value = [
+        {
+            "id": "outcome-1",
+            "league_id": "abc",
+            "partner_team_name": "Team Rocket",
+            "trade_summary": {"send": [], "receive": [], "value_edge_label": "+120"},
+            "outcome": "yes",
+            "shared_at": "2026-08-01T00:00:00Z",
+            "outcome_recorded_at": "2026-08-02T00:00:00Z",
+            "result_summary": {"status": "ready", "verdict": "worked_out"},
+            "result_computed_at": "2026-08-30T00:00:00Z",
+        },
+        {
+            "id": "outcome-2",
+            "league_id": "abc",
+            "partner_team_name": "Team Ghost",
+            "trade_summary": {"send": [], "receive": [], "value_edge_label": "-10"},
+            "outcome": "no",
+            "shared_at": "2026-07-01T00:00:00Z",
+            "outcome_recorded_at": "2026-07-02T00:00:00Z",
+            "result_summary": None,
+            "result_computed_at": None,
+        },
+    ]
+
+    with patch("requests.get", side_effect=[auth_user_response, history_response]) as mock_get:
+        response = client.get("/v1/trade-outcomes/history", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert len(body["outcomes"]) == 2
+    assert body["outcomes"][0]["outcome"] == "yes"
+    assert body["outcomes"][0]["result_summary"] == {"status": "ready", "verdict": "worked_out"}
+    assert body["outcomes"][1]["outcome"] == "no"
+    assert body["outcomes"][1]["result_summary"] is None
+    history_url = mock_get.call_args_list[1].args[0]
+    assert "user_id=eq.user-123" in history_url
+    assert "outcome=neq.pending" in history_url
+
+
+def test_trade_outcome_history_fails_soft_when_table_unreachable(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    error_response = Mock(status_code=404)
+
+    with patch("requests.get", side_effect=[auth_user_response, error_response]):
+        response = client.get("/v1/trade-outcomes/history", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "outcomes": []}
+
+
 def test_save_league_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     assert client.post("/v1/leagues/save", json={"league_id": "123"}).status_code == 401

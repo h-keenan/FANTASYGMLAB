@@ -120,7 +120,14 @@ function shareAssetsToPlayers(assets: PresentationAsset[]): RankedPlayer[] {
       status: null,
       injury_status: null,
       tier: null,
-      score: null,
+      // Was hardcoded null — harmless for the share PNG (it doesn't render
+      // a score), but it silently meant Trade Hub-originated shares could
+      // never carry a Trade Outcomes baseline value_score (see
+      // TradeSharePreviewModal.recordShare), unlike Trade Analyzer's own
+      // sendIds/receiveIds which already carry a real score. The idea's own
+      // score is already computed under the same lens the idea was
+      // generated with, so this is just passing existing data through.
+      score: asset.score ?? null,
       overall_rank: null,
       position_rank: null,
       rank_unavailable_reason: null,
@@ -760,6 +767,9 @@ function TradeIdeaCard({
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
+  // Recorded alongside the share so the quiet Trade Outcomes result sweep
+  // can re-value these same players under the same lens later.
+  const { lens } = useValuationLens(leagueId);
   const [rationaleOpen, setRationaleOpen] = useState(false);
   const openPlayer = (asset: PresentationAsset) =>
     navigation.navigate('PlayerDetail', { player: assetToRankedPlayer(asset), leagueId, leagueName });
@@ -893,6 +903,7 @@ function TradeIdeaCard({
         verdict={ideaToShareVerdict(idea)}
         sendPlayers={shareAssetsToPlayers(idea.package.send)}
         receivePlayers={shareAssetsToPlayers(idea.package.receive)}
+        valuationLens={lens}
       />
 
       <View style={styles.exchangeRow}>

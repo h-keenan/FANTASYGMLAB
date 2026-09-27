@@ -44,6 +44,9 @@ Deployment topology (Render):
   - POST /v1/leagues/{id}/trade-outcomes        — record a shared trade for later "did this happen?" follow-up
   - GET  /v1/trade-outcomes/pending             — this user's shared trades ready to be asked about
   - POST /v1/trade-outcomes/{id}/answer         — record yes/no/didnt_send, or snooze with still_pending
+  - GET  /v1/trade-outcomes/history             — this user's answered trades, with a quiet "how it
+                                                   worked out" result folded in once computed (pull-based,
+                                                   no push/popup — powers the mobile Trade History screen)
   - GET  /v1/preferences                        — cross-device display density + last-viewed league
   - POST /v1/preferences                        — partial update to those same preferences
   - GET  /v1/leagues/{id}/gm-stance             — the caller's remembered team strategy for this league
@@ -2070,6 +2073,15 @@ TRADE_OUTCOME_SNOOZE_HOURS = 20
 class TradeOutcomeAssetSummary(BaseModel):
     name: str = ""
     position: str = ""
+    # Both optional and best-effort: only the mobile share flow's RankedPlayer
+    # rows carry them (never draft picks — see TradeSharePreviewModal callers,
+    # which filter picks out before recording a share). Without a player_id,
+    # this asset can never be tracked by the quiet trade-outcome result sweep
+    # (modules.trade_outcome_results) — it's simply excluded from that
+    # comparison rather than treated as a zero, so legacy shares recorded
+    # before this field existed keep working exactly as before.
+    player_id: str = ""
+    value_score: float | None = None
 
 
 class RecordTradeShareRequest(BaseModel):
@@ -2077,6 +2089,12 @@ class RecordTradeShareRequest(BaseModel):
     send: list[TradeOutcomeAssetSummary] = Field(default_factory=list)
     receive: list[TradeOutcomeAssetSummary] = Field(default_factory=list)
     value_edge_label: str = ""
+    # Whichever evaluation lens (Dynasty/Rebuild/Non-Dynasty) was active on
+    # screen when this trade was shared — stored so the later result sweep
+    # re-values the same players under the SAME lens rather than an
+    # arbitrary default, an apples-to-apples comparison. Missing/unknown
+    # values fall back to modules.trade_outcome_results.DEFAULT_LENS.
+    valuation_lens: str = ""
 
 
 @app.post("/v1/leagues/{league_id}/trade-outcomes")
@@ -2098,17 +2116,24 @@ def record_trade_share(
     if not user_id:
         return {"ok": False, "reason": "not_available"}
 
+    def _asset_dict(asset: TradeOutcomeAssetSummary) -> dict[str, Any]:
+        entry: dict[str, Any] = {"name": asset.name.strip()[:80], "position": asset.position.strip()[:8]}
+        player_id = asset.player_id.strip()[:64]
+        if player_id:
+            entry["player_id"] = player_id
+        if asset.value_score is not None:
+            try:
+                entry["value_score"] = float(asset.value_score)
+            except (TypeError, ValueError):
+                pass
+        return entry
+
     trade_summary = {
         "partner_team_name": body.partner_team_name.strip()[:120],
-        "send": [
-            {"name": asset.name.strip()[:80], "position": asset.position.strip()[:8]}
-            for asset in body.send[:10]
-        ],
-        "receive": [
-            {"name": asset.name.strip()[:80], "position": asset.position.strip()[:8]}
-            for asset in body.receive[:10]
-        ],
+        "send": [_asset_dict(asset) for asset in body.send[:10]],
+        "receive": [_asset_dict(asset) for asset in body.receive[:10]],
         "value_edge_label": body.value_edge_label.strip()[:40],
+        "valuation_lens": body.valuation_lens.strip()[:20],
     }
     url = auth_supabase.rest_api_url(config, TRADE_OUTCOMES_TABLE)
     headers = auth_supabase.auth_headers(config, str(user.get("_access_token") or ""))
@@ -2226,6 +2251,66 @@ def answer_trade_outcome(
     if response.status_code >= 400:
         return {"ok": False, "reason": "not_available"}
     return {"ok": True, "reason": ""}
+
+
+def _project_trade_outcome_history(row: dict[str, Any]) -> dict[str, Any]:
+    summary = row.get("trade_summary") if isinstance(row.get("trade_summary"), dict) else {}
+    result_summary = row.get("result_summary") if isinstance(row.get("result_summary"), dict) else None
+    return {
+        "id": str(row.get("id") or ""),
+        "league_id": str(row.get("league_id") or ""),
+        "partner_team_name": str(row.get("partner_team_name") or ""),
+        "trade_summary": summary,
+        "outcome": str(row.get("outcome") or ""),
+        "shared_at": row.get("shared_at"),
+        "outcome_recorded_at": row.get("outcome_recorded_at"),
+        # Present only once modules.trade_outcome_results's quiet sweep has
+        # actually computed something — absent (not a placeholder) the rest
+        # of the time, so the mobile Trade History screen only ever renders
+        # a result section when there's a real one to show.
+        "result_summary": result_summary,
+        "result_computed_at": row.get("result_computed_at"),
+    }
+
+
+@app.get("/v1/trade-outcomes/history")
+def get_trade_outcome_history(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """This user's answered trades (yes/no/didn't send), newest first, with
+    the quiet "did it work out?" result folded in once computed.
+
+    Pull-based only — the mobile Trade History screen (More > Trade
+    History) calls this on its own when the user opens it. Nothing calls
+    this automatically and nothing here triggers a push or a popup; the
+    result itself is computed out-of-band by modules.trade_outcome_results's
+    standalone sweep and simply read back here.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": True, "outcomes": []}
+
+    query = (
+        f"user_id=eq.{user_id}&outcome=neq.pending"
+        "&select=id,league_id,partner_team_name,trade_summary,outcome,shared_at,"
+        "outcome_recorded_at,result_summary,result_computed_at"
+        "&order=shared_at.desc&limit=50"
+    )
+    url = auth_supabase.rest_api_url(config, TRADE_OUTCOMES_TABLE, query)
+    try:
+        response = requests.get(url, headers=auth_supabase.auth_headers(config, access_token), timeout=15)
+    except Exception:
+        return {"ok": True, "outcomes": []}
+    if response.status_code >= 400:
+        return {"ok": True, "outcomes": []}
+    try:
+        rows = response.json()
+    except Exception:
+        return {"ok": True, "outcomes": []}
+    if not isinstance(rows, list):
+        return {"ok": True, "outcomes": []}
+    return {"ok": True, "outcomes": [_project_trade_outcome_history(row) for row in rows if isinstance(row, dict)]}
 
 
 def _stat_item_dict(item: player_quick_view.StatItem) -> dict[str, Any]:

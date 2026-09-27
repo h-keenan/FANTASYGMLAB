@@ -221,6 +221,14 @@ export default function MoreScreen({ navigation }: Props) {
             label="Team Situation"
             description="Declare Rebuilding / Competing / Balanced and manage protected players"
             onPress={onOpenTeamStance}
+            showDivider
+          />
+          <SettingsRow
+            icon="swap-horizontal-outline"
+            iconColor={colors.accent}
+            label="Trade History"
+            description="Trades you've shared and confirmed, plus how they've worked out so far"
+            onPress={() => navigation.navigate('TradeHistory')}
             showDivider={false}
           />
         </AnimatedCard>

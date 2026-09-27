@@ -19,6 +19,10 @@
 -- Until this migration is applied, the share flow still works (recording a
 -- share fails closed, no crash) and the "did this happen?" surfaces just
 -- stay empty rather than erroring.
+--
+-- Follow-up: docs/supabase_trade_outcome_results.sql adds the quiet
+-- "did it actually work?" result columns (result_summary/result_computed_at)
+-- once a confirmed trade has had a few weeks to play out.
 
 create table if not exists public.trade_outcomes (
     id uuid primary key default gen_random_uuid(),
