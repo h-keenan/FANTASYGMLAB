@@ -158,7 +158,7 @@ _SHELL_CSS = """
 }
 .dg-startup-card {
     align-items: center;
-    color: #f8fafc;
+    color: var(--color-text-primary, #f8fafc);
     display: flex;
     flex-direction: column;
     gap: 0.78rem;
@@ -220,7 +220,7 @@ _SHELL_CSS = """
     text-align: left;
 }
 .dg-startup-badge-wrap .dg-founder-badge__copy strong {
-    color: #f8fafc;
+    color: var(--color-text-primary, #f8fafc);
     font-size: 0.64rem;
     font-weight: 850;
     line-height: 1.1;

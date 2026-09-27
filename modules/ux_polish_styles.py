@@ -209,7 +209,7 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
     .live-rank-score small,
     .summary-tile-note,
     .player-support-chip,
-    .player-status-pill,
+    .dg-status-badge,
     .dg-glyph-chip,
     .dg-tier-chip {
         font-size: var(--dg-ux-small-type) !important;

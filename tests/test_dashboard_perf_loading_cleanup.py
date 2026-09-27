@@ -72,6 +72,25 @@ def test_begin_hydrate_and_placeholder_render():
     assert "Updating Dashboard" in switch_html
 
 
+def test_hydrate_placeholder_escapes_league_name():
+    """Sleeper league names are freely user-editable and can contain markup.
+
+    render_hydrate_placeholder interpolates ``league_name`` directly into HTML
+    rendered via st.markdown(unsafe_allow_html=True); without escaping, a
+    league named e.g. ``My League<img src=x onerror=alert(1)>`` would inject
+    live markup into the Dashboard's hydrating placeholder on every load.
+    """
+
+    state: dict = {"_league_switch_first_useful_guard": {"to": "b"}}
+    hostile_name = "<img src=x onerror=alert(1)>&\"'"
+    assert dls.begin_hydrate(state, league_id="league-b", league_name=hostile_name) is True
+    with patch.object(dls.st, "markdown") as markdown:
+        dls.render_hydrate_placeholder(state, league_name=hostile_name)
+    html = markdown.call_args.args[0]
+    assert "<img src=x onerror=alert(1)>" not in html
+    assert "&lt;img src=x onerror=alert(1)&gt;" in html
+
+
 def test_mark_first_useful_sets_phase_and_fingerprint():
     state: dict = {dls.PHASE_KEY: dls.PHASE_HYDRATING}
     dls.mark_first_useful(
