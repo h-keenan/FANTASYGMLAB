@@ -9,12 +9,14 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';
+import CompactPlayerModule from '../components/CompactPlayerModule';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import InsightRow from '../components/InsightRow';
+import PlayerInsightRow from '../components/PlayerInsightRow';
 import NewBadge from '../components/NewBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
@@ -172,13 +174,13 @@ function playerStubFromItem(item: DashboardItem): RankedPlayer {
   return {
     player_id: item.route_player_id,
     name: item.route_player_name || null,
-    position: null,
-    team: null,
+    position: item.route_player_position || null,
+    team: item.route_player_team || null,
     age: null,
     status: null,
     injury_status: null,
-    tier: null,
-    score: null,
+    tier: item.route_player_tier || null,
+    score: item.route_player_score,
     overall_rank: null,
     position_rank: null,
     rank_unavailable_reason: null,
@@ -767,13 +769,15 @@ function WeeklyMatchupCard({
   );
 }
 
-/** One line of the "what's driving the flag" list — mirrors the engine's own
- * top_injury_impact_summary wording (name (POS, TEAM) - status, impact N,
- * freshness) that web renders, trimmed for a phone-width row. */
-function injuryImpactLine(player: InjuryImpactPlayer): string {
-  const where = [player.position, player.team].filter(Boolean).join(', ');
+/** The "why" portion of an injury-impact card's context line — status,
+ * roster relevance, impact contribution, and freshness caveat. Identity
+ * (name/position/team/tier) is now rendered by CompactPlayerModule itself,
+ * so this only covers what that module can't show. Mirrors the engine's own
+ * top_injury_impact_summary wording (status, impact N, freshness) that web
+ * renders, trimmed for a phone-width row. */
+function injuryImpactContextLine(player: InjuryImpactPlayer): string {
   const status = player.injury_status || player.injury_level;
-  const detail = [
+  return [
     status,
     player.roster_relevance,
     player.impact_contribution != null ? `impact ${player.impact_contribution}` : '',
@@ -783,8 +787,6 @@ function injuryImpactLine(player: InjuryImpactPlayer): string {
   ]
     .filter(Boolean)
     .join(' · ');
-  const who = where ? `${player.name} (${where})` : player.name;
-  return detail ? `${who} — ${detail}` : who;
 }
 
 /** The "why" behind an injury-driven Watch flag: which injuries, and which
@@ -800,7 +802,19 @@ function injuryImpactLine(player: InjuryImpactPlayer): string {
  * §12: one grouped surface with internal dividers, not card-per-item).
  * Caller (`NeedsAttentionSection`) already checks `hasHealthContext` before
  * rendering this. */
-function TeamHealthContextBlock({ snapshot, last }: { snapshot: TeamSnapshot; last: boolean }) {
+function TeamHealthContextBlock({
+  snapshot,
+  last,
+  leagueId,
+  leagueName,
+  navigation,
+}: {
+  snapshot: TeamSnapshot;
+  last: boolean;
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const players = snapshot.top_injury_impact_players ?? [];
@@ -820,9 +834,42 @@ function TeamHealthContextBlock({ snapshot, last }: { snapshot: TeamSnapshot; la
         <View style={styles.detailListGroup}>
           <AppText style={styles.detailListLabel}>Driving the flag</AppText>
           {players.map((player, index) => (
-            <AppText key={`${player.player_id || player.name}-${index}`} style={styles.detailListItem}>
-              {'•'} {injuryImpactLine(player)}
-            </AppText>
+            <CompactPlayerModule
+              key={`${player.player_id || player.name}-${index}`}
+              playerId={player.player_id || null}
+              name={player.name}
+              position={player.position || null}
+              team={player.team || null}
+              tier={player.tier || null}
+              value={player.player_value_score}
+              valueLabel="VALUE"
+              contextLine={injuryImpactContextLine(player)}
+              style={styles.injuryPlayerRow}
+              onPress={
+                player.player_id
+                  ? () =>
+                      navigation.navigate('PlayerDetail', {
+                        player: {
+                          player_id: player.player_id,
+                          name: player.name || null,
+                          position: player.position || null,
+                          team: player.team || null,
+                          age: null,
+                          status: null,
+                          injury_status: player.injury_status || null,
+                          tier: player.tier || null,
+                          score: player.player_value_score,
+                          overall_rank: null,
+                          position_rank: null,
+                          rank_unavailable_reason: null,
+                          opportunity_label: null,
+                        },
+                        leagueId,
+                        leagueName,
+                      })
+                  : undefined
+              }
+            />
           ))}
         </View>
       ) : fallbackSummary ? (
@@ -1032,6 +1079,37 @@ function DashboardInsightRow({
     ? () => navigation.navigate('PlayerDetail', { player: playerStubFromItem(item), leagueId, leagueName })
     : undefined;
 
+  if (item.route_player_id) {
+    // Some tiles' headline text IS just the player's own name (e.g. a
+    // waiver/trade target) — CompactPlayerModule already renders that
+    // identity, so showing it again as a text line would just duplicate it.
+    // Other tiles' headline is a real conclusion (e.g. "2 injured
+    // starters") that the player module can't express, so that text stays.
+    const headlineIsPlayerName =
+      item.headline.trim().toLowerCase() === item.route_player_name.trim().toLowerCase();
+    return (
+      <PlayerInsightRow
+        icon={meta.icon}
+        color={meta.color}
+        label={meta.label}
+        headline={headlineIsPlayerName ? null : item.headline}
+        isNew={isNew}
+        actionLabel={onActionPress ? actionLabel : null}
+        onActionPress={onActionPress}
+        onPress={onPress}
+        last={last}
+        playerId={item.route_player_id}
+        playerName={item.route_player_name || null}
+        position={item.route_player_position || null}
+        team={item.route_player_team || null}
+        tier={item.route_player_tier || null}
+        value={item.route_player_score}
+        valueLabel="VALUE"
+        detail={showExplanations ? item.reason : null}
+      />
+    );
+  }
+
   return (
     <InsightRow
       icon={meta.icon}
@@ -1100,7 +1178,15 @@ function NeedsAttentionSection({
       ))}
       {showHealth || rowItems.length > 0 ? (
         <AnimatedCard style={styles.groupCard}>
-          {showHealth ? <TeamHealthContextBlock snapshot={snapshot!} last={rowItems.length === 0} /> : null}
+          {showHealth ? (
+            <TeamHealthContextBlock
+              snapshot={snapshot!}
+              last={rowItems.length === 0}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+            />
+          ) : null}
           {rowItems.map((item, index) => (
             <DashboardInsightRow
               key={`watch-${index}`}
@@ -1263,7 +1349,7 @@ function createStyles(colors: ThemeColors) {
   snapshotTileHalf: { minWidth: '48%', flexBasis: '48%' },
   healthSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   // Matches TeamRosterScreen's archetype strengths/risks list styling.
-  detailListGroup: { gap: 2 },
+  detailListGroup: { gap: spacing.sm },
   detailListLabel: {
     fontSize: 11,
     fontWeight: '700',
@@ -1273,6 +1359,7 @@ function createStyles(colors: ThemeColors) {
     marginBottom: 2,
   },
   detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  injuryPlayerRow: { paddingVertical: spacing.xs },
   card: {
     borderLeftWidth: 4,
     padding: spacing.lg,

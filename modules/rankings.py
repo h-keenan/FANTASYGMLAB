@@ -2434,6 +2434,11 @@ def build_player_injury_index(
             "team": str(mapping.get("team") or "").strip().upper(),
             "status": str(mapping.get("status") or "").strip(),
             "injury_status": str(mapping.get("injury_status") or "").strip(),
+            # Same canonical player_tier column every other player-identity
+            # surface reads (e.g. _project_ranking_row's "tier") — carried
+            # through so injury-impact cards can render the same prestige
+            # ring/tier chip as everywhere else, not a second tier scheme.
+            "player_tier": str(mapping.get("player_tier") or "").strip(),
             "injury_level": level,
             "injury_risk_score": float(risk_number),
             "player_value": player_value,
@@ -2623,6 +2628,7 @@ def summarize_team_injuries(
                 "name": str(record.get("name") or "").strip(),
                 "position": str(record.get("position") or "").strip().upper(),
                 "team": str(record.get("team") or "").strip().upper(),
+                "player_tier": str(record.get("player_tier") or "").strip(),
                 "injury_level": level,
                 "injury_status": status_context,
                 "player_value_score": round(player_value, 1),

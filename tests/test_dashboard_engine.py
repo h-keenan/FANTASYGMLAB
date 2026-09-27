@@ -257,6 +257,83 @@ def test_build_trade_tile_returns_none_without_a_headline_idea():
     assert dashboard_engine.build_trade_tile(None, league_id="l", roster_id="1", score_field="dynasty_score") is None
 
 
+def test_build_trade_tile_carries_real_player_identity_fields():
+    """The receive-side target player's position/team/tier/score should ride
+    along on the tile — same raw asset dict compact_package already reads
+    them from (modules.trade_ideas._player_asset), not a second source."""
+
+    idea = _fake_trade_idea_record()
+    idea["receive_assets"][0].update(
+        {"position": "WR", "team": "CIN", "player_tier": "Elite", "score": 88}
+    )
+    tile = dashboard_engine.build_trade_tile(
+        idea, league_id="league-1", roster_id="1", score_field="dynasty_score"
+    )
+    assert tile["route_player_position"] == "WR"
+    assert tile["route_player_team"] == "CIN"
+    assert tile["route_player_tier"] == "Elite"
+    assert tile["route_player_score"] == 88
+
+
+def test_build_trade_tile_leaves_player_identity_fields_empty_without_tier_data():
+    """Honest 'no tier data' edge case — the receive asset here has no
+    player_tier/position/team/score at all, so the tile must not fabricate
+    them, just surface empty/None."""
+
+    tile = dashboard_engine.build_trade_tile(
+        _fake_trade_idea_record(),
+        league_id="league-1",
+        roster_id="1",
+        score_field="dynasty_score",
+    )
+    assert tile["route_player_position"] == ""
+    assert tile["route_player_team"] == ""
+    assert tile["route_player_tier"] == ""
+    assert tile["route_player_score"] is None
+
+
+def test_build_waiver_tile_carries_real_player_identity_fields():
+    top_waiver = pd.Series(
+        {
+            "player_id": "fa-wr9",
+            "name": "Free Agent WR",
+            "position": "WR",
+            "team": "SEA",
+            "player_tier": "Contributor",
+            "dynasty_score": 42,
+            "position_rank": 5,
+            "opportunity_label": "Strong Opportunity",
+        }
+    )
+    tile = dashboard_engine.build_waiver_tile(
+        top_waiver, league_id="league-1", roster_id="1", score_field="dynasty_score"
+    )
+    assert tile is not None
+    assert tile["route_player_id"] == "fa-wr9"
+    assert tile["route_player_position"] == "WR"
+    assert tile["route_player_team"] == "SEA"
+    assert tile["route_player_tier"] == "Contributor"
+    assert tile["route_player_score"] == 42
+
+
+def test_build_waiver_tile_leaves_tier_empty_without_tier_data():
+    top_waiver = pd.Series(
+        {
+            "player_id": "fa-wr9",
+            "name": "Free Agent WR",
+            "position": "WR",
+            "team": "SEA",
+            "dynasty_score": 42,
+            "position_rank": 5,
+            "opportunity_label": "Strong Opportunity",
+        }
+    )
+    tile = dashboard_engine.build_waiver_tile(
+        top_waiver, league_id="league-1", roster_id="1", score_field="dynasty_score"
+    )
+    assert tile["route_player_tier"] == ""
+
+
 def test_compose_next_move_briefing_includes_trade_tile_when_rosters_given():
     league_id = "dashboard-engine-test-league-2"
     roster_id = "1"

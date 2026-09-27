@@ -1230,6 +1230,11 @@ def _project_injury_impact_player(item: Any) -> dict[str, Any]:
         "name": str(item.get("name") or "").strip(),
         "position": str(item.get("position") or "").strip().upper(),
         "team": str(item.get("team") or "").strip().upper(),
+        # Same canonical player_tier column _project_ranking_row's "tier"
+        # reads — never a fabricated/second tier scheme. Empty string (not
+        # None) when the roster row genuinely has no tier on file, matching
+        # this function's existing "" defaults for every other text field.
+        "tier": str(item.get("player_tier") or "").strip(),
         # injury_status is Sleeper's raw status string ("Questionable"),
         # injury_level the engine's severity word ("major"/"moderate") —
         # same split PresentationAsset already carries on the trade side.
@@ -3625,6 +3630,16 @@ def _project_briefing_item(item: Any) -> dict[str, Any]:
         "destination": payload.get("destination"),
         "route_player_id": payload.get("route_player_id") or "",
         "route_player_name": payload.get("route_player_name") or "",
+        # Real player identity for the compact player module — sourced from
+        # the same valued-player row the tile itself was built from
+        # (dashboard_engine.py); "" / None when this tile's underlying row
+        # genuinely lacks the field, never fabricated. Not every
+        # route_player_id-bearing tile populates these yet, so the client
+        # must handle empty/None gracefully.
+        "route_player_position": payload.get("route_player_position") or "",
+        "route_player_team": payload.get("route_player_team") or "",
+        "route_player_tier": payload.get("route_player_tier") or "",
+        "route_player_score": _clean_json_value(payload.get("route_player_score")),
         "recommendation_narrative": payload.get("recommendation_narrative"),
         "presentation": payload.get("presentation"),
         "recommendation_id": payload.get("recommendation_id") or "",

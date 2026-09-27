@@ -1287,6 +1287,16 @@ export interface DashboardItem {
   destination: string;
   route_player_id: string;
   route_player_name: string;
+  /** Real player identity for a compact player module — sourced from the
+   * same valued-player row the tile itself was built from
+   * (modules.dashboard_engine). Empty string / null when this tile's
+   * underlying row genuinely lacks the field (older tile shapes, or a pick
+   * asset rather than a player) — never fabricated, so render nothing
+   * rather than a placeholder. */
+  route_player_position: string;
+  route_player_team: string;
+  route_player_tier: string;
+  route_player_score: number | null;
   recommendation_narrative: Record<string, unknown> | null;
   presentation: DashboardTradePresentation | null;
   recommendation_id: string;
@@ -1302,6 +1312,10 @@ export interface InjuryImpactPlayer {
   name: string;
   position: string;
   team: string;
+  /** Same canonical stored tier every other player-identity surface reads
+   * (e.g. RankedPlayer.tier) — empty string when this roster row has no
+   * tier on file, never a fabricated one. */
+  tier: string;
   /** Sleeper's raw status string (e.g. "Questionable"/"Out"). */
   injury_status: string;
   /** The engine's severity word (e.g. "major"/"moderate") — see PresentationAsset. */
