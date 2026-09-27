@@ -16,6 +16,7 @@ import IconCircle from '../components/IconCircle';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -167,7 +168,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
       }
       setRecapReadyWeek(recapResult?.recap && !recapResult.recap.incomplete ? recapResult.recap.week : null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load alerts.');
+      setError(toUserErrorMessage(err, 'Failed to load alerts.'));
     } finally {
       setLoading(false);
     }

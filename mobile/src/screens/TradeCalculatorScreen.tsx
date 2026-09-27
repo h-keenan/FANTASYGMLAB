@@ -21,6 +21,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type RankedPlayer } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { valueDirectionLabel } from '../lib/tradeValue';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -78,7 +79,7 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
         if (!cancelled) setRankings(result.players);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load player values.');
+          setError(toUserErrorMessage(err, 'Failed to load player values.'));
         }
       } finally {
         if (!cancelled) setLoading(false);

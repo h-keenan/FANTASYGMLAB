@@ -32,6 +32,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { disabledOpacity, radii, shadows, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -384,7 +385,7 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
             setRoster([...result.starters, ...result.bench]);
           }
         } catch (err) {
-          if (!cancelled) setRosterError(err instanceof Error ? err.message : 'Failed to load your roster.');
+          if (!cancelled) setRosterError(toUserErrorMessage(err, 'Failed to load your roster.'));
         } finally {
           if (!cancelled) setLoadingRoster(false);
         }
@@ -419,7 +420,7 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
         );
       }
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : 'Could not search for trades.');
+      setSearchError(toUserErrorMessage(err, 'Could not search for trades.'));
     } finally {
       setSearching(false);
     }

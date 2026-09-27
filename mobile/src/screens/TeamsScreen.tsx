@@ -15,6 +15,7 @@ import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { api } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -111,7 +112,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
           });
           setTeams(rows);
         } catch (err) {
-          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load teams.');
+          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load teams.'));
         } finally {
           if (!cancelled) setLoading(false);
         }

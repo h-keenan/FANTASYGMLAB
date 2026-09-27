@@ -30,6 +30,7 @@ import {
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -249,7 +250,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
           const result = await api.getLeagueMatchup(leagueId);
           if (!cancelled) setMatchup(result);
         } catch (err) {
-          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load this week’s matchup.');
+          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load this week’s matchup.'));
         } finally {
           if (!cancelled) setLoading(false);
         }

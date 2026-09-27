@@ -13,6 +13,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import { api, TEAM_STANCE_OPTIONS, type LineupPlayer, type TeamStance } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useGmStance } from '../context/GmStanceContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -79,7 +80,7 @@ export default function TeamStanceScreen({ route, navigation }: Props) {
       }
       setRows(nextRows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load Team Situation.');
+      setError(toUserErrorMessage(err, 'Failed to load Team Situation.'));
     } finally {
       setLoading(false);
     }

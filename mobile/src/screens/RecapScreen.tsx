@@ -18,6 +18,7 @@ import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -158,7 +159,7 @@ export default function RecapScreen({ route, navigation }: Props) {
           setNotReady(true);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load recap.');
+        if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load recap.'));
       } finally {
         if (!cancelled) setLoading(false);
       }

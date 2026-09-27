@@ -25,6 +25,7 @@ import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysis
 import TeamAvatar from '../components/TeamAvatar';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -178,7 +179,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
               .catch(() => {});
           }
         } catch (err) {
-          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load your lineup.');
+          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load your lineup.'));
         } finally {
           if (!cancelled) setLoading(false);
         }

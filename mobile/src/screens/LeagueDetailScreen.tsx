@@ -18,6 +18,7 @@ import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGr
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type DashboardItem } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { setLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -156,7 +157,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           }
         } catch (err) {
           if (!cancelled) {
-            setError(err instanceof Error ? err.message : 'Failed to load league.');
+            setError(toUserErrorMessage(err, 'Failed to load league.'));
           }
         } finally {
           if (!cancelled) setLoading(false);

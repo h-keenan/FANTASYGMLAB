@@ -11,6 +11,7 @@ import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type PastTradeOutcome, type TradeOutcomeAnswer } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -67,7 +68,7 @@ export default function TradeHistoryScreen({ navigation }: Props) {
       const result = await api.getTradeOutcomeHistory();
       setOutcomes(result.outcomes);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load Trade History.');
+      setError(toUserErrorMessage(err, 'Failed to load Trade History.'));
     } finally {
       setLoading(false);
       setRefreshing(false);

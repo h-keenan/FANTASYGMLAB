@@ -31,6 +31,7 @@ import WaiverRecommendationCard, {
   waiverOpponentContext,
 } from '../components/WaiverRecommendationCard';
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -133,7 +134,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
           setIsPremium(result.entitlement.is_premium);
           setNotice(result.reason ? reasonMessage(result.reason) : null);
         } catch (err) {
-          if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load waivers.');
+          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load waivers.'));
         } finally {
           if (!cancelled) setLoading(false);
         }

@@ -20,6 +20,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
+import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -148,7 +149,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
           setRanking(matchedRanking);
         } catch (err) {
           if (!cancelled) {
-            setError(err instanceof Error ? err.message : 'Failed to load roster.');
+            setError(toUserErrorMessage(err, 'Failed to load roster.'));
           }
         } finally {
           if (!cancelled) setLoading(false);
