@@ -880,6 +880,13 @@ def rank_to_value(search_rank) -> int:
     Convert Sleeper search_rank into a dynasty-ish value curve.
     Top players need meaningful separation; deep/unranked players should not
     tie with real starters.
+
+    Three tiers share one continuous, strictly non-increasing curve. Each
+    tier's ceiling is anchored to the exact value the previous tier reached
+    at its final rank (rather than an independent reset constant) — a reset
+    would let a worse search_rank (e.g. #251) jump to a far higher value than
+    a better one (e.g. #250), which directly breaks the "should not tie with
+    real starters" guarantee above.
     """
     try:
         rank = int(search_rank)
@@ -891,10 +898,14 @@ def rank_to_value(search_rank) -> int:
 
     if rank <= 250:
         return int(round(10000 * ((251 - rank) / 250) ** 0.72))
+
+    tier1_floor = 10000 * (1 / 250) ** 0.72  # value at rank 250
     if rank <= 500:
-        return int(round(2600 * ((501 - rank) / 250) ** 1.2))
+        return int(round(tier1_floor * ((501 - rank) / 250) ** 1.2))
+
+    tier2_floor = tier1_floor * (1 / 250) ** 1.2  # value at rank 500
     if rank <= 900:
-        return int(round(500 * ((901 - rank) / 400) ** 1.3))
+        return int(round(tier2_floor * ((901 - rank) / 400) ** 1.3))
     return 0
 
 
@@ -3279,31 +3290,69 @@ def compose_composite_score(df: pd.DataFrame) -> pd.DataFrame:
     scarcity = _factor("scarcity_score", 0.0)
     role = _factor("role_score", 0.0)
     risk = _factor("risk_multiplier", 1.0)
-    # role_score/opportunity_score already carry their own injury adjustment
-    # from apply_role_and_opportunity (e.g. a major-injury starter is set to
-    # the fixed "Starter At Risk" opportunity score, not scaled by a separate
-    # multiplier) — applying the full risk_multiplier (which folds injury_
-    # multiplier in via min()) to those two factors as well double-counts
-    # injury specifically. non_injury_risk_multiplier carries the same
-    # roster-presence/status/searchability risk minus that injury component,
-    # so it's what applies here instead — an unsigned/unranked player's
-    # role and opportunity are still discounted, just not for injury twice.
-    role_risk = _factor("non_injury_risk_multiplier", 1.0)
+    # opportunity_score already carries its own injury adjustment from
+    # apply_role_and_opportunity's opportunity_profile() (e.g. a major-injury
+    # starter is set to the fixed "Starter At Risk" opportunity score, not
+    # scaled by a separate multiplier) — applying the full risk_multiplier
+    # (which folds injury_multiplier in via min()) to that factor as well
+    # would double-count injury specifically. non_injury_risk_multiplier
+    # carries the same roster-presence/status/searchability risk minus that
+    # injury component, so it's what applies to opportunity instead — an
+    # unsigned/unranked player's opportunity is still discounted, just not
+    # for injury twice.
+    #
+    # role_score is purely depth-chart structural (see role_score()) and has
+    # NO injury adjustment baked in anywhere — unlike opportunity_score, an
+    # IR/season-ending-injury starter and a fully healthy starter at the same
+    # depth-chart slot get the identical role_score. It must receive the
+    # same full risk_multiplier as market/age/production/scarcity, or the
+    # role factor would silently ignore injury severity entirely.
+    opportunity_risk = _factor("non_injury_risk_multiplier", 1.0)
     work["factor_market"] = market * COMPOSITE_WEIGHT_MARKET
     work["factor_age"] = age_curve * COMPOSITE_WEIGHT_AGE
     work["factor_production"] = prod_series * COMPOSITE_WEIGHT_PRODUCTION
     work["factor_scarcity"] = scarcity * COMPOSITE_WEIGHT_SCARCITY
     work["factor_role"] = role * COMPOSITE_WEIGHT_ROLE
     work["factor_opportunity"] = opp_series * COMPOSITE_WEIGHT_OPPORTUNITY
-    risk_sensitive = work["factor_market"] + work["factor_age"] + work["factor_production"] + work["factor_scarcity"]
-    role_and_opportunity = work["factor_role"] + work["factor_opportunity"]
-    composite = (risk_sensitive * risk) + (role_and_opportunity * role_risk)
+    risk_sensitive = (
+        work["factor_market"]
+        + work["factor_age"]
+        + work["factor_production"]
+        + work["factor_scarcity"]
+        + work["factor_role"]
+    )
+    composite = (risk_sensitive * risk) + (work["factor_opportunity"] * opportunity_risk)
     work["score"] = composite.clip(lower=0).round().astype(int)
     work["age_penalty"] = (age_curve - market).round().astype(int)
     work["news_factor"] = 0.0
     work["dynasty_score"] = work["score"]
     work["value_score"] = work["score"]
     return work
+
+
+def _compose_and_scrub_public_score(df: pd.DataFrame) -> pd.DataFrame:
+    """compose_composite_score(), without introducing the diagnostic
+    factor_*/opportunity_signal_confidence/opportunity_fallback breakdown
+    columns into a frame that did not already carry them.
+
+    The public-player snapshot contract (see
+    ``public_player_snapshot.FORBIDDEN_SNAPSHOT_OUTPUT_COLUMNS``) forbids
+    those columns from ever appearing in this hydration path's output —
+    compose_composite_score() always (re)creates them as a side effect of
+    recomposing "score", so a cheap risk-only refresh here must not let that
+    leak a schema change into the persisted/snapshotted public frame.
+    """
+
+    original_columns = set(df.columns)
+    composed = compose_composite_score(df)
+    introduced_forbidden = [
+        column
+        for column in public_player_snapshot.FORBIDDEN_SNAPSHOT_OUTPUT_COLUMNS
+        if column in composed.columns and column not in original_columns
+    ]
+    if introduced_forbidden:
+        composed = composed.drop(columns=introduced_forbidden)
+    return composed
 
 
 def apply_local_structured_valuation(df: pd.DataFrame) -> pd.DataFrame:
@@ -3682,36 +3731,24 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
 
     normalization_started = time.perf_counter()
     with player_hydrate_stages.stage("injury_normalization", kind="cpu"):
-        df["injury_level"] = df.apply(
-            lambda row: injury_level(row.get("status"), row.get("injury_status")),
-            axis=1,
-        )
-        df["injury_risk_score"] = df.apply(
-            lambda row: injury_risk_score(row.get("status"), row.get("injury_status")),
-            axis=1,
-        )
-        df["injury_multiplier"] = df.apply(
-            lambda row: injury_multiplier(row.get("status"), row.get("injury_status")),
-            axis=1,
-        )
-        old_risk = pd.to_numeric(df.get("risk_multiplier"), errors="coerce").fillna(1.0)
-        old_risk = old_risk.mask(old_risk <= 0, 1.0)
-        df["risk_multiplier"] = df.apply(
-            lambda row: risk_multiplier(
-                row.get("status"),
-                row.get("team"),
-                row.get("search_rank"),
-                row.get("injury_status"),
-            ),
-            axis=1,
-        )
-        if "score" in df.columns:
-            base_score = pd.to_numeric(df["score"], errors="coerce").fillna(0) / old_risk
-            updated_score = (base_score * pd.to_numeric(df["risk_multiplier"], errors="coerce").fillna(1.0)).clip(lower=0)
-            df["score"] = updated_score.round().astype(int)
-            for col in ["dynasty_score", "value_score"]:
-                if col in df.columns:
-                    df[col] = updated_score.round().astype(int)
+        # Recompute every injury/risk-derived column canonically (this used to
+        # refresh injury_level/injury_risk_score/injury_multiplier/risk_multiplier
+        # via ad hoc per-row applies, leave non_injury_risk_multiplier stale, and
+        # rebuild "score" by dividing out the *old* risk_multiplier and
+        # reapplying the *new* one uniformly across the whole composite. That
+        # is only correct when risk_multiplier == non_injury_risk_multiplier
+        # (a healthy player) — compose_composite_score() applies risk_multiplier
+        # to the market/age/production/scarcity factors but
+        # non_injury_risk_multiplier (which excludes the injury component) to
+        # the role/opportunity factors, so whenever an injury actually changes
+        # — exactly what this refresh exists for — the old ratio silently
+        # mis-weighted the role/opportunity portion of the score. Recomputing
+        # the risk fields canonically and recomposing from the existing
+        # sub-scores is both simpler and provably consistent with the full
+        # apply_valuation_model path.
+        df = apply_injury_risk_fields(df)
+        if {"market_score", "age_curve_score", "scarcity_score", "role_score"}.issubset(df.columns):
+            df = _compose_and_scrub_public_score(df)
 
         for col in ["dynasty_score", "value_score", "news_factor"]:
             if col not in df.columns:
@@ -3753,27 +3790,27 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
     return ensure_identity_columns(df)
 
 
-def _refresh_risk_adjusted_scores(
-    df: pd.DataFrame,
-    old_risk: pd.Series,
-) -> pd.DataFrame:
+def _refresh_risk_adjusted_scores(df: pd.DataFrame) -> pd.DataFrame:
+    """Recompose "score" from existing sub-scores plus the frame's current
+    risk_multiplier/non_injury_risk_multiplier (already refreshed onto ``df``
+    by the snapshot merge).
+
+    Previously this divided the stored score by an *old* risk_multiplier and
+    reapplied the *new* one uniformly. That is only exact when
+    risk_multiplier == non_injury_risk_multiplier (a healthy player) —
+    compose_composite_score() applies risk_multiplier to the market/age/
+    production/scarcity factors but non_injury_risk_multiplier (which
+    excludes the injury component) to the role/opportunity factors. Whenever
+    an injury actually changed between snapshots — exactly the case this
+    refresh exists for — the old ratio silently mis-weighted the
+    role/opportunity portion of the score. Recomposing directly from the
+    canonical formula is both simpler and provably consistent with the full
+    apply_valuation_model path.
+    """
+
     refreshed = df.copy()
-    normalized_old_risk = pd.to_numeric(old_risk, errors="coerce").fillna(1.0)
-    normalized_old_risk = normalized_old_risk.mask(normalized_old_risk <= 0, 1.0)
-    if "score" in refreshed.columns:
-        base_score = pd.to_numeric(refreshed["score"], errors="coerce").fillna(0)
-        base_score = base_score / normalized_old_risk
-        updated_score = (
-            base_score
-            * pd.to_numeric(
-                refreshed.get("risk_multiplier"),
-                errors="coerce",
-            ).fillna(1.0)
-        ).clip(lower=0)
-        refreshed["score"] = updated_score.round().astype(int)
-        for column in ("dynasty_score", "value_score"):
-            if column in refreshed.columns:
-                refreshed[column] = updated_score.round().astype(int)
+    if {"market_score", "age_curve_score", "scarcity_score", "role_score"}.issubset(refreshed.columns):
+        refreshed = _compose_and_scrub_public_score(refreshed)
     for column in ("dynasty_score", "value_score", "news_factor"):
         if column not in refreshed.columns:
             refreshed[column] = 0.0 if column == "news_factor" else refreshed.get("score", 0)
@@ -3824,13 +3861,12 @@ def _load_players_from_snapshot(
     if not base_player_ids.equals(snapshot_player_ids):
         public_player_snapshot.invalidate_public_player_snapshot(db_path)
         return None
-    old_risk = pd.to_numeric(base.get("risk_multiplier"), errors="coerce").fillna(1.0)
     with player_hydrate_stages.stage("snapshot_merge", kind="cpu"):
         hydrated = base.copy()
         for column in snapshot.frame.columns:
             if column != "player_id":
                 hydrated[column] = snapshot.frame[column].reset_index(drop=True)
-        hydrated = _refresh_risk_adjusted_scores(hydrated, old_risk)
+        hydrated = _refresh_risk_adjusted_scores(hydrated)
     with player_hydrate_stages.stage("eligibility_annotation", kind="cpu"):
         hydrated = annotate_player_eligibility(hydrated)
     with player_hydrate_stages.stage("identity_columns", kind="cpu"):
