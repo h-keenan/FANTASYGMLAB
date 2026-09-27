@@ -22,7 +22,7 @@ import { setLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { gradients, radii, spacing, type ThemeColors } from '../theme';
+import { gradients, lightGradients, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -76,7 +76,7 @@ function scoringLabel(scoringSettings: Record<string, unknown> | undefined): str
 export default function LeagueDetailScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [summary, setSummary] = useState<LeagueSummary | null>(null);
@@ -199,7 +199,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
         activeOpacity={0.9}
         onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}
       >
-        <LinearGradient colors={gradients.hero} style={styles.heroCard}>
+        <LinearGradient colors={isDark ? gradients.hero : lightGradients.hero} style={styles.heroCard}>
           <AppText style={styles.heroKicker}>TODAY'S GAME PLAN</AppText>
           <AppText style={styles.heroHeadline}>{heroHeadline}</AppText>
           <AppText style={styles.heroSubtitle} numberOfLines={1}>
