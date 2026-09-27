@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
 import type { TextProps } from 'react-native';
 import AppText from './AppText';
-
-/** "Rhamondre Stevenson" -> "R. Stevenson" — used only once a name is
- * actually about to be clipped (see below), never as the default display. */
-function abbreviate(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length < 2) return name;
-  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
-}
+import { abbreviatePlayerName } from '../lib/formatPlayerName';
 
 /**
  * A single-line player name that degrades to "F. Lastname" instead of
@@ -41,7 +34,7 @@ export default function PlayerNameText({
         }
       }}
     >
-      {clipped ? abbreviate(name) : name}
+      {clipped ? abbreviatePlayerName(name) : name}
     </AppText>
   );
 }
