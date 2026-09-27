@@ -675,12 +675,26 @@ export interface TeamStanceResponse {
   ok: boolean;
   stance: TeamStance | '';
   options?: TeamStance[];
+  /** The real backend-computed value (modules.team_stance.team_strategy_for_stance)
+   * — prefer this over deriving it client-side when it's present (older API
+   * builds may omit it on the POST response). */
+  strategy?: TeamStrategy;
 }
 
-// Client mirror of modules.team_stance.team_strategy_for_stance — kept in
-// sync by hand (a small, stable, rarely-changing table), same pattern as
-// modules.trade_hub_engine.apply_strategy_age_curve's own "faithful port"
-// of app.py's copy.
+// Client mirror of modules.team_stance.team_strategy_for_stance's mapping
+// table (modules/team_stance.py's `_STANCE_TO_TEAM_STRATEGY`), kept ONLY for
+// GmStanceContext.setStance's genuine optimistic local update — the UI must
+// reflect the new strategy immediately, before api.setTeamStance's request
+// round-trips (see GmStanceContext.tsx). Every other call site should prefer
+// the real `strategy` field the backend's GET/POST /team-stance and GET
+// /gm-stance responses already compute and return (TeamStanceResponse.strategy
+// / GmStanceResponse.strategy) instead of deriving it here.
+//
+// This exact table is asserted, key-for-key, against
+// modules.team_stance._STANCE_TO_TEAM_STRATEGY by
+// tests/test_team_stance.py::test_stance_to_strategy_mapping_matches_the_mobile_client_mirror
+// — if that Python test ever fails, this table (and DEFAULT_TEAM_STRATEGY
+// below) must be updated to match the real backend mapping.
 export const TEAM_STANCE_TO_STRATEGY: Record<TeamStance, TeamStrategy> = {
   competing: 'contender',
   balanced: 'retool',

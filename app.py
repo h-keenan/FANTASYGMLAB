@@ -42,7 +42,6 @@ from modules import auth_supabase
 from modules import auth_restore_lifecycle
 from modules import draft_assistant
 from modules import draft_center_ui
-from modules import dashboard_engine as dashboard_engine_module
 from modules import dashboard_orientation
 from modules import dashboard_workflow
 from modules import daily_gm_briefing
@@ -126,8 +125,10 @@ from modules import trade_hub_first_useful
 from modules import league_switch_first_useful
 from modules import interaction_latency
 from modules.roster_needs import (
+    NEED_TIER_LABELS,
     TeamNeedsAssessment,
     assess_team_needs,
+    select_need_headline,
 )
 from modules import team_eval as team_eval_module
 from modules import team_stance
@@ -8874,70 +8875,13 @@ def render_league_team_page_header(team_profile: dict, selected_league_name: str
 
 get_needed_positions = trade_analyzer_fit_module.get_needed_positions
 build_team_needs_assessment = trade_analyzer_fit_module.build_team_needs_assessment
-# Shared with modules.dashboard_engine.select_need_headline — same real
-# priority-ladder category, same tier wording, so web and mobile never drift
-# on what "Urgent"/"Priority"/etc. means for an identical Next Move category.
-NEED_TIER_LABELS = dashboard_engine_module.NEED_TIER_LABELS
-
-def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
-    """Select an accurate need-category headline without collapsing semantics."""
-
-    position_items = {
-        item.position: item for item in assessment.positions
-    }
-    current_needs = [
-        position
-        for position in assessment.true_needs
-        if (
-            position_items.get(position) is not None
-            and position_items[position].classification == "short_term_need"
-            and not position_items[position].temporary_injury_pressure
-        )
-    ]
-    if current_needs:
-        return {
-            "category": "true_need",
-            "label": "Biggest Team Need",
-            "value": current_needs[0],
-            "note": "Starter and depth coverage identify this as the clearest current roster deficiency.",
-            "tone": "need",
-            "tier_label": NEED_TIER_LABELS["true_need"],
-        }
-    if assessment.temporary_injury_pressures:
-        return {
-            "category": "injury_pressure",
-            "label": "Injury Pressure",
-            "value": assessment.temporary_injury_pressures[0],
-            "note": "Current availability is creating temporary pressure in this room.",
-            "tone": "risk",
-            "tier_label": NEED_TIER_LABELS["injury_pressure"],
-        }
-    if assessment.future_risks:
-        return {
-            "category": "future_risk",
-            "label": "Future Roster Risk",
-            "value": assessment.future_risks[0],
-            "note": "Current coverage is playable, but future stability is limited.",
-            "tone": "draft",
-            "tier_label": NEED_TIER_LABELS["future_risk"],
-        }
-    if assessment.upgrade_opportunities:
-        return {
-            "category": "upgrade",
-            "label": "Upgrade Opportunity",
-            "value": assessment.upgrade_opportunities[0],
-            "note": "This covered room trails the league baseline but is not a true roster need.",
-            "tone": "need",
-            "tier_label": NEED_TIER_LABELS["upgrade"],
-        }
-    return {
-        "category": "balanced",
-        "label": "Balanced Roster",
-        "value": "No urgent need",
-        "note": "No current roster deficiency is standing out under the canonical coverage policy.",
-        "tone": "draft",
-        "tier_label": NEED_TIER_LABELS["balanced"],
-    }
+# NEED_TIER_LABELS/select_need_headline (imported above from
+# modules.roster_needs) are the single source of truth shared with
+# modules.dashboard_engine — same real priority-ladder category, same tier
+# wording, so web and mobile never drift on what "Urgent"/"Priority"/etc.
+# means for an identical Next Move category. Previously two hand-kept-in-sync
+# copies of the same dict/function.
+team_need_display = select_need_headline
 
 
 def player_fit_context(
@@ -11283,35 +11227,14 @@ def build_trade_trust_context(
     df_summary: pd.DataFrame,
     roster_player_map: dict[str, tuple[str, ...]] | None,
 ) -> TradeTrustContext:
-    ownership_by_player: dict[str, int] = {}
-    valid_roster_ids: set[int] = set()
-    for roster_id_value, player_ids in (roster_player_map or {}).items():
-        try:
-            roster_id = int(roster_id_value)
-        except (TypeError, ValueError):
-            continue
-        if not roster_id:
-            continue
-        valid_roster_ids.add(roster_id)
-        for player_id in player_ids or ():
-            ownership_by_player[str(player_id)] = roster_id
+    """Thin alias to modules.trade_trust.build_trade_trust_context (single
+    source of truth shared with modules.trade_hub_engine — previously two
+    hand-kept-in-sync copies of the exact same logic)."""
 
-    team_name_to_roster: dict[str, int] = {}
-    if df_summary is not None and not df_summary.empty:
-        for _, row in df_summary.iterrows():
-            try:
-                roster_id = int(row.get("roster_id") or 0)
-            except (TypeError, ValueError):
-                continue
-            team_name = _safe_text(row.get("team_name")).casefold()
-            if roster_id and team_name:
-                team_name_to_roster[team_name] = roster_id
-
-    return TradeTrustContext(
-        ownership_by_player=tuple(ownership_by_player.items()),
-        valid_roster_ids=frozenset(valid_roster_ids),
-        team_name_to_roster=tuple(team_name_to_roster.items()),
-        league_context_valid=bool(league_id and valid_roster_ids),
+    return trade_trust.build_trade_trust_context(
+        league_id=league_id,
+        df_summary=df_summary,
+        roster_player_map=roster_player_map,
     )
 
 
@@ -13791,17 +13714,10 @@ def _enrich_league_display_with_roster_profiles(
 
 @runtime_trace.traced("ownership_map_construction", phase="roster_normalization")
 def _build_roster_player_map(rosters: list[dict] | None) -> dict[str, tuple[str, ...]]:
-    roster_player_map: dict[str, tuple[str, ...]] = {}
-    for roster in rosters or []:
-        roster_id = _safe_text(roster.get("roster_id")).strip()
-        if not roster_id:
-            continue
-        roster_player_map[roster_id] = tuple(
-            str(pid)
-            for pid in (roster.get("players", []) or [])
-            if pid is not None
-        )
-    return roster_player_map
+    """Single source of truth shared with modules.trade_hub_engine — previously
+    two hand-kept-in-sync copies of the exact same normalization."""
+
+    return trade_trust.build_roster_player_map(rosters)
 
 
 def _session_team_direction_summary(league_id: str = "") -> pd.DataFrame:
