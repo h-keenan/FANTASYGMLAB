@@ -31,6 +31,7 @@ DESTINATION_CONCEPT = {
     "dashboard": "home",
     "alerts": "alerts",
     "my_team": "roster",
+    "matchup": "roster",
     "players": "rankings",
     "gm_targets": "roster",
     "team_stance": "roster",

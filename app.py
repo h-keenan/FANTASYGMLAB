@@ -103,6 +103,7 @@ from modules import injury_ui
 from modules import legal_pages
 from modules import methodology_page
 from modules import my_team_ui
+from modules import web_matchup_ui
 from modules import roster_primary_actions
 from modules import onboarding_ui
 from modules import platform_import_ui
@@ -2190,6 +2191,7 @@ def _team_initials(name: str) -> str:
 PAGE_GLYPHS = {
     "dashboard": "GM",
     "my_team": "TM",
+    "matchup": "MU",
     "players": "PL",
     "rankings": "RK",
     "trade_hub": "TH",
@@ -20525,6 +20527,72 @@ def main():
                             key_prefix=f"my_team_trade_routes_{selected_league_id}_{my_roster_id}",
                             note="Trade discovery now lives in Trade Hub. Use Trade Analyzer only when you already know the exact package you want to test.",
                         )
+
+    # MATCHUP
+    if current_page == "matchup":
+        render_page_shell(
+            page_key="matchup",
+            title="Matchup",
+            subtitle="This week's real head-to-head — live Sleeper lineup and points for both rosters, plus real per-player weekly projections.",
+            meta_items=[
+                (_safe_text(selected_league_name, "League"), "primary"),
+            ],
+        )
+        if startup_mode and selected_league_id:
+            workspace_notices.render_startup_blocked_notice(
+                "Matchup unlocks after the startup draft completes and rosters are populated."
+            )
+        elif (
+            st.session_state.get("active_platform") == "espn"
+            and st.session_state.get("espn_limited_mode")
+            and not selected_league_id
+        ):
+            render_section_header(
+                "ESPN limited review mode",
+                kicker="ESPN Import",
+                note="Matchup is gated for ESPN until live-score and lineup paths are validated.",
+            )
+            st.markdown(
+                "<div class='app-degraded-state'>Sleeper remains the full Matchup path. ESPN imports can currently show mapping review and limited status, but they do not yet unlock this week's head-to-head.</div>",
+                unsafe_allow_html=True,
+            )
+        elif not username or not selected_league_id:
+            render_onboarding_handoff(
+                username=username,
+                selected_league_id=selected_league_id,
+                note="Import your Sleeper league to see this week's real matchup.",
+            )
+        elif my_roster_id is None:
+            workspace_notices.render_roster_mismatch_notice()
+        elif df_players.empty:
+            st.info("Player data isn't available right now — try again in a bit.")
+        else:
+            render_workflow_continuity_bar(
+                "matchup",
+                selected_league_id=_safe_text(selected_league_id),
+            )
+            matchup_inputs = web_matchup_ui.fetch_matchup_inputs(selected_league_id)
+            matchup_view = web_matchup_ui.build_matchup_view(
+                current_week=matchup_inputs["current_week"],
+                matchups=matchup_inputs["matchups"],
+                my_roster_id=str(my_roster_id),
+                rosters_by_id=matchup_inputs["rosters_by_id"],
+                profiles=matchup_inputs["profiles"],
+                valued=df_players,
+                settings=league_value_settings,
+                score_field=score_field,
+                season=matchup_inputs["season"],
+                players_map=matchup_inputs["players_map"],
+                defense_strength=matchup_inputs["defense_strength"],
+            )
+            web_matchup_ui.render_matchup_page(
+                matchup_view,
+                score_label=league_score_label(score_field),
+                compact_player_row_html=_compact_player_row_html,
+                render_tappable_player_html=_render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
+                key_prefix=f"matchup_{selected_league_id}_{my_roster_id}",
+            )
 
     # STARTUP DRAFT CENTER
     if current_page == "startup_draft_center":
