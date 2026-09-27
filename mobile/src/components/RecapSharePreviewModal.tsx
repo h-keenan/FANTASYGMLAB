@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { WeeklyRecap } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
-import RecapShareCard, { CARD_HEIGHT, CARD_WIDTH } from './RecapShareCard';
+import RecapShareCard, { CARD_HEIGHT, CARD_WIDTH, type RecapRosterMap } from './RecapShareCard';
 
 const PREVIEW_SCALE = 0.82;
 
@@ -17,10 +17,11 @@ interface Props {
   onClose: () => void;
   leagueName: string;
   recap: WeeklyRecap;
+  rosterMap: RecapRosterMap;
 }
 
 /** Preview + share sheet for the real branded recap PNG, plus a fallback plain-text share. */
-export default function RecapSharePreviewModal({ visible, onClose, leagueName, recap }: Props) {
+export default function RecapSharePreviewModal({ visible, onClose, leagueName, recap, rosterMap }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const cardRef = useRef<View>(null);
@@ -66,7 +67,7 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
           <AppText style={styles.title}>Share this recap</AppText>
           <View style={styles.previewWrap}>
             <View style={styles.previewScaled}>
-              <RecapShareCard ref={cardRef} leagueName={leagueName} recap={recap} />
+              <RecapShareCard ref={cardRef} leagueName={leagueName} recap={recap} rosterMap={rosterMap} />
             </View>
           </View>
           <TouchableOpacity style={styles.primaryButton} onPress={onShareImage} disabled={capturing}>

@@ -16,6 +16,7 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
+import TeamAvatar from '../components/TeamAvatar';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -84,6 +85,16 @@ interface StoryGroupData {
   stories: RecapStory[];
 }
 
+export type RosterMap = Record<string, { playerIds: string[]; teamName: string; avatarId: string }>;
+
+/** Sleeper avatar id for a story's team, when its roster_id resolved against
+ * `rosterMap` — `TeamAvatar` already renders a graceful empty-circle
+ * fallback for '' / undefined, so a miss here never blocks rendering. */
+function avatarFor(rosterMap: RosterMap, rosterId: string | undefined): string | undefined {
+  if (!rosterId) return undefined;
+  return rosterMap[rosterId]?.avatarId || undefined;
+}
+
 /** Merges consecutive same-category stories into one group, mirroring
  * AlertsScreen's adjacent-run grouping — backend story order (see
  * modules/league_recaps.py's builder list) stays intact, only genuinely
@@ -116,7 +127,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [tradeStory, setTradeStory] = useState<RecapStory | null>(null);
-  const [rosterMap, setRosterMap] = useState<Record<string, { playerIds: string[]; teamName: string }>>({});
+  const [rosterMap, setRosterMap] = useState<RosterMap>({});
 
   useScreenHeaderTitle(navigation, 'Recap', leagueName);
 
@@ -170,7 +181,7 @@ export default function RecapScreen({ route, navigation }: Props) {
           api.getLeagueTeamProfiles(leagueId),
         ]);
         if (cancelled) return;
-        const map: Record<string, { playerIds: string[]; teamName: string }> = {};
+        const map: RosterMap = {};
         for (const roster of rostersResult.rosters) {
           const rosterId = String(roster.roster_id ?? '');
           if (!rosterId) continue;
@@ -178,6 +189,7 @@ export default function RecapScreen({ route, navigation }: Props) {
           map[rosterId] = {
             playerIds: players.map(String),
             teamName: profilesResult.profiles[rosterId]?.team_name || '',
+            avatarId: profilesResult.profiles[rosterId]?.avatar_id || '',
           };
         }
         setRosterMap(map);
@@ -292,13 +304,14 @@ export default function RecapScreen({ route, navigation }: Props) {
         />
       ) : (
         <>
-          <LeadStoryCard story={leadStory} onPress={resolveStoryPress(leadStory)} />
+          <LeadStoryCard story={leadStory} onPress={resolveStoryPress(leadStory)} rosterMap={rosterMap} />
           {groupedStories.map((group, index) => (
             <StoryGroup
               key={`${group.category}-${index}`}
               category={group.category}
               stories={group.stories}
               resolvePress={resolveStoryPress}
+              rosterMap={rosterMap}
             />
           ))}
         </>
@@ -310,6 +323,7 @@ export default function RecapScreen({ route, navigation }: Props) {
         onClose={() => setShareOpen(false)}
         leagueName={leagueName}
         recap={recap}
+        rosterMap={rosterMap}
       />
       <RecapTradeDetailModal visible={tradeStory != null} onClose={() => setTradeStory(null)} story={tradeStory} />
     </View>
@@ -323,7 +337,15 @@ export default function RecapScreen({ route, navigation }: Props) {
  * the list below it (Magna Carta §12/§15: reserve glow for the one thing on
  * a screen that genuinely matters most).
  */
-function LeadStoryCard({ story, onPress }: { story: RecapStory; onPress?: () => void }) {
+function LeadStoryCard({
+  story,
+  onPress,
+  rosterMap,
+}: {
+  story: RecapStory;
+  onPress?: () => void;
+  rosterMap: RosterMap;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const meta = storyMeta(colors)[story.story_type] ?? defaultStoryMeta(colors);
@@ -334,6 +356,9 @@ function LeadStoryCard({ story, onPress }: { story: RecapStory; onPress?: () => 
     <AnimatedCard glow style={styles.leadCard} onPress={onPress}>
       <View style={styles.leadHeaderRow}>
         <IconCircle name={meta.icon} color={meta.color} size={48} iconSize={22} />
+        {!isMatchup && !isTrade ? (
+          <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={40} />
+        ) : null}
         <View style={styles.storyTextGroup}>
           <AppText style={[styles.leadKicker, { color: meta.color }]}>
             {story.story_type.replace(/_/g, ' ').toUpperCase()}
@@ -350,25 +375,33 @@ function LeadStoryCard({ story, onPress }: { story: RecapStory; onPress?: () => 
 
       {isMatchup ? (
         <View style={styles.matchupRow}>
-          <AppText style={styles.matchupTeam} numberOfLines={1}>
-            {story.primary_team}
-          </AppText>
+          <View style={styles.matchupTeamGroup}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={32} />
+            <AppText style={styles.matchupTeam} numberOfLines={1}>
+              {story.primary_team}
+            </AppText>
+          </View>
           <AppText style={styles.matchupVs}>vs</AppText>
-          <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
-            {story.secondary_team}
-          </AppText>
+          <View style={styles.matchupTeamGroup}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={32} />
+            <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
+              {story.secondary_team}
+            </AppText>
+          </View>
         </View>
       ) : null}
 
       {isTrade && story.secondary_team ? (
         <View style={styles.tradeRow}>
           <View style={styles.tradeChip}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={20} />
             <AppText style={styles.tradeChipText} numberOfLines={1}>
               {story.primary_team}
             </AppText>
           </View>
           <Ionicons name="swap-horizontal" size={14} color={colors.textTertiary} />
           <View style={styles.tradeChip}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={20} />
             <AppText style={styles.tradeChipText} numberOfLines={1}>
               {story.secondary_team}
             </AppText>
@@ -398,10 +431,12 @@ function StoryGroup({
   category,
   stories,
   resolvePress,
+  rosterMap,
 }: {
   category: string;
   stories: RecapStory[];
   resolvePress: (story: RecapStory) => (() => void) | undefined;
+  rosterMap: RosterMap;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -423,6 +458,7 @@ function StoryGroup({
             story={story}
             showDivider={index < stories.length - 1}
             onPress={resolvePress(story)}
+            rosterMap={rosterMap}
           />
         ))}
       </AnimatedCard>
@@ -430,7 +466,17 @@ function StoryGroup({
   );
 }
 
-function StoryRow({ story, showDivider, onPress }: { story: RecapStory; showDivider: boolean; onPress?: () => void }) {
+function StoryRow({
+  story,
+  showDivider,
+  onPress,
+  rosterMap,
+}: {
+  story: RecapStory;
+  showDivider: boolean;
+  onPress?: () => void;
+  rosterMap: RosterMap;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const meta = storyMeta(colors)[story.story_type] ?? defaultStoryMeta(colors);
@@ -446,6 +492,9 @@ function StoryRow({ story, showDivider, onPress }: { story: RecapStory; showDivi
     >
       <View style={styles.rowHeaderRow}>
         <IconCircle name={meta.icon} color={meta.color} size={32} iconSize={15} />
+        {!isMatchup && !isTrade ? (
+          <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={28} />
+        ) : null}
         <AppText style={styles.rowTitle} numberOfLines={1}>
           {story.title}
         </AppText>
@@ -460,25 +509,33 @@ function StoryRow({ story, showDivider, onPress }: { story: RecapStory; showDivi
 
       {isMatchup ? (
         <View style={styles.matchupRowCompact}>
-          <AppText style={styles.matchupTeam} numberOfLines={1}>
-            {story.primary_team}
-          </AppText>
+          <View style={styles.matchupTeamGroup}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={24} />
+            <AppText style={styles.matchupTeam} numberOfLines={1}>
+              {story.primary_team}
+            </AppText>
+          </View>
           <AppText style={styles.matchupVs}>vs</AppText>
-          <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
-            {story.secondary_team}
-          </AppText>
+          <View style={styles.matchupTeamGroup}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={24} />
+            <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
+              {story.secondary_team}
+            </AppText>
+          </View>
         </View>
       ) : null}
 
       {isTrade && story.secondary_team ? (
         <View style={styles.tradeRowCompact}>
           <View style={styles.tradeChip}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={18} />
             <AppText style={styles.tradeChipText} numberOfLines={1}>
               {story.primary_team}
             </AppText>
           </View>
           <Ionicons name="swap-horizontal" size={13} color={colors.textTertiary} />
           <View style={styles.tradeChip}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={18} />
             <AppText style={styles.tradeChipText} numberOfLines={1}>
               {story.secondary_team}
             </AppText>
@@ -548,17 +605,21 @@ function createStyles(colors: ThemeColors) {
   metricGroup: { alignItems: 'flex-end' },
   metricValue: { fontSize: 18, fontWeight: '700' },
   metricLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-  matchupTeam: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  matchupTeamGroup: { flex: 1, alignItems: 'center', gap: 4 },
+  matchupTeam: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   matchupTeamMuted: { color: colors.textSecondary, fontWeight: '500' },
   matchupVs: { fontSize: 11, color: colors.textTertiary, fontWeight: '600' },
   tradeChip: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     backgroundColor: colors.background,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
   },
-  tradeChipText: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  tradeChipText: { flex: 1, fontSize: 12, fontWeight: '600', color: colors.textPrimary },
   storySummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
   error: { color: colors.danger, textAlign: 'center' },
 
