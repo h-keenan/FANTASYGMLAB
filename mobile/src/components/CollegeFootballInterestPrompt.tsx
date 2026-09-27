@@ -1,9 +1,12 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AppText from './AppText';
 import { useCollegeInterest } from '../context/CollegeInterestContext';
 import { useThemeMode } from '../context/ThemeModeContext';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -14,13 +17,25 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * disappear for good (see CollegeInterestContext). Renders nothing once
  * `status` leaves `'unanswered'` (including the initial `'loading'` read),
  * so a returning user never sees so much as a flash of it.
+ *
+ * Bug fix (coridian_, 2026-09-27): tapping "Yes, I'm in" used to just close
+ * the card with no follow-up — the new "College Prospects" row lives one
+ * level down in More, which a first-time yes-answer had no way of knowing.
+ * Answering yes now takes the user straight there instead of leaving them
+ * to go find it themselves; answering no/dismissing still just closes.
  */
 export default function CollegeFootballInterestPrompt() {
   const { status, respond, dismiss } = useCollegeInterest();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   if (status !== 'unanswered') return null;
+
+  const handleYes = () => {
+    respond(true);
+    navigation.navigate('CollegeProspects');
+  };
 
   return (
     <View style={styles.card}>
@@ -40,7 +55,7 @@ export default function CollegeFootballInterestPrompt() {
         </AppText>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.button, styles.yesButton]} onPress={() => respond(true)}>
+        <TouchableOpacity style={[styles.button, styles.yesButton]} onPress={handleYes}>
           <AppText style={styles.yesButtonText}>Yes, I'm in</AppText>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.button, styles.noButton]} onPress={() => respond(false)}>
