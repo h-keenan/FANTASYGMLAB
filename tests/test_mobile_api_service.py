@@ -4655,6 +4655,14 @@ def test_dashboard_team_snapshot_explains_the_health_flag(monkeypatch):
     assert driver["impact_contribution"] > 0
     assert driver["player_value_score"] > 0
     assert driver["freshness_label"] == "current"
+    # tier rides along end-to-end (roster row -> injury-impact record ->
+    # mobile projection) as a real computed tier label, not a fabricated
+    # placeholder — see tests/test_injury_impact.py for the "no tier data
+    # on the row at all" edge case at the modules.rankings layer, where this
+    # pipeline's own player_tier assignment doesn't get in the way.
+    from modules.player_tiers import PLAYER_TIERS
+
+    assert driver["tier"] in PLAYER_TIERS
 
     # Same two strings web renders (the "Key injuries: ..." caption and the
     # engine's own impact summary), not a mobile-only rewording.

@@ -71,6 +71,18 @@ class DailyBriefingItem:
     # than fetching a full record (same pattern AlertsScreen already used
     # for matched-player taps), so a display name has to ride along too.
     route_player_name: str = ""
+    # Real player identity fields sourced from the same valued-player row the
+    # tile itself was already built from (dashboard_engine.py's
+    # build_injury_tile/build_waiver_tile/build_trade_tile) — added so mobile
+    # can render a real compact player module instead of a bare name. Empty
+    # string/None when the underlying row genuinely lacks the field (e.g. no
+    # tier on file), never fabricated. Not every route_player_id-bearing tile
+    # sets these (older callers just leave the defaults), so treat as
+    # optional identity, same as route_player_name.
+    route_player_position: str = ""
+    route_player_team: str = ""
+    route_player_tier: str = ""
+    route_player_score: float | None = None
     route_focus_mode: str = ""
     recommendation_narrative: Mapping[str, Any] | None = None
     handoff_context: Mapping[str, Any] | None = None
@@ -234,6 +246,10 @@ def _item_from_tile(
         ),
         route_player_id=_text(tile.get("route_player_id")),
         route_player_name=_text(tile.get("route_player_name")),
+        route_player_position=_text(tile.get("route_player_position")),
+        route_player_team=_text(tile.get("route_player_team")),
+        route_player_tier=_text(tile.get("route_player_tier")),
+        route_player_score=tile.get("route_player_score"),
         route_focus_mode=_text(tile.get("route_focus_mode")),
         recommendation_narrative=narrative,
         handoff_context=(

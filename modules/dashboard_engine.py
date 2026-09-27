@@ -207,6 +207,10 @@ def build_injury_tile(injury_display_context: Mapping[str, Any]) -> dict[str, An
         "route_key": "my_team",
         "route_player_id": alert.get("route_player_id") or "",
         "route_player_name": alert.get("route_player_name") or "",
+        "route_player_position": alert.get("route_player_position") or "",
+        "route_player_team": alert.get("route_player_team") or "",
+        "route_player_tier": alert.get("route_player_tier") or "",
+        "route_player_score": alert.get("route_player_score"),
     }
 
 
@@ -242,6 +246,12 @@ def build_waiver_tile(
         "tone": "waiver",
         "route_key": "waivers",
         "route_player_id": _text(top_waiver.get("player_id")),
+        # Same row already backing every other field on this tile — not a
+        # second valuation source.
+        "route_player_position": _text(top_waiver.get("position")),
+        "route_player_team": _text(top_waiver.get("team")),
+        "route_player_tier": _text(top_waiver.get("player_tier")),
+        "route_player_score": top_waiver.get(score_field),
         "recommendation_narrative": narrative.to_dict() if narrative else None,
         "recommendation_id": narrative.recommendation_id if narrative else "",
     }
@@ -306,6 +316,13 @@ def build_trade_tile(
         asset for asset in (headline_idea.get("send_assets") or []) if isinstance(asset, Mapping)
     ]
     route_player_id = _text(receive_assets[0].get("player_id")) if receive_assets else ""
+    # Same raw asset dict compact_package/presentation_asset already reads
+    # position/team/player_tier/score from (modules.trade_ideas._player_asset)
+    # — not a second valuation source.
+    route_player_position = _text(receive_assets[0].get("position")) if receive_assets else ""
+    route_player_team = _text(receive_assets[0].get("team")) if receive_assets else ""
+    route_player_tier = _text(receive_assets[0].get("player_tier")) if receive_assets else ""
+    route_player_score = receive_assets[0].get("score") if receive_assets else None
     package = compact_package(
         send_assets, receive_assets, value_edge=value_delta, confidence=confidence_label
     )
@@ -316,6 +333,10 @@ def build_trade_tile(
         "tone": "trade",
         "route_key": "trade_hub",
         "route_player_id": route_player_id,
+        "route_player_position": route_player_position,
+        "route_player_team": route_player_team,
+        "route_player_tier": route_player_tier,
+        "route_player_score": route_player_score,
         "route_focus_mode": "target_player",
         "recommendation_narrative": narrative.to_dict(),
         "recommendation_id": narrative.recommendation_id,

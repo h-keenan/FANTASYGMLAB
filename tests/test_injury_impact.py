@@ -320,6 +320,47 @@ class TestInjuryImpact(unittest.TestCase):
         self.assertTrue(injury_ui.is_acute_injury_pressure(summary))
         alert = injury_ui.my_team_injury_alert(summary)
         self.assertEqual(alert["value"], "1 injured starter")
+        # Real player identity for the single unambiguous starter this alert
+        # routes to — position/score come straight from the same
+        # injury-impact record; tier is "" (never fabricated) since this
+        # fixture carries no player_tier column at all.
+        self.assertEqual(alert["route_player_id"], "active-rb")
+        self.assertEqual(alert["route_player_position"], "RB")
+        self.assertEqual(alert["route_player_tier"], "")
+        self.assertGreater(alert["route_player_score"], 0)
+
+    def test_injured_starter_alert_carries_real_tier_when_present(self):
+        roster = pd.DataFrame(
+            [
+                {
+                    "player_id": "active-rb",
+                    "name": "Active Running Back",
+                    "position": "RB",
+                    "team": "SEA",
+                    "status": "IR",
+                    "injury_status": "out",
+                    "market_score": 92,
+                    "age": 25,
+                    "years_exp": 4,
+                    "depth_chart_slot": 1,
+                    "projected_starter": True,
+                    "opportunity_label": "Starter At Risk",
+                    "news_updated": time.time(),
+                    "player_tier": "Elite",
+                },
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = [True]
+
+        summary = summarize_team_injuries(roster, lineup)
+        alert = injury_ui.my_team_injury_alert(summary)
+
+        self.assertEqual(alert["route_player_id"], "active-rb")
+        self.assertEqual(alert["route_player_team"], "SEA")
+        # Same canonical stored-tier column every other player-identity
+        # surface reads — not a second/fabricated tier scheme.
+        self.assertEqual(alert["route_player_tier"], "Elite")
 
     def test_stale_injury_data_is_labeled_uncertain_in_league_card(self):
         stale_time = time.time() - (90 * 24 * 60 * 60)

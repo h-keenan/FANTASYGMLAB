@@ -268,11 +268,23 @@ def my_team_injury_alert(context) -> dict:
     single_starter = starters_only[0] if len(starters_only) == 1 else None
     route_player_id = str(single_starter.get("player_id") or "") if single_starter else ""
     route_player_name = str(single_starter.get("name") or "") if single_starter else ""
+    # Same fields modules.rankings.summarize_team_injuries already computes
+    # per injury-impact record (player_tier/player_value_score) — carried
+    # along so a mobile card can render the player's real identity chip
+    # instead of a bare name, without a second lookup.
+    route_player_position = str(single_starter.get("position") or "") if single_starter else ""
+    route_player_team = str(single_starter.get("team") or "") if single_starter else ""
+    route_player_tier = str(single_starter.get("player_tier") or "") if single_starter else ""
+    route_player_score = single_starter.get("player_value_score") if single_starter else None
     return {
         "value": value,
         "note": note,
         "route_player_id": route_player_id,
         "route_player_name": route_player_name,
+        "route_player_position": route_player_position,
+        "route_player_team": route_player_team,
+        "route_player_tier": route_player_tier,
+        "route_player_score": route_player_score,
         "starter_count": starter_count,
         "weekly_count": weekly_count,
         "future_count": future_count,
