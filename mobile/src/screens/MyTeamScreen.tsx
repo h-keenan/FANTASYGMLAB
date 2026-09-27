@@ -26,7 +26,7 @@ import TeamAvatar from '../components/TeamAvatar';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
-import { percentileColor, percentileFromRank } from '../lib/percentile';
+import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -352,7 +352,7 @@ function TeamAnalyticsSection({
           ) : null}
           {team.power_rank != null ? (
             <AppText style={styles.analyticsRankLine}>
-              Power Rank #{team.power_rank} of {leagueSize}
+              Power Rank {formatRank(team.power_rank, team.power_rank_tied)} of {leagueSize}
             </AppText>
           ) : null}
         </View>
@@ -360,14 +360,14 @@ function TeamAnalyticsSection({
       <View style={styles.analyticsMetricsRow}>
         <MetricCard
           label="Starter Strength"
-          value={team.starter_rank != null ? `#${team.starter_rank}` : '—'}
+          value={formatRank(team.starter_rank, team.starter_rank_tied)}
           percentile={starterPercentile}
           valueColor={starterPercentile != null ? percentileColor(starterPercentile, colors) : undefined}
           style={styles.analyticsMetricTile}
         />
         <MetricCard
           label="Draft Capital"
-          value={team.draft_capital_rank != null ? `#${team.draft_capital_rank}` : '—'}
+          value={formatRank(team.draft_capital_rank, team.draft_capital_rank_tied)}
           percentile={draftCapitalPercentile}
           valueColor={draftCapitalPercentile != null ? percentileColor(draftCapitalPercentile, colors) : undefined}
           style={styles.analyticsMetricTile}

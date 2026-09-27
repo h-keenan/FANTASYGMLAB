@@ -22,7 +22,15 @@ import pandas as pd
 
 from modules import league_value_settings, player_eligibility, rankings, sleeper, trade_ideas
 from modules.league_value_settings import _safe_float, _safe_positive_int
+from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.team_eval import build_league_summary, normalize_team_strategy, team_strategy_label
+
+__all__ = ["add_rank_tie_metadata"]  # re-exported: see modules/rank_tie_metadata.py's
+# docstring for why this lives in its own module (team_eval.py needs it too,
+# and team_eval.py is imported *by* this module, so it couldn't import it
+# back from here without a cycle) — kept importable from here as well since
+# every existing caller (app.py, this module's own rank-producing functions)
+# already does `from modules.league_rankings import add_rank_tie_metadata`.
 
 
 def safe_pick_value(pick: dict) -> int:
@@ -106,6 +114,7 @@ def build_draft_capital_summary(
     capital_rows["draft_capital_rank"] = (
         capital_rows["draft_capital"].rank(method="dense", ascending=False).astype(int)
     )
+    capital_rows = add_rank_tie_metadata(capital_rows, ["draft_capital_rank"])
     return capital_rows.sort_values(["draft_capital_rank", "draft_capital", "team_name"], ascending=[True, False, True]).reset_index(drop=True)
 
 
@@ -124,15 +133,33 @@ def build_league_display_frame(
             "second_rounders",
             "third_rounders",
             "draft_capital_rank",
+            "draft_capital_rank_tied",
+            "draft_capital_rank_tie_count",
         ]
         draft_cols_to_merge.extend(
             [column for column in draft_capital_summary.columns if column.startswith("pick_value_")]
         )
+        # Defensive against a caller-supplied draft_capital_summary that
+        # predates add_rank_tie_metadata (e.g. a hand-built test fixture) —
+        # only merge columns that actually exist rather than KeyError.
+        draft_cols_to_merge = [
+            column for column in draft_cols_to_merge if column in draft_capital_summary.columns
+        ]
         draft_cols = draft_capital_summary[draft_cols_to_merge].copy()
         df_display = df_display.merge(draft_cols, on="roster_id", how="left")
     for column in ["draft_capital", "pick_count", "first_rounders", "second_rounders", "third_rounders", "draft_capital_rank"]:
         if column not in df_display.columns:
             df_display[column] = 0
+    if "draft_capital_rank_tied" not in df_display.columns:
+        df_display["draft_capital_rank_tied"] = False
+    else:
+        df_display["draft_capital_rank_tied"] = df_display["draft_capital_rank_tied"].fillna(False).astype(bool)
+    if "draft_capital_rank_tie_count" not in df_display.columns:
+        df_display["draft_capital_rank_tie_count"] = 1
+    else:
+        df_display["draft_capital_rank_tie_count"] = pd.to_numeric(
+            df_display["draft_capital_rank_tie_count"], errors="coerce"
+        ).fillna(1).astype(int)
     for column in [column for column in df_display.columns if column.startswith("pick_value_")]:
         df_display[column] = pd.to_numeric(df_display[column], errors="coerce").fillna(0).astype(int)
     df_display["draft_capital"] = pd.to_numeric(df_display["draft_capital"], errors="coerce").fillna(0).astype(int)
@@ -141,12 +168,17 @@ def build_league_display_frame(
     raw_roster_score = pd.to_numeric(df_display.get("raw_roster_score"), errors="coerce").fillna(df_display["power_score"])
     df_display["franchise_score"] = raw_roster_score + df_display["draft_capital"]
     df_display["franchise_rank"] = df_display["franchise_score"].rank(method="dense", ascending=False).astype(int)
+    df_display = add_rank_tie_metadata(df_display, ["power_rank", "franchise_rank"])
     if include_picks:
         df_display["overall_score"] = df_display["franchise_score"]
         df_display["overall_rank"] = df_display["franchise_rank"]
+        df_display["overall_rank_tied"] = df_display["franchise_rank_tied"]
+        df_display["overall_rank_tie_count"] = df_display["franchise_rank_tie_count"]
     else:
         df_display["overall_score"] = df_display["power_score"]
         df_display["overall_rank"] = df_display["power_rank"]
+        df_display["overall_rank_tied"] = df_display["power_rank_tied"]
+        df_display["overall_rank_tie_count"] = df_display["power_rank_tie_count"]
     df_display["rank_points"] = len(df_display) - df_display["power_rank"] + 1
     if "strategy_label" in df_display.columns:
         df_display["strategy_display"] = df_display["strategy_label"].fillna("").astype(str)
@@ -188,6 +220,10 @@ def add_league_detail_ranks(df_display: pd.DataFrame) -> pd.DataFrame:
         .fillna(999)
         .rank(method="dense", ascending=True)
         .astype(int)
+    )
+    ranked = add_rank_tie_metadata(
+        ranked,
+        ["roster_value_rank", "current_roster_rank", "starter_rank", "bench_rank", "age_rank"],
     )
     return ranked
 
@@ -383,6 +419,7 @@ def build_draft_workspace_frame(
         .rank(method="dense", ascending=False)
         .astype(int)
     )
+    summary = add_rank_tie_metadata(summary, ["future_draft_capital_rank"])
 
     if df_intel is not None and not df_intel.empty:
         intel_cols = [
@@ -391,8 +428,14 @@ def build_draft_workspace_frame(
             "owner_name",
             "owner_username",
             "power_rank",
+            "power_rank_tied",
+            "power_rank_tie_count",
             "franchise_rank",
+            "franchise_rank_tied",
+            "franchise_rank_tie_count",
             "age_rank",
+            "age_rank_tied",
+            "age_rank_tie_count",
             "avg_age",
             "strategy_display",
             "trading_style",
@@ -431,6 +474,18 @@ def build_draft_workspace_frame(
         if column not in summary.columns:
             summary[column] = default
         summary[column] = pd.to_numeric(summary.get(column), errors="coerce").fillna(default)
+
+    for rank_col in ["draft_capital_rank", "future_draft_capital_rank", "power_rank", "franchise_rank", "age_rank"]:
+        tied_col = f"{rank_col}_tied"
+        tie_count_col = f"{rank_col}_tie_count"
+        if tied_col not in summary.columns:
+            summary[tied_col] = False
+        else:
+            summary[tied_col] = summary[tied_col].fillna(False).astype(bool)
+        if tie_count_col not in summary.columns:
+            summary[tie_count_col] = 1
+        else:
+            summary[tie_count_col] = pd.to_numeric(summary[tie_count_col], errors="coerce").fillna(1).astype(int)
 
     if "strategy_display" not in summary.columns:
         summary["strategy_display"] = ""

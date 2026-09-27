@@ -64,18 +64,21 @@ def gap_status_html(*, count: int) -> str:
     )
 
 
-def rank_badge_html(rank: int, *, kind: str = "leader") -> str:
-    """#1 / #2 / #3 leader mark. Text remains the accessible value."""
+def rank_badge_html(rank: int, *, kind: str = "leader", tied: bool = False) -> str:
+    """#1 / #2 / #3 leader mark, or T1 / T2 / T3 when `tied` (2+ teams share
+    that exact dense rank — see modules.league_rankings.add_rank_tie_metadata).
+    Text remains the accessible value."""
 
     n = max(0, _int(rank))
     if n <= 0:
         return ""
     tier = "gold" if n == 1 else "silver" if n == 2 else "bronze" if n == 3 else "rest"
-    title = "Leader" if n == 1 else f"Rank {n}"
+    title = ("Tied for Leader" if tied else "Leader") if n == 1 else f"{'Tied for ' if tied else ''}Rank {n}"
+    mark = "T" if tied else "#"
     return (
         f"<span class='dg-mg-rank dg-mg-rank--{escape(tier)} dg-mg-rank--{escape(kind)}' "
         f"aria-label='{escape(title, quote=True)}'>"
-        f"<span class='dg-mg-rank__hash' aria-hidden='true'>#</span>"
+        f"<span class='dg-mg-rank__hash' aria-hidden='true'>{mark}</span>"
         f"<span class='dg-mg-rank__n'>{n}</span></span>"
     )
 

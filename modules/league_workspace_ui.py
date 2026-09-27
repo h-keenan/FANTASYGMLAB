@@ -108,12 +108,18 @@ def _format_score(value) -> str:
         return "0"
 
 
-def _format_rank(value) -> str:
+def _format_rank(value, *, tied: bool = False) -> str:
+    """"#4" for a rank unique to one team, "T4" when 2+ teams share that
+    exact dense rank (see modules.league_rankings.add_rank_tie_metadata,
+    which computes the `<field>_tied` flag callers pass in as `tied`)."""
+
     try:
         rank = int(round(float(value)))
     except Exception:
         return "N/A"
-    return f"#{rank}" if rank > 0 else "N/A"
+    if rank <= 0:
+        return "N/A"
+    return f"T{rank}" if tied else f"#{rank}"
 
 
 def compact_activity_metric(value) -> str:
@@ -604,11 +610,17 @@ def _league_overview_team_lines(
         team_name = _safe_text(row.get("team_name"), "Team")
         details: list[str] = []
         if include_power:
-            details.append(f"Power {_format_rank(row.get('power_rank'))}")
+            details.append(
+                f"Power {_format_rank(row.get('power_rank'), tied=bool(row.get('power_rank_tied')))}"
+            )
         if include_franchise:
-            details.append(f"Franchise {_format_rank(row.get('franchise_rank'))}")
+            details.append(
+                f"Franchise {_format_rank(row.get('franchise_rank'), tied=bool(row.get('franchise_rank_tied')))}"
+            )
         if include_draft:
-            details.append(f"Draft {_format_rank(row.get('draft_capital_rank'))}")
+            details.append(
+                f"Draft {_format_rank(row.get('draft_capital_rank'), tied=bool(row.get('draft_capital_rank_tied')))}"
+            )
         if include_strategy:
             details.append(
                 _safe_text(
@@ -1084,11 +1096,11 @@ def render_power_rankings_board(
             .fillna(0)
             .iloc[0]
         )
-        starter_rank = _format_rank(row.get("starter_rank"))
-        bench_rank = _format_rank(row.get("bench_rank"))
-        draft_rank = _format_rank(row.get("draft_capital_rank"))
-        franchise_rank = _format_rank(row.get("franchise_rank"))
-        power_rank = _format_rank(row.get("power_rank"))
+        starter_rank = _format_rank(row.get("starter_rank"), tied=bool(row.get("starter_rank_tied")))
+        bench_rank = _format_rank(row.get("bench_rank"), tied=bool(row.get("bench_rank_tied")))
+        draft_rank = _format_rank(row.get("draft_capital_rank"), tied=bool(row.get("draft_capital_rank_tied")))
+        franchise_rank = _format_rank(row.get("franchise_rank"), tied=bool(row.get("franchise_rank_tied")))
+        power_rank = _format_rank(row.get("power_rank"), tied=bool(row.get("power_rank_tied")))
         injured_starters = _safe_positive_int(
             row.get("injured_starters"),
             0,
@@ -1111,7 +1123,7 @@ def render_power_rankings_board(
         tap_class, tap_attrs = team_tap_markup(row)
         board_rows.append(
             ranked_leaderboard_row_html(
-                rank_label=_format_rank(rank_value),
+                rank_label=_format_rank(rank_value, tied=bool(row.get(f"{rank_column}_tied"))),
                 team_name=_safe_text(row.get("team_name")),
                 owner_text=owner_text,
                 primary_metric=_format_score(row.get(score_column)),
@@ -1237,8 +1249,8 @@ def render_team_comparison_board(
         tap_class, tap_attrs = team_tap_markup(row)
         board_rows.append(
             team_comparison_row_html(
-                power_rank=_format_rank(row.get("power_rank")),
-                franchise_rank=_format_rank(row.get("franchise_rank")),
+                power_rank=_format_rank(row.get("power_rank"), tied=bool(row.get("power_rank_tied"))),
+                franchise_rank=_format_rank(row.get("franchise_rank"), tied=bool(row.get("franchise_rank_tied"))),
                 team_name=_safe_text(row.get("team_name")),
                 owner_text=owner_text,
                 archetype=_safe_text(row.get("archetype_label")),
@@ -1394,37 +1406,19 @@ def render_team_rank_cards(team_row: dict):
     """Team comparative ranks via canonical summary tiles."""
 
     card_specs = [
-        (
-            "Power Rank",
-            team_row.get("power_rank"),
-            "Strongest lineup and depth right now",
-            "power",
-        ),
-        (
-            "Franchise Rank",
-            team_row.get("franchise_rank"),
-            "Full roster value plus future assets",
-            "franchise",
-        ),
-        (
-            "Roster Value Rank",
-            team_row.get("roster_value_rank"),
-            "All-player roster value",
-            "metric",
-        ),
-        ("Starter Rank", team_row.get("starter_rank"), "Best weekly lineup", "metric"),
-        ("Bench Rank", team_row.get("bench_rank"), "Depth behind starters", "metric"),
-        ("Age Rank", team_row.get("age_rank"), "Younger roster ranks higher", "metric"),
-        (
-            "Draft Capital Rank",
-            team_row.get("draft_capital_rank"),
-            "Owned future picks",
-            "metric",
-        ),
+        ("Power Rank", "power_rank", "Strongest lineup and depth right now", "power"),
+        ("Franchise Rank", "franchise_rank", "Full roster value plus future assets", "franchise"),
+        ("Roster Value Rank", "roster_value_rank", "All-player roster value", "metric"),
+        ("Starter Rank", "starter_rank", "Best weekly lineup", "metric"),
+        ("Bench Rank", "bench_rank", "Depth behind starters", "metric"),
+        ("Age Rank", "age_rank", "Younger roster ranks higher", "metric"),
+        ("Draft Capital Rank", "draft_capital_rank", "Owned future picks", "metric"),
     ]
     items = []
-    for label, value, note, tone in card_specs:
-        rank_text = f"#{int(value)}" if value and pd.notna(value) else "N/A"
+    for label, field, note, tone in card_specs:
+        value = team_row.get(field)
+        tied = bool(team_row.get(f"{field}_tied"))
+        rank_text = _format_rank(value, tied=tied) if value and pd.notna(value) else "N/A"
         rank_n = int(value) if value and pd.notna(value) else 0
         items.append(
             {
@@ -1433,7 +1427,7 @@ def render_team_rank_cards(team_row: dict):
                 "note": note,
                 "tone": tone,
                 "tappable": False,
-                "graphic": mgp.rank_badge_html(rank_n) if 1 <= rank_n <= 3 else "",
+                "graphic": mgp.rank_badge_html(rank_n, tied=tied) if 1 <= rank_n <= 3 else "",
             }
         )
     workspace_ui.render_summary_tiles(
@@ -1538,7 +1532,7 @@ def build_team_partner_context_tiles(
         if draft_rank <= max(2, league_size // 3):
             draft_posture = "Pick-Rich"
             draft_note = (
-                f"Draft rank {_format_rank(draft_rank)} | {draft_capital} "
+                f"Draft rank {_format_rank(draft_rank, tied=bool(draft_row.get('draft_capital_rank_tied')))} | {draft_capital} "
                 "capital gives this team room to spend or stay patient."
             )
         elif draft_rank >= max(
@@ -1547,13 +1541,13 @@ def build_team_partner_context_tiles(
         ):
             draft_posture = "Pick-Poor"
             draft_note = (
-                f"Draft rank {_format_rank(draft_rank)} | {draft_capital} "
+                f"Draft rank {_format_rank(draft_rank, tied=bool(draft_row.get('draft_capital_rank_tied')))} | {draft_capital} "
                 "capital means future flexibility is relatively thin."
             )
         else:
             draft_posture = "Balanced Picks"
             draft_note = (
-                f"Draft rank {_format_rank(draft_rank)} | {draft_capital} "
+                f"Draft rank {_format_rank(draft_rank, tied=bool(draft_row.get('draft_capital_rank_tied')))} | {draft_capital} "
                 "capital keeps this team flexible but not overloaded with picks."
             )
     else:
@@ -1882,7 +1876,10 @@ def render_league_team_workspace(
             },
             {
                 "label": "Draft Capital",
-                "value": format_rank(selected_draft_row.get("draft_capital_rank")),
+                "value": format_rank(
+                    selected_draft_row.get("draft_capital_rank"),
+                    tied=bool(selected_draft_row.get("draft_capital_rank_tied")),
+                ),
                 "note": f"{format_score(selected_draft_row.get('draft_capital'))} total | {int(selected_draft_row.get('pick_count') or 0)} picks",
                 "tone": "franchise",
             },

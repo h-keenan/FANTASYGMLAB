@@ -18,6 +18,7 @@ import streamlit as st
 import pandas as pd
 
 from modules import rankings as rankings_module
+from modules.league_rankings import add_rank_tie_metadata
 from modules import player_asset_explorer_ui
 from modules import account_store
 from modules import account_ui
@@ -5796,7 +5797,8 @@ def build_home_league_pulse_items(df_intel: pd.DataFrame) -> list[dict]:
             "label": "Biggest Contender",
             "value": _safe_text(strongest_contender.get("team_name"), "No clear leader") if strongest_contender is not None else "No clear leader",
             "note": (
-                f"Power {_format_rank(strongest_contender.get('power_rank'))} | Starter {_format_rank(strongest_contender.get('starter_rank'))}"
+                f"Power {_format_rank(strongest_contender.get('power_rank'), tied=bool(strongest_contender.get('power_rank_tied')))} | "
+                f"Starter {_format_rank(strongest_contender.get('starter_rank'), tied=bool(strongest_contender.get('starter_rank_tied')))}"
                 if strongest_contender is not None
                 else "No contender read available yet."
             ),
@@ -5806,7 +5808,8 @@ def build_home_league_pulse_items(df_intel: pd.DataFrame) -> list[dict]:
             "label": "Biggest Rebuilder",
             "value": _safe_text(biggest_rebuilder.get("team_name"), "No clear leader") if biggest_rebuilder is not None else "No clear leader",
             "note": (
-                f"Draft {_format_rank(biggest_rebuilder.get('draft_capital_rank'))} | {_safe_text(biggest_rebuilder.get('strategy_display'), 'Rebuild')}"
+                f"Draft {_format_rank(biggest_rebuilder.get('draft_capital_rank'), tied=bool(biggest_rebuilder.get('draft_capital_rank_tied')))} | "
+                f"{_safe_text(biggest_rebuilder.get('strategy_display'), 'Rebuild')}"
                 if biggest_rebuilder is not None
                 else "No rebuild read available yet."
             ),
@@ -7598,8 +7601,8 @@ def render_home_dashboard(
             action_center_items = [
                 {
                     "label": "Roster Quality",
-                    "value": f"Power {_format_rank(team_row.get('power_rank'))}",
-                    "note": f"Franchise {_format_rank(team_row.get('franchise_rank'))} after the completed startup.",
+                    "value": f"Power {_format_rank(team_row.get('power_rank'), tied=bool(team_row.get('power_rank_tied')))}",
+                    "note": f"Franchise {_format_rank(team_row.get('franchise_rank'), tied=bool(team_row.get('franchise_rank_tied')))} after the completed startup.",
                     "tone": "power",
                 },
                 need_item,
@@ -7607,7 +7610,10 @@ def render_home_dashboard(
                 {
                     "label": "Lineup Construction",
                     "value": f"{len(starters)} projected starters",
-                    "note": f"Starter rank {_format_rank(team_row.get('starter_rank'))} | Bench rank {_format_rank(team_row.get('bench_rank'))}.",
+                    "note": (
+                        f"Starter rank {_format_rank(team_row.get('starter_rank'), tied=bool(team_row.get('starter_rank_tied')))} | "
+                        f"Bench rank {_format_rank(team_row.get('bench_rank'), tied=bool(team_row.get('bench_rank_tied')))}."
+                    ),
                     "tone": "franchise",
                 },
                 {
@@ -7805,14 +7811,14 @@ def render_home_dashboard(
             },
             {
                 "label": "Starter Strength",
-                "value": _format_rank(team_row.get("starter_rank")),
+                "value": _format_rank(team_row.get("starter_rank"), tied=bool(team_row.get("starter_rank_tied"))),
                 "note": "Projected lineup rank",
                 "tone": "power",
                 "comparison": snapshot_comparisons.get("Starter Strength"),
             },
             {
                 "label": "Bench Strength",
-                "value": _format_rank(team_row.get("bench_rank")),
+                "value": _format_rank(team_row.get("bench_rank"), tied=bool(team_row.get("bench_rank_tied"))),
                 "note": "Depth rank",
                 "tone": "franchise",
                 "comparison": snapshot_comparisons.get("Bench Strength"),
@@ -13656,6 +13662,7 @@ def build_draft_capital_summary(
     capital_rows["draft_capital_rank"] = (
         capital_rows["draft_capital"].rank(method="dense", ascending=False).astype(int)
     )
+    capital_rows = add_rank_tie_metadata(capital_rows, ["draft_capital_rank"])
     return capital_rows.sort_values(["draft_capital_rank", "draft_capital", "team_name"], ascending=[True, False, True]).reset_index(drop=True)
 
 
@@ -13674,15 +13681,33 @@ def build_league_display_frame(
             "second_rounders",
             "third_rounders",
             "draft_capital_rank",
+            "draft_capital_rank_tied",
+            "draft_capital_rank_tie_count",
         ]
         draft_cols_to_merge.extend(
             [column for column in draft_capital_summary.columns if column.startswith("pick_value_")]
         )
+        # Defensive against a caller-supplied draft_capital_summary that
+        # predates add_rank_tie_metadata (e.g. a hand-built test fixture) —
+        # only merge columns that actually exist rather than KeyError.
+        draft_cols_to_merge = [
+            column for column in draft_cols_to_merge if column in draft_capital_summary.columns
+        ]
         draft_cols = draft_capital_summary[draft_cols_to_merge].copy()
         df_display = df_display.merge(draft_cols, on="roster_id", how="left")
     for column in ["draft_capital", "pick_count", "first_rounders", "second_rounders", "third_rounders", "draft_capital_rank"]:
         if column not in df_display.columns:
             df_display[column] = 0
+    if "draft_capital_rank_tied" not in df_display.columns:
+        df_display["draft_capital_rank_tied"] = False
+    else:
+        df_display["draft_capital_rank_tied"] = df_display["draft_capital_rank_tied"].fillna(False).astype(bool)
+    if "draft_capital_rank_tie_count" not in df_display.columns:
+        df_display["draft_capital_rank_tie_count"] = 1
+    else:
+        df_display["draft_capital_rank_tie_count"] = pd.to_numeric(
+            df_display["draft_capital_rank_tie_count"], errors="coerce"
+        ).fillna(1).astype(int)
     for column in [column for column in df_display.columns if column.startswith("pick_value_")]:
         df_display[column] = pd.to_numeric(df_display[column], errors="coerce").fillna(0).astype(int)
     df_display["draft_capital"] = pd.to_numeric(df_display["draft_capital"], errors="coerce").fillna(0).astype(int)
@@ -13691,12 +13716,17 @@ def build_league_display_frame(
     raw_roster_score = pd.to_numeric(df_display.get("raw_roster_score"), errors="coerce").fillna(df_display["power_score"])
     df_display["franchise_score"] = raw_roster_score + df_display["draft_capital"]
     df_display["franchise_rank"] = df_display["franchise_score"].rank(method="dense", ascending=False).astype(int)
+    df_display = add_rank_tie_metadata(df_display, ["power_rank", "franchise_rank"])
     if include_picks:
         df_display["overall_score"] = df_display["franchise_score"]
         df_display["overall_rank"] = df_display["franchise_rank"]
+        df_display["overall_rank_tied"] = df_display["franchise_rank_tied"]
+        df_display["overall_rank_tie_count"] = df_display["franchise_rank_tie_count"]
     else:
         df_display["overall_score"] = df_display["power_score"]
         df_display["overall_rank"] = df_display["power_rank"]
+        df_display["overall_rank_tied"] = df_display["power_rank_tied"]
+        df_display["overall_rank_tie_count"] = df_display["power_rank_tie_count"]
     df_display["rank_points"] = len(df_display) - df_display["power_rank"] + 1
     if "strategy_label" in df_display.columns:
         df_display["strategy_display"] = df_display["strategy_label"].fillna("").astype(str)
@@ -13902,6 +13932,7 @@ def build_draft_workspace_frame(
         .rank(method="dense", ascending=False)
         .astype(int)
     )
+    summary = add_rank_tie_metadata(summary, ["future_draft_capital_rank"])
 
     if df_intel is not None and not df_intel.empty:
         intel_cols = [
@@ -13910,8 +13941,14 @@ def build_draft_workspace_frame(
             "owner_name",
             "owner_username",
             "power_rank",
+            "power_rank_tied",
+            "power_rank_tie_count",
             "franchise_rank",
+            "franchise_rank_tied",
+            "franchise_rank_tie_count",
             "age_rank",
+            "age_rank_tied",
+            "age_rank_tie_count",
             "avg_age",
             "strategy_display",
             "trading_style",
@@ -13950,6 +13987,18 @@ def build_draft_workspace_frame(
         if column not in summary.columns:
             summary[column] = default
         summary[column] = pd.to_numeric(summary.get(column), errors="coerce").fillna(default)
+
+    for rank_col in ["draft_capital_rank", "future_draft_capital_rank", "power_rank", "franchise_rank", "age_rank"]:
+        tied_col = f"{rank_col}_tied"
+        tie_count_col = f"{rank_col}_tie_count"
+        if tied_col not in summary.columns:
+            summary[tied_col] = False
+        else:
+            summary[tied_col] = summary[tied_col].fillna(False).astype(bool)
+        if tie_count_col not in summary.columns:
+            summary[tie_count_col] = 1
+        else:
+            summary[tie_count_col] = pd.to_numeric(summary[tie_count_col], errors="coerce").fillna(1).astype(int)
 
     if "strategy_display" not in summary.columns:
         summary["strategy_display"] = ""
@@ -14059,6 +14108,10 @@ def add_league_detail_ranks(df_display: pd.DataFrame) -> pd.DataFrame:
         .fillna(999)
         .rank(method="dense", ascending=True)
         .astype(int)
+    )
+    ranked = add_rank_tie_metadata(
+        ranked,
+        ["roster_value_rank", "current_roster_rank", "starter_rank", "bench_rank", "age_rank"],
     )
     return ranked
 
@@ -14305,7 +14358,12 @@ def _classify_manager_tendencies(enriched: pd.DataFrame) -> pd.DataFrame:
         evidence = [
             f"{trade_count} completed trades | {trade_asset_total} tracked trade assets",
             f"{transaction_count} total moves | {waiver_moves} waivers | {roster_churn} churn",
-            f"Power {_format_rank(power_rank)} | Franchise {_format_rank(franchise_rank)} | Draft {_format_rank(draft_rank)} | Age {_format_rank(age_rank)}",
+            (
+                f"Power {_format_rank(power_rank, tied=bool(row.get('power_rank_tied')))} | "
+                f"Franchise {_format_rank(franchise_rank, tied=bool(row.get('franchise_rank_tied')))} | "
+                f"Draft {_format_rank(draft_rank, tied=bool(row.get('draft_capital_rank_tied')))} | "
+                f"Age {_format_rank(age_rank, tied=bool(row.get('age_rank_tied')))}"
+            ),
         ]
         if firsts_acquired or firsts_sent:
             evidence.append(f"{firsts_acquired} future 1sts acquired | {firsts_sent} future 1sts sent")
@@ -14785,13 +14843,13 @@ def cached_weekly_league_report(
                 {
                     "label": "Team of the Week",
                     "value": _safe_text(team_of_week_row.get("team_name"), "Team"),
-                    "note": f"{_format_score(team_of_week.get('points'))} points | Power {_format_rank(team_of_week_row.get('power_rank'))}",
+                    "note": f"{_format_score(team_of_week.get('points'))} points | Power {_format_rank(team_of_week_row.get('power_rank'), tied=bool(team_of_week_row.get('power_rank_tied')))}",
                     "tone": "strength",
                 },
                 {
                     "label": "Disappointment",
                     "value": _safe_text(disappointment_row.get("team_name"), "Team"),
-                    "note": f"{_format_score(disappointment.get('points'))} points after entering at Power {_format_rank(disappointment_row.get('power_rank'))}",
+                    "note": f"{_format_score(disappointment.get('points'))} points after entering at Power {_format_rank(disappointment_row.get('power_rank'), tied=bool(disappointment_row.get('power_rank_tied')))}",
                     "tone": "risk",
                 },
             ]
@@ -14822,7 +14880,7 @@ def cached_weekly_league_report(
             "tone": "strength",
             "items": [
                 f"{int(hottest.get('current_streak') or 0)}-game win streak",
-                f"Power Rank {_format_rank(hottest.get('power_rank'))}",
+                f"Power Rank {_format_rank(hottest.get('power_rank'), tied=bool(hottest.get('power_rank_tied')))}",
                 f"Strategy: {_safe_text(hottest.get('strategy_display'))}",
             ] if hottest is not None else ["Need completed matchup history first."],
         },
@@ -14832,7 +14890,7 @@ def cached_weekly_league_report(
             "tone": "risk",
             "items": [
                 f"{abs(int(coldest.get('current_streak') or 0))}-game losing streak",
-                f"Power Rank {_format_rank(coldest.get('power_rank'))}",
+                f"Power Rank {_format_rank(coldest.get('power_rank'), tied=bool(coldest.get('power_rank_tied')))}",
                 f"Strategy: {_safe_text(coldest.get('strategy_display'))}",
             ] if coldest is not None else ["Need completed matchup history first."],
         },
@@ -21009,8 +21067,8 @@ def main():
                         )
                         team_selector_df["selector_label"] = team_selector_df.apply(
                             lambda row: (
-                                f"P{_format_rank(row.get('power_rank'))} "
-                                f"F{_format_rank(row.get('franchise_rank'))} "
+                                f"P{_format_rank(row.get('power_rank'), tied=bool(row.get('power_rank_tied')))} "
+                                f"F{_format_rank(row.get('franchise_rank'), tied=bool(row.get('franchise_rank_tied')))} "
                                 f"{row['team_name']} | {owner_handle(row.get('owner_username'), row.get('owner_name', 'Owner'))}"
                             ),
                             axis=1,
@@ -21484,7 +21542,7 @@ def main():
                                 detail_rows.append(
                                     dense_list_primitives.dense_row_html(
                                         lead_html=dense_list_primitives.dense_lead_html(
-                                            _format_rank(row.get("power_rank"))
+                                            _format_rank(row.get("power_rank"), tied=bool(row.get("power_rank_tied")))
                                         ),
                                         identity_html=dense_list_primitives.dense_identity_html(
                                             primary=_safe_text(row.get("team_name")),
@@ -22564,7 +22622,10 @@ def main():
                             [
                                 {
                                     "label": "Team Context",
-                                    "value": f"Power {_format_rank(my_rank_row.get('power_rank'))} | Franchise {_format_rank(my_rank_row.get('franchise_rank'))}",
+                                    "value": (
+                                        f"Power {_format_rank(my_rank_row.get('power_rank'), tied=bool(my_rank_row.get('power_rank_tied')))} | "
+                                        f"Franchise {_format_rank(my_rank_row.get('franchise_rank'), tied=bool(my_rank_row.get('franchise_rank_tied')))}"
+                                    ),
                                     "note": f"Trade lens: {trade_hub_lens_label}.",
                                     "tone": "strategy",
                                 },
@@ -22663,7 +22724,8 @@ def main():
                             "label": "Current Team",
                             "value": target_team_name,
                             "note": (
-                                f"{target_owner_name} | Power {_format_rank(target_rank_row.get('power_rank'))} | Franchise {_format_rank(target_rank_row.get('franchise_rank'))}"
+                                f"{target_owner_name} | Power {_format_rank(target_rank_row.get('power_rank'), tied=bool(target_rank_row.get('power_rank_tied')))} | "
+                                f"Franchise {_format_rank(target_rank_row.get('franchise_rank'), tied=bool(target_rank_row.get('franchise_rank_tied')))}"
                                 + (
                                     f" | {_safe_text(target_rank_row.get('manager_tendencies_summary'))}"
                                     if _safe_text(target_rank_row.get('manager_tendencies_summary'))

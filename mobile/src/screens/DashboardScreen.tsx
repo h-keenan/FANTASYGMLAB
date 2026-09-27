@@ -40,6 +40,7 @@ import TeamAvatar from '../components/TeamAvatar';
 import BrandMark from '../components/BrandMark';
 import { useOrbClearance } from '../lib/orbLayout';
 import { getCachedDashboard, setCachedDashboard } from '../lib/dashboardCache';
+import { formatRank } from '../lib/percentile';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
@@ -131,7 +132,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
     {
       label: 'Biggest Contender',
       value: contender?.team_name ?? 'No clear leader',
-      note: contender ? `Power #${contender.power_rank}` : 'No contender read available yet.',
+      note: contender ? `Power ${formatRank(contender.power_rank, contender.power_rank_tied)}` : 'No contender read available yet.',
       icon: 'flame',
       color: colors.accent,
     },
@@ -139,7 +140,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
       label: 'Biggest Rebuilder',
       value: rebuilder?.team_name ?? 'No clear leader',
       note: rebuilder
-        ? `Draft Capital #${rebuilder.draft_capital_rank} · ${rebuilder.strategy_label ?? 'Rebuild'}`
+        ? `Draft Capital ${formatRank(rebuilder.draft_capital_rank, rebuilder.draft_capital_rank_tied)} · ${rebuilder.strategy_label ?? 'Rebuild'}`
         : 'No rebuild read available yet.',
       icon: 'construct',
       color: colors.premium,
@@ -147,7 +148,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
     {
       label: 'Draft Capital Leader',
       value: draftLeader?.team_name ?? 'No clear leader',
-      note: draftLeader ? `Draft Capital #${draftLeader.draft_capital_rank}` : 'No draft-capital read available yet.',
+      note: draftLeader ? `Draft Capital ${formatRank(draftLeader.draft_capital_rank, draftLeader.draft_capital_rank_tied)}` : 'No draft-capital read available yet.',
       icon: 'layers',
       color: colors.success,
     },
@@ -649,7 +650,7 @@ function TeamSnapshotRow({
         {snapshot.power_rank != null ? (
           <MetricCard
             label="Power"
-            value={`#${snapshot.power_rank}`}
+            value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)}
             onPress={goToTeams}
             style={styles.snapshotTileThird}
           />
@@ -657,7 +658,7 @@ function TeamSnapshotRow({
         {snapshot.franchise_rank != null ? (
           <MetricCard
             label="Franchise"
-            value={`#${snapshot.franchise_rank}`}
+            value={formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied)}
             onPress={goToTeams}
             style={styles.snapshotTileThird}
           />
