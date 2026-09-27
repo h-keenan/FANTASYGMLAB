@@ -16,6 +16,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping
 
+import pandas as pd
+
 # Bump when the serialized trust schema changes (invalidates st.cache_data entries).
 TRADE_TRUST_CACHE_VERSION = 1
 
@@ -84,6 +86,76 @@ def hydrate_trade_trust_context(
         valid_roster_ids=valid,
         team_name_to_roster=names,
         league_context_valid=bool(value.get("league_context_valid")),
+    )
+
+
+def _safe_text(value: object, default: str = "") -> str:
+    if value is None:
+        return default
+    text = str(value).strip()
+    return text if text else default
+
+
+def build_roster_player_map(rosters: list[dict] | None) -> dict[str, tuple[str, ...]]:
+    """Roster id -> owned player ids, keyed as strings.
+
+    Single source of truth for both app.py (``_build_roster_player_map``) and
+    modules.trade_hub_engine (``build_roster_player_map``) — previously two
+    hand-kept-in-sync copies of the exact same normalization.
+    """
+
+    roster_player_map: dict[str, tuple[str, ...]] = {}
+    for roster in rosters or []:
+        roster_id = _safe_text(roster.get("roster_id"))
+        if not roster_id:
+            continue
+        roster_player_map[roster_id] = tuple(
+            str(pid) for pid in (roster.get("players") or []) if pid is not None
+        )
+    return roster_player_map
+
+
+def build_trade_trust_context(
+    *,
+    league_id: str,
+    df_summary: pd.DataFrame,
+    roster_player_map: dict[str, tuple[str, ...]] | None,
+) -> TradeTrustContext:
+    """Build the Trust enforcement boundary context for one league snapshot.
+
+    Single source of truth for both app.py and modules.trade_hub_engine —
+    previously two hand-kept-in-sync copies of the exact same logic.
+    """
+
+    ownership_by_player: dict[str, int] = {}
+    valid_roster_ids: set[int] = set()
+    for roster_id_value, player_ids in (roster_player_map or {}).items():
+        try:
+            roster_id = int(roster_id_value)
+        except (TypeError, ValueError):
+            continue
+        if not roster_id:
+            continue
+        valid_roster_ids.add(roster_id)
+        for player_id in player_ids or ():
+            ownership_by_player[str(player_id)] = roster_id
+
+    team_name_to_roster: dict[str, int] = {}
+    if df_summary is not None and not df_summary.empty:
+        for _, row in df_summary.iterrows():
+            try:
+                roster_id = int(row.get("roster_id") or 0)
+            except (TypeError, ValueError):
+                continue
+            team_name = _safe_text(row.get("team_name")).casefold()
+            if roster_id and team_name:
+                team_name_to_roster[team_name] = roster_id
+
+    return TradeTrustContext(
+        ownership_by_player=tuple(ownership_by_player.items()),
+        valid_roster_ids=frozenset(valid_roster_ids),
+        team_name_to_roster=tuple(team_name_to_roster.items()),
+        league_context_valid=bool(league_id and valid_roster_ids),
     )
 
 

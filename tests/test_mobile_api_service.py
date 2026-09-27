@@ -4006,6 +4006,65 @@ def test_update_device_preferences_partial_update_only_touches_sent_fields(monke
     }
 
 
+def test_get_team_stance_includes_the_backend_computed_strategy(monkeypatch):
+    """GET /team-stance now also returns `strategy` (the SAME computation
+    get_gm_stance returns) so mobile can read the real backend-computed value
+    instead of re-deriving it client-side after this round-trip — see
+    mobile/src/lib/api.ts's TEAM_STANCE_TO_STRATEGY comment."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = [{"stance": "rebuilding"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
+        response = client.get("/v1/leagues/abc/team-stance", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["stance"] == "rebuilding"
+    assert body["strategy"] == "rebuild"
+
+
+def test_get_team_stance_defaults_to_retool_strategy_when_nothing_stored(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
+        response = client.get("/v1/leagues/abc/team-stance", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stance"] == ""
+    assert body["strategy"] == "retool"
+
+
+def test_set_team_stance_returns_the_backend_computed_strategy(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=upsert_response):
+            response = client.post(
+                "/v1/leagues/abc/team-stance",
+                json={"stance": "competing"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "stance": "competing", "strategy": "contender"}
+
+
 def test_gm_stance_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     assert client.get("/v1/leagues/abc/gm-stance").status_code == 401

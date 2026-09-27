@@ -75,6 +75,87 @@ class TeamNeedsAssessment:
         )
 
 
+# Real, already-computed signal for the Next Move/Dashboard priority ladder
+# (roster need > injury pressure > future risk > upgrade opportunity — see
+# select_need_headline below). This is a strict step-function, not a numeric
+# confidence score, so rather than fabricate a percentage the ladder doesn't
+# produce, each rung gets an honest tier word describing *why* it surfaced.
+# Single source of truth for app.py (web Dashboard) and modules.dashboard_engine
+# (mobile "Next Move" briefing) so both agree on the wording for the identical
+# category — previously two hand-kept-in-sync copies of the same dict.
+NEED_TIER_LABELS: dict[str, str] = {
+    "true_need": "Priority",
+    "injury_pressure": "Urgent",
+    "future_risk": "Watch",
+    "upgrade": "Opportunity",
+    "balanced": "",
+}
+
+
+def select_need_headline(assessment: "TeamNeedsAssessment") -> dict[str, str]:
+    """Select an accurate need-category headline without collapsing semantics.
+
+    Single source of truth for app.py's ``team_need_display`` and
+    modules.dashboard_engine's ``select_need_headline`` — previously two
+    hand-kept-in-sync copies of the exact same priority-ladder logic.
+    """
+
+    position_items = {item.position: item for item in assessment.positions}
+    current_needs = [
+        position
+        for position in assessment.true_needs
+        if (
+            position_items.get(position) is not None
+            and position_items[position].classification == "short_term_need"
+            and not position_items[position].temporary_injury_pressure
+        )
+    ]
+    if current_needs:
+        return {
+            "category": "true_need",
+            "label": "Biggest Team Need",
+            "value": current_needs[0],
+            "note": "Starter and depth coverage identify this as the clearest current roster deficiency.",
+            "tone": "need",
+            "tier_label": NEED_TIER_LABELS["true_need"],
+        }
+    if assessment.temporary_injury_pressures:
+        return {
+            "category": "injury_pressure",
+            "label": "Injury Pressure",
+            "value": assessment.temporary_injury_pressures[0],
+            "note": "Current availability is creating temporary pressure in this room.",
+            "tone": "risk",
+            "tier_label": NEED_TIER_LABELS["injury_pressure"],
+        }
+    if assessment.future_risks:
+        return {
+            "category": "future_risk",
+            "label": "Future Roster Risk",
+            "value": assessment.future_risks[0],
+            "note": "Current coverage is playable, but future stability is limited.",
+            "tone": "draft",
+            "tier_label": NEED_TIER_LABELS["future_risk"],
+        }
+    if assessment.upgrade_opportunities:
+        return {
+            "category": "upgrade",
+            "label": "Upgrade Opportunity",
+            "value": assessment.upgrade_opportunities[0],
+            "note": "This covered room trails the league baseline but is not a true roster need.",
+            "tone": "need",
+            "tier_label": NEED_TIER_LABELS["upgrade"],
+        }
+    return {
+        "category": "balanced",
+        "label": "Balanced Roster",
+        "value": "No urgent need",
+        "note": "No current roster deficiency is standing out under the canonical coverage policy.",
+        "tone": "draft",
+        "tier_label": NEED_TIER_LABELS["balanced"],
+    }
+
+
 def _number(value, default: float = 0.0) -> float:
     try:
         number = float(value)

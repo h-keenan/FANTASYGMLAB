@@ -8,13 +8,17 @@ reverse). The actual idea-generation engine (modules.trade_ideas.build_trade_ide
 (modules.team_eval.build_league_summary) are already clean, already-shared
 modules/ functions — this module calls them directly with zero duplication.
 
-Three small, pure functions ARE faithful ports from app.py (documented
-below) because no modules/ equivalent existed and extracting their app.py
-originals would have required following several more non-trivial upstream
-dependencies for no benefit: apply_strategy_age_curve (~135 lines, pandas
-only), strategy_adjusted_pick_score_multiplier (~10 lines), and the
-Trust-enforcement plumbing (build_trade_trust_context + a trivial
-roster-player-map builder) that wraps modules.trust_enforcement.
+apply_strategy_age_curve (~135 lines, pandas only) and
+strategy_adjusted_pick_score_multiplier (~10 lines) live here and are
+imported by app.py (`from modules.trade_hub_engine import
+apply_strategy_age_curve, strategy_adjusted_pick_score_multiplier`) — this
+file used to carry its own byte-for-byte copy of both, ported by hand from
+app.py, until that drift risk was consolidated to a single implementation.
+The Trust-enforcement plumbing (build_trade_trust_context + a trivial
+roster-player-map builder) that wraps modules.trust_enforcement is a
+similar case: both this module and app.py used to hand-keep their own
+copies in sync by inspection; both now alias modules.trade_trust's single
+implementation (see modules/trade_trust.py).
 """
 
 from __future__ import annotations
@@ -164,58 +168,8 @@ def strategy_adjusted_pick_score_multiplier(base_multiplier: float, strategy: st
     return float(base_multiplier) * _PICK_STRATEGY_MULTIPLIERS.get(strategy_key, 1.0)
 
 
-def build_roster_player_map(rosters: list[dict] | None) -> dict[str, tuple[str, ...]]:
-    """Faithful port of app.py's _build_roster_player_map."""
-
-    roster_player_map: dict[str, tuple[str, ...]] = {}
-    for roster in rosters or []:
-        roster_id = _safe_text(roster.get("roster_id"))
-        if not roster_id:
-            continue
-        roster_player_map[roster_id] = tuple(
-            str(pid) for pid in (roster.get("players") or []) if pid is not None
-        )
-    return roster_player_map
-
-
-def build_trade_trust_context(
-    *,
-    league_id: str,
-    df_summary: pd.DataFrame,
-    roster_player_map: dict[str, tuple[str, ...]] | None,
-) -> trade_trust.TradeTrustContext:
-    """Faithful port of app.py's build_trade_trust_context."""
-
-    ownership_by_player: dict[str, int] = {}
-    valid_roster_ids: set[int] = set()
-    for roster_id_value, player_ids in (roster_player_map or {}).items():
-        try:
-            roster_id = int(roster_id_value)
-        except (TypeError, ValueError):
-            continue
-        if not roster_id:
-            continue
-        valid_roster_ids.add(roster_id)
-        for player_id in player_ids or ():
-            ownership_by_player[str(player_id)] = roster_id
-
-    team_name_to_roster: dict[str, int] = {}
-    if df_summary is not None and not df_summary.empty:
-        for _, row in df_summary.iterrows():
-            try:
-                roster_id = int(row.get("roster_id") or 0)
-            except (TypeError, ValueError):
-                continue
-            team_name = _safe_text(row.get("team_name")).casefold()
-            if roster_id and team_name:
-                team_name_to_roster[team_name] = roster_id
-
-    return trade_trust.TradeTrustContext(
-        ownership_by_player=tuple(ownership_by_player.items()),
-        valid_roster_ids=frozenset(valid_roster_ids),
-        team_name_to_roster=tuple(team_name_to_roster.items()),
-        league_context_valid=bool(league_id and valid_roster_ids),
-    )
+build_roster_player_map = trade_trust.build_roster_player_map
+build_trade_trust_context = trade_trust.build_trade_trust_context
 
 
 def enforce_generated_trade_ideas(

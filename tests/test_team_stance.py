@@ -282,6 +282,27 @@ def test_team_strategy_for_stance_never_reaches_the_retired_extreme_strategies()
     assert "tank" not in reachable
 
 
+def test_stance_to_strategy_mapping_matches_the_mobile_client_mirror():
+    """Tripwire for mobile/src/lib/api.ts's TEAM_STANCE_TO_STRATEGY.
+
+    That TypeScript table is a genuine, intentionally-kept client-side mirror
+    of this module's `_STANCE_TO_TEAM_STRATEGY` (used ONLY for
+    GmStanceContext.setStance's optimistic local update — every other client
+    call site now reads the real `strategy` field the backend's
+    GET/POST /team-stance and GET /gm-stance responses already return). If
+    this assertion ever fails, mobile/src/lib/api.ts's TEAM_STANCE_TO_STRATEGY
+    (and DEFAULT_TEAM_STRATEGY) must be updated to match — there is no
+    automated cross-language check, only this hard-coded tripwire.
+    """
+
+    assert ts._STANCE_TO_TEAM_STRATEGY == {
+        "competing": "contender",
+        "balanced": "retool",
+        "rebuilding": "rebuild",
+    }
+    assert ts.DEFAULT_TEAM_STRATEGY == "retool"
+
+
 def test_declared_stance_measurably_changes_real_valuation_output():
     """Proves the actual product decision: Team Situation's declared value
     now genuinely drives the same real valuation math GM Stance used to

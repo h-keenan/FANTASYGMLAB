@@ -68,7 +68,14 @@ export function GmStanceProvider({ children }: { children: React.ReactNode }) {
       .getTeamStance(leagueId)
       .then((result) => {
         const stance = result.stance || '';
-        const entry: StanceEntry = { stance, strategy: teamStrategyForStance(stance), isSet: Boolean(stance) };
+        // Prefer the real backend-computed strategy (result.strategy) now
+        // that GET /team-stance returns it — teamStrategyForStance is a
+        // client-side fallback only, for an older API build that omits it.
+        const entry: StanceEntry = {
+          stance,
+          strategy: result.strategy ?? teamStrategyForStance(stance),
+          isSet: Boolean(stance),
+        };
         setStances((prev) => ({ ...prev, [leagueId]: entry }));
         return entry;
       })
@@ -85,6 +92,10 @@ export function GmStanceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setStance = useCallback((leagueId: string, stance: TeamStance) => {
+    // Genuine optimistic UI: the new strategy must render immediately, before
+    // api.setTeamStance's request round-trips (its result is intentionally
+    // discarded below) — this is the one real remaining use of the client-side
+    // teamStrategyForStance mirror; see its definition in lib/api.ts.
     setStances((prev) => ({ ...prev, [leagueId]: { stance, strategy: teamStrategyForStance(stance), isSet: true } }));
     void api.setTeamStance(leagueId, stance).catch(() => {});
   }, []);

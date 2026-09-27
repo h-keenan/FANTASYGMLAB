@@ -3593,7 +3593,16 @@ def get_team_stance(league_id: str, user: dict[str, Any] = Depends(require_user)
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
     stance = _fetch_team_stance(config, user_id, access_token, league_id)
-    return {"ok": True, "stance": stance, "options": list(team_stance.STANCE_OPTIONS)}
+    return {
+        "ok": True,
+        "stance": stance,
+        "options": list(team_stance.STANCE_OPTIONS),
+        # Same computation get_gm_stance returns as `strategy` — included here
+        # too so the client can read the real backend-computed value after
+        # this round-trip instead of re-deriving it itself (see
+        # modules.team_stance.team_strategy_for_stance).
+        "strategy": team_stance.team_strategy_for_stance(stance),
+    }
 
 
 class SetTeamStanceRequest(BaseModel):
@@ -3630,7 +3639,11 @@ def set_team_stance(
     )
     if not ok:
         return {"ok": False, "reason": "not_available"}
-    return {"ok": True, "stance": stance_key}
+    return {
+        "ok": True,
+        "stance": stance_key,
+        "strategy": team_stance.team_strategy_for_stance(stance_key),
+    }
 
 
 def _project_briefing_item(item: Any) -> dict[str, Any]:
