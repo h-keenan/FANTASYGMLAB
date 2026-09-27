@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
+import TeamAvatar from './TeamAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -13,6 +14,11 @@ const SHARE_QR_URL = 'https://fantasygmlab.com';
 const QR_SIZE = 60;
 const MAX_STORIES = 3;
 
+/** Minimal roster-id -> avatar lookup the share card needs — structurally
+ * compatible with RecapScreen's richer RosterMap (playerIds/teamName are
+ * simply ignored here). */
+export type RecapRosterMap = Record<string, { avatarId?: string }>;
+
 const STORY_META: Record<string, { icon: React.ComponentProps<typeof Ionicons>['name']; color: string }> = {
   performance: { icon: 'trophy', color: colors.premium },
   matchup: { icon: 'flame', color: colors.danger },
@@ -23,13 +29,32 @@ const STORY_META: Record<string, { icon: React.ComponentProps<typeof Ionicons>['
 };
 const DEFAULT_STORY_META = { icon: 'newspaper-outline' as const, color: colors.textSecondary };
 
-function StoryLine({ story }: { story: RecapStory }) {
+// Only single-team story types get a team avatar in place of the generic
+// icon disc — matchup/trade involve two teams and this compact one-line
+// layout has no room to show both without a larger restructure (see
+// RecapShareCard's usage note below).
+const SINGLE_TEAM_TYPES = new Set([
+  'performance',
+  'performance_low',
+  'waiver',
+  'waiver_low',
+  'activity',
+  'activity_low',
+  'roster_riser',
+]);
+
+function StoryLine({ story, rosterMap }: { story: RecapStory; rosterMap: RecapRosterMap }) {
   const meta = STORY_META[story.story_type] ?? DEFAULT_STORY_META;
+  const avatarId = SINGLE_TEAM_TYPES.has(story.story_type) ? rosterMap[story.primary_roster_id]?.avatarId : undefined;
   return (
     <View style={styles.storyLine}>
-      <View style={[styles.storyIconDisc, { backgroundColor: `${meta.color}26` }]}>
-        <Ionicons name={meta.icon} size={14} color={meta.color} />
-      </View>
+      {avatarId ? (
+        <TeamAvatar avatarId={avatarId} size={32} />
+      ) : (
+        <View style={[styles.storyIconDisc, { backgroundColor: `${meta.color}26` }]}>
+          <Ionicons name={meta.icon} size={14} color={meta.color} />
+        </View>
+      )}
       <View style={styles.storyTextGroup}>
         <AppText style={styles.storyTitle} numberOfLines={1}>
           {story.title}
@@ -51,8 +76,8 @@ function StoryLine({ story }: { story: RecapStory }) {
  * QR footer), built from the same WeeklyRecap data the on-screen Recap
  * screen shows. Fixed 360x500 logical size for consistent capture.
  */
-const RecapShareCard = forwardRef<View, { leagueName: string; recap: WeeklyRecap }>(
-  ({ leagueName, recap }, ref) => {
+const RecapShareCard = forwardRef<View, { leagueName: string; recap: WeeklyRecap; rosterMap: RecapRosterMap }>(
+  ({ leagueName, recap, rosterMap }, ref) => {
     const stories = recap.stories.slice(0, MAX_STORIES);
     return (
       <View ref={ref} collapsable={false} style={styles.card}>
@@ -77,7 +102,7 @@ const RecapShareCard = forwardRef<View, { leagueName: string; recap: WeeklyRecap
 
         <View style={styles.storiesGroup}>
           {stories.map((story, index) => (
-            <StoryLine key={`${story.story_type}-${index}`} story={story} />
+            <StoryLine key={`${story.story_type}-${index}`} story={story} rosterMap={rosterMap} />
           ))}
         </View>
 
