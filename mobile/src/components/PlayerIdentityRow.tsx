@@ -3,6 +3,7 @@ import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-
 
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
+import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
 import TierBadge from './TierBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -158,9 +159,13 @@ export default function PlayerIdentityRow({
       <PlayerAvatar playerId={playerId} size={38} tier={tier} style={styles.avatar} />
       <View style={styles.body}>
         <View style={styles.nameRow}>
-          <AppText style={styles.name} numberOfLines={1}>
-            {name ?? 'Unknown player'}
-          </AppText>
+          {/* PlayerNameText (not a plain numberOfLines AppText) so a name
+           * that doesn't fit degrades to "F. Lastname" instead of a
+           * mid-word ellipsis cut — coridian_, "Jauan Jenni…" on Trade Hub's
+           * exchange columns, 2026-09-27. This is the one shared row used
+           * across My Team/Waivers/Trade Hub/Matchup/etc., so the fix here
+           * covers every consumer at once. */}
+          <PlayerNameText name={name ?? 'Unknown player'} style={styles.name} />
           {injuryLabel ? (
             <View style={[styles.injuryPill, { backgroundColor: injuryPillBg }]}>
               <AppText style={[styles.injuryText, { color: injuryTextColor }]} numberOfLines={1}>
