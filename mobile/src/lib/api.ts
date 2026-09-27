@@ -504,6 +504,12 @@ export interface WaiverPriorityAdd extends WaiverPlayer {
   recommendation_label: string;
   recommendation_tone: string;
   faab: WaiverFaabGuidance;
+  /** Real need-fit/standout-value confidence for this recommendation
+   * (High/Medium/Low — modules.waivers_ui.waiver_confidence_label), the
+   * same already-computed signals that ranked it into Priority Adds. Same
+   * confidence language Trade Hub's cards already use. */
+  confidence_label: string;
+  confidence_reason: string;
 }
 
 // Shared shape for every endpoint that gates part of its own response by
@@ -1159,6 +1165,11 @@ export interface DashboardItem {
   recommendation_narrative: Record<string, unknown> | null;
   presentation: DashboardTradePresentation | null;
   recommendation_id: string;
+  /** Real tier word for a Next Move priority-ladder tile (e.g. "Priority" /
+   * "Urgent" / "Watch" / "Opportunity" — modules.dashboard_engine's
+   * NEED_TIER_LABELS). Empty string for every other tile (trade/waiver/etc.)
+   * — never a fabricated confidence score. */
+  tier_label: string;
 }
 
 export interface InjuryImpactPlayer {

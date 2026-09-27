@@ -166,8 +166,13 @@ def test_dashboard_need_display_distinguishes_true_need_and_upgrade():
 
     assert app.team_need_display(covered)["label"] == "Upgrade Opportunity"
     assert app.team_need_display(covered)["value"] == "QB"
+    # Real, already-computed tier word for the priority ladder this headline
+    # came from (roster need > injury pressure > future risk > upgrade
+    # opportunity) — not a fabricated confidence score.
+    assert app.team_need_display(covered)["tier_label"] == "Opportunity"
     assert app.team_need_display(deficient)["label"] == "Biggest Team Need"
     assert app.team_need_display(deficient)["value"] == "QB"
+    assert app.team_need_display(deficient)["tier_label"] == "Priority"
 
 
 def test_my_team_advice_keeps_upgrade_separate_from_true_need():
@@ -238,8 +243,11 @@ def test_dashboard_need_display_distinguishes_injury_future_and_balanced():
     future = assess_team_needs(future_roster, future_lineup, SETTINGS)
 
     assert app.team_need_display(balanced)["label"] == "Balanced Roster"
+    assert app.team_need_display(balanced)["tier_label"] == ""
     assert app.team_need_display(injured_assessment)["label"] == "Injury Pressure"
+    assert app.team_need_display(injured_assessment)["tier_label"] == "Urgent"
     assert app.team_need_display(future)["label"] == "Future Roster Risk"
+    assert app.team_need_display(future)["tier_label"] == "Watch"
 
 
 def test_player_fit_wording_uses_canonical_categories_for_quick_and_detail():

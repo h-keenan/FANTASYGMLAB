@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import BrandHeaderBar from '../components/BrandHeaderBar';
+import MeterRow, { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -159,7 +160,6 @@ function ideaToShareVerdict(idea: TradeIdea): TradeVerdict {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHub'>;
 
-const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
 
 const NOT_READY_MESSAGES: Record<string, string> = {
@@ -683,25 +683,6 @@ function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
           </View>
         ))}
       </View>
-    </View>
-  );
-}
-
-function MeterRow({ label, value, level, color }: { label: string; value: string; level: number; color: string }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.meter}>
-      <AppText style={styles.meterLabel}>{label}</AppText>
-      <View style={styles.meterSegments}>
-        {[1, 2, 3].map((segment) => (
-          <View
-            key={segment}
-            style={[styles.meterSegment, { backgroundColor: segment <= level ? color : colors.borderStrong }]}
-          />
-        ))}
-      </View>
-      <AppText style={[styles.meterValue, { color }]}>{value}</AppText>
     </View>
   );
 }
@@ -1231,11 +1212,6 @@ function createStyles(colors: ThemeColors) {
     borderTopColor: colors.hairline,
     gap: spacing.lg,
   },
-  meter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  meterLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-  meterSegments: { flexDirection: 'row', gap: 3 },
-  meterSegment: { width: 14, height: 4, borderRadius: 2 },
-  meterValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
   // Primary CTA (recommendation-clarity fix): the one clearly-labeled,
   // real action affordance on the card. Reuses the same primary-button
   // visual language as `gatePrimaryButton` above (cyan fill, dark text) so

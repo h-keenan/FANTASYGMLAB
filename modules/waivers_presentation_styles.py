@@ -210,6 +210,18 @@ WAIVERS_PRESENTATION_CSS = """
     margin-top: var(--space-sm);
 }
 
+/* Real, need-fit/standout-value confidence badge for a Priority Adds
+   recommendation (modules.waivers_ui.waiver_confidence_label), shrunk to fit
+   this compact row alongside the Add/Stash/Watch action pill — same ring
+   markup Trade Hub uses, just a smaller footprint for a denser card. */
+.waiver-priority-confidence .tvl-conf-ring {
+    height: 1.75rem;
+    width: 1.75rem;
+}
+.waiver-priority-confidence .tvl-conf-ring-value {
+    font-size: var(--font-size-caption);
+}
+
 .waiver-card-decision-grid {
     display: grid;
     gap: var(--space-sm);

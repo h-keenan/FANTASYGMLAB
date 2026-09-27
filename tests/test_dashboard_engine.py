@@ -93,6 +93,54 @@ def test_select_need_headline_prefers_true_need_over_balanced():
     headline = dashboard_engine.select_need_headline(assessment)
     assert headline["label"] == "Biggest Team Need"
     assert headline["value"] == "RB"
+    # Real, already-computed tier word for the priority ladder this headline
+    # came from (roster need > injury pressure > future risk > upgrade
+    # opportunity) — not a fabricated confidence score.
+    assert headline["category"] == "true_need"
+    assert headline["tier_label"] == "Priority"
+
+
+def _empty_assessment(**overrides):
+    from modules.roster_needs import TeamNeedsAssessment
+
+    fields = {
+        "positions": (),
+        "true_needs": (),
+        "relative_weaknesses": (),
+        "upgrade_opportunities": (),
+        "temporary_injury_pressures": (),
+        "future_risks": (),
+    }
+    fields.update(overrides)
+    return TeamNeedsAssessment(**fields)
+
+
+def test_select_need_headline_tier_labels_match_the_priority_ladder():
+    # Each rung of the ladder (roster need > injury pressure > future risk >
+    # upgrade opportunity > balanced) gets its own real, honest tier word —
+    # see modules.dashboard_engine.NEED_TIER_LABELS. A strict step-function,
+    # not a numeric confidence score.
+    injury = dashboard_engine.select_need_headline(
+        _empty_assessment(temporary_injury_pressures=("RB",))
+    )
+    assert injury["category"] == "injury_pressure"
+    assert injury["tier_label"] == "Urgent"
+
+    future_risk = dashboard_engine.select_need_headline(
+        _empty_assessment(future_risks=("TE",))
+    )
+    assert future_risk["category"] == "future_risk"
+    assert future_risk["tier_label"] == "Watch"
+
+    upgrade = dashboard_engine.select_need_headline(
+        _empty_assessment(upgrade_opportunities=("WR",))
+    )
+    assert upgrade["category"] == "upgrade"
+    assert upgrade["tier_label"] == "Opportunity"
+
+    balanced = dashboard_engine.select_need_headline(_empty_assessment())
+    assert balanced["category"] == "balanced"
+    assert balanced["tier_label"] == ""
 
 
 def test_compose_next_move_briefing_returns_a_real_composed_briefing():

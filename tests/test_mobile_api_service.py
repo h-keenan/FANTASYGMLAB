@@ -4028,6 +4028,10 @@ def test_dashboard_returns_real_briefing_items(monkeypatch):
     for item in body["items"]:
         assert item["headline"]
         assert item["destination"]
+        # Real tier word for a Next Move priority-ladder tile (e.g. a
+        # "Biggest Team Need" headline) — empty string for every other tile,
+        # never a fabricated confidence score. Always present in the payload.
+        assert "tier_label" in item
     top_priority_items = [item for item in body["items"] if item["category"] == "top_priority"]
     categories = [item["category"] for item in body["items"]]
     assert top_priority_items, f"expected a top_priority tile, got categories: {categories}"
@@ -5108,6 +5112,47 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
     # league-global canonical rank.
     assert target["position_rank"] == 1
     assert target["overall_rank"] == 1
+
+
+def test_project_priority_add_carries_the_real_waiver_confidence_label(monkeypatch):
+    """A Priority Add's confidence badge (High/Medium/Low) must reach the
+    mobile payload — the same real priority_need_fit/priority_value_opportunity
+    signals modules.waivers_ui.rank_priority_add_candidates already computed
+    to rank this exact row, not a fabricated number."""
+
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-key-for-tests")
+    from modules.faab import FaabGuidance
+    from services import mobile_api_service
+
+    guidance = FaabGuidance(
+        point_bid=10,
+        low_bid=5,
+        high_bid=15,
+        budget_scale=100,
+        remaining=100,
+        min_bid=1,
+        pct_low=5,
+        pct_high=15,
+        rationale="",
+        dollars_known=True,
+    )
+    row = pd.Series(
+        {
+            "player_id": "p1",
+            "name": "Priority Player",
+            "position": "RB",
+            "team": "SEA",
+            "position_rank": 2,
+            "value_score": 40,
+            "priority_need_fit": True,
+            "priority_value_opportunity": False,
+            "stale_free_agent": False,
+        }
+    )
+    projected = mobile_api_service._project_priority_add(row, "value_score", guidance)
+    assert projected["confidence_label"] == "High"
+    assert projected["confidence_reason"]
 
 
 def test_waivers_overall_rating_uses_the_full_league_pool_not_just_free_agents(monkeypatch):

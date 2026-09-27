@@ -42,6 +42,7 @@ from modules import auth_supabase
 from modules import auth_restore_lifecycle
 from modules import draft_assistant
 from modules import draft_center_ui
+from modules import dashboard_engine as dashboard_engine_module
 from modules import dashboard_orientation
 from modules import dashboard_workflow
 from modules import daily_gm_briefing
@@ -7579,6 +7580,11 @@ def render_home_dashboard(
             "note": biggest_need_note,
             "tone": need_display["tone"],
             "route_key": "my_team",
+            # Real signal for the Next Move priority ladder this tile came
+            # from (roster need > injury pressure > future risk > upgrade
+            # opportunity) — not a fabricated confidence score, since the
+            # ladder is a strict step-function. See NEED_TIER_LABELS.
+            "tier_label": need_display.get("tier_label", ""),
         }
         injury_item = {
             "label": "Injury Alert",
@@ -8866,6 +8872,10 @@ def render_league_team_page_header(team_profile: dict, selected_league_name: str
 
 get_needed_positions = trade_analyzer_fit_module.get_needed_positions
 build_team_needs_assessment = trade_analyzer_fit_module.build_team_needs_assessment
+# Shared with modules.dashboard_engine.select_need_headline — same real
+# priority-ladder category, same tier wording, so web and mobile never drift
+# on what "Urgent"/"Priority"/etc. means for an identical Next Move category.
+NEED_TIER_LABELS = dashboard_engine_module.NEED_TIER_LABELS
 
 def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
     """Select an accurate need-category headline without collapsing semantics."""
@@ -8889,6 +8899,7 @@ def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
             "value": current_needs[0],
             "note": "Starter and depth coverage identify this as the clearest current roster deficiency.",
             "tone": "need",
+            "tier_label": NEED_TIER_LABELS["true_need"],
         }
     if assessment.temporary_injury_pressures:
         return {
@@ -8897,6 +8908,7 @@ def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
             "value": assessment.temporary_injury_pressures[0],
             "note": "Current availability is creating temporary pressure in this room.",
             "tone": "risk",
+            "tier_label": NEED_TIER_LABELS["injury_pressure"],
         }
     if assessment.future_risks:
         return {
@@ -8905,6 +8917,7 @@ def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
             "value": assessment.future_risks[0],
             "note": "Current coverage is playable, but future stability is limited.",
             "tone": "draft",
+            "tier_label": NEED_TIER_LABELS["future_risk"],
         }
     if assessment.upgrade_opportunities:
         return {
@@ -8913,6 +8926,7 @@ def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
             "value": assessment.upgrade_opportunities[0],
             "note": "This covered room trails the league baseline but is not a true roster need.",
             "tone": "need",
+            "tier_label": NEED_TIER_LABELS["upgrade"],
         }
     return {
         "category": "balanced",
@@ -8920,6 +8934,7 @@ def team_need_display(assessment: TeamNeedsAssessment) -> dict[str, str]:
         "value": "No urgent need",
         "note": "No current roster deficiency is standing out under the canonical coverage policy.",
         "tone": "draft",
+        "tier_label": NEED_TIER_LABELS["balanced"],
     }
 
 

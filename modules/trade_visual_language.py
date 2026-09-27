@@ -69,6 +69,12 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-lean-fill{height:100%;position:absolute;top:0}
 .tvl-lean--pos .tvl-lean-fill{background:var(--color-success);left:50%;width:var(--tvl-lean-fraction,0%)}
 .tvl-lean--neg .tvl-lean-fill{background:var(--color-danger);right:50%;width:var(--tvl-lean-fraction,0%)}
+/* Small categorical tier tag (Dashboard Next Move's priority-ladder word —
+   "Priority"/"Urgent"/"Watch"/"Opportunity") — same micro-label typography
+   as .tvl-conf-label above, deliberately without that badge's ring/percent:
+   the ladder is a strict step-function, not a numeric score, so this never
+   implies a fabricated confidence percentage. */
+.tvl-tier{background:var(--color-surface-secondary);border-radius:var(--radius-pill);color:var(--color-text-secondary);display:inline-flex;font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);padding:2px var(--space-xs);text-transform:uppercase;white-space:nowrap}
 .dg-gp-trade-side--give,.dg-trade-side--send,.toa-side-send{border-inline-start:var(--border-width-semantic) solid var(--color-danger);padding-inline-start:var(--space-xs)}
 .dg-gp-trade-side--get,.dg-trade-side--receive,.toa-side-receive{border-inline-start:var(--border-width-semantic) solid var(--color-success);padding-inline-start:var(--space-xs)}
 .dg-gp-trade-metrics{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-top:var(--space-2xs);max-width:40rem}
@@ -215,6 +221,24 @@ def confidence_indicator_html(label: object, *, extra_class: str = "") -> str:
         f"<span class='tvl-sr'>{escape(accessible)}</span>"
         "</div>"
     )
+
+
+def priority_tier_html(label: object, *, extra_class: str = "") -> str:
+    """A real, already-computed tier tag for a strict-ladder recommendation
+    (e.g. Dashboard's Next Move priority ladder — roster need > injury
+    pressure > future risk > upgrade opportunity). Deliberately not the
+    confidence ring above: that ladder is a step-function with no numeric
+    strength gradient, so this never implies a fabricated percentage —
+    only the real category word the recommendation actually came from.
+    """
+
+    text = str(label or "").strip()
+    if not text:
+        return ""
+    classes = "tvl-tier"
+    if extra_class:
+        classes += f" {extra_class}"
+    return f"<span class='{classes}'>{escape(text.upper())}</span>"
 
 
 def cue_html(kind: CueKind, text: object) -> str:

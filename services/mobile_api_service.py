@@ -3479,6 +3479,7 @@ def _project_briefing_item(item: Any) -> dict[str, Any]:
         "recommendation_narrative": payload.get("recommendation_narrative"),
         "presentation": payload.get("presentation"),
         "recommendation_id": payload.get("recommendation_id") or "",
+        "tier_label": payload.get("tier_label") or "",
     }
 
 
@@ -4335,6 +4336,13 @@ def _project_priority_add(
     label, tone = waivers_ui.waiver_recommendation_label(row, position_rank)
     projected["recommendation_label"] = label
     projected["recommendation_tone"] = tone
+    # Real need-fit/standout-value confidence for this Priority Add — same
+    # already-computed signals rank_priority_add_candidates used to rank it
+    # (see waivers_ui.waiver_confidence_label), shown with Trade Ideas'
+    # High/Medium/Low confidence language rather than no signal at all.
+    confidence_label, confidence_reason = waivers_ui.waiver_confidence_label(row, position_rank)
+    projected["confidence_label"] = confidence_label
+    projected["confidence_reason"] = confidence_reason
     projected["faab"] = {
         "low_bid": guidance.low_bid,
         "high_bid": guidance.high_bid,

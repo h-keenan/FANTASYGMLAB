@@ -38,6 +38,7 @@ import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import TeamAvatar from '../components/TeamAvatar';
 import BrandMark from '../components/BrandMark';
+import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
 import { getCachedDashboard, setCachedDashboard } from '../lib/dashboardCache';
 import { formatRank } from '../lib/percentile';
@@ -74,8 +75,6 @@ const DESTINATION_ROUTE: Record<string, string> = {
   trade_hub: 'TradeHub',
   waivers: 'Waivers',
 };
-
-const CONFIDENCE_LEVELS: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
 interface LeaguePulseTile {
   label: string;
@@ -983,6 +982,15 @@ function BriefingCard({
         <Ionicons name={meta.icon} size={15} color={meta.color} style={styles.cardIcon} />
         <AppText style={[styles.cardLabel, { color: meta.color }]}>{meta.label.toUpperCase()}</AppText>
         {isNew ? <NewBadge /> : null}
+        {/* Real signal for why this tile leads the priority ladder (roster
+            need > injury pressure > future risk > upgrade opportunity) —
+            not a fabricated confidence score, since that ladder is a strict
+            step-function. See modules.dashboard_engine.NEED_TIER_LABELS. */}
+        {item.tier_label ? (
+          <View style={styles.tradeBadge}>
+            <AppText style={styles.tradeBadgeText}>{item.tier_label.toUpperCase()}</AppText>
+          </View>
+        ) : null}
       </View>
       <AppText style={styles.cardHeadline}>{item.headline}</AppText>
       {showExplanations && item.reason ? <AppText style={styles.cardReason}>{item.reason}</AppText> : null}
