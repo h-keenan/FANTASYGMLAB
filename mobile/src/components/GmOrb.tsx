@@ -195,6 +195,19 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       color: colors.premium,
       subtitle: 'Declare your rebuild/compete stance',
     },
+    // Season-arc complement to Dashboard's one-off "Next Move" tile: a
+    // roadmap conditioned on the Team Situation stance declared just above,
+    // aggregating real signals (trade ideas, power/draft-capital rank,
+    // roster construction) rather than a one-off action. Placed right after
+    // Team Situation since it reads that declaration directly.
+    {
+      label: 'GM Plan',
+      route: 'GmPlan',
+      icon: 'map-outline',
+      needsLeague: true,
+      color: colors.premium,
+      subtitle: 'Your season-long roadmap',
+    },
     {
       label: 'Draft Center',
       route: 'DraftCenter',

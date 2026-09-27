@@ -4590,6 +4590,181 @@ def test_dashboard_team_snapshot_is_none_without_a_resolved_roster(monkeypatch):
     assert body["reason"] == "no_sleeper_username_linked"
 
 
+# --- GM Plan (season-phase-aware roadmap, additive on top of existing engines) ---
+#
+# GM Plan is a NEW aggregation layer, distinct from both the Dashboard's
+# one-off "Next Move" tile above and the older, valuation-affecting
+# "GM Stance" team-strategy system (/v1/leagues/{id}/gm-stance). These
+# tests pin the wiring: it reads the declared Team Situation stance
+# (modules.team_stance) and already-computed league_rankings/trade_hub_
+# engine outputs, never recomputing valuation itself. See
+# tests/test_gm_plan.py for the phase-detection and aggregation unit tests.
+
+
+def test_gm_plan_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/gm-plan")
+    assert response.status_code == 401
+
+
+def test_gm_plan_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/leagues/abc/gm-plan",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["quiet"] is True
+    assert body["reason"] == "no_sleeper_username_linked"
+    assert body["focus_areas"] == []
+
+
+def test_gm_plan_rejects_an_invalid_lens(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/gm-plan?lens=NotARealLens",
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch):
+    # Week 10 with a week-15 playoff start reads as "trade deadline
+    # approach" per modules.gm_plan.derive_season_phase.
+    league = dict(_TRADE_ANALYZER_LEAGUE)
+    league["settings"] = {"type": 2, "leg": 10, "playoff_week_start": 15}
+
+    rankings_frame = pd.DataFrame(
+        [
+            {
+                "roster_id": "1",
+                "power_rank": 2,
+                "power_rank_tied": False,
+                "draft_capital_rank": 4,
+                "draft_capital_rank_tied": True,
+                "starter_rank": 1,
+                "starter_rank_tied": False,
+                "bench_rank": 11,
+                "bench_rank_tied": False,
+                "age_rank": 5,
+                "age_rank_tied": False,
+            },
+            {
+                "roster_id": "2",
+                "power_rank": 5,
+                "power_rank_tied": False,
+                "draft_capital_rank": 8,
+                "draft_capital_rank_tied": False,
+                "starter_rank": 6,
+                "starter_rank_tied": False,
+                "bench_rank": 3,
+                "bench_rank_tied": False,
+                "age_rank": 2,
+                "age_rank_tied": False,
+            },
+        ]
+    )
+    trade_idea_records = [
+        {
+            "partner_team_name": "Team Two",
+            "my_player": "Bench Runner",
+            "their_player": "Target Runner",
+            "rationale": "This fits your declared rebuild: it leans into youth and future draft capital.",
+            "trade_confidence_label": "Strong",
+            "priority": 1,
+        }
+    ]
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=[auth_user_response, profile_response]))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(
+            patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["my1"]},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            )
+        )
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=league))
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_team_stance", return_value="rebuilding")
+        )
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_stored_gm_stance", return_value="retool")
+        )
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ()))
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.league_rankings.build_league_rankings_frame_cached",
+                return_value=rankings_frame,
+            )
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached",
+                return_value=trade_idea_records,
+            )
+        )
+
+        response = client.get(
+            "/v1/leagues/abc/gm-plan",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["quiet"] is False
+    assert body["season_phase"] == "trade_deadline_approach"
+    assert body["team_stance"] == "rebuilding"
+    assert body["team_stance_label"] == "Rebuilding"
+
+    focus_by_key = {fa["key"]: fa for fa in body["focus_areas"]}
+
+    standing = focus_by_key["standing"]
+    assert standing["status"] == "signal_found"
+    power_item = next(item for item in standing["items"] if item["label"] == "Power Rank")
+    assert power_item["rank"] == 2
+    assert power_item["total_teams"] == 2
+    capital_item = next(item for item in standing["items"] if item["label"] == "Draft Capital Rank")
+    assert capital_item["tied"] is True
+
+    trade_area = focus_by_key["trade_opportunities"]
+    assert trade_area["status"] == "signal_found"
+    assert "youth" in trade_area["framing"].lower()
+    assert trade_area["items"][0]["partner_team_name"] == "Team Two"
+    assert trade_area["items"][0]["trade_confidence_label"] == "Strong"
+
+    roster_area = focus_by_key["roster_construction"]
+    assert roster_area["status"] == "signal_found"
+    bench_item = next(item for item in roster_area["items"] if item["label"] == "Bench Depth")
+    assert bench_item["relative_weak_spot"] is True
+
+
 def test_trade_hub_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/trade-hub")
