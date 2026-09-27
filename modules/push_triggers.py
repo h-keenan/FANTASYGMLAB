@@ -30,7 +30,7 @@ from typing import Any, Mapping
 import pandas as pd
 import requests
 
-from modules import alert_presentation, app_config, dashboard_engine, league_recaps, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues
+from modules import alert_presentation, app_config, dashboard_engine, league_recaps, league_value_settings, player_eligibility, push_tokens, rankings, sleeper, sleeper_leagues, team_stance
 
 
 PLAYERS_DB_PATH = "data/players.db"
@@ -52,7 +52,12 @@ PUSH_TITLE_BY_CATEGORY = {
     "watch": "Watch",
     "recap": "Recap Ready",
     "injury": "Injury Update",
-    "gm_stance_reminder": "Set Your GM Stance",
+    # Title text only — GM Stance / Team Situation merge (product decision,
+    # 2026-09-26). The internal category key/recommendation_id prefix stays
+    # "gm_stance_reminder" on purpose, so an already-sent dedup row for an
+    # existing user still matches (see push_notification_log) rather than
+    # firing the one-time nudge a second time after a rename.
+    "gm_stance_reminder": "Set Your Team Situation",
 }
 DEFAULT_LENS = "Dynasty"
 
@@ -210,10 +215,12 @@ def push_item_allowed(preferences: dict[str, dict[str, bool]], *, user_id: str, 
 
 
 def fetch_gm_stance_leagues(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, set[str]]:
-    """user_id -> the set of league_ids that already have an explicit GM
-    stance stored (see services/mobile_api_service.py's get_gm_stance /
-    "team_strategy_by_league" key in the same user_settings blob). Used
-    only to decide whether the one-time "set your GM stance" reminder is
+    """user_id -> the set of league_ids that already have a declared Team
+    Situation stored (see services/mobile_api_service.py's get_gm_stance,
+    which now reads modules.team_stance — GM Stance's own separate
+    "team_strategy_by_league" user_settings storage this used to read was
+    retired in the GM Stance / Team Situation merge, 2026-09-26). Used only
+    to decide whether the one-time "set your Team Situation" reminder is
     still owed for a league — never to read the stance value itself.
     """
 
@@ -222,9 +229,9 @@ def fetch_gm_stance_leagues(config: PushTriggerConfig, user_ids: list[str]) -> d
         return {}
     try:
         response = requests.get(
-            f"{config.url}/rest/v1/{USER_SETTINGS_TABLE}",
+            f"{config.url}/rest/v1/{team_stance.STANCE_TABLE}",
             headers=_headers(config),
-            params={"select": "user_id,settings", "user_id": f"in.({','.join(ids)})"},
+            params={"select": "user_id,league_id", "user_id": f"in.({','.join(ids)})"},
             timeout=15,
         )
     except Exception:
@@ -235,27 +242,28 @@ def fetch_gm_stance_leagues(config: PushTriggerConfig, user_ids: list[str]) -> d
         rows = response.json()
     except Exception:
         return {}
-    result: dict[str, set[str]] = {}
+    result: dict[str, set[str]] = {uid: set() for uid in ids}
     for row in rows if isinstance(rows, list) else []:
         if not isinstance(row, Mapping):
             continue
         user_id = _safe_text(row.get("user_id"))
-        if not user_id:
+        league_id = _safe_text(row.get("league_id"))
+        if not user_id or not league_id:
             continue
-        settings = row.get("settings") if isinstance(row.get("settings"), Mapping) else {}
-        by_league = settings.get("team_strategy_by_league")
-        result[user_id] = set(by_league.keys()) if isinstance(by_league, Mapping) else set()
+        result.setdefault(user_id, set()).add(league_id)
     return result
 
 
 def gm_stance_reminder_push_item(
     *, league_id: str, league_name: str, leagues_with_stance: set[str]
 ) -> dict[str, Any] | None:
-    """A one-time nudge to set a GM stance for this league — never re-fires
-    once sent (dedup is the same durable push_notification_log every other
-    category uses, keyed on this item's recommendation_id) regardless of
-    whether the user ever actually sets one, matching the explicit "once,
-    if never set" product decision (not a recurring reminder).
+    """A one-time nudge to declare a Team Situation for this league — never
+    re-fires once sent (dedup is the same durable push_notification_log
+    every other category uses, keyed on this item's recommendation_id)
+    regardless of whether the user ever actually sets one, matching the
+    explicit "once, if never set" product decision (not a recurring
+    reminder). Internal category/id are still "gm_stance_reminder" — see
+    PUSH_TITLE_BY_CATEGORY's comment for why.
     """
 
     if league_id in leagues_with_stance:
@@ -264,7 +272,7 @@ def gm_stance_reminder_push_item(
         "league_id": league_id,
         "league_name": league_name,
         "category": "gm_stance_reminder",
-        "headline": "Tell us if you're contending, rebuilding, or retooling — it shapes your trade suggestions.",
+        "headline": "Tell us if you're rebuilding, competing, or balanced — it shapes your trade suggestions.",
         "recommendation_id": f"gm_stance_reminder:{league_id}",
     }
 

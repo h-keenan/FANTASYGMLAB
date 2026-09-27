@@ -597,8 +597,10 @@ export interface GmStanceResponse {
   is_set?: boolean;
 }
 
-// Single source for the stance options/labels. Rendered only by
-// GmStanceHeaderButton now — the one stance control every screen shares.
+// Labels for the underlying TeamStrategy value the age-curve math keys on.
+// No longer its own rendered control (see GmStanceContext/GmStanceHeaderButton
+// — GM Stance / Team Situation merge, product decision 2026-09-26): kept
+// only so code that already has a TeamStrategy value can show its label.
 export const TEAM_STRATEGY_OPTIONS: Array<{ value: TeamStrategy; label: string }> = [
   { value: 'contender', label: 'Contender' },
   { value: 'fringe_contender', label: 'Fringe Contender' },
@@ -608,11 +610,16 @@ export const TEAM_STRATEGY_OPTIONS: Array<{ value: TeamStrategy; label: string }
 ];
 
 /**
- * Team Situation — a SEPARATE, simpler declaration from GM Stance above.
- * GM Stance feeds the age-curve valuation (it changes scoring); Team
- * Situation is a fixed three-way pick that only ever biases trade-idea
- * rationale TEXT server-side (modules.trade_ideas.apply_team_stance_framing)
- * — it never changes a value, a rank, or which ideas are generated.
+ * Team Situation is now the single source of truth for BOTH: it still only
+ * ever biases trade-idea rationale TEXT server-side
+ * (modules.trade_ideas.apply_team_stance_framing) AND — via
+ * TEAM_STANCE_TO_STRATEGY below, the client mirror of
+ * modules.team_stance.team_strategy_for_stance — drives the real age-curve
+ * valuation math (modules.trade_hub_engine.apply_strategy_age_curve) GM
+ * Stance's own separate, now-retired storage used to drive. GM Stance's
+ * five states are coarser-grained than these three, so "fringe_contender"
+ * and "tank" are no longer independently reachable — see the backend
+ * mapping's docstring for the full rationale.
  */
 export type TeamStance = 'rebuilding' | 'competing' | 'balanced';
 
@@ -626,6 +633,21 @@ export interface TeamStanceResponse {
   ok: boolean;
   stance: TeamStance | '';
   options?: TeamStance[];
+}
+
+// Client mirror of modules.team_stance.team_strategy_for_stance — kept in
+// sync by hand (a small, stable, rarely-changing table), same pattern as
+// modules.trade_hub_engine.apply_strategy_age_curve's own "faithful port"
+// of app.py's copy.
+export const TEAM_STANCE_TO_STRATEGY: Record<TeamStance, TeamStrategy> = {
+  competing: 'contender',
+  balanced: 'retool',
+  rebuilding: 'rebuild',
+};
+export const DEFAULT_TEAM_STRATEGY: TeamStrategy = 'retool';
+
+export function teamStrategyForStance(stance: TeamStance | ''): TeamStrategy {
+  return stance ? TEAM_STANCE_TO_STRATEGY[stance] : DEFAULT_TEAM_STRATEGY;
 }
 
 export interface TradeCounterAction {
@@ -1594,11 +1616,14 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,
       { alert_key: alertKey },
     ),
+  /** Deprecated (GM Stance / Team Situation merge, product decision
+   * 2026-09-26) — kept only for a pre-merge build still calling it. Current
+   * code reads Team Situation directly via getTeamStance/setTeamStance and
+   * derives `strategy` client-side via teamStrategyForStance. */
   getGmStance: (leagueId: string) =>
     authorizedFetch<GmStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-stance`),
-  /** Pass `null` to clear the stored stance ("Reset to Auto") — a later
-   * getGmStance then reports is_set=false and the app is back on the
-   * auto-picked default. */
+  /** Deprecated, see getGmStance above. `null` is a no-op server-side now —
+   * Team Situation has no "unset" concept. */
   updateGmStance: (leagueId: string, strategy: TeamStrategy | null) =>
     authorizedPost<GmStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-stance`, { strategy }),
   postTradeAnalyzer: (

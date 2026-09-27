@@ -135,7 +135,7 @@ from modules import (
     trade_offer_analyzer,
     waivers_ui,
 )
-from modules.team_eval import normalize_team_strategy, refine_team_directions, suggest_optimal_lineup
+from modules.team_eval import refine_team_directions, suggest_optimal_lineup
 from modules.trade_analyzer_assembly import pick_asset_from_mapping, player_asset_from_mapping
 
 
@@ -3287,38 +3287,51 @@ def update_device_preferences(
 
 
 # Decision Memory v1 ("structured picks," per explicit product direction —
-# not free text): a durable per-league GM stance, reusing the TeamStrategy
-# values Trade Hub/Trade Analyzer already offer as an in-session-only picker
-# (contender/fringe_contender/retool/rebuild/tank). Stored in the same
-# user_settings blob under "team_strategy_by_league" (league_id -> strategy)
-# rather than a new table — a GM's stance genuinely differs by league, so
-# this can't be a single flat preference like ui_density.
+# not free text): originally a durable per-league GM stance, reusing the
+# TeamStrategy values Trade Hub/Trade Analyzer already offer as an
+# in-session-only picker (contender/fringe_contender/retool/rebuild/tank),
+# stored in the user_settings blob under "team_strategy_by_league".
+#
+# GM Stance / Team Situation merge (product decision, 2026-09-26): that
+# separate "team_strategy_by_league" storage is retired. Team Situation
+# (modules.team_stance, the /team-stance endpoints below) is now the single
+# source of truth for this input — see modules.team_stance's module
+# docstring and team_strategy_for_stance() for the full mapping. This
+# TEAM_STRATEGY_VALUES set is kept only to validate the legacy
+# POST /gm-stance write path below (still-installed pre-merge mobile builds
+# calling it must not silently corrupt storage), and because
+# modules.trade_hub_engine.apply_strategy_age_curve is still keyed on these
+# same five concrete strings — the real math is unchanged, only its input
+# source moved.
 TEAM_STRATEGY_VALUES = {"contender", "fringe_contender", "retool", "rebuild", "tank"}
+
+# Reverse of modules.team_stance.team_strategy_for_stance's mapping, used
+# only by the legacy POST /gm-stance write-through below.
+_LEGACY_STRATEGY_TO_STANCE: dict[str, str] = {
+    "contender": team_stance.STANCE_COMPETING,
+    "fringe_contender": team_stance.STANCE_COMPETING,
+    "retool": team_stance.STANCE_BALANCED,
+    "rebuild": team_stance.STANCE_REBUILDING,
+    "tank": team_stance.STANCE_REBUILDING,
+}
 
 
 def _fetch_gm_stance_with_set_flag(
     config: dict, access_token: str, *, user_id: str, league_id: str
 ) -> tuple[str, bool]:
-    """Best-effort read — any failure just falls back to ("retool", False),
-    the same default every strategy-consuming endpoint already used before
-    this existed. `is_set` distinguishes "the user actually chose this" from
-    "nothing chosen yet, showing the fallback" — used only by get_gm_stance
-    to power the mobile in-app "not set yet" nudge; nothing else needs it.
+    """GM Stance merged into Team Situation (product decision, 2026-09-26):
+    this now reads the SAME team_stance row get_team_stance/set_team_stance
+    use (via _fetch_team_stance), mapped through
+    modules.team_stance.team_strategy_for_stance into the strategy key
+    apply_strategy_age_curve expects — instead of the old, now-retired
+    "team_strategy_by_league" user_settings key. `is_set` still distinguishes
+    "the user actually declared a Team Situation" from "nothing declared
+    yet, showing the fallback" — used only by get_gm_stance to power the
+    mobile in-app "not set yet" nudge; nothing else needs it.
     """
 
-    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
-    if error:
-        return "retool", False
-    by_league = (current.get("settings") or {}).get("team_strategy_by_league")
-    stored = by_league.get(league_id) if isinstance(by_league, dict) else None
-    if stored is None:
-        return "retool", False
-    return normalize_team_strategy(stored), True
-
-
-def _fetch_stored_gm_stance(config: dict, access_token: str, *, user_id: str, league_id: str) -> str:
-    strategy, _ = _fetch_gm_stance_with_set_flag(config, access_token, user_id=user_id, league_id=league_id)
-    return strategy
+    stance = _fetch_team_stance(config, user_id, access_token, league_id)
+    return team_stance.team_strategy_for_stance(stance), bool(stance)
 
 
 @app.get("/v1/leagues/{league_id}/gm-stance")
@@ -3339,12 +3352,11 @@ def get_gm_stance(league_id: str, user: dict[str, Any] = Depends(require_user)) 
 
 
 class UpdateGmStanceRequest(BaseModel):
-    # `null` (or an omitted field) clears the stance instead of setting one,
-    # so a later GET reports is_set=False again and the app goes back to the
-    # auto-picked "retool" fallback plus its "pick one" nudge. coridian_:
-    # "there is no auto function to put it back to auto picked" — once a
-    # stance was chosen there was no way out of it short of editing the
-    # stored settings blob by hand.
+    # `null` (or an omitted field) clears the stance instead of setting one.
+    # Pre-merge behavior note: this used to reset the old, now-retired
+    # "team_strategy_by_league" storage to unset. Team Situation has no
+    # "unset" concept (see modules.team_stance) — clearing is now a no-op,
+    # see update_gm_stance's docstring.
     strategy: str | None = None
 
 
@@ -3354,6 +3366,20 @@ def update_gm_stance(
     body: UpdateGmStanceRequest,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
+    """Deprecated write path, kept only so a pre-merge mobile build still
+    calling this endpoint doesn't silently break (GM Stance / Team Situation
+    merge, product decision 2026-09-26): the separate "team_strategy_by_league"
+    user_settings storage this used to write is retired, so a legacy
+    `strategy` choice here now writes through to the SAME team_stance row
+    set_team_stance uses, via _LEGACY_STRATEGY_TO_STANCE (the reverse of
+    modules.team_stance.team_strategy_for_stance's mapping). Clearing
+    (`strategy: null`) is a no-op: Team Situation has no "unset" concept, so
+    there is nothing left to revert to "Auto."
+
+    Current mobile builds no longer call this — they read/write Team
+    Situation directly via GET/POST /v1/leagues/{id}/team-stance.
+    """
+
     clearing = body.strategy is None
     if not clearing and body.strategy not in TEAM_STRATEGY_VALUES:
         raise HTTPException(
@@ -3364,37 +3390,48 @@ def update_gm_stance(
     config = auth_supabase.get_supabase_config()
     access_token = str(user.get("_access_token") or "")
     user_id = str(user.get("id") or "")
-    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
-    if error:
-        return {"ok": False, "strategy": "retool", "is_set": False}
-    settings = dict(current.get("settings") or {})
-    by_league = dict(settings.get("team_strategy_by_league") or {})
+
     if clearing:
-        # Drop the key entirely rather than storing a null: _fetch_gm_stance_
-        # with_set_flag treats a missing key as "never chosen", and leaving a
-        # null behind would only be equivalent by accident.
-        by_league.pop(league_id, None)
-    else:
-        by_league[league_id] = body.strategy
-    settings["team_strategy_by_league"] = by_league
-    resolved = "retool" if clearing else str(body.strategy)
-    payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
-    ok, error = account_store.upsert_user_settings(config, access_token, payload)
+        current_stance = _fetch_team_stance(config, user_id, access_token, league_id)
+        return {
+            "ok": True,
+            "strategy": team_stance.team_strategy_for_stance(current_stance),
+            "is_set": bool(current_stance),
+        }
+
+    stance_key = _LEGACY_STRATEGY_TO_STANCE[str(body.strategy)]
+    ok, error = account_store.upsert_row(
+        config,
+        access_token,
+        team_stance.STANCE_TABLE,
+        {"user_id": user_id, "league_id": league_id, "stance": stance_key},
+        on_conflict="user_id,league_id",
+    )
     if not ok:
-        return {"ok": False, "strategy": resolved, "is_set": not clearing}
-    return {"ok": True, "strategy": resolved, "is_set": not clearing}
+        return {"ok": False, "strategy": "retool", "is_set": False}
+    return {
+        "ok": True,
+        "strategy": team_stance.team_strategy_for_stance(stance_key),
+        "is_set": True,
+    }
 
 
-# Team Situation (Decision Memory v1 gap, #232 follow-up): a SEPARATE
-# mechanism from GM Stance above. GM Stance (contender/fringe_contender/
-# retool/rebuild/tank) already feeds modules.team_eval's age-curve, which
-# rewrites the active score_field — it changes valuation. Team Situation is
-# a plain, fixed three-way declaration (Rebuilding/Competing/Balanced),
-# stored in its own dedicated table (modules.team_stance, RLS-scoped like
-# gm_targets — not the user_settings JSON blob GM Stance uses), and it is
-# ONLY ever allowed to append a short clause to trade-idea rationale TEXT
-# (modules.trade_ideas.apply_team_stance_framing). It never touches
-# value_score, composite scoring, or rankings.
+# Team Situation (Decision Memory v1 gap, #232 follow-up): a plain, fixed
+# three-way declaration (Rebuilding/Competing/Balanced), stored in its own
+# dedicated table (modules.team_stance, RLS-scoped like gm_targets — not a
+# user_settings JSON blob).
+#
+# GM Stance / Team Situation merge (product decision, 2026-09-26): Team
+# Situation used to be a SEPARATE, presentation-only mechanism from GM
+# Stance (contender/fringe_contender/retool/rebuild/tank, which fed
+# modules.trade_hub_engine's age-curve and changed valuation). That
+# separation is gone: Team Situation is now the single source of truth for
+# BOTH — it still appends a rationale-TEXT clause
+# (modules.trade_ideas.apply_team_stance_framing) AND, via
+# modules.team_stance.team_strategy_for_stance, drives the same real
+# age-curve/pick-multiplier valuation math GM Stance used to drive (see
+# _fetch_gm_stance_with_set_flag above). See modules.team_stance's module
+# docstring for the full mapping and rationale.
 def _fetch_team_stance(config: dict, user_id: str, access_token: str, league_id: str) -> str:
     """Best-effort read — any failure/missing row/missing table returns ""
     (no stance declared), never raises. A Team Situation outage must never
@@ -3418,8 +3455,9 @@ def _fetch_team_stance(config: dict, user_id: str, access_token: str, league_id:
 def get_team_stance(league_id: str, user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
     """The caller's declared Team Situation for this league — "" when unset.
 
-    Presentation-only preference (see module docstring above); fails soft to
-    "" rather than erroring the screen if storage isn't reachable.
+    Drives both trade-idea rationale framing AND real valuation adjustments
+    (see module comment above); fails soft to "" rather than erroring the
+    screen if storage isn't reachable.
     """
 
     config = auth_supabase.get_supabase_config()
@@ -3505,7 +3543,8 @@ def get_league_dashboard(
     fresh composition rather than importing app.py directly (modules/ never
     imports app.py). Includes a Top Trade Opportunity tile fed by the same
     Trade Hub engine (modules.trade_hub_engine), using the caller's
-    remembered GM stance for this league (see get_gm_stance) rather than a
+    declared Team Situation for this league (see get_team_stance, mapped
+    via modules.team_stance.team_strategy_for_stance) rather than a
     hardcoded default — falls back to "retool" only if nothing's been set.
     """
 
@@ -3549,18 +3588,24 @@ def get_league_dashboard(
     for roster in rosters:
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
 
-    team_strategy = _fetch_stored_gm_stance(
-        config, str(user.get("_access_token") or ""), user_id=user_id, league_id=league_id
+    # One fetch of the declared Team Situation feeds BOTH consumers below:
+    # `team_strategy` (mapped, for the real age-curve/pick-multiplier
+    # valuation math GM Stance used to drive — see
+    # modules.team_stance.team_strategy_for_stance) and
+    # `declared_team_stance` (raw, for rationale-text framing only). These
+    # used to be two separate storage reads (a GM Stance user_settings blob
+    # and this Team Situation row); merging them into one row means one
+    # fetch instead of two.
+    declared_team_stance = _fetch_team_stance(
+        config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    team_strategy = team_stance.team_strategy_for_stance(declared_team_stance)
     # Shares the exact same cached search Trade Hub's own endpoint uses
     # (trade_hub_engine.generate_trade_idea_records_cached) for this tile,
     # rather than letting compose_next_move_briefing recompute the identical
     # (league, roster, strategy, lens) search a user may have just triggered
     # moments earlier by opening Trade Hub.
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
-        config, user_id, str(user.get("_access_token") or ""), league_id
-    )
-    declared_team_stance = _fetch_team_stance(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
     trade_idea_records = None

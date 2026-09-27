@@ -23,9 +23,10 @@ const ValuationLensContext = createContext<ValuationLensContextValue | undefined
  * team, draft center, draft picks, player rank) — this context is what
  * finally lets every screen agree on the same chosen value for it.
  *
- * Client-only (no server persistence, unlike GM Stance): there's no backend
- * "saved lens" concept today, so this simply resets to DEFAULT_LENS on a
- * fresh app launch, same as every screen's own local default already did.
+ * Client-only (no server persistence, unlike Team Situation): there's no
+ * backend "saved lens" concept today, so this simply resets to
+ * DEFAULT_LENS on a fresh app launch, same as every screen's own local
+ * default already did.
  */
 export function ValuationLensProvider({ children }: { children: React.ReactNode }) {
   const [lenses, setLenses] = useState<Record<string, ValuationLens>>({});

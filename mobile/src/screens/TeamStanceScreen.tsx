@@ -13,6 +13,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import { api, TEAM_STANCE_OPTIONS, type LineupPlayer, type TeamStance } from '../lib/api';
+import { useGmStance } from '../context/GmStanceContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -28,12 +29,20 @@ interface ProtectRow {
 
 /**
  * Team Situation — a small, standalone screen (Decision Memory v1 gap):
- * declare a fixed stance (Rebuilding/Competing/Balanced) that biases
- * trade-idea rationale TEXT only, plus a "protected players" checklist that
- * reads/writes the SAME untouchable flag GM Targets already owns
- * (modules.gm_targets) rather than a second, parallel protect list.
- * Deliberately not embedded in My Team or Dashboard — those get separate
- * structural redesigns; this is reachable from More (Settings) only.
+ * declare a fixed stance (Rebuilding/Competing/Balanced), plus a "protected
+ * players" checklist that reads/writes the SAME untouchable flag GM
+ * Targets already owns (modules.gm_targets) rather than a second, parallel
+ * protect list. Deliberately not embedded in My Team or Dashboard — those
+ * get separate structural redesigns; this is reachable from More
+ * (Settings) only.
+ *
+ * GM Stance / Team Situation merge (product decision, 2026-09-26): the
+ * declared stance now drives real trade/lineup value adjustments too, not
+ * just trade-idea rationale text (see modules.team_stance's module
+ * docstring). Reads/writes through the SAME shared GmStanceContext
+ * GmStanceHeaderButton uses (rather than a separate local fetch/save),
+ * so a change made here is instantly visible on every other screen already
+ * showing this league's stance, and vice versa.
  */
 export default function TeamStanceScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
@@ -41,11 +50,10 @@ export default function TeamStanceScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
+  const { stance, setStance } = useGmStance(leagueId);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stance, setStance] = useState<TeamStance | ''>('');
-  const [savingStance, setSavingStance] = useState(false);
   const [rows, setRows] = useState<ProtectRow[]>([]);
   const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
 
@@ -54,12 +62,10 @@ export default function TeamStanceScreen({ route, navigation }: Props) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [stanceResult, teamResult, targetsResult] = await Promise.all([
-        api.getTeamStance(leagueId),
+      const [teamResult, targetsResult] = await Promise.all([
         api.getLeagueMyTeam(leagueId),
         api.getGmTargets(leagueId),
       ]);
-      setStance(stanceResult.stance);
       const protectedIds = new Set(
         targetsResult.targets.filter((t) => t.untouchable).map((t) => t.player_id),
       );
@@ -86,21 +92,11 @@ export default function TeamStanceScreen({ route, navigation }: Props) {
   );
 
   const onPickStance = useCallback(
-    async (next: TeamStance) => {
-      if (savingStance || next === stance) return;
-      const previous = stance;
+    (next: TeamStance) => {
+      if (next === stance) return;
       setStance(next);
-      setSavingStance(true);
-      try {
-        const result = await api.setTeamStance(leagueId, next);
-        if (!result.ok) setStance(previous);
-      } catch {
-        setStance(previous);
-      } finally {
-        setSavingStance(false);
-      }
     },
-    [leagueId, savingStance, stance],
+    [setStance, stance],
   );
 
   const onToggleProtect = useCallback(
@@ -144,7 +140,7 @@ export default function TeamStanceScreen({ route, navigation }: Props) {
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenInfoNote
-        text="Tell us how you see this team right now. We'll lean trade-idea language toward that stance — this never changes player values, rankings, or scoring."
+        text="Tell us how you see this team right now. We'll lean trade-idea language toward that stance, and use it to shape your trade and lineup value adjustments too."
       />
 
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
@@ -165,7 +161,6 @@ export default function TeamStanceScreen({ route, navigation }: Props) {
                     key={option.value}
                     style={[styles.stanceCard, active && styles.stanceCardActive]}
                     onPress={() => onPickStance(option.value)}
-                    disabled={savingStance}
                     activeOpacity={0.8}
                   >
                     <AppText style={[styles.stanceLabel, active && styles.stanceLabelActive]}>
@@ -176,12 +171,6 @@ export default function TeamStanceScreen({ route, navigation }: Props) {
                 );
               })}
             </View>
-            {savingStance ? (
-              <View style={styles.savingRow}>
-                <ActivityIndicator size="small" color={colors.accent} />
-                <AppText style={styles.savingText}>Saving...</AppText>
-              </View>
-            ) : null}
 
             <SectionHeading title="Protected Players" icon="lock-closed-outline" />
             <AppText style={styles.protectCaption}>
@@ -295,8 +284,6 @@ function createStyles(colors: ThemeColors) {
     // 2026-09-25).
     stanceLabelActive: { color: colors.accentOnTint },
     stanceDescription: { fontSize: 12, color: colors.textSecondary },
-    savingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
-    savingText: { fontSize: 12, color: colors.textSecondary },
     protectCaption: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.sm },
     row: {
       flexDirection: 'row',
