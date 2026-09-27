@@ -599,6 +599,9 @@ function VerdictCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
   const toneColor = toneColors(colors)[verdict.tone];
+  // Recorded alongside the share so the quiet Trade Outcomes result sweep
+  // can re-value these same players under the same lens later.
+  const { lens } = useValuationLens(leagueId);
 
   return (
     <AnimatedCard style={StyleSheet.flatten([styles.verdictCard, { borderLeftColor: toneColor }])}>
@@ -664,6 +667,7 @@ function VerdictCard({
         verdict={verdict}
         sendPlayers={sendIds}
         receivePlayers={receiveIds}
+        valuationLens={lens}
       />
     </AnimatedCard>
   );

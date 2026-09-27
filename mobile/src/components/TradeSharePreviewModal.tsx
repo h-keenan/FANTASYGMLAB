@@ -21,6 +21,13 @@ interface Props {
   verdict: TradeVerdict;
   sendPlayers: RankedPlayer[];
   receivePlayers: RankedPlayer[];
+  /** Evaluation lens active when this trade was evaluated (e.g. "Dynasty")
+   * — recorded alongside the share so the quiet Trade Outcomes result sweep
+   * (modules.trade_outcome_results) can re-value the same players under the
+   * SAME lens later, an apples-to-apples "did it work?" comparison instead
+   * of an arbitrary default. Optional: omitted entirely just means the
+   * later sweep falls back to its own default lens for this one trade. */
+  valuationLens?: string;
 }
 
 /** Preview + share sheet for the real branded trade PNG, plus a fallback plain-text share. */
@@ -33,6 +40,7 @@ export default function TradeSharePreviewModal({
   verdict,
   sendPlayers,
   receivePlayers,
+  valuationLens,
 }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -52,12 +60,28 @@ export default function TradeSharePreviewModal({
   // for exactly this ambiguity — most share APIs don't reliably report
   // completion, so recording optimistically beats not asking at all).
   const recordShare = () => {
+    // player_id/score travel through only for real tracked players — a
+    // hand-built lean RankedPlayer (Trade Hub's draft-pick-filtered rows,
+    // etc.) with an empty player_id is dropped to '' -> undefined server-side,
+    // so it's simply excluded from the later result sweep's comparison
+    // rather than treated as a zero-value asset.
     void api
       .recordTradeShare(leagueId, {
         partnerTeamName,
-        send: sendPlayers.map((p) => ({ name: p.name ?? 'Unknown', position: p.position ?? '' })),
-        receive: receivePlayers.map((p) => ({ name: p.name ?? 'Unknown', position: p.position ?? '' })),
+        send: sendPlayers.map((p) => ({
+          name: p.name ?? 'Unknown',
+          position: p.position ?? '',
+          player_id: p.player_id || undefined,
+          value_score: p.score ?? undefined,
+        })),
+        receive: receivePlayers.map((p) => ({
+          name: p.name ?? 'Unknown',
+          position: p.position ?? '',
+          player_id: p.player_id || undefined,
+          value_score: p.score ?? undefined,
+        })),
         valueEdgeLabel: verdict.band,
+        valuationLens,
       })
       .catch(() => {});
   };

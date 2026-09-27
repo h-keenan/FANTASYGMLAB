@@ -160,3 +160,25 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+  # Quiet Trade Outcomes "did it actually work?" result sweep (mobile).
+  # Deliberately separate from the push-trigger sweep above: this one sends
+  # no push and no popup — it only computes a real production/value-score
+  # comparison for confirmed ('yes') trades a few weeks old and stores it
+  # for the mobile Trade History screen to read on its own next visit (see
+  # modules/trade_outcome_results.py). Runs once a day (not */30 * * * *)
+  # since, by design, it only ever has new eligible rows after a multi-week
+  # delay — no reason to pay a real player-valuation pass every 30 minutes.
+  - type: cron
+    name: fantasygm-lab-trade-outcome-result-sweep
+    branch: main
+    runtime: python
+    schedule: "0 13 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/run_trade_outcome_result_sweep.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
