@@ -1,6 +1,14 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    // Metro/Babel transpile the app (tsc only ever runs as `tsc --noEmit`
+    // for type-checking — see package.json's "typecheck" script), so
+    // explicit .ts extensions in relative imports are safe to allow. Needed
+    // by backgroundRetry.test.ts, which is executed directly by plain
+    // Node's own test runner (no bundler involved) and so needs a real,
+    // resolvable extension in its import specifier.
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   }
 }
