@@ -75,11 +75,25 @@ def test_assembly_and_ui_never_execute_analysis():
 
 def test_analyze_trade_is_the_only_execution_boundary():
     block = _route_block()
-    assert block.count("evaluate_trade_analyzer_fit(") == 1
     assert "if analyze_clicked:" in block
     analyze_at = block.index("if analyze_clicked:")
-    fit_at = block.index("evaluate_trade_analyzer_fit(")
-    assert fit_at > analyze_at
+    # Trade-fit evaluation only ever happens inside the analyze_clicked
+    # boundary — never scattered into assembly/UI or run on every rerun.
+    # There are now two call sites in this block: the original verdict
+    # evaluation, and the counter-offer package generator's regrade closure
+    # (which re-evaluates fit for 1-3 candidate packages, only when the
+    # original offer graded unfavorably) — both still strictly gated behind
+    # this same click, so every occurrence must fall after it.
+    fit_positions: list[int] = []
+    search_from = 0
+    while True:
+        idx = block.find("evaluate_trade_analyzer_fit(", search_from)
+        if idx == -1:
+            break
+        fit_positions.append(idx)
+        search_from = idx + 1
+    assert fit_positions
+    assert all(pos > analyze_at for pos in fit_positions)
     assert "render_trade_analyzer_assembly(" in block
     assert "search_trade_assets_for_side(" not in block
     assert "+ Add asset" not in block

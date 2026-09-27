@@ -6,9 +6,9 @@ counter decision surface. Does not generate trade ideas or invent valuations.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from html import escape
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from modules import brand_identity
 from modules.compact_fantasy_assets import compact_matchup_html
@@ -17,6 +17,12 @@ from modules.trade_visual_language import (
     cue_html,
     value_edge_html,
 )
+
+# Reused, not duplicated: trade_ideas.py already owns the "is this asset
+# untouchable/core/protected" heuristic (tier + score + age thresholds) used
+# by its own package-construction search. A real counter-offer generator
+# must respect the same guardrail rather than re-deriving a cruder one here.
+from modules.trade_ideas import _is_core_or_protected_starter
 
 
 VERDICT_SMASH_ACCEPT = "SMASH ACCEPT"
@@ -61,6 +67,12 @@ class OfferVerdict:
     value_delta: int
     tone: str  # accept | counter | decline | fair
     counter_action: dict[str, Any] | None = None
+    # Concrete alternate packages that would grade as Fair/Accept — see
+    # `build_counter_offer_packages`. Empty whenever no clean rebalancing
+    # exists (never fabricated); populated by the caller via
+    # `with_alternate_packages` since this dataclass has no access to the
+    # players dataframe / regrade machinery needed to build them.
+    alternate_packages: tuple[dict[str, Any], ...] = ()
 
     def to_public_dict(self) -> dict[str, Any]:
         return {
@@ -77,7 +89,18 @@ class OfferVerdict:
             "value_delta": self.value_delta,
             "tone": self.tone,
             "counter_action": self.counter_action,
+            "alternate_packages": [dict(pkg) for pkg in self.alternate_packages],
         }
+
+    def with_alternate_packages(
+        self, packages: Sequence[Mapping[str, Any]] | None
+    ) -> "OfferVerdict":
+        """Attach caller-computed alternate packages without touching verdict math."""
+
+        return replace(
+            self,
+            alternate_packages=tuple(dict(pkg) for pkg in (packages or ())),
+        )
 
 
 def package_signature(
@@ -252,6 +275,256 @@ def build_counter_guidance(
     return "Ask for a first-round equivalent or remove a major piece from your side.", None
 
 
+# Bands where a real alternate package is worth generating — never for
+# FAIR/ACCEPT (nothing to fix) and never SMASH_ACCEPT.
+COUNTER_PACKAGE_BANDS = {VERDICT_COUNTER, VERDICT_DECLINE, VERDICT_HARD_DECLINE}
+
+_FAVORABLE_TONES = {"accept", "fair"}
+
+
+def _asset_identity(asset: Mapping[str, Any]) -> str:
+    if str(asset.get("asset_type") or "player") == "pick":
+        return (
+            f"pick:{asset.get('season')}:{asset.get('round')}:"
+            f"{asset.get('owner_roster_id')}:{asset.get('label') or asset.get('name')}"
+        )
+    return f"player:{asset.get('player_id') or asset.get('label') or asset.get('name')}"
+
+
+def _asset_label(asset: Mapping[str, Any]) -> str:
+    return str(asset.get("name") or asset.get("label") or "Asset").strip() or "Asset"
+
+
+def _asset_score(asset: Mapping[str, Any]) -> int:
+    try:
+        return int(asset.get("score") if asset.get("score") is not None else asset.get("value_score") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _rank_addition_candidates(
+    pool: Sequence[Mapping[str, Any]],
+    *,
+    exclude_identities: set[str],
+    gap: int,
+    need_positions: Sequence[str] | None,
+    limit: int = 6,
+) -> list[dict[str, Any]]:
+    """Rank pool assets as sweetener candidates: real, owned, not untouchable.
+
+    Never proposes an asset that isn't actually on the pool roster (the pool
+    itself is the caller's verified asset list — nothing here invents an
+    asset), and never proposes a core/protected asset — same guardrail
+    trade_ideas.py's own automatic package construction uses
+    (`_is_core_or_protected_starter`).
+    """
+
+    needs = {str(pos).upper() for pos in (need_positions or ())}
+    scored: list[tuple[int, int, int, dict[str, Any]]] = []
+    for asset in pool or ():
+        if not isinstance(asset, Mapping):
+            continue
+        candidate = dict(asset)
+        identity = _asset_identity(candidate)
+        if identity in exclude_identities:
+            continue
+        score = _asset_score(candidate)
+        if score <= 0:
+            continue
+        if _is_core_or_protected_starter(candidate):
+            continue
+        need_bonus = 0
+        if needs and str(candidate.get("position") or "").upper() not in needs:
+            need_bonus = 1
+        closeness = abs(score - gap)
+        scored.append((need_bonus, closeness, -score, candidate))
+    scored.sort(key=lambda item: (item[0], item[1]))
+    return [item[3] for item in scored[:limit]]
+
+
+def _package_entry(
+    *,
+    label: str,
+    send_assets: Sequence[Mapping[str, Any]],
+    receive_assets: Sequence[Mapping[str, Any]],
+    verdict: "OfferVerdict",
+) -> dict[str, Any]:
+    return {
+        "label": label,
+        "send_assets": [dict(a) for a in send_assets],
+        "receive_assets": [dict(a) for a in receive_assets],
+        "band": verdict.band,
+        "ui_verdict": verdict.ui_verdict,
+        "confidence": verdict.confidence,
+        "value_delta": verdict.value_delta,
+    }
+
+
+def build_counter_offer_packages(
+    *,
+    band: str,
+    value_delta: int,
+    send_assets: Sequence[Mapping[str, Any]],
+    receive_assets: Sequence[Mapping[str, Any]],
+    my_asset_pool: Sequence[Mapping[str, Any]] | None,
+    partner_asset_pool: Sequence[Mapping[str, Any]] | None,
+    regrade: Callable[
+        [Sequence[Mapping[str, Any]], Sequence[Mapping[str, Any]]], "OfferVerdict | None"
+    ],
+    my_needs: Sequence[str] | None = None,
+    max_packages: int = 3,
+) -> list[dict[str, Any]]:
+    """Generate 2-3 concrete alternate packages for an unfavorable offer.
+
+    Reuses `trade_ideas.py`'s own package-construction guardrails
+    (`_is_core_or_protected_starter`) instead of a second, cruder notion of
+    "untouchable," and reuses the exact same scoring/verdict pipeline the
+    original offer was graded on (`regrade` — a caller-supplied closure
+    wrapping `trade_analyzer_fit.evaluate_trade_analyzer_fit` +
+    `decide_offer_verdict`) so a candidate is only ever returned once it
+    genuinely regrades as Fair/Accept, never because it "looks" better.
+
+    Stays close to the original offer's spirit per design: every candidate
+    is the original package with ONE (or, as a last resort, two) real
+    asset(s) added/removed — never an unrelated wholesale rebuild. Real
+    assets only: additions are drawn strictly from `my_asset_pool` /
+    `partner_asset_pool`, which callers build from the two rosters' actual
+    holdings, and additions never include anything `_is_core_or_protected_starter`
+    flags. Never fabricates a candidate that doesn't actually clear the
+    bar — if nothing found here regrades as Fair/Accept, returns [].
+    """
+
+    if band not in COUNTER_PACKAGE_BANDS or regrade is None:
+        return []
+
+    gap = abs(min(0, int(value_delta)))
+    if gap <= 0:
+        return []
+
+    send_list = [dict(a) for a in (send_assets or ())]
+    receive_list = [dict(a) for a in (receive_assets or ())]
+    receive_ids = {_asset_identity(a) for a in receive_list}
+
+    results: list[dict[str, Any]] = []
+    seen_signatures: set[tuple[str, str]] = set()
+
+    def _record(candidate_send, candidate_receive, label) -> bool:
+        sig = (
+            ",".join(sorted(_asset_identity(a) for a in candidate_send)),
+            ",".join(sorted(_asset_identity(a) for a in candidate_receive)),
+        )
+        if sig in seen_signatures:
+            return False
+        verdict = regrade(candidate_send, candidate_receive)
+        if verdict is None or verdict.tone not in _FAVORABLE_TONES:
+            return False
+        seen_signatures.add(sig)
+        results.append(
+            _package_entry(
+                label=label,
+                send_assets=candidate_send,
+                receive_assets=candidate_receive,
+                verdict=verdict,
+            )
+        )
+        return True
+
+    # Strategy 1: trim the weakest outgoing piece — the smallest possible
+    # change, and the one closest to the original offer's spirit. Removing
+    # an asset from your own send side is always legal (you never owe
+    # anything you no longer offer), so no untouchable filter applies here.
+    trimmed_asset: dict[str, Any] | None = None
+    if len(send_list) > 1:
+        by_score = sorted(send_list, key=_asset_score)
+        for weakest in by_score[:2]:
+            if len(results) >= max_packages:
+                break
+            candidate_send = [a for a in send_list if _asset_identity(a) != _asset_identity(weakest)]
+            if not candidate_send:
+                continue
+            if _record(candidate_send, receive_list, f"Remove {_asset_label(weakest)} from your side"):
+                if trimmed_asset is None:
+                    trimmed_asset = weakest
+                continue
+            if trimmed_asset is None:
+                trimmed_asset = weakest
+
+    # Strategy 1b: swap the weakest outgoing piece for a cheaper one from
+    # your own bench — for a single-asset send (trimming would leave
+    # nothing to send) or whenever a same-shape substitution reads more
+    # naturally than dropping a piece outright. Only ever proposes a
+    # cheaper replacement (the point is reducing outgoing value, not
+    # restructuring it), drawn strictly from `my_asset_pool` (real, owned
+    # assets only) and never a protected/untouchable one.
+    if len(results) < max_packages and send_list and my_asset_pool:
+        weakest = min(send_list, key=_asset_score)
+        weakest_score = _asset_score(weakest)
+        bench_candidates = _rank_addition_candidates(
+            my_asset_pool,
+            exclude_identities={_asset_identity(a) for a in send_list},
+            gap=gap,
+            need_positions=None,
+            limit=6,
+        )
+        for candidate in bench_candidates:
+            if len(results) >= max_packages:
+                break
+            if _asset_score(candidate) >= weakest_score:
+                continue
+            candidate_send = [
+                a for a in send_list if _asset_identity(a) != _asset_identity(weakest)
+            ] + [candidate]
+            _record(
+                candidate_send,
+                receive_list,
+                f"Send {_asset_label(candidate)} instead of {_asset_label(weakest)}",
+            )
+
+    # Strategy 2: ask for one real sweetener from the partner's actual
+    # roster — ranked toward filling one of your real needs, never a
+    # protected/untouchable partner asset.
+    if len(results) < max_packages:
+        candidates = _rank_addition_candidates(
+            partner_asset_pool or (),
+            exclude_identities=receive_ids,
+            gap=gap,
+            need_positions=my_needs,
+            limit=6,
+        )
+        for candidate in candidates:
+            if len(results) >= max_packages:
+                break
+            candidate_receive = receive_list + [candidate]
+            _record(send_list, candidate_receive, f"Ask for {_asset_label(candidate)} too")
+
+    # Strategy 3 (last resort, only if nothing above cleared the bar): a
+    # combined change — trim the weakest outgoing piece AND ask for one
+    # small partner sweetener at the same time. Only tried when the
+    # single-asset adjustments above weren't enough to close the gap; still
+    # exactly the original package plus/minus real, owned assets.
+    if not results and trimmed_asset is not None:
+        candidate_send = [a for a in send_list if _asset_identity(a) != _asset_identity(trimmed_asset)]
+        if candidate_send:
+            candidates = _rank_addition_candidates(
+                partner_asset_pool or (),
+                exclude_identities=receive_ids,
+                gap=gap,
+                need_positions=my_needs,
+                limit=4,
+            )
+            for candidate in candidates:
+                if len(results) >= max_packages:
+                    break
+                candidate_receive = receive_list + [candidate]
+                _record(
+                    candidate_send,
+                    candidate_receive,
+                    f"Remove {_asset_label(trimmed_asset)}, ask for {_asset_label(candidate)}",
+                )
+
+    return results[:max_packages]
+
+
 def decide_offer_verdict(
     fit: Mapping[str, Any] | None,
     *,
@@ -407,6 +680,46 @@ def _asset_lines_html(assets: Sequence[Mapping[str, Any]]) -> str:
     return "".join(rows)
 
 
+def _alternate_packages_html(packages: Sequence[Mapping[str, Any]]) -> str:
+    """Real "try this instead" packages — same player-identity rendering
+    (`compact_matchup_html`) already used for the actual send/receive
+    matchup above, never a bespoke row. Empty whenever no clean rebalancing
+    was found (see `build_counter_offer_packages`), in which case this
+    renders nothing and the honest text-only `counter_guidance` cue stands
+    alone — never a fabricated placeholder.
+    """
+
+    if not packages:
+        return ""
+    cards: list[str] = []
+    for pkg in packages:
+        label = escape(str(pkg.get("label") or "Alternate package"))
+        band = escape(str(pkg.get("ui_verdict") or pkg.get("band") or ""))
+        matchup = compact_matchup_html(
+            pkg.get("send_assets") or (),
+            pkg.get("receive_assets") or (),
+            send_label="You send",
+            receive_label="You receive",
+            size="chip",
+            show_value=True,
+        )
+        cards.append(
+            "<div class='toa-alt-package'>"
+            "<div class='toa-alt-package-head'>"
+            f"<span class='toa-alt-package-label'>{label}</span>"
+            f"<span class='toa-alt-package-band'>{band}</span>"
+            "</div>"
+            f"{matchup}"
+            "</div>"
+        )
+    return (
+        "<div class='toa-alt-packages'>"
+        "<div class='toa-alt-packages-title'>Try this instead</div>"
+        + "".join(cards)
+        + "</div>"
+    )
+
+
 def build_offer_result_card_html(
     verdict: OfferVerdict,
     *,
@@ -450,6 +763,11 @@ def build_offer_result_card_html(
     # to act — what to ask for or trim — must be visible without a tap, not
     # buried in the same collapsed drawer as restated reference detail.
     action_cue = cue_html("action", verdict.counter_guidance)
+    # The concrete version of action_cue above — real alternate packages,
+    # not just the sentence describing one. Augments the honest prose
+    # guidance rather than replacing it; empty (renders nothing) whenever no
+    # clean rebalancing was found.
+    alt_packages_html = _alternate_packages_html(verdict.alternate_packages)
     # Roster impact / strategy fit / the plain-English value restatement are
     # secondary reference, not required to reach a decision — fine collapsed.
     # Risk and Counter are NOT repeated here: both already render visibly
@@ -493,6 +811,7 @@ def build_offer_result_card_html(
   {value_edge_html(edge_label, extra_class="toa-value-edge")}
   {why_cue}
   {action_cue}
+  {alt_packages_html}
   {confidence_indicator_html(verdict.confidence, extra_class="toa-confidence")}
   {risk_cue}
   <details class="toa-more">

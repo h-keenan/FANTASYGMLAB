@@ -23082,12 +23082,95 @@ def main():
                                     "round": pick.get("round"),
                                 }
                             )
+                # My own full roster's assets — same shape as partner_asset_pool
+                # above, used only as the real-asset universe a counter-offer
+                # package generator may draw from (never invents an asset).
+                my_asset_pool = []
+                if my_roster_id is not None and not trade_analyzer_df.empty:
+                    my_roster_ids_for_pool = roster_player_ids_map.get(str(my_roster_id), set()) or set(my_player_ids)
+                    my_pool_df = trade_analyzer_df[
+                        trade_analyzer_df["player_id"].astype(str).isin(my_roster_ids_for_pool)
+                    ]
+                    for _, mrow in my_pool_df.head(60).iterrows():
+                        my_asset_pool.append(
+                            {
+                                "asset_type": "player",
+                                "player_id": str(mrow.get("player_id")),
+                                "name": mrow.get("name"),
+                                "label": mrow.get("name"),
+                                "position": mrow.get("position"),
+                                "team": mrow.get("team"),
+                                "age": mrow.get("age"),
+                                "player_tier": mrow.get("player_tier"),
+                                "score": score_asset_value(mrow),
+                                "value_score": int(mrow.get("value_score") or 0),
+                                "owner_roster_id": str(my_roster_id),
+                            }
+                        )
+                for pick in owned_picks if "owned_picks" in locals() else ():
+                    my_asset_pool.append(
+                        {
+                            "asset_type": "pick",
+                            "label": pick.get("label"),
+                            "name": pick.get("label"),
+                            "score": int(round(float(pick.get("score", 0) or 0) * trade_analyzer_pick_multiplier)),
+                            "value_score": int(pick.get("score", 0) or 0),
+                            "owner_roster_id": str(my_roster_id),
+                            "season": pick.get("season"),
+                            "round": pick.get("round"),
+                        }
+                    )
                 offer_verdict = offer_analyzer.decide_offer_verdict(
                     trade_fit_evaluation,
                     send_assets=send_assets,
                     receive_assets=receive_assets,
                     partner_assets=partner_asset_pool,
                 )
+                if offer_verdict.band in offer_analyzer.COUNTER_PACKAGE_BANDS:
+                    try:
+                        my_needs_for_counter = get_needed_positions(
+                            my_team_df,
+                            trade_metrics if "trade_metrics" in locals() else None,
+                            league_value_settings,
+                        )
+                    except Exception:
+                        my_needs_for_counter = []
+
+                    def _regrade_counter_package(cand_send, cand_receive):
+                        cand_fit = evaluate_trade_analyzer_fit(
+                            my_team_df=my_team_df,
+                            all_players_df=trade_analyzer_df,
+                            send_assets=cand_send,
+                            receive_assets=cand_receive,
+                            metrics=trade_metrics if "trade_metrics" in locals() else None,
+                            strategy=trade_analyzer_strategy,
+                            lineup_settings=league_value_settings,
+                            score_field=score_field,
+                        )
+                        if not cand_fit or not cand_fit.get("available"):
+                            return None
+                        return offer_analyzer.decide_offer_verdict(
+                            cand_fit,
+                            send_assets=cand_send,
+                            receive_assets=cand_receive,
+                            partner_assets=partner_asset_pool,
+                        )
+
+                    try:
+                        alternate_packages = offer_analyzer.build_counter_offer_packages(
+                            band=offer_verdict.band,
+                            value_delta=offer_verdict.value_delta,
+                            send_assets=send_assets,
+                            receive_assets=receive_assets,
+                            my_asset_pool=my_asset_pool,
+                            partner_asset_pool=partner_asset_pool,
+                            regrade=_regrade_counter_package,
+                            my_needs=my_needs_for_counter,
+                        )
+                    except Exception:
+                        alternate_packages = []
+                    if alternate_packages:
+                        offer_verdict = offer_verdict.with_alternate_packages(alternate_packages)
                 latency_ms = int((time.perf_counter() - analyze_started) * 1000)
                 st.session_state["trade_analyzer_analyzed_signature"] = package_sig
                 st.session_state["trade_analyzer_result_payload"] = {
@@ -23143,6 +23226,12 @@ def main():
                 fit_total=int(verdict_payload.get("fit_total") or 0),
                 value_delta=int(verdict_payload.get("value_delta") or 0),
                 tone=str(verdict_payload.get("tone") or "fair"),
+                counter_action=verdict_payload.get("counter_action"),
+                alternate_packages=tuple(
+                    dict(pkg)
+                    for pkg in (verdict_payload.get("alternate_packages") or ())
+                    if isinstance(pkg, dict)
+                ),
             )
             st.markdown(
                 "<div class='toa-review-kicker'>Reviewed package</div>",

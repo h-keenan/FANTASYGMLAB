@@ -1661,6 +1661,70 @@ def post_trade_analyzer(
         receive_assets=receive_assets,
         partner_assets=partner_assets,
     )
+
+    if getattr(verdict, "band", None) in trade_offer_analyzer.COUNTER_PACKAGE_BANDS:
+        # Real alternate packages only get built for an unfavorable verdict,
+        # and only reuse assets the two rosters actually hold — never a
+        # second, invented valuation. Any failure here (e.g. no picks data
+        # for this league) just falls back to the existing text-only
+        # counter_guidance already on `verdict`.
+        try:
+            my_asset_pool: list[dict[str, Any]] = [
+                player_asset_from_mapping(row, score_field=score_field)
+                for _, row in my_team_df.iterrows()
+            ]
+            partner_asset_pool: list[dict[str, Any]] = list(partner_assets)
+            pick_summary, _ = league_rankings.build_league_summary_and_draft_capital(
+                valued, league_id, score_field=score_field, league_settings=settings
+            )
+            if not pick_summary.empty:
+                my_roster_id_str = str(my_roster.get("roster_id") or "")
+                for pick in trade_ideas.list_draft_pick_assets(
+                    league_id, pick_summary, league_settings=settings
+                ):
+                    owner = str(pick.get("owner_roster_id") or "")
+                    if owner == my_roster_id_str:
+                        my_asset_pool.append(pick_asset_from_mapping(pick))
+                    elif body.partner_roster_id and owner == str(body.partner_roster_id):
+                        partner_asset_pool.append(pick_asset_from_mapping(pick))
+
+            my_needs = trade_analyzer_fit.get_needed_positions(my_team_df, None, settings)
+
+            def _regrade_counter_package(cand_send, cand_receive):
+                cand_fit = trade_analyzer_fit.evaluate_trade_analyzer_fit(
+                    my_team_df=my_team_df,
+                    all_players_df=valued,
+                    send_assets=cand_send,
+                    receive_assets=cand_receive,
+                    metrics=None,
+                    strategy=body.strategy,
+                    lineup_settings=settings,
+                    score_field=score_field,
+                )
+                if not cand_fit or not cand_fit.get("available"):
+                    return None
+                return trade_offer_analyzer.decide_offer_verdict(
+                    cand_fit,
+                    send_assets=cand_send,
+                    receive_assets=cand_receive,
+                    partner_assets=partner_asset_pool,
+                )
+
+            alternate_packages = trade_offer_analyzer.build_counter_offer_packages(
+                band=verdict.band,
+                value_delta=verdict.value_delta,
+                send_assets=send_assets,
+                receive_assets=receive_assets,
+                my_asset_pool=my_asset_pool,
+                partner_asset_pool=partner_asset_pool,
+                regrade=_regrade_counter_package,
+                my_needs=my_needs,
+            )
+            if alternate_packages:
+                verdict = verdict.with_alternate_packages(alternate_packages)
+        except Exception:
+            pass
+
     return {"ok": True, "verdict": verdict.to_public_dict(), "reason": ""}
 
 
