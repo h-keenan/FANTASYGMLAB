@@ -662,6 +662,32 @@ function defenseTierColor(tier: ScheduleWeek['opponent_defense_tier'], colors: T
   return colors.textPrimary;
 }
 
+/**
+ * The far-right projection slot for one schedule row —
+ * modules.player_projections.project_player_week's output, already null on
+ * the API for a played or bye week (the row already answers those two
+ * cases elsewhere), so this only ever has something to say for an upcoming
+ * game. `"ok"` renders a compact point estimate labeled "PROJ" (never
+ * confusable with the real "Final: X-Y" line played weeks show); a
+ * meaningful non-"ok" status renders a short muted note instead of a
+ * number; anything else (e.g. `unsupported_position`, or no projection
+ * object at all) renders nothing — this is supporting detail, not a second
+ * dominant metric on the row.
+ */
+function scheduleProjectionDisplay(
+  projection: ScheduleWeek['projection'],
+): { value: string | null; note: string | null } {
+  if (!projection) return { value: null, note: null };
+  if (projection.status === 'ok' && projection.point_estimate != null) {
+    return { value: projection.point_estimate.toFixed(1), note: null };
+  }
+  if (projection.status === 'insufficient_player_data') return { value: null, note: 'No projection yet' };
+  if (projection.status === 'no_opponent' || projection.status === 'no_schedule_data') {
+    return { value: null, note: 'No projection yet' };
+  }
+  return { value: null, note: null };
+}
+
 function ScheduleRow({ week }: { week: ScheduleWeek }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -673,6 +699,7 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
           ? `Underdog by ${week.spread_line.toFixed(1)}`
           : 'Even'
       : null;
+  const projection = scheduleProjectionDisplay(week.projection);
   return (
     <View style={styles.scheduleRow}>
       <View style={styles.scheduleWeekCol}>
@@ -704,6 +731,22 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
           <AppText style={styles.scheduleDetailMuted}>Line not posted yet</AppText>
         )}
       </View>
+      {projection.value ? (
+        <View style={styles.scheduleProjectionCol}>
+          <AppText style={styles.scheduleProjectionLabel} numberOfLines={1}>
+            PROJ
+          </AppText>
+          <AppText style={styles.scheduleProjectionValue} numberOfLines={1}>
+            {projection.value}
+          </AppText>
+        </View>
+      ) : projection.note ? (
+        <View style={styles.scheduleProjectionCol}>
+          <AppText style={styles.scheduleProjectionMuted} numberOfLines={2}>
+            {projection.note}
+          </AppText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1841,5 +1884,22 @@ function createStyles(colors: ThemeColors) {
   scheduleBye: { fontSize: 14, fontWeight: '700', color: colors.danger, letterSpacing: 0.4 },
   scheduleDetail: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
   scheduleDetailMuted: { fontSize: 12, color: colors.textTertiary, marginTop: 1, fontStyle: 'italic' },
+  // Far-right projection slot — a supporting figure, sized/weighted well
+  // below scheduleOpponent (the row's one dominant identity) so it never
+  // reads as a second competing number.
+  scheduleProjectionCol: { width: 64, alignItems: 'flex-end', marginLeft: spacing.sm },
+  scheduleProjectionLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.textTertiary,
+    letterSpacing: 0.5,
+  },
+  scheduleProjectionValue: { fontSize: 14, fontWeight: '700', color: colors.accent, marginTop: 1 },
+  scheduleProjectionMuted: {
+    fontSize: 10,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    textAlign: 'right',
+  },
   });
 }

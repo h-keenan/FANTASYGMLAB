@@ -2863,6 +2863,178 @@ def test_schedule_returns_empty_for_a_player_with_no_team(monkeypatch):
     assert response.json() == {"ok": True, "team": None, "weeks": []}
 
 
+def test_schedule_attaches_a_projection_to_each_unplayed_non_bye_week(monkeypatch):
+    """modules.player_projections.project_player_week's output is additive
+    on the schedule endpoint: a played week already has its final score, and
+    a bye week has neither a game nor an opponent — neither draws a second,
+    possibly-confusing number next to it. Only the remaining unplayed weeks
+    get a `projection`, and the shared inputs (players lookup, season
+    weekly stats, opponent-defense signal) are fetched/computed once for
+    the whole request, not once per week.
+    """
+
+    from modules import nfl_schedule, player_projections
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame(
+        [{"player_id": "9001", "name": "Test Runner", "position": "RB", "team": "KC"}]
+    )
+    fake_weeks = [
+        {
+            "week": 1,
+            "opponent": "BUF",
+            "is_home": True,
+            "spread_line": -2.5,
+            "total_line": 47.5,
+            "played": True,
+            "team_score": 24.0,
+            "opponent_score": 20.0,
+        },
+        {
+            "week": 2,
+            "opponent": None,
+            "is_home": None,
+            "spread_line": None,
+            "total_line": None,
+            "played": False,
+            "team_score": None,
+            "opponent_score": None,
+            "bye": True,
+        },
+        {
+            "week": 3,
+            "opponent": "MIA",
+            "is_home": False,
+            "spread_line": 1.5,
+            "total_line": 44.0,
+            "played": False,
+            "team_score": None,
+            "opponent_score": None,
+        },
+    ]
+
+    fake_projection = {
+        "status": "ok",
+        "player_id": "9001",
+        "position": "RB",
+        "team": "KC",
+        "week": 3,
+        "opponent": "MIA",
+        "point_estimate": 14.2,
+        "low": 9.8,
+        "high": 18.6,
+        "confidence": "medium",
+        "basis": {"recent_games_played": 3},
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            with patch.object(nfl_schedule, "team_schedule", return_value=fake_weeks):
+                with patch.object(nfl_schedule, "team_defense_strength", return_value={}):
+                    with patch("modules.sleeper.get_players", return_value={"9001": {"position": "RB", "team": "KC"}}):
+                        with patch(
+                            "modules.sleeper.get_season_player_stats",
+                            return_value={"9001": {"weekly": [{"week": 1, "fantasy_points_ppr": 12.0}]}},
+                        ):
+                            with patch.object(
+                                player_projections,
+                                "team_defense_points_allowed_by_position",
+                                return_value={},
+                            ) as mock_defense_by_position:
+                                with patch.object(
+                                    player_projections, "project_player_week", return_value=fake_projection
+                                ) as mock_project:
+                                    response = client.get(
+                                        "/v1/players/9001/schedule",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    weeks_by_number = {week["week"]: week for week in response.json()["weeks"]}
+
+    # Played week: the final score already answers this — no projection.
+    assert weeks_by_number[1]["projection"] is None
+    # Bye week: nothing to project.
+    assert weeks_by_number[2]["projection"] is None
+    # The one unplayed, non-bye week gets the trimmed projection summary.
+    projection = weeks_by_number[3]["projection"]
+    assert projection == {
+        "status": "ok",
+        "point_estimate": 14.2,
+        "low": 9.8,
+        "high": 18.6,
+        "confidence": "medium",
+        "opponent": "MIA",
+    }
+
+    # Shared inputs computed once for the whole request, not once per week.
+    assert mock_defense_by_position.call_count == 1
+    mock_project.assert_called_once()
+    assert mock_project.call_args.args[1] == 3
+
+
+def test_schedule_projection_honors_an_edge_case_status_without_a_fabricated_number(monkeypatch):
+    """A non-"ok" status from project_player_week (e.g. a rookie with no
+    recent-week production yet) must never be paired with a made-up number
+    — every numeric field stays null so the client renders "No projection
+    yet" instead of a false-precision figure.
+    """
+
+    from modules import nfl_schedule, player_projections
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame([{"player_id": "9002", "name": "Rookie WR", "position": "WR", "team": "KC"}])
+    fake_weeks = [
+        {
+            "week": 1,
+            "opponent": "BUF",
+            "is_home": True,
+            "spread_line": None,
+            "total_line": None,
+            "played": False,
+            "team_score": None,
+            "opponent_score": None,
+        }
+    ]
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            with patch.object(nfl_schedule, "team_schedule", return_value=fake_weeks):
+                with patch.object(nfl_schedule, "team_defense_strength", return_value={}):
+                    with patch("modules.sleeper.get_players", return_value={}):
+                        with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                            with patch.object(
+                                player_projections, "team_defense_points_allowed_by_position", return_value={}
+                            ):
+                                with patch.object(
+                                    player_projections,
+                                    "project_player_week",
+                                    return_value={"status": "insufficient_player_data", "player_id": "9002"},
+                                ):
+                                    response = client.get(
+                                        "/v1/players/9002/schedule",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    projection = response.json()["weeks"][0]["projection"]
+    assert projection == {
+        "status": "insufficient_player_data",
+        "point_estimate": None,
+        "low": None,
+        "high": None,
+        "confidence": None,
+        "opponent": None,
+    }
+
+
 def test_schedule_returns_empty_for_an_unknown_player(monkeypatch):
     client = _client(monkeypatch)
 
@@ -4440,6 +4612,184 @@ def test_dashboard_team_snapshot_is_none_without_a_resolved_roster(monkeypatch):
     body = response.json()
     assert body["team_snapshot"] is None
     assert body["reason"] == "no_sleeper_username_linked"
+
+
+# --- GM Plan (season-phase-aware roadmap, additive on top of existing engines) ---
+#
+# GM Plan is a NEW aggregation layer, distinct from both the Dashboard's
+# one-off "Next Move" tile above and the older, valuation-affecting
+# "GM Stance" team-strategy system (/v1/leagues/{id}/gm-stance). These
+# tests pin the wiring: it reads the declared Team Situation stance
+# (modules.team_stance) and already-computed league_rankings/trade_hub_
+# engine outputs, never recomputing valuation itself. See
+# tests/test_gm_plan.py for the phase-detection and aggregation unit tests.
+
+
+def test_gm_plan_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/gm-plan")
+    assert response.status_code == 401
+
+
+def test_gm_plan_reports_no_linked_username(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": ""}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/leagues/abc/gm-plan",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["quiet"] is True
+    assert body["reason"] == "no_sleeper_username_linked"
+    assert body["focus_areas"] == []
+
+
+def test_gm_plan_rejects_an_invalid_lens(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/gm-plan?lens=NotARealLens",
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch):
+    # Week 10 with a week-15 playoff start reads as "trade deadline
+    # approach" per modules.gm_plan.derive_season_phase.
+    league = dict(_TRADE_ANALYZER_LEAGUE)
+    league["settings"] = {"type": 2, "leg": 10, "playoff_week_start": 15}
+
+    rankings_frame = pd.DataFrame(
+        [
+            {
+                "roster_id": "1",
+                "power_rank": 2,
+                "power_rank_tied": False,
+                "draft_capital_rank": 4,
+                "draft_capital_rank_tied": True,
+                "starter_rank": 1,
+                "starter_rank_tied": False,
+                "bench_rank": 11,
+                "bench_rank_tied": False,
+                "age_rank": 5,
+                "age_rank_tied": False,
+            },
+            {
+                "roster_id": "2",
+                "power_rank": 5,
+                "power_rank_tied": False,
+                "draft_capital_rank": 8,
+                "draft_capital_rank_tied": False,
+                "starter_rank": 6,
+                "starter_rank_tied": False,
+                "bench_rank": 3,
+                "bench_rank_tied": False,
+                "age_rank": 2,
+                "age_rank_tied": False,
+            },
+        ]
+    )
+    trade_idea_records = [
+        {
+            "partner_team_name": "Team Two",
+            "my_player": "Bench Runner",
+            "their_player": "Target Runner",
+            "rationale": "This fits your declared rebuild: it leans into youth and future draft capital.",
+            "trade_confidence_label": "Strong",
+            "priority": 1,
+        }
+    ]
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=[auth_user_response, profile_response]))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(
+            patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["my1"]},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            )
+        )
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=league))
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_team_stance", return_value="rebuilding")
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service._fetch_gm_stance_with_set_flag",
+                return_value=("retool", True),
+            )
+        )
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ()))
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.league_rankings.build_league_rankings_frame_cached",
+                return_value=rankings_frame,
+            )
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached",
+                return_value=trade_idea_records,
+            )
+        )
+
+        response = client.get(
+            "/v1/leagues/abc/gm-plan",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["quiet"] is False
+    assert body["season_phase"] == "trade_deadline_approach"
+    assert body["team_stance"] == "rebuilding"
+    assert body["team_stance_label"] == "Rebuilding"
+
+    focus_by_key = {fa["key"]: fa for fa in body["focus_areas"]}
+
+    standing = focus_by_key["standing"]
+    assert standing["status"] == "signal_found"
+    power_item = next(item for item in standing["items"] if item["label"] == "Power Rank")
+    assert power_item["rank"] == 2
+    assert power_item["total_teams"] == 2
+    capital_item = next(item for item in standing["items"] if item["label"] == "Draft Capital Rank")
+    assert capital_item["tied"] is True
+
+    trade_area = focus_by_key["trade_opportunities"]
+    assert trade_area["status"] == "signal_found"
+    assert "youth" in trade_area["framing"].lower()
+    assert trade_area["items"][0]["partner_team_name"] == "Team Two"
+    assert trade_area["items"][0]["trade_confidence_label"] == "Strong"
+
+    roster_area = focus_by_key["roster_construction"]
+    assert roster_area["status"] == "signal_found"
+    bench_item = next(item for item in roster_area["items"] if item["label"] == "Bench Depth")
+    assert bench_item["relative_weak_spot"] is True
 
 
 def test_trade_hub_requires_auth(monkeypatch):
@@ -6266,6 +6616,88 @@ def test_matchup_real_lineup_handles_a_starter_missing_from_the_valued_pool(monk
     assert by_id["mine1"]["actual_points"] == 20.5
     assert by_id["DEN"]["name"] is None
     assert by_id["DEN"]["actual_points"] == 6.0
+
+
+def test_matchup_real_starters_carry_a_per_game_projection(monkeypatch):
+    """Each REAL (actual) starter also carries this week's per-game
+    projection from modules.player_projections.project_player_week —
+    additive, and clearly a separate figure from the real `actual_points`
+    next to it. Shared projection inputs (players lookup, season weekly
+    stats, opponent-defense signal) are fetched/computed once for the whole
+    request (both rosters), not once per starter.
+    """
+
+    from modules import player_projections
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [20.5], "points": 20.5},
+        {"roster_id": 2, "matchup_id": 3, "starters": ["opp1"], "starters_points": [10.0], "points": 10.0},
+    ]
+
+    fake_projection = {
+        "status": "ok",
+        "point_estimate": 18.4,
+        "low": 14.0,
+        "high": 22.8,
+        "confidence": "high",
+        "opponent": "BUF",
+    }
+
+    with _matchup_world(matchups):
+        with patch("modules.sleeper.get_players", return_value={}):
+            with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                with patch.object(
+                    player_projections, "team_defense_points_allowed_by_position", return_value={}
+                ) as mock_defense:
+                    with patch.object(
+                        player_projections, "project_player_week", return_value=fake_projection
+                    ) as mock_project:
+                        response = client.get(
+                            "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
+                        )
+
+    body = response.json()
+    mine_starter = body["my_team"]["real_starters"][0]
+    projection = mine_starter["projection"]
+    assert projection == {
+        "status": "ok",
+        "point_estimate": 18.4,
+        "low": 14.0,
+        "high": 22.8,
+        "confidence": "high",
+        "opponent": "BUF",
+    }
+    # Distinct field from, never confused with, the real live points.
+    assert mine_starter["actual_points"] == 20.5
+
+    # Computed once for the whole request (both rosters), not once per
+    # starter — see _ProjectionContext/_weekly_projection_for_player.
+    assert mock_defense.call_count == 1
+    assert mock_project.call_count == 2
+
+
+def test_matchup_real_lineup_projection_fails_soft_on_error(monkeypatch):
+    """A transient failure building the projection inputs must never break
+    the real Sleeper lineup/points response itself — the client just gets
+    `projection: null` per starter, same "fails soft" contract as every
+    other enrichment fetch in this file.
+    """
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [20.5], "points": 20.5},
+        {"roster_id": 2, "matchup_id": 3},
+    ]
+
+    with _matchup_world(matchups):
+        with patch("modules.sleeper.get_players", side_effect=RuntimeError("boom")):
+            response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    mine_starter = response.json()["my_team"]["real_starters"][0]
+    assert mine_starter["projection"] is None
+    assert mine_starter["actual_points"] == 20.5
 
 
 def test_trade_outcomes_requires_auth(monkeypatch):

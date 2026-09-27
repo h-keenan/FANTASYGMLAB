@@ -64,6 +64,17 @@ export interface PlayerIdentityRowProps {
   /** One short line under `trailingValue`, e.g. "82% conf". Ignored when
    * `trailingValue` is absent. */
   trailingCaption?: string | null;
+  /** A smaller, muted SECOND figure under the main trailing block — e.g. a
+   * per-game projection ("Proj 14.2") sitting under a real live/actual
+   * score. Deliberately smaller and quieter than `trailingValue` so it
+   * never competes with the row's one dominant metric (Magna Carta's "one
+   * dominant module/metric" rule) — always a supporting number, never a
+   * second equally-weighted one. Ignored when `trailingValue` is absent
+   * (there is nothing to sit "under" otherwise). */
+  secondaryTrailingValue?: string | null;
+  /** One short line under `secondaryTrailingValue`, e.g. "med conf".
+   * Ignored when `secondaryTrailingValue` is absent. */
+  secondaryTrailingCaption?: string | null;
   onPress?: () => void;
   /** Renders a hairline divider under the row — set false on the last row
    * of a group so the group's own bottom edge stays clean. */
@@ -101,6 +112,8 @@ export default function PlayerIdentityRow({
   injuryTone = 'risk',
   trailingValue,
   trailingCaption,
+  secondaryTrailingValue,
+  secondaryTrailingCaption,
   onPress,
   showDivider = false,
   style,
@@ -186,6 +199,19 @@ export default function PlayerIdentityRow({
               {trailingCaption}
             </AppText>
           ) : null}
+          {secondaryTrailingValue ? (
+            <View style={styles.secondaryTrailingRow}>
+              <AppText style={styles.secondaryTrailingValue} numberOfLines={1}>
+                {secondaryTrailingValue}
+              </AppText>
+              {secondaryTrailingCaption ? (
+                <AppText style={styles.secondaryTrailingCaption} numberOfLines={1}>
+                  {' '}
+                  {secondaryTrailingCaption}
+                </AppText>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </TouchableOpacity>
@@ -235,5 +261,11 @@ function createStyles(colors: ThemeColors) {
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
     trailingValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
     trailingCaption: { fontSize: 10, color: colors.textTertiary, marginTop: 1 },
+    // Deliberately smaller/quieter than trailingValue/trailingCaption above
+    // — a supporting secondary figure (e.g. a projection next to a real
+    // score), never a second equally-weighted metric on the row.
+    secondaryTrailingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
+    secondaryTrailingValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+    secondaryTrailingCaption: { fontSize: 9, color: colors.textTertiary },
   });
 }

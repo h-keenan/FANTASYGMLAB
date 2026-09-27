@@ -32,6 +32,14 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     ),
     PageDefinition("my_team", "My Team", "ROSTER", "Hands-on roster management surface.", category="CORE", beta_visible=True),
     PageDefinition(
+        "matchup",
+        "Matchup",
+        "ROSTER",
+        "This week's real head-to-head: live Sleeper lineup/points for both rosters, plus real per-player weekly projections.",
+        category="CORE",
+        beta_visible=True,
+    ),
+    PageDefinition(
         "players",
         "Players",
         "ROSTER",

@@ -1146,6 +1146,14 @@ def render_account_panel(
             st.caption("No saved leagues yet.")
 
         ui_primitives.render_section_header("Preferences", weight="context")
+        # Discoverability audit (2026-09-26): Theme used to render only inside
+        # this collapsed "Profile preferences" expander — one extra click
+        # behind Account/login before a user could even see it, unlike
+        # mobile's More screen where Day/Night/System sits directly in
+        # Preferences with no expand step. Rendered directly here now, same
+        # component/logic, just no longer nested behind the expander.
+        _render_theme_mode_control(config)
+
         with st.expander("Profile preferences", expanded=False):
             settings_row = st.session_state.get("account_user_settings")
             onboarding_hidden = user_preferences.onboarding_is_dismissed(settings_row)
@@ -1169,9 +1177,6 @@ def render_account_panel(
                     st.warning("Onboarding could not be reset right now. Please try again.")
                 else:
                     st.success("League Orientation will appear again.")
-
-            st.markdown("---")
-            _render_theme_mode_control(config)
 
         # Sign-out gets its own visually distinct (danger-toned) surface rather
         # than sitting next to routine actions like Save league — mirrors the

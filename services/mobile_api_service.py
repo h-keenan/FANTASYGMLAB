@@ -100,6 +100,7 @@ from modules import (
     draft_assistant,
     draft_center_ui,
     faab,
+    gm_plan,
     gm_targets,
     injury_ui,
     league_history,
@@ -115,6 +116,7 @@ from modules import (
     player_awards,
     player_eligibility,
     player_history,
+    player_projections,
     player_quick_view,
     player_state_authority,
     players_refresh_flight,
@@ -2529,6 +2531,66 @@ def get_player_weekly_stats(
     }
 
 
+def _projection_summary_dict(result: dict[str, Any]) -> dict[str, Any]:
+    """Trim `modules.player_projections.project_player_week`'s output to the
+    fields a mobile client needs to render an honest per-game projection.
+
+    `status` drives the client's rendering: anything other than `"ok"` means
+    "no projection" (e.g. "No projection yet" / "Bye week") — the numeric
+    fields are always `None` for a non-"ok" status so a client can never
+    accidentally render a stale/fabricated number by skipping the status
+    check. Deliberately omits `basis` (recency-weighted internals) — that's
+    diagnostic detail this first pass doesn't need to ship to a client.
+    """
+
+    status = str(result.get("status") or "unknown_player")
+    summary: dict[str, Any] = {
+        "status": status,
+        "point_estimate": None,
+        "low": None,
+        "high": None,
+        "confidence": None,
+        "opponent": result.get("opponent"),
+    }
+    if status == "ok":
+        summary.update(
+            {
+                "point_estimate": result.get("point_estimate"),
+                "low": result.get("low"),
+                "high": result.get("high"),
+                "confidence": result.get("confidence"),
+            }
+        )
+    return summary
+
+
+def _weekly_projection_for_player(
+    player_id: str,
+    week: int,
+    season: int,
+    *,
+    players_lookup: dict[str, Any],
+    weekly_stats: dict[str, Any],
+    defense_strength: dict[str, Any],
+) -> dict[str, Any]:
+    """One player's per-game projection for one week, from data already
+    fetched once by the caller (never re-reads the season stats cache file
+    or recomputes defense strength per player/week — see the callers below).
+    """
+
+    record = weekly_stats.get(str(player_id))
+    weekly_rows = record.get("weekly") if isinstance(record, dict) else None
+    result = player_projections.project_player_week(
+        player_id,
+        week,
+        season,
+        players=players_lookup,
+        player_weekly_rows=weekly_rows or [],
+        defense_strength=defense_strength,
+    )
+    return _projection_summary_dict(result)
+
+
 @app.get("/v1/players/{player_id}/schedule")
 def get_player_schedule(
     player_id: str,
@@ -2540,6 +2602,15 @@ def get_player_schedule(
     is context only, never a scoring input). Empty when the player has no
     resolvable team (free agent / retired) or the schedule fetch fails —
     fails soft, same as every other enrichment endpoint here.
+
+    Each not-yet-played, non-bye week additionally carries a `projection`
+    (modules.player_projections.project_player_week — point estimate, low/
+    high band, confidence, honest edge-case status; see
+    `_projection_summary_dict`). Already-played weeks and byes carry
+    `projection: null` — that information is either already on the row
+    (the final score) or moot (bye), so this never draws two competing
+    numbers on one row. This is an ADDITIVE field: existing consumers of
+    this endpoint that don't know about `projection` are unaffected.
     """
 
     players_df = rankings.load_players(PLAYERS_DB_PATH)
@@ -2563,6 +2634,46 @@ def get_player_schedule(
         opponent = week.get("opponent")
         entry = defense_strength.get(str(opponent)) if opponent else None
         week["opponent_defense_tier"] = entry["tier"] if entry else None
+
+    # Per-game projection for the remaining (not-yet-played, non-bye)
+    # schedule. Only fetched/computed at all when at least one such week
+    # exists — a fully-played or bye-only schedule (e.g. a look-back at a
+    # finished season) never touches the projection data sources. When it
+    # does run, players lookup / season weekly stats / opponent-defense
+    # signal are each fetched ONCE for the whole request, not once per week
+    # — see `_weekly_projection_for_player`'s own docstring for why that
+    # matters.
+    projectable_weeks = [week for week in weeks if not week.get("bye") and not week.get("played")]
+    if not projectable_weeks:
+        for week in weeks:
+            week["projection"] = None
+    else:
+        try:
+            players_lookup = sleeper.get_players()
+            weekly_stats = sleeper.get_season_player_stats(season=season, retain_weekly=True)
+            projection_defense_strength = player_projections.team_defense_points_allowed_by_position(
+                season, weekly_stats=weekly_stats, players=players_lookup
+            )
+            for week in weeks:
+                if week.get("bye") or week.get("played"):
+                    week["projection"] = None
+                    continue
+                week["projection"] = _weekly_projection_for_player(
+                    player_id,
+                    int(week["week"]),
+                    season,
+                    players_lookup=players_lookup,
+                    weekly_stats=weekly_stats,
+                    defense_strength=projection_defense_strength,
+                )
+        except Exception:
+            # Best-effort enrichment, same "fails soft" contract as every
+            # other enrichment fetch in this file — a transient issue
+            # loading player-stats/defense data must never break the real
+            # schedule data already built above.
+            for week in weeks:
+                week.setdefault("projection", None)
+
     return {"ok": True, "team": str(team), "season": season, "weeks": weeks}
 
 
@@ -3729,6 +3840,112 @@ def get_league_dashboard(
     }
 
 
+@app.get("/v1/leagues/{league_id}/gm-plan")
+def get_gm_plan(
+    league_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """A season-phase-aware roadmap, conditioned on the caller's declared
+    Team Situation stance (modules.team_stance — Rebuilding / Competing /
+    Balanced; NOT the older, valuation-affecting "GM Stance" team-strategy
+    system at /v1/leagues/{league_id}/gm-stance, which this endpoint never
+    reads for framing purposes beyond the pass-through `strategy` argument
+    the shared trade-idea search already requires).
+
+    A season-arc complement to the Dashboard's one-off "Next Move" tile
+    (get_league_dashboard) — not a replacement for it. Purely additive
+    aggregation: every module.gm_plan.build_gm_plan input below is an
+    ALREADY-COMPUTED output of an existing engine
+    (modules.league_rankings.build_league_rankings_frame_cached for
+    power/draft-capital/roster-construction ranks,
+    modules.trade_hub_engine.generate_trade_idea_records_cached for trade
+    ideas — the same stance-framed records the Dashboard's trade tile
+    uses). No new valuation math is introduced here.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return {"ok": True, "quiet": True, "focus_areas": [], "reason": reason}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    # Same "leg"/"week" field modules.league_standings already reads off
+    # Sleeper's raw league settings — reused, not recomputed.
+    raw_settings = league.get("settings") or {}
+    current_week = raw_settings.get("leg") or raw_settings.get("week")
+    playoff_week_start = raw_settings.get("playoff_week_start")
+    season_phase = gm_plan.derive_season_phase(current_week, playoff_week_start)
+
+    declared_team_stance = _fetch_team_stance(config, user_id, access_token, league_id)
+
+    rankings_row: dict[str, Any] | None = None
+    total_teams: int | None = None
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if not rankings_frame.empty:
+        total_teams = int(len(rankings_frame))
+        my_roster_id = str(my_roster.get("roster_id") or "")
+        match = rankings_frame[rankings_frame["roster_id"].astype(str) == my_roster_id]
+        if not match.empty:
+            rankings_row = {
+                key: _clean_json_value(value) for key, value in match.iloc[0].to_dict().items()
+            }
+
+    trade_idea_records: list[dict[str, Any]] = []
+    try:
+        team_strategy, _ = _fetch_gm_stance_with_set_flag(
+            config, access_token, user_id=user_id, league_id=league_id
+        )
+        gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+            config, user_id, access_token, league_id
+        )
+        trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
+            league_id=league_id,
+            roster_id=int(my_roster.get("roster_id")),
+            strategy=team_strategy,
+            lens=lens,
+            players_db_path=PLAYERS_DB_PATH,
+            untouchable_player_ids=gm_untouchable_ids,
+            gm_target_player_ids=gm_target_ids,
+            team_stance=declared_team_stance,
+        )
+    except (TypeError, ValueError):
+        trade_idea_records = []
+
+    roster_settings = my_roster.get("settings") or {}
+    record = {
+        "wins": roster_settings.get("wins"),
+        "losses": roster_settings.get("losses"),
+        "ties": roster_settings.get("ties"),
+    }
+
+    plan = gm_plan.build_gm_plan(
+        team_stance=declared_team_stance,
+        season_phase=season_phase,
+        rankings_row=rankings_row,
+        total_teams=total_teams,
+        record=record,
+        trade_ideas=trade_idea_records,
+    )
+
+    return {"ok": True, "quiet": False, "reason": "", **plan}
+
+
 # Display order for My Team's starters section — matches
 # modules.team_eval.suggest_optimal_lineup's own slot-assignment order.
 # Bench keeps the frame's existing sort_score-descending order untouched.
@@ -4031,19 +4248,58 @@ def _matchup_side(
     }
 
 
-def _project_real_starter_row(row: pd.Series, score_field: str, actual_points: Any) -> dict[str, Any]:
+def _project_real_starter_row(
+    row: pd.Series,
+    score_field: str,
+    actual_points: Any,
+    *,
+    projection_context: "_ProjectionContext | None",
+) -> dict[str, Any]:
     """One REAL current-week starter row: a player Sleeper says is actually
     starting this week, enriched via the same identity helper the suggested
-    lineup uses, plus his real point total scored so far this week.
+    lineup uses, plus his real point total scored so far this week and (when
+    `projection_context` is available) this week's per-game projection —
+    additive, clearly separate from `actual_points`, never a substitute for
+    it. See `_projection_summary_dict` for the honest-edge-case shape.
     """
 
     fields = _matchup_player_identity_fields(row, score_field)
     fields["actual_points"] = round(float(actual_points), 2) if isinstance(actual_points, (int, float)) else None
+    fields["projection"] = (
+        _weekly_projection_for_player(
+            str(row.get("player_id") or ""),
+            projection_context.week,
+            projection_context.season,
+            players_lookup=projection_context.players_lookup,
+            weekly_stats=projection_context.weekly_stats,
+            defense_strength=projection_context.defense_strength,
+        )
+        if projection_context is not None
+        else None
+    )
     return fields
 
 
+@dataclasses.dataclass(frozen=True)
+class _ProjectionContext:
+    """Everything `_weekly_projection_for_player` needs, fetched/computed
+    ONCE per matchup request rather than once per starter — see that
+    function's own docstring for why a per-player refetch would be wasteful.
+    """
+
+    week: int
+    season: int
+    players_lookup: dict[str, Any]
+    weekly_stats: dict[str, Any]
+    defense_strength: dict[str, Any]
+
+
 def _real_current_lineup(
-    matchup_entry: dict[str, Any], valued: pd.DataFrame, score_field: str
+    matchup_entry: dict[str, Any],
+    valued: pd.DataFrame,
+    score_field: str,
+    *,
+    projection_context: "_ProjectionContext | None" = None,
 ) -> dict[str, Any]:
     """This roster's ACTUAL current-week lineup and points, straight from Sleeper.
 
@@ -4079,11 +4335,18 @@ def _real_current_lineup(
         actual_points = starters_points[index] if index < len(starters_points) else None
         row = valued_by_id.get(player_id)
         if row is not None:
-            rows.append(_project_real_starter_row(row, score_field, actual_points))
+            rows.append(
+                _project_real_starter_row(
+                    row, score_field, actual_points, projection_context=projection_context
+                )
+            )
         else:
             # A real Sleeper starter who isn't in our valued pool (e.g. a
             # team DEF, or filtered out upstream) — still show his real
-            # points, just without season-value enrichment.
+            # points, just without season-value enrichment. `project_player_week`
+            # itself returns `unknown_player` for an id it can't resolve, so
+            # this still gets an honest projection status rather than a bare
+            # None field.
             rows.append(
                 {
                     "player_id": player_id,
@@ -4099,6 +4362,18 @@ def _real_current_lineup(
                     "opportunity_label": None,
                     "overall_rating": None,
                     "actual_points": round(float(actual_points), 2) if isinstance(actual_points, (int, float)) else None,
+                    "projection": (
+                        _weekly_projection_for_player(
+                            player_id,
+                            projection_context.week,
+                            projection_context.season,
+                            players_lookup=projection_context.players_lookup,
+                            weekly_stats=projection_context.weekly_stats,
+                            defense_strength=projection_context.defense_strength,
+                        )
+                        if projection_context is not None
+                        else None
+                    ),
                 }
             )
 
@@ -4309,9 +4584,42 @@ def get_league_matchup(
 
     # Additive: each side's REAL current-week lineup/points from Sleeper's
     # own matchup entry, alongside the (unchanged) suggested season-value
-    # lineup already built into my_side/opponent_side above.
-    my_side.update(_real_current_lineup(my_entry, valued, score_field))
-    opponent_side.update(_real_current_lineup(opponent_entry, valued, score_field))
+    # lineup already built into my_side/opponent_side above. Each real
+    # starter also carries this week's per-game `projection` (point
+    # estimate/low/high/confidence/honest status) — computed from data
+    # fetched ONCE for the whole request (both rosters), not once per
+    # player, via `_ProjectionContext`/`_weekly_projection_for_player`. Only
+    # attempted at all when at least one side actually has a live lineup to
+    # enrich, and treated as best-effort (same "fails soft" contract as
+    # every other enrichment fetch in this file) — a projection-data hiccup
+    # must never break the real Sleeper lineup/points response.
+    projection_context = None
+    has_any_real_starters = bool(my_entry.get("starters")) or bool(opponent_entry.get("starters"))
+    if has_any_real_starters:
+        try:
+            projection_season = sleeper.default_player_stats_season()
+            projection_players_lookup = sleeper.get_players()
+            projection_weekly_stats = sleeper.get_season_player_stats(
+                season=projection_season, retain_weekly=True
+            )
+            projection_context = _ProjectionContext(
+                week=current_week,
+                season=projection_season,
+                players_lookup=projection_players_lookup,
+                weekly_stats=projection_weekly_stats,
+                defense_strength=player_projections.team_defense_points_allowed_by_position(
+                    projection_season,
+                    upto_week=current_week - 1,
+                    weekly_stats=projection_weekly_stats,
+                    players=projection_players_lookup,
+                ),
+            )
+        except Exception:
+            projection_context = None
+    my_side.update(_real_current_lineup(my_entry, valued, score_field, projection_context=projection_context))
+    opponent_side.update(
+        _real_current_lineup(opponent_entry, valued, score_field, projection_context=projection_context)
+    )
 
     return {
         "ok": True,

@@ -338,6 +338,12 @@ export interface MatchupRealStarter {
   overall_rating: number | null;
   /** This starter's real points scored so far this week. Null only if Sleeper didn't report a value for him. */
   actual_points: number | null;
+  /** This week's per-game projection (modules.player_projections) — a
+   * separate, clearly-labeled figure from `actual_points`, never a
+   * substitute for it. Null when the projection enrichment couldn't run
+   * (best-effort; see services/mobile_api_service.py's fails-soft
+   * contract) — render nothing rather than a guess. */
+  projection: PlayerWeekProjection | null;
 }
 
 export interface MatchupSide {
@@ -648,6 +654,71 @@ export const DEFAULT_TEAM_STRATEGY: TeamStrategy = 'retool';
 
 export function teamStrategyForStance(stance: TeamStance | ''): TeamStrategy {
   return stance ? TEAM_STANCE_TO_STRATEGY[stance] : DEFAULT_TEAM_STRATEGY;
+}
+
+/**
+ * GM Plan — a season-arc roadmap layer, additive on top of the Dashboard's
+ * one-off "Next Move" tile. Conditioned on the declared Team Situation
+ * stance above (NOT the separate GM Stance/team-strategy system). Every
+ * item in a focus area traces to an already-computed signal server-side
+ * (a real trade idea, a real rank) — see modules.gm_plan on the backend.
+ */
+export type GmPlanSeasonPhase =
+  | 'early_season'
+  | 'trade_deadline_approach'
+  | 'playoff_push'
+  | 'offseason_adjacent';
+
+export type GmPlanFocusStatus = 'signal_found' | 'no_signal';
+
+export interface GmPlanRankItem {
+  label: string;
+  rank: number;
+  total_teams: number | null;
+  tied: boolean;
+  source: string;
+  relative_weak_spot?: boolean;
+}
+
+export interface GmPlanRecordItem {
+  label: 'Record';
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  source: string;
+}
+
+export interface GmPlanTradeItem {
+  partner_team_name: string;
+  my_player: string;
+  their_player: string;
+  rationale: string;
+  trade_confidence_label: string;
+  priority: number | null;
+  source: string;
+}
+
+export type GmPlanFocusItem = GmPlanRankItem | GmPlanRecordItem | GmPlanTradeItem;
+
+export interface GmPlanFocusArea {
+  key: 'standing' | 'trade_opportunities' | 'roster_construction';
+  title: string;
+  framing?: string;
+  status: GmPlanFocusStatus;
+  items: GmPlanFocusItem[];
+  watch_for: string;
+}
+
+export interface GmPlanResponse {
+  ok: boolean;
+  quiet: boolean;
+  reason: string;
+  season_phase?: GmPlanSeasonPhase;
+  season_phase_label?: string;
+  team_stance?: TeamStance | '';
+  team_stance_label?: string;
+  headline?: string;
+  focus_areas: GmPlanFocusArea[];
 }
 
 export interface TradeCounterAction {
@@ -1011,6 +1082,34 @@ export interface CareerResponse {
  * app, and both line fields are null once the market hasn't published that
  * far out yet — never estimated client-side.
  */
+/**
+ * A single-week fantasy-point projection from
+ * modules.player_projections.project_player_week — the first real per-game
+ * projection feed in this app (distinct from the season-long value/
+ * opportunity score used everywhere else). `status` drives rendering:
+ * anything other than `"ok"` means "no projection" and every numeric field
+ * is null — never a fabricated number. Honest statuses: `"bye_week"`,
+ * `"no_opponent"` / `"no_schedule_data"`, `"insufficient_player_data"`,
+ * `"unsupported_position"` (K/DEF/IDP — no defense-by-position signal
+ * exists for them), `"unknown_player"` / `"no_team"`.
+ */
+export interface PlayerWeekProjection {
+  status:
+    | 'ok'
+    | 'bye_week'
+    | 'no_opponent'
+    | 'no_schedule_data'
+    | 'insufficient_player_data'
+    | 'unsupported_position'
+    | 'unknown_player'
+    | 'no_team';
+  point_estimate: number | null;
+  low: number | null;
+  high: number | null;
+  confidence: 'low' | 'medium' | 'high' | null;
+  opponent: string | null;
+}
+
 export interface ScheduleWeek {
   week: number;
   opponent: string | null;
@@ -1025,6 +1124,10 @@ export interface ScheduleWeek {
    * a scoring input, display only. Null when that team has no completed
    * games yet to rank it by. */
   opponent_defense_tier: 'tough' | 'average' | 'weak' | null;
+  /** This week's per-game projection — null for an already-played week (the
+   * final score above already answers it) or a bye (nothing to project).
+   * See `PlayerWeekProjection`. */
+  projection: PlayerWeekProjection | null;
 }
 
 export interface ScheduleResponse {
@@ -1584,6 +1687,14 @@ export const api = {
     authorizedFetch<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`),
   setTeamStance: (leagueId: string, stance: TeamStance) =>
     authorizedPost<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`, { stance }),
+  getGmPlan: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<GmPlanResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/gm-plan${query ? `?${query}` : ''}`,
+    );
+  },
   registerPushToken: (expoPushToken: string, platform: string, deviceName = '') =>
     authorizedPost<PushMutationResponse>('/v1/push/register', {
       expo_push_token: expoPushToken,

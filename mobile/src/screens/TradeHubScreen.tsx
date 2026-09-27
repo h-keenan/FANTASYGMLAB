@@ -213,10 +213,23 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
           <EvaluationLensHeaderButton leagueId={leagueId} />
           <GmStanceHeaderButton leagueId={leagueId} />
+          {/* Discoverability audit (2026-09-26): Trade History had exactly one
+              path in (More -> Your Team), even though "did my trade work out"
+              is a Trade Hub question first. Same icon-button pattern as the
+              three buttons to its left — no new header affordance invented. */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('TradeHistory')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Trade History"
+            accessibilityHint="Trades you've confirmed and how they've worked out"
+          >
+            <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
       ),
     });
-  }, [navigation, leagueId, lens]);
+  }, [navigation, leagueId, lens, colors.textSecondary]);
 
   const load = useCallback(
     async (nextStrategy: TeamStrategy, nextAdUnlocks: number, nextLens: ValuationLens) => {
