@@ -39,9 +39,11 @@ def _clear_trade_hub_ideas_cache():
 
     trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
     league_rankings._build_league_rankings_frame_cached.cache_clear()
+    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
     yield
     trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
     league_rankings._build_league_rankings_frame_cached.cache_clear()
+    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
 
 
 def test_render_yaml_documents_mobile_api_service():
@@ -841,6 +843,71 @@ def test_draft_picks_returns_real_pick_assets(monkeypatch):
         assert pick["pick_id"] == f"{pick['season']}:{pick['round']}:{pick['original_roster_id']}"
         assert pick["owner_roster_id"] in {"1", "2"}
         assert isinstance(pick["score"], (int, float))
+
+
+def test_draft_center_and_draft_picks_share_one_cached_league_summary(monkeypatch):
+    # Draft Center's posture/decision cards and Draft Picks' per-pick
+    # valuation breakdown both start from the identical (league, lens)
+    # question to modules.league_rankings.build_league_summary_and_draft_capital
+    # — the same real per-roster Power/Franchise/Draft-Capital pass Team
+    # Rankings/Dashboard already share one cache entry for (see
+    # test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame
+    # above). This pins that Draft Center -> Draft Picks (a common
+    # navigation within the same session) hits ONE cached entry via
+    # build_league_summary_and_draft_capital_cached instead of each
+    # independently rerunning that pass from scratch.
+    client = _client(monkeypatch)
+    from modules import league_rankings
+
+    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    fake_rosters, fake_users = _draft_center_rosters_and_users()
+
+    call_count = {"n": 0}
+    real_build = league_rankings.build_league_summary_and_draft_capital
+
+    def counting_build(*args, **kwargs):
+        call_count["n"] += 1
+        return real_build(*args, **kwargs)
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch(
+            "requests.get",
+            side_effect=[auth_user_response, profile_response, auth_user_response],
+        ))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE))
+        stack.enter_context(patch("modules.sleeper.get_rosters", return_value=fake_rosters))
+        stack.enter_context(patch("modules.sleeper.get_users", return_value=fake_users))
+        stack.enter_context(patch("modules.sleeper.get_traded_picks", return_value=[]))
+        stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_roster_frame()))
+        stack.enter_context(patch(
+            "modules.player_eligibility.filter_current_fantasy_players",
+            side_effect=lambda df, **kwargs: df,
+        ))
+        stack.enter_context(patch.object(
+            league_rankings, "build_league_summary_and_draft_capital", side_effect=counting_build
+        ))
+
+        draft_center_response = client.get(
+            "/v1/leagues/abc/draft-center",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        draft_picks_response = client.get(
+            "/v1/leagues/abc/draft-picks",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert draft_center_response.status_code == 200
+    assert draft_picks_response.status_code == 200
+    assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
+
+    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
 
 
 def test_draft_picks_blends_crowd_scouting_signal_when_enabled(monkeypatch):
