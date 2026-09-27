@@ -26,6 +26,7 @@ import {
   type MatchupResponse,
   type MatchupSide,
   type MatchupStarter,
+  type PlayerWeekProjection,
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -183,6 +184,37 @@ function deriveContextLine(player: MatchupStarter): string | null {
   if (parts.length === 0) return null;
   const phrase = parts.join(' · ');
   return phrase.charAt(0).toUpperCase() + phrase.slice(1);
+}
+
+/**
+ * The REAL lineup's secondary (never-competing) trailing figure: this
+ * week's per-game projection (modules.player_projections), rendered next to
+ * — never instead of — the row's real `actual_points`. Honors every honest
+ * edge-case status from `project_player_week`: an "ok" projection renders
+ * as a small "Proj X.X" + confidence caption; a handful of statuses that
+ * are meaningful to a user watching their own lineup (bye, no market/
+ * schedule data yet, not enough recent games) render a short plain-English
+ * note instead; anything else (e.g. `unsupported_position` for a K/DEF,
+ * or a missing projection object entirely) renders nothing at all rather
+ * than a confusing "no projection" note on a row that was never going to
+ * have one.
+ */
+function projectionSecondary(
+  projection: PlayerWeekProjection | null | undefined,
+): { value: string | null; caption: string | null } {
+  if (!projection) return { value: null, caption: null };
+  if (projection.status === 'ok' && projection.point_estimate != null) {
+    return {
+      value: `Proj ${projection.point_estimate.toFixed(1)}`,
+      caption: projection.confidence ? `${projection.confidence} conf` : null,
+    };
+  }
+  if (projection.status === 'bye_week') return { value: 'Bye week', caption: null };
+  if (projection.status === 'insufficient_player_data') return { value: 'No projection yet', caption: null };
+  if (projection.status === 'no_opponent' || projection.status === 'no_schedule_data') {
+    return { value: 'No matchup data', caption: null };
+  }
+  return { value: null, caption: null };
 }
 
 export default function MatchupScreen({ route, navigation }: Props) {
@@ -504,25 +536,33 @@ function RealLineupSection({
         ) : null}
       </View>
       <AnimatedCard style={styles.sectionCard}>
-        {side.real_starters.map((player, index) => (
-          <PlayerIdentityRow
-            key={`${side.roster_id}-real-${player.player_id}`}
-            playerId={player.player_id}
-            name={player.name}
-            position={player.position}
-            team={player.team}
-            tier={player.tier}
-            opportunityLabel={player.opportunity_label}
-            // Same injury_label/tone rule as the suggested lineup below —
-            // IR/PUP/season-ending arrives on `status`, not `injury_status`.
-            injuryLabel={player.injury_label}
-            injuryTone={waiverInjuryDisplay(player.injury_status).tone}
-            trailingValue={player.actual_points != null ? player.actual_points.toFixed(1) : '—'}
-            trailingCaption="PTS"
-            onPress={() => onPressPlayer(player)}
-            showDivider={index < side.real_starters.length - 1}
-          />
-        ))}
+        {side.real_starters.map((player, index) => {
+          const projection = projectionSecondary(player.projection);
+          return (
+            <PlayerIdentityRow
+              key={`${side.roster_id}-real-${player.player_id}`}
+              playerId={player.player_id}
+              name={player.name}
+              position={player.position}
+              team={player.team}
+              tier={player.tier}
+              opportunityLabel={player.opportunity_label}
+              // Same injury_label/tone rule as the suggested lineup below —
+              // IR/PUP/season-ending arrives on `status`, not `injury_status`.
+              injuryLabel={player.injury_label}
+              injuryTone={waiverInjuryDisplay(player.injury_status).tone}
+              trailingValue={player.actual_points != null ? player.actual_points.toFixed(1) : '—'}
+              trailingCaption="PTS"
+              // Per-game projection — a small secondary figure under the
+              // real live score, never a competing primary number (Magna
+              // Carta's one-dominant-metric rule). See projectionSecondary.
+              secondaryTrailingValue={projection.value}
+              secondaryTrailingCaption={projection.caption}
+              onPress={() => onPressPlayer(player)}
+              showDivider={index < side.real_starters.length - 1}
+            />
+          );
+        })}
       </AnimatedCard>
     </View>
   );

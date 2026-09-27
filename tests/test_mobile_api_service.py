@@ -2863,6 +2863,178 @@ def test_schedule_returns_empty_for_a_player_with_no_team(monkeypatch):
     assert response.json() == {"ok": True, "team": None, "weeks": []}
 
 
+def test_schedule_attaches_a_projection_to_each_unplayed_non_bye_week(monkeypatch):
+    """modules.player_projections.project_player_week's output is additive
+    on the schedule endpoint: a played week already has its final score, and
+    a bye week has neither a game nor an opponent — neither draws a second,
+    possibly-confusing number next to it. Only the remaining unplayed weeks
+    get a `projection`, and the shared inputs (players lookup, season
+    weekly stats, opponent-defense signal) are fetched/computed once for
+    the whole request, not once per week.
+    """
+
+    from modules import nfl_schedule, player_projections
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame(
+        [{"player_id": "9001", "name": "Test Runner", "position": "RB", "team": "KC"}]
+    )
+    fake_weeks = [
+        {
+            "week": 1,
+            "opponent": "BUF",
+            "is_home": True,
+            "spread_line": -2.5,
+            "total_line": 47.5,
+            "played": True,
+            "team_score": 24.0,
+            "opponent_score": 20.0,
+        },
+        {
+            "week": 2,
+            "opponent": None,
+            "is_home": None,
+            "spread_line": None,
+            "total_line": None,
+            "played": False,
+            "team_score": None,
+            "opponent_score": None,
+            "bye": True,
+        },
+        {
+            "week": 3,
+            "opponent": "MIA",
+            "is_home": False,
+            "spread_line": 1.5,
+            "total_line": 44.0,
+            "played": False,
+            "team_score": None,
+            "opponent_score": None,
+        },
+    ]
+
+    fake_projection = {
+        "status": "ok",
+        "player_id": "9001",
+        "position": "RB",
+        "team": "KC",
+        "week": 3,
+        "opponent": "MIA",
+        "point_estimate": 14.2,
+        "low": 9.8,
+        "high": 18.6,
+        "confidence": "medium",
+        "basis": {"recent_games_played": 3},
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            with patch.object(nfl_schedule, "team_schedule", return_value=fake_weeks):
+                with patch.object(nfl_schedule, "team_defense_strength", return_value={}):
+                    with patch("modules.sleeper.get_players", return_value={"9001": {"position": "RB", "team": "KC"}}):
+                        with patch(
+                            "modules.sleeper.get_season_player_stats",
+                            return_value={"9001": {"weekly": [{"week": 1, "fantasy_points_ppr": 12.0}]}},
+                        ):
+                            with patch.object(
+                                player_projections,
+                                "team_defense_points_allowed_by_position",
+                                return_value={},
+                            ) as mock_defense_by_position:
+                                with patch.object(
+                                    player_projections, "project_player_week", return_value=fake_projection
+                                ) as mock_project:
+                                    response = client.get(
+                                        "/v1/players/9001/schedule",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    weeks_by_number = {week["week"]: week for week in response.json()["weeks"]}
+
+    # Played week: the final score already answers this — no projection.
+    assert weeks_by_number[1]["projection"] is None
+    # Bye week: nothing to project.
+    assert weeks_by_number[2]["projection"] is None
+    # The one unplayed, non-bye week gets the trimmed projection summary.
+    projection = weeks_by_number[3]["projection"]
+    assert projection == {
+        "status": "ok",
+        "point_estimate": 14.2,
+        "low": 9.8,
+        "high": 18.6,
+        "confidence": "medium",
+        "opponent": "MIA",
+    }
+
+    # Shared inputs computed once for the whole request, not once per week.
+    assert mock_defense_by_position.call_count == 1
+    mock_project.assert_called_once()
+    assert mock_project.call_args.args[1] == 3
+
+
+def test_schedule_projection_honors_an_edge_case_status_without_a_fabricated_number(monkeypatch):
+    """A non-"ok" status from project_player_week (e.g. a rookie with no
+    recent-week production yet) must never be paired with a made-up number
+    — every numeric field stays null so the client renders "No projection
+    yet" instead of a false-precision figure.
+    """
+
+    from modules import nfl_schedule, player_projections
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    players_df = pd.DataFrame([{"player_id": "9002", "name": "Rookie WR", "position": "WR", "team": "KC"}])
+    fake_weeks = [
+        {
+            "week": 1,
+            "opponent": "BUF",
+            "is_home": True,
+            "spread_line": None,
+            "total_line": None,
+            "played": False,
+            "team_score": None,
+            "opponent_score": None,
+        }
+    ]
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=players_df):
+            with patch.object(nfl_schedule, "team_schedule", return_value=fake_weeks):
+                with patch.object(nfl_schedule, "team_defense_strength", return_value={}):
+                    with patch("modules.sleeper.get_players", return_value={}):
+                        with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                            with patch.object(
+                                player_projections, "team_defense_points_allowed_by_position", return_value={}
+                            ):
+                                with patch.object(
+                                    player_projections,
+                                    "project_player_week",
+                                    return_value={"status": "insufficient_player_data", "player_id": "9002"},
+                                ):
+                                    response = client.get(
+                                        "/v1/players/9002/schedule",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    projection = response.json()["weeks"][0]["projection"]
+    assert projection == {
+        "status": "insufficient_player_data",
+        "point_estimate": None,
+        "low": None,
+        "high": None,
+        "confidence": None,
+        "opponent": None,
+    }
+
+
 def test_schedule_returns_empty_for_an_unknown_player(monkeypatch):
     client = _client(monkeypatch)
 
@@ -6242,6 +6414,88 @@ def test_matchup_real_lineup_handles_a_starter_missing_from_the_valued_pool(monk
     assert by_id["mine1"]["actual_points"] == 20.5
     assert by_id["DEN"]["name"] is None
     assert by_id["DEN"]["actual_points"] == 6.0
+
+
+def test_matchup_real_starters_carry_a_per_game_projection(monkeypatch):
+    """Each REAL (actual) starter also carries this week's per-game
+    projection from modules.player_projections.project_player_week —
+    additive, and clearly a separate figure from the real `actual_points`
+    next to it. Shared projection inputs (players lookup, season weekly
+    stats, opponent-defense signal) are fetched/computed once for the whole
+    request (both rosters), not once per starter.
+    """
+
+    from modules import player_projections
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [20.5], "points": 20.5},
+        {"roster_id": 2, "matchup_id": 3, "starters": ["opp1"], "starters_points": [10.0], "points": 10.0},
+    ]
+
+    fake_projection = {
+        "status": "ok",
+        "point_estimate": 18.4,
+        "low": 14.0,
+        "high": 22.8,
+        "confidence": "high",
+        "opponent": "BUF",
+    }
+
+    with _matchup_world(matchups):
+        with patch("modules.sleeper.get_players", return_value={}):
+            with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                with patch.object(
+                    player_projections, "team_defense_points_allowed_by_position", return_value={}
+                ) as mock_defense:
+                    with patch.object(
+                        player_projections, "project_player_week", return_value=fake_projection
+                    ) as mock_project:
+                        response = client.get(
+                            "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
+                        )
+
+    body = response.json()
+    mine_starter = body["my_team"]["real_starters"][0]
+    projection = mine_starter["projection"]
+    assert projection == {
+        "status": "ok",
+        "point_estimate": 18.4,
+        "low": 14.0,
+        "high": 22.8,
+        "confidence": "high",
+        "opponent": "BUF",
+    }
+    # Distinct field from, never confused with, the real live points.
+    assert mine_starter["actual_points"] == 20.5
+
+    # Computed once for the whole request (both rosters), not once per
+    # starter — see _ProjectionContext/_weekly_projection_for_player.
+    assert mock_defense.call_count == 1
+    assert mock_project.call_count == 2
+
+
+def test_matchup_real_lineup_projection_fails_soft_on_error(monkeypatch):
+    """A transient failure building the projection inputs must never break
+    the real Sleeper lineup/points response itself — the client just gets
+    `projection: null` per starter, same "fails soft" contract as every
+    other enrichment fetch in this file.
+    """
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [20.5], "points": 20.5},
+        {"roster_id": 2, "matchup_id": 3},
+    ]
+
+    with _matchup_world(matchups):
+        with patch("modules.sleeper.get_players", side_effect=RuntimeError("boom")):
+            response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    mine_starter = response.json()["my_team"]["real_starters"][0]
+    assert mine_starter["projection"] is None
+    assert mine_starter["actual_points"] == 20.5
 
 
 def test_trade_outcomes_requires_auth(monkeypatch):

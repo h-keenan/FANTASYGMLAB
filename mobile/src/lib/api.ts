@@ -338,6 +338,12 @@ export interface MatchupRealStarter {
   overall_rating: number | null;
   /** This starter's real points scored so far this week. Null only if Sleeper didn't report a value for him. */
   actual_points: number | null;
+  /** This week's per-game projection (modules.player_projections) — a
+   * separate, clearly-labeled figure from `actual_points`, never a
+   * substitute for it. Null when the projection enrichment couldn't run
+   * (best-effort; see services/mobile_api_service.py's fails-soft
+   * contract) — render nothing rather than a guess. */
+  projection: PlayerWeekProjection | null;
 }
 
 export interface MatchupSide {
@@ -989,6 +995,34 @@ export interface CareerResponse {
  * app, and both line fields are null once the market hasn't published that
  * far out yet — never estimated client-side.
  */
+/**
+ * A single-week fantasy-point projection from
+ * modules.player_projections.project_player_week — the first real per-game
+ * projection feed in this app (distinct from the season-long value/
+ * opportunity score used everywhere else). `status` drives rendering:
+ * anything other than `"ok"` means "no projection" and every numeric field
+ * is null — never a fabricated number. Honest statuses: `"bye_week"`,
+ * `"no_opponent"` / `"no_schedule_data"`, `"insufficient_player_data"`,
+ * `"unsupported_position"` (K/DEF/IDP — no defense-by-position signal
+ * exists for them), `"unknown_player"` / `"no_team"`.
+ */
+export interface PlayerWeekProjection {
+  status:
+    | 'ok'
+    | 'bye_week'
+    | 'no_opponent'
+    | 'no_schedule_data'
+    | 'insufficient_player_data'
+    | 'unsupported_position'
+    | 'unknown_player'
+    | 'no_team';
+  point_estimate: number | null;
+  low: number | null;
+  high: number | null;
+  confidence: 'low' | 'medium' | 'high' | null;
+  opponent: string | null;
+}
+
 export interface ScheduleWeek {
   week: number;
   opponent: string | null;
@@ -1003,6 +1037,10 @@ export interface ScheduleWeek {
    * a scoring input, display only. Null when that team has no completed
    * games yet to rank it by. */
   opponent_defense_tier: 'tough' | 'average' | 'weak' | null;
+  /** This week's per-game projection — null for an already-played week (the
+   * final score above already answers it) or a bye (nothing to project).
+   * See `PlayerWeekProjection`. */
+  projection: PlayerWeekProjection | null;
 }
 
 export interface ScheduleResponse {
