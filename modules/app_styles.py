@@ -5900,10 +5900,14 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
 }
 :root {
-    --dg-smoke-dark: rgba(7, 8, 11, 0.72);
-    --dg-smoke-mid: rgba(24, 25, 29, 0.54);
+    /* -dark/-mid/-border (the only 3 consumed via var() below) were fixed
+       dark literals -- no light variant, unlike -light-ready below them.
+       Every "smoke glass" card stayed dark-tinted in light mode. Rebuilt
+       from existing tokens so they resolve per-theme; dark values ~match. */
+    --dg-smoke-dark: color-mix(in srgb, var(--color-bg) 72%, transparent);
+    --dg-smoke-mid: color-mix(in srgb, var(--color-surface-secondary) 54%, transparent);
     --dg-smoke-ash: rgba(229, 231, 235, 0.075);
-    --dg-smoke-border: rgba(229, 231, 235, 0.13);
+    --dg-smoke-border: color-mix(in srgb, var(--color-text-secondary) 13%, transparent);
     --dg-smoke-border-strong: rgba(248, 250, 252, 0.2);
     --dg-smoke-light-ready: rgba(238, 238, 235, 0.62);
     --dg-smoke-light-border-ready: rgba(32, 32, 34, 0.14);

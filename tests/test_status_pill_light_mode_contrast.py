@@ -272,3 +272,30 @@ def test_dg_status_badge_tone_variants_are_reachable_and_styled():
     base_block = _rule_block(APP_CSS, ".dg-status-badge {")
     assert "display: inline-flex;" in base_block
     assert "padding:" in base_block
+
+
+def test_dg_smoke_card_glass_tokens_are_theme_aware():
+    # Bug: --dg-smoke-dark/-mid/-border (the only three --dg-smoke-* custom
+    # properties actually consumed via var(), by the shared "glass" background
+    # rule for .home-command-card, .summary-tile, .decision-panel, .trade-card,
+    # .free-agent-card, .roster-limit-stat, .platform-sidebar-card, and others)
+    # were fixed near-black rgba literals with no light-mode counterpart, even
+    # though --dg-smoke-light-ready / -light-border-ready sit right next to
+    # them, unused -- clear evidence a light variant was prepared and never
+    # wired in. Every one of those "smoke glass" cards rendered dark-tinted
+    # regardless of the active theme. Fixed by deriving the three consumed
+    # properties from existing surface/text tokens via color-mix(), so they
+    # resolve per-theme automatically instead of needing a second literal.
+    root_block = _rule_block(APP_CSS, "--dg-smoke-dark:")
+    assert "color-mix(in srgb, var(--color-bg) 72%, transparent)" in root_block
+    assert "color-mix(in srgb, var(--color-surface-secondary) 54%, transparent)" in root_block
+    assert "color-mix(in srgb, var(--color-text-secondary) 13%, transparent)" in root_block
+    assert "rgba(7, 8, 11, 0.72)" not in root_block
+    assert "rgba(24, 25, 29, 0.54)" not in root_block
+
+    # The consuming rule itself is untouched -- still reads through var(), so
+    # every card in its selector list benefits without a per-card patch.
+    glass_rule = _rule_block(APP_CSS, ".home-command-card,\n.team-identity-card,")
+    assert "var(--dg-smoke-mid)" in glass_rule
+    assert "var(--dg-smoke-dark)" in glass_rule
+    assert "var(--dg-smoke-border)" in glass_rule
