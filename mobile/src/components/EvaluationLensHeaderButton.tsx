@@ -19,8 +19,9 @@ const LENS_OPTIONS: { value: ValuationLens; label: string; hint: string }[] = [
  * evaluation lens UI is wrong in the header," which turned out to mean it
  * didn't exist at all on mobile. The web app's Trade Hub renders "Strategy"
  * and "Evaluation" as two side-by-side selectboxes (app.py's trade_hub_setup
- * container); mobile only ever shipped the Strategy half (the GM Stance
- * pill). This is the missing Evaluation half, following the same compact
+ * container); mobile only ever shipped the Strategy half (the Team
+ * Situation pill — "GM Stance" pre-merge). This is the missing Evaluation
+ * half, following the same compact
  * pill-plus-sheet pattern rather than reusing PlayersScreen's full
  * horizontal pill row, which doesn't fit in a nav header.
  *
@@ -50,7 +51,7 @@ export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: str
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <AppText style={styles.title}>Evaluation Lens</AppText>
             <AppText style={styles.subtitle}>
-              Which score field decides value in these trades — a second axis from GM Stance, not a replacement for it.
+              Which score field decides value in these trades — a second axis from Team Situation, not a replacement for it.
             </AppText>
             {LENS_OPTIONS.map((option) => {
               const active = option.value === lens;

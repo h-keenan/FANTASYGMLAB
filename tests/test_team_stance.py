@@ -1,10 +1,16 @@
 """Team Situation (Decision Memory v1 gap, #232) — stance CRUD + rationale framing.
 
 Covers modules.team_stance (durable per-user, per-league stance storage) and
-the additive rationale-framing layer in modules.trade_ideas. Confirms the
-new feature never touches value_score/scoring, and that
+the additive rationale-framing layer in modules.trade_ideas. Confirms that
 modules/decision_memory.py (an unrelated recommendation-change-history log)
 is untouched by this feature.
+
+GM Stance / Team Situation merge (product decision, 2026-09-26): a stance
+stored here now ALSO drives real valuation math (previously GM Stance's own
+separate, now-retired concern) via team_strategy_for_stance() — see that
+function's tests below and modules.team_stance's module docstring. The
+rationale-framing layer itself (apply_team_stance_framing) still only
+touches rationale TEXT, unchanged.
 """
 
 from __future__ import annotations
@@ -241,3 +247,68 @@ def test_decision_memory_module_is_unrelated_and_untouched():
     assert not hasattr(decision_memory, "set_stance")
     assert decision_memory.EVENTS_TABLE != ts.STANCE_TABLE
     assert decision_memory.BASELINES_TABLE != ts.STANCE_TABLE
+
+
+# --- GM Stance merge: team_strategy_for_stance ------------------------------
+
+
+def test_team_strategy_for_stance_maps_all_three_declared_states():
+    # The explicit, documented, lossy mapping onto GM Stance's five-state
+    # space — see modules.team_stance.team_strategy_for_stance's docstring
+    # for why each representative was chosen.
+    assert ts.team_strategy_for_stance(ts.STANCE_COMPETING) == "contender"
+    assert ts.team_strategy_for_stance(ts.STANCE_BALANCED) == "retool"
+    assert ts.team_strategy_for_stance(ts.STANCE_REBUILDING) == "rebuild"
+
+
+def test_team_strategy_for_stance_falls_back_to_retool_when_undeclared():
+    # No declared Team Situation must resolve to GM Stance's own pre-merge
+    # default, so a user who never touches either control sees unchanged
+    # valuation after this merge.
+    assert ts.team_strategy_for_stance("") == "retool"
+    assert ts.team_strategy_for_stance(None) == "retool"
+    assert ts.team_strategy_for_stance("not-a-real-stance") == "retool"
+
+
+def test_team_strategy_for_stance_never_reaches_the_retired_extreme_strategies():
+    # fringe_contender and tank are GM Stance's more extreme granularity —
+    # intentionally unreachable now that Team Situation's three states are
+    # the only control surface for this input.
+    reachable = {
+        ts.team_strategy_for_stance(stance) for stance in ts.STANCE_OPTIONS
+    } | {ts.team_strategy_for_stance("")}
+    assert reachable == {"contender", "retool", "rebuild"}
+    assert "fringe_contender" not in reachable
+    assert "tank" not in reachable
+
+
+def test_declared_stance_measurably_changes_real_valuation_output():
+    """Proves the actual product decision: Team Situation's declared value
+    now genuinely drives the same real valuation math GM Stance used to
+    drive (modules.trade_hub_engine.apply_strategy_age_curve), not just
+    rationale text. A young player's age-curve multiplier differs sharply
+    between "rebuilding" and "competing" — this is the measurable change.
+    """
+
+    import pandas as pd
+
+    from modules import trade_hub_engine
+
+    df = pd.DataFrame(
+        [{"player_id": "p1", "name": "Young RB", "position": "RB", "age": 22, "dynasty_score": 1000}]
+    )
+
+    rebuilding_strategy = ts.team_strategy_for_stance(ts.STANCE_REBUILDING)
+    competing_strategy = ts.team_strategy_for_stance(ts.STANCE_COMPETING)
+    assert rebuilding_strategy != competing_strategy
+
+    rebuilding_df = trade_hub_engine.apply_strategy_age_curve(df, rebuilding_strategy, "dynasty_score")
+    competing_df = trade_hub_engine.apply_strategy_age_curve(df, competing_strategy, "dynasty_score")
+
+    rebuilding_score = int(rebuilding_df.loc[0, "dynasty_score"])
+    competing_score = int(competing_df.loc[0, "dynasty_score"])
+    assert rebuilding_score != competing_score
+    # A young player is upweighted for a declared rebuild and downweighted
+    # for a declared win-now stance — the same direction GM Stance's own
+    # age-curve table always applied for these two buckets.
+    assert rebuilding_score > 1000 > competing_score

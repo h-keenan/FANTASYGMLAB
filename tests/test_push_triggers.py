@@ -130,12 +130,10 @@ def test_run_push_trigger_sweep_sends_once_and_dedupes_second_run():
     profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
     preferences_response = Mock(status_code=200)
     preferences_response.json.return_value = []
-    # league-1 already has a GM stance stored, so the one-time reminder
-    # doesn't fire and pollute this test's pushes_sent count.
+    # league-1 already has a Team Situation declared, so the one-time GM
+    # stance reminder doesn't fire and pollute this test's pushes_sent count.
     gm_stance_response = Mock(status_code=200)
-    gm_stance_response.json.return_value = [
-        {"user_id": "u1", "settings": {"team_strategy_by_league": {"league-1": "retool"}}}
-    ]
+    gm_stance_response.json.return_value = [{"user_id": "u1", "league_id": "league-1"}]
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
     already_notified_response = Mock(status_code=200)
@@ -260,9 +258,7 @@ def test_run_push_trigger_sweep_also_pushes_a_ready_recap():
     preferences_response = Mock(status_code=200)
     preferences_response.json.return_value = []
     gm_stance_response = Mock(status_code=200)
-    gm_stance_response.json.return_value = [
-        {"user_id": "u1", "settings": {"team_strategy_by_league": {"league-1": "retool"}}}
-    ]
+    gm_stance_response.json.return_value = [{"user_id": "u1", "league_id": "league-1"}]
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -461,9 +457,7 @@ def test_run_push_trigger_sweep_also_pushes_an_injury_status(monkeypatch):
     preferences_response = Mock(status_code=200)
     preferences_response.json.return_value = []
     gm_stance_response = Mock(status_code=200)
-    gm_stance_response.json.return_value = [
-        {"user_id": "u1", "settings": {"team_strategy_by_league": {"league-1": "retool"}}}
-    ]
+    gm_stance_response.json.return_value = [{"user_id": "u1", "league_id": "league-1"}]
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -673,10 +667,13 @@ def test_run_trade_outcome_followup_sweep_fails_soft_when_not_configured():
 
 
 def test_fetch_gm_stance_leagues_returns_the_leagues_with_a_stored_stance():
+    # Rows straight off modules.team_stance.STANCE_TABLE — the GM Stance /
+    # Team Situation merge (2026-09-26) retired the old
+    # "team_strategy_by_league" user_settings storage this used to read.
     response = Mock(status_code=200)
     response.json.return_value = [
-        {"user_id": "u1", "settings": {"team_strategy_by_league": {"league-1": "rebuild", "league-2": "contender"}}},
-        {"user_id": "u2", "settings": {}},
+        {"user_id": "u1", "league_id": "league-1"},
+        {"user_id": "u1", "league_id": "league-2"},
     ]
     with patch("requests.get", return_value=response):
         result = push_triggers.fetch_gm_stance_leagues(_config(), ["u1", "u2"])
@@ -721,9 +718,9 @@ def test_run_push_trigger_sweep_sends_the_gm_stance_reminder_once():
     profiles_response.json.return_value = [{"user_id": "u1", "sleeper_username": "gm_dynasty"}]
     preferences_response = Mock(status_code=200)
     preferences_response.json.return_value = []
-    # Nobody has a stance stored for league-1 yet.
+    # Nobody has a Team Situation stance stored for league-1 yet.
     gm_stance_response = Mock(status_code=200)
-    gm_stance_response.json.return_value = [{"user_id": "u1", "settings": {}}]
+    gm_stance_response.json.return_value = []
     not_notified_response = Mock(status_code=200)
     not_notified_response.json.return_value = []
 
@@ -761,6 +758,6 @@ def test_run_push_trigger_sweep_sends_the_gm_stance_reminder_once():
 
     assert stats["pushes_sent"] == 1
     push_call = mock_post.call_args_list[0]
-    assert push_call.kwargs["json"][0]["title"] == "Set Your GM Stance — Test League"
+    assert push_call.kwargs["json"][0]["title"] == "Set Your Team Situation — Test League"
     assert push_call.kwargs["json"][0]["data"]["category"] == "gm_stance_reminder"
     assert push_call.kwargs["json"][0]["data"]["league_name"] == "Test League"

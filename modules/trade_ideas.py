@@ -2861,6 +2861,14 @@ def _apply_strategy_context_to_idea(
 # read/write value_score, never change send/receive assets, never change
 # priority/ordering, and are safe to call on the output of build_trade_ideas /
 # build_player_trade_hub_ideas after everything else has already run.
+#
+# This is one of TWO places the same declared stance now feeds trade ideas
+# (GM Stance merge, 2026-09-26): the other is real valuation math, via
+# modules.team_stance.team_strategy_for_stance feeding
+# modules.trade_hub_engine.apply_strategy_age_curve upstream of
+# build_trade_ideas — that part does change value_score/ordering. This
+# module's own framing functions still don't; see modules.team_stance's
+# module docstring for the full picture.
 TEAM_STANCE_FRAMING_CLAUSES: dict[str, str] = {
     team_stance_module.STANCE_REBUILDING: (
         "This fits your declared rebuild: it leans into youth and future draft capital."

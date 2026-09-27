@@ -12,9 +12,27 @@ Contract (mirrors modules.gm_targets' Supabase conventions):
   - Fail-open: any Supabase outage/misconfiguration returns "" (no stance),
     never raises, never blocks the app
 
-Presentation only. This module never touches value_score, composite
-scoring, or player rankings — see modules.trade_ideas.apply_team_stance_framing
-for the one place a stance is allowed to influence anything: rationale TEXT.
+Team Situation vs. valuation math — merged, 2026-09-26 (coridian_'s product
+decision), MOBILE ONLY: this module used to be presentation-only,
+appending a clause to trade-idea rationale TEXT via
+modules.trade_ideas.apply_team_stance_framing and nothing else. GM Stance
+(services/mobile_api_service.py's old "team_strategy_by_league"
+user_settings field, five states: contender / fringe_contender / retool /
+rebuild / tank — a MOBILE-only feature) was the SEPARATE system with real
+teeth there — it fed modules.trade_hub_engine.apply_strategy_age_curve and
+strategy_adjusted_pick_score_multiplier, which genuinely rewrite the active
+score_field. That separate GM Stance storage is now retired: on mobile,
+Team Situation (this module) is the single source of truth, and its
+declared value now ALSO drives that same real math, via
+team_strategy_for_stance() below (see services/mobile_api_service.py's
+_fetch_gm_stance_with_set_flag and the dashboard/trade-hub endpoints).
+This module's own storage/read/write functions are unchanged; only the
+number of things that now read the stored value grew from one (rationale
+framing) to two (rationale framing + real valuation adjustment) — on
+mobile. The web app (app.py) has its own, separate, pre-existing
+"Strategy" override (modules.profile's strategy_override /
+modules.game_plan_truth_canon) that is NOT named GM Stance and is NOT part
+of this merge — it keeps driving web valuation independently, unchanged.
 
 "Protect" tags are NOT a new concept here — modules.gm_targets' existing
 `untouchable` flag (GmTarget.untouchable) already is exactly that ("never
@@ -49,9 +67,15 @@ STANCE_LABELS: dict[str, str] = {
 }
 
 FEATURE_LABEL = "Team Situation"
+# Rendered on web by modules.team_stance_ui — the "mobile app" caveat is
+# deliberate: web's own trade valuation is driven by a separate, older
+# "Strategy" override (modules.profile / modules.game_plan_truth_canon),
+# not by this stance, so this copy must not promise a valuation effect web
+# doesn't actually have (GM Stance / Team Situation merge, 2026-09-26).
 SUPPORTING_COPY = (
     "Tell us how you see your team right now. We'll lean trade-idea language "
-    "toward that stance — this never changes player values or rankings."
+    "toward that stance — and, in the mobile app, use it to shape trade and "
+    "lineup value adjustments too."
 )
 
 SESSION_CACHE_STANCE_KEY = "_team_stance_cache_value"
@@ -76,6 +100,54 @@ def normalize_stance(value: object) -> str:
 
 def stance_label(value: object) -> str:
     return STANCE_LABELS.get(normalize_stance(value), "")
+
+
+# --- GM Stance merge (product decision, 2026-09-26) ------------------------
+#
+# GM Stance's five states (contender / fringe_contender / retool / rebuild /
+# tank — modules.team_eval.TEAM_STRATEGY_LABELS) drive real valuation math:
+# modules.trade_hub_engine.apply_strategy_age_curve's age-curve multiplier
+# and strategy_adjusted_pick_score_multiplier's pick-value multiplier, both
+# keyed on one of those five concrete strings. Team Situation's three states
+# are coarser, so this is an explicit, honest, LOSSY mapping — not a rename.
+#
+# GM Stance's own modules.team_eval.TEAM_STRATEGY_MODE_MAP already collapses
+# its five states into three buckets for other purposes ("contender" /
+# "competitive" / "rebuild"). This mapping reuses that exact grouping and
+# picks one concrete representative strategy per bucket — the age-curve
+# table needs one of the five concrete keys, not the mode label itself:
+#   STANCE_COMPETING  -> "contender"  (mode "contender" — the only strategy in it)
+#   STANCE_BALANCED   -> "retool"     (mode "competitive" — the more moderate
+#                                      of its two strategies; "fringe_contender"
+#                                      is the other and is no longer reachable)
+#   STANCE_REBUILDING -> "rebuild"    (mode "rebuild" — the more moderate of
+#                                      its two strategies; "tank" is the
+#                                      other and is no longer reachable)
+#   "" (no stance declared) -> "retool", GM Stance's own pre-merge default,
+#                               so a user who never declares a Team Situation
+#                               sees the exact same valuation as before.
+#
+# A user who wants GM Stance's more extreme "fringe_contender" or "tank"
+# precision no longer has a way to express that — that granularity is
+# intentionally gone now that Team Situation (three states) is the only
+# control surface for this input.
+_STANCE_TO_TEAM_STRATEGY: dict[str, str] = {
+    STANCE_COMPETING: "contender",
+    STANCE_BALANCED: "retool",
+    STANCE_REBUILDING: "rebuild",
+}
+DEFAULT_TEAM_STRATEGY = "retool"
+
+
+def team_strategy_for_stance(value: object) -> str:
+    """Map a declared Team Situation stance to the GM-Stance-era strategy key
+    modules.trade_hub_engine.apply_strategy_age_curve (and
+    strategy_adjusted_pick_score_multiplier) expect. "" / unknown input falls
+    back to DEFAULT_TEAM_STRATEGY, matching the default those functions used
+    before this merge.
+    """
+
+    return _STANCE_TO_TEAM_STRATEGY.get(normalize_stance(value), DEFAULT_TEAM_STRATEGY)
 
 
 def experiment_enabled(*, environ: Mapping[str, str] | None = None) -> bool:

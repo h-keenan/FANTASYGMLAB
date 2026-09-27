@@ -3946,37 +3946,36 @@ def test_gm_stance_requires_auth(monkeypatch):
 
 
 def test_get_gm_stance_defaults_to_retool_when_nothing_stored(monkeypatch):
+    # GM Stance / Team Situation merge (2026-09-26): get_gm_stance now reads
+    # modules.team_stance's STANCE_TABLE instead of the retired
+    # "team_strategy_by_league" user_settings key.
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    settings_response = Mock(status_code=200)
-    settings_response.json.return_value = [{"user_id": "user-123", "settings": {}}]
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = []
 
-    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+    with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
         response = client.get("/v1/leagues/abc/gm-stance", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "strategy": "retool", "is_set": False}
 
 
-def test_get_gm_stance_is_scoped_per_league(monkeypatch):
+def test_get_gm_stance_reads_the_declared_team_stance_through_the_mapping(monkeypatch):
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    settings_response = Mock(status_code=200)
-    settings_response.json.return_value = [
-        {
-            "user_id": "user-123",
-            "settings": {"team_strategy_by_league": {"abc": "rebuild", "xyz": "contender"}},
-        }
-    ]
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = [{"stance": "rebuilding"}]
 
-    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+    with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
         response = client.get("/v1/leagues/abc/gm-stance", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
+    # "rebuilding" -> "rebuild", per modules.team_stance.team_strategy_for_stance.
     assert response.json() == {"ok": True, "strategy": "rebuild", "is_set": True}
 
 
@@ -3995,18 +3994,22 @@ def test_update_gm_stance_rejects_an_invalid_strategy(monkeypatch):
     assert response.status_code == 422
 
 
-def test_update_gm_stance_merges_without_clobbering_other_leagues(monkeypatch):
+def test_update_gm_stance_writes_through_to_team_stance(monkeypatch):
+    """Legacy write path (GM Stance / Team Situation merge, 2026-09-26): a
+    pre-merge mobile build calling POST /gm-stance no longer writes a
+    user_settings blob — it writes the SAME team_stance row the current
+    POST /team-stance endpoint uses, via the reverse of
+    modules.team_stance.team_strategy_for_stance's mapping. No existing
+    caller of this endpoint breaks: same request/response shape as before.
+    """
+
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    settings_response = Mock(status_code=200)
-    settings_response.json.return_value = [
-        {"user_id": "user-123", "settings": {"team_strategy_by_league": {"xyz": "contender"}}}
-    ]
     upsert_response = Mock(status_code=200)
 
-    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+    with patch("requests.get", return_value=auth_user_response):
         with patch("requests.post", return_value=upsert_response) as mock_post:
             response = client.post(
                 "/v1/leagues/abc/gm-stance",
@@ -4016,30 +4019,51 @@ def test_update_gm_stance_merges_without_clobbering_other_leagues(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "strategy": "rebuild", "is_set": True}
-    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
-    assert upserted_settings["team_strategy_by_league"] == {"xyz": "contender", "abc": "rebuild"}
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload == {"user_id": "user-123", "league_id": "abc", "stance": "rebuilding"}
 
 
-def test_update_gm_stance_with_a_null_strategy_clears_only_that_league(monkeypatch):
-    """"Reset to Auto" — a null strategy drops the league's stored key so a
-    later GET reports is_set=False again, without disturbing other leagues.
+def test_update_gm_stance_collapses_the_retired_extreme_strategies(monkeypatch):
+    """"fringe_contender" and "tank" are GM Stance's more extreme states —
+    no longer independently representable now that Team Situation's three
+    states are the only storage. They collapse onto their bucket's Team
+    Situation neighbor rather than being rejected, so a pre-merge client
+    that still sends them doesn't get an error.
     """
 
     client = _client(monkeypatch)
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    settings_response = Mock(status_code=200)
-    settings_response.json.return_value = [
-        {
-            "user_id": "user-123",
-            "settings": {"team_strategy_by_league": {"abc": "tank", "xyz": "contender"}},
-        }
-    ]
     upsert_response = Mock(status_code=200)
 
-    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+    with patch("requests.get", return_value=auth_user_response):
         with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/leagues/abc/gm-stance",
+                json={"strategy": "tank"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "strategy": "rebuild", "is_set": True}
+    assert mock_post.call_args.kwargs["json"]["stance"] == "rebuilding"
+
+
+def test_update_gm_stance_with_a_null_strategy_is_a_no_op_when_declared(monkeypatch):
+    """Team Situation has no "unset" concept, so clearing no longer resets
+    anything — it just reports whatever Team Situation currently holds.
+    """
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = [{"stance": "competing"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
+        with patch("requests.post") as mock_post:
             response = client.post(
                 "/v1/leagues/abc/gm-stance",
                 json={"strategy": None},
@@ -4047,9 +4071,8 @@ def test_update_gm_stance_with_a_null_strategy_clears_only_that_league(monkeypat
             )
 
     assert response.status_code == 200
-    assert response.json() == {"ok": True, "strategy": "retool", "is_set": False}
-    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
-    assert upserted_settings["team_strategy_by_league"] == {"xyz": "contender"}
+    assert response.json() == {"ok": True, "strategy": "contender", "is_set": True}
+    mock_post.assert_not_called()
 
 
 def test_update_gm_stance_clearing_an_unset_league_is_a_no_op(monkeypatch):
@@ -4057,12 +4080,11 @@ def test_update_gm_stance_clearing_an_unset_league_is_a_no_op(monkeypatch):
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
-    settings_response = Mock(status_code=200)
-    settings_response.json.return_value = [{"user_id": "user-123", "settings": {}}]
-    upsert_response = Mock(status_code=200)
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = []
 
-    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
-        with patch("requests.post", return_value=upsert_response) as mock_post:
+    with patch("requests.get", side_effect=[auth_user_response, team_stance_response]):
+        with patch("requests.post") as mock_post:
             response = client.post(
                 "/v1/leagues/abc/gm-stance",
                 json={"strategy": None},
@@ -4071,25 +4093,27 @@ def test_update_gm_stance_clearing_an_unset_league_is_a_no_op(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "strategy": "retool", "is_set": False}
-    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
-    assert upserted_settings["team_strategy_by_league"] == {}
+    mock_post.assert_not_called()
 
 
 def test_dashboard_uses_the_stored_gm_stance(monkeypatch):
+    # GM Stance / Team Situation merge (2026-09-26): the dashboard's Top
+    # Trade Opportunity tile now sources its strategy from the SAME
+    # team_stance row get/set_team_stance use, mapped through
+    # modules.team_stance.team_strategy_for_stance — one fetch instead of
+    # the old separate GM Stance user_settings blob + Team Situation row.
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
     profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
-    stance_settings_response = Mock(status_code=200)
-    stance_settings_response.json.return_value = [
-        {"user_id": "user-123", "settings": {"team_strategy_by_league": {"abc": "rebuild"}}}
-    ]
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = [{"stance": "rebuilding"}]
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
 
     with patch(
         "requests.get",
-        side_effect=[auth_user_response, profile_response, stance_settings_response],
+        side_effect=[auth_user_response, profile_response, team_stance_response],
     ):
         with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
             with patch(
@@ -4716,7 +4740,10 @@ def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch
             patch("services.mobile_api_service._fetch_team_stance", return_value="rebuilding")
         )
         stack.enter_context(
-            patch("services.mobile_api_service._fetch_stored_gm_stance", return_value="retool")
+            patch(
+                "services.mobile_api_service._fetch_gm_stance_with_set_flag",
+                return_value=("retool", True),
+            )
         )
         stack.enter_context(
             patch("services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ()))

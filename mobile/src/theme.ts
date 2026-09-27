@@ -132,7 +132,7 @@ const lightColors = {
   // ~3.8-4.3:1 against an accentMuted-tinted background and 4.02:1 against
   // `backgroundElevated` — under AA in both cases, which is exactly why
   // several shared components' "selected"/"current" label text (segmented
-  // tabs, GM Orb's current nav row, GM Stance's active option) read as
+  // tabs, GM Orb's current nav row, Team Situation's active option) read as
   // washed-out on the light theme despite dark mode looking fine with the
   // same code. #00597A clears 5.9-6.6:1 against those same backgrounds.
   accentOnTint: '#00597A',
