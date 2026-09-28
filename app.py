@@ -3898,7 +3898,7 @@ def _set_pqv_weekly_season(state_key: str, season: int) -> None:
     st.session_state[state_key] = int(season)
 
 
-def _render_pqv_weekly_points(*, player_id: str, player_name: str = "") -> bool:
+def _render_pqv_weekly_points(*, player_id: str, player_name: str = "", show_heading: bool = True) -> bool:
     """Points By Week — the web counterpart of mobile's Player Detail chart.
 
     Same weekly rows modules.sleeper already retains next to the season
@@ -3906,6 +3906,12 @@ def _render_pqv_weekly_points(*, player_id: str, player_name: str = "") -> bool:
     never waits on provider calls; switching to an older season is the one
     deliberate on-demand rebuild (prior-season aggregates are cached without
     weekly rows), matching what the mobile weekly-stats endpoint does.
+
+    ``show_heading`` defaults to True (PQV's own Trends tab call site is
+    unchanged) — Player Compare passes False for its two side-by-side calls
+    since it already renders one shared "Points By Week" section header
+    above both columns; without this, each column would repeat its own
+    "Points By Week" heading directly underneath that shared one.
     """
 
     identifier = _safe_text(player_id).strip()
@@ -3919,13 +3925,14 @@ def _render_pqv_weekly_points(*, player_id: str, player_name: str = "") -> bool:
     if selected_season not in seasons:
         selected_season = default_season
 
-    st.markdown(
-        player_quick_view.dossier_section_heading_html(
-            "Points By Week",
-            "Weekly PPR output across the selected season.",
-        ),
-        unsafe_allow_html=True,
-    )
+    if show_heading:
+        st.markdown(
+            player_quick_view.dossier_section_heading_html(
+                "Points By Week",
+                "Weekly PPR output across the selected season.",
+            ),
+            unsafe_allow_html=True,
+        )
 
     if len(seasons) > 1:
         with st.container(key=f"pqv_weekly_season_rail_{identifier}"):
@@ -5560,6 +5567,52 @@ def render_player_compare_content(
     if player_compare.has_any_value(model_rows):
         render_section_header("Model Breakdown", kicker="Head-to-Head")
         render_html_fragment(player_compare.compare_rows_html(model_rows))
+
+    trend_rows = player_compare.build_trend_rows(player_a_row, player_b_row)
+    if player_compare.has_any_text_value(trend_rows):
+        render_section_header("Trends", kicker="Head-to-Head")
+        render_html_fragment(player_compare.text_compare_rows_html(trend_rows))
+
+    narrative_a, narrative_b = player_compare.decision_fit_pair(df_players, player_a_row, player_b_row)
+    narrative_html = player_compare.narrative_block_html(
+        player_display_name(player_a_row),
+        narrative_a,
+        player_display_name(player_b_row),
+        narrative_b,
+    )
+    if narrative_html:
+        render_section_header("Decision Fit", kicker="Head-to-Head")
+        render_html_fragment(narrative_html)
+
+    # Points By Week — reuses the exact same season-picker/cache/chart helper
+    # PQV's own Trends surface calls (_render_pqv_weekly_points), just called
+    # twice side-by-side instead of once. No new charting work: that helper
+    # already owns its own season state key (scoped by player_id), so two
+    # independent instances on one screen don't collide. show_heading=False
+    # on both calls: the shared render_section_header below already labels
+    # the whole two-column section, so the helper's own internal "Points By
+    # Week" heading (meant for a single-player dossier) would just repeat
+    # directly under it otherwise — the small name label per column (reusing
+    # the same eyebrow style Decision Fit's narrative columns use) replaces
+    # it, since the chart itself carries no other visible player-name text.
+    render_section_header("Points By Week", kicker="Head-to-Head")
+    weekly_cols = st.columns(2, gap="small")
+    with weekly_cols[0]:
+        render_html_fragment(
+            f"<div class='pqv-compare-narrative-name'>{escape(player_display_name(player_a_row) or 'Player A')}</div>"
+        )
+        _render_pqv_weekly_points(
+            player_id=player_a_id, player_name=player_display_name(player_a_row), show_heading=False
+        )
+    with weekly_cols[1]:
+        render_html_fragment(
+            f"<div class='pqv-compare-narrative-name'>{escape(player_display_name(player_b_row) or 'Player B')}</div>"
+        )
+        _render_pqv_weekly_points(
+            player_id=_safe_text(player_b_row.get("player_id")).strip(),
+            player_name=player_display_name(player_b_row),
+            show_heading=False,
+        )
 
     st.markdown("</div>", unsafe_allow_html=True)
 

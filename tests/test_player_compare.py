@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 import pandas as pd
 
@@ -17,10 +18,15 @@ def _row(**overrides) -> pd.Series:
         "dynasty_score": 8000,
         "canonical_position_rank": 3,
         "position_rank": 3,
+        "canonical_overall_rank": 12,
+        "overall_rank": 12,
         "market_score": 80,
         "opportunity_score": 70,
         "scarcity_score": 60,
         "role_score": 50,
+        "age_score": 90,
+        "opportunity_confidence": 75,
+        "workload_trend": "Rising",
     }
     base.update(overrides)
     return pd.Series(base)
@@ -29,13 +35,32 @@ def _row(**overrides) -> pd.Series:
 class TestPlayerCompareRows(unittest.TestCase):
     def test_build_value_rows_matches_mobile_field_set(self):
         row_a = _row()
-        row_b = _row(player_id="2", value_score=7000, dynasty_score=7000, canonical_position_rank=1, position_rank=1, age=27)
+        row_b = _row(
+            player_id="2",
+            value_score=7000,
+            dynasty_score=7000,
+            canonical_position_rank=1,
+            position_rank=1,
+            canonical_overall_rank=5,
+            overall_rank=5,
+            age=27,
+        )
         rows = player_compare.build_value_rows(row_a, row_b, score_field="dynasty_score")
-        self.assertEqual([row.label for row in rows], ["Value Score", "Position Rank", "Age"])
-        value_row, rank_row, age_row = rows
+        self.assertEqual(
+            [row.label for row in rows],
+            ["Value Score", "Overall Rank", "Position Rank", "Age"],
+        )
+        value_row, overall_rank_row, rank_row, age_row = rows
         self.assertEqual((value_row.a, value_row.b), (8000.0, 7000.0))
+        self.assertEqual((overall_rank_row.a, overall_rank_row.b), (12.0, 5.0))
         self.assertEqual((rank_row.a, rank_row.b), (3.0, 1.0))
         self.assertEqual((age_row.a, age_row.b), (24.0, 27.0))
+
+    def test_build_value_rows_overall_rank_falls_back_to_plain_overall_rank(self):
+        row_a = _row(canonical_overall_rank=None)
+        rows = player_compare.build_value_rows(row_a, _row(player_id="2"), score_field="dynasty_score")
+        overall_rank_row = rows[1]
+        self.assertEqual(overall_rank_row.a, 12.0)
 
     def test_build_model_rows_matches_mobile_field_set(self):
         row_a = _row()
@@ -43,12 +68,24 @@ class TestPlayerCompareRows(unittest.TestCase):
         rows = player_compare.build_model_rows(row_a, row_b)
         self.assertEqual(
             [row.label for row in rows],
-            ["Market", "Opportunity", "Scarcity", "Role"],
+            ["Market", "Opportunity", "Scarcity", "Role", "Age Score", "Confidence"],
         )
         # Scarcity is null on side B — never coerced to 0.
         scarcity_row = rows[2]
         self.assertEqual(scarcity_row.a, 60.0)
         self.assertIsNone(scarcity_row.b)
+        age_row, confidence_row = rows[4], rows[5]
+        self.assertEqual((age_row.a, age_row.b), (90.0, 90.0))
+        self.assertEqual((confidence_row.a, confidence_row.b), (75.0, 75.0))
+        self.assertEqual(player_compare.compare_row_html(confidence_row).count("75%"), 2)
+
+    def test_build_model_rows_falls_back_to_age_lens_label_when_no_native_score(self):
+        row_a = _row(age_score=None, age_penalty=-4.5)
+        row_b = _row(player_id="2", age_score=None, age_penalty=2.0)
+        rows = player_compare.build_model_rows(row_a, row_b)
+        age_row = rows[4]
+        self.assertEqual(age_row.label, "Age Lens")
+        self.assertEqual((age_row.a, age_row.b), (-4.5, 2.0))
 
     def test_has_any_value_false_when_both_sides_entirely_null(self):
         rows = (
@@ -92,6 +129,62 @@ class TestPlayerCompareRows(unittest.TestCase):
         rows = player_compare.build_model_rows(_row(), _row(player_id="2"))
         html = player_compare.compare_rows_html(rows)
         self.assertEqual(html.count("pqv-compare-row"), len(rows) + 1)  # +1 for the wrapper's own class name match
+
+
+class TestPlayerCompareTrendRows(unittest.TestCase):
+    def test_build_trend_rows_includes_role_trend_only_when_no_usage_read_clears_the_gate(self):
+        # Neither row carries the recency_sample_n/recency_trend/
+        # recency_confidence columns rankings.recency_trend_display gates on
+        # — same real "not enough signal to narrate" behavior PQV itself
+        # already applies, not a Compare-specific re-gate.
+        row_a = _row(workload_trend="Rising")
+        row_b = _row(player_id="2", workload_trend="Falling")
+        rows = player_compare.build_trend_rows(row_a, row_b)
+        self.assertEqual([row.label for row in rows], ["Role Trend"])
+        self.assertEqual((rows[0].a, rows[0].b), ("Rising", "Falling"))
+
+    def test_build_trend_rows_omits_unknown_workload_trend(self):
+        row_a = _row(workload_trend="Unknown")
+        row_b = _row(player_id="2", workload_trend=None)
+        rows = player_compare.build_trend_rows(row_a, row_b)
+        self.assertEqual(rows, tuple())
+
+    def test_text_compare_row_html_never_carries_a_win_pill(self):
+        row = player_compare.TextCompareRow("Role Trend", "Rising", "Falling")
+        html = player_compare.text_compare_row_html(row)
+        self.assertNotIn("pqv-compare-pill-win", html)
+        self.assertIn("Rising", html)
+        self.assertIn("Falling", html)
+
+    def test_text_compare_row_html_renders_em_dash_for_missing_side(self):
+        row = player_compare.TextCompareRow("Role Trend", "Rising", None)
+        html = player_compare.text_compare_row_html(row)
+        self.assertIn("—", html)
+
+
+class TestPlayerCompareNarrative(unittest.TestCase):
+    def test_decision_fit_pair_reads_both_sides_from_the_shared_engine(self):
+        row_a, row_b = _row(), _row(player_id="2")
+        players_df = pd.DataFrame([row_a, row_b])
+        with mock.patch.object(
+            player_compare.player_quick_view,
+            "decision_fit_narrative",
+            side_effect=["Market is the biggest driver.", None],
+        ) as patched:
+            narrative_a, narrative_b = player_compare.decision_fit_pair(players_df, row_a, row_b)
+        self.assertEqual(narrative_a, "Market is the biggest driver.")
+        self.assertIsNone(narrative_b)
+        self.assertEqual(patched.call_count, 2)
+
+    def test_narrative_block_html_empty_when_neither_side_has_a_sentence(self):
+        self.assertEqual(player_compare.narrative_block_html("A", None, "B", None), "")
+
+    def test_narrative_block_html_renders_both_names_and_falls_back_per_side(self):
+        html = player_compare.narrative_block_html("Player One", "Real driver sentence.", "Player Two", None)
+        self.assertIn("Player One", html)
+        self.assertIn("Player Two", html)
+        self.assertIn("Real driver sentence.", html)
+        self.assertIn("No decision-fit read available yet.", html)
 
 
 class TestPlayerCompareAppWiring(unittest.TestCase):

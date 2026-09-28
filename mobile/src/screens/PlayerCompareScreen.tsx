@@ -16,78 +16,27 @@ import GridBackground from '../components/GridBackground';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
-import { api, type QuickViewModel, type RankedPlayer } from '../lib/api';
+import { api, type RankedPlayer } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
+import { injuryTone } from '../lib/injuryDisplay';
 import { percentileColor } from '../lib/percentile';
+import {
+  buildModelRows,
+  buildNarrativePair,
+  buildStatusRows,
+  buildTrendRows,
+  buildValueRows,
+  LOWER_IS_BETTER,
+  type CompareRow,
+  type CompareSide,
+  type CompareTextRow,
+} from '../lib/playerCompare';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerCompare'>;
-
-interface CompareSide {
-  player: RankedPlayer;
-  overallRating: number | null;
-  model: QuickViewModel | null;
-}
-
-/** One head-to-head row: label, both sides' real values, and which side
- * (if either) reads higher. Never a synthesized "winner" score — just
- * highlights whichever real number is bigger, or neither when they tie or
- * either side is missing. */
-interface CompareRow {
-  label: string;
-  a: number | null;
-  b: number | null;
-  format?: (value: number) => string;
-}
-
-// Value Score / Position Rank / Age — the same "how do these two rank"
-// context PlayerSnapshotCard leads with on Player Detail, just doubled for
-// a head-to-head read instead of one player's own snapshot.
-function buildValueRows(a: CompareSide, b: CompareSide): CompareRow[] {
-  return [
-    {
-      label: 'Value Score',
-      a: a.player.score,
-      b: b.player.score,
-      format: (v) => Math.round(v).toLocaleString(),
-    },
-    {
-      label: 'Position Rank',
-      a: a.player.position_rank,
-      b: b.player.position_rank,
-      // Lower is better for rank — flip the compare direction below via negation.
-      format: (v) => `#${v}`,
-    },
-    { label: 'Age', a: a.player.age, b: b.player.age },
-  ];
-}
-
-// Same four composite subscores PlayerDetailScreen's ModelSection already
-// renders (market/opportunity/scarcity/role) — never recomputed here, just
-// placed head-to-head instead of alongside one player's own breakdown.
-function buildModelRows(a: CompareSide, b: CompareSide): CompareRow[] {
-  return [
-    { label: 'Market', a: a.model?.market_score ?? null, b: b.model?.market_score ?? null, format: (v) => Math.round(v).toString() },
-    {
-      label: 'Opportunity',
-      a: a.model?.opportunity_score ?? null,
-      b: b.model?.opportunity_score ?? null,
-      format: (v) => Math.round(v).toString(),
-    },
-    {
-      label: 'Scarcity',
-      a: a.model?.scarcity_score ?? null,
-      b: b.model?.scarcity_score ?? null,
-      format: (v) => Math.round(v).toString(),
-    },
-    { label: 'Role', a: a.model?.role_score ?? null, b: b.model?.role_score ?? null, format: (v) => Math.round(v).toString() },
-  ];
-}
-
-const LOWER_IS_BETTER = new Set(['Position Rank']);
 
 function CompareRowView({ row, isLast }: { row: CompareRow; isLast: boolean }) {
   const { colors } = useThemeMode();
@@ -111,6 +60,47 @@ function CompareRowView({ row, isLast }: { row: CompareRow; isLast: boolean }) {
         <View style={[styles.rowValuePill, bWins && styles.rowValuePillWin]}>
           <AppText style={[styles.rowValue, bWins && styles.rowValueWin]}>{display(row.b)}</AppText>
         </View>
+      </View>
+    </View>
+  );
+}
+
+/** Color hint for a text row's value — only Injury Status has a shared,
+ * already-defined tone convention (see ../lib/injuryDisplay, the same P0
+ * fix Player Detail's Snapshot card uses); every other text row (Status,
+ * Role Trend) renders as plain neutral text rather than reinventing a
+ * second status-coloring scheme local to this screen. */
+function textRowColor(label: string, value: string | null, colors: ThemeColors): string {
+  if (label === 'Injury Status') {
+    const tone = injuryTone(value);
+    if (tone === 'success') return colors.success;
+    if (tone === 'danger') return colors.danger;
+  }
+  return colors.textPrimary;
+}
+
+/** Same row shape as CompareRowView but for a CATEGORICAL field (Status,
+ * Injury Status, Role Trend direction) — no numeric "winner" pill, since
+ * there's no real number to compare, just both sides' real text values
+ * placed side by side. */
+function CompareTextRowView({ row, isLast }: { row: CompareTextRow; isLast: boolean }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const display = (value: string | null) => value || '—';
+  return (
+    <View style={[styles.row, !isLast && styles.rowDivider]}>
+      <View style={styles.rowValueColumn}>
+        <AppText style={[styles.rowValueText, { color: textRowColor(row.label, row.a, colors) }]} numberOfLines={2}>
+          {display(row.a)}
+        </AppText>
+      </View>
+      <AppText style={styles.rowLabel} numberOfLines={1}>
+        {row.label}
+      </AppText>
+      <View style={styles.rowValueColumn}>
+        <AppText style={[styles.rowValueText, { color: textRowColor(row.label, row.b, colors) }]} numberOfLines={2}>
+          {display(row.b)}
+        </AppText>
       </View>
     </View>
   );
@@ -150,6 +140,46 @@ function IdentityHeader({ side }: { side: CompareSide }) {
           </AppText>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+/** decision_fit_narrative (QuickViewModel) is a full real sentence — the
+ * same "why" copy PlayerDetailScreen's ModelSection renders above its
+ * subscore grid — not a number, so it can never be a CompareRow/
+ * CompareTextRow. Rendered as two labeled text blocks stacked instead of a
+ * row, since two full sentences side-by-side in the narrow two-column row
+ * layout would truncate illegibly. Caller only renders this when at least
+ * one side actually has a sentence (see buildNarrativePair). */
+function NarrativeCompareBlock({
+  sideA,
+  sideB,
+  narrative,
+}: {
+  sideA: CompareSide;
+  sideB: CompareSide;
+  narrative: { a: string | null; b: string | null };
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.narrativeGroup}>
+      {narrative.a ? (
+        <View style={styles.narrativeBlock}>
+          <AppText style={styles.narrativeName} numberOfLines={1}>
+            {sideA.player.name ?? 'Player A'}
+          </AppText>
+          <AppText style={styles.narrativeText}>{narrative.a}</AppText>
+        </View>
+      ) : null}
+      {narrative.b ? (
+        <View style={styles.narrativeBlock}>
+          <AppText style={styles.narrativeName} numberOfLines={1}>
+            {sideB.player.name ?? 'Player B'}
+          </AppText>
+          <AppText style={styles.narrativeText}>{narrative.b}</AppText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -284,6 +314,11 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
   const valueRows = sides ? buildValueRows(sides[0], sides[1]) : [];
   const modelRows = sides ? buildModelRows(sides[0], sides[1]) : [];
   const hasModelRows = modelRows.some((row) => row.a !== null || row.b !== null);
+  const trendRows = sides ? buildTrendRows(sides[0], sides[1]) : [];
+  const hasTrendRows = trendRows.some((row) => row.a !== null || row.b !== null);
+  const statusRows = sides ? buildStatusRows(sides[0], sides[1]) : [];
+  const hasStatusRows = statusRows.some((row) => Boolean(row.a) || Boolean(row.b));
+  const narrative = sides ? buildNarrativePair(sides[0], sides[1]) : null;
 
   return (
     <View style={[styles.root, { paddingTop: headerHeight }]}>
@@ -311,6 +346,27 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
               {modelRows.map((row, index) => (
                 <CompareRowView key={row.label} row={row} isLast={index === modelRows.length - 1} />
               ))}
+            </AnalyticsSection>
+          ) : null}
+          {hasStatusRows || hasTrendRows ? (
+            <AnalyticsSection title="Trends & Status" icon="trending-up-outline">
+              {statusRows.map((row, index) => (
+                <CompareTextRowView
+                  key={row.label}
+                  row={row}
+                  isLast={index === statusRows.length - 1 && !hasTrendRows}
+                />
+              ))}
+              {hasTrendRows
+                ? trendRows.map((row, index) => (
+                    <CompareRowView key={row.label} row={row} isLast={index === trendRows.length - 1} />
+                  ))
+                : null}
+            </AnalyticsSection>
+          ) : null}
+          {narrative ? (
+            <AnalyticsSection title="Decision Fit" icon="chatbubble-ellipses-outline">
+              <NarrativeCompareBlock sideA={sides[0]} sideB={sides[1]} narrative={narrative} />
             </AnalyticsSection>
           ) : null}
         </ScrollView>
@@ -397,5 +453,19 @@ function createStyles(colors: ThemeColors) {
   rowValuePillWin: { backgroundColor: `${colors.successBright}1F`, borderColor: colors.successBright },
   rowValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   rowValueWin: { color: colors.successBright, fontWeight: '800' },
+  // Text-row value (Status/Injury Status/Role Trend) — smaller than the
+  // numeric rowValue since these are often full words ("Questionable",
+  // "Injured Reserve") rather than a compact number, and never gets the
+  // win-pill treatment CompareRowView's numeric values get.
+  rowValueText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  narrativeGroup: { gap: spacing.md },
+  narrativeBlock: {
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    gap: 4,
+  },
+  narrativeName: { fontSize: 11, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.3 },
+  narrativeText: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   });
 }
