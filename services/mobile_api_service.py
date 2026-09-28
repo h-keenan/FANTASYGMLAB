@@ -2504,7 +2504,7 @@ def get_player_quick_view(
     }
 
 
-MAX_WEEKLY_STATS_SEASONS_BACK = 3
+MAX_WEEKLY_STATS_SEASONS_BACK = 7
 
 
 @app.get("/v1/players/{player_id}/weekly-stats")
