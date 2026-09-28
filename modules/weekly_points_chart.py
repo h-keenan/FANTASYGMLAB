@@ -24,8 +24,8 @@ from modules import sleeper
 
 # Mirrors services/mobile_api_service.py's MAX_WEEKLY_STATS_SEASONS_BACK and
 # the mobile picker's own WEEKLY_STATS_SEASONS_BACK — the year list is the
-# current stats season plus the two before it.
-WEEKLY_STATS_SEASONS_BACK = 3
+# current stats season plus the six before it.
+WEEKLY_STATS_SEASONS_BACK = 7
 
 # Chart geometry in viewBox units; the SVG itself scales to its container.
 _VIEW_WIDTH = 640

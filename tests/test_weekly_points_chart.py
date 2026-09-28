@@ -22,8 +22,8 @@ def _week(week: int, points: float | None, **extra) -> dict:
 
 
 def test_season_options_mirror_the_mobile_picker_window():
-    assert weekly_points_chart.WEEKLY_STATS_SEASONS_BACK == 3
-    assert weekly_points_chart.season_options(2025) == (2025, 2024, 2023)
+    assert weekly_points_chart.WEEKLY_STATS_SEASONS_BACK == 7
+    assert weekly_points_chart.season_options(2025) == (2025, 2024, 2023, 2022, 2021, 2020, 2019)
 
 
 def test_normalize_keeps_played_weeks_in_order_and_drops_pointless_rows():
@@ -235,7 +235,15 @@ def test_quick_view_section_paints_the_chart_for_the_default_season(monkeypatch)
     assert "<svg class='wpc-svg'" in html
     # Default season reads cache only — a dossier open never waits on Sleeper.
     assert loads == [("4046", 2025, False)]
-    assert [label for label, _ in buttons] == ["2025", "2024", "2023"]
+    assert [label for label, _ in buttons] == [
+        "2025",
+        "2024",
+        "2023",
+        "2022",
+        "2021",
+        "2020",
+        "2019",
+    ]
     assert buttons[0][1] == "primary"
     assert {kind for _, kind in buttons[1:]} == {"secondary"}
 

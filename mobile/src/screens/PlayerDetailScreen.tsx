@@ -448,7 +448,7 @@ function metricGroupCardStyle(count: number): { minWidth: number; flexBasis: `${
 }
 
 // Mirrors services/mobile_api_service.py's MAX_WEEKLY_STATS_SEASONS_BACK —
-// the weekly-stats endpoint already serves up to 3 prior seasons on
+// the weekly-stats endpoint already serves up to 7 prior seasons on
 // request, but a single-season player (e.g. week 1 of a rookie year, or
 // just the current season in view) previously had no year list to pick
 // from at all: the picker was built from quick-view's `seasons`, which is
@@ -457,8 +457,8 @@ function metricGroupCardStyle(count: number): { minWidth: number; flexBasis: `${
 // produce more than one year and the picker silently never rendered. Build
 // the year list from the season the weekly-stats endpoint itself reports
 // as current instead, so a lightly-played current season still lets you
-// page back to last year or the year before.
-const WEEKLY_STATS_SEASONS_BACK = 3;
+// page back to prior seasons.
+const WEEKLY_STATS_SEASONS_BACK = 7;
 
 /** "Rookie" or "N season(s)" — see modules/player_quick_view.py's
  * build_executive_snapshot (years_exp=0 -> "Rookie", else "{n} season(s)").
@@ -1845,7 +1845,10 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  yearRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
+  // flexWrap matches this screen's other pill/chip rows (actionRow,
+  // pairedRow, awardsBioRow) — with up to 7 season pills now on offer,
+  // an unwrapped row would overflow the card on narrow devices.
+  yearRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
   yearPill: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
