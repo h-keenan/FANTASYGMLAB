@@ -182,3 +182,44 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+  # Auto-refresh data/players.db (P0 fix — see PR #818's postmortem:
+  # players.db sat ~11 weeks stale in production with no scheduled refresh
+  # anywhere). Render persistent disks are single-service and unreachable
+  # from any other service or from a job/cron run at all
+  # (https://render.com/docs/disks); fantasygm-lab and
+  # fantasygm-lab-mobile-api are two independently-deployed services that
+  # each read "data/players.db" from their own git checkout, and neither
+  # has a `disk:` block today. So a shared-disk cron cannot reach both
+  # running services — the only mechanism that does is a new commit on the
+  # branch they both already auto-deploy from (autoDeploy: true, branch:
+  # main). This cron rebuilds players.db (scripts/refresh_players_db_subprocess.py,
+  # the same code the manual refresh script uses) and — only when that
+  # rebuild genuinely succeeded and changed the file's content, see
+  # scripts/refresh_and_commit_players_db.py's module docstring for the
+  # full safety contract — commits it (plus any changed sibling cache
+  # files, e.g. data/sleeper_players.json) and pushes straight to main,
+  # which lets Render's existing auto-deploy pick it up on both services.
+  # Schedule: every 6 hours. Injury/roster status is the single most
+  # time-sensitive field players.db carries — it changes throughout the
+  # week, especially close to game days (Wed/Thu/Sun/Mon) — so a same-day
+  # cadence keeps that reasonably fresh without hammering Sleeper/
+  # FantasyCalc's APIs; FantasyCalc's own on-disk cache already uses a 6h
+  # TTL (modules/fantasycalc.py), so this lines up with staleness the app
+  # already tolerates elsewhere rather than introducing a new bar.
+  - type: cron
+    name: fantasygm-lab-players-db-refresh
+    branch: main
+    runtime: python
+    schedule: "0 */6 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/refresh_and_commit_players_db.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      # Fine-grained GitHub PAT scoped to this repo only, Contents: write
+      # permission — used solely to push the refreshed data/players.db (and
+      # any changed sibling cache files) to main. No other scope needed.
+      - key: GITHUB_PUSH_TOKEN
+        sync: false
+      - key: GITHUB_REPO_SLUG
+        value: h-keenan/FANTASYGMLAB
