@@ -7,10 +7,11 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
 import BrandedSpinner from '../components/BrandedSpinner';
+import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import { api, type PastTradeOutcome, type TradeOutcomeAnswer } from '../lib/api';
+import { api, type PastTradeOutcome, type TradeOutcomeAnswer, type TradeOutcomeAssetSummary } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -115,8 +116,6 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const summary = outcome.trade_summary;
-  const sendNames = summary.send.map((a) => a.name).join(', ') || 'Nothing';
-  const receiveNames = summary.receive.map((a) => a.name).join(', ') || 'Nothing';
   const partner = outcome.partner_team_name || summary.partner_team_name || 'your trade partner';
   const date = formatDate(outcome.shared_at);
 
@@ -162,11 +161,44 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
 
       <View style={styles.exchangeGroup}>
         <AppText style={styles.exchangeLabel}>You sent</AppText>
-        <AppText style={styles.exchangeValue}>{sendNames}</AppText>
+        <AssetList assets={summary.send} />
         <AppText style={styles.exchangeLabel}>You received</AppText>
-        <AppText style={styles.exchangeValue}>{receiveNames}</AppText>
+        <AssetList assets={summary.receive} />
       </View>
     </AnimatedCard>
+  );
+}
+
+/**
+ * Real player identity for each asset instead of a plain "You sent: Name,
+ * Name" string — every entry here is a real tracked player (draft picks are
+ * excluded before a trade share is ever recorded; see
+ * TradeSharePreviewModal.recordShare / TradeHubScreen.shareAssetsToPlayers),
+ * so the shared compact module always has a genuine player identity to
+ * show, not a fabricated one. `value_score` is the value visible on screen
+ * at share time — shown as trailing context, same "VALUE" convention
+ * Dashboard's injury-impact rows already use, never overriding the verdict
+ * above as the row's primary read.
+ */
+function AssetList({ assets }: { assets: TradeOutcomeAssetSummary[] }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  if (assets.length === 0) {
+    return <AppText style={styles.exchangeValue}>Nothing</AppText>;
+  }
+  return (
+    <View style={styles.assetGroup}>
+      {assets.map((asset, index) => (
+        <CompactPlayerModule
+          key={`${asset.player_id || asset.name}-${index}`}
+          playerId={asset.player_id || null}
+          name={asset.name}
+          position={asset.position}
+          value={asset.value_score}
+          valueLabel="VALUE"
+        />
+      ))}
+    </View>
   );
 }
 
@@ -221,5 +253,6 @@ function createStyles(colors: ThemeColors) {
     exchangeGroup: { marginTop: spacing.xs, gap: 2 },
     exchangeLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, marginTop: spacing.xs },
     exchangeValue: { fontSize: 13, color: colors.textPrimary },
+    assetGroup: { gap: spacing.xs, marginTop: 2 },
   });
 }

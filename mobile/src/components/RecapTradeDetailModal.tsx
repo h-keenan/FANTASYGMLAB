@@ -6,9 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import type { RecapStory, RecapTradeAsset } from '../lib/api';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import CompactPlayerModule from './CompactPlayerModule';
 import IconCircle from './IconCircle';
-import PlayerAvatar from './PlayerAvatar';
-import PositionBadge from './PositionBadge';
 
 interface Props {
   visible: boolean;
@@ -87,6 +86,8 @@ function AssetRow({ asset }: { asset: RecapTradeAsset }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (asset.kind === 'pick') {
+    // Draft picks stay a distinct, non-player shape (Magna Carta §30: "do
+    // not make picks pretend to be players") — no CompactPlayerModule here.
     return (
       <View style={styles.assetRow}>
         <IconCircle name="albums-outline" color={colors.accent} size={32} iconSize={16} />
@@ -96,19 +97,19 @@ function AssetRow({ asset }: { asset: RecapTradeAsset }) {
       </View>
     );
   }
+  // Player identity portion reuses the shared compact module instead of
+  // hand-rolling the same avatar/name/position-badge shape locally — this
+  // modal is read-only history, so no onPress/PlayerDetail navigation is
+  // wired (would require plumbing `navigation` through RecapScreen and the
+  // modal's props, out of scope for this pass).
   return (
-    <View style={styles.assetRow}>
-      <PlayerAvatar playerId={asset.player_id} size={32} />
-      <View style={styles.assetInfo}>
-        <AppText style={styles.assetName} numberOfLines={1}>
-          {asset.name}
-        </AppText>
-        <View style={styles.assetMetaRow}>
-          <PositionBadge position={asset.position} />
-          {asset.team ? <AppText style={styles.assetMeta}>{asset.team}</AppText> : null}
-        </View>
-      </View>
-    </View>
+    <CompactPlayerModule
+      playerId={asset.player_id}
+      name={asset.name}
+      position={asset.position}
+      team={asset.team}
+      style={styles.assetRow}
+    />
   );
 }
 
@@ -158,10 +159,7 @@ function createStyles(colors: ThemeColors) {
     gap: spacing.sm,
     paddingVertical: spacing.xs,
   },
-  assetInfo: { flex: 1 },
   assetName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  assetMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-  assetMeta: { fontSize: 11, color: colors.textSecondary },
   editorial: {
     fontSize: 12,
     fontWeight: '600',
