@@ -76,8 +76,12 @@ from __future__ import annotations
 import concurrent.futures
 import dataclasses
 import hashlib
+import logging
 import os
 import re
+import sys
+import threading
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -85,6 +89,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
@@ -142,6 +147,196 @@ from modules.trade_analyzer_assembly import pick_asset_from_mapping, player_asse
 
 
 SERVICE_NAME = "mobile-api"
+
+# --- Observability -----------------------------------------------------
+#
+# Before this, an unhandled exception on this service produced only the
+# generic {"ok": false, "error": "Request failed."} 500 body below — nothing
+# was ever written anywhere a human could see it. Render captures a
+# process's stdout/stderr into its own log viewer automatically, so a
+# stdlib `logging` logger writing there is a zero-external-dependency fix:
+# configuring it is enough to make every crash debuggable from the Render
+# dashboard alone. `force=True` guards against a no-op if some import order
+# already attached a handler to the root logger before this module loads.
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger("fantasygm.mobile_api")
+
+# Sentry is a genuine *upgrade* on top of the stdout logging above, not a
+# requirement — inert (no import attempted, no network call, no behavior
+# change) unless a real SENTRY_DSN is supplied via env var. This is the one
+# piece of this fix that needs a human step: creating a free Sentry
+# project and setting SENTRY_DSN in Render (see render.yaml).
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+
+        if not sentry_sdk.is_initialized():
+            sentry_sdk.init(
+                dsn=SENTRY_DSN,
+                integrations=[StarletteIntegration(), FastApiIntegration()],
+                environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+                # Error events only by default — request tracing is a paid-quota
+                # cost this app doesn't need to opt into implicitly. Raise via
+                # SENTRY_TRACES_SAMPLE_RATE if that changes later.
+                traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
+            )
+            logger.info("Sentry error reporting initialized.")
+    except Exception:
+        logger.exception("Sentry initialization failed; continuing without it.")
+
+
+def _report_to_sentry(exc: BaseException) -> None:
+    """Best-effort forward to Sentry; a no-op whenever SENTRY_DSN is unset."""
+
+    if not SENTRY_DSN:
+        return
+    try:
+        import sentry_sdk
+
+        sentry_sdk.capture_exception(exc)
+    except Exception:
+        logger.exception("Failed to report exception to Sentry.")
+
+
+# --- Rate limiting -------------------------------------------------------
+#
+# No Redis/external cache anywhere in this stack (checked: the only "redis"
+# hit in the whole repo is a test asserting a *different* module never
+# introduces one — see tests/test_production_interaction_investigation.py).
+# This is also a single always-on instance (see render.yaml), so a small
+# hand-rolled in-memory fixed-window counter is enough: no new dependency,
+# no cross-instance coordination problem to solve, and it is trivially
+# testable. A fixed window (vs. a sliding log) can allow a short burst right
+# at a window boundary — an accepted tradeoff for simplicity at this scale.
+#
+# Limits are deliberately two-tier rather than per-route: everything this
+# service serves is either a cheap read (GET) or a comparatively expensive/
+# mutating write (POST/PUT/PATCH/DELETE — trade analysis, alerts, push
+# registration, watchlist writes, ...). Bucketing by HTTP method class
+# covers all ~50 routes with one rule each instead of hand-tuning every
+# endpoint, while still giving mutations the tighter budget they deserve.
+# Both tiers are env-configurable so they can be tuned in production
+# without a code change/redeploy... other than the redeploy Render already
+# requires to pick up a new env var value (there is no live-reload path).
+RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "true").strip().casefold() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+RATE_LIMIT_GENERAL_MAX = int(os.environ.get("RATE_LIMIT_GENERAL_MAX", "120"))
+RATE_LIMIT_GENERAL_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_GENERAL_WINDOW_SECONDS", "60"))
+RATE_LIMIT_MUTATING_MAX = int(os.environ.get("RATE_LIMIT_MUTATING_MAX", "20"))
+RATE_LIMIT_MUTATING_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_MUTATING_WINDOW_SECONDS", "60"))
+_RATE_LIMIT_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+# Safety valve so a flood of distinct client keys (spoofed IPs, etc.) can't
+# grow this dict unboundedly over a long-lived process's uptime.
+_RATE_LIMIT_MAX_TRACKED_KEYS = 20_000
+
+
+class _InMemoryFixedWindowRateLimiter:
+    """Per-key request counter over a fixed wall-clock window.
+
+    Thread-safe (uvicorn can run request handling across a small worker
+    pool for sync code paths); cheap enough per-request to not matter next
+    to this service's real work (Sleeper/Supabase calls, pandas scoring).
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._buckets: dict[str, tuple[float, int]] = {}
+
+    def hit(self, key: str, limit: int, window_seconds: int) -> tuple[bool, float]:
+        now = time.time()
+        window_start = (now // window_seconds) * window_seconds
+        with self._lock:
+            window_start_stored, count = self._buckets.get(key, (window_start, 0))
+            if window_start_stored != window_start:
+                window_start_stored, count = window_start, 0
+            if count >= limit:
+                retry_after = max(0.0, window_seconds - (now - window_start_stored))
+                return False, retry_after
+            self._buckets[key] = (window_start_stored, count + 1)
+            if len(self._buckets) > _RATE_LIMIT_MAX_TRACKED_KEYS:
+                self._prune(now, window_seconds)
+            return True, 0.0
+
+    def _prune(self, now: float, window_seconds: int) -> None:
+        cutoff = now - window_seconds
+        stale = [key for key, (window_start, _count) in self._buckets.items() if window_start < cutoff]
+        for key in stale:
+            self._buckets.pop(key, None)
+
+    def reset(self) -> None:
+        with self._lock:
+            self._buckets.clear()
+
+
+_rate_limiter = _InMemoryFixedWindowRateLimiter()
+
+
+def _client_rate_limit_key(request: Request) -> str:
+    """Bucket by client IP, further split by caller identity when present.
+
+    Render terminates TLS behind a proxy, so the real client address is the
+    first hop of X-Forwarded-For when present. A hash (not a decode/verify)
+    of the raw Authorization header is enough to keep two different signed-in
+    users behind the same IP/NAT from sharing one bucket — verifying the
+    token is require_user's job, not this middleware's.
+    """
+
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",")[0].strip() if forwarded else ""
+    if not ip:
+        ip = request.client.host if request.client else "unknown"
+    authorization = request.headers.get("authorization", "")
+    if authorization:
+        fingerprint = hashlib.sha256(authorization.encode("utf-8")).hexdigest()[:16]
+        return f"{ip}:{fingerprint}"
+    return ip
+
+
+class _RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if not RATE_LIMIT_ENABLED:
+            return await call_next(request)
+        # Never throttle the test suite by accident: hundreds of tests share
+        # this one process/module and would otherwise pile onto the same
+        # in-memory buckets within a single 60s window. The dedicated rate-
+        # limit tests opt back in explicitly via DYNASTYGM_FORCE_RATE_LIMIT.
+        if os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("DYNASTYGM_FORCE_RATE_LIMIT"):
+            return await call_next(request)
+        is_mutating = request.method.upper() in _RATE_LIMIT_MUTATING_METHODS
+        limit = RATE_LIMIT_MUTATING_MAX if is_mutating else RATE_LIMIT_GENERAL_MAX
+        window = RATE_LIMIT_MUTATING_WINDOW_SECONDS if is_mutating else RATE_LIMIT_GENERAL_WINDOW_SECONDS
+        scope = "mutating" if is_mutating else "general"
+        client_key = _client_rate_limit_key(request)
+        allowed, retry_after = _rate_limiter.hit(f"{scope}|{client_key}", limit, window)
+        if not allowed:
+            logger.warning(
+                "Rate limit exceeded: %s %s scope=%s",
+                request.method,
+                request.url.path,
+                scope,
+            )
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "ok": False,
+                    "error": "Too many requests. Please slow down and try again shortly.",
+                },
+                headers={"Retry-After": str(int(retry_after) + 1)},
+            )
+        return await call_next(request)
+
 
 _PLAYERS_CACHE_WARM_TIMEOUT_S = 60
 
@@ -201,11 +396,28 @@ app = FastAPI(
 # 1KB minimum so tiny responses (health checks, single-player lookups)
 # aren't paying gzip's per-request CPU cost for no bandwidth benefit.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+# Added after GZip so it wraps outermost and runs before any other work
+# (including gzip'ing a response nobody should have gotten) on a throttled
+# request.
+app.add_middleware(_RateLimitMiddleware)
 
 
 @app.exception_handler(HTTPException)
-async def _http_exception_handler(_request: Request, exc: HTTPException):
+async def _http_exception_handler(request: Request, exc: HTTPException):
     detail = exc.detail if isinstance(exc.detail, str) else "Request failed."
+    if exc.status_code >= 500:
+        # A deliberately-raised 5xx (e.g. "Accounts are not configured.") is
+        # still a production problem worth seeing, just not a Python
+        # traceback — no exc_info here since there isn't one.
+        user_id = getattr(request.state, "user_id", None)
+        logger.warning(
+            "HTTP %s on %s %s (user_id=%s): %s",
+            exc.status_code,
+            request.method,
+            request.url.path,
+            user_id or "anonymous",
+            detail,
+        )
     return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": detail})
 
 
@@ -215,7 +427,21 @@ async def _validation_exception_handler(_request: Request, _exc: RequestValidati
 
 
 @app.exception_handler(Exception)
-async def _unhandled_exception_handler(_request: Request, _exc: Exception):
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    # The one thing this fix exists for: before this, a production 500 left
+    # zero trace anywhere. Full traceback + request path + caller identity
+    # (when known — require_user stashes it on request.state) now goes to
+    # stdout, which Render already captures into its log viewer, before the
+    # client-facing response (unchanged) is returned.
+    user_id = getattr(request.state, "user_id", None)
+    logger.error(
+        "Unhandled exception on %s %s (user_id=%s)",
+        request.method,
+        request.url.path,
+        user_id or "anonymous",
+        exc_info=exc,
+    )
+    _report_to_sentry(exc)
     return JSONResponse(status_code=500, content={"ok": False, "error": "Request failed."})
 
 
@@ -323,7 +549,10 @@ def _maybe_schedule_players_refresh() -> None:
         pass
 
 
-def require_user(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+def require_user(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
     """Verify the caller's Supabase access token and return the auth user.
 
     Calls GoTrue `/auth/v1/user` on every request rather than verifying the
@@ -341,6 +570,18 @@ def require_user(authorization: str | None = Header(default=None)) -> dict[str, 
         raise HTTPException(status_code=401, detail=error or "Invalid or expired session.")
     normalized = auth_supabase.normalize_auth_user(user, access_token=token)
     normalized["_access_token"] = token
+    # Stashed only for the unhandled-exception logger above to attribute a
+    # crash to a caller — never read back by any endpoint's own logic.
+    user_id = normalized.get("id")
+    if user_id:
+        request.state.user_id = user_id
+        if SENTRY_DSN:
+            try:
+                import sentry_sdk
+
+                sentry_sdk.set_user({"id": user_id})
+            except Exception:
+                pass
     _maybe_schedule_players_refresh()
     return normalized
 

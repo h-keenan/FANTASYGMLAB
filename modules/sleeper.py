@@ -459,23 +459,75 @@ def _safe_provider_endpoint(label: str) -> str:
     return cleaned[:48]
 
 
-def _request_json(label: str, url: str, *, timeout: int = 5):
+# Retry only genuinely transient conditions: network errors, timeouts, and
+# 5xx/429 responses from Sleeper. A real 4xx (bad request, not found, ...)
+# means the request itself is wrong and retrying it would just waste time
+# and hammer Sleeper for no benefit, so those still fail fast exactly like
+# before. Small retry budget + short backoff: enough to ride out a blip
+# without turning one flaky call into a multi-second pileup for the
+# request/thread that's waiting on it.
+SLEEPER_REQUEST_MAX_RETRIES = int(os.environ.get("SLEEPER_REQUEST_MAX_RETRIES", "2"))
+SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS = float(
+    os.environ.get("SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS", "0.25")
+)
+_RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
+
+def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | None = None):
+    """GET ``url`` as JSON, retrying transient failures with backoff.
+
+    Return contract unchanged from before this fix: ``None`` on any failure
+    (bad status, exhausted retries, network error) — never raises for a
+    request-level failure. Callers that already wrap this in
+    ``try/except Exception`` keep working unmodified; the only behavior
+    change is that a Timeout, which used to propagate immediately, is now
+    retried first and then also converges to ``None`` like every other
+    failure mode, rather than being a special case.
+    """
+
+    retries = SLEEPER_REQUEST_MAX_RETRIES if max_retries is None else max_retries
     started = time.perf_counter()
     timed_out = False
+    cache_status = "miss"
+    attempt = 0
     try:
-        with performance.time_block(label, category="sleeper"):
-            response = requests.get(url, timeout=timeout)
-            if response.status_code != 200:
+        while True:
+            timed_out = False
+            try:
+                with performance.time_block(label, category="sleeper"):
+                    response = requests.get(url, timeout=timeout)
+            except requests.Timeout:
+                timed_out = True
+                if attempt < retries:
+                    attempt += 1
+                    time.sleep(SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1)))
+                    continue
+                cache_status = "timeout"
                 return None
-            return response.json()
-    except requests.Timeout:
-        timed_out = True
-        raise
+            except requests.RequestException:
+                # Network-level failure (connection error, etc.) — same
+                # transient treatment as a timeout.
+                if attempt < retries:
+                    attempt += 1
+                    time.sleep(SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1)))
+                    continue
+                cache_status = "error"
+                return None
+
+            if response.status_code == 200:
+                return response.json()
+            if response.status_code in _RETRYABLE_STATUS_CODES and attempt < retries:
+                attempt += 1
+                time.sleep(SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1)))
+                continue
+            # Genuine 4xx (or a non-retryable/exhausted 5xx/429): fail fast,
+            # same as before this fix.
+            return None
     finally:
         _note_provider_timing(
             label,
             (time.perf_counter() - started) * 1000.0,
-            cache_status="timeout" if timed_out else "miss",
+            cache_status=cache_status,
             timeout=timed_out,
         )
 

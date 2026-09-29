@@ -11,3 +11,7 @@ httpx>=0.27,<1
 Pillow>=10,<12
 qrcode[pil]>=8.0,<9
 pytest>=8,<9
+# Optional crash reporting: fully inert unless SENTRY_DSN is set (see
+# services/mobile_api_service.py and app.py) — see the "Minimum required
+# from you" section of the PR that introduced this for the one manual step.
+sentry-sdk>=2,<3

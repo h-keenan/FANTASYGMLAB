@@ -39,6 +39,11 @@ services:
         sync: false
       - key: DYNASTYGM_SHOW_EXPERIMENTAL
         sync: false
+      # Optional crash reporting (see app.py's top-of-file guard). Fully
+      # inert — no code path executes differently — until this is set to a
+      # real Sentry project DSN. Leave unset/blank until that project exists.
+      - key: SENTRY_DSN
+        sync: false
   # Static marketing landing (fantasygmlab.com).
   # After Blueprint sync: attach custom domains fantasygmlab.com + www,
   # then remove those domains from the Streamlit service so auth/session
@@ -106,6 +111,27 @@ services:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
+        sync: false
+      # Optional crash reporting (see services/mobile_api_service.py's
+      # top-of-file guard). Fully inert — no code path executes
+      # differently, sentry-sdk isn't even imported — until this is set to
+      # a real Sentry project DSN. This is the one manual step left after
+      # this fix: create a free Sentry project and paste its DSN here.
+      - key: SENTRY_DSN
+        sync: false
+      # Rate limiting is on by default with sane built-in limits (see the
+      # RATE_LIMIT_* constants in services/mobile_api_service.py) and needs
+      # no env var to function — these are optional overrides only, for
+      # tuning without a code change.
+      - key: RATE_LIMIT_ENABLED
+        sync: false
+      - key: RATE_LIMIT_GENERAL_MAX
+        sync: false
+      - key: RATE_LIMIT_GENERAL_WINDOW_SECONDS
+        sync: false
+      - key: RATE_LIMIT_MUTATING_MAX
+        sync: false
+      - key: RATE_LIMIT_MUTATING_WINDOW_SECONDS
         sync: false
   # RevenueCat webhook -> Supabase entitlement sync (mobile IAP + RC Billing
   # web). Not deployed until Founder Ops syncs this Blueprint entry and

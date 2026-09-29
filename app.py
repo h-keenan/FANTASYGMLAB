@@ -17,6 +17,39 @@ from urllib.parse import urlparse
 import streamlit as st
 import pandas as pd
 
+# Optional crash reporting: inert unless SENTRY_DSN is set (empty/missing =
+# no import attempted, no network call, no behavior change). Streamlit's
+# own runtime already logs every uncaught app-script exception, full
+# traceback included, to its internal logger before showing the generic
+# error banner (.streamlit/config.toml's showErrorDetails="none" only hides
+# details from the user-facing banner, not from that log line) — Render
+# captures stdout/stderr automatically, so that alone is already
+# zero-dependency crash visibility with no code change needed here. This
+# init is a pure upgrade on top of it: sentry-sdk's logging integration is
+# on by default and auto-captures any ERROR-level log record that carries
+# exc_info, which is exactly the call Streamlit already makes — so no
+# separate hook into Streamlit's error handling is required for the same
+# crashes to also start reaching Sentry.
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if _SENTRY_DSN:
+    try:
+        import sentry_sdk
+
+        if not sentry_sdk.is_initialized():
+            sentry_sdk.init(
+                dsn=_SENTRY_DSN,
+                environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+                # Error events only by default; raise via
+                # SENTRY_TRACES_SAMPLE_RATE later if request tracing is wanted.
+                traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
+            )
+    except Exception:
+        import logging
+
+        logging.getLogger("fantasygm.web").exception(
+            "Sentry initialization failed; continuing without it."
+        )
+
 from modules import rankings as rankings_module
 from modules.league_rankings import add_rank_tie_metadata
 from modules import player_asset_explorer_ui
