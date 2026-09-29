@@ -69,6 +69,13 @@ def render_age_confirmation(key_prefix: str) -> bool:
     day = cols[1].text_input("DD", key=f"{key_prefix}_age_gate_day", max_chars=2, placeholder="DD")
     year = cols[2].text_input("YYYY", key=f"{key_prefix}_age_gate_year", max_chars=4, placeholder="YYYY")
 
+    # No st.rerun() here (budget-capped app-wide, see
+    # scripts/check_founder_beta_performance_budget.py): the outcome is
+    # decided and rendered/returned within this same click-triggered run
+    # instead of forcing a second rerun to hide the entry fields above. The
+    # entry fields stay visible for this one pass, which is harmless — the
+    # very next script run (any subsequent interaction) short-circuits on
+    # passed_key/blocked_key before ever drawing them again.
     if st.button("Confirm date of birth", key=f"{key_prefix}_age_gate_continue"):
         try:
             birth_date = date(int(year), int(month), int(day))
@@ -80,8 +87,12 @@ def render_age_confirmation(key_prefix: str) -> bool:
             return False
         if calculate_age(birth_date) < MINIMUM_AGE:
             st.session_state[blocked_key] = True
-        else:
-            st.session_state[passed_key] = True
-        st.rerun()
+            st.error(
+                f"You must be at least {MINIMUM_AGE} years old to use "
+                f"{brand_identity.PRODUCT_NAME}. Nothing you entered has been saved."
+            )
+            return False
+        st.session_state[passed_key] = True
+        return True
 
     return False
