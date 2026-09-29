@@ -401,7 +401,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
     table_response.json.return_value = [{"user_id": "user-123"}]
 
     # auth fetch, then one requests.get per table in _EXPORTABLE_USER_TABLES.
-    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 8):
+    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 13):
         response = client.get("/v1/me/export", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
@@ -417,6 +417,11 @@ def test_export_my_data_returns_every_table(monkeypatch):
         "trade_outcomes",
         "push_tokens",
         "team_stance",
+        "scouting_reports",
+        "prospect_watchlist",
+        "decision_memory_events",
+        "decision_memory_baselines",
+        "notification_read_state",
     }
     assert body["tables"]["profiles"] == [{"user_id": "user-123"}]
 
@@ -435,7 +440,7 @@ def test_export_my_data_reports_a_per_table_error_instead_of_failing_the_whole_r
     # First table lookup (profiles) fails; the rest succeed — the request
     # as a whole must still return 200 with the failure isolated to its
     # own table key.
-    with patch("requests.get", side_effect=[auth_user_response, failing_response] + [ok_response] * 6):
+    with patch("requests.get", side_effect=[auth_user_response, failing_response] + [ok_response] * 12):
         response = client.get("/v1/me/export", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200

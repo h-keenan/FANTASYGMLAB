@@ -82,7 +82,13 @@ def test_cold_account_is_collapsed_create_and_sign_in():
 
 
 def test_create_account_form_expands_with_confirmation_copy():
-    state: dict = {"launch_auth_mode": "account", "launch_account_form": "create"}
+    state: dict = {
+        "launch_auth_mode": "account",
+        "launch_account_form": "create",
+        # Age gate already confirmed this session — this test covers the
+        # confirmation-copy/expand behavior below the gate, not the gate itself.
+        "_launch_account_signup_age_gate_passed": True,
+    }
     markdown: list[str] = []
     labels: list[str] = []
 

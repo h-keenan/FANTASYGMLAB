@@ -10,7 +10,7 @@ from modules.html_rendering import render_html_fragment
 from modules.workspace_ui import render_section_header
 
 
-LAST_UPDATED = "September 22, 2026"
+LAST_UPDATED = "September 29, 2026"
 
 NO_AFFILIATION_TEXT = (
     f"{brand_identity.PRODUCT_NAME} is an independent fantasy football tool. It is not affiliated with, "
@@ -18,6 +18,37 @@ NO_AFFILIATION_TEXT = (
     "National Football League (NFL), the NFL Players Association (NFLPA), any NFL "
     "team, any player, or any other fantasy sports platform. All third-party names, "
     "marks, and data belong to their respective owners."
+)
+
+# Existing placeholder support contact used elsewhere in this repo
+# (docs/SUPABASE_SETUP.md's suggested confirmation-email body,
+# docs/founder-beta-marketing-readiness.md) — reused here rather than
+# inventing a second address. Replace everywhere at once when a real
+# public support address is published.
+SUPPORT_EMAIL = "support@example.com"
+
+# --- Part 2 draft legal text -------------------------------------------
+#
+# DRAFT — PENDING LEGAL REVIEW. The sections tagged with this notice below
+# (governing law / dispute resolution, and user-generated content) are a
+# first-pass draft prepared for an attorney to review and edit — NOT final,
+# reviewed, or approved legal language. Do not treat as binding, and do not
+# let this notice or the "(DRAFT — pending legal review)" section titles be
+# removed until qualified counsel has reviewed and signed off. In
+# particular:
+#   - The governing-law jurisdiction below is a literal placeholder
+#     (`[GOVERNING STATE]`) because no company name, state of incorporation,
+#     or registered business address was found anywhere in this codebase or
+#     its docs — do not fill this in without confirming the real answer.
+#   - Whether to include a mandatory arbitration / class-action-waiver
+#     clause at all is a separate business-risk decision for coridian_ and
+#     counsel to make explicitly; it is included below only as optional,
+#     clearly-flagged draft language, not as an adopted decision.
+_DRAFT_PENDING_LEGAL_REVIEW_NOTICE = (
+    "DRAFT — PENDING LEGAL REVIEW. This section is a first-pass draft prepared "
+    "for an attorney to review and edit. It is not final, has not been reviewed "
+    "or approved by qualified counsel, and must not be relied upon as binding "
+    "until that review is complete."
 )
 
 
@@ -102,6 +133,55 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                     "These terms may be updated as the product changes. Continued use after an update means you accept the revised terms.",
                 ),
             ),
+            # DRAFT — pending legal review. See _DRAFT_PENDING_LEGAL_REVIEW_NOTICE
+            # above: not final, not attorney-reviewed. [GOVERNING STATE] is a
+            # literal placeholder (no real jurisdiction was findable in this
+            # codebase), and the arbitration/class-action-waiver paragraph is
+            # explicitly flagged as an unadopted, optional business decision.
+            LegalSection(
+                "Governing law and dispute resolution (DRAFT — pending legal review)",
+                (
+                    _DRAFT_PENDING_LEGAL_REVIEW_NOTICE,
+                    "These Terms are governed by the laws of [GOVERNING STATE], without "
+                    "regard to its conflict-of-laws principles, except where applicable "
+                    "law (including consumer-protection law in your jurisdiction) "
+                    "requires otherwise.",
+                    f"Before filing a claim against {brand_identity.PRODUCT_NAME}, you agree to first "
+                    f"contact us at {SUPPORT_EMAIL} and attempt in good faith to resolve the dispute "
+                    "informally. Most concerns can be resolved this way without a formal proceeding.",
+                    "OPTIONAL, NOT YET ADOPTED — whether to include a mandatory arbitration "
+                    "and class-action-waiver clause at all is a separate business-risk decision "
+                    "that coridian_ and counsel should confirm before this paragraph is "
+                    "finalized. If adopted, this paragraph would require you and "
+                    f"{brand_identity.PRODUCT_NAME} to resolve any dispute not settled informally "
+                    "through binding individual arbitration rather than a court proceeding, and "
+                    "would require you to waive the right to participate in a class action or "
+                    "jury trial, subject to any rights that cannot be waived under applicable law.",
+                ),
+            ),
+            # DRAFT — pending legal review. See _DRAFT_PENDING_LEGAL_REVIEW_NOTICE
+            # above: not final, not attorney-reviewed.
+            LegalSection(
+                "User-generated content (DRAFT — pending legal review)",
+                (
+                    _DRAFT_PENDING_LEGAL_REVIEW_NOTICE,
+                    "The College Prospects feature lets any signed-in user submit a scouting "
+                    "grade, optional round projection, and an optional short note on a college "
+                    "prospect. These submissions are pooled into a shared aggregate and the "
+                    "individual grades and notes are visible to every signed-in user — this "
+                    "is a shared, crowdsourced feature, not a private one.",
+                    "You retain ownership of any content you submit. By submitting a "
+                    f"scouting grade, note, or other content, you grant {brand_identity.PRODUCT_NAME} "
+                    "a non-exclusive, worldwide, royalty-free license to host, store, "
+                    "display, and aggregate that content as part of this and similar shared "
+                    "features, for as long as your account or the feature exists.",
+                    f"{brand_identity.PRODUCT_NAME} may remove or hide submitted content that "
+                    "violates these Terms or is abusive, illegal, harassing, or otherwise "
+                    "inappropriate, without prior notice.",
+                    f"To report content that violates these Terms, use the in-app Report option "
+                    f"or contact {SUPPORT_EMAIL}.",
+                ),
+            ),
             LegalSection(
                 "No affiliation",
                 (NO_AFFILIATION_TEXT,),
@@ -119,6 +199,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 (
                     f"{brand_identity.PRODUCT_NAME} may handle or store basic information needed to run the app, including a Sleeper username, selected league and roster identifiers, league or team names, user preferences, roster roles, untouchable-player choices, feedback reports, and app or session state.",
                     "Feedback reports may include the page or recommendation being reported, related player or team identifiers, league context, confidence or reason fields, and an optional user comment.",
+                    "For signed-in accounts, this can also include college prospect scouting grades, round projections, and notes you submit and your prospect watchlist (College Prospects is a shared feature — see the User-generated content section of Terms of Use), trade outcome records you log, Decision Memory event and baseline history (a Premium feature), and notification read/dismiss state.",
                 ),
             ),
             LegalSection(
@@ -137,6 +218,13 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 ),
             ),
             LegalSection(
+                "First-party product analytics",
+                (
+                    f"Separately from the third-party services above, {brand_identity.PRODUCT_NAME} also collects a first-party, pseudonymous analytics signal — for example, which screens or features are used and basic session timing — to diagnose problems and improve the product.",
+                    "These events are tied to a pseudonymous session identifier and a one-way hashed account identifier, never your name, email, or raw account ID, and are never shared with a third party or advertising network.",
+                ),
+            ),
+            LegalSection(
                 "Your privacy rights and controls",
                 (
                     "You can manage your account data directly in the app, under More > Account:",
@@ -152,6 +240,13 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 (
                     f"Data may be retained while the {brand_identity.FOUNDER_BETA_LABEL} is operated, tested, or improved. Users can clear local browser or session state where supported, but some operational or feedback records may remain in application storage.",
                     "Reasonable care is taken with application data, but no internet service or local storage method can be guaranteed completely secure.",
+                ),
+            ),
+            LegalSection(
+                "Children's privacy",
+                (
+                    f"{brand_identity.PRODUCT_NAME} is not directed to children and is not intended for use by anyone under 13 years old. Account creation requires confirming a date of birth showing you are at least 13 before an account can be created; that date of birth itself is never stored.",
+                    f"{brand_identity.PRODUCT_NAME} does not knowingly collect personal information from a child under 13. If you believe a child under 13 has provided personal information, contact {SUPPORT_EMAIL} and it will be removed.",
                 ),
             ),
             LegalSection(
@@ -192,8 +287,10 @@ LEGAL_PAGES: dict[str, LegalPage] = {
             LegalSection(
                 "What Premium includes",
                 (
-                    "Premium unlocks full player rankings, unlimited saved leagues, and the complete "
-                    "Trade Analyzer and roster-analysis feature set. Feature availability may evolve as "
+                    "Premium unlocks full player rankings, unlimited saved leagues, the complete "
+                    "Trade Analyzer and roster-analysis feature set, Decision Memory (durable "
+                    "cross-session history of material roster-priority changes), and the full GM "
+                    "Targets board. Feature availability may evolve as "
                     f"{brand_identity.PRODUCT_NAME} develops; material reductions to paid functionality "
                     "will be communicated where required by the app store you subscribed through.",
                 ),
