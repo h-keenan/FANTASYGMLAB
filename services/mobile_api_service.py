@@ -699,6 +699,11 @@ _EXPORTABLE_USER_TABLES = (
     "trade_outcomes",
     "push_tokens",
     "team_stance",
+    "scouting_reports",
+    "prospect_watchlist",
+    "decision_memory_events",
+    "decision_memory_baselines",
+    "notification_read_state",
 )
 
 

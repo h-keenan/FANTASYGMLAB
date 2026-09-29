@@ -12,6 +12,7 @@ from typing import Any, Mapping, MutableMapping
 
 import streamlit as st
 
+from modules import age_gate
 from modules import auth_supabase
 from modules.html_rendering import render_html_fragment
 
@@ -446,74 +447,75 @@ def render_guest_auth_dialog(*, config: dict) -> None:
                 st.session_state[GUEST_AUTH_DIALOG_MODE_KEY] = "signup"
                 st.rerun()
         else:
-            email = st.text_input(
-                "Email",
-                key="guest_dialog_signup_email",
-                autocomplete="email",
-            )
-            password = st.text_input(
-                "Password",
-                type="password",
-                key="guest_dialog_signup_password",
-                autocomplete="new-password",
-            )
-            st.caption("We'll email you a confirmation link.")
-            if st.button(
-                "Create account",
-                key="guest_dialog_signup_button",
-                type="primary",
-                use_container_width=True,
-                disabled=bool(st.session_state.get("_auth_signup_in_flight")),
-            ):
-                if st.session_state.get("_auth_signup_in_flight"):
-                    st.info("Creating your account…")
-                else:
-                    st.session_state["_auth_signup_in_flight"] = True
-                    capture_guest_resume(prompt_surface=surface, intended_action="signup")
-                    _track("guest_signup_started", surface=surface)
-                    with st.spinner("Creating your account…"):
-                        payload, error = auth_supabase.sign_up(config, email, password)
-                    st.session_state.pop("_auth_signup_in_flight", None)
-                    if error:
-                        if auth_supabase.auth_error_requires_email_confirmation(error):
+            if age_gate.render_age_confirmation("guest_dialog_signup"):
+                email = st.text_input(
+                    "Email",
+                    key="guest_dialog_signup_email",
+                    autocomplete="email",
+                )
+                password = st.text_input(
+                    "Password",
+                    type="password",
+                    key="guest_dialog_signup_password",
+                    autocomplete="new-password",
+                )
+                st.caption("We'll email you a confirmation link.")
+                if st.button(
+                    "Create account",
+                    key="guest_dialog_signup_button",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=bool(st.session_state.get("_auth_signup_in_flight")),
+                ):
+                    if st.session_state.get("_auth_signup_in_flight"):
+                        st.info("Creating your account…")
+                    else:
+                        st.session_state["_auth_signup_in_flight"] = True
+                        capture_guest_resume(prompt_surface=surface, intended_action="signup")
+                        _track("guest_signup_started", surface=surface)
+                        with st.spinner("Creating your account…"):
+                            payload, error = auth_supabase.sign_up(config, email, password)
+                        st.session_state.pop("_auth_signup_in_flight", None)
+                        if error:
+                            if auth_supabase.auth_error_requires_email_confirmation(error):
+                                auth_supabase.enter_pending_email_confirmation(
+                                    st.session_state, email
+                                )
+                                st.rerun()
+                            else:
+                                st.warning(auth_supabase.signup_user_message(error))
+                        elif (
+                            auth_supabase.signup_requires_email_confirmation(payload)
+                            or not auth_supabase.session_is_authenticated_for_app(payload)
+                        ):
                             auth_supabase.enter_pending_email_confirmation(
-                                st.session_state, email
+                                st.session_state,
+                                email,
+                                payload=payload if isinstance(payload, dict) else None,
+                            )
+                            _track(
+                                "guest_signup_completed",
+                                surface=surface,
+                                extra={"confirmation_required": True},
                             )
                             st.rerun()
                         else:
-                            st.warning(auth_supabase.signup_user_message(error))
-                    elif (
-                        auth_supabase.signup_requires_email_confirmation(payload)
-                        or not auth_supabase.session_is_authenticated_for_app(payload)
-                    ):
-                        auth_supabase.enter_pending_email_confirmation(
-                            st.session_state,
-                            email,
-                            payload=payload if isinstance(payload, dict) else None,
-                        )
-                        _track(
-                            "guest_signup_completed",
-                            surface=surface,
-                            extra={"confirmation_required": True},
-                        )
-                        st.rerun()
-                    else:
-                        auth_supabase.apply_auth_payload(st.session_state, payload or {})
-                        if not auth_supabase.current_user_id(st.session_state):
-                            auth_supabase.enter_pending_email_confirmation(
-                                st.session_state, email, payload=payload
+                            auth_supabase.apply_auth_payload(st.session_state, payload or {})
+                            if not auth_supabase.current_user_id(st.session_state):
+                                auth_supabase.enter_pending_email_confirmation(
+                                    st.session_state, email, payload=payload
+                                )
+                                st.rerun()
+                            auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
+                            auth_supabase.log_auth_operation_diagnostic(
+                                operation="signup",
+                                category="success_bootstrap",
+                                auth_user_created=True,
+                                profile_bootstrap_ran=True,
+                                durable_session_write=True,
                             )
+                            finish_auth_from_guest(config=config, mode="signup", surface=surface)
                             st.rerun()
-                        auth_supabase.queue_durable_auth_save(st.session_state, payload or {})
-                        auth_supabase.log_auth_operation_diagnostic(
-                            operation="signup",
-                            category="success_bootstrap",
-                            auth_user_created=True,
-                            profile_bootstrap_ran=True,
-                            durable_session_write=True,
-                        )
-                        finish_auth_from_guest(config=config, mode="signup", surface=surface)
-                        st.rerun()
             if st.button("Already have an account? Sign in", key="guest_dialog_switch_signin"):
                 st.session_state[GUEST_AUTH_DIALOG_MODE_KEY] = "signin"
                 st.rerun()
