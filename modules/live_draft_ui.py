@@ -11,11 +11,14 @@ import streamlit as st
 
 from modules import executive_table_ui
 from modules import live_draft
+from modules import live_draft_trade_evaluator
 from modules import performance
 from modules import football_assets
+from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS, compact_matchup_html
 from modules.html_rendering import inject_global_styles
 from modules.player_tier_identity import resolve_player_tier_identity
 from modules.live_draft_styles import LIVE_DRAFT_CSS
+from modules.trade_visual_language import value_edge_html
 
 
 def _text(value: Any, default: str = "") -> str:
@@ -682,6 +685,203 @@ def _render_team_boards(state: dict[str, Any]) -> None:
             )
 
 
+def _trade_evaluator_asset_builder(
+    pick_keys: list[str],
+    player_ids: list[str],
+    *,
+    option_by_key: dict[str, dict[str, Any]],
+    season: int,
+    draft_pick_assets: list[dict[str, Any]] | None,
+    df_players: pd.DataFrame,
+    score_field: str,
+) -> list[dict[str, Any]]:
+    assets: list[dict[str, Any]] = []
+    for key in pick_keys:
+        option = option_by_key.get(key)
+        if option is None:
+            continue
+        assets.append(
+            live_draft_trade_evaluator.pick_asset_for_option(
+                option, season=season, draft_pick_assets=draft_pick_assets
+            )
+        )
+    for player_id in player_ids:
+        asset = live_draft_trade_evaluator.drafted_player_asset(
+            player_id, df_players=df_players, score_field=score_field
+        )
+        if asset is not None:
+            assets.append(asset)
+    return assets
+
+
+def _render_trade_evaluator(
+    state: dict[str, Any],
+    *,
+    draft_id: str,
+    draft: dict[str, Any],
+    rosters: list[dict[str, Any]],
+    roster_profiles: dict[str, dict[str, Any]],
+    df_players: pd.DataFrame,
+    score_field: str,
+    draft_pick_assets: list[dict[str, Any]] | None,
+) -> None:
+    """Hypothetical trade evaluator for an active live draft.
+
+    Valuation never invents new numbers: remaining-pick values come from
+    `modules.trade_ideas.list_draft_pick_assets` (via the caller-supplied
+    `draft_pick_assets`, the same list the standalone Trade Calculator
+    uses) with the app's existing static round-value chart as fallback,
+    and already-drafted-player values come straight from `df_players`
+    through the same asset adapter the Trade Calculator catalog uses. See
+    `modules/live_draft_trade_evaluator.py` for the full reuse chain.
+    """
+
+    inject_global_styles(COMPACT_FANTASY_ASSET_CSS)
+    st.markdown(
+        "<div class='live-draft-section-head'><span>Trade Evaluator</span>"
+        "<small>Hypothetical only — nothing is sent to Sleeper</small></div>",
+        unsafe_allow_html=True,
+    )
+
+    picks_key = f"live_draft_last_picks_{draft_id}"
+    picks = st.session_state.get(picks_key) or []
+    rounds = live_draft.safe_int(state.get("rounds"), 0)
+    teams = live_draft.safe_int(state.get("teams"), 0)
+    season = live_draft.safe_int(draft.get("season"), 0)
+
+    pick_options = live_draft_trade_evaluator.remaining_pick_options(
+        draft=draft,
+        rosters=rosters,
+        picks=picks,
+        rounds=rounds,
+        teams=teams,
+        roster_profiles=roster_profiles,
+    )
+    drafted_rows = [row for row in (state.get("pick_rows") or []) if _text(row.get("player_id"))]
+
+    if not pick_options and not drafted_rows:
+        st.caption("No remaining picks or drafted players are available to evaluate yet.")
+        return
+
+    pick_label_by_key = {option["pick_key"]: option["label"] for option in pick_options}
+    player_label_by_id: dict[str, str] = {}
+    for row in drafted_rows:
+        player_id = _text(row.get("player_id"))
+        if not player_id or player_id in player_label_by_id:
+            continue
+        player_label_by_id[player_id] = (
+            f"{_text(row.get('player_name'), 'Unknown Player')} "
+            f"({_text(row.get('position'), 'UNK')} · {_text(row.get('fantasy_team'), 'Unknown team')})"
+        )
+
+    with st.form(key=f"live_draft_trade_eval_form_{draft_id}"):
+        send_col, receive_col = st.columns(2)
+        with send_col:
+            st.markdown("**You send**")
+            send_picks = st.multiselect(
+                "Remaining picks",
+                options=list(pick_label_by_key),
+                format_func=lambda key: pick_label_by_key.get(key, key),
+                key=f"live_draft_trade_send_picks_{draft_id}",
+            )
+            send_players = st.multiselect(
+                "Drafted players",
+                options=list(player_label_by_id),
+                format_func=lambda pid: player_label_by_id.get(pid, pid),
+                key=f"live_draft_trade_send_players_{draft_id}",
+            )
+        with receive_col:
+            st.markdown("**You receive**")
+            receive_picks = st.multiselect(
+                "Remaining picks",
+                options=list(pick_label_by_key),
+                format_func=lambda key: pick_label_by_key.get(key, key),
+                key=f"live_draft_trade_receive_picks_{draft_id}",
+            )
+            receive_players = st.multiselect(
+                "Drafted players",
+                options=list(player_label_by_id),
+                format_func=lambda pid: player_label_by_id.get(pid, pid),
+                key=f"live_draft_trade_receive_players_{draft_id}",
+            )
+        submitted = st.form_submit_button("Evaluate Trade")
+
+    if not submitted:
+        return
+
+    if not (send_picks or send_players):
+        st.warning("Add at least one pick or player to the side you send.")
+        return
+    if not (receive_picks or receive_players):
+        st.warning("Add at least one pick or player to the side you receive.")
+        return
+    overlap_picks = set(send_picks) & set(receive_picks)
+    overlap_players = set(send_players) & set(receive_players)
+    if overlap_picks or overlap_players:
+        st.warning("The same pick or player can't be on both sides of a trade.")
+        return
+
+    # Re-check against the freshest polled picks: a pick selected earlier in
+    # this form may have been made by another team while it was open. The
+    # live draft fragment keeps `picks_key` current every poll interval
+    # regardless of what triggered this rerun, so re-reading it here (rather
+    # than reusing the `picks` captured when the form was first drawn)
+    # reflects the board as of right now, not as of when the user opened it.
+    latest_picks = st.session_state.get(picks_key) or picks
+    latest_options = live_draft_trade_evaluator.remaining_pick_options(
+        draft=draft,
+        rosters=rosters,
+        picks=latest_picks,
+        rounds=rounds,
+        teams=teams,
+        roster_profiles=roster_profiles,
+    )
+    selected_pick_keys = list(dict.fromkeys(send_picks + receive_picks))
+    stale_keys = live_draft_trade_evaluator.validate_pick_keys_still_open(
+        selected_pick_keys, open_options=latest_options
+    )
+    if stale_keys:
+        stale_labels = ", ".join(pick_label_by_key.get(key, key) for key in stale_keys)
+        st.error(
+            f"These picks were just selected and can no longer be evaluated: {stale_labels}. "
+            "Refresh the selections above and re-submit."
+        )
+        return
+
+    option_by_key = {option["pick_key"]: option for option in latest_options}
+    send_assets = _trade_evaluator_asset_builder(
+        send_picks,
+        send_players,
+        option_by_key=option_by_key,
+        season=season,
+        draft_pick_assets=draft_pick_assets,
+        df_players=df_players,
+        score_field=score_field,
+    )
+    receive_assets = _trade_evaluator_asset_builder(
+        receive_picks,
+        receive_players,
+        option_by_key=option_by_key,
+        season=season,
+        draft_pick_assets=draft_pick_assets,
+        df_players=df_players,
+        score_field=score_field,
+    )
+    result = live_draft_trade_evaluator.evaluate_trade(
+        send_assets=send_assets, receive_assets=receive_assets
+    )
+
+    st.markdown(
+        compact_matchup_html(result["send_assets"], result["receive_assets"]),
+        unsafe_allow_html=True,
+    )
+    edge_html = value_edge_html(result["delta"])
+    if edge_html:
+        st.markdown(edge_html, unsafe_allow_html=True)
+    else:
+        st.caption(f"Trade value: {result['verdict']} (even value).")
+
+
 def render_live_draft_page(
     *,
     selected_league_id: str,
@@ -702,6 +902,7 @@ def render_live_draft_page(
     render_tappable_player_html: Callable[..., str] | None = None,
     open_player_quick_view: Callable[..., None] | None = None,
     open_trade_hub_for_player: Callable[[str], None] | None = None,
+    draft_pick_assets: list[dict[str, Any]] | None = None,
 ) -> None:
     _inject_live_draft_css()
     st.markdown("<div class='live-draft-route-marker'></div>", unsafe_allow_html=True)
@@ -862,3 +1063,20 @@ def render_live_draft_page(
         live_draft_fragment()
     else:
         render_snapshot()
+
+    # Placed outside the polling fragment on purpose: a `st.form` here keeps
+    # the user's in-progress trade inputs from being recreated/wiped by the
+    # 12s poll tick, and the evaluator reads the latest polled state straight
+    # out of session_state instead of needing its own Sleeper calls.
+    latest_state = st.session_state.get(state_key)
+    if isinstance(latest_state, dict) and latest_state.get("status") in live_draft.LIVE_DRAFT_ACTIVE_STATUSES:
+        _render_trade_evaluator(
+            latest_state,
+            draft_id=draft_id,
+            draft=selected_draft,
+            rosters=rosters,
+            roster_profiles=roster_profiles,
+            df_players=df_players,
+            score_field=score_field,
+            draft_pick_assets=draft_pick_assets,
+        )

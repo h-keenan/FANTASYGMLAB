@@ -20696,6 +20696,18 @@ def main():
                 if live_roster_ids
                 else pd.DataFrame(columns=df_players.columns)
             )
+            # Reuse the same cached shell context other routes use for
+            # draft-pick valuation (modules.trade_ideas.list_draft_pick_assets
+            # under the hood) — never a second valuation path for the live
+            # draft's Trade Evaluator section. During an active startup draft
+            # this returns [] (same startup_mode gate every cached league
+            # context in this app applies, since there's no roster
+            # composition yet to price team strength from); the evaluator
+            # falls back to the existing static round-value chart in that case.
+            try:
+                live_draft_pick_assets = get_shell_league_context().get("draft_pick_assets", [])
+            except Exception:
+                live_draft_pick_assets = []
             live_draft_ui.render_live_draft_page(
                 selected_league_id=selected_league_id,
                 selected_league_name=selected_league_name,
@@ -20714,6 +20726,7 @@ def main():
                 render_tappable_player_html=_render_tappable_player_html,
                 open_player_quick_view=open_player_quick_view,
                 open_trade_hub_for_player=_open_trade_hub_from_live_draft_rank,
+                draft_pick_assets=live_draft_pick_assets,
             )
 
     # LEAGUE OVERVIEW

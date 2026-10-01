@@ -268,6 +268,9 @@ class TestLiveDraft(unittest.TestCase):
             patch.object(live_draft_ui.st, "columns", return_value=[context, context]),
             patch.object(live_draft_ui.st, "text_input", return_value=""),
             patch.object(live_draft_ui.st, "expander", return_value=context),
+            patch.object(live_draft_ui.st, "form", return_value=context),
+            patch.object(live_draft_ui.st, "multiselect", return_value=[]),
+            patch.object(live_draft_ui.st, "form_submit_button", return_value=False),
         ):
             with patch.object(live_draft_ui.st, "fragment", create=True, new=fragment):
                 live_draft_ui.render_live_draft_page(
