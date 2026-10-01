@@ -29,6 +29,7 @@ CONCEPTS = (
 # Destination keys → concept. Unknown keys fall back to "more".
 DESTINATION_CONCEPT = {
     "dashboard": "home",
+    "portfolio": "league",
     "alerts": "alerts",
     "my_team": "roster",
     "matchup": "roster",

@@ -142,6 +142,7 @@ from modules import web_matchup_ui
 from modules import roster_primary_actions
 from modules import onboarding_ui
 from modules import platform_import_ui
+from modules import portfolio_page
 from modules import premium
 from modules import premium_page
 from modules import performance
@@ -23712,6 +23713,20 @@ def main():
         )
         premium_page.render_premium_page(entitlement=current_user_entitlement())
         _render_premium_entitlement_diagnostics()
+
+    if current_page == portfolio_page.PAGE_KEY:
+        render_page_shell(
+            page_key=portfolio_page.PAGE_KEY,
+            title="Portfolio",
+            subtitle="Your standing, record, and top need or opportunity across every saved league.",
+            meta_items=[
+                (f"Current plan: {premium_page.plan_status_label(current_user_entitlement())}", "primary"),
+            ],
+        )
+        portfolio_actions = portfolio_page.render_portfolio_page()
+        if portfolio_actions.get("open_league"):
+            _resume_saved_supabase_league(portfolio_actions["open_league"], route_to_dashboard=True)
+            st.rerun()
 
     if current_page == methodology_page.PAGE_KEY:
         methodology_page.render_methodology_page()

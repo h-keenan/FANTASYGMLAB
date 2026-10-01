@@ -249,6 +249,20 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
 function generalDestinations(colors: ThemeColors): Destination[] {
   return [
     { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: 'Switch leagues and manage account' },
+    // Account-wide, not league-scoped — belongs here with Home/News/Premium,
+    // not nested inside coreLeagueDestinations' single-league context, since
+    // the entire point is standing/needs/opportunities ACROSS every saved
+    // league at once (coridian_-approved multi-league Portfolio view).
+    // Violet matches the "secondary/analytical" semantic family (see
+    // Destination.color comment above) — this is read-only cross-league
+    // analysis, not a GM tool or an alert.
+    {
+      label: 'Portfolio',
+      route: 'Portfolio',
+      icon: 'layers-outline',
+      color: colors.violet,
+      subtitle: 'Your standing across every saved league',
+    },
     { label: 'News', route: 'News', icon: 'globe-outline', color: colors.violet, subtitle: 'Latest NFL news and updates' },
     {
       label: 'Premium',

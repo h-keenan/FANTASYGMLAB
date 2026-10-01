@@ -24,7 +24,6 @@ import {
   api,
   type DashboardEntitlementInfo,
   type DashboardItem,
-  type DashboardItemCategory,
   type InjuryImpactPlayer,
   type MatchupResponse,
   type PresentationAsset,
@@ -32,6 +31,7 @@ import {
   type TeamRanking,
   type TeamSnapshot,
 } from '../lib/api';
+import { categoryMeta } from '../lib/dashboardItemPresentation';
 import MetricCard from '../components/MetricCard';
 import PremiumLock from '../components/PremiumLock';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
@@ -54,17 +54,6 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 type DashboardNavigation = Props['navigation'];
-
-function categoryMeta(
-  colors: ThemeColors,
-): Record<DashboardItemCategory, { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }> {
-  return {
-    top_priority: { label: 'Top Priority', icon: 'flash', color: colors.accent },
-    watch: { label: 'Watch', icon: 'eye-outline', color: colors.danger },
-    waiver_opportunity: { label: 'Waiver Opportunity', icon: 'swap-horizontal-outline', color: colors.premium },
-    league_movement: { label: 'League Movement', icon: 'trending-up-outline', color: colors.textSecondary },
-  };
-}
 
 // Only destinations mobile can navigate to with just {leagueId, leagueName} —
 // "my_team" would need TeamRoster's ownerName/playerIds params, which this

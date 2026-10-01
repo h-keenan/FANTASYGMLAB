@@ -46,6 +46,7 @@ import MatchupScreen from '../screens/MatchupScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 import CollegeProspectsScreen from '../screens/CollegeProspectsScreen';
 import ProspectScoutingDetailScreen from '../screens/ProspectScoutingDetailScreen';
+import PortfolioScreen from '../screens/PortfolioScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -81,6 +82,9 @@ export type RootStackParamList = {
   // Not league-scoped — shared prospect pool + personal watchlist span every league.
   CollegeProspects: undefined;
   CollegeProspectDetail: { prospect: CollegeProspect };
+  // Not league-scoped — the whole point is standing/needs across every
+  // saved league at once, not one league's context.
+  Portfolio: undefined;
 };
 
 const AppStack = createNativeStackNavigator<RootStackParamList>();
@@ -227,6 +231,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="TeamStance" component={TeamStanceScreen} />
           <AppStack.Screen name="GmPlan" component={GmPlanScreen} />
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
+          <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />
           <AppStack.Screen
             name="Paywall"
             component={PaywallScreen}
