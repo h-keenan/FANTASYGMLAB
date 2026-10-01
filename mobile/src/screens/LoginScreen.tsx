@@ -195,18 +195,27 @@ export default function LoginScreen() {
           </AppText>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={onGuestPress} disabled={guestSubmitting} style={styles.guestButton}>
+        {/* Fix 4 (welcome/signup audit, positioning judgment call — see PR
+            description): equal visual weight to the primary account form via
+            this screen's EXISTING secondary-button pattern (the same
+            bordered/surfaceSolid `socialButton` style "Continue with Google"
+            already uses above), not a new one-off style. Account creation
+            stays the default/primary action — this button is not styled as
+            `type="primary"`. */}
+        <TouchableOpacity
+          style={[styles.socialButton, styles.guestButton, guestSubmitting && styles.buttonDisabled]}
+          onPress={onGuestPress}
+          disabled={guestSubmitting}
+        >
           {guestSubmitting ? (
-            <ActivityIndicator color={colors.textSecondary} />
+            <ActivityIndicator color={colors.textPrimary} />
           ) : (
-            <>
-              <AppText style={styles.guestButtonText}>Continue as Guest</AppText>
-              <AppText style={styles.guestCaption}>
-                No account needed — a guest session can't be recovered if you lose this device.
-              </AppText>
-            </>
+            <AppText style={styles.socialButtonText}>Continue as Guest</AppText>
           )}
         </TouchableOpacity>
+        <AppText style={styles.guestCaption}>
+          No account needed to try it now — you can create an account later and keep this league connected.
+        </AppText>
 
         <View style={styles.legalRow}>
           <AppText style={styles.legalLink} onPress={() => setLegalPageKey('terms')}>
@@ -314,20 +323,17 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.lg,
     color: colors.accent,
   },
+  // Layers on top of the shared `socialButton` base (border/surface/height)
+  // — only the extra top margin separating it from the sign-in form is
+  // specific to this placement.
   guestButton: {
-    alignItems: 'center',
     marginTop: spacing.lg,
-  },
-  guestButtonText: {
-    color: colors.textSecondary,
-    fontSize: 15,
-    fontWeight: '500',
   },
   guestCaption: {
     color: colors.textTertiary,
     fontSize: 11,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: spacing.xs,
     paddingHorizontal: spacing.lg,
   },
   legalRow: {

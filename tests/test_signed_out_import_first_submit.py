@@ -94,6 +94,11 @@ def test_first_submit_writes_leagues_and_shows_results_without_second_click():
         {
             marketing_landing.SIGNED_OUT_ENTRY_KEY: "import",
             "home_launch_username_input": "sleeper_user",
+            # Age gate already confirmed this session (welcome/signup audit
+            # Fix 4 — guests now pass the same age gate an account-creator
+            # does) — this test covers the Sleeper-import submit mechanics,
+            # not the gate itself; see test_guest_import_age_gate.py for that.
+            "_launch_guest_import_age_gate_passed": True,
         }
     )
     calls: list[str] = []

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const KEY = 'fgl:onboarding-complete';
 
@@ -14,6 +14,25 @@ interface OnboardingContextValue {
   onboardingComplete: boolean | null;
   /** Marks the tutorial as seen (Skip or the final "Get Started" both call this). Idempotent. */
   completeOnboarding: () => void;
+  /**
+   * Same effect as `completeOnboarding`, but additionally arms a one-shot
+   * "route into Team Situation after the first league is added" signal —
+   * ONLY when this call is a genuine first run (`onboardingComplete` was
+   * still `false` right before this call). A tutorial replay from
+   * More > "Replay intro tutorial" always starts with `onboardingComplete`
+   * already `true`, so calling this there never arms anything — it behaves
+   * exactly like plain `completeOnboarding`. See OnboardingScreen's final
+   * "Get Started" button and HomeScreen's `saveLeague` (Fix 1, welcome/
+   * signup audit).
+   */
+  completeOnboardingViaGetStarted: () => void;
+  /**
+   * One-shot consume: true (and clears the signal) the first time this is
+   * called after a genuine-first-run `completeOnboardingViaGetStarted`;
+   * false otherwise (including every call after the first, or when Skip or
+   * a replay completed onboarding instead).
+   */
+  consumeFirstLeagueTeamStanceRouting: () => boolean;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
@@ -33,6 +52,10 @@ const OnboardingContext = createContext<OnboardingContextValue | undefined>(unde
  */
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  // Ref, not state: purely an in-memory, single-use signal consumed within
+  // the same app session (never persisted) — no screen needs a re-render
+  // when this flips, only a later imperative read.
+  const firstLeagueRoutingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,8 +79,30 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     AsyncStorage.setItem(KEY, '1').catch(() => {});
   };
 
+  const completeOnboardingViaGetStarted = () => {
+    // Capture BEFORE completeOnboarding flips the flag: a genuine first run
+    // is exactly the case where this read is still false. A replay always
+    // observes `true` here already, so it's a no-op (matches
+    // completeOnboarding's own existing idempotent-replay behavior).
+    if (onboardingComplete === false) {
+      firstLeagueRoutingRef.current = true;
+    }
+    completeOnboarding();
+  };
+
+  const consumeFirstLeagueTeamStanceRouting = () => {
+    if (!firstLeagueRoutingRef.current) return false;
+    firstLeagueRoutingRef.current = false;
+    return true;
+  };
+
   const value = useMemo<OnboardingContextValue>(
-    () => ({ onboardingComplete, completeOnboarding }),
+    () => ({
+      onboardingComplete,
+      completeOnboarding,
+      completeOnboardingViaGetStarted,
+      consumeFirstLeagueTeamStanceRouting,
+    }),
     [onboardingComplete],
   );
 

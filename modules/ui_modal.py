@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 from html import escape
@@ -165,8 +166,21 @@ def modal_content_html(content: ModalContent, *, surface: str) -> str:
     )
 
 
-def render_modal(content: ModalContent, *, surface: str) -> None:
-    """Open one dismissible, focus-managed Streamlit dialog."""
+def render_modal(
+    content: ModalContent,
+    *,
+    surface: str,
+    extra_body: Callable[[], None] | None = None,
+) -> None:
+    """Open one dismissible, focus-managed Streamlit dialog.
+
+    `extra_body`, when given, is called after the static HTML content
+    renders, inside the same dialog — the only way to embed real
+    interactive Streamlit widgets (buttons, radios, etc.), since
+    `modal_content_html` only ever renders escaped, non-interactive markup.
+    Existing callers (e.g. modules.dashboard_orientation) are unaffected —
+    this is additive and defaults to no extra content.
+    """
 
     @st.dialog(
         escape(content.title),
@@ -176,5 +190,7 @@ def render_modal(content: ModalContent, *, surface: str) -> None:
     )
     def _dialog() -> None:
         render_html_fragment(modal_content_html(content, surface=surface))
+        if extra_body is not None:
+            extra_body()
 
     _dialog()
