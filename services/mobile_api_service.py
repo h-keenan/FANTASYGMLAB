@@ -250,9 +250,23 @@ class _InMemoryFixedWindowRateLimiter:
     to this service's real work (Sleeper/Supabase calls, pandas scoring).
     """
 
+    # Floor between full _prune() scans, independent of how often hit() is
+    # called. Without this, once _buckets stays above
+    # _RATE_LIMIT_MAX_TRACKED_KEYS (e.g. sustained traffic from more than
+    # 20k distinct live IP/token keys within one window — plausible at
+    # scale, not just a one-time-visitor flood), _prune only removes STALE
+    # (previous-window) entries, so a dict full of CURRENT-window keys never
+    # drops back under the threshold. That previously meant every single
+    # subsequent hit() paid a full O(len(_buckets)) dict scan while holding
+    # _lock, serializing every request in the process on that scan. This
+    # cooldown caps that cost to at most one scan per interval, regardless
+    # of request volume.
+    _PRUNE_MIN_INTERVAL_SECONDS = 5.0
+
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._buckets: dict[str, tuple[float, int]] = {}
+        self._last_prune_at = 0.0
 
     def hit(self, key: str, limit: int, window_seconds: int) -> tuple[bool, float]:
         now = time.time()
@@ -265,7 +279,11 @@ class _InMemoryFixedWindowRateLimiter:
                 retry_after = max(0.0, window_seconds - (now - window_start_stored))
                 return False, retry_after
             self._buckets[key] = (window_start_stored, count + 1)
-            if len(self._buckets) > _RATE_LIMIT_MAX_TRACKED_KEYS:
+            if (
+                len(self._buckets) > _RATE_LIMIT_MAX_TRACKED_KEYS
+                and (now - self._last_prune_at) >= self._PRUNE_MIN_INTERVAL_SECONDS
+            ):
+                self._last_prune_at = now
                 self._prune(now, window_seconds)
             return True, 0.0
 
@@ -278,6 +296,7 @@ class _InMemoryFixedWindowRateLimiter:
     def reset(self) -> None:
         with self._lock:
             self._buckets.clear()
+            self._last_prune_at = 0.0
 
 
 _rate_limiter = _InMemoryFixedWindowRateLimiter()
@@ -2288,23 +2307,21 @@ def get_league_alerts(
     roster_teams = sorted({str(team) for team in mine.get("team", []) if str(team).strip()})
     if not player_names:
         return {"ok": True, "items": [], "reason": "no_player_data"}
-    player_ids_by_name = {
-        str(row["name"]): str(row["player_id"])
-        for _, row in mine.iterrows()
-        if str(row.get("name") or "").strip()
-    }
-    # Same roster slice already carries position/team/tier — just not
-    # discarded like player_ids_by_name; keyed by player_id so
-    # _project_alert_item can look it up alongside matched_player_id.
-    player_info_by_id = {
-        str(row["player_id"]): {
-            "position": _clean_json_value(row.get("position")),
-            "team": _clean_json_value(row.get("team")),
-            "tier": _clean_json_value(row.get("player_tier")),
-        }
-        for _, row in mine.iterrows()
-        if str(row.get("player_id") or "").strip()
-    }
+    # One pass over the roster slice builds both lookups (previously two
+    # separate .iterrows() passes over the same frame).
+    player_ids_by_name: dict[str, str] = {}
+    player_info_by_id: dict[str, dict[str, Any]] = {}
+    for _, row in mine.iterrows():
+        player_id = str(row.get("player_id") or "").strip()
+        name = str(row.get("name") or "").strip()
+        if name:
+            player_ids_by_name[name] = player_id
+        if player_id:
+            player_info_by_id[player_id] = {
+                "position": _clean_json_value(row.get("position")),
+                "team": _clean_json_value(row.get("team")),
+                "tier": _clean_json_value(row.get("player_tier")),
+            }
 
     news_cache.schedule_news_cache_refresh()
     pool = news_cache.load_cached_news_pool()

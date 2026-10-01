@@ -265,6 +265,45 @@ def test_missing_table_fails_safely():
         assert dm.should_sync_durable(session, environ={dm.EXPERIMENT_ENV_KEY: "1"}) is False
 
 
+def test_prune_overflow_issues_one_batched_delete_not_one_per_row():
+    """Regression test: retention pruning used to issue one DELETE request
+    per overflow event_id (up to 50 sequential Supabase round trips for a
+    single prune pass). It must now collapse those into one request using
+    PostgREST's `event_id=in.(...)` filter."""
+
+    overflow_rows = [{"event_id": f"ev{i}", "created_at": "2020-01-01"} for i in range(37)]
+    delete_calls: list[str] = []
+
+    def fake_delete_rows(config, token, table, *, query, timing_label="supabase_delete_rows", timeout=8):
+        delete_calls.append(query)
+        return True, ""
+
+    def fake_fetch_rows(config, token, table, *, user_id, extra_query="", timing_label="", timeout=8):
+        if "offset=" in extra_query:
+            return overflow_rows, ""
+        return [], ""
+
+    with (
+        patch.object(dm.account_store, "delete_rows", side_effect=fake_delete_rows),
+        patch.object(dm.account_store, "fetch_rows", side_effect=fake_fetch_rows),
+    ):
+        dm._prune_expired_events(
+            {"enabled": True, "url": "x", "anon_key": "y"},
+            "token",
+            user_id="u1",
+            league_id="L1",
+        )
+
+    # First call is the age-based (created_at < cutoff) delete, unchanged.
+    # Second call is the overflow prune — exactly one request, carrying
+    # every overflow id in a single `in.(...)` filter.
+    assert len(delete_calls) == 2
+    overflow_query = delete_calls[1]
+    assert "event_id=in.(" in overflow_query
+    for row in overflow_rows:
+        assert row["event_id"] in overflow_query
+
+
 def test_logout_clears_memory_session_not_requiring_durable_delete():
     session = _premium_session()
     session[dm.SESSION_CACHE_EVENTS_KEY] = [{"event_id": "x"}]

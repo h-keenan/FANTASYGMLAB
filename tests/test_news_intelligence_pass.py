@@ -632,3 +632,59 @@ def test_performance_cached_pool_no_live_rss(tmp_path, monkeypatch):
         starters_df=my,
     )
     assert called["n"] == 0
+
+
+def test_canonical_player_name_index_basic_and_edge_cases():
+    """Regression test for the vectorized `_name_index` rewrite (perf audit
+    follow-up): a loop-free pandas implementation must keep the exact same
+    "ambiguous key -> dropped entirely" contract as the original
+    df.iterrows() version it replaced.
+    """
+
+    assert ni.canonical_player_name_index(None) == {}
+    assert ni.canonical_player_name_index(pd.DataFrame()) == {}
+    assert ni.canonical_player_name_index(pd.DataFrame({"other": [1, 2]})) == {}
+
+    clean = _players_frame(
+        [
+            {"name": "Josh Allen", "player_id": "100"},
+            {"name": "A.J. Brown", "player_id": "200"},
+        ]
+    )
+    index = ni.canonical_player_name_index(clean)
+    assert index[news_signal.normalize_player_name("Josh Allen")] == "100"
+    assert index[news_signal.normalize_player_name("A.J. Brown")] == "200"
+
+    # Same normalized name, same player_id, repeated rows: not ambiguous.
+    repeated_same_id = _players_frame(
+        [
+            {"name": "Travis Kelce", "player_id": "9"},
+            {"name": "Travis Kelce", "player_id": "9"},
+        ]
+    )
+    assert ni.canonical_player_name_index(repeated_same_id) == {
+        news_signal.normalize_player_name("Travis Kelce"): "9"
+    }
+
+    # Same normalized name, conflicting player_ids: ambiguous key is
+    # dropped from the index entirely (never resolves to either id).
+    ambiguous = _players_frame(
+        [
+            {"name": "Mike Williams", "player_id": "1"},
+            {"name": "Mike Williams", "player_id": "2"},
+            {"name": "Unique Guy", "player_id": "3"},
+        ]
+    )
+    ambiguous_index = ni.canonical_player_name_index(ambiguous)
+    assert news_signal.normalize_player_name("Mike Williams") not in ambiguous_index
+    assert ambiguous_index[news_signal.normalize_player_name("Unique Guy")] == "3"
+
+    # Missing/blank name or player_id rows are skipped, not KeyErrors.
+    messy = pd.DataFrame(
+        {
+            "name": [None, float("nan"), "", "Real Name"],
+            "player_id": ["1", "2", "", "9"],
+        }
+    )
+    messy_index = ni.canonical_player_name_index(messy)
+    assert messy_index.get(news_signal.normalize_player_name("Real Name")) == "9"
