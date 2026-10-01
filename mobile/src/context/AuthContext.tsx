@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 
 import { api } from '../lib/api';
+import { canConvertGuestToAccount, validateGuestConversionInput } from '../lib/guestConversion';
 import { identifyRevenueCatUser, signOutRevenueCatUser } from '../lib/revenuecat';
 import { syncLastLeagueFromServer } from '../lib/lastLeague';
 import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotifications';
@@ -23,6 +24,22 @@ interface AuthContextValue {
   signInAsGuest: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<{ error: string | null }>;
+  /** True for a currently-signed-in guest (anonymous) session — see
+   * lib/guestConversion.ts for why this is a materially different state
+   * from a signed-out session. */
+  isGuest: boolean;
+  /**
+   * Fix 3 (welcome/signup audit): upgrades the CURRENT guest session into a
+   * real account in place via Supabase's own anonymous -> permanent
+   * identity upgrade, rather than signing out and signing up as a
+   * brand-new, unrelated user. Because `session.user.id` never changes,
+   * every saved league/roster/preference already scoped to this guest's
+   * id (saved_leagues, GM Targets, etc. — all RLS-scoped to
+   * `auth.uid() = user_id`) stays reachable automatically; there is
+   * nothing to snapshot or restore. No-op error when called outside a
+   * guest session.
+   */
+  convertGuestToAccount: (email: string, password: string) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -105,6 +122,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           options: { emailRedirectTo: 'fantasygmlab://' },
         });
+        return { error: error?.message ?? null };
+      },
+      isGuest: canConvertGuestToAccount(session),
+      convertGuestToAccount: async (email, password) => {
+        const validationError = validateGuestConversionInput(email, password);
+        if (validationError) return { error: validationError };
+        if (!canConvertGuestToAccount(session)) {
+          return { error: 'Only a guest session can be converted to an account.' };
+        }
+        const { error } = await supabase.auth.updateUser({ email, password });
         return { error: error?.message ?? null };
       },
       signInAsGuest: async () => {

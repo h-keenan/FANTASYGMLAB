@@ -87,7 +87,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { completeOnboarding } = useOnboarding();
+  const { completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const isLast = index === SLIDES.length - 1;
@@ -105,6 +105,14 @@ export default function OnboardingScreen({ navigation }: Props) {
   // RootNavigator's onboardingComplete flip remounts the stack onto Home.
   const finish = () => {
     completeOnboarding();
+    if (navigation.canGoBack()) navigation.goBack();
+  };
+
+  // Final-slide "Get Started" only (never Skip): arms Fix 1's "route into
+  // Team Situation after the user's first league add" signal, but only on
+  // a genuine first run — see completeOnboardingViaGetStarted's own guard.
+  const finishViaGetStarted = () => {
+    completeOnboardingViaGetStarted();
     if (navigation.canGoBack()) navigation.goBack();
   };
 
@@ -178,7 +186,7 @@ export default function OnboardingScreen({ navigation }: Props) {
           ) : null}
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={() => (isLast ? finish() : goTo(index + 1))}
+            onPress={() => (isLast ? finishViaGetStarted() : goTo(index + 1))}
             accessibilityRole="button"
             accessibilityLabel={isLast ? 'Get Started' : 'Next slide'}
           >

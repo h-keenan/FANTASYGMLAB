@@ -77,6 +77,7 @@ from modules import draft_assistant
 from modules import draft_center_ui
 from modules import dashboard_orientation
 from modules import dashboard_workflow
+from modules import welcome_orientation
 from modules import daily_gm_briefing
 from modules import daily_gm_briefing_ui
 from modules import decision_change_history
@@ -6108,6 +6109,19 @@ def render_home_launch_screen(
 
     def _render_launch_import_and_leagues() -> None:
         nonlocal platform_actions
+        # A guest importing a league is a real user of the product and must
+        # pass the same age gate an account-creator does (launch/welcome
+        # audit finding: guests previously skipped this entirely — neither
+        # the Sleeper nor the ESPN-experimental import path below ever
+        # called age_gate). Signed-in users already passed this at signup
+        # (modules.account_ui's launch_account_signup / guest_dialog_signup
+        # call sites), so this only gates the still-signed-out path.
+        if guest_conversion.is_guest(st.session_state):
+            from modules import age_gate
+
+            if not age_gate.render_age_confirmation("launch_guest_import"):
+                platform_actions = {"platform": "sleeper", "handled": False, "espn_result": None}
+                return
         platform_actions = platform_import_ui.render_platform_import_panel(
             df_players if df_players is not None else pd.DataFrame()
         )
@@ -6572,6 +6586,34 @@ def render_home_dashboard(
         '<div data-fgl-dashboard-root="1" aria-hidden="true" hidden></div>',
         unsafe_allow_html=True,
     )
+    if selected_league_id and not startup_mode:
+        # Welcome/signup audit Fix 2: a new, earlier, separate first-run
+        # modal — not modules.dashboard_orientation's own nav-tour card
+        # (untouched, still gated further below on authenticated +
+        # active_roster_available). Runs for guests too (see
+        # modules.welcome_orientation's module docstring); its own pending
+        # flag keeps this a true one-time render regardless.
+        #
+        # Load durable preferences BEFORE this check (not just later at this
+        # function's own authenticated-dashboard boundary, line ~8328): a
+        # returning user's saved league can auto-resume on a brand-new
+        # session and reach this point before account_user_settings is
+        # cached, which would otherwise make an already-seen modal wrongly
+        # reappear (and, pre-fix, risked modules.welcome_orientation's
+        # _mark_seen clobbering other durable preferences on write).
+        # refresh_authenticated_preferences is a cheap per-session-cached
+        # no-op for a guest or an already-loaded session.
+        user_preferences.refresh_authenticated_preferences(
+            config=_supabase_config(), session_state=st.session_state
+        )
+        from modules import welcome_orientation
+
+        welcome_orientation.render_welcome_orientation_if_applicable(
+            session_state=st.session_state,
+            config=_supabase_config(),
+            league_id=selected_league_id,
+            user_settings=st.session_state.get("account_user_settings"),
+        )
     if startup_mode and selected_league_id:
         startup_context = startup_context or {}
         st.markdown(
@@ -13385,6 +13427,12 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
             launch_analytics.set_league_scope(st.session_state, selected_league_id)
         except Exception:
             pass
+        # Welcome/signup audit Fix 2: this is the FIRST league selected this
+        # session (guest or authenticated alike) — arm the one-time welcome
+        # modal, shown on the next Dashboard render.
+        from modules import welcome_orientation
+
+        welcome_orientation.mark_pending(st.session_state)
     with league_switch_first_useful.stage_timer("selected_league_persisted"):
         _persist_active_account_context(
             username=_safe_text(st.session_state.get("username")).strip(),

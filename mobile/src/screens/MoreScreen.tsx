@@ -1,5 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, ScrollView, Share, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Switch,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -58,8 +71,14 @@ export default function MoreScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [pushCategories, setPushCategories] = useState<Record<PushCategory, boolean> | null>(null);
   const [updatingCategory, setUpdatingCategory] = useState<PushCategory | null>(null);
-  const { deleteAccount, session } = useAuth();
+  const { deleteAccount, session, isGuest, convertGuestToAccount } = useAuth();
   const [deleting, setDeleting] = useState(false);
+  const [guestUpgradeOpen, setGuestUpgradeOpen] = useState(false);
+  const [guestUpgradeEmail, setGuestUpgradeEmail] = useState('');
+  const [guestUpgradePassword, setGuestUpgradePassword] = useState('');
+  const [guestUpgradeSubmitting, setGuestUpgradeSubmitting] = useState(false);
+  const [guestUpgradeError, setGuestUpgradeError] = useState<string | null>(null);
+  const [guestUpgradeNotice, setGuestUpgradeNotice] = useState<string | null>(null);
   const { showcaseMode, setShowcaseMode } = useShowcaseMode();
   const { status: collegeInterestStatus, respond: respondToCollegeInterest } = useCollegeInterest();
   // Dev/founder accounts only (lib/showcaseMode.ts allowlist) — the row
@@ -156,6 +175,31 @@ export default function MoreScreen({ navigation }: Props) {
       return;
     }
     navigation.navigate('TeamStance', league);
+  };
+
+  const closeGuestUpgrade = () => {
+    setGuestUpgradeOpen(false);
+    setGuestUpgradeEmail('');
+    setGuestUpgradePassword('');
+    setGuestUpgradeError(null);
+    setGuestUpgradeNotice(null);
+  };
+
+  // Fix 3 (welcome/signup audit): upgrades the CURRENT guest session in
+  // place (see AuthContext.convertGuestToAccount) — the connected league
+  // and everything else already tied to this guest's id simply stays
+  // connected, nothing to re-enter.
+  const onSubmitGuestUpgrade = async () => {
+    setGuestUpgradeError(null);
+    setGuestUpgradeNotice(null);
+    setGuestUpgradeSubmitting(true);
+    const result = await convertGuestToAccount(guestUpgradeEmail, guestUpgradePassword);
+    setGuestUpgradeSubmitting(false);
+    if (result.error) {
+      setGuestUpgradeError(result.error);
+      return;
+    }
+    setGuestUpgradeNotice('Check your email to confirm your account. Your league stays connected once you do.');
   };
 
   const onDeleteAccount = () => {
@@ -362,6 +406,16 @@ export default function MoreScreen({ navigation }: Props) {
 
         <AppText style={styles.sectionLabel}>Account</AppText>
         <AnimatedCard style={styles.groupCard}>
+          {isGuest ? (
+            <SettingsRow
+              icon="person-add-outline"
+              iconColor={colors.accent}
+              label="Create account"
+              description="Keep this league connected — no need to re-enter your Sleeper info"
+              onPress={() => setGuestUpgradeOpen(true)}
+              showDivider
+            />
+          ) : null}
           <SettingsRow
             icon="card-outline"
             iconColor={colors.textSecondary}
@@ -397,6 +451,59 @@ export default function MoreScreen({ navigation }: Props) {
           />
         </AnimatedCard>
       </ScrollView>
+
+      <Modal visible={guestUpgradeOpen} animationType="fade" transparent onRequestClose={closeGuestUpgrade}>
+        <View style={styles.guestUpgradeBackdrop}>
+          <View style={styles.guestUpgradeCard}>
+            <AppText style={styles.guestUpgradeTitle}>Create account</AppText>
+            <AppText style={styles.guestUpgradeHint}>
+              Your connected league carries over automatically — nothing to re-enter.
+            </AppText>
+            <TextInput
+              style={styles.guestUpgradeInput}
+              placeholder="Email"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              value={guestUpgradeEmail}
+              onChangeText={setGuestUpgradeEmail}
+              editable={!guestUpgradeSubmitting}
+            />
+            <TextInput
+              style={styles.guestUpgradeInput}
+              placeholder="Password"
+              placeholderTextColor={colors.textTertiary}
+              secureTextEntry
+              value={guestUpgradePassword}
+              onChangeText={setGuestUpgradePassword}
+              editable={!guestUpgradeSubmitting}
+            />
+            {guestUpgradeError ? <AppText style={styles.guestUpgradeError}>{guestUpgradeError}</AppText> : null}
+            {guestUpgradeNotice ? <AppText style={styles.guestUpgradeNotice}>{guestUpgradeNotice}</AppText> : null}
+            <View style={styles.guestUpgradeActions}>
+              <TouchableOpacity
+                style={styles.guestUpgradeCancelButton}
+                onPress={closeGuestUpgrade}
+                disabled={guestUpgradeSubmitting}
+              >
+                <AppText style={styles.guestUpgradeCancelText}>Cancel</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.guestUpgradeSaveButton}
+                onPress={onSubmitGuestUpgrade}
+                disabled={guestUpgradeSubmitting || !guestUpgradeEmail || !guestUpgradePassword}
+              >
+                {guestUpgradeSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <AppText style={styles.guestUpgradeSaveText}>Create account</AppText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -578,5 +685,52 @@ function createStyles(colors: ThemeColors) {
       fontSize: 12,
       color: colors.textSecondary,
     },
+    // Mirrors HomeScreen's rename/add-league modal styling (same backdrop/
+    // card/input/action tokens) rather than inventing a new form pattern.
+    guestUpgradeBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+      padding: spacing.xl,
+    },
+    guestUpgradeCard: {
+      backgroundColor: colors.backgroundElevated,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: spacing.lg,
+    },
+    guestUpgradeTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+    guestUpgradeHint: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
+    guestUpgradeInput: {
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+      fontSize: 15,
+      backgroundColor: colors.surface,
+      color: colors.textPrimary,
+      marginBottom: spacing.sm,
+    },
+    guestUpgradeError: { fontSize: 12, color: colors.danger, marginTop: spacing.xs, lineHeight: 16 },
+    guestUpgradeNotice: { fontSize: 12, color: colors.success, marginTop: spacing.xs, lineHeight: 16 },
+    guestUpgradeActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    guestUpgradeCancelButton: { paddingHorizontal: spacing.md, paddingVertical: 10 },
+    guestUpgradeCancelText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+    guestUpgradeSaveButton: {
+      backgroundColor: colors.accent,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: 10,
+      borderRadius: radii.sm,
+      minWidth: 120,
+      alignItems: 'center',
+    },
+    guestUpgradeSaveText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   });
 }

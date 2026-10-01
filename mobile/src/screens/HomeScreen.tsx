@@ -27,6 +27,7 @@ import IconCircle from '../components/IconCircle';
 import PremiumLock from '../components/PremiumLock';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import { getLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -52,6 +53,7 @@ export default function HomeScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { session, signOut } = useAuth();
   const { showcaseMode } = useShowcaseMode();
+  const { consumeFirstLeagueTeamStanceRouting } = useOnboarding();
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
   const [leagues, setLeagues] = useState<SavedLeague[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -180,8 +182,24 @@ export default function HomeScreen({ navigation }: Props) {
         sleeperUsername: input.username ?? '',
       });
       if (result.ok) {
+        // Fix 1 (welcome/signup audit): a genuine-first-run onboarding
+        // "Get Started" arms this signal (OnboardingContext), and this is
+        // the user's very first league ever (none existed before this
+        // save) — route into Team Situation instead of the usual "stay on
+        // Home" / auto-jump-to-Dashboard behavior, honoring onboarding's
+        // "tell us your team's situation" promise. Pre-arm autoNavigated so
+        // the effect below never races this with its own Dashboard jump.
+        const wasFirstLeagueEver = (leagues?.length ?? 0) === 0;
+        const routeToTeamStance = wasFirstLeagueEver && consumeFirstLeagueTeamStanceRouting();
+        if (routeToTeamStance) autoNavigated.current = true;
         closeAddLeague();
         await load();
+        if (routeToTeamStance) {
+          navigation.navigate('TeamStance', {
+            leagueId: input.leagueId,
+            leagueName: input.leagueName || 'League',
+          });
+        }
         return;
       }
       if (result.reason === 'at_cap') {
