@@ -1402,6 +1402,118 @@ def render_standings_board(
             st.rerun()
 
 
+# Honest, not-ready-yet copy per real `reason` code from
+# modules.playoff_simulator.build_league_playoff_odds — same convention
+# render_standings_board's own "offseason"/"unavailable" messaging follows.
+_PLAYOFF_ODDS_REASON_MESSAGES = {
+    "offseason": "Playoff odds will be available once the regular season begins.",
+    "no_playoff_format": "This league's playoff format isn't set yet — odds need a real playoff-team count from league settings.",
+    "no_rankings_data": "We don't have enough roster data to compute Power Rank for this league yet.",
+    "unavailable": "Playoff odds aren't available for this league right now.",
+}
+
+
+def render_playoff_odds_board(
+    odds_result: dict,
+    *,
+    team_tap_markup: Callable,
+    render_team_card_tap_grid: Callable,
+    open_league_team_from_tap: Callable,
+    team_logo_html: Callable,
+    current_roster_id: object = None,
+):
+    """Real Monte Carlo rest-of-season simulation — see
+    modules.playoff_simulator's module docstring for the full methodology
+    (real schedule, real Power Rank, real standings/tiebreakers). Teams
+    arrive from the backend already sorted by playoff_probability desc."""
+
+    if not isinstance(odds_result, dict) or not odds_result.get("ok"):
+        ui_primitives.render_empty_state_panel(
+            "Playoff odds unavailable",
+            "Playoff odds normally appear here once this league has a real schedule and standings to simulate.",
+            kind="no-data",
+            recovery_guidance="Refresh after the league has real results.",
+        )
+        return
+
+    reason = _safe_text(odds_result.get("reason"))
+    teams = odds_result.get("teams") or []
+    if reason or not teams:
+        ui_primitives.render_empty_state_panel(
+            "Playoff odds not ready yet",
+            _PLAYOFF_ODDS_REASON_MESSAGES.get(reason, "Playoff odds aren't available for this league right now."),
+            kind="no-data",
+            recovery_guidance="Nothing to do now — this board unlocks with real season results.",
+        )
+        return
+
+    current_key = _safe_text(current_roster_id).strip()
+    board_chunks: list[str] = []
+    for rank_value, team in enumerate(teams, start=1):
+        probability = team.get("playoff_probability")
+        try:
+            probability_label = f"{float(probability):.0f}%"
+        except (TypeError, ValueError):
+            probability_label = "—"
+        record_label = _safe_text(team.get("record_label"), "0-0")
+        median_label = f"Proj {team.get('median_final_wins', '—')}-{team.get('median_final_losses', '—')}"
+        seed_label = f"Seed #{team.get('median_seed', '—')}"
+        status = "Clinched" if team.get("clinched") else ("Eliminated" if team.get("eliminated") else "")
+        interpretation_parts = [median_label, seed_label]
+        if status:
+            interpretation_parts.append(status)
+        roster_key = _safe_text(team.get("roster_id")).strip()
+        tap_class, tap_attrs = team_tap_markup(team)
+        board_chunks.append(
+            ranked_leaderboard_row_html(
+                rank_label=_format_rank(rank_value),
+                team_name=_safe_text(team.get("team_name"), "Team"),
+                owner_text=owner_handle(None, _safe_text(team.get("owner_name"), "Manager")),
+                primary_metric=probability_label,
+                metric_label="Playoff Odds",
+                interpretation=" · ".join(interpretation_parts),
+                secondary=record_label,
+                logo_html=team_logo_html(
+                    _safe_text(team.get("avatar_url")),
+                    _safe_text(team.get("team_name"), "Team"),
+                    css_class="dg-ranked-logo",
+                ),
+                tap_class=tap_class,
+                tap_attrs=tap_attrs,
+                top_three=rank_value <= 3,
+                first_place=rank_value == 1,
+                is_current=bool(current_key and roster_key == current_key),
+            )
+        )
+
+    clicked = render_team_card_tap_grid(
+        html=(
+            "<div class='dg-ranked-board dg-ranked-board--playoff-odds' "
+            "aria-label='League playoff odds'>"
+            + "".join(board_chunks)
+            + "</div>"
+        ),
+        key_prefix="league_playoff_odds",
+    )
+    if open_league_team_from_tap(clicked):
+        st.rerun()
+
+    trials = _safe_positive_int(odds_result.get("trials"), 0)
+    weeks_remaining = odds_result.get("weeks_remaining")
+    if weeks_remaining == 0:
+        st.caption("The regular season is over (or there are no games left to simulate) — these are today's final results, not a projection.")
+    else:
+        calibration_note = (
+            "calibrated against this league's own real results so far"
+            if odds_result.get("slope_fitted")
+            else "using a standard default model until more real results come in this season"
+        )
+        st.caption(
+            f"Based on {trials:,} simulated completions of the remaining season, {calibration_note}. "
+            "A probabilistic estimate, not a guarantee."
+        )
+
+
 def render_team_rank_cards(team_row: dict):
     """Team comparative ranks via canonical summary tiles."""
 

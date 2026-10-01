@@ -128,6 +128,19 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       color: colors.violet,
       subtitle: 'View and compare league teams',
     },
+    // Real Monte Carlo rest-of-season simulation (modules.playoff_simulator)
+    // keyed off the same real schedule/Power Rank/standings this app
+    // already computes — an analytical, compare-the-league view like
+    // Teams/Players, not a roster-management action, hence violet rather
+    // than the League group's cyan.
+    {
+      label: 'Playoff Odds',
+      route: 'PlayoffOdds',
+      icon: 'podium-outline',
+      needsLeague: true,
+      color: colors.violet,
+      subtitle: 'Simulated playoff chances for every team',
+    },
     {
       label: 'Players',
       route: 'Players',

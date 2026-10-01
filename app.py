@@ -127,6 +127,7 @@ from modules import league_history_ui
 from modules import league_recaps
 from modules import league_recaps_ui
 from modules import league_standings
+from modules import playoff_simulator
 from modules import league_intelligence as league_intelligence_feed
 from modules import league_intelligence_ui
 from modules import league_maturity
@@ -16071,6 +16072,21 @@ def render_league_standings_board(standings_bundle: dict):
         current_roster_id=active_context.get("my_roster_id"),
     )
 
+
+def render_league_playoff_odds_board(league_id: str):
+    active_context = st.session_state.get("active_league_context", {}) or {}
+    odds_result = playoff_simulator.build_league_playoff_odds_cached(
+        league_id=league_id, lens="Dynasty", players_db_path=DB_PATH
+    )
+    return league_workspace_ui.render_playoff_odds_board(
+        odds_result,
+        team_tap_markup=_team_tap_markup,
+        render_team_card_tap_grid=_render_team_card_tap_grid,
+        open_league_team_from_tap=_open_league_team_from_tap,
+        team_logo_html=team_logo_html,
+        current_roster_id=active_context.get("my_roster_id"),
+    )
+
 def build_league_team_advice(
     team_df: pd.DataFrame,
     metrics: dict | None,
@@ -20842,6 +20858,18 @@ def main():
                     st.caption(
                         "Standings = actual results. Boards below = roster strength, dynasty value, and draft capital."
                     )
+                    render_section_header(
+                        "Playoff Odds",
+                        kicker="What might happen next",
+                        note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Power Rank, thousands of simulated outcomes.",
+                    )
+                    with _wrr_league.block(
+                        st.session_state,
+                        "league_overview_playoff_odds",
+                        owner="playoff_simulator.build_league_playoff_odds_cached",
+                        work_kind="compute",
+                    ):
+                        render_league_playoff_odds_board(selected_league_id)
                     render_section_header(
                         "Power Rankings",
                         kicker="Who is strongest",

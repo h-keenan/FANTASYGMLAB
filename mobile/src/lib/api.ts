@@ -247,6 +247,40 @@ export interface LeagueTeamRankingsResponse {
   reason: string;
 }
 
+// Real Monte-Carlo rest-of-season simulation result for one team — see
+// modules.playoff_simulator's module docstring (backend) for the full
+// methodology. `clinched`/`eliminated` are only ever true at exactly
+// 100/0 — that's a structural property of the simulation, not a rounded
+// display convenience, so the UI can treat them as hard facts.
+export interface PlayoffOddsTeam {
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  record_label: string | null;
+  playoff_probability: number;
+  median_final_wins: number;
+  median_final_losses: number;
+  median_seed: number;
+  remaining_games: number;
+  clinched: boolean;
+  eliminated: boolean;
+}
+
+export interface PlayoffOddsResponse {
+  ok: true;
+  reason: string;
+  teams: PlayoffOddsTeam[];
+  playoff_teams?: number;
+  current_week?: number;
+  regular_season_end?: number;
+  weeks_remaining?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  games_used_for_fit?: number;
+  season?: string;
+}
+
 export interface DraftPosture {
   label: string;
   note: string;
@@ -1575,6 +1609,14 @@ export const api = {
     authorizedFetch<LeagueTeamRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-rankings`,
     ),
+  getLeaguePlayoffOdds: (leagueId: string, options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    if (options?.lens) params.set('lens', options.lens);
+    const query = params.toString();
+    return authorizedFetch<PlayoffOddsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds${query ? `?${query}` : ''}`,
+    );
+  },
   getMyRoster: (leagueId: string) =>
     authorizedFetch<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),
   getLeagueDraftCenter: (leagueId: string, options?: { lens?: ValuationLens }) => {
