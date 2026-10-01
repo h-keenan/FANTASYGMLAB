@@ -1,0 +1,61 @@
+name: Injury Status Sync
+
+# Migrated from Render cron fantasygm-lab-injury-status-sync (see render.yaml
+# history) per the cron-migration audit: a standalone batch job with zero
+# runtime dependency on the live Render web services, same shape as
+# players-db-refresh.yml but lighter-weight (patches only two columns, never
+# runs a full rebuild). Schedule matches the old Render cron exactly: every
+# 30 minutes.
+#
+# Fetches Sleeper's full raw player list (modules.sleeper.get_players(),
+# already cheaply cached) and PATCHes only the status/injury_status columns
+# directly onto matching player_id rows in the existing data/players.db —
+# see scripts/sync_injury_status.py's module docstring for the full
+# "race-safe with the 6-hour full rebuild" design and why only these two
+# columns are touched.
+#
+# Required GitHub repo/environment secrets: none beyond the built-in
+# GITHUB_TOKEN — see the GITHUB_TOKEN-vs-GITHUB_PUSH_TOKEN note in
+# players-db-refresh.yml (this workflow's push logic is the exact same
+# refresh_and_commit() helper, reused by scripts/sync_injury_status.py).
+# `permissions: contents: write` is likewise required here for the default
+# GITHUB_TOKEN to have push rights.
+#
+# Push-loop safety: same as players-db-refresh.yml — a plain push to main,
+# not a PR, so .github/workflows/auto-merge.yml's `pull_request`-only
+# trigger condition never fires for it; only an extra "Delivery Validation"
+# test run, same as any ordinary merge to main.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: injury-status-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # See players-db-refresh.yml's identical note: the script manages
+          # its own git auth via an explicit push URL, so actions/checkout
+          # must not also persist a credential on the `origin` remote.
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Sync injury status
+        env:
+          GITHUB_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_SLUG: ${{ github.repository }}
+        run: python scripts/sync_injury_status.py
