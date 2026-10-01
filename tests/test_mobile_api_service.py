@@ -6418,6 +6418,79 @@ def test_my_team_returns_the_real_suggested_lineup_split(monkeypatch):
     assert "my_bench_rb" in bench_ids
 
 
+def test_my_team_reinstates_rostered_inactive_player_instead_of_hiding_them(monkeypatch):
+    """Injury-awareness audit finding: modules.player_eligibility.
+    filter_current_fantasy_players treats a literal Sleeper `status` of
+    "Inactive" as no-longer-a-current-player (correct for rankings/waivers/
+    trade search), but a real Sleeper roster can still list that player —
+    previously he silently vanished from BOTH suggested starters and bench
+    here. Now _suggested_lineup_split reinstates him (scoped to this one
+    roster's own lineup view) using modules.sleeper.get_players' raw
+    directory, with a clear Inactive/ruled-out flag — never fabricated
+    healthy, never hidden."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    # "my_inactive_wr" is deliberately absent from the valued players
+    # frame below — simulating exactly what filter_current_fantasy_players
+    # does to a literal "Inactive" status upstream — and only resolvable
+    # via the raw Sleeper players directory.
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_inactive_wr"]
+    raw_players_lookup = {
+        "my_inactive_wr": {
+            "player_id": "my_inactive_wr",
+            "full_name": "Inactive Wideout",
+            "position": "WR",
+            "fantasy_positions": ["WR"],
+            "team": "KC",
+            "status": "Inactive",
+            "injury_status": "",
+            "age": 24,
+        }
+    }
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            with patch("modules.sleeper.get_players", return_value=raw_players_lookup):
+                                response = client.get(
+                                    "/v1/leagues/abc/my-team",
+                                    headers={"Authorization": "Bearer good-token"},
+                                )
+
+    assert response.status_code == 200
+    body = response.json()
+    all_players = body["starters"] + body["bench"]
+    assert len(all_players) == 10  # 9 healthy fixture players + the reinstated one, nothing dropped
+
+    reinstated = next((p for p in all_players if p["player_id"] == "my_inactive_wr"), None)
+    assert reinstated is not None, "a genuinely rostered Inactive player must never silently vanish"
+    assert reinstated["name"] == "Inactive Wideout"
+    assert reinstated["status"] == "Inactive"
+    assert reinstated["injury_label"] == "Inactive"
+    assert reinstated["ruled_out"] is True
+    # Never fabricated a value/tier for a player excluded from the valued pool.
+    assert reinstated["score"] is None
+    assert reinstated["tier"] is None
+
+
 def test_my_team_bench_distinguishes_ir_and_taxi_from_plain_bench(monkeypatch):
     """A real IR/taxi placement must read distinctly from an ordinary
     scratched bench player — the gap this endpoint used to have (bench was

@@ -598,6 +598,68 @@ class TestTradeStrategyFit(unittest.TestCase):
         self.assertLess(injury_patch["score"], normal["score"])
         self.assertNotEqual(injury_patch["label"], "High")
 
+    def _rebuild_shapes(self):
+        base_shape = {
+            "needs": [],
+            "surplus": [],
+            "counts": {},
+            "minimums": {},
+            "draft_capital_tier": "middle",
+            "injured_starter_positions": set(),
+            "injury_burden": 0,
+        }
+        my_shape = {**base_shape, "strategy": "rebuild", "mode": "rebuild"}
+        partner_shape = {**base_shape, "strategy": "contender", "mode": "contender"}
+        return my_shape, partner_shape
+
+    def test_rebuild_buy_low_bonus_names_player_and_injury_explicitly(self):
+        my_shape, partner_shape = self._rebuild_shapes()
+        send = [player("Rebuild Vet", 4000, 27)]
+        receive = [
+            player("Injured Stud", 6000, 24, tier="Star", position="RB"),
+            pick(score=2000),
+        ]
+        receive[0]["status"] = "Injured Reserve"
+        receive[0]["injury_status"] = "Torn ACL"
+
+        reasoning = _trade_reasoning_context(my_shape, partner_shape, send, receive, "Partner")
+
+        self.assertIn("Injury Risk", reasoning["tags"])
+        summary = reasoning["summary"]
+        self.assertIn("Injured Stud", summary)
+        self.assertIn("Torn ACL", summary)
+        self.assertIn("buy-low", summary.lower())
+
+    def test_rebuild_buy_low_bonus_withheld_for_indefinite_status(self):
+        my_shape, partner_shape = self._rebuild_shapes()
+        send = [player("Rebuild Vet", 4000, 27)]
+        receive = [
+            player("Mystery Inactive Player", 6000, 24, tier="Star", position="RB"),
+            pick(score=2000),
+        ]
+        receive[0]["status"] = "Inactive"
+        receive[0]["injury_status"] = ""
+
+        reasoning = _trade_reasoning_context(my_shape, partner_shape, send, receive, "Partner")
+
+        summary = reasoning["summary"]
+        self.assertIn("Mystery Inactive Player", summary)
+        self.assertIn("indefinite", summary.lower())
+        self.assertIn("isn't treated as a buy-low discount", summary.lower())
+
+        # Compare against the recoverable-injury case to confirm the bonus
+        # (not just the wording) is actually withheld.
+        recoverable_receive = [
+            player("Recoverable Player", 6000, 24, tier="Star", position="RB"),
+            pick(score=2000),
+        ]
+        recoverable_receive[0]["status"] = "Injured Reserve"
+        recoverable_receive[0]["injury_status"] = "Broken Leg"
+        recoverable_reasoning = _trade_reasoning_context(
+            my_shape, partner_shape, send, recoverable_receive, "Partner"
+        )
+        self.assertGreater(recoverable_reasoning["score"], reasoning["score"])
+
 
 if __name__ == "__main__":
     unittest.main()

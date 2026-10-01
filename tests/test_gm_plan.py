@@ -132,9 +132,14 @@ def test_trade_focus_area_carries_real_idea_fields_and_a_traceable_source():
             "partner_team_name": "Team Foo",
             "my_player": "Player A",
             "their_player": "Player B",
+            "my_player_id": "my-1",
+            "their_player_id": "their-1",
             "rationale": "This fits your declared rebuild.",
             "trade_confidence_label": "Strong",
             "priority": 1,
+            "receive_assets": [
+                {"asset_type": "player", "player_id": "their-1", "status": "Active", "injury_status": ""}
+            ],
         }
     ]
     plan = gm_plan.build_gm_plan(
@@ -148,9 +153,42 @@ def test_trade_focus_area_carries_real_idea_fields_and_a_traceable_source():
     assert item["partner_team_name"] == "Team Foo"
     assert item["my_player"] == "Player A"
     assert item["their_player"] == "Player B"
+    assert item["my_player_id"] == "my-1"
+    assert item["their_player_id"] == "their-1"
+    assert item["their_player_injury_display"] == ""
     assert item["rationale"] == "This fits your declared rebuild."
     assert item["trade_confidence_label"] == "Strong"
     assert "trade_ideas" in item["source"] or "trade_hub_engine" in item["source"]
+
+
+def test_trade_focus_area_surfaces_receive_side_injury_display():
+    """The data-contract fix: GM Plan's trade-opportunity items previously
+    discarded player_id/injury data even though modules.trade_ideas already
+    computes it on every idea's receive_assets — this is real signal, not an
+    invented one (same modules.rankings.injury_display_label vocabulary
+    modules.gm_targets already uses)."""
+
+    ideas = [
+        {
+            "partner_team_name": "Team Foo",
+            "my_player": "Player A",
+            "their_player": "Injured Player B",
+            "their_player_id": "their-2",
+            "receive_assets": [
+                {
+                    "asset_type": "player",
+                    "player_id": "their-2",
+                    "status": "Injured Reserve",
+                    "injury_status": "Torn ACL",
+                }
+            ],
+        }
+    ]
+    plan = gm_plan.build_gm_plan(team_stance="", season_phase=gm_plan.PHASE_EARLY_SEASON, trade_ideas=ideas)
+    trade_area = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_TRADE)
+    item = trade_area["items"][0]
+    assert item["their_player_id"] == "their-2"
+    assert item["their_player_injury_display"] == "Torn ACL"
 
 
 def test_trade_focus_area_respects_max_trade_ideas_cap():

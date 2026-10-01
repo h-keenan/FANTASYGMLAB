@@ -4521,11 +4521,77 @@ def _project_lineup_row(
     return fields
 
 
+def _reinstated_inactive_roster_rows(
+    missing_player_ids: set[str],
+    *,
+    players_lookup: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Minimal rows for genuinely-rostered players the valued pool dropped.
+
+    modules.player_eligibility.filter_current_fantasy_players treats a
+    literal Sleeper `status` of "Inactive" as no-longer-a-current-player —
+    correct for every OTHER recommendation surface (rankings, waivers,
+    trade search: you don't want those recommending a ghost). But a real
+    Sleeper roster can still literally list that player (the injury-
+    awareness audit's exact finding: a season-ending/placeholder "Inactive"
+    status silently vanished a rostered player from both the suggested
+    starters AND bench here, with no explanation). Reinstated ONLY here,
+    scoped to this one roster's own lineup view — never silently hidden,
+    never fabricated healthy.
+
+    Deliberately narrow: only literal "Inactive" is reinstated.
+    Retired/historical/deceased players really are gone even on a stale
+    Sleeper roster, so those correctly stay excluded. No valuation data is
+    invented for these rows (score/tier/opportunity_label are left absent)
+    — modules.team_eval.suggest_optimal_lineup's own injury_level/
+    is_ruled_out logic (which already treats a literal "Inactive" status as
+    ruled out, see modules.rankings.injury_level) naturally keeps a
+    reinstated row out of a starting slot unless nothing else is available
+    at the position, same as any other ruled-out player.
+    """
+
+    rows: list[dict[str, Any]] = []
+    for player_id in missing_player_ids:
+        raw = (players_lookup or {}).get(player_id)
+        if not isinstance(raw, dict):
+            continue
+        status = str(raw.get("status") or "").strip()
+        if status.casefold() != "inactive":
+            continue
+        name = str(raw.get("full_name") or "").strip()
+        if not name:
+            name = " ".join(
+                str(part).strip()
+                for part in (raw.get("first_name"), raw.get("last_name"))
+                if str(part or "").strip()
+            ).strip()
+        fantasy_positions = raw.get("fantasy_positions") or []
+        position = str(
+            raw.get("position") or (fantasy_positions[0] if fantasy_positions else "") or ""
+        ).strip()
+        rows.append(
+            {
+                "player_id": player_id,
+                "name": name or f"Player {player_id}",
+                "position": position,
+                "team": str(raw.get("team") or ""),
+                "age": raw.get("age"),
+                "status": status,
+                "injury_status": str(raw.get("injury_status") or ""),
+                "player_tier": None,
+                "opportunity_label": None,
+            }
+        )
+    return rows
+
+
 def _suggested_lineup_split(
     valued: pd.DataFrame,
     roster: dict[str, Any],
     settings: dict[str, Any],
     score_field: str,
+    *,
+    players_lookup: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """One roster's suggested starters (slot-ordered) and bench.
 
@@ -4554,6 +4620,14 @@ def _suggested_lineup_split(
         )
 
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+
+    present_ids = set(roster_df["player_id"].astype(str)) if not roster_df.empty else set()
+    missing_ids = roster_player_ids - present_ids
+    if missing_ids and players_lookup:
+        reinstated_rows = _reinstated_inactive_roster_rows(missing_ids, players_lookup=players_lookup)
+        if reinstated_rows:
+            roster_df = pd.concat([roster_df, pd.DataFrame(reinstated_rows)], ignore_index=True, sort=False)
+
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
 
     players = [
@@ -4623,7 +4697,16 @@ def get_league_my_team(
     if not roster_player_ids:
         return {"ok": True, "starters": [], "bench": [], "reason": "empty_roster"}
 
-    starters, bench = _suggested_lineup_split(valued, my_roster, settings, score_field)
+    # Best-effort — a hiccup fetching Sleeper's raw player directory must
+    # never break this endpoint; it only means a rostered-but-Inactive
+    # player can't be reinstated into the lineup this one request.
+    try:
+        my_team_players_lookup = sleeper.get_players()
+    except Exception:
+        my_team_players_lookup = {}
+    starters, bench = _suggested_lineup_split(
+        valued, my_roster, settings, score_field, players_lookup=my_team_players_lookup
+    )
 
     return {
         "ok": True,
@@ -4703,6 +4786,8 @@ def _matchup_side(
     valued: pd.DataFrame,
     settings: dict[str, Any],
     score_field: str,
+    *,
+    players_lookup: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One team's side of the matchup: identity, suggested starters, season-value total.
 
@@ -4711,9 +4796,16 @@ def _matchup_side(
     That also means the opponent side is their best available lineup, not
     necessarily the lineup they've actually set in Sleeper — stated in the
     response as `starters_basis` so the client can say so out loud.
+
+    `players_lookup` (modules.sleeper.get_players' raw directory) lets
+    _suggested_lineup_split reinstate a genuinely rostered player whose
+    literal "Inactive" status got him filtered out of `valued` upstream —
+    see _reinstated_inactive_roster_rows.
     """
 
-    starters, _bench = _suggested_lineup_split(valued, roster, settings, score_field)
+    starters, _bench = _suggested_lineup_split(
+        valued, roster, settings, score_field, players_lookup=players_lookup
+    )
 
     best_score_by_position: dict[str, float] = {}
     for player in starters:
@@ -5064,8 +5156,23 @@ def get_league_matchup(
         return _empty_matchup("opponent_roster_missing", week=current_week)
 
     profiles = sleeper.get_league_roster_profiles(league_id) or {}
+    # Best-effort, same "fails soft" contract as every other enrichment
+    # fetch in this file (e.g. the projection lookup below) — a hiccup
+    # fetching Sleeper's raw player directory must never break the real
+    # matchup response; it only means a rostered-but-Inactive player can't
+    # be reinstated into the suggested lineup this one request.
+    try:
+        matchup_players_lookup = sleeper.get_players()
+    except Exception:
+        matchup_players_lookup = {}
     my_side = _matchup_side(
-        my_roster_id, my_roster, profiles.get(my_roster_id) or {}, valued, settings, score_field
+        my_roster_id,
+        my_roster,
+        profiles.get(my_roster_id) or {},
+        valued,
+        settings,
+        score_field,
+        players_lookup=matchup_players_lookup,
     )
     opponent_side = _matchup_side(
         opponent_roster_id,
@@ -5074,6 +5181,7 @@ def get_league_matchup(
         valued,
         settings,
         score_field,
+        players_lookup=matchup_players_lookup,
     )
     if not my_side["starters"] and not opponent_side["starters"]:
         return _empty_matchup("empty_roster", week=current_week)

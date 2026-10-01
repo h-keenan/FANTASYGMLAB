@@ -208,6 +208,38 @@ class TestBuildMatchupViewHappyPath(unittest.TestCase):
             self.assertEqual(player["projection"]["status"], "insufficient_player_data")
             self.assertEqual(player["projection_note"], "Not enough recent games yet for a projection.")
 
+    def test_forwards_players_map_into_matchup_side_for_inactive_reinstatement(self):
+        """Plumbing test only — _matchup_side/_suggested_lineup_split's own
+        reinstatement logic (a genuinely rostered player filtered out of
+        `valued` upstream for a literal "Inactive" status must not silently
+        vanish) is covered by tests/test_mobile_api_service.py. This just
+        confirms build_matchup_view actually forwards its `players_map`
+        argument into those reused helpers rather than dropping it on the
+        floor, so the web Matchup page gets the same fix as mobile."""
+
+        players_map = {"mine_inactive": {"status": "Inactive"}}
+        with patch("modules.web_matchup_ui.project_player_week", side_effect=_no_projection_stub):
+            with patch(
+                "modules.web_matchup_ui._matchup_side", wraps=web_matchup_ui._matchup_side
+            ) as spy_matchup_side:
+                web_matchup_ui.build_matchup_view(
+                    current_week=5,
+                    matchups=[{"roster_id": 1, "matchup_id": 3}, {"roster_id": 2, "matchup_id": 3}],
+                    my_roster_id="1",
+                    rosters_by_id=_ROSTERS_BY_ID,
+                    profiles=_PROFILES,
+                    valued=_fake_matchup_players_frame(),
+                    settings=_SETTINGS,
+                    score_field="value_score",
+                    season=2026,
+                    players_map=players_map,
+                    defense_strength={},
+                )
+
+        self.assertEqual(spy_matchup_side.call_count, 2)
+        for call in spy_matchup_side.call_args_list:
+            self.assertIs(call.kwargs.get("players_lookup"), players_map)
+
     def test_empty_roster_when_neither_roster_has_players(self):
         rosters = {
             "1": {**_ROSTERS_BY_ID["1"], "players": []},
