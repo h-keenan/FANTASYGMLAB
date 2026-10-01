@@ -1407,6 +1407,53 @@ export interface DashboardResponse {
   reason: string;
 }
 
+/**
+ * One saved league's row on the cross-league Portfolio screen — the exact
+ * same per-league summary GET /v1/leagues/{id}/dashboard already builds
+ * (modules.dashboard_engine.build_league_summary), condensed to what a
+ * compact row needs. `top_item` is that league's single highest-priority
+ * Next Move tile (same shape as DashboardItem) — "the one thing to do in
+ * this league right now."
+ */
+export interface PortfolioLeague {
+  league_id: string;
+  league_name: string;
+  team_name: string;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  health_flag: string;
+  power_rank: number | null;
+  power_rank_tied: boolean;
+  top_item: DashboardItem | null;
+}
+
+/** A saved league whose summary couldn't be built this time — Portfolio
+ * shows every league that DID succeed rather than blanking the whole
+ * screen over one broken league. */
+export interface PortfolioFailedLeague {
+  league_id: string;
+  league_name: string;
+  reason: string;
+}
+
+export interface PortfolioUpsell {
+  title: string;
+  body: string;
+}
+
+export interface PortfolioResponse {
+  ok: true;
+  is_premium: boolean;
+  lens: string;
+  leagues: PortfolioLeague[];
+  failed_leagues: PortfolioFailedLeague[];
+  /** Present only for a Free caller — Portfolio needs more than the one
+   * league Free accounts can save, so Free gets this honest upsell instead
+   * of an empty or broken screen. */
+  upsell: PortfolioUpsell | null;
+}
+
 export interface PresentationAsset {
   asset_type: 'player' | 'pick';
   label?: string;
@@ -1638,6 +1685,8 @@ export const api = {
   },
   getLeagueDashboard: (leagueId: string) =>
     authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
+  /** Cross-league Portfolio — one row per saved league (Premium). */
+  getPortfolio: () => authorizedFetch<PortfolioResponse>('/v1/portfolio'),
   getTradeHubIdeas: (
     leagueId: string,
     strategy: TeamStrategy = 'retool',

@@ -37,7 +37,21 @@ from typing import Any, Mapping
 
 import pandas as pd
 
-from modules import canonical_recommendation_narrative, daily_gm_briefing, dashboard_workflow, injury_ui, sleeper, trade_hub_ui, trade_hub_engine
+from modules import (
+    canonical_recommendation_narrative,
+    daily_gm_briefing,
+    dashboard_workflow,
+    injury_ui,
+    league_rankings,
+    league_value_settings,
+    player_eligibility,
+    rankings,
+    sleeper,
+    sleeper_leagues,
+    team_stance,
+    trade_hub_ui,
+    trade_hub_engine,
+)
 from modules.canonical_recommendation_narrative import build_waiver_narrative
 from modules.compact_fantasy_assets import compact_package
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
@@ -402,3 +416,179 @@ def compose_next_move_briefing(
         valuation_lens=score_field,
         entitlement=entitlement,
     )
+
+
+# Everyday, non-error outcomes a caller iterating many leagues should treat
+# as "nothing to show for this one" rather than a bug — the same reasons
+# _resolve_my_roster/get_league_dashboard (services/mobile_api_service.py)
+# already surface for a single league.
+LEAGUE_SUMMARY_SKIP_REASONS = frozenset(
+    {
+        "no_sleeper_username_linked",
+        "sleeper_user_not_found",
+        "league_not_found",
+        "not_a_member_of_league",
+        "empty_roster",
+        "no_player_data",
+    }
+)
+
+
+def build_league_summary(
+    *,
+    league_id: str,
+    lens: str,
+    sleeper_username: str,
+    players_db_path: str,
+    team_stance_value: str = "",
+    gm_target_player_ids: tuple[str, ...] = (),
+    gm_untouchable_player_ids: tuple[str, ...] = (),
+    entitlement: str = "free",
+) -> dict[str, Any]:
+    """One league's compact standing/record/rank/top-need-or-opportunity
+    summary — a cross-league "Portfolio" row.
+
+    Built for the multi-league Portfolio view (mobile's GET /v1/portfolio
+    and the web app's Portfolio page) so BOTH surfaces compute "my team in
+    this league, at a glance" the exact same way, from the exact same
+    engines `compose_next_move_briefing` above already uses for the
+    single-league Dashboard (modules.league_value_settings for the lens,
+    modules.trade_hub_engine for the trade tile, modules.league_rankings for
+    power rank, modules.injury_ui for the health flag) — no new valuation or
+    ranking math, just one more caller of what already exists, condensed to
+    the handful of fields a league row needs instead of the full Dashboard's
+    item list.
+
+    Every field this function needs to resolve a user's roster in
+    `league_id` (sleeper_username, declared team stance, GM Targets) is
+    passed in rather than fetched here, so this stays a plain function any
+    runtime can call — the FastAPI mobile API and the Streamlit web app
+    fetch those from Supabase differently (bearer token vs. session state),
+    and neither concern belongs in this module (see module docstring: this
+    is a session-independent sibling to web's own dashboard, not a Supabase
+    client).
+
+    Returns `{"ok": False, "reason": "..."}` for any everyday non-member/
+    no-data state (`LEAGUE_SUMMARY_SKIP_REASONS`) — never raises for those,
+    matching `_resolve_my_roster`'s own non-error contract. A genuine
+    failure (Sleeper unreachable, a malformed league payload, etc.) raises,
+    same as the engines it calls — a caller iterating many leagues should
+    catch that per league and report it, not swallow it here.
+    """
+
+    if not str(sleeper_username or "").strip():
+        return {"ok": False, "reason": "no_sleeper_username_linked"}
+
+    sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
+    if not sleeper_user_id:
+        return {"ok": False, "reason": "sleeper_user_not_found"}
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        return {"ok": False, "reason": "league_not_found"}
+
+    rosters = sleeper.get_rosters(league_id)
+    my_roster = next(
+        (r for r in rosters if str(r.get("owner_id") or "") == sleeper_user_id), None
+    )
+    if my_roster is None:
+        return {"ok": False, "reason": "not_a_member_of_league"}
+
+    roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    if not roster_player_ids:
+        return {"ok": False, "reason": "empty_roster"}
+
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(players_db_path)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(players_db_path)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="portfolio", league=league
+    )
+    if players_df.empty:
+        return {"ok": False, "reason": "no_player_data"}
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    all_rostered_player_ids: set[str] = set()
+    for roster in rosters:
+        all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
+
+    roster_id = my_roster.get("roster_id")
+    team_strategy = team_stance.team_strategy_for_stance(team_stance_value)
+
+    trade_idea_records = None
+    try:
+        trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
+            league_id=league_id,
+            roster_id=int(roster_id),
+            strategy=team_strategy,
+            lens=lens,
+            players_db_path=players_db_path,
+            untouchable_player_ids=gm_untouchable_player_ids,
+            gm_target_player_ids=gm_target_player_ids,
+            team_stance=team_stance_value,
+        )
+    except (TypeError, ValueError):
+        pass
+
+    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+    injury_context = roster_injury_context(roster_df, lineup_df)
+
+    briefing = compose_next_move_briefing(
+        league_id=league_id,
+        roster_id=str(roster_id or ""),
+        players_df=valued,
+        roster_player_ids=roster_player_ids,
+        all_rostered_player_ids=all_rostered_player_ids,
+        league_settings=settings,
+        score_field=score_field,
+        entitlement=entitlement,
+        rosters=rosters,
+        team_strategy=team_strategy,
+        trade_idea_records=trade_idea_records,
+        roster_df=roster_df,
+        lineup_df=lineup_df,
+        injury_context=injury_context,
+        team_stance=team_stance_value,
+    )
+
+    injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
+    health_flag = (
+        injury_ui.team_injury_display_label(injury_display_context, include_uncertainty=True)
+        or "Stable"
+    )
+
+    power_rank = None
+    power_rank_tied = False
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
+    if not rankings_frame.empty:
+        match = rankings_frame[rankings_frame["roster_id"].astype(str) == str(roster_id or "")]
+        if not match.empty:
+            power_rank = match.iloc[0].get("power_rank")
+            power_rank_tied = bool(match.iloc[0].get("power_rank_tied"))
+
+    team_profile = sleeper.get_league_roster_profiles(league_id).get(str(roster_id or ""), {})
+    roster_settings = my_roster.get("settings") or {}
+
+    return {
+        "ok": True,
+        "reason": "",
+        "roster_id": str(roster_id or ""),
+        "team_name": _text(team_profile.get("team_name")),
+        "wins": roster_settings.get("wins"),
+        "losses": roster_settings.get("losses"),
+        "ties": roster_settings.get("ties"),
+        "health_flag": health_flag,
+        "power_rank": power_rank,
+        "power_rank_tied": power_rank_tied,
+        # Priority-ordered by organize_dashboard_items/compose_daily_gm_briefing
+        # above — items[0] is already "the one thing to do in this league",
+        # the same headline the single-league Dashboard leads with.
+        "top_item": briefing.items[0].to_dict() if briefing.items else None,
+    }

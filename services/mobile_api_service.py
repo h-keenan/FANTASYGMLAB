@@ -39,6 +39,7 @@ Deployment topology (Render):
   - POST /v1/push/unregister  — remove one of the caller's tokens (sign-out)
   - POST /v1/push/test        — send a test push to all of the caller's tokens
   - GET  /v1/leagues/{id}/dashboard — the caller's "Next Move" briefing
+  - GET  /v1/portfolio              — cross-league standing/needs/opportunities, one row per saved league (Premium)
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
   - GET  /v1/leagues/{id}/waivers   — roster-need-aware free-agent pool + FAAB guidance
   - POST /v1/leagues/{id}/trade-outcomes        — record a shared trade for later "did this happen?" follow-up
@@ -3892,8 +3893,7 @@ def set_team_stance(
     }
 
 
-def _project_briefing_item(item: Any) -> dict[str, Any]:
-    payload = item.to_dict()
+def _project_briefing_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "category": payload.get("category"),
         "headline": payload.get("headline"),
@@ -3917,6 +3917,10 @@ def _project_briefing_item(item: Any) -> dict[str, Any]:
         "recommendation_id": payload.get("recommendation_id") or "",
         "tier_label": payload.get("tier_label") or "",
     }
+
+
+def _project_briefing_item(item: Any) -> dict[str, Any]:
+    return _project_briefing_item_payload(item.to_dict())
 
 
 # Matches web's app.py `visible_action_items = action_center_items if
@@ -4125,6 +4129,149 @@ def get_league_dashboard(
             "visible_count": len(visible_items),
             "hidden_count": len(all_items) - len(visible_items),
         },
+    }
+
+
+_PORTFOLIO_UPSELL = {
+    "title": "See every league at a glance",
+    "body": (
+        "Portfolio is a Premium feature — free accounts keep one saved league, "
+        "so there's nothing to aggregate yet. Upgrade to Premium to save every "
+        "league you're in and see your record, rank, and top need or "
+        "opportunity across all of them in one place."
+    ),
+}
+
+
+@app.get("/v1/portfolio")
+def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Cross-league "Portfolio" — one compact row per saved league.
+
+    coridian_-approved multi-league view: a single surface showing this
+    user's standing/needs/opportunities across every connected league at
+    once, previously discussed as a planned Premium feature but never
+    built. Each row is built by modules.dashboard_engine.build_league_summary
+    — the exact same engines (modules.league_value_settings,
+    modules.trade_hub_engine, modules.league_rankings, modules.injury_ui,
+    dashboard_engine.compose_next_move_briefing) GET
+    /v1/leagues/{league_id}/dashboard already uses for a single league, just
+    called once per saved league and condensed to the handful of fields a
+    row needs — no new valuation or ranking math. The web app's Portfolio
+    page (modules.portfolio_page) calls this exact same shared function, so
+    both surfaces agree.
+
+    Gated behind Premium the same way every other Premium feature resolves
+    entitlement (profile.entitlement via _fetch_profile_fields — the single
+    authoritative source every other gate in this file already uses). This
+    is inherently a Premium-only surface: modules.saved_leagues caps Free
+    accounts at exactly one saved league, so there is nothing to aggregate
+    on Free — a Free caller gets an honest upsell instead of an empty or
+    broken screen, never partial/truncated data (there's no "the rest is
+    locked" partial state that makes sense for a one-league Free account).
+
+    A league that fails to build its summary (Sleeper outage, a deleted
+    league, a genuinely unexpected error) is reported in `failed_leagues`
+    with a short reason instead of failing the whole response — one broken
+    league never blanks the rest of the portfolio.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
+    is_premium = str(profile.get("entitlement") or "free") == "premium"
+
+    if not is_premium:
+        return {
+            "ok": True,
+            "is_premium": False,
+            "lens": lens,
+            "leagues": [],
+            "failed_leagues": [],
+            "upsell": _PORTFOLIO_UPSELL,
+        }
+
+    if not user_id:
+        return {"ok": True, "is_premium": True, "lens": lens, "leagues": [], "failed_leagues": [], "upsell": None}
+
+    saved_rows, error = account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+    if error:
+        return {
+            "ok": True,
+            "is_premium": True,
+            "lens": lens,
+            "leagues": [],
+            "failed_leagues": [],
+            "upsell": None,
+            "reason": "saved_leagues_unavailable",
+        }
+
+    sleeper_username = str(profile.get("sleeper_username") or "")
+    entitlement = str(profile.get("entitlement") or "free")
+    leagues: list[dict[str, Any]] = []
+    failed_leagues: list[dict[str, Any]] = []
+
+    for row in saved_rows:
+        league_id = saved_leagues.normalize_league_id(row.get("league_id"))
+        if not league_id:
+            continue
+        league_name = str(row.get("league_name") or "").strip() or league_id
+
+        try:
+            team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
+            gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+                config, user_id, access_token, league_id
+            )
+            summary = dashboard_engine.build_league_summary(
+                league_id=league_id,
+                lens=lens,
+                sleeper_username=sleeper_username,
+                players_db_path=PLAYERS_DB_PATH,
+                team_stance_value=team_stance_value,
+                gm_target_player_ids=gm_target_ids,
+                gm_untouchable_player_ids=gm_untouchable_ids,
+                entitlement=entitlement,
+            )
+        except Exception:
+            failed_leagues.append({"league_id": league_id, "league_name": league_name, "reason": "unavailable"})
+            continue
+
+        if not summary.get("ok"):
+            reason = summary.get("reason") or "unavailable"
+            if reason not in dashboard_engine.LEAGUE_SUMMARY_SKIP_REASONS:
+                reason = "unavailable"
+            failed_leagues.append({"league_id": league_id, "league_name": league_name, "reason": reason})
+            continue
+
+        top_item = summary.get("top_item")
+        leagues.append(
+            {
+                "league_id": league_id,
+                "league_name": league_name,
+                "team_name": summary.get("team_name") or "",
+                "wins": _clean_json_value(summary.get("wins")),
+                "losses": _clean_json_value(summary.get("losses")),
+                "ties": _clean_json_value(summary.get("ties")),
+                "health_flag": summary.get("health_flag"),
+                "power_rank": _clean_json_value(summary.get("power_rank")),
+                "power_rank_tied": bool(summary.get("power_rank_tied")),
+                "top_item": _project_briefing_item_payload(top_item) if top_item else None,
+            }
+        )
+
+    return {
+        "ok": True,
+        "is_premium": True,
+        "lens": lens,
+        "leagues": leagues,
+        "failed_leagues": failed_leagues,
+        "upsell": None,
     }
 
 

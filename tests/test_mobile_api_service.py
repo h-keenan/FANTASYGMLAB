@@ -4757,6 +4757,180 @@ def test_dashboard_team_snapshot_is_none_without_a_resolved_roster(monkeypatch):
     assert body["reason"] == "no_sleeper_username_linked"
 
 
+# --- Portfolio (cross-league standing/needs/opportunities, Premium-gated) ---
+#
+# Portfolio aggregates modules.dashboard_engine.build_league_summary — the
+# same engines the single-league Dashboard above already uses — once per
+# saved league. These tests pin the aggregation/gating loop itself (gate
+# resolution, one-broken-league-never-blanks-the-rest, response shape);
+# build_league_summary's own engine-composition correctness is covered by
+# the Dashboard tests above (it calls the identical
+# compose_next_move_briefing/league_rankings/injury_ui pipeline).
+
+
+def test_portfolio_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/portfolio")
+    assert response.status_code == 401
+
+
+def test_portfolio_rejects_an_invalid_lens(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/portfolio?lens=NotARealLens",
+            headers={"Authorization": "Bearer good-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_portfolio_free_user_gets_an_upsell_and_never_builds_summaries(monkeypatch):
+    # Free accounts keep exactly one saved league (modules.saved_leagues) —
+    # there is nothing to aggregate, so Free gets an honest upsell instead of
+    # a broken/empty screen, and the (expensive) per-league engine never
+    # even runs.
+    from services import mobile_api_service
+
+    def _must_not_run(**_kwargs):
+        raise AssertionError("build_league_summary should not run for a Free caller")
+
+    monkeypatch.setattr(mobile_api_service.dashboard_engine, "build_league_summary", _must_not_run)
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["is_premium"] is False
+    assert body["leagues"] == []
+    assert body["failed_leagues"] == []
+    assert body["upsell"]["title"]
+    assert body["upsell"]["body"]
+
+
+def test_portfolio_premium_user_with_no_saved_leagues_is_empty_not_broken(monkeypatch):
+    from services import mobile_api_service
+
+    monkeypatch.setattr(
+        mobile_api_service.account_store, "fetch_saved_leagues", lambda *a, **k: ([], "")
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["is_premium"] is True
+    assert body["leagues"] == []
+    assert body["failed_leagues"] == []
+    assert body["upsell"] is None
+
+
+def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monkeypatch):
+    # Three saved leagues: one builds a real summary, one is an everyday
+    # "not a member" skip state, one raises outright (a genuine Sleeper
+    # outage) — none of that should blank the one league that DID succeed.
+    from services import mobile_api_service
+
+    saved_rows = [
+        {"league_id": "league-ok", "league_name": "The Ok League"},
+        {"league_id": "league-skip", "league_name": "The Skip League"},
+        {"league_id": "league-boom", "league_name": "The Boom League"},
+    ]
+    monkeypatch.setattr(
+        mobile_api_service.account_store,
+        "fetch_saved_leagues",
+        lambda *a, **k: (saved_rows, ""),
+    )
+    monkeypatch.setattr(mobile_api_service, "_fetch_team_stance", lambda *a, **k: "")
+    monkeypatch.setattr(mobile_api_service, "_fetch_gm_target_player_ids", lambda *a, **k: ((), ()))
+
+    def _fake_build_league_summary(*, league_id, **_kwargs):
+        if league_id == "league-ok":
+            return {
+                "ok": True,
+                "reason": "",
+                "roster_id": "1",
+                "team_name": "Ok Team",
+                "wins": 7,
+                "losses": 3,
+                "ties": 0,
+                "health_flag": "Stable",
+                "power_rank": 2,
+                "power_rank_tied": False,
+                "top_item": {
+                    "category": "need",
+                    "headline": "Add RB2 depth",
+                    "reason": "Thin behind your starter.",
+                    "destination": "my_team",
+                },
+            }
+        if league_id == "league-skip":
+            return {"ok": False, "reason": "not_a_member_of_league"}
+        raise RuntimeError("Sleeper is unreachable")
+
+    monkeypatch.setattr(
+        mobile_api_service.dashboard_engine, "build_league_summary", _fake_build_league_summary
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["is_premium"] is True
+
+    assert len(body["leagues"]) == 1
+    league = body["leagues"][0]
+    assert league["league_id"] == "league-ok"
+    assert league["league_name"] == "The Ok League"
+    assert league["team_name"] == "Ok Team"
+    assert league["wins"] == 7
+    assert league["power_rank"] == 2
+    assert league["top_item"]["headline"] == "Add RB2 depth"
+    assert league["top_item"]["category"] == "need"
+
+    failed_by_id = {row["league_id"]: row for row in body["failed_leagues"]}
+    assert set(failed_by_id) == {"league-skip", "league-boom"}
+    assert failed_by_id["league-skip"]["reason"] == "not_a_member_of_league"
+    # An unexpected raise never leaks internals — it's reported as a plain
+    # "unavailable", same bucket any other genuine failure falls into.
+    assert failed_by_id["league-boom"]["reason"] == "unavailable"
+
+
 # --- GM Plan (season-phase-aware roadmap, additive on top of existing engines) ---
 #
 # GM Plan is a NEW aggregation layer, distinct from both the Dashboard's
