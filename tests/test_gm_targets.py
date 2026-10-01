@@ -702,6 +702,50 @@ def test_league_switch_clears_cache_no_stale_leakage():
     assert "6794" not in gt.cached_target_ids(session, league_id="L1")
 
 
+def test_enrich_target_surfaces_injury_display():
+    """Injury-awareness audit finding: a watched target's card previously had
+    zero visibility into the player's current availability — the player_row
+    was fetched but injury_status/status were dropped before enrichment.
+    enrich_target() must carry an honest injury tag through, reusing
+    rankings.injury_display_label() (the app's one injury vocabulary) rather
+    than inventing a second one."""
+
+    target = gt.GmTarget(
+        user_id="u1",
+        league_id="L1",
+        player_id="123",
+        source_surface="waivers",
+    )
+    hurt_card = gt.enrich_target(
+        target,
+        session=None,
+        player_row={
+            "name": "Hurt Guy",
+            "position": "RB",
+            "team": "KC",
+            "status": "Injured Reserve",
+            "injury_status": "",
+        },
+    )
+    assert hurt_card.injury_display == "Injured Reserve"
+
+    healthy_card = gt.enrich_target(
+        target,
+        session=None,
+        player_row={
+            "name": "Fine Guy",
+            "position": "WR",
+            "team": "KC",
+            "status": "Active",
+            "injury_status": "",
+        },
+    )
+    assert healthy_card.injury_display == ""
+
+    missing_row_card = gt.enrich_target(target, session=None, player_row=None)
+    assert missing_row_card.injury_display == ""
+
+
 def test_no_stale_auth_supabase_loaders_in_repo():
     """Wider drift check — no production call sites for the removed loader."""
 

@@ -33,6 +33,7 @@ from modules.player_eligibility import (
     filter_current_fantasy_players,
     player_eligibility,
 )
+from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES
 from modules.sleeper import (
     get_players,
     get_prior_season_player_stats,
@@ -2057,6 +2058,26 @@ def injury_level(status: str, injury_status: str = "") -> str:
     )
 
 
+# Sleeper roster-level `status` values that player_state_authority.py's
+# NFL_NON_ACTIONABLE_STATUSES also treats as fully non-actionable, reused
+# here (rather than re-invented) so this value column and waiver_actionability
+# never disagree about which literal status strings mean "can't play."
+# Deliberately a narrow subset of that set, not the whole thing:
+# - "out" is excluded on purpose: is_ruled_out() below already gives a
+#   literal "Out" token a hard ruling via its own token check, while
+#   grouping it with "Doubtful" at the "moderate" severity bucket here is
+#   intentional (see is_ruled_out()'s docstring) — promoting it to "major"
+#   would silently change that designed split.
+# - "retired"/"historical"/"historical only"/"deceased" describe players no
+#   longer in the league (filter_current_fantasy_players already excludes
+#   them upstream), which is a different question from injury severity.
+_MAJOR_NFL_STATUS_VALUES = {"inactive", "practice squad"}
+assert _MAJOR_NFL_STATUS_VALUES <= NFL_NON_ACTIONABLE_STATUSES, (
+    "rankings._MAJOR_NFL_STATUS_VALUES drifted from player_state_authority's "
+    "canonical NFL_NON_ACTIONABLE_STATUSES"
+)
+
+
 @lru_cache(maxsize=4096)
 def _injury_level_cached(status: str, injury_status: str) -> str:
     healthy_markers = {"", "none", "healthy", "active"}
@@ -2081,6 +2102,8 @@ def _injury_level_cached(status: str, injury_status: str) -> str:
     def has_term(text: str, terms: set[str]) -> bool:
         return any(term in text for term in terms if term)
 
+    if status in _MAJOR_NFL_STATUS_VALUES:
+        return "major"
     if status in major_terms or has_term(status, major_terms) or has_term(injury_status, major_terms):
         return "major"
     if status in moderate_terms or has_term(status, moderate_terms) or has_term(injury_status, moderate_terms):

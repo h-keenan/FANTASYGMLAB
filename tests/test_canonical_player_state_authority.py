@@ -43,6 +43,33 @@ def _reconciled_frame() -> pd.DataFrame:
     )
 
 
+def test_injury_level_matches_player_state_authority_for_inactive_and_practice_squad():
+    """Injury-awareness audit finding: rankings.injury_level() — the app's
+    other injury-severity vocabulary, used by trade_ideas.py, trade_hub_ui.py,
+    faab.py, chat.py and the player_cards "Injury Risk" tag — independently
+    missed two literal Sleeper `status` values that
+    player_state_authority.waiver_actionability() already treats as fully
+    non-actionable: "Inactive" (the exact real-world example from the PR #818
+    bug history: a season-ending rookie QB whose `active` flag stayed True
+    while `status` read "Inactive") and "Practice Squad". Both used to
+    silently classify as "healthy" with zero warning anywhere downstream.
+    """
+
+    for status in ("Inactive", "Practice Squad"):
+        assert status.casefold() in player_state_authority.NFL_NON_ACTIONABLE_STATUSES
+        assert rankings.injury_level(status, "") == "major", status
+        assert rankings.is_ruled_out(status, "") is True, status
+
+    # Regression guard: "Out" is a documented, intentional exception — it
+    # stays bucketed with "Doubtful" at "moderate" severity (is_ruled_out()
+    # separately gives a literal "Out" token its own hard ruling via a token
+    # check, not via this severity bucket) and must not be swept into the
+    # "major" bucket by a future, less careful reuse of
+    # NFL_NON_ACTIONABLE_STATUSES.
+    assert rankings.injury_level("Out", "") == "moderate"
+    assert rankings.is_ruled_out("Out", "") is True
+
+
 def test_actual_keenan_survives_current_player_universe_reconciliation():
     keenan = _actual_record("Keenan Allen")
     frame = _reconciled_frame()
