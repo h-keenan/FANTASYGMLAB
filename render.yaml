@@ -249,3 +249,48 @@ services:
         sync: false
       - key: GITHUB_REPO_SLUG
         value: h-keenan/FANTASYGMLAB
+  # Frequent injury-status-only sync for data/players.db — deliberately
+  # separate from, and far more frequent than, the full rebuild cron right
+  # above. That 6-hour full rebuild recomputes every column (valuation,
+  # scoring, usage shares, stats joins, ...), which is overkill to run more
+  # often just to catch injury-status churn; but 6 hours is too coarse for
+  # injury status specifically — a player ruled OUT (or upgraded/downgraded
+  # between Questionable/Doubtful) on a Friday afternoon could otherwise sit
+  # stale in players.db for most of a game week. modules.sleeper.
+  # get_players() already fetches Sleeper's full raw player list —
+  # status/injury_status included — cheaply (no valuation recompute, its
+  # own 5-minute disk cache), so this cron does only that fetch and PATCHes
+  # the status/injury_status columns directly onto matching player_id rows
+  # in the existing SQLite file (scripts/sync_injury_status.py). It never
+  # runs build_players_table() and never touches any valuation/score/usage
+  # column; a Sleeper player_id not yet present in players.db is skipped
+  # (only a full rebuild inserts new rows — see that script's docstring).
+  # Schedule: every 30 minutes, matching fantasygm-lab-push-trigger-sweep's
+  # cadence above — frequent enough that a mid-week injury designation
+  # change reaches the app same-cycle, without meaningfully increasing load
+  # on Sleeper's API given its own 5-minute cache already dedupes fetches
+  # that land close together with the full-rebuild cron or the live app.
+  # Race safety vs. the full-rebuild cron above: both scripts call
+  # sync_to_latest_branch() (fetch + hard-reset to origin/main) before
+  # diffing, and neither ever force-pushes, so if both happen to run close
+  # together the loser's plain fast-forward push is cleanly rejected (never
+  # clobbers the winner) and its dropped update is simply recomputed and
+  # retried on that cron's own next cycle — see scripts/sync_injury_status.py's
+  # module docstring for the full reasoning.
+  - type: cron
+    name: fantasygm-lab-injury-status-sync
+    branch: main
+    runtime: python
+    schedule: "*/30 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/sync_injury_status.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      # Same fine-grained GitHub PAT as fantasygm-lab-players-db-refresh —
+      # used solely to push the patched data/players.db (and the changed
+      # data/sleeper_players.json cache sibling, when applicable) to main.
+      - key: GITHUB_PUSH_TOKEN
+        sync: false
+      - key: GITHUB_REPO_SLUG
+        value: h-keenan/FANTASYGMLAB
