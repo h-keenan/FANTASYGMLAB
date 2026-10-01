@@ -1011,20 +1011,27 @@ def clear_alert_state(session: MutableMapping[str, Any], *, league_id: str | Non
 def _name_index(df: pd.DataFrame) -> Dict[str, str]:
     if df is None or getattr(df, "empty", True):
         return {}
-    mapping: Dict[str, str] = {}
-    ambiguous: set[str] = set()
     if "name" not in df.columns or "player_id" not in df.columns:
-        return mapping
-    for _, row in df.iterrows():
-        key = news_signal.normalize_player_name(str(row.get("name") or ""))
-        pid = str(row.get("player_id") or "")
-        if key and pid:
-            prior = mapping.get(key)
-            if prior and prior != pid:
-                ambiguous.add(key)
-            else:
-                mapping[key] = pid
-    for key in ambiguous:
+        return {}
+    # Vectorized over Series instead of df.iterrows(): this runs on the
+    # full player pool (2000+ rows) on every Dashboard load (app.py's
+    # render_home_dashboard and main()'s news/alerts context both call
+    # canonical_player_name_index(df_players)), and the per-row work here
+    # is a pure string normalize + dict build — no per-row branching that
+    # needs a Series. Same "first build the mapping, then drop any key
+    # whose rows disagreed on player_id" semantics as before: a key with
+    # more than one distinct non-empty player_id across rows is ambiguous
+    # and is dropped entirely, regardless of row order.
+    keys = df["name"].map(lambda value: news_signal.normalize_player_name(str(value or "")))
+    pids = df["player_id"].map(lambda value: str(value or ""))
+    valid = (keys != "") & (pids != "")
+    if not bool(valid.any()):
+        return {}
+    pairs = pd.DataFrame({"key": keys[valid], "pid": pids[valid]})
+    ambiguous_keys = set(pairs.groupby("key")["pid"].nunique().loc[lambda s: s > 1].index)
+    first_seen = pairs.drop_duplicates(subset="key", keep="first")
+    mapping = dict(zip(first_seen["key"], first_seen["pid"]))
+    for key in ambiguous_keys:
         mapping.pop(key, None)
     return mapping
 

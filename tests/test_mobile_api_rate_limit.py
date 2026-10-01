@@ -105,3 +105,46 @@ def test_rate_limiting_is_inert_by_default_under_pytest(monkeypatch):
 
     for _ in range(10):
         assert client.get("/health").status_code == 200
+
+
+def test_prune_is_throttled_once_bucket_count_stays_over_the_cap(monkeypatch):
+    """Regression test for a lock-contention bug: once `_buckets` stays
+    above `_RATE_LIMIT_MAX_TRACKED_KEYS` with all-current-window (non-stale)
+    keys, `_prune` can't remove anything, so the old code re-ran a full
+    O(len(_buckets)) dict scan — while holding the limiter's lock — on
+    EVERY subsequent `hit()` call, serializing every request in the process
+    on that scan. The fix caps actual prune attempts to at most one per
+    `_PRUNE_MIN_INTERVAL_SECONDS`, regardless of call volume."""
+
+    pytest.importorskip("httpx")
+    from services import mobile_api_service
+
+    limiter = mobile_api_service._InMemoryFixedWindowRateLimiter()
+    cap = mobile_api_service._RATE_LIMIT_MAX_TRACKED_KEYS
+
+    # Seed the limiter past the cap with distinct, all-current-window keys
+    # (nothing stale to collect) — the exact scenario where the old code
+    # would scan on every single call and never shrink.
+    for i in range(cap + 10):
+        limiter.hit(f"client-{i}", limit=1_000_000, window_seconds=60)
+
+    prune_calls = []
+    original_prune = limiter._prune
+
+    def _counting_prune(now, window_seconds):
+        prune_calls.append(now)
+        return original_prune(now, window_seconds)
+
+    monkeypatch.setattr(limiter, "_prune", _counting_prune)
+
+    # Many more hits in rapid succession, still over the cap and still
+    # within the cooldown window — must not re-scan every time.
+    for i in range(200):
+        limiter.hit(f"client-extra-{i}", limit=1_000_000, window_seconds=60)
+
+    assert len(prune_calls) <= 1
+
+    # After the cooldown elapses, a prune attempt is allowed again.
+    limiter._last_prune_at -= mobile_api_service._InMemoryFixedWindowRateLimiter._PRUNE_MIN_INTERVAL_SECONDS + 1
+    limiter.hit("client-after-cooldown", limit=1_000_000, window_seconds=60)
+    assert len(prune_calls) >= 1

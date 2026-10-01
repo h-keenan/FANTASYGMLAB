@@ -404,13 +404,27 @@ def _prune_expired_events(
         for row in rows
         if _safe_text(row.get("event_id"))
     ]
-    for event_id in overflow_ids[:50]:
+    # Single batched delete via PostgREST's `in.()` filter instead of one
+    # DELETE round trip per overflow row (previously up to 50 sequential
+    # requests to Supabase for one prune pass). event_id is always a 24-char
+    # lowercase-hex sha256 slice (see decision_change_history._event_id), so
+    # these values can never contain "," or ")" — the characters that would
+    # break the in.(...) filter syntax — but the guard is kept anyway since
+    # this reads whatever Supabase returns, not a value this process just
+    # generated.
+    safe_overflow_ids = [
+        event_id for event_id in overflow_ids[:50] if "," not in event_id and ")" not in event_id
+    ]
+    if safe_overflow_ids:
         account_store.delete_rows(
             dict(config),
             access_token,
             EVENTS_TABLE,
-            query=f"user_id=eq.{_safe_text(user_id)}&event_id=eq.{event_id}",
-            timing_label="decision_memory_prune_row",
+            query=(
+                f"user_id=eq.{_safe_text(user_id)}"
+                f"&event_id=in.({','.join(safe_overflow_ids)})"
+            ),
+            timing_label="decision_memory_prune_overflow_batch",
         )
 
 
