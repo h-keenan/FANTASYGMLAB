@@ -35,7 +35,13 @@ _NFL_ACTIONABLE_STATUSES = frozenset(
 # one of those values (currently ~80+ real skill-position players at any
 # given time) was treated as a safe waiver-add candidate purely because the
 # `active` flag happened to still read True.
-_NFL_NON_ACTIONABLE_STATUSES = frozenset(
+# Public (not underscore-prefixed) because modules/rankings.py's
+# injury_level()/is_injury_status() reuse this exact set as their single
+# source of truth for which literal Sleeper `status` values represent
+# genuine unavailability — see the comment there. Keeping one definition
+# avoids the "multiple sources of truth" bug class this whole module
+# exists to prevent.
+NFL_NON_ACTIONABLE_STATUSES = frozenset(
     {
         "inactive",
         "retired",
@@ -52,6 +58,7 @@ _NFL_NON_ACTIONABLE_STATUSES = frozenset(
         "non-football injury",
     }
 )
+_NFL_NON_ACTIONABLE_STATUSES = NFL_NON_ACTIONABLE_STATUSES  # internal alias, kept for this module's own readability
 
 
 def _text(value: object) -> str:

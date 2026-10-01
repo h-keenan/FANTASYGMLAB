@@ -197,8 +197,12 @@ def recommendation_reason_text(value: str, limit: int | None = 120) -> str:
 
 
 def injury_value_impact(row) -> dict[str, str]:
-    level = _safe_text(row.get("injury_level"), "healthy").strip().lower()
-    if not level or level == "healthy":
+    # Default to "unknown", not "healthy": a row missing the injury_level
+    # column entirely (never computed, not merely blank) has no basis for
+    # a positive health claim — it should fall through to the "unknown"
+    # bucket below, the same honest-no-data shape used elsewhere in the app.
+    level = _safe_text(row.get("injury_level"), "unknown").strip().lower()
+    if level == "healthy":
         return {"level": "healthy", "class": "", "label": ""}
     if level == "major":
         return {
@@ -433,7 +437,12 @@ def player_scan_tags(
     elif workload_trend in {"Rising", "Contingent"} and primary_key != "rising":
         add_tag("Rising", "success", "trend:rising")
 
-    injury_level = _safe_text(row.get("injury_level"), "healthy").strip().lower()
+    # Default to "unknown", not "healthy" — a missing injury_level cell is
+    # not evidence of health. is_injury_status(row) below is the real check
+    # (it re-derives from the raw status/injury_status fields rather than
+    # trusting this precomputed column), so this default change is a
+    # correctness/consistency fix, not a behavior change on its own.
+    injury_level = _safe_text(row.get("injury_level"), "unknown").strip().lower()
     if (injury_level in {"major", "moderate"} or is_injury_status(row)) and primary_key != "injury risk":
         add_tag("Injury Risk", "risk", "injury:risk")
 
