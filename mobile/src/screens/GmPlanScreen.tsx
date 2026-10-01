@@ -154,12 +154,19 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
           {focusArea.items.map((item, index) => {
             const last = index === focusArea.items.length - 1;
             if (focusArea.key === 'trade_opportunities' && 'partner_team_name' in item) {
+              // Real injury signal now reaches this item (gm_plan data-contract
+              // fix) — never let an injured receive-side player read as a clean
+              // opportunity. Same risk/accent semantic this screen already uses
+              // for Roster Construction's weak-spot rows (below), not a new
+              // color convention.
+              const injuryDisplay = item.their_player_injury_display || '';
+              const theirPlayerLabel = injuryDisplay ? `${item.their_player} (${injuryDisplay})` : item.their_player;
               return (
                 <InsightRow
                   key={`${focusArea.key}-${index}`}
                   icon="swap-horizontal-outline"
-                  color={colors.premium}
-                  headline={`${item.my_player} → ${item.their_player} (${item.partner_team_name})`}
+                  color={injuryDisplay ? colors.danger : colors.premium}
+                  headline={`${item.my_player} → ${theirPlayerLabel} (${item.partner_team_name})`}
                   detail={item.rationale || item.trade_confidence_label}
                   last={last}
                 />

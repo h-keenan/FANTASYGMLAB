@@ -345,6 +345,23 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn("player-value-injury-moderate", html)
         self.assertIn("Injury adjusted", html)
 
+    def test_missing_injury_level_column_is_not_fabricated_as_healthy(self):
+        """Injury-awareness audit finding: a row with no injury_level cell at
+        all (never computed, not merely blank) was being treated identically
+        to a confirmed-healthy player — the same fabrication-fallback bug
+        class as the fixed PlayerDetailScreen ?? 'Healthy' bug (PR #818). It
+        must fall through to the existing "unknown" bucket instead."""
+
+        impact = player_cards.injury_value_impact({})
+        self.assertEqual(impact["level"], "unknown")
+        self.assertNotEqual(impact["level"], "healthy")
+
+        html = player_cards.injury_adjusted_value_html(
+            "Value", "74", {}, css_class="compact-player-value"
+        )
+        self.assertIn("player-value-injury-moderate", html)
+        self.assertIn("Injury adjusted", html)
+
     def test_player_value_injury_marker_css_exists(self):
         for selector in [
             ".player-value-injury-adjusted",

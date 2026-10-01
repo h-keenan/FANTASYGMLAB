@@ -57,7 +57,8 @@ from modules.compact_fantasy_assets import compact_package
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
 from modules.league_workspace_ui import _format_score
 from modules.player_cards import recommendation_reason_text
-from modules.rankings import injury_level
+from modules.rankings import injury_display_label, injury_level
+from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES
 from modules.roster_needs import NEED_TIER_LABELS, TeamNeedsAssessment, select_need_headline
 from modules.team_eval import suggest_optimal_lineup
 from modules.trade_analyzer_fit import (
@@ -263,9 +264,29 @@ def build_trade_tile(
     package = compact_package(
         send_assets, receive_assets, value_edge=value_delta, confidence=confidence_label
     )
+    # This tile's "value" is what the push-notification sweep sends verbatim
+    # as the notification body (modules.push_triggers.run_push_trigger_sweep
+    # uses item.headline, which traces straight back to this field — the
+    # fuller injury-aware "note"/reason text is never included in the push).
+    # A rebuild/tank buy-low trade idea is a legitimate recommendation (see
+    # modules.trade_ideas' injury-discount scoring), so this never suppresses
+    # the push — it just makes sure the headline-side player's non-actionable
+    # status (the same canonical check waivers already gate on, see
+    # modules.player_state_authority.NFL_NON_ACTIONABLE_STATUSES) is named
+    # right in the short text a user actually sees, instead of reading as a
+    # clean opportunity.
+    trade_value = _text(narrative.target_label, _text(headline_idea.get("partner_team_name"), "Open Trade Hub"))
+    if receive_assets:
+        headline_status = str(receive_assets[0].get("status") or "").strip().casefold()
+        if headline_status in NFL_NON_ACTIONABLE_STATUSES:
+            injury_tag = injury_display_label(
+                receive_assets[0].get("status"), receive_assets[0].get("injury_status")
+            )
+            if injury_tag:
+                trade_value = f"{trade_value} ({injury_tag})"
     return {
         "label": "Top Trade Opportunity",
-        "value": _text(narrative.target_label, _text(headline_idea.get("partner_team_name"), "Open Trade Hub")),
+        "value": trade_value,
         "note": narrative.shorten("reason", 150),
         "tone": "trade",
         "route_key": "trade_hub",

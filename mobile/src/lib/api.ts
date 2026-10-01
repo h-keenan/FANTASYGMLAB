@@ -776,6 +776,15 @@ export interface GmPlanTradeItem {
   partner_team_name: string;
   my_player: string;
   their_player: string;
+  /** Real player identity for both sides of the exchange (modules.gm_plan's
+   * data-contract fix — previously only display-name strings reached here).
+   * May be '' when the underlying asset is a draft pick, not a player. */
+  my_player_id: string;
+  their_player_id: string;
+  /** The receive-side player's injury tag (modules.rankings.injury_display_label
+   * — same vocabulary GmTarget.injury_display already uses), '' when healthy
+   * or unknown. Never fabricated. */
+  their_player_injury_display: string;
   rationale: string;
   trade_confidence_label: string;
   priority: number | null;

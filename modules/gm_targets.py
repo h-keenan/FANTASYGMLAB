@@ -24,6 +24,7 @@ from modules import notification_center
 from modules import performance
 from modules import player_identity
 from modules import premium
+from modules import rankings
 
 
 EXPERIMENT_ENV_KEY = "DYNASTYGM_EXPERIMENTAL_GM_TARGETS"
@@ -821,6 +822,15 @@ class EnrichedTargetCard:
     # but silently dropped before reaching presentation, so every card looked
     # identical regardless of how it got onto the list.
     source_surface: str = ""
+    # Injury/availability display tag (e.g. "Questionable", "Injured Reserve"),
+    # "" when healthy or unknown — injury-awareness audit finding: a target
+    # card previously carried the player's full row but dropped injury_status/
+    # status before reaching presentation, so a user could see "Add/Trade for
+    # this player" with zero visibility into whether they were hurt or on IR.
+    # Reuses rankings.injury_display_label(), the app's one injury vocabulary
+    # (same helper waivers_ui.py already renders from) rather than inventing
+    # a second one.
+    injury_display: str = ""
 
 
 def enrich_target(
@@ -871,6 +881,9 @@ def enrich_target(
         has_material_change=bool(_safe_text(change.get("label"))),
         untouchable=bool(target.untouchable),
         source_surface=_safe_text(target.source_surface),
+        injury_display=rankings.injury_display_label(
+            row.get("status"), row.get("injury_status")
+        ),
     )
 
 

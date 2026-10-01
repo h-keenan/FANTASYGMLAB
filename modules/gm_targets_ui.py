@@ -13,6 +13,7 @@ from modules import html_rendering
 from modules import performance
 from modules import player_profile_ui
 from modules import ui_primitives
+from modules.player_cards import player_support_chip_html
 
 
 GM_TARGETS_CSS = """
@@ -290,6 +291,16 @@ def render_gm_targets_workspace(
             if origin_label
             else ""
         )
+        # Injury-awareness audit finding: a watched target's current
+        # availability was previously invisible on this card — a user could
+        # see "Add/Trade for this player" with zero signal they were hurt or
+        # on IR. Reuses the same player_support_chip_html tag component
+        # waivers_ui.py already renders injury tags with.
+        injury_html = (
+            f"<div class='dg-gm-target-meta'>{player_support_chip_html(card.injury_display, 'risk')}</div>"
+            if card.injury_display
+            else ""
+        )
         action_html = (
             f"<div class='dg-gm-target-action'>{escape(card.action)}"
             + (
@@ -325,6 +336,7 @@ def render_gm_targets_workspace(
             "<div>"
             f"<div class='dg-gm-target-name'>{escape(card.name)}</div>"
             f"<div class='dg-gm-target-meta'>{escape(identity_bits)}</div>"
+            f"{injury_html}"
             f"{origin_html}"
             "</div></div>"
             f"<div class='dg-gm-target-rank'>{escape(card.rank_line)}</div>"
