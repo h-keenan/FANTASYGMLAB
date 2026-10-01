@@ -160,9 +160,21 @@ def refresh_and_commit(
     sync_first: bool = True,
     sync_remote: str = "origin",
     branch: str = GIT_BRANCH,
+    commit_author_name: str = COMMIT_AUTHOR_NAME,
+    commit_author_email: str = COMMIT_AUTHOR_EMAIL,
+    commit_message_subject: str = COMMIT_MESSAGE_SUBJECT,
+    commit_message_note: str = "Automated by the fantasygm-lab-players-db-refresh cron.",
 ) -> int:
     """Refresh db_path in place, then commit+push only a genuine, changed,
     successful result.
+
+    The commit_author_*/commit_message_* parameters default to this
+    script's own identity/message so existing callers (and the Render cron
+    that runs this file directly) are unaffected. Other scripts that reuse
+    this same commit/push plumbing for a different kind of players.db write
+    (e.g. scripts/sync_injury_status.py's narrow column patch, as opposed to
+    a full rebuild) pass their own values so the git history and bot
+    identity accurately reflect which automation made the change.
 
     Returns a process-style exit code: 0 for either a real push or a
     legitimate no-op (nothing changed); 1 for any failure (refresh failed,
@@ -223,13 +235,13 @@ def refresh_and_commit(
         return 0
 
     commit_env = dict(os.environ)
-    commit_env["GIT_AUTHOR_NAME"] = COMMIT_AUTHOR_NAME
-    commit_env["GIT_AUTHOR_EMAIL"] = COMMIT_AUTHOR_EMAIL
-    commit_env["GIT_COMMITTER_NAME"] = COMMIT_AUTHOR_NAME
-    commit_env["GIT_COMMITTER_EMAIL"] = COMMIT_AUTHOR_EMAIL
+    commit_env["GIT_AUTHOR_NAME"] = commit_author_name
+    commit_env["GIT_AUTHOR_EMAIL"] = commit_author_email
+    commit_env["GIT_COMMITTER_NAME"] = commit_author_name
+    commit_env["GIT_COMMITTER_EMAIL"] = commit_author_email
     message = (
-        f"{COMMIT_MESSAGE_SUBJECT}\n\n"
-        "Automated by the fantasygm-lab-players-db-refresh cron.\n"
+        f"{commit_message_subject}\n\n"
+        f"{commit_message_note}\n"
         f"Files: {', '.join(rel_paths)}"
     )
     commit = _run_git(repo_root, ["commit", "-m", message], env=commit_env)
