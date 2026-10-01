@@ -612,7 +612,11 @@ def _render_live_rankings(
                     st.session_state[f"trade_hub_focus_mode_{league_id}"] = "target_player"
                 st.session_state["current_page"] = "trade_hub"
                 st.session_state["platform_nav_page"] = "trade_hub"
-                st.rerun()
+                # No st.rerun() (budget-capped app-wide) — the button click
+                # that got us here already triggers Streamlit's own rerun;
+                # the sibling branch above (on_click=open_trade_hub_for_player)
+                # already proves navigation via session_state alone works
+                # without forcing a second explicit rerun.
 
 def _render_team_boards(state: dict[str, Any]) -> None:
     rows = state.get("pick_rows") or []
