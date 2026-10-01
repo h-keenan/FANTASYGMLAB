@@ -85,6 +85,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [dashboardQuiet, setDashboardQuiet] = useState(false);
   const [myTeam, setMyTeam] = useState<MyTeamInfo | null>(null);
   const [recapReady, setRecapReady] = useState<number | null>(null);
+  const [myPlayoffOdds, setMyPlayoffOdds] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,13 +113,14 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
       async function load() {
         try {
-          const [leagueResult, dashboardResult, myRosterResult, profilesResult, recapResult] =
+          const [leagueResult, dashboardResult, myRosterResult, profilesResult, recapResult, playoffOddsResult] =
             await Promise.all([
               api.getLeague(leagueId).catch(() => null),
               api.getLeagueDashboard(leagueId).catch(() => null),
               api.getMyRoster(leagueId).catch(() => null),
               api.getLeagueTeamProfiles(leagueId).catch(() => null),
               api.getLeagueRecap(leagueId).catch(() => null),
+              api.getLeaguePlayoffOdds(leagueId).catch(() => null),
             ]);
           if (cancelled) return;
 
@@ -139,8 +141,10 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           }
 
           const roster = myRosterResult?.roster as { roster_id?: unknown; players?: unknown } | null | undefined;
+          let rosterIdForOdds = '';
           if (roster && profilesResult) {
             const rosterId = String(roster.roster_id ?? '');
+            rosterIdForOdds = rosterId;
             const profile = profilesResult.profiles[rosterId];
             const playerIds = Array.isArray(roster.players) ? roster.players.map(String) : [];
             setMyTeam({
@@ -154,6 +158,11 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
           if (recapResult?.recap && !recapResult.recap.incomplete) {
             setRecapReady(recapResult.recap.week);
+          }
+
+          if (rosterIdForOdds && playoffOddsResult && !playoffOddsResult.reason) {
+            const myOdds = playoffOddsResult.teams.find((team) => String(team.roster_id) === rosterIdForOdds);
+            if (myOdds) setMyPlayoffOdds(myOdds.playoff_probability);
           }
         } catch (err) {
           if (!cancelled) {
@@ -269,6 +278,19 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
         >
           <IconCircle name="newspaper-outline" color={colors.accent} size={36} />
           <AppText style={styles.stripTextGroup2}>Week {recapReady} recap ready</AppText>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </AnimatedCard>
+      ) : null}
+
+      {myPlayoffOdds !== null ? (
+        <AnimatedCard
+          style={styles.stripCard}
+          onPress={() => navigation.navigate('PlayoffOdds', { leagueId, leagueName })}
+        >
+          <IconCircle name="podium-outline" color={colors.violet} size={36} />
+          <AppText style={styles.stripTextGroup2}>
+            Your simulated playoff odds: {Math.round(myPlayoffOdds)}%
+          </AppText>
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </AnimatedCard>
       ) : null}

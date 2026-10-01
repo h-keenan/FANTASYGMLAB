@@ -125,6 +125,7 @@ from modules import (
     player_quick_view,
     player_state_authority,
     players_refresh_flight,
+    playoff_simulator,
     premium_page,
     push_tokens,
     push_triggers,
@@ -1040,6 +1041,49 @@ def get_league_team_rankings(
         )
 
     return {"ok": True, "teams": teams, "reason": ""}
+
+
+@app.get("/v1/leagues/{league_id}/playoff-odds")
+def get_league_playoff_odds(
+    league_id: str,
+    lens: str = "Dynasty",
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Rest-of-season Monte Carlo playoff-odds simulation for every team.
+
+    Real inputs only — see modules.playoff_simulator's module docstring for
+    the full methodology: real remaining matchup schedule (Sleeper), real
+    Power Rank team strength, real season-to-date record/points for
+    tiebreaking, real playoff_teams/playoff_week_start league settings. The
+    win-probability model is a single-parameter logistic function of
+    Power-Rank differential, calibrated against this league's own real
+    results so far once enough of the season has been played, and a
+    documented default shape before that.
+
+    Same public, league-wide auth pattern as /team-rankings. Not-ready
+    states return 200 with a `reason` (same contract as the other league
+    endpoints) rather than an HTTP error: "offseason" (no real results
+    yet), "no_playoff_format" (league has no playoff_teams setting
+    configured), "no_rankings_data"/"unavailable" (Power Rank/league data
+    isn't computable right now).
+
+    Cached for modules.playoff_simulator.PLAYOFF_ODDS_TTL_SECONDS (3 hours)
+    per (league_id, lens) — a multi-thousand-trial simulation is real work
+    worth sharing across every request for the same league within that
+    window, and this is a rest-of-season outlook that can only meaningfully
+    change once new real games are played.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    result = playoff_simulator.build_league_playoff_odds_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    return result
 
 
 @app.get("/v1/leagues/{league_id}/draft-center")

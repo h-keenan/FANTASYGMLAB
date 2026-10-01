@@ -35,15 +35,17 @@ def _clear_trade_hub_ideas_cache():
     # modules.trade_hub_engine.generate_trade_idea_records result instead of
     # their own, since the cache sits between the caller (both the Trade Hub
     # endpoint and Dashboard's trade tile) and that mockable call.
-    from modules import league_rankings, trade_hub_engine
+    from modules import league_rankings, playoff_simulator, trade_hub_engine
 
     trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
     league_rankings._build_league_rankings_frame_cached.cache_clear()
     league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
+    playoff_simulator._build_league_playoff_odds_cached.cache_clear()
     yield
     trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
     league_rankings._build_league_rankings_frame_cached.cache_clear()
     league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
+    playoff_simulator._build_league_playoff_odds_cached.cache_clear()
 
 
 def test_render_yaml_documents_mobile_api_service():
@@ -5951,6 +5953,81 @@ def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
         assert isinstance(team["archetype_strengths"], list)
         assert isinstance(team["archetype_risks"], list)
         assert isinstance(team["archetype_recommendations"], list)
+
+
+def test_playoff_odds_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/playoff-odds")
+    assert response.status_code == 401
+
+
+def test_playoff_odds_returns_real_standings_based_simulation(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    fake_league = {
+        **_TRADE_ANALYZER_LEAGUE,
+        "settings": {"type": 2, "leg": 15, "playoff_teams": 1, "playoff_week_start": 15},
+    }
+    fake_rosters = [
+        {
+            "roster_id": 1,
+            "owner_id": "sleeper-user-1",
+            "players": my_roster_ids,
+            "settings": {"wins": 7, "losses": 6, "ties": 0, "fpts": 1200, "fpts_against": 1100},
+        },
+        {
+            "roster_id": 2,
+            "owner_id": "sleeper-user-2",
+            "players": ["target_rb"],
+            "settings": {"wins": 3, "losses": 10, "ties": 0, "fpts": 1000, "fpts_against": 1300},
+        },
+    ]
+    fake_users = [
+        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+        {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+    ]
+
+    # leg=15 == playoff_week_start, so regular_season_end (14) < current
+    # week: no remaining games to simulate. Every trial is decided purely
+    # by each roster's real wins already banked — the same deterministic
+    # "zero weeks left" case covered directly in
+    # tests/test_playoff_simulator.py, exercised here through the real
+    # endpoint/caching wiring instead of the pure function.
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                with patch("modules.sleeper.get_users", return_value=fake_users):
+                    with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                        with patch("modules.sleeper.get_matchups", return_value=[]):
+                            with patch("modules.rankings.load_players", return_value=_fake_roster_frame()):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/playoff-odds",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    assert body["playoff_teams"] == 1
+    assert body["weeks_remaining"] == 0
+    teams = {t["roster_id"]: t for t in body["teams"]}
+    assert len(teams) == 2
+    # Roster 1 has more real banked wins (7 vs 3) and nothing left to play,
+    # so with only one playoff spot it must be exactly 100%/0%, not merely
+    # "likely".
+    assert teams["1"]["playoff_probability"] == 100.0
+    assert teams["1"]["clinched"] is True
+    assert teams["2"]["playoff_probability"] == 0.0
+    assert teams["2"]["eliminated"] is True
 
 
 def test_draft_center_requires_auth(monkeypatch):
