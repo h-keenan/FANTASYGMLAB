@@ -1,0 +1,43 @@
+# FantasyGM Lab — systemd unit that brings the Docker Compose stack up on
+# boot and keeps it running.
+#
+# Why this exists at all: Docker Compose's own `restart: unless-stopped`
+# policy (set on every service in docker-compose.yml) already restarts an
+# individual container if it crashes, as long as the Docker daemon is
+# running. But nothing brings the *stack* up after the whole machine
+# reboots unless something starts `docker compose up` again — on Render
+# that's the platform's job; on a bare Ubuntu box, that job falls to
+# systemd. This unit is a thin wrapper: it doesn't manage individual
+# containers itself (Compose + each container's own restart policy still
+# does that) — it just guarantees `docker compose up -d` runs once after
+# Docker is up, on every boot, and `docker compose down` runs on a clean
+# stop (e.g. `systemctl stop fantasygmlab`).
+#
+# Install (see docs/SELF_HOSTED_MIGRATION.md for the full walkthrough):
+#   sudo cp deploy/systemd/fantasygmlab.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fantasygmlab.service
+#
+# Assumes the repo is checked out at /opt/fantasygmlab (adjust
+# WorkingDirectory below if deployed elsewhere) and that the deploy user
+# (see the runbook's "create a non-root deploy user" step) is in the
+# `docker` group so `docker compose` needs no sudo.
+
+[Unit]
+Description=FantasyGM Lab Docker Compose stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/fantasygmlab
+# "docker compose" (v2 CLI plugin) — if only the standalone "docker-compose"
+# (v1) binary is installed instead, change this to docker-compose.
+ExecStart=/usr/bin/docker compose -f /opt/fantasygmlab/docker-compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f /opt/fantasygmlab/docker-compose.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
