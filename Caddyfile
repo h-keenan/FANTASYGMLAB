@@ -1,0 +1,67 @@
+# FantasyGM Lab — Caddy reverse proxy / static file server.
+#
+# Why Caddy instead of nginx+certbot: Caddy issues and renews Let's
+# Encrypt (and, as a fallback, ZeroSSL) certificates automatically the
+# first time it sees a request for a domain listed below — no separate
+# certbot install, no cron job to renew certs, no manual nginx vhost +
+# certbot --nginx dance, and no risk of a forgotten renewal silently
+# expiring a cert on a box nobody is watching full-time. For a small
+# self-hosted deployment with a handful of subdomains, that's the entire
+# reverse-proxy + TLS story in the ~20 lines below, with no extra moving
+# parts to operate.
+#
+# Domain values come from docker-compose.yml's environment (which reads
+# them from .env — see .env.example). Caddy substitutes {$VAR} from its
+# own process environment, same mechanism .env variables reach it through
+# compose's `environment:`/`env_file:` on the caddy service.
+#
+# Internal services are reached by their Docker Compose service name on the
+# shared network (Docker's embedded DNS resolves "web", "mobile-api", etc.
+# to the right container) — none of those ports are published to the host,
+# only Caddy's 80/443 are, so port 8080 behind each name is never directly
+# reachable from outside the box.
+{
+	email {$CADDY_ACME_EMAIL}
+}
+
+# --- fantasygm-lab (Streamlit web app) --------------------------------------
+# Matches render.yaml's healthCheckPath (/_stcore/health) and startCommand
+# (streamlit run ... --server.port $PORT) — see docker-compose.yml's `web`
+# service. Streamlit uses WebSockets for live UI updates, so this proxy
+# forwards the Connection/Upgrade headers Caddy already handles by default
+# for HTTP/1.1 upstreams.
+{$APP_DOMAIN} {
+	reverse_proxy web:8080
+}
+
+# --- fantasygm-lab-marketing (static landing site) --------------------------
+# Static files only (no Python process) — same content Render's
+# fantasygm-lab-marketing static service publishes from staticPublishPath
+# ./static/landing after running scripts/build_static_landing_assets.py.
+# That script is idempotent and only touches checked-in assets, so the
+# repo's checked-in static/landing/ is served as-is; re-run the script
+# after pulling marketing asset changes to refresh it before the next
+# `docker compose up -d`.
+{$MARKETING_DOMAIN}, {$MARKETING_DOMAIN_WWW} {
+	root * /srv/static/landing
+	header /* {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	file_server
+}
+
+# --- fantasygm-lab-mobile-api ------------------------------------------------
+{$MOBILE_API_DOMAIN} {
+	reverse_proxy mobile-api:8080
+}
+
+# --- fantasygm-lab-stripe-webhook --------------------------------------------
+{$STRIPE_WEBHOOK_DOMAIN} {
+	reverse_proxy stripe-webhook:8080
+}
+
+# --- fantasygm-lab-revenuecat-webhook -----------------------------------------
+{$REVENUECAT_WEBHOOK_DOMAIN} {
+	reverse_proxy revenuecat-webhook:8080
+}

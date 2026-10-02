@@ -1,0 +1,144 @@
+# FantasyGM Lab — self-hosted stack.
+#
+# Replicates render.yaml's four real (non-cron) services plus a Caddy
+# reverse proxy with automatic HTTPS. The 4 cron jobs in render.yaml
+# (push-trigger sweep, trade-outcome-result sweep, players-db refresh,
+# injury-status sync) are deliberately NOT part of this stack — they are
+# being migrated to GitHub Actions in a separate PR and will not run on
+# this box. See docs/SELF_HOSTED_MIGRATION.md.
+#
+# All four app services are built from the same image (./Dockerfile) and
+# differ only in `command:`, copied verbatim from each service's
+# render.yaml startCommand. Secrets are never set here directly — every
+# service reads from `.env` (gitignored; see .env.example for every
+# required variable name, mapped to its Render dashboard source).
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fantasygmlab-app:latest
+    # NOTE: command must go through a shell ("sh -c") for $PORT to expand —
+    # Compose's bare string/list command form is argv-exec'd directly (no
+    # shell), so a literal "$PORT" argument would otherwise be passed
+    # through unexpanded. The doubled "$$" escapes Compose's own
+    # variable-interpolation pass over this file so a literal "$PORT"
+    # reaches the container's sh, which then expands it from `environment:`
+    # below — mirroring exactly how Render's platform invokes startCommand
+    # through a shell.
+    command: ["sh", "-c", "streamlit run app.py --server.address 0.0.0.0 --server.port $$PORT --server.headless true"]
+    environment:
+      PORT: "8080"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - internal
+
+  mobile-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fantasygmlab-app:latest
+    # See the "web" service's command comment above for why this is
+    # wrapped in sh -c and uses the doubled "$$PORT".
+    command: ["sh", "-c", "uvicorn services.mobile_api_service:app --host 0.0.0.0 --port $$PORT"]
+    environment:
+      PORT: "8080"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - internal
+
+  stripe-webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fantasygmlab-app:latest
+    # See the "web" service's command comment above for why this is
+    # wrapped in sh -c and uses the doubled "$$PORT".
+    command: ["sh", "-c", "uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $$PORT"]
+    environment:
+      PORT: "8080"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - internal
+
+  revenuecat-webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fantasygmlab-app:latest
+    # See the "web" service's command comment above for why this is
+    # wrapped in sh -c and uses the doubled "$$PORT".
+    command: ["sh", "-c", "uvicorn services.revenuecat_webhook_service:app --host 0.0.0.0 --port $$PORT"]
+    environment:
+      PORT: "8080"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./static/landing:/srv/static/landing:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      - web
+      - mobile-api
+      - stripe-webhook
+      - revenuecat-webhook
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
