@@ -34,6 +34,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from modules import team_stance as team_stance_module
+from modules.rankings import injury_display_label
 
 # --- Season phase detection -------------------------------------------------
 
@@ -265,11 +266,36 @@ def _trade_focus_area(
     for idea in list(trade_ideas)[: max(0, max_ideas)]:
         if not isinstance(idea, Mapping):
             continue
+        # The receive-side ("their_player") asset dict — modules.trade_ideas'
+        # _player_asset already carries real status/injury_status on every
+        # idea it builds; GM Plan previously discarded it here, leaving this
+        # item type with zero player identity/injury signal (the gap flagged
+        # by the injury-awareness audit). Reuse that same asset dict rather
+        # than re-deriving anything.
+        receive_assets = [
+            asset for asset in (idea.get("receive_assets") or []) if isinstance(asset, Mapping)
+        ]
+        their_player_asset = next(
+            (asset for asset in receive_assets if asset.get("asset_type") == "player"), None
+        )
+        # modules.rankings.injury_display_label() is the app's one injury
+        # vocabulary (same helper modules.gm_targets uses for its own
+        # `injury_display` field) — "" means healthy/no data, never fabricated.
+        their_player_injury_display = (
+            injury_display_label(
+                their_player_asset.get("status"), their_player_asset.get("injury_status")
+            )
+            if their_player_asset
+            else ""
+        )
         items.append(
             {
                 "partner_team_name": idea.get("partner_team_name") or "",
                 "my_player": idea.get("my_player") or "",
                 "their_player": idea.get("their_player") or "",
+                "my_player_id": str(idea.get("my_player_id") or ""),
+                "their_player_id": str(idea.get("their_player_id") or ""),
+                "their_player_injury_display": their_player_injury_display,
                 "rationale": idea.get("rationale") or "",
                 "trade_confidence_label": idea.get("trade_confidence_label") or "",
                 "priority": idea.get("priority"),

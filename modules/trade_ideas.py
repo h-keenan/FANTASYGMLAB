@@ -34,10 +34,12 @@ from modules.team_eval import (
 from modules.roster_needs import true_roster_needs
 from modules.rankings import (
     build_player_injury_index,
+    injury_display_label,
     injury_level,
     is_injury_status,
     summarize_team_injuries,
 )
+from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES
 from modules.performance import debug_enabled, record_timing
 from modules import runtime_trace
 from modules import team_stance as team_stance_module
@@ -1726,6 +1728,25 @@ def _attach_trade_assessment_fields(
     return idea
 
 
+# Within NFL_NON_ACTIONABLE_STATUSES, the subset that reads as an
+# indefinite/non-medical absence rather than a specific, recoverable injury
+# with an expected return window. "Inactive" is the ambiguous catch-all
+# status flagged in the PR #818/#831 audits (the real case: a season-ending
+# rookie QB carried a literal `status` of "Inactive" with no defined return
+# path), and "Retired"/"Historical"/"Historical Only"/"Deceased"/
+# "Practice Squad" aren't injury statuses at all. Deliberately excludes
+# "Injured Reserve"/"IR"/"PUP"/"NFI"/"Out" — those denote a real medical
+# condition with a known-ish recovery timeline (the legitimate dynasty
+# buy-low case), even when that timeline is long (e.g. a torn ACL).
+_INDEFINITE_RECEIVE_STATUSES = frozenset(
+    {"inactive", "retired", "historical", "historical only", "deceased", "practice squad"}
+)
+assert _INDEFINITE_RECEIVE_STATUSES <= NFL_NON_ACTIONABLE_STATUSES, (
+    "trade_ideas._INDEFINITE_RECEIVE_STATUSES drifted from player_state_authority's "
+    "canonical NFL_NON_ACTIONABLE_STATUSES"
+)
+
+
 def _asset_injury_profile(assets: List[Dict[str, Any]]) -> Dict[str, Any]:
     players = _player_assets(assets)
     healthy_positions = {
@@ -1739,12 +1760,29 @@ def _asset_injury_profile(assets: List[Dict[str, Any]]) -> Dict[str, Any]:
         if is_injury_status(asset)
     }
     levels = [injury_level(asset.get("status"), asset.get("injury_status")) for asset in players]
+    major_players = [
+        asset
+        for asset in players
+        if injury_level(asset.get("status"), asset.get("injury_status")) == "major"
+    ]
+    indefinite_players = [
+        asset
+        for asset in major_players
+        if str(asset.get("status") or "").strip().casefold() in _INDEFINITE_RECEIVE_STATUSES
+    ]
     return {
         "healthy_positions": {pos for pos in healthy_positions if pos in CORE_POSITIONS},
         "injured_positions": {pos for pos in injured_positions if pos in CORE_POSITIONS},
         "major": sum(1 for level in levels if level == "major"),
         "moderate": sum(1 for level in levels if level == "moderate"),
         "minor": sum(1 for level in levels if level == "minor"),
+        # Recoverable/time-limited major-injury players only (excludes the
+        # indefinite subset below) — the set eligible for a dynasty buy-low
+        # read.
+        "major_recoverable_players": [p for p in major_players if p not in indefinite_players],
+        # Major-injury players whose literal status reads as indefinite/
+        # non-medical rather than a knowable recovery timeline.
+        "major_indefinite_players": indefinite_players,
     }
 
 
@@ -3094,8 +3132,44 @@ def _trade_reasoning_context(
             explanations.append("Retool builds should avoid paying for long injury timelines unless the upside is clear.")
     elif my_strategy in {"rebuild", "tank"} and receive_injury["major"] > 0 and incoming_picks:
         tags.append("Injury Risk")
-        score += 3
-        explanations.append("A rebuild can afford to absorb some injury timeline if draft value also comes back.")
+        recoverable_players = receive_injury.get("major_recoverable_players") or []
+        indefinite_players = receive_injury.get("major_indefinite_players") or []
+        if recoverable_players:
+            # Legitimate dynasty buy-low: a rebuild has the roster timeline to
+            # wait out a real but recoverable injury. Never silent about it —
+            # name the player(s) and the specific injury tag driving the
+            # discount, via the app's one injury vocabulary
+            # (injury_display_label), same pattern _format_pos_list already
+            # uses elsewhere in this function to name specifics rather than
+            # speak abstractly.
+            score += 3
+            injury_names = ", ".join(
+                f"{asset.get('label')} ({injury_display_label(asset.get('status'), asset.get('injury_status')) or 'injured'})"
+                for asset in recoverable_players
+            )
+            # Inserted at the front (not appended) so this explicit
+            # injury-named reasoning survives the top-3 explanation cap
+            # applied below ("summary": " ".join(explanations[:3])) instead
+            # of risking truncation behind earlier, less-important notes.
+            explanations.insert(
+                0,
+                f"{injury_names} is a buy-low injury discount: a rebuild has time to wait out that "
+                "timeline, and it's worth more here if draft value also comes back.",
+            )
+        if indefinite_players:
+            # Explicitly withhold the bonus and say why: these statuses read
+            # as indefinite/non-medical rather than a knowable recovery
+            # window, so even a rebuild shouldn't price them as a confident
+            # buy-low.
+            flagged_names = ", ".join(
+                f"{asset.get('label')} ({injury_display_label(asset.get('status'), asset.get('injury_status')) or 'status unknown'})"
+                for asset in indefinite_players
+            )
+            explanations.insert(
+                0,
+                f"{flagged_names} carries an indefinite status with no confirmed return timeline, so this "
+                "isn't treated as a buy-low discount even for a rebuild.",
+            )
 
     score_diff = _score_assets(receive_assets) - _score_assets(send_assets)
     if score_diff >= 500:

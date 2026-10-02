@@ -257,6 +257,35 @@ def test_build_trade_tile_returns_none_without_a_headline_idea():
     assert dashboard_engine.build_trade_tile(None, league_id="l", roster_id="1", score_field="dynasty_score") is None
 
 
+def test_build_trade_tile_names_injury_in_value_for_non_actionable_receive_asset():
+    """This tile's "value" is what modules.push_triggers.run_push_trigger_sweep
+    sends verbatim as the push notification body — so a receive-side player
+    in a non-actionable status (the same canonical set the waiver push
+    already gates on) must never read as a clean opportunity in that short
+    text, even though trade generation itself still legitimately surfaces
+    the idea (a rebuild/tank buy-low per modules.trade_ideas)."""
+
+    idea = _fake_trade_idea_record()
+    idea["receive_assets"][0]["status"] = "Injured Reserve"
+    idea["receive_assets"][0]["injury_status"] = "Torn ACL"
+
+    tile = dashboard_engine.build_trade_tile(
+        idea, league_id="league-1", roster_id="1", score_field="dynasty_score"
+    )
+
+    assert "Torn ACL" in tile["value"]
+
+
+def test_build_trade_tile_value_unchanged_for_actionable_receive_asset():
+    tile = dashboard_engine.build_trade_tile(
+        _fake_trade_idea_record(),
+        league_id="league-1",
+        roster_id="1",
+        score_field="dynasty_score",
+    )
+    assert "(" not in tile["value"]
+
+
 def test_build_trade_tile_carries_real_player_identity_fields():
     """The receive-side target player's position/team/tier/score should ride
     along on the tile — same raw asset dict compact_package already reads

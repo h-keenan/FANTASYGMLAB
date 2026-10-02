@@ -330,7 +330,13 @@ def build_matchup_view(
         return _empty_matchup("no_player_data", week=week)
 
     my_side = _matchup_side(
-        my_roster_id, my_roster, profiles.get(my_roster_id) or {}, valued, settings, score_field
+        my_roster_id,
+        my_roster,
+        profiles.get(my_roster_id) or {},
+        valued,
+        settings,
+        score_field,
+        players_lookup=players_map,
     )
     opponent_side = _matchup_side(
         opponent_roster_id,
@@ -339,6 +345,7 @@ def build_matchup_view(
         valued,
         settings,
         score_field,
+        players_lookup=players_map,
     )
     if not my_side["starters"] and not opponent_side["starters"]:
         return _empty_matchup("empty_roster", week=week)
