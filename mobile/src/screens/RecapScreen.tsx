@@ -337,6 +337,13 @@ export default function RecapScreen({ route, navigation }: Props) {
  * from) — rendered as one standout glowing card instead of blending into
  * the list below it (Magna Carta §12/§15: reserve glow for the one thing on
  * a screen that genuinely matters most).
+ *
+ * The AnimatedCard's cyan glow rim stays the universal "this is the hero"
+ * signal used app-wide (Dashboard/GmPlan/Alerts/Matchup/Waiver all glow the
+ * same color) — per-category *content* inside the card (icon ring, avatar
+ * ring, tinted header panel, headline number) carries the story's own
+ * semantic color instead, so the hero still reads as distinct per category
+ * without redefining what "glow" means globally.
  */
 function LeadStoryCard({
   story,
@@ -352,63 +359,92 @@ function LeadStoryCard({
   const meta = storyMeta(colors)[story.story_type] ?? defaultStoryMeta(colors);
   const isMatchup = story.story_type === 'matchup' || story.story_type === 'matchup_close';
   const isTrade = story.story_type === 'trade';
+  // Matchup's own scoreboard below already gives the margin number a huge,
+  // centered focal point — showing it a second time in the header's
+  // top-right metric slot would just be noise competing with itself.
+  const showHeaderMetric = Boolean(story.metric_label) && !isMatchup;
 
   return (
     <AnimatedCard glow style={styles.leadCard} onPress={onPress}>
-      <View style={styles.leadHeaderRow}>
-        <IconCircle name={meta.icon} color={meta.color} size={48} iconSize={22} />
-        {!isMatchup && !isTrade ? (
-          <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={40} />
-        ) : null}
-        <View style={styles.storyTextGroup}>
-          <AppText style={[styles.leadKicker, { color: meta.color }]}>
-            {story.story_type.replace(/_/g, ' ').toUpperCase()}
-          </AppText>
-          <AppText style={styles.leadTitle}>{story.title}</AppText>
+      <View style={[styles.leadTintPanel, { backgroundColor: `${meta.color}17` }]}>
+        <View style={styles.leadHeaderRow}>
+          <IconCircle
+            name={meta.icon}
+            color={meta.color}
+            size={52}
+            iconSize={24}
+            style={[styles.ringedIcon, { borderColor: meta.color }]}
+          />
+          {!isMatchup && !isTrade ? (
+            <TeamAvatar
+              avatarId={avatarFor(rosterMap, story.primary_roster_id)}
+              size={44}
+              style={[styles.avatarRing, { borderColor: meta.color }]}
+            />
+          ) : null}
+          <View style={styles.storyTextGroup}>
+            <AppText style={[styles.leadKicker, { color: meta.color }]}>
+              {story.story_type.replace(/_/g, ' ').toUpperCase()}
+            </AppText>
+            <AppText style={styles.leadTitle}>{story.title}</AppText>
+          </View>
+          {showHeaderMetric ? (
+            <View style={styles.metricGroup}>
+              <AppText style={[styles.leadMetricValue, { color: meta.color }]}>{story.metric_value}</AppText>
+              <AppText style={styles.metricLabel}>{story.metric_label.toUpperCase()}</AppText>
+            </View>
+          ) : null}
         </View>
-        {story.metric_label ? (
-          <View style={styles.metricGroup}>
-            <AppText style={[styles.leadMetricValue, { color: meta.color }]}>{story.metric_value}</AppText>
-            <AppText style={styles.metricLabel}>{story.metric_label.toUpperCase()}</AppText>
+
+        {isMatchup ? (
+          <View style={styles.scoreboardRow}>
+            <View style={styles.scoreboardTeam}>
+              <TeamAvatar
+                avatarId={avatarFor(rosterMap, story.primary_roster_id)}
+                size={56}
+                style={[styles.avatarRing, { borderColor: meta.color }]}
+              />
+              <AppText style={styles.scoreboardTeamName} numberOfLines={1}>
+                {story.primary_team}
+              </AppText>
+            </View>
+            <View style={styles.scoreboardMetric}>
+              <AppText style={[styles.scoreboardValue, { color: meta.color }]} numberOfLines={1}>
+                {story.metric_value}
+              </AppText>
+              <AppText style={styles.metricLabel}>{(story.metric_label || '').toUpperCase()}</AppText>
+            </View>
+            <View style={styles.scoreboardTeam}>
+              <TeamAvatar
+                avatarId={avatarFor(rosterMap, story.secondary_roster_id)}
+                size={56}
+                style={styles.avatarMuted}
+              />
+              <AppText style={[styles.scoreboardTeamName, styles.scoreboardTeamMuted]} numberOfLines={1}>
+                {story.secondary_team}
+              </AppText>
+            </View>
+          </View>
+        ) : null}
+
+        {isTrade && story.secondary_team ? (
+          <View style={styles.tradeRow}>
+            <View style={styles.tradeChip}>
+              <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={24} />
+              <AppText style={styles.tradeChipText} numberOfLines={1}>
+                {story.primary_team}
+              </AppText>
+            </View>
+            <Ionicons name="swap-horizontal" size={14} color={colors.textTertiary} />
+            <View style={styles.tradeChip}>
+              <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={24} />
+              <AppText style={styles.tradeChipText} numberOfLines={1}>
+                {story.secondary_team}
+              </AppText>
+            </View>
           </View>
         ) : null}
       </View>
-
-      {isMatchup ? (
-        <View style={styles.matchupRow}>
-          <View style={styles.matchupTeamGroup}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={32} />
-            <AppText style={styles.matchupTeam} numberOfLines={1}>
-              {story.primary_team}
-            </AppText>
-          </View>
-          <AppText style={styles.matchupVs}>vs</AppText>
-          <View style={styles.matchupTeamGroup}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={32} />
-            <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
-              {story.secondary_team}
-            </AppText>
-          </View>
-        </View>
-      ) : null}
-
-      {isTrade && story.secondary_team ? (
-        <View style={styles.tradeRow}>
-          <View style={styles.tradeChip}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={20} />
-            <AppText style={styles.tradeChipText} numberOfLines={1}>
-              {story.primary_team}
-            </AppText>
-          </View>
-          <Ionicons name="swap-horizontal" size={14} color={colors.textTertiary} />
-          <View style={styles.tradeChip}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={20} />
-            <AppText style={styles.tradeChipText} numberOfLines={1}>
-              {story.secondary_team}
-            </AppText>
-          </View>
-        </View>
-      ) : null}
 
       <AppText style={styles.leadSummary}>{story.summary}</AppText>
 
@@ -453,20 +489,155 @@ function StoryGroup({
         </AppText>
       </View>
       <AnimatedCard style={styles.groupCard}>
-        {stories.map((story, index) => (
-          <StoryRow
-            key={`${story.story_type}-${index}`}
-            story={story}
-            showDivider={index < stories.length - 1}
-            onPress={resolvePress(story)}
-            rosterMap={rosterMap}
-          />
-        ))}
+        {stories.map((story, index) =>
+          index === 0 ? (
+            <FeaturedStoryRow
+              key={`${story.story_type}-${index}`}
+              story={story}
+              showDivider={index < stories.length - 1}
+              onPress={resolvePress(story)}
+              rosterMap={rosterMap}
+              meta={meta}
+            />
+          ) : (
+            <StoryRow
+              key={`${story.story_type}-${index}`}
+              story={story}
+              showDivider={index < stories.length - 1}
+              onPress={resolvePress(story)}
+              rosterMap={rosterMap}
+            />
+          ),
+        )}
       </AnimatedCard>
     </View>
   );
 }
 
+/**
+ * The most significant story within its category — always the first story
+ * of a given category in `recap.stories` (backend emits each category's
+ * headline-worthy builder before its "opposite extreme"/routine counterpart,
+ * e.g. the week's highest FAAB win before the cheapest waiver add; see
+ * build_weekly_recap's builder order in modules/league_recaps.py). Gets a
+ * category-tinted background, a thicker colored avatar/icon ring, and a
+ * genuinely larger headline number — the second tier of this screen's
+ * three-tier hierarchy (hero card → featured row → routine row), so a
+ * category's one real storyline doesn't carry the same visual weight as its
+ * routine counterpart directly beneath it.
+ */
+function FeaturedStoryRow({
+  story,
+  showDivider,
+  onPress,
+  rosterMap,
+  meta,
+}: {
+  story: RecapStory;
+  showDivider: boolean;
+  onPress?: () => void;
+  rosterMap: RosterMap;
+  meta: { icon: React.ComponentProps<typeof Ionicons>['name']; color: string };
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const isMatchup = story.story_type === 'matchup' || story.story_type === 'matchup_close';
+  const isTrade = story.story_type === 'trade';
+  const showMetric = Boolean(story.metric_label) && !isMatchup;
+
+  return (
+    <TouchableOpacity
+      style={[styles.featuredRow, { backgroundColor: `${meta.color}14` }, showDivider && styles.rowDivider]}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.rowHeaderRow}>
+        <IconCircle
+          name={meta.icon}
+          color={meta.color}
+          size={40}
+          iconSize={19}
+          style={[styles.ringedIconThin, { borderColor: meta.color }]}
+        />
+        {!isMatchup && !isTrade ? (
+          <TeamAvatar
+            avatarId={avatarFor(rosterMap, story.primary_roster_id)}
+            size={36}
+            style={[styles.avatarRingThin, { borderColor: meta.color }]}
+          />
+        ) : null}
+        <AppText style={styles.featuredTitle} numberOfLines={1}>
+          {story.title}
+        </AppText>
+        {showMetric ? (
+          <View style={styles.metricGroup}>
+            <AppText style={[styles.featuredMetricValue, { color: meta.color }]}>{story.metric_value}</AppText>
+            <AppText style={styles.metricLabel}>{story.metric_label.toUpperCase()}</AppText>
+          </View>
+        ) : null}
+        {onPress ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
+      </View>
+
+      {isMatchup ? (
+        <View style={styles.scoreboardRowCompact}>
+          <View style={styles.scoreboardTeam}>
+            <TeamAvatar
+              avatarId={avatarFor(rosterMap, story.primary_roster_id)}
+              size={38}
+              style={[styles.avatarRingThin, { borderColor: meta.color }]}
+            />
+            <AppText style={styles.matchupTeam} numberOfLines={1}>
+              {story.primary_team}
+            </AppText>
+          </View>
+          <AppText style={[styles.scoreboardValueCompact, { color: meta.color }]} numberOfLines={1}>
+            {story.metric_value}
+          </AppText>
+          <View style={styles.scoreboardTeam}>
+            <TeamAvatar
+              avatarId={avatarFor(rosterMap, story.secondary_roster_id)}
+              size={38}
+              style={styles.avatarMuted}
+            />
+            <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
+              {story.secondary_team}
+            </AppText>
+          </View>
+        </View>
+      ) : null}
+
+      {isTrade && story.secondary_team ? (
+        <View style={styles.tradeRowCompact}>
+          <View style={styles.tradeChip}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={22} />
+            <AppText style={styles.tradeChipText} numberOfLines={1}>
+              {story.primary_team}
+            </AppText>
+          </View>
+          <Ionicons name="swap-horizontal" size={13} color={colors.textTertiary} />
+          <View style={styles.tradeChip}>
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={22} />
+            <AppText style={styles.tradeChipText} numberOfLines={1}>
+              {story.secondary_team}
+            </AppText>
+          </View>
+        </View>
+      ) : null}
+
+      <AppText style={styles.featuredSummary}>{story.summary}</AppText>
+    </TouchableOpacity>
+  );
+}
+
+/**
+ * Every other story in a category — a routine FAAB add, a quiet week, the
+ * close-but-not-the-headline matchup. Deliberately quieter than
+ * `FeaturedStoryRow` above it: a smaller neutral-ring icon, a secondary-tone
+ * (not category-color) metric number, and a tighter two-line summary clamp
+ * — real information, just not fighting the featured row for attention
+ * (coridian_'s "$0 FAAB pickup shouldn't read as dramatic as a blowout").
+ */
 function StoryRow({
   story,
   showDivider,
@@ -492,16 +663,16 @@ function StoryRow({
       activeOpacity={0.7}
     >
       <View style={styles.rowHeaderRow}>
-        <IconCircle name={meta.icon} color={meta.color} size={32} iconSize={15} />
+        <IconCircle name={meta.icon} color={meta.color} size={28} iconSize={13} />
         {!isMatchup && !isTrade ? (
-          <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={28} />
+          <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={26} />
         ) : null}
         <AppText style={styles.rowTitle} numberOfLines={1}>
           {story.title}
         </AppText>
         {story.metric_label ? (
           <View style={styles.metricGroup}>
-            <AppText style={[styles.metricValue, { color: meta.color }]}>{story.metric_value}</AppText>
+            <AppText style={styles.metricValue}>{story.metric_value}</AppText>
             <AppText style={styles.metricLabel}>{story.metric_label.toUpperCase()}</AppText>
           </View>
         ) : null}
@@ -511,14 +682,14 @@ function StoryRow({
       {isMatchup ? (
         <View style={styles.matchupRowCompact}>
           <View style={styles.matchupTeamGroup}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={24} />
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={22} />
             <AppText style={styles.matchupTeam} numberOfLines={1}>
               {story.primary_team}
             </AppText>
           </View>
           <AppText style={styles.matchupVs}>vs</AppText>
           <View style={styles.matchupTeamGroup}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={24} />
+            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={22} />
             <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
               {story.secondary_team}
             </AppText>
@@ -544,7 +715,7 @@ function StoryRow({
         </View>
       ) : null}
 
-      <AppText style={styles.storySummary} numberOfLines={3}>
+      <AppText style={styles.storySummary} numberOfLines={2}>
         {story.summary}
       </AppText>
     </TouchableOpacity>
@@ -604,12 +775,23 @@ function createStyles(colors: ThemeColors) {
   shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   storyTextGroup: { flex: 1 },
   metricGroup: { alignItems: 'flex-end' },
-  metricValue: { fontSize: 18, fontWeight: '700' },
+  // Routine-row metric: deliberately plain textSecondary, not the category
+  // color — a $0 FAAB add shouldn't visually compete with the featured
+  // row's bold colored number directly above it in the same group.
+  metricValue: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
   metricLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   matchupTeamGroup: { flex: 1, alignItems: 'center', gap: 4 },
   matchupTeam: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
   matchupTeamMuted: { color: colors.textSecondary, fontWeight: '500' },
   matchupVs: { fontSize: 11, color: colors.textTertiary, fontWeight: '600' },
+  // Colored rings — a bolder presence than a flat icon/avatar, scaled down
+  // for the featured tier vs. the hero tier (Magna Carta §19/§20: one
+  // player/team-identity visual language, varied through size/weight only).
+  ringedIcon: { borderWidth: 2 },
+  ringedIconThin: { borderWidth: 1.5 },
+  avatarRing: { borderWidth: 2 },
+  avatarRingThin: { borderWidth: 1.5 },
+  avatarMuted: { opacity: 0.55 },
   tradeChip: {
     flex: 1,
     flexDirection: 'row',
@@ -621,17 +803,32 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 6,
   },
   tradeChipText: { flex: 1, fontSize: 12, fontWeight: '600', color: colors.textPrimary },
-  storySummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
   error: { color: colors.danger, textAlign: 'center' },
 
   // Lead story (hero) card — bigger type + glow, the one card on this screen
   // allowed to visually dominate (Magna Carta §15).
   leadCard: { marginBottom: spacing.lg },
+  // Category-tinted banner bleeding to the card's own edges (AnimatedCard's
+  // default padding is spacing.lg, so a matching negative margin + re-applied
+  // padding recreates the inset while the tint paints behind it). Square
+  // corners (radii.md === 0 app-wide) mean no corner-radius matching is
+  // needed for the bleed to look intentional rather than clipped.
+  leadTintPanel: {
+    marginTop: -spacing.lg,
+    marginHorizontal: -spacing.lg,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    marginBottom: spacing.md,
+  },
   leadHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   leadKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: 3 },
   leadTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
-  leadMetricValue: { fontSize: 24, fontWeight: '800' },
-  matchupRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  // Bumped from 24->30 — the one number on this screen allowed to read as a
+  // genuine headline stat rather than a label-adjacent figure (Magna Carta
+  // §10's "display/hero" tier, reserved here for the single most dramatic
+  // story on the whole screen).
+  leadMetricValue: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
   tradeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   leadSummary: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginTop: spacing.md },
   leadFooterRow: {
@@ -645,19 +842,46 @@ function createStyles(colors: ThemeColors) {
   },
   leadFooterText: { fontSize: 12, fontWeight: '700' },
 
+  // Hero-tier matchup "scoreboard": two team avatars flanking one giant
+  // centered margin number — the number genuinely IS the story here, so it
+  // gets the biggest type on the whole screen instead of competing with the
+  // teams' names at equal weight (coridian_'s core complaint).
+  scoreboardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  scoreboardTeam: { flex: 1, alignItems: 'center', gap: spacing.xs },
+  scoreboardTeamName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  scoreboardTeamMuted: { color: colors.textSecondary, fontWeight: '500' },
+  scoreboardMetric: { alignItems: 'center', paddingHorizontal: spacing.xs },
+  scoreboardValue: { fontSize: 38, fontWeight: '800', letterSpacing: -1 },
+  // Featured-tier (in-group) scoreboard — same idea, smaller.
+  scoreboardRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  scoreboardValueCompact: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+
   // Grouped-story surfaces below the hero — one AnimatedCard per category
-  // with internal dividers between rows (Magna Carta §12).
+  // with internal dividers between rows (Magna Carta §12). The card itself
+  // carries no padding so each row (featured or routine) can supply its own
+  // horizontal inset — required for the featured row's tint to bleed flush
+  // to the card's edges.
   group: { marginBottom: spacing.md },
   groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
   groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
   groupIcon: { marginLeft: -2 },
   groupLabel: { flex: 1, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  groupCard: { padding: spacing.md, paddingVertical: spacing.xs },
-  row: { paddingVertical: spacing.sm + 2 },
+  groupCard: { padding: 0 },
+  // Featured row (tier 2) — the category's one real storyline: tinted
+  // background, thicker colored rings, a larger bolded number, full summary.
+  featuredRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+  featuredTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  featuredMetricValue: { fontSize: 20, fontWeight: '800' },
+  featuredSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginTop: spacing.sm },
+  // Routine row (tier 3) — everything else in the category: quieter type,
+  // neutral metric color, tighter summary clamp (coridian_'s "$0 FAAB
+  // pickup" example shouldn't fight the featured row above it for attention).
+  row: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowTitle: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  rowTitle: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.textSecondary },
   matchupRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   tradeRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  storySummary: { fontSize: 12, color: colors.textTertiary, lineHeight: 17, marginTop: spacing.xs },
   });
 }
