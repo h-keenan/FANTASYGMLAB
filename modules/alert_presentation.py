@@ -919,15 +919,29 @@ def attach_player_identity_fields(
         position_col = "position" if "position" in players_df.columns else None
         team_col = "team" if "team" in players_df.columns else None
         tier_col = "player_tier" if "player_tier" in players_df.columns else None
-        for _, prow in players_df.iterrows():
-            pid = str(prow.get("player_id") or "").strip()
-            if not pid or pid in info_by_id:
-                continue
-            info_by_id[pid] = {
-                "position": str(prow.get(position_col) or "").strip() if position_col else "",
-                "team": str(prow.get(team_col) or "").strip() if team_col else "",
-                "tier": str(prow.get(tier_col) or "").strip() if tier_col else "",
-            }
+        needed_ids = {
+            str(row.get("player_id") or "").strip() for row in rows if isinstance(row, Mapping)
+        }
+        needed_ids.discard("")
+        if needed_ids:
+            # `players_df` is the full valued player universe (hundreds-plus
+            # rows via prepared_player_frame.usable_player_frame_for_news),
+            # but a single Alerts timeline render only ever needs a lookup
+            # for the player_ids actually present in `rows` (bounded by
+            # MAX_TIMELINE_ITEMS, ~50). Filtering to that tiny subset before
+            # the row-wise lookup below avoids iterating the entire
+            # universe per render — the same bug shape already fixed in
+            # modules.news_intelligence._name_index.
+            subset = players_df[players_df["player_id"].astype(str).str.strip().isin(needed_ids)]
+            for _, prow in subset.iterrows():
+                pid = str(prow.get("player_id") or "").strip()
+                if not pid or pid in info_by_id:
+                    continue
+                info_by_id[pid] = {
+                    "position": str(prow.get(position_col) or "").strip() if position_col else "",
+                    "team": str(prow.get(team_col) or "").strip() if team_col else "",
+                    "tier": str(prow.get(tier_col) or "").strip() if tier_col else "",
+                }
     out: list[dict[str, Any]] = []
     for row in rows:
         payload = dict(row) if isinstance(row, Mapping) else {}

@@ -293,6 +293,37 @@ host serves live web traffic, so they're decoupled from this cutover
 either way (they already push results to Supabase or to `main` via a
 scoped PAT — they don't need to run on the same box as the web services).
 
+## 7.5. Resource isolation and worker count (read before changing either)
+
+Two things are genuinely different here vs. Render, both purely because
+this box colocates every service instead of giving each one its own
+isolated instance:
+
+**Per-container memory/CPU limits.** `docker-compose.yml` sets an explicit
+`mem_limit`/`cpus` on every service (`web`/`mobile-api`: 4GB RAM, 2 CPUs
+each; `stripe-webhook`/`revenuecat-webhook`: 512MB, 0.5 CPUs each;
+`caddy`: 256MB, 0.5 CPUs) — sized for the 16GB RAM / 4-core / 8-thread box
+this was prepped for, leaving real headroom (~6.75GB RAM, ~2.5 logical
+threads) for the host and Docker itself. On Render, one service leaking
+memory or pegging CPU couldn't affect the others; on this box, without a
+limit, it could — these limits are the new guardrail that replaces that
+isolation. If you resize the box, resize these proportionally rather than
+removing them.
+
+**`mobile-api` stays single-worker.** It would be tempting to add
+`--workers 4` to `mobile-api`'s uvicorn command to use the extra cores —
+**don't**, not without first moving its state out of process memory.
+`services/mobile_api_service.py` keeps an in-memory rate limiter
+(`_InMemoryFixedWindowRateLimiter`) and a warmed `rankings.load_players`
+cache, both scoped to a single process. Multiple worker processes would
+each get their own independent copy of both: the rate limiter's effective
+per-client limit would silently become `limit * worker_count` instead of
+`limit` (a correctness regression, not just a perf question), and the
+player-data cache would be duplicated in memory per worker. See
+`docker-compose.yml`'s own comment on the `mobile-api` service for the
+full reasoning. Revisit this only alongside moving the rate limiter to a
+shared store (e.g. Redis) — not before.
+
 ## 8. Logging and monitoring on the self-hosted box
 
 Render aggregates logs per-service in its dashboard; a self-hosted box

@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import time
 from functools import lru_cache
 from typing import Dict, Any, List, Optional
@@ -558,11 +559,34 @@ def load_cached_players_disk(
     return {}, 0
 
 
+#   Every real request-latency caller of get_players() only ever reads the
+#   returned dict (indexes into it / iterates .items()) — never mutates a
+#   player entry in place — so sharing the same in-process object across
+#   calls/requests is safe; see the self-hosted perf audit that added this.
+_players_memo_lock = threading.Lock()
+_players_memo: Optional[Dict[str, Any]] = None
+_players_memo_mtime_ns: int = -1
+
+
 def get_players(refresh: bool = False) -> Dict[str, Any]:
     """
     Fetch all NFL players from Sleeper, with basic local caching.
     Returns dict keyed by player_id -> player_object.[web:4]
+
+    On a disk-cache hit (the common case — ``PLAYERS_CACHE_TTL_SECONDS`` is
+    5 minutes and nothing proactively evicts between refreshes), this used
+    to re-``json.load()`` the on-disk cache file (currently ~16MB) on
+    *every single call* — no in-process memoization at all, despite several
+    hot mobile-API endpoints (``/v1/players``, matchup, my-team, schedule)
+    calling this once or more per request. Measured ~95ms of synchronous
+    disk I/O + JSON decode per call. This process-wide memo, keyed by the
+    cache file's mtime, cuts that to one parse per actual file change
+    (write from a real refresh) instead of one parse per call — a real
+    request can still call this multiple times (e.g. the matchup endpoint
+    calls it twice) and now pays for the parse at most once per process
+    between refreshes.
     """
+    global _players_memo, _players_memo_mtime_ns
     _ensure_data_dir()
 
     cache_ok = False
@@ -576,10 +600,22 @@ def get_players(refresh: bool = False) -> Dict[str, Any]:
 
     if cache_ok:
         try:
+            mtime_ns = os.stat(PLAYERS_CACHE_PATH).st_mtime_ns
+        except Exception:
+            mtime_ns = -1
+        with _players_memo_lock:
+            if _players_memo is not None and mtime_ns != -1 and mtime_ns == _players_memo_mtime_ns:
+                _note_provider_timing("sleeper_players_memo", 0.0, cache_status="hit")
+                return _players_memo
+        try:
             with open(PLAYERS_CACHE_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict):
                 _note_provider_timing("sleeper_players_disk", 0.0, cache_status="hit")
+                if mtime_ns != -1:
+                    with _players_memo_lock:
+                        _players_memo = data
+                        _players_memo_mtime_ns = mtime_ns
                 return data
         except Exception:
             pass
@@ -596,6 +632,10 @@ def get_players(refresh: bool = False) -> Dict[str, Any]:
         try:
             with open(PLAYERS_CACHE_PATH, "w", encoding="utf-8") as f:
                 json.dump(players, f)
+            fresh_mtime_ns = os.stat(PLAYERS_CACHE_PATH).st_mtime_ns
+            with _players_memo_lock:
+                _players_memo = players
+                _players_memo_mtime_ns = fresh_mtime_ns
         except Exception:
             pass
         _note_provider_timing(

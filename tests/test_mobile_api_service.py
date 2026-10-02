@@ -41,11 +41,13 @@ def _clear_trade_hub_ideas_cache():
     league_rankings._build_league_rankings_frame_cached.cache_clear()
     league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
     playoff_simulator._build_league_playoff_odds_cached.cache_clear()
+    playoff_simulator._playoff_odds_locks.clear()
     yield
     trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
     league_rankings._build_league_rankings_frame_cached.cache_clear()
     league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
     playoff_simulator._build_league_playoff_odds_cached.cache_clear()
+    playoff_simulator._playoff_odds_locks.clear()
 
 
 def test_render_yaml_documents_mobile_api_service():

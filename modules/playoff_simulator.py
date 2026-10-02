@@ -98,6 +98,7 @@ certainty on its own, without any special-cased override.
 
 from __future__ import annotations
 
+import threading
 import time
 from functools import lru_cache
 from typing import Any, Sequence
@@ -579,6 +580,53 @@ def _build_league_playoff_odds_cached(
     )
 
 
+
+# Per-cache-key single-flight locks. functools.lru_cache's own internal
+# lock only protects the cache dict itself during a lookup/insert — it
+# does NOT serialize the wrapped function's *execution*, so N concurrent
+# requests that all miss the same (league_id, lens, players_db_path,
+# n_trials, bucket) key before the first one finishes would each
+# independently pay the full DEFAULT_TRIALS=3000-trial simulation cost
+# instead of sharing one. That directly contradicts this cache's own
+# purpose (see PLAYOFF_ODDS_TTL_SECONDS's comment: "collapsing many
+# requests from many users ... down to roughly one real simulation run").
+# A concrete trigger: every league member's app polling/opening at once
+# right after a 3-hour TTL rollover, or the mobile client's own
+# navigation retries. A lock keyed by the exact same cache key (bucket
+# included) makes only the first caller for a given key actually run the
+# simulation; every other concurrent caller for that key blocks here and
+# then gets the now-warm lru_cache result back immediately instead of
+# redoing the work.
+_PLAYOFF_ODDS_LOCK_PRUNE_THRESHOLD = 500
+
+_playoff_odds_locks: dict[tuple[Any, ...], threading.Lock] = {}
+_playoff_odds_locks_guard = threading.Lock()
+
+
+def _playoff_odds_lock_for(key: tuple[Any, ...]) -> threading.Lock:
+    with _playoff_odds_locks_guard:
+        lock = _playoff_odds_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _playoff_odds_locks[key] = lock
+        if len(_playoff_odds_locks) > _PLAYOFF_ODDS_LOCK_PRUNE_THRESHOLD:
+            # Safe to drop any lock from an older bucket: this function's
+            # only caller always passes the *current* bucket (see
+            # build_league_playoff_odds_cached below), so a key whose
+            # bucket doesn't match the one we were just asked for can
+            # never be requested again. Skip anything still held, just in
+            # case a simulation genuinely spans a bucket rollover.
+            current_bucket = key[-1]
+            stale = [
+                existing_key
+                for existing_key, existing_lock in _playoff_odds_locks.items()
+                if existing_key[-1] != current_bucket and not existing_lock.locked()
+            ]
+            for existing_key in stale:
+                _playoff_odds_locks.pop(existing_key, None)
+        return lock
+
+
 def build_league_playoff_odds_cached(
     *,
     league_id: str,
@@ -586,8 +634,13 @@ def build_league_playoff_odds_cached(
     players_db_path: str,
     n_trials: int = DEFAULT_TRIALS,
 ) -> dict[str, Any]:
-    """Cached front door — see ``PLAYOFF_ODDS_TTL_SECONDS``/module docstring."""
+    """Cached front door — see ``PLAYOFF_ODDS_TTL_SECONDS``/module docstring.
 
-    return _build_league_playoff_odds_cached(
-        league_id, lens, players_db_path, n_trials, _playoff_odds_cache_bucket()
-    )
+    Single-flight per (league_id, lens, players_db_path, n_trials, bucket):
+    see ``_playoff_odds_lock_for``'s docstring-comment for why this needs
+    its own lock on top of ``lru_cache``.
+    """
+
+    key = (league_id, lens, players_db_path, n_trials, _playoff_odds_cache_bucket())
+    with _playoff_odds_lock_for(key):
+        return _build_league_playoff_odds_cached(*key)

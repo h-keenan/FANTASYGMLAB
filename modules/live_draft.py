@@ -814,15 +814,25 @@ def build_live_draft_rankings(
     board["overall_rank"] = board["draft_board_rank"]
     board["position_rank"] = board.groupby(board.get("position", pd.Series(dtype=str)).astype(str).str.upper()).cumcount() + 1
     board["is_rookie"] = board.apply(_is_rookie, axis=1)
+    # Self-hosted perf audit: these two used to each `.iterrows()` the
+    # whole board (hundreds of undrafted players, recomputed on every live
+    # draft poll — see the performance.time_block wrapping the caller) just
+    # to read one or two plain columns per row. iterrows's real cost is
+    # boxing every column of every row into a fresh Series; zipping the
+    # one or two needed columns directly (still a Python-level loop, same
+    # fallback/`or` semantics as before) skips that boxing entirely.
+    _tier_primary = board.get("player_tier", pd.Series([None] * len(board), index=board.index))
+    _tier_fallback = board.get("tier", pd.Series([None] * len(board), index=board.index))
     board["tier"] = [
-        _tier_for_rank(rank, len(board), safe_text(row.get("player_tier") or row.get("tier")))
-        for rank, (_, row) in enumerate(board.iterrows(), start=1)
+        _tier_for_rank(rank, len(board), safe_text(primary or fallback))
+        for rank, (primary, fallback) in enumerate(zip(_tier_primary, _tier_fallback), start=1)
     ]
     previous_ranks = previous_ranks or {}
+    _movement_player_ids = board.get("player_id", pd.Series([None] * len(board), index=board.index))
+    _movement_overall_ranks = board.get("overall_rank", pd.Series([None] * len(board), index=board.index))
     board["movement"] = [
-        (previous_ranks.get(safe_text(row.get("player_id"))) - safe_int(row.get("overall_rank"), 0))
-        if safe_text(row.get("player_id")) in previous_ranks else 0
-        for _, row in board.iterrows()
+        (previous_ranks.get(safe_text(pid)) - safe_int(orank, 0)) if safe_text(pid) in previous_ranks else 0
+        for pid, orank in zip(_movement_player_ids, _movement_overall_ranks)
     ]
     board["recommendation_label"] = ""
     board["recommendation_reason"] = "Strongest blend of existing value, format, scarcity, and roster construction."

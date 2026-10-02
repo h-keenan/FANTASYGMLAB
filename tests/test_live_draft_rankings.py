@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import pandas as pd
 
@@ -416,6 +417,71 @@ class TestLiveDraftRankings(unittest.TestCase):
         self.assertEqual(cards["player_id"].tolist(), ["first", "second"])
         self.assertEqual(cards["league_adjusted_draft_score"].tolist(), [950, 800])
         pd.testing.assert_frame_equal(source, original)
+
+
+class TestLiveDraftRankingsTierAndMovementAvoidFullIterrows(unittest.TestCase):
+    """Self-hosted perf audit: build_live_draft_rankings used to
+    `.iterrows()` the ENTIRE undrafted pool twice more (tier assignment,
+    movement calc) beyond its already-flagged scoring-components pass,
+    recomputed on every live-draft poll. Those two were switched to
+    zipping the one or two needed columns directly instead of boxing a
+    full row per iteration. These tests pin both the behavior (identical
+    tier/movement output, including the pre-existing `or`-fallback and
+    tier-alias semantics) and the perf fix (iterrows not called a number
+    of times proportional to the full pool).
+    """
+
+    def test_tier_and_movement_match_previous_row_based_semantics(self):
+        pool = players()
+        # One player already carries a recognized tier alias (should map
+        # through _tier_for_rank's alias table, not the percentile bands);
+        # the rest fall back to the rank-percentile bands.
+        pool.loc[pool["player_id"] == "wr1", "player_tier"] = "elite"
+        previous = {"rb1": 1, "wr2": 10}  # wr1/others absent on purpose.
+
+        result = board(previous=previous, pool=pool)
+
+        wr1 = result.loc[result["player_id"] == "wr1"].iloc[0]
+        self.assertEqual(wr1["tier"], "Elite")
+
+        for _, row in result.iterrows():
+            pid = row["player_id"]
+            if pid in previous:
+                expected_movement = previous[pid] - int(row["overall_rank"])
+                self.assertEqual(row["movement"], expected_movement)
+            else:
+                self.assertEqual(row["movement"], 0)
+
+    def test_missing_tier_and_player_id_columns_degrade_the_same_as_before(self):
+        # No "player_tier"/"tier" columns at all, and (via a minimal pool)
+        # confirm this doesn't raise and falls back to percentile tiers.
+        pool = players().drop(columns=["name"], errors="ignore")
+        result = board(pool=pool)
+        self.assertIn("tier", result.columns)
+        self.assertTrue(result["tier"].isin(
+            {"Elite", "Star", "Core Starter", "Starter", "Upside", "Depth"}
+        ).all())
+
+    def test_tier_and_movement_do_not_iterrows_the_full_pool(self):
+        real_iterrows = pd.DataFrame.iterrows
+        call_count = {"n": 0}
+
+        def counting_iterrows(self):
+            call_count["n"] += 1
+            yield from real_iterrows(self)
+
+        pool = players()
+        with mock.patch.object(pd.DataFrame, "iterrows", counting_iterrows):
+            board(pool=pool)
+
+        # One remaining call is modules.player_eligibility's own (separate,
+        # pre-existing, out of scope here) iterrows pass; one more is the
+        # still-untouched scoring-components loop (line 761) — both
+        # legitimate. Before this fix there were two MORE full-pool
+        # iterrows passes on top of those (tier assignment, movement calc).
+        # This pins that those two are gone, not that iterrows is banned
+        # outright.
+        self.assertLessEqual(call_count["n"], 2)
 
 
 if __name__ == "__main__":

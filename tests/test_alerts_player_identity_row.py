@@ -58,6 +58,60 @@ def test_attach_player_identity_fields_leaves_unresolved_player_blank():
     assert "matched_player_tier" not in out[0]
 
 
+def test_attach_player_identity_fields_does_not_scan_the_full_player_universe():
+    """Self-hosted perf audit: used to .iterrows() the ENTIRE players_df
+    (hundreds-plus rows in production) on every call, even though a single
+    Alerts render only ever needs a lookup for the handful of player_ids in
+    `rows` — the same bug shape as already fixed in
+    modules.news_intelligence._name_index. This pins the fix: only rows
+    whose player_id is actually referenced get visited.
+    """
+
+    visited_player_ids: list[str] = []
+    real_iterrows = pd.DataFrame.iterrows
+
+    def spying_iterrows(self):
+        for idx, row in real_iterrows(self):
+            visited_player_ids.append(row.get("player_id"))
+            yield idx, row
+
+    big_frame = pd.DataFrame(
+        [
+            {
+                "player_id": str(1000 + i),
+                "name": f"Player {i}",
+                "position": "WR",
+                "team": "KC",
+                "player_tier": "Depth",
+            }
+            for i in range(500)
+        ]
+    )
+    # The one player these rows actually reference.
+    big_frame.loc[250, ["player_id", "position", "team", "player_tier"]] = [
+        "9001",
+        "RB",
+        "GB",
+        "Elite",
+    ]
+    rows = [{"player_id": "9001", "headline": "Needle in the haystack"}]
+
+    import pandas as _pd
+
+    original = _pd.DataFrame.iterrows
+    _pd.DataFrame.iterrows = spying_iterrows
+    try:
+        out = alert_presentation.attach_player_identity_fields(rows, players_df=big_frame)
+    finally:
+        _pd.DataFrame.iterrows = original
+
+    assert out[0]["matched_player_position"] == "RB"
+    assert out[0]["matched_player_team"] == "GB"
+    # Only the matched player's row (the pre-filtered subset) was visited,
+    # never the other 499 rows of the full universe frame.
+    assert visited_player_ids == ["9001"]
+
+
 def test_attach_player_identity_fields_handles_missing_frame():
     rows = [{"player_id": "9001", "headline": "Star Wideout ankle update"}]
     out = alert_presentation.attach_player_identity_fields(rows, players_df=None)
