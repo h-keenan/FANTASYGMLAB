@@ -242,6 +242,7 @@ def test_build_trade_tile_composes_a_top_trade_opportunity_tile():
     assert tile["route_key"] == "trade_hub"
     assert tile["route_focus_mode"] == "target_player"
     assert tile["route_player_id"] == "target-wr1"
+    assert tile["route_player_name"] == "Target WR1"
     assert tile["note"]
     assert tile["recommendation_narrative"] is not None
     assert tile["recommendation_id"]
@@ -298,6 +299,7 @@ def test_build_trade_tile_carries_real_player_identity_fields():
     tile = dashboard_engine.build_trade_tile(
         idea, league_id="league-1", roster_id="1", score_field="dynasty_score"
     )
+    assert tile["route_player_name"] == "Target WR1"
     assert tile["route_player_position"] == "WR"
     assert tile["route_player_team"] == "CIN"
     assert tile["route_player_tier"] == "Elite"
@@ -339,6 +341,7 @@ def test_build_waiver_tile_carries_real_player_identity_fields():
     )
     assert tile is not None
     assert tile["route_player_id"] == "fa-wr9"
+    assert tile["route_player_name"] == "Free Agent WR"
     assert tile["route_player_position"] == "WR"
     assert tile["route_player_team"] == "SEA"
     assert tile["route_player_tier"] == "Contributor"

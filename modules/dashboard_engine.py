@@ -186,6 +186,7 @@ def build_waiver_tile(
         "route_player_id": _text(top_waiver.get("player_id")),
         # Same row already backing every other field on this tile — not a
         # second valuation source.
+        "route_player_name": _text(top_waiver.get("name")),
         "route_player_position": _text(top_waiver.get("position")),
         "route_player_team": _text(top_waiver.get("team")),
         "route_player_tier": _text(top_waiver.get("player_tier")),
@@ -257,6 +258,7 @@ def build_trade_tile(
     # Same raw asset dict compact_package/presentation_asset already reads
     # position/team/player_tier/score from (modules.trade_ideas._player_asset)
     # — not a second valuation source.
+    route_player_name = _text(receive_assets[0].get("name")) if receive_assets else ""
     route_player_position = _text(receive_assets[0].get("position")) if receive_assets else ""
     route_player_team = _text(receive_assets[0].get("team")) if receive_assets else ""
     route_player_tier = _text(receive_assets[0].get("player_tier")) if receive_assets else ""
@@ -291,6 +293,7 @@ def build_trade_tile(
         "tone": "trade",
         "route_key": "trade_hub",
         "route_player_id": route_player_id,
+        "route_player_name": route_player_name,
         "route_player_position": route_player_position,
         "route_player_team": route_player_team,
         "route_player_tier": route_player_tier,
