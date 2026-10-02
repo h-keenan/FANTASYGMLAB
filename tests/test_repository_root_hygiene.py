@@ -9,12 +9,17 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 ALLOWED_ROOT_FILES = {
+    ".dockerignore",
+    ".env.example",
     ".gitignore",
     ".python-version",
     "AGENTS.md",
+    "Caddyfile",
     "DEPENDENCIES.md",
     "DEPLOYMENT.md",
+    "Dockerfile",
     "app.py",
+    "docker-compose.yml",
     "favicon.ico",
     "favicon.png",
     "render.yaml",

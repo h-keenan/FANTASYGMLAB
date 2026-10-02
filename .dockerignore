@@ -1,0 +1,51 @@
+# Keep the Docker build context small and avoid baking dev-only or
+# irrelevant content into the self-hosted image. None of the four Python
+# web services (Streamlit app, mobile API, Stripe webhook, RevenueCat
+# webhook) need any of this at runtime.
+
+.git/
+.github/
+
+# Mobile app (Expo/React Native) — a completely separate build/runtime,
+# not part of any Python service.
+mobile/
+
+# Tests and docs — not needed to run the services; keep CI/local-only.
+tests/
+docs/
+
+# Local/editor/OS state.
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Python dev/runtime artifacts.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp_*/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.venv/
+.venv*/
+venv/
+
+# Secrets — never copied into an image layer.
+local_secrets/
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+
+# Self-hosted deployment artifacts that reference, but don't need to be
+# inside, the image itself.
+docker-compose.yml
+Caddyfile
+deploy/
