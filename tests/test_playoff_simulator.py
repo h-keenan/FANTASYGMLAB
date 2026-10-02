@@ -4,11 +4,14 @@ Covers: a fully deterministic small-league scenario (no remaining games,
 expected outcome computable by hand), a hand-calculable single-game
 win-probability case, structural clinch/elimination (must be exact, not
 approximate), the logistic slope fit's insufficient-data fallback and its
-ability to recover a real signal, and the real-matchup-payload parsing
-helpers.
+ability to recover a real signal, the real-matchup-payload parsing
+helpers, and the cached front door's single-flight concurrency guard.
 """
 
 from __future__ import annotations
+
+import threading
+import time
 
 import numpy as np
 import pytest
@@ -236,3 +239,81 @@ def test_group_completed_week_games_picks_real_winner_and_skips_ties_and_unplaye
     ]
     games = sim._group_completed_week_games(matchups)
     assert games == [("1", "2", "1")]
+
+
+def test_concurrent_requests_for_same_key_single_flight(monkeypatch):
+    """Two concurrent cache misses for the same key must run the expensive
+    simulation exactly once, not twice.
+
+    functools.lru_cache alone does not guarantee this: its internal lock
+    only protects the cache dict during lookup/insert, not the wrapped
+    call itself, so two threads that both miss before either finishes
+    would otherwise both run the real (here: stubbed, slow) computation.
+    build_league_playoff_odds_cached's per-key lock (_playoff_odds_lock_for)
+    is what actually prevents that double-run.
+    """
+
+    call_count = 0
+    call_count_lock = threading.Lock()
+
+    def _slow_stub(league_id, *, lens, players_db_path, n_trials, rng):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        time.sleep(0.2)
+        return {"ok": True, "reason": "", "league_id": league_id, "lens": lens}
+
+    monkeypatch.setattr(sim, "build_league_playoff_odds", _slow_stub)
+    sim._build_league_playoff_odds_cached.cache_clear()
+
+    league_id = "test-single-flight-league"
+    results: list[dict] = []
+    results_lock = threading.Lock()
+
+    def _call():
+        result = sim.build_league_playoff_odds_cached(
+            league_id=league_id, lens="Dynasty", players_db_path="unused.db"
+        )
+        with results_lock:
+            results.append(result)
+
+    threads = [threading.Thread(target=_call) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert call_count == 1, "concurrent misses for the same key must single-flight to one real computation"
+    assert len(results) == 8
+    assert all(r["league_id"] == league_id for r in results)
+
+
+def test_lock_prune_drops_only_stale_unlocked_entries():
+    """The lock-dict safety valve must never drop a lock that's still held,
+    and must never drop a lock for the *current* bucket (it could still be
+    requested again very soon)."""
+
+    sim._playoff_odds_locks.clear()
+    current_bucket = sim._playoff_odds_cache_bucket()
+    stale_bucket = current_bucket - 1
+
+    held_stale_key = ("league-held", "Dynasty", "db", sim.DEFAULT_TRIALS, stale_bucket)
+    held_lock = sim._playoff_odds_lock_for(held_stale_key)
+    held_lock.acquire()
+    try:
+        # Push the dict over the prune threshold with stale, unlocked keys.
+        for i in range(sim._PLAYOFF_ODDS_LOCK_PRUNE_THRESHOLD + 5):
+            sim._playoff_odds_lock_for((f"league-{i}", "Dynasty", "db", sim.DEFAULT_TRIALS, stale_bucket))
+        current_key = ("league-current", "Dynasty", "db", sim.DEFAULT_TRIALS, current_bucket)
+        sim._playoff_odds_lock_for(current_key)
+
+        assert held_stale_key in sim._playoff_odds_locks, "a still-held lock must never be pruned"
+        assert current_key in sim._playoff_odds_locks, "the current bucket's lock must never be pruned"
+        stale_unlocked_key = ("league-0", "Dynasty", "db", sim.DEFAULT_TRIALS, stale_bucket)
+        assert stale_unlocked_key not in sim._playoff_odds_locks, (
+            "a stale, unheld lock from an old bucket should actually get pruned once the "
+            "dict grows past the threshold -- otherwise the safety valve never fires"
+        )
+    finally:
+        held_lock.release()
+        sim._playoff_odds_locks.clear()

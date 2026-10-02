@@ -12,6 +12,33 @@
 # render.yaml startCommand. Secrets are never set here directly — every
 # service reads from `.env` (gitignored; see .env.example for every
 # required variable name, mapped to its Render dashboard source).
+#
+# Per-service resource limits (`mem_limit`/`cpus` below): on Render, every
+# service got its own isolated instance, so one runaway service could not
+# starve another. Colocating all five containers on one shared box removes
+# that isolation — a leak or a CPU-bound spike (pandas/Monte Carlo work in
+# `web` or `mobile-api`) in one container could otherwise exhaust the host's
+# RAM/CPU and take the others down with it. `mem_limit`/`cpus` are the
+# plain (non-`deploy.resources`) Compose fields, which is deliberate: the
+# `deploy.resources.limits` key is only enforced by `docker stack deploy`
+# (Swarm), not by plain `docker compose up`, which is what this stack
+# actually runs (see docs/SELF_HOSTED_MIGRATION.md and
+# deploy/systemd/fantasygmlab.service).
+#
+# Sized for the actual target box (16GB RAM, 4-core/8-thread 7th-gen i5):
+# `web` and `mobile-api` do the real pandas/Monte Carlo/player-cache work,
+# so they get the largest share; the two webhook services only handle
+# occasional small Stripe/RevenueCat POSTs; Caddy just proxies. Total
+# mem_limit across all five is 9.25GB, leaving ~6.75GB headroom for the
+# host OS/Docker itself; total cpus is 5.5 of the 8 logical threads,
+# leaving headroom rather than pinning every thread even if all five
+# happened to spike at once. These are ceilings, not reservations, so
+# normal (non-spiking) operation is unaffected — they only bound the
+# worst case. Sign-off note: this is a real production resource-limit
+# change (new, not tightening something that worked before) — flagging for
+# coridian_ to confirm before this ships to the actual box, even though the
+# values themselves are deliberately conservative (safe headroom, not
+# tight enough to cause normal-load throttling).
 
 services:
   web:
@@ -32,6 +59,8 @@ services:
       PORT: "8080"
     env_file:
       - .env
+    mem_limit: 4g
+    cpus: 2.0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/_stcore/health"]
       interval: 30s
@@ -49,11 +78,34 @@ services:
     image: fantasygmlab-app:latest
     # See the "web" service's command comment above for why this is
     # wrapped in sh -c and uses the doubled "$$PORT".
+    #
+    # Deliberately no `--workers N`: this box has 4 cores/8 threads, so
+    # multiple uvicorn worker PROCESSES could plausibly help throughput
+    # under concurrent load. But this service keeps two pieces of state
+    # in process memory that are not shared across processes:
+    #   1. `_rate_limiter` (an in-memory fixed-window counter — see
+    #      services/mobile_api_service.py's "Rate limiting" section).
+    #      With N worker processes, each gets its own counter, so the
+    #      *effective* per-client limit becomes limit*N instead of limit —
+    #      a silent correctness regression, not just a perf tradeoff.
+    #   2. The warmed `rankings.load_players` cache populated by
+    #      `_warm_players_cache_at_startup` in this process's lifespan —
+    #      with N workers each would redo that warm-up independently
+    #      (acceptable: happens once at startup, in parallel) but then
+    #      hold its own independent copy in memory.
+    # (1) is the blocker: moving to multiple workers safely needs the rate
+    # limiter's state moved to a shared store (e.g. Redis) first, so a
+    # client's request count is consistent across whichever worker handles
+    # it. Until that lands, single-worker (today's behavior, unchanged) is
+    # the correct choice here, not just the cautious one — flip this only
+    # alongside that migration, not before it.
     command: ["sh", "-c", "uvicorn services.mobile_api_service:app --host 0.0.0.0 --port $$PORT"]
     environment:
       PORT: "8080"
     env_file:
       - .env
+    mem_limit: 4g
+    cpus: 2.0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -76,6 +128,8 @@ services:
       PORT: "8080"
     env_file:
       - .env
+    mem_limit: 512m
+    cpus: 0.5
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -98,6 +152,8 @@ services:
       PORT: "8080"
     env_file:
       - .env
+    mem_limit: 512m
+    cpus: 0.5
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -120,6 +176,8 @@ services:
       - ./static/landing:/srv/static/landing:ro
       - caddy_data:/data
       - caddy_config:/config
+    mem_limit: 256m
+    cpus: 0.5
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:2019/config/"]
       interval: 30s
