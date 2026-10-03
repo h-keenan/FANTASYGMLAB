@@ -1450,13 +1450,32 @@ export interface DashboardResponse {
   reason: string;
 }
 
+/** The single highest-value-score player on a saved league's roster — the
+ * top row of modules.dashboard_engine.build_league_summary's already-
+ * computed roster_df, no new valuation math. Lean on purpose (not a full
+ * RankedPlayer): just enough for the Portfolio share card's "standout
+ * asset" avatar + name + score line. */
+export interface PortfolioTopAsset {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  tier: string | null;
+  score: number | null;
+}
+
 /**
  * One saved league's row on the cross-league Portfolio screen — the exact
  * same per-league summary GET /v1/leagues/{id}/dashboard already builds
  * (modules.dashboard_engine.build_league_summary), condensed to what a
  * compact row needs. `top_item` is that league's single highest-priority
  * Next Move tile (same shape as DashboardItem) — "the one thing to do in
- * this league right now."
+ * this league right now." `franchise_rank`/`roster_value_rank` and
+ * `archetype`/`archetype_label` come from the same cached
+ * modules.league_rankings rankings frame `power_rank` already reads, run
+ * through modules.team_eval.refine_team_directions — the identical,
+ * already-cached pass GET /v1/leagues/{id}/team-rankings uses for its own
+ * archetype column.
  */
 export interface PortfolioLeague {
   league_id: string;
@@ -1468,6 +1487,13 @@ export interface PortfolioLeague {
   health_flag: string;
   power_rank: number | null;
   power_rank_tied: boolean;
+  franchise_rank: number | null;
+  franchise_rank_tied: boolean;
+  roster_value_rank: number | null;
+  roster_value_rank_tied: boolean;
+  archetype: string | null;
+  archetype_label: string | null;
+  top_asset: PortfolioTopAsset | null;
   top_item: DashboardItem | null;
 }
 
