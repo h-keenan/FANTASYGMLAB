@@ -23,6 +23,7 @@ implementation (see modules/trade_trust.py).
 
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass
 from functools import lru_cache
@@ -544,6 +545,56 @@ def _generate_trade_idea_records_cached(
     )
 
 
+# Per-cache-key single-flight locks — same pattern, and same reason, as
+# modules.playoff_simulator's _playoff_odds_lock_for: functools.lru_cache's
+# own internal lock only protects the cache dict itself during a
+# lookup/insert, it does NOT serialize the wrapped function's *execution*.
+# Without this, N concurrent requests that all miss the same (league_id,
+# roster_id, strategy, lens, untouchables, gm_targets, bucket) key before
+# the first one finishes would each independently pay the full
+# build_trade_ideas search cost (measured at ~150-300ms of mostly
+# pure-Python, GIL-held work per call for a realistic 12-14 team dynasty
+# league — see scripts/profile_trade_hub.py) instead of sharing one. That
+# directly contradicts this cache's own documented purpose above (one
+# shared entry per 30s window across every caller), and on this service's
+# single uvicorn worker (see docker-compose.yml's mobile-api comment),
+# every one of those duplicate runs holds the one process's GIL back-to-
+# back, stalling every other in-flight request for that much longer than
+# necessary. A concrete trigger: the Dashboard's Top Trade Opportunity tile
+# and the Trade Hub screen both cold-loading for the same user/league
+# within the same request burst (a real multi-screen session, or the
+# mobile client's own navigation retries) — both ask for the exact same
+# cache key.
+_TRADE_HUB_IDEAS_LOCK_PRUNE_THRESHOLD = 500
+
+_trade_hub_ideas_locks: dict[tuple[Any, ...], threading.Lock] = {}
+_trade_hub_ideas_locks_guard = threading.Lock()
+
+
+def _trade_hub_ideas_lock_for(key: tuple[Any, ...]) -> threading.Lock:
+    with _trade_hub_ideas_locks_guard:
+        lock = _trade_hub_ideas_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _trade_hub_ideas_locks[key] = lock
+        if len(_trade_hub_ideas_locks) > _TRADE_HUB_IDEAS_LOCK_PRUNE_THRESHOLD:
+            # Safe to drop any lock from an older bucket: this function's
+            # only caller always passes the *current* bucket (see
+            # generate_trade_idea_records_cached below), so a key whose
+            # bucket doesn't match the one we were just asked for can never
+            # be requested again. Skip anything still held, just in case a
+            # search genuinely spans a bucket rollover.
+            current_bucket = key[-1]
+            stale = [
+                existing_key
+                for existing_key, existing_lock in _trade_hub_ideas_locks.items()
+                if existing_key[-1] != current_bucket and not existing_lock.locked()
+            ]
+            for existing_key in stale:
+                _trade_hub_ideas_locks.pop(existing_key, None)
+        return lock
+
+
 def generate_trade_idea_records_cached(
     *,
     league_id: str,
@@ -570,9 +621,13 @@ def generate_trade_idea_records_cached(
     `team_stance` (the caller's own declared Team Situation) is applied
     OUTSIDE the lru_cache boundary — a stance-aware rationale clause is a
     cheap string append, not worth invalidating/duplicating the expensive
-    search cache entry over. See modules.trade_ideas.apply_team_stance_framing."""
+    search cache entry over. See modules.trade_ideas.apply_team_stance_framing.
 
-    records = _generate_trade_idea_records_cached(
+    Single-flight per cache key: see `_trade_hub_ideas_lock_for`'s
+    docstring-comment for why this needs its own lock on top of
+    `lru_cache`."""
+
+    key = (
         league_id,
         roster_id,
         strategy,
@@ -582,6 +637,8 @@ def generate_trade_idea_records_cached(
         tuple(sorted({str(pid) for pid in gm_target_player_ids if str(pid)})),
         _trade_hub_ideas_cache_bucket(),
     )
+    with _trade_hub_ideas_lock_for(key):
+        records = _generate_trade_idea_records_cached(*key)
     return trade_ideas_module.apply_team_stance_framing(records, team_stance)
 
 

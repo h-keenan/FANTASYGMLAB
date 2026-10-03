@@ -11,11 +11,13 @@ without crashing end to end.
 
 from __future__ import annotations
 
+import threading
+import time
 from unittest.mock import patch
 
 import pandas as pd
 
-from modules import trade_hub_engine
+from modules import league_value_settings, player_eligibility, rankings, sleeper, trade_hub_engine
 
 
 SETTINGS = {
@@ -471,3 +473,66 @@ def test_project_trade_idea_card_leaves_impact_tag_empty_with_no_matching_signal
     )
     card = trade_hub_engine.project_trade_idea_card(idea)
     assert card.to_dict()["impact_tag"] == ""
+
+
+def test_concurrent_requests_for_same_key_single_flight(monkeypatch):
+    """Two concurrent cache misses for the same (league, roster, strategy,
+    lens, ...) key must run the expensive search exactly once, not once per
+    caller.
+
+    functools.lru_cache alone does not guarantee this: its internal lock
+    only protects the cache dict during lookup/insert, not the wrapped
+    call itself, so N threads that all miss before any of them finishes
+    would otherwise each independently redo the real (here: stubbed, slow)
+    build_trade_ideas search. generate_trade_idea_records_cached's per-key
+    lock (_trade_hub_ideas_lock_for) is what actually prevents that.
+    """
+
+    monkeypatch.setattr(sleeper, "get_league", lambda _league_id: {"league_id": "x", "settings": {}})
+    monkeypatch.setattr(sleeper, "get_rosters", lambda _league_id: [])
+    monkeypatch.setattr(
+        rankings, "load_players", lambda _db_path: pd.DataFrame([{"player_id": "p1", "name": "P1"}])
+    )
+    monkeypatch.setattr(
+        player_eligibility, "filter_current_fantasy_players", lambda df, **_kwargs: df
+    )
+    monkeypatch.setattr(league_value_settings, "apply_valuation_lens", lambda df, *_args, **_kwargs: df)
+    monkeypatch.setattr(league_value_settings, "valuation_score_field", lambda _lens: "value_score")
+
+    call_count = 0
+    call_count_lock = threading.Lock()
+
+    def _slow_stub(*, league_id, **_kwargs):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        time.sleep(0.2)
+        return [{"league_id": league_id, "ok": True}]
+
+    monkeypatch.setattr(trade_hub_engine, "generate_trade_idea_records", _slow_stub)
+    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
+
+    league_id = "test-single-flight-league"
+    results: list[list[dict]] = []
+    results_lock = threading.Lock()
+
+    def _call():
+        result = trade_hub_engine.generate_trade_idea_records_cached(
+            league_id=league_id,
+            roster_id=1,
+            strategy="retool",
+            lens="Dynasty",
+            players_db_path="unused.db",
+        )
+        with results_lock:
+            results.append(result)
+
+    threads = [threading.Thread(target=_call) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert call_count == 1, "concurrent misses for the same key must single-flight to one real computation"
+    assert len(results) == 8
+    assert all(r and r[0]["league_id"] == league_id for r in results)

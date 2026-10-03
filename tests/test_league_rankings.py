@@ -6,9 +6,12 @@ needs for the full endpoint, since these functions take plain DataFrames.
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pandas as pd
 
-from modules import league_rankings
+from modules import league_rankings, league_value_settings, player_eligibility, rankings, sleeper
 
 
 def test_safe_pick_value_uses_score_when_present():
@@ -409,3 +412,110 @@ def test_build_draft_workspace_frame_exposes_future_draft_capital_rank_tie_metad
     assert by_roster[1]["future_draft_capital_rank_tied"] is True
     assert by_roster[2]["future_draft_capital_rank_tied"] is True
     assert by_roster[1]["future_draft_capital_rank_tie_count"] == 2
+
+
+def _patch_cache_ingredients(monkeypatch):
+    monkeypatch.setattr(sleeper, "get_league", lambda _league_id: {"league_id": "x", "settings": {}})
+    monkeypatch.setattr(
+        rankings, "load_players", lambda _db_path: pd.DataFrame([{"player_id": "p1", "name": "P1"}])
+    )
+    monkeypatch.setattr(
+        player_eligibility, "filter_current_fantasy_players", lambda df, **_kwargs: df
+    )
+    monkeypatch.setattr(league_value_settings, "apply_valuation_lens", lambda df, *_args, **_kwargs: df)
+    monkeypatch.setattr(league_value_settings, "valuation_score_field", lambda _lens: "value_score")
+
+
+def test_build_league_rankings_frame_cached_concurrent_misses_single_flight(monkeypatch):
+    """Two concurrent cache misses for the same (league, lens, ...) key must
+    run the expensive league-wide ranking pass exactly once, not once per
+    caller.
+
+    functools.lru_cache alone does not guarantee this: its internal lock
+    only protects the cache dict during lookup/insert, not the wrapped
+    call itself, so N threads that all miss before any of them finishes
+    would otherwise each independently redo the real (here: stubbed, slow)
+    build_league_rankings_frame pass. build_league_rankings_frame_cached's
+    per-key lock (_league_rankings_lock_for) is what actually prevents
+    that."""
+
+    _patch_cache_ingredients(monkeypatch)
+
+    call_count = 0
+    call_count_lock = threading.Lock()
+
+    def _slow_stub(_valued, league_id, **_kwargs):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        time.sleep(0.2)
+        return pd.DataFrame([{"league_id": league_id, "ok": True}])
+
+    monkeypatch.setattr(league_rankings, "build_league_rankings_frame", _slow_stub)
+    league_rankings._build_league_rankings_frame_cached.cache_clear()
+
+    league_id = "test-single-flight-league"
+    results: list[pd.DataFrame] = []
+    results_lock = threading.Lock()
+
+    def _call():
+        result = league_rankings.build_league_rankings_frame_cached(
+            league_id=league_id, lens="Dynasty", players_db_path="unused.db"
+        )
+        with results_lock:
+            results.append(result)
+
+    threads = [threading.Thread(target=_call) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert call_count == 1, "concurrent misses for the same key must single-flight to one real computation"
+    assert len(results) == 8
+    assert all(r.iloc[0]["league_id"] == league_id for r in results)
+
+
+def test_build_league_summary_and_draft_capital_cached_concurrent_misses_single_flight(monkeypatch):
+    """Same single-flight guarantee as the rankings-frame cache above, for
+    build_league_summary_and_draft_capital_cached (Draft Center/Draft
+    Picks' shared cache)."""
+
+    _patch_cache_ingredients(monkeypatch)
+
+    call_count = 0
+    call_count_lock = threading.Lock()
+
+    def _slow_stub(_valued, league_id, **_kwargs):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        time.sleep(0.2)
+        return (
+            pd.DataFrame([{"league_id": league_id, "ok": True}]),
+            pd.DataFrame([{"league_id": league_id, "ok": True}]),
+        )
+
+    monkeypatch.setattr(league_rankings, "build_league_summary_and_draft_capital", _slow_stub)
+    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
+
+    league_id = "test-single-flight-league-2"
+    results: list[tuple[pd.DataFrame, pd.DataFrame]] = []
+    results_lock = threading.Lock()
+
+    def _call():
+        result = league_rankings.build_league_summary_and_draft_capital_cached(
+            league_id=league_id, lens="Dynasty", players_db_path="unused.db"
+        )
+        with results_lock:
+            results.append(result)
+
+    threads = [threading.Thread(target=_call) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert call_count == 1, "concurrent misses for the same key must single-flight to one real computation"
+    assert len(results) == 8
+    assert all(summary.iloc[0]["league_id"] == league_id for summary, _ in results)
