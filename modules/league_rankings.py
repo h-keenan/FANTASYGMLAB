@@ -1,4 +1,4 @@
-"""League-wide team ranking assembly (Power Rank, Franchise Rank, Draft
+"""League-wide team ranking assembly (Roster Power, Franchise Rank, Draft
 Capital Rank) — ported from app.py so it can be called from services/ without
 importing app.py (modules/ never imports app.py, per dashboard_engine.py's
 docstring).

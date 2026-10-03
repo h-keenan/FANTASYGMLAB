@@ -85,7 +85,7 @@ class TestWeeklyReportUI(unittest.TestCase):
             [call.args[0] for call in section_header.call_args_list],
             [
                 "Weekly Highlights",
-                "Power Movement",
+                "Roster Power Movement",
                 "League Trends",
                 "Transaction Summary",
                 "Manager Activity",
@@ -93,7 +93,7 @@ class TestWeeklyReportUI(unittest.TestCase):
             ],
         )
         movement_tiles = summary_tiles.call_args_list[1].args[0]
-        self.assertEqual(movement_tiles[0]["label"], "Biggest Power Riser")
+        self.assertEqual(movement_tiles[0]["label"], "Biggest Roster Power Riser")
         self.assertEqual(movement_tiles[0]["note"], "+2 spots | #4 to #2")
         # Rank movement direction (up/down) now carries a consistent
         # success/danger-colored badge independent of each tile's own
@@ -106,7 +106,7 @@ class TestWeeklyReportUI(unittest.TestCase):
         # on-page next-step pointer through the existing tap-to-detail
         # affordance (see test_workspace_ui.py's non-comparison "detail" tile
         # case) — a clarity fix, not a new component or navigation target.
-        self.assertIn("Power Rank", movement_tiles[0]["detail"])
+        self.assertIn("Roster Power", movement_tiles[0]["detail"])
         self.assertIn("Transaction Summary", movement_tiles[0]["supporting_context"])
         self.assertIn("Franchise Rank", movement_tiles[2]["detail"])
         columns = list(dataframe.call_args.args[0].columns)
@@ -114,9 +114,9 @@ class TestWeeklyReportUI(unittest.TestCase):
             columns,
             [
                 "Team",
-                "Power Before",
-                "Power After",
-                "Power Change",
+                "Roster Power Before",
+                "Roster Power After",
+                "Roster Power Change",
                 "Franchise Before",
                 "Franchise After",
                 "Franchise Change",

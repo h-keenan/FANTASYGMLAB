@@ -221,7 +221,7 @@ def _standing_focus_area(
 ) -> dict[str, Any]:
     items: list[dict[str, Any]] = []
 
-    power_fact = _rank_fact(rankings_row, "power_rank", "power_rank_tied", total_teams, "Power Rank")
+    power_fact = _rank_fact(rankings_row, "power_rank", "power_rank_tied", total_teams, "Roster Power")
     if power_fact:
         power_fact["source"] = "modules.league_rankings.build_league_rankings_frame"
         items.append(power_fact)

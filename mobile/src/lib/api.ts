@@ -239,6 +239,21 @@ export interface TeamRanking {
   // this roster has been party to so far this season. Powers the Dashboard
   // League Pulse "Most Active Manager" tile.
   transaction_activity_count: number;
+  // Real future-1st-round-pick flow off actual Sleeper trade history
+  // (modules.pick_flow) — backs the "Pick Hoarder"/"Pick Seller" entry in
+  // team_badges below.
+  firsts_acquired: number;
+  firsts_sent: number;
+  // Real current win/loss streak off actual weekly matchup results
+  // (modules.team_streaks) — positive = active win streak, negative =
+  // active losing streak. Backs the "Hot Streak"/"Cold Streak" entry in
+  // team_badges below.
+  current_streak: number;
+  // Zero, one, or several real, data-backed team signals (Highly Active /
+  // Quiet Manager, Pick Hoarder / Pick Seller, Veteran Collector / Youth
+  // Builder, Hot Streak / Cold Streak, Top-Heavy Roster) — see
+  // TEAM_BADGE_VISUALS in TeamsScreen.tsx for how each label renders.
+  team_badges: string[];
 }
 
 export interface LeagueTeamRankingsResponse {

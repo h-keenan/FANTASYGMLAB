@@ -83,6 +83,7 @@ from modules import daily_gm_briefing_ui
 from modules import decision_change_history
 from modules import decision_change_history_ui
 from modules import decision_memory
+from modules import manager_activity
 from modules import gm_targets
 from modules import gm_targets_ui
 from modules import guest_conversion
@@ -5900,7 +5901,7 @@ def build_home_league_pulse_items(df_intel: pd.DataFrame) -> list[dict]:
             "label": "Biggest Contender",
             "value": _safe_text(strongest_contender.get("team_name"), "No clear leader") if strongest_contender is not None else "No clear leader",
             "note": (
-                f"Power {_format_rank(strongest_contender.get('power_rank'), tied=bool(strongest_contender.get('power_rank_tied')))} | "
+                f"Roster Power {_format_rank(strongest_contender.get('power_rank'), tied=bool(strongest_contender.get('power_rank_tied')))} | "
                 f"Starter {_format_rank(strongest_contender.get('starter_rank'), tied=bool(strongest_contender.get('starter_rank_tied')))}"
                 if strongest_contender is not None
                 else "No contender read available yet."
@@ -7755,7 +7756,7 @@ def render_home_dashboard(
             action_center_items = [
                 {
                     "label": "Roster Quality",
-                    "value": f"Power {_format_rank(team_row.get('power_rank'), tied=bool(team_row.get('power_rank_tied')))}",
+                    "value": f"Roster Power {_format_rank(team_row.get('power_rank'), tied=bool(team_row.get('power_rank_tied')))}",
                     "note": f"Franchise {_format_rank(team_row.get('franchise_rank'), tied=bool(team_row.get('franchise_rank_tied')))} after the completed startup.",
                     "tone": "power",
                 },
@@ -14432,18 +14433,21 @@ def _classify_manager_tendencies(enriched: pd.DataFrame) -> pd.DataFrame:
         else:
             asset_behavior = "Balanced Asset Manager"
 
-        if transaction_count >= max(6, int(round(tx_high))) or roster_churn >= max(12, int(round(churn_high))):
-            activity_level = "Highly Active"
-        elif transaction_count <= max(1, int(round(tx_low))) and waiver_moves <= 1 and trade_count <= 1:
-            activity_level = "Quiet Manager"
-        else:
-            activity_level = "Average Activity"
+        activity_level = manager_activity.classify_activity_level(
+            transaction_count=transaction_count,
+            tx_high=tx_high,
+            tx_low=tx_low,
+            waiver_moves=waiver_moves,
+            trade_count=trade_count,
+            roster_churn=roster_churn,
+            churn_high=churn_high,
+        ) or "Average Activity"
 
         evidence = [
             f"{trade_count} completed trades | {trade_asset_total} tracked trade assets",
             f"{transaction_count} total moves | {waiver_moves} waivers | {roster_churn} churn",
             (
-                f"Power {_format_rank(power_rank, tied=bool(row.get('power_rank_tied')))} | "
+                f"Roster Power {_format_rank(power_rank, tied=bool(row.get('power_rank_tied')))} | "
                 f"Franchise {_format_rank(franchise_rank, tied=bool(row.get('franchise_rank_tied')))} | "
                 f"Draft {_format_rank(draft_rank, tied=bool(row.get('draft_capital_rank_tied')))} | "
                 f"Age {_format_rank(age_rank, tied=bool(row.get('age_rank_tied')))}"
@@ -14583,7 +14587,7 @@ def build_weekly_rank_movement(
     if not snapshot_rows or not league_id or report_week <= 0:
         return {
             "available": False,
-            "note": "Power and Franchise rank movement will appear once the report has at least one saved prior-week snapshot.",
+            "note": "Roster Power and Franchise rank movement will appear once the report has at least one saved prior-week snapshot.",
             "previous_week": None,
             "rows": [],
         }
@@ -14644,7 +14648,7 @@ def build_weekly_rank_movement(
     if not rows:
         return {
             "available": False,
-            "note": "Power and Franchise rank movement will appear once the report has at least one saved prior-week snapshot.",
+            "note": "Roster Power and Franchise rank movement will appear once the report has at least one saved prior-week snapshot.",
             "previous_week": previous_week,
             "rows": [],
         }
@@ -14904,7 +14908,7 @@ def cached_weekly_league_report(
                     {
                         "label": "Biggest Upset",
                         "value": f"{biggest_upset['winner_team']} over {biggest_upset['loser_team']}",
-                        "note": f"Beat a team ranked {biggest_upset['gap']} spots higher in Power Rank",
+                        "note": f"Beat a team ranked {biggest_upset['gap']} spots higher in Roster Power",
                         "tone": "power",
                     }
                 )
@@ -14927,13 +14931,13 @@ def cached_weekly_league_report(
                 {
                     "label": "Team of the Week",
                     "value": _safe_text(team_of_week_row.get("team_name"), "Team"),
-                    "note": f"{_format_score(team_of_week.get('points'))} points | Power {_format_rank(team_of_week_row.get('power_rank'), tied=bool(team_of_week_row.get('power_rank_tied')))}",
+                    "note": f"{_format_score(team_of_week.get('points'))} points | Roster Power {_format_rank(team_of_week_row.get('power_rank'), tied=bool(team_of_week_row.get('power_rank_tied')))}",
                     "tone": "strength",
                 },
                 {
                     "label": "Disappointment",
                     "value": _safe_text(disappointment_row.get("team_name"), "Team"),
-                    "note": f"{_format_score(disappointment.get('points'))} points after entering at Power {_format_rank(disappointment_row.get('power_rank'), tied=bool(disappointment_row.get('power_rank_tied')))}",
+                    "note": f"{_format_score(disappointment.get('points'))} points after entering at Roster Power {_format_rank(disappointment_row.get('power_rank'), tied=bool(disappointment_row.get('power_rank_tied')))}",
                     "tone": "risk",
                 },
             ]
@@ -14964,7 +14968,7 @@ def cached_weekly_league_report(
             "tone": "strength",
             "items": [
                 f"{int(hottest.get('current_streak') or 0)}-game win streak",
-                f"Power Rank {_format_rank(hottest.get('power_rank'), tied=bool(hottest.get('power_rank_tied')))}",
+                f"Roster Power {_format_rank(hottest.get('power_rank'), tied=bool(hottest.get('power_rank_tied')))}",
                 f"Strategy: {_safe_text(hottest.get('strategy_display'))}",
             ] if hottest is not None else ["Need completed matchup history first."],
         },
@@ -14974,7 +14978,7 @@ def cached_weekly_league_report(
             "tone": "risk",
             "items": [
                 f"{abs(int(coldest.get('current_streak') or 0))}-game losing streak",
-                f"Power Rank {_format_rank(coldest.get('power_rank'), tied=bool(coldest.get('power_rank_tied')))}",
+                f"Roster Power {_format_rank(coldest.get('power_rank'), tied=bool(coldest.get('power_rank_tied')))}",
                 f"Strategy: {_safe_text(coldest.get('strategy_display'))}",
             ] if coldest is not None else ["Need completed matchup history first."],
         },
@@ -20924,7 +20928,7 @@ def main():
                     season_label = _safe_text(standings_bundle.get("season"))
                     week_label = _safe_text(standings_bundle.get("week_label"))
                     standings_note_bits = [
-                        "Actual results from league matchups — separate from Power Rankings strength.",
+                        "Actual results from league matchups — separate from Roster Power strength.",
                     ]
                     if week_label:
                         standings_note_bits.insert(0, week_label)
@@ -20943,7 +20947,7 @@ def main():
                     render_section_header(
                         "Playoff Odds",
                         kicker="What might happen next",
-                        note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Power Rank, thousands of simulated outcomes.",
+                        note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Roster Power, thousands of simulated outcomes.",
                     )
                     with _wrr_league.block(
                         st.session_state,
@@ -20953,7 +20957,7 @@ def main():
                     ):
                         render_league_playoff_odds_board(selected_league_id)
                     render_section_header(
-                        "Power Rankings",
+                        "Roster Power Rankings",
                         kicker="Who is strongest",
                         note="Who is best equipped to win games right now — not who has the best record.",
                     )
@@ -20993,7 +20997,7 @@ def main():
                                     "tone": "strategy",
                                 },
                                 {
-                                    "label": "Power Rank",
+                                    "label": "Roster Power",
                                     "title": "Current strength",
                                     "body": "Starter quality and usable depth — who can win now.",
                                     "tone": "power",
@@ -21193,7 +21197,7 @@ def main():
                         else:
                             archetype_table = archetype_table.rename(
                                 columns={
-                                    "power_rank": "Power Rank",
+                                    "power_rank": "Roster Power",
                                     "franchise_rank": "Franchise Rank",
                                     "team_name": "Team",
                                     "owner_name": "Owner",
@@ -21208,7 +21212,7 @@ def main():
                                 primary_column="Team",
                                 secondary_columns=("Archetype", "Strategy"),
                                 meta_column="Explanation",
-                                badge_column="Power Rank",
+                                badge_column="Roster Power",
                                 max_summary_rows=12,
                                 expander_label="Full archetype table",
                                 key_suffix=f"archetypes_{selected_league_id}",
@@ -21745,7 +21749,7 @@ def main():
                                         ),
                                         metric_html=dense_list_primitives.dense_metric_html(
                                             _format_score(row.get("power_score")),
-                                            "Power",
+                                            "Roster Power",
                                         ),
                                         trail_html=dense_list_primitives.dense_trail_html(
                                             meta_html=dense_list_primitives.dense_meta_html(
@@ -21927,7 +21931,7 @@ def main():
         render_section_header(
             "Weekly League Report",
             kicker="Weekly Desk",
-            note="Automatic league highlights built from Sleeper matchups, transactions, standings context, Power Rank, Franchise Rank, strategy, injuries, and draft capital.",
+            note="Automatic league highlights built from Sleeper matchups, transactions, standings context, Roster Power, Franchise Rank, strategy, injuries, and draft capital.",
         )
 
         if startup_mode and selected_league_id:
@@ -22828,7 +22832,7 @@ def main():
                                 {
                                     "label": "Team Context",
                                     "value": (
-                                        f"Power {_format_rank(my_rank_row.get('power_rank'), tied=bool(my_rank_row.get('power_rank_tied')))} | "
+                                        f"Roster Power {_format_rank(my_rank_row.get('power_rank'), tied=bool(my_rank_row.get('power_rank_tied')))} | "
                                         f"Franchise {_format_rank(my_rank_row.get('franchise_rank'), tied=bool(my_rank_row.get('franchise_rank_tied')))}"
                                     ),
                                     "note": f"Trade lens: {trade_hub_lens_label}.",
@@ -22929,7 +22933,7 @@ def main():
                             "label": "Current Team",
                             "value": target_team_name,
                             "note": (
-                                f"{target_owner_name} | Power {_format_rank(target_rank_row.get('power_rank'), tied=bool(target_rank_row.get('power_rank_tied')))} | "
+                                f"{target_owner_name} | Roster Power {_format_rank(target_rank_row.get('power_rank'), tied=bool(target_rank_row.get('power_rank_tied')))} | "
                                 f"Franchise {_format_rank(target_rank_row.get('franchise_rank'), tied=bool(target_rank_row.get('franchise_rank_tied')))}"
                                 + (
                                     f" | {_safe_text(target_rank_row.get('manager_tendencies_summary'))}"

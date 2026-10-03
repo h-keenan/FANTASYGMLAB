@@ -188,7 +188,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
               <PostureTile
                 label="Strategy"
                 value={posture.strategy_display || '—'}
-                note={`Power ${formatRank(posture.power_rank, posture.power_rank_tied)} · Franchise ${formatRank(posture.franchise_rank, posture.franchise_rank_tied)}`}
+                note={`Roster Power ${formatRank(posture.power_rank, posture.power_rank_tied)} · Franchise ${formatRank(posture.franchise_rank, posture.franchise_rank_tied)}`}
               />
             </View>
             <AnimatedCard

@@ -502,7 +502,7 @@ def _matchup_story(
         )
         summary = (
             f"{winner} beat {loser} {_float(row.get('winner_points'), 0.0):.1f}–"
-            f"{_float(row.get('loser_points'), 0.0):.1f} despite a worse Power Rank entering the week."
+            f"{_float(row.get('loser_points'), 0.0):.1f} despite a worse Roster Power entering the week."
         )
     else:
         row = max(paired, key=lambda item: (_float(item.get("margin"), 0.0), -_int(item.get("matchup_id"), 0)))
@@ -939,11 +939,11 @@ def _riser_story(movement: Mapping[str, Any] | None, *, week: int) -> dict[str, 
     return _story(
         story_type=STORY_RISER,
         title="Roster riser",
-        summary=f"{name} moved up {delta} Power Rank spot{'s' if delta != 1 else ''} after Week {week}.",
+        summary=f"{name} moved up {delta} Roster Power spot{'s' if delta != 1 else ''} after Week {week}.",
         glyph="insights",
         primary_team=name,
         primary_roster_id=_roster_id_str(riser.get("roster_id")),
-        metric_label="Power Rank",
+        metric_label="Roster Power",
         metric_value=f"+{delta}",
         history_week=week,
         extra={"basis": "saved_weekly_snapshot"},

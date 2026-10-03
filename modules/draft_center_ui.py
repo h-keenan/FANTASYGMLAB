@@ -833,9 +833,9 @@ def _draft_workspace_team_lines(
                 return f"{strategy} timeline, but draft rank {draft_rank} says this roster still needs more future capital."
             return f"Draft rank {draft_rank} leaves too little flexibility for a {strategy.lower()} build."
         if mode in {"pick_seller", "sell_picks"}:
-            return f"Power rank {power_rank} gives this roster a real reason to spend picks for points now."
+            return f"Roster Power rank {power_rank} gives this roster a real reason to spend picks for points now."
         if mode == "pivot":
-            return "Middle-tier power and franchise ranks leave this roster needing optionality before it picks a direction."
+            return "Middle-tier Roster Power and franchise ranks leave this roster needing optionality before it picks a direction."
         if mode == "pick_rich":
             return f"{firsts} first-rounder{'s' if firsts != 1 else ''} and future rank {future_rank} keep the board open."
         if mode == "pick_poor":
@@ -947,7 +947,7 @@ def render_your_draft_posture(
                     ),
                 ),
                 "note": (
-                    f"Power {_format_rank(team_row.get('power_rank'), tied=bool(team_row.get('power_rank_tied')))} | "
+                    f"Roster Power {_format_rank(team_row.get('power_rank'), tied=bool(team_row.get('power_rank_tied')))} | "
                     f"Franchise {_format_rank(team_row.get('franchise_rank'), tied=bool(team_row.get('franchise_rank_tied')))}"
                 ),
                 "tone": "strategy",

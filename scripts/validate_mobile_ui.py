@@ -16,7 +16,7 @@ SURFACES = {
     ),
     "league": (
         "Standings",
-        "Power Rankings",
+        "Roster Power Rankings",
         "Franchise Value",
             "Draft Capital",
             "How to read these boards",
@@ -1075,7 +1075,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             failures.append(f"executive shell must be square: {metrics.get('shellRadius')}")
         if metrics["switcherCount"] != 1:
             failures.append(f"expected one integrated league switcher: {metrics['switcherCount']}")
-        if any(label in metrics["shellText"] for label in ("Power Rank", "Franchise Rank", "Strategy", "Archetype")):
+        if any(label in metrics["shellText"] for label in ("Roster Power", "Franchise Rank", "Strategy", "Archetype")):
             failures.append(f"franchise metrics leaked into executive shell: {metrics['shellText']}")
         shell_height_limit = 190 if surface == "header-geometry" else 140
         if width <= 430 and (

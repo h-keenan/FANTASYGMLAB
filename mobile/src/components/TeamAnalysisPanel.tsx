@@ -12,7 +12,7 @@ import { spacing, type ThemeColors } from '../theme';
 
 /**
  * Shared "roster analysis" content: the full TeamRanking rank matrix
- * (Power/Franchise/Draft Capital/Starters/Bench/Age) plus the archetype
+ * (Roster Power/Franchise/Draft Capital/Starters/Bench/Age) plus the archetype
  * narrative (explanation, strengths, risks, recommendations) and real trade
  * behavior — every field here already exists on `TeamRanking`
  * (services/mobile_api_service.py via modules/team_eval.py +
@@ -41,8 +41,8 @@ export default function TeamAnalysisPanel({
   leagueSize: number;
   /** Density setting (DensityContext's `showExplanations`) — hides the
    * archetype "why" narrative + strengths/risks/recommendations elaboration
-   * in Compact mode, while the rank matrix above (the actual Power/Starter/
-   * Draft Capital/etc. calls) always stays visible. */
+   * in Compact mode, while the rank matrix above (the actual Roster Power/
+   * Starter/Draft Capital/etc. calls) always stays visible. */
   showExplanations: boolean;
   onOpenTeams?: () => void;
   /** Draft Capital tile destination — Draft Center's own posture header
@@ -59,8 +59,8 @@ export default function TeamAnalysisPanel({
    * those two tiles simply stay non-tappable there. */
   onOpenStarters?: () => void;
   onOpenBench?: () => void;
-  /** Age tile destination — same shared Teams leaderboard Power/Franchise
-   * already open, pointed at the Age metric (see TeamsScreen's
+  /** Age tile destination — same shared Teams leaderboard Roster Power/
+   * Franchise already open, pointed at the Age metric (see TeamsScreen's
    * `METRIC_CONFIG`) instead of a screen that doesn't exist. */
   onOpenAge?: () => void;
 }) {
@@ -130,9 +130,9 @@ export default function TeamAnalysisPanel({
 }
 
 /** Whether `team` carries any real analysis content beyond the plain rank
- * fields My Team's Overview snapshot already shows (Power/Starter/Draft
- * Capital/Age) — used to decide whether the Overview tab's "View Analysis"
- * affordance has anything real to point at. */
+ * fields My Team's Overview snapshot already shows (Roster Power/Starter/
+ * Draft Capital/Age) — used to decide whether the Overview tab's "View
+ * Analysis" affordance has anything real to point at. */
 export function hasRosterAnalysis(team: TeamRanking): boolean {
   return Boolean(
     team.archetype_explanation ||
@@ -165,10 +165,10 @@ interface RankMetric {
 /**
  * Age used to have no destination anywhere in the app — there was no
  * standalone screen that answered "why is my roster's age rank what it
- * is." TeamsScreen (the shared league leaderboard Power/Franchise already
- * open) now takes a `metric` param and already has every team's
+ * is." TeamsScreen (the shared league leaderboard Roster Power/Franchise
+ * already open) now takes a `metric` param and already has every team's
  * `age_rank`/`average_age` from the same `getLeagueTeamRankings` call it
- * uses for Power, so Age opens that same leaderboard sorted/labeled by Age
+ * uses for Roster Power, so Age opens that same leaderboard sorted/labeled by Age
  * instead of needing a new screen or per-player breakdown.
  */
 function buildRankMetrics(
@@ -182,8 +182,8 @@ function buildRankMetrics(
   },
 ): RankMetric[] {
   const metrics: RankMetric[] = [
-    // flash: Power = overall roster strength/firepower.
-    { key: 'power', label: 'Power', icon: 'flash', rank: team.power_rank, tied: team.power_rank_tied, onPress: callbacks.onOpenTeams },
+    // flash: Roster Power = overall roster strength/firepower.
+    { key: 'power', label: 'Roster Power', icon: 'flash', rank: team.power_rank, tied: team.power_rank_tied, onPress: callbacks.onOpenTeams },
     // star: Franchise = long-term franchise value, not a single-season read.
     { key: 'franchise', label: 'Franchise', icon: 'star', rank: team.franchise_rank, tied: team.franchise_rank_tied, onPress: callbacks.onOpenTeams },
     // file-tray-stacked: Draft Capital = the stack of picks a team holds.

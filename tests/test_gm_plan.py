@@ -226,10 +226,10 @@ def test_standing_focus_area_surfaces_power_and_draft_capital_rank_with_ties():
     standing = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_STANDING)
     assert standing["status"] == gm_plan.STATUS_SIGNAL_FOUND
     labels = {item["label"] for item in standing["items"]}
-    assert "Power Rank" in labels
+    assert "Roster Power" in labels
     assert "Draft Capital Rank" in labels
     assert "Record" in labels
-    power_item = next(item for item in standing["items"] if item["label"] == "Power Rank")
+    power_item = next(item for item in standing["items"] if item["label"] == "Roster Power")
     assert power_item["rank"] == 3
     assert power_item["total_teams"] == 12
     assert power_item["tied"] is False

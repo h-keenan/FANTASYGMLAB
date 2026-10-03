@@ -34,10 +34,10 @@ def test_authenticated_premium_header_keeps_page_and_league_identity():
     )
     html = application_shell.workspace_header_html(header)
     assert "Trade Hub" in html and "Alpha League" in html and "Premium" in html
-    assert "Power Rank" not in html and "Franchise Rank" not in html
+    assert "Roster Power" not in html and "Franchise Rank" not in html
 
 
-@pytest.mark.parametrize("label", ["Average Age", "Starter Strength", "Bench Strength", "Power Rank", "Franchise Rank", "Draft Capital"])
+@pytest.mark.parametrize("label", ["Average Age", "Starter Strength", "Bench Strength", "Roster Power", "Franchise Rank", "Draft Capital"])
 def test_comparative_metrics_are_full_ordered_leaderboards(label):
     payload = comparative_metrics.dashboard_comparison_payloads(_league_frame(), "1")[label]
     assert len(payload["rows"]) == 2
