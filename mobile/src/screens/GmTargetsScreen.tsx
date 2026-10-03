@@ -112,7 +112,7 @@ function TargetGroupRow({
       <View style={styles.trailing}>
         <AppText style={styles.score}>{player?.score != null ? Math.round(player.score) : '—'}</AppText>
         <View style={styles.trailingChips}>
-          <OverallRatingBadge rating={player?.overall_rating} />
+          <OverallRatingBadge rating={player?.overall_rating} positionRank={player?.position_rank} />
           {player?.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
         </View>
       </View>

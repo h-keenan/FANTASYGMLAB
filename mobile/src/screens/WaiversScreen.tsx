@@ -15,6 +15,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
@@ -213,16 +214,8 @@ export default function WaiversScreen({ route, navigation }: Props) {
           autoCapitalize="none"
           placeholderTextColor={colors.textTertiary}
         />
-        <View style={styles.pillRow}>
-          {POSITIONS.map((option) => (
-            <TouchableOpacity
-              key={option}
-              style={[styles.pill, position === option && styles.pillActive]}
-              onPress={() => setPosition(option)}
-            >
-              <AppText style={[styles.pillText, position === option && styles.pillTextActive]}>{option}</AppText>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.filterRow}>
+          <FilterDropdownButton label="Position" options={POSITIONS} value={position} onChange={setPosition} />
         </View>
       </View>
 
@@ -428,7 +421,7 @@ function BestAvailableCard({
         {player.name ?? 'Unknown'}
       </AppText>
       <AppText style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-      <OverallRatingBadge rating={player.overall_rating} />
+      <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
       <AppText style={styles.bestAvailableCount}>{count} active</AppText>
     </AnimatedCard>
   );
@@ -489,14 +482,17 @@ function FreeAgentRow({
       </View>
       <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.freeAgentTrailing}>
         <AppText style={styles.freeAgentValue}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-        {player.position_rank ? (
-          <View style={styles.positionRankPill}>
-            <AppText style={styles.positionRankText}>
-              {player.position}
-              {player.position_rank}
-            </AppText>
-          </View>
-        ) : null}
+        <View style={styles.freeAgentTrailingChips}>
+          {player.position_rank ? (
+            <View style={styles.positionRankPill}>
+              <AppText style={styles.positionRankText}>
+                {player.position}
+                {player.position_rank}
+              </AppText>
+            </View>
+          ) : null}
+          <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -533,22 +529,14 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.background,
     color: colors.textPrimary,
   },
-  pillRow: {
+  // Position used to be a full row of always-expanded pills — now one
+  // compact dropdown button (FilterDropdownButton), matching Players'
+  // treatment of the same filter pattern.
+  filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  pillActive: { backgroundColor: colors.accent, borderColor: colors.accent, borderWidth: 1.5 },
-  pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pillTextActive: { color: '#fff', fontWeight: '700' },
   loading: { marginTop: spacing.xl },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   sectionBlock: { marginBottom: spacing.lg },
@@ -611,6 +599,7 @@ function createStyles(colors: ThemeColors) {
   freeAgentIdentity: { flex: 1 },
   freeAgentTrailing: { alignItems: 'flex-end', gap: 2, paddingLeft: spacing.sm },
   freeAgentValue: { fontSize: 16, fontWeight: '700', color: colors.accent },
+  freeAgentTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
   positionRankPill: {
     backgroundColor: colors.backgroundElevated,
     borderRadius: radii.pill,

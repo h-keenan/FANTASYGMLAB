@@ -7,6 +7,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import EmptyState from '../components/EmptyState';
 import BrandedSpinner from '../components/BrandedSpinner';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import GridBackground from '../components/GridBackground';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -54,44 +55,6 @@ function matchesAvailability(injuryStatus: string | null, filter: AvailabilityFi
   if (filter === 'ALL') return true;
   const hasInjury = Boolean((injuryStatus ?? '').trim());
   return filter === 'Injured' ? hasInjury : !hasInjury;
-}
-
-/**
- * One labeled row of filter chips — Position/Age/Status/Availability all
- * share this exact treatment (Magna Carta §18) instead of four subtly
- * different ad hoc rows. Chips wrap onto a second line on narrow screens
- * rather than requiring a horizontal swipe per row, matching Waivers'
- * canonical discovery-card filter treatment.
- */
-function FilterGroup<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: readonly T[];
-  value: T;
-  onChange: (next: T) => void;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.filterGroup}>
-      <AppText style={styles.filterLabel}>{label}</AppText>
-      <View style={styles.pillRow}>
-        {options.map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[styles.pill, value === option && styles.pillActive]}
-            onPress={() => onChange(option)}
-          >
-            <AppText style={[styles.pillText, value === option && styles.pillTextActive]}>{option}</AppText>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
 }
 
 /**
@@ -155,7 +118,7 @@ function PlayerRankRow({
               </AppText>
             </View>
           ) : null}
-          <OverallRatingBadge rating={player.overall_rating} />
+          <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
           {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
         </View>
       </TouchableOpacity>
@@ -239,15 +202,17 @@ export default function PlayersScreen({ route, navigation }: Props) {
           autoCapitalize="none"
           placeholderTextColor={colors.textTertiary}
         />
-        <FilterGroup label="Position" options={POSITIONS} value={position} onChange={setPosition} />
-        <FilterGroup label="Age" options={AGE_FILTERS} value={ageFilter} onChange={setAgeFilter} />
-        <FilterGroup label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
-        <FilterGroup
-          label="Availability"
-          options={AVAILABILITY_FILTERS}
-          value={availabilityFilter}
-          onChange={setAvailabilityFilter}
-        />
+        <View style={styles.filterRow}>
+          <FilterDropdownButton label="Position" options={POSITIONS} value={position} onChange={setPosition} />
+          <FilterDropdownButton label="Age" options={AGE_FILTERS} value={ageFilter} onChange={setAgeFilter} />
+          <FilterDropdownButton label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
+          <FilterDropdownButton
+            label="Availability"
+            options={AVAILABILITY_FILTERS}
+            value={availabilityFilter}
+            onChange={setAvailabilityFilter}
+          />
+        </View>
       </View>
 
       {loading ? (
@@ -305,30 +270,16 @@ function createStyles(colors: ThemeColors) {
     backgroundColor: colors.background,
     color: colors.textPrimary,
   },
-  filterGroup: { gap: 4 },
-  filterLabel: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  pillRow: {
+  // Position/Age/Status/Availability now render as one wrapping row of
+  // compact dropdown buttons (FilterDropdownButton) instead of four full
+  // rows of always-expanded pills — coridian_, Discord: "these filter pills
+  // need to be grouped and turn into drop down menus because this is
+  // ridiculous."
+  filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  pillActive: { backgroundColor: colors.accent, borderColor: colors.accent, borderWidth: 1.5 },
-  pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pillTextActive: { color: '#fff', fontWeight: '700' },
   loading: { marginTop: spacing.xl },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   playerRow: {

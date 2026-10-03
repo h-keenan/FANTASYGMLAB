@@ -15,6 +15,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import BrandedSpinner from '../components/BrandedSpinner';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
@@ -35,6 +36,7 @@ type Side = 'A' | 'B';
 
 const MAX_SEARCH_RESULTS = 40;
 const POSITION_FILTERS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+const ALL_POSITION_OPTIONS = ['ALL', ...POSITION_FILTERS];
 
 function playerScore(player: RankedPlayer): number {
   return typeof player.score === 'number' ? player.score : 0;
@@ -177,21 +179,12 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
       ) : null}
 
       <View style={styles.positionRow}>
-        <TouchableOpacity
-          style={[styles.pill, positionFilter === null && styles.pillActive]}
-          onPress={() => setPositionFilter(null)}
-        >
-          <AppText style={[styles.pillText, positionFilter === null && styles.pillTextActive]}>All</AppText>
-        </TouchableOpacity>
-        {POSITION_FILTERS.map((position) => (
-          <TouchableOpacity
-            key={position}
-            style={[styles.pill, positionFilter === position && styles.pillActive]}
-            onPress={() => setPositionFilter(positionFilter === position ? null : position)}
-          >
-            <AppText style={[styles.pillText, positionFilter === position && styles.pillTextActive]}>{position}</AppText>
-          </TouchableOpacity>
-        ))}
+        <FilterDropdownButton
+          label="Position"
+          options={ALL_POSITION_OPTIONS}
+          value={positionFilter ?? 'ALL'}
+          onChange={(next) => setPositionFilter(next === 'ALL' ? null : next)}
+        />
       </View>
 
       <TextInput
@@ -215,6 +208,8 @@ export default function TradeCalculatorScreen({ route, navigation }: Props) {
             position={item.position}
             team={item.team}
             tier={item.tier}
+            overallRating={item.overall_rating}
+            positionRank={item.position_rank}
             trailingValue={String(Math.round(playerScore(item)))}
             onPress={() => addToActiveSide(item)}
             showDivider={index < searchResults.length - 1}
@@ -297,6 +292,7 @@ function TradeSide({
               team={player.team}
               tier={player.tier}
               overallRating={player.overall_rating}
+              positionRank={player.position_rank}
               onPress={() => onRemove(player.player_id)}
               showDivider={index < players.length - 1}
             />
@@ -375,17 +371,6 @@ function createStyles(colors: ThemeColors) {
   },
   splitFill: { height: '100%' },
   positionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pillTextActive: { color: '#fff', fontWeight: '700' },
   searchInput: {
     borderWidth: 1,
     borderColor: colors.cardBorder,

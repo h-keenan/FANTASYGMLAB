@@ -19,6 +19,7 @@ import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
@@ -58,6 +59,7 @@ type SearchItem =
 
 const MAX_SEARCH_RESULTS = 40;
 const POSITION_FILTERS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+const ALL_POSITION_OPTIONS = ['ALL', ...POSITION_FILTERS];
 
 function toneColors(colors: ThemeColors): Record<TradeVerdict['tone'], string> {
   return {
@@ -401,21 +403,12 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
 
       {assetType === 'players' ? (
         <View style={styles.teamRow}>
-          <TouchableOpacity
-            style={[styles.pill, positionFilter === null && styles.pillActive]}
-            onPress={() => setPositionFilter(null)}
-          >
-            <AppText style={[styles.pillText, positionFilter === null && styles.pillTextActive]}>All</AppText>
-          </TouchableOpacity>
-          {POSITION_FILTERS.map((position) => (
-            <TouchableOpacity
-              key={position}
-              style={[styles.pill, positionFilter === position && styles.pillActive]}
-              onPress={() => setPositionFilter(positionFilter === position ? null : position)}
-            >
-              <AppText style={[styles.pillText, positionFilter === position && styles.pillTextActive]}>{position}</AppText>
-            </TouchableOpacity>
-          ))}
+          <FilterDropdownButton
+            label="Position"
+            options={ALL_POSITION_OPTIONS}
+            value={positionFilter ?? 'ALL'}
+            onChange={(next) => setPositionFilter(next === 'ALL' ? null : next)}
+          />
         </View>
       ) : null}
 
@@ -507,6 +500,8 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
               position={item.player.position}
               team={item.player.team}
               tier={item.player.tier}
+              overallRating={item.player.overall_rating}
+              positionRank={item.player.position_rank}
               trailingValue={String(Math.round(playerScore(item.player)))}
               onPress={() => addPlayerToSide(item.player)}
               showDivider={showDivider}
@@ -722,6 +717,7 @@ function TradeSide({
                   team={item.player.team}
                   tier={item.player.tier}
                   overallRating={item.player.overall_rating}
+                  positionRank={item.player.position_rank}
                   onPress={() => onRemove(item.player.player_id)}
                   showDivider={showDivider}
                 />

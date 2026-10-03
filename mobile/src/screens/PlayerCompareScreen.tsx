@@ -318,12 +318,20 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
                 <EmptyState icon="search-outline" title="No players match" subtitle="Try a different search term." />
               }
               renderItem={({ item, index }) => (
+                // overallRating/positionRank here match Players/Waivers/GM
+                // Targets — this candidate list previously showed only a bare
+                // score via `trailingValue`, with no numeric Overall badge
+                // anywhere in the row, unlike every other ranked player list
+                // in the app. Both fields were already on RankedPlayer; they
+                // just weren't threaded into this row.
                 <PlayerIdentityRow
                   playerId={item.player_id}
                   name={item.name}
                   position={item.position}
                   team={item.team}
                   tier={item.tier}
+                  overallRating={item.overall_rating}
+                  positionRank={item.position_rank}
                   trailingValue={item.score != null ? String(Math.round(item.score)) : null}
                   onPress={() => setPlayerB(item)}
                   showDivider={index !== filteredCandidates.length - 1}

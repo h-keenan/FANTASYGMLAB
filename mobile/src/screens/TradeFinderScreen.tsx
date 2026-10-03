@@ -223,12 +223,19 @@ function RosterRow({
         </View>
       </TouchableOpacity>
       <View style={styles.rosterIdentity}>
+        {/* overallRating matches Players/Waivers/GM Targets' rows (coridian_:
+            player rows throughout the app need the same numeric Overall
+            badge, not just a tier ring) — `overall_rating` was already on
+            LineupPlayer, it just wasn't threaded into this row. No
+            league-wide position-rank field exists on LineupPlayer, so no
+            crown here (nothing to render honestly). */}
         <PlayerIdentityRow
           playerId={player.player_id}
           name={player.name}
           position={player.position}
           team={player.team}
           tier={player.tier}
+          overallRating={player.overall_rating}
           injuryLabel={player.injury_label}
           ruledOut={player.ruled_out}
           onPress={onToggle}
