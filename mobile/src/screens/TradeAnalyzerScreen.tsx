@@ -721,6 +721,7 @@ function TradeSide({
                   position={item.player.position}
                   team={item.player.team}
                   tier={item.player.tier}
+                  overallRating={item.player.overall_rating}
                   onPress={() => onRemove(item.player.player_id)}
                   showDivider={showDivider}
                 />

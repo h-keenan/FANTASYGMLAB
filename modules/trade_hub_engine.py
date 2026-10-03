@@ -33,6 +33,7 @@ import pandas as pd
 
 from modules import league_value_settings
 from modules import player_eligibility
+from modules import player_quick_view
 from modules import rankings
 from modules import sleeper
 from modules import trade_hub_ui
@@ -412,6 +413,25 @@ def generate_trade_idea_records(
     modules.trade_hub_ui.order_trade_hub_visible_ideas, or narrative
     building via modules.canonical_recommendation_narrative.build_trade_narrative
     (the Dashboard's Top Trade Opportunity tile) — should call this instead."""
+
+    # OVR for every asset's PlayerIdentityRow badge (coridian_, Trade Hub
+    # card screenshot: the colored tier ring alone doesn't say how good two
+    # similarly-tiered players actually are relative to each other).
+    # Computed once here, on the pool as handed in — BEFORE
+    # apply_strategy_age_curve below touches `score_field` — so a player's
+    # OVR matches the same percentile-against-the-full-ranked-pool contract
+    # every other surface already uses (see
+    # player_quick_view.overall_ratings_for_pool's docstring and
+    # services/mobile_api_service.py's /rankings endpoint), not a number that
+    # shifts with this request's team-strategy age curve. `_player_asset`
+    # reads it straight off the row as "overall_rating"; callers whose pool
+    # lacks `position`/`score_field` simply get no column, and
+    # `_player_asset` already treats a missing value as "no rating" (None).
+    if "position" in players_df.columns and score_field in players_df.columns:
+        players_df = players_df.copy()
+        players_df["overall_rating"] = player_quick_view.overall_ratings_for_pool(
+            players_df, score_column=score_field
+        )
 
     df_summary = build_league_summary(
         players_df,

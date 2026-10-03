@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 import AppText from './AppText';
+import OverallRatingBadge from './OverallRatingBadge';
 import PlayerAvatar from './PlayerAvatar';
 import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
@@ -19,6 +20,17 @@ export interface PlayerIdentityRowProps {
    * portrait ring color and the TierBadge chip, same as everywhere else in
    * the app (see lib/playerTier.ts). */
   tier?: string | null;
+  /** 0-99 "OVR" badge rendered alongside the tier/position chips (see
+   * OverallRatingBadge) — the colored avatar ring only conveys relative
+   * tier, not how two similarly-tiered players actually compare, so this
+   * is the number that answers that (coridian_, Trade Hub card feedback:
+   * "I think that they should have the overall and then their prestige,
+   * which is already on their colored [ring]"). Omit (or pass null) for
+   * contexts that already show OVR elsewhere, e.g. a value column next to
+   * this row — see TeamRosterScreen/MyTeamScreen's CompactRosterRow, which
+   * render OverallRatingBadge outside this component instead. Renders
+   * nothing for null/undefined, same as OverallRatingBadge itself. */
+  overallRating?: number | null;
   /** Lineup slot label (QB/RB/FLEX/...) shown as a small chip on the left —
    * omit for contexts with no lineup slot (e.g. a plain roster list). When
    * `slot` is a single-position label that exactly matches `position`
@@ -105,6 +117,7 @@ export default function PlayerIdentityRow({
   position,
   team,
   tier,
+  overallRating,
   slot,
   opportunityLabel,
   contextLine,
@@ -182,6 +195,9 @@ export default function PlayerIdentityRow({
               {team}
             </AppText>
           ) : null}
+          {/* Last in the meta row, per UI_HIERARCHY_DIRECTIVE.md §11: OVR is
+           * a supporting metric, never ahead of identity/position/team/tier. */}
+          <OverallRatingBadge rating={overallRating} />
         </View>
         {labelBits.length > 0 ? (
           <AppText style={styles.label} numberOfLines={1}>

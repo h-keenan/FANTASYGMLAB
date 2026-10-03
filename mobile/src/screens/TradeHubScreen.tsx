@@ -557,6 +557,7 @@ function ExchangeAssetList({
             position={asset.position}
             team={teamAgeLine || null}
             tier={asset.tier}
+            overallRating={asset.overall_rating}
             opportunityLabel={asset.role}
             injuryLabel={asset.injury_status}
             onPress={asset.player_id ? () => onPressPlayer(asset) : undefined}
