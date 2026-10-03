@@ -259,6 +259,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
               onOpenDraftCenter={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
               onOpenStarters={() => setActiveTab('overview')}
               onOpenBench={() => setActiveTab('bench')}
+              onOpenAge={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'age' })}
             />
           ) : (
             <EmptyState

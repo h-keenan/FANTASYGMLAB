@@ -14,7 +14,7 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
-import { api } from '../lib/api';
+import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
@@ -25,14 +25,96 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Teams'>;
 
+type RankingMetric = NonNullable<Props['route']['params']['metric']>;
+
+/**
+ * Per-metric leaderboard config — the one thing that changes between "Teams"
+ * (Power Rank, the long-standing default) and a metric-specific drill-down
+ * (e.g. Age, opened from My Team's Analysis tab tiles via TeamAnalysisPanel).
+ * Every metric here already exists on `TeamRanking` for every team in the
+ * league (modules/team_eval.py + modules/league_rankings.py via
+ * getLeagueTeamRankings) — nothing computed client-side.
+ */
+const METRIC_CONFIG: Record<
+  RankingMetric,
+  {
+    title: string;
+    pillLabel: string;
+    infoLabel: string;
+    infoText: string;
+    rank: (team: TeamRanking) => number | null;
+    tied: (team: TeamRanking) => boolean;
+    /** Optional secondary value shown under the rank pill — only Age has
+     * a real-unit figure (average roster age) worth surfacing. */
+    detail?: (team: TeamRanking) => string | null;
+  }
+> = {
+  power: {
+    title: 'Teams',
+    pillLabel: 'POWER',
+    infoLabel: 'How Power Rank works',
+    infoText:
+      'Teams are ordered by Power Rank — roster strength (starters + bench), not record — so you can see exactly where every team in the league stacks up. Your team is marked You and highlighted below.',
+    rank: (team) => team.power_rank,
+    tied: (team) => team.power_rank_tied,
+  },
+  franchise: {
+    title: 'Franchise Rankings',
+    pillLabel: 'FRANCHISE',
+    infoLabel: 'How Franchise Rank works',
+    infoText:
+      'Teams are ordered by Franchise Rank — long-term roster value (youth, talent, draft capital), not just this season’s record. Your team is marked You and highlighted below.',
+    rank: (team) => team.franchise_rank,
+    tied: (team) => team.franchise_rank_tied,
+  },
+  draft_capital: {
+    title: 'Draft Capital Rankings',
+    pillLabel: 'DRAFT',
+    infoLabel: 'How Draft Capital Rank works',
+    infoText:
+      'Teams are ordered by Draft Capital Rank — the value of upcoming draft picks each team holds. Your team is marked You and highlighted below.',
+    rank: (team) => team.draft_capital_rank,
+    tied: (team) => team.draft_capital_rank_tied,
+  },
+  starter: {
+    title: 'Starter Rankings',
+    pillLabel: 'STARTERS',
+    infoLabel: 'How Starter Rank works',
+    infoText:
+      'Teams are ordered by Starter Rank — the combined strength of each team’s starting lineup. Your team is marked You and highlighted below.',
+    rank: (team) => team.starter_rank,
+    tied: (team) => team.starter_rank_tied,
+  },
+  bench: {
+    title: 'Bench Rankings',
+    pillLabel: 'BENCH',
+    infoLabel: 'How Bench Rank works',
+    infoText:
+      'Teams are ordered by Bench Rank — the depth and value of each team’s bench. Your team is marked You and highlighted below.',
+    rank: (team) => team.bench_rank,
+    tied: (team) => team.bench_rank_tied,
+  },
+  age: {
+    title: 'Age Rankings',
+    pillLabel: 'AGE',
+    infoLabel: 'How Age Rank works',
+    infoText:
+      'Teams are ordered by Age Rank — average age of starters, youngest roster ranked #1 — so you can see exactly how your team’s timeline compares across the league. Your team is marked You and highlighted below.',
+    rank: (team) => team.age_rank,
+    tied: (team) => team.age_rank_tied,
+    detail: (team) => (team.average_age != null ? `${team.average_age.toFixed(1)} yrs avg` : null),
+  },
+};
+
 interface TeamRow {
   rosterId: number | string;
   teamName: string;
   avatarId: string;
   playerIds: string[];
   isMine: boolean;
-  powerRank: number | null;
-  powerRankTied: boolean;
+  metricRank: number | null;
+  metricRankTied: boolean;
+  metricDetail: string | null;
   recordLabel: string | null;
   archetypeLabel: string | null;
   tradeTendency: string | null;
@@ -43,12 +125,13 @@ export default function TeamsScreen({ route, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
+  const { leagueId, leagueName, metric = 'power' } = route.params;
+  const config = METRIC_CONFIG[metric];
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useScreenHeaderTitle(navigation, 'Teams', leagueName);
+  useScreenHeaderTitle(navigation, config.title, leagueName);
 
   useEffect(() => {
     navigation.setOptions({
@@ -92,23 +175,24 @@ export default function TeamsScreen({ route, navigation }: Props) {
               avatarId: profile?.avatar_id || '',
               playerIds: players.map(String),
               isMine: Boolean(myRosterId) && rosterId === myRosterId,
-              powerRank: ranking?.power_rank ?? null,
-              powerRankTied: Boolean(ranking?.power_rank_tied),
+              metricRank: ranking ? config.rank(ranking) : null,
+              metricRankTied: ranking ? config.tied(ranking) : false,
+              metricDetail: ranking && config.detail ? config.detail(ranking) : null,
               recordLabel: ranking?.record_label ?? null,
               archetypeLabel: ranking?.archetype_label ?? null,
               tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
             };
           });
-          // Pure Power Rank order — no longer pins the caller's own team
+          // Pure metric-rank order — no longer pins the caller's own team
           // first, since that made a rank-4 team appear above rank-1 with
           // no explanation. The "You" badge + left-accent row below is how a
           // user finds their own row now instead of it always being #1 in
           // the list regardless of rank.
           rows.sort((a, b) => {
-            if (a.powerRank == null && b.powerRank == null) return 0;
-            if (a.powerRank == null) return 1;
-            if (b.powerRank == null) return -1;
-            return a.powerRank - b.powerRank;
+            if (a.metricRank == null && b.metricRank == null) return 0;
+            if (a.metricRank == null) return 1;
+            if (b.metricRank == null) return -1;
+            return a.metricRank - b.metricRank;
           });
           setTeams(rows);
         } catch (err) {
@@ -122,13 +206,13 @@ export default function TeamsScreen({ route, navigation }: Props) {
       return () => {
         cancelled = true;
       };
-    }, [leagueId]),
+    }, [leagueId, config]),
   );
 
   // Percentile denominator is the count of teams the backend actually ranked
-  // (not every roster — an unclaimed team has no power_rank and shouldn't
-  // shrink the league size other teams are compared against).
-  const rankedTeamCount = useMemo(() => teams.filter((team) => team.powerRank != null).length, [teams]);
+  // for this metric (not every roster — an unclaimed team has no rank and
+  // shouldn't shrink the league size other teams are compared against).
+  const rankedTeamCount = useMemo(() => teams.filter((team) => team.metricRank != null).length, [teams]);
 
   if (loading) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
@@ -153,10 +237,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
         keyExtractor={(item) => String(item.rosterId)}
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
-            <ScreenInfoNote
-              label="How Power Rank works"
-              text="Teams are ordered by Power Rank — roster strength (starters + bench), not record — so you can see exactly where every team in the league stacks up. Your team is marked You and highlighted below."
-            />
+            <ScreenInfoNote label={config.infoLabel} text={config.infoText} />
           </View>
         }
         renderItem={({ item, index }) => (
@@ -165,6 +246,8 @@ export default function TeamsScreen({ route, navigation }: Props) {
             isFirst={index === 0}
             isLast={index === teams.length - 1}
             rankedTeamCount={rankedTeamCount}
+            pillLabel={config.pillLabel}
+            showTrophy={metric === 'power'}
             colors={colors}
             styles={styles}
             onPress={() =>
@@ -188,6 +271,8 @@ function TeamRowCard({
   isFirst,
   isLast,
   rankedTeamCount,
+  pillLabel,
+  showTrophy,
   colors,
   styles,
   onPress,
@@ -196,12 +281,18 @@ function TeamRowCard({
   isFirst: boolean;
   isLast: boolean;
   rankedTeamCount: number;
+  pillLabel: string;
+  /** Trophy-for-rank-1 styling only applies to Power Rank — "league
+   * champion" is a Power Rank concept, so other metrics (e.g. youngest
+   * roster for Age) just get the plain rank pill instead of a misleading
+   * trophy. */
+  showTrophy: boolean;
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
   onPress: () => void;
 }) {
-  const isChampion = item.powerRank === 1;
-  const rankPercentile = percentileFromRank(item.powerRank, rankedTeamCount);
+  const isChampion = showTrophy && item.metricRank === 1;
+  const rankPercentile = percentileFromRank(item.metricRank, rankedTeamCount);
   // League #1 keeps the same premium/gold hue as an award badge instead of
   // the percentile ramp — a leaderboard's top spot should read as "the"
   // rank at a glance. Every other rank uses the shared percentile color
@@ -261,14 +352,19 @@ function TeamRowCard({
           </View>
         ) : null}
       </View>
-      {item.powerRank != null ? (
+      {item.metricRank != null ? (
         <View style={[styles.rankPill, isChampion && styles.rankPillFirst, { borderColor: `${rankColor}80` }]}>
           {isChampion ? (
             <Ionicons name="trophy" size={13} color={rankColor} style={styles.rankTrophy} />
           ) : (
-            <AppText style={styles.rankLabel}>POWER</AppText>
+            <AppText style={styles.rankLabel}>{pillLabel}</AppText>
           )}
-          <AppText style={[styles.rankValue, { color: rankColor }]}>{formatRank(item.powerRank, item.powerRankTied)}</AppText>
+          <AppText style={[styles.rankValue, { color: rankColor }]}>{formatRank(item.metricRank, item.metricRankTied)}</AppText>
+          {item.metricDetail ? (
+            <AppText style={styles.rankDetail} numberOfLines={1}>
+              {item.metricDetail}
+            </AppText>
+          ) : null}
         </View>
       ) : (
         <View style={styles.countPill}>
@@ -349,6 +445,7 @@ function createStyles(colors: ThemeColors) {
     letterSpacing: 0.4,
   },
   rankValue: { fontSize: 15, fontWeight: '700' },
+  rankDetail: { fontSize: 9, fontWeight: '600', color: colors.textTertiary, marginTop: 1 },
   // League #1 gets the same premium/gold hue as an award badge instead of
   // the standard accent — a leaderboard's top spot should read as "the"
   // rank at a glance, not just another pill in the same color scheme as

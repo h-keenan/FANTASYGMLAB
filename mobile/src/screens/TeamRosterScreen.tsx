@@ -56,9 +56,16 @@ function positionSortKey(position: string | null): number {
   return index === -1 ? POSITION_ORDER.length : index;
 }
 
+type IoniconName = React.ComponentProps<typeof MetricCard>['icon'];
+
 interface RankMetric {
   key: string;
   label: string;
+  /** Leading glyph on the tile label — same icon choice per metric as
+   * TeamAnalysisPanel's identical rank matrix (My Team's Analysis tab for
+   * your own roster), so the two duplicate tile grids stay visually
+   * consistent instead of diverging now that one of them has icons. */
+  icon: IoniconName;
   rank: number | null;
   /** 2+ teams share this exact dense rank — renders "T4" instead of "#4"
    * (see modules.league_rankings.add_rank_tie_metadata on the backend). */
@@ -87,14 +94,15 @@ interface RankMetric {
 }
 
 function buildRankMetrics(ranking: TeamRanking): RankMetric[] {
-  return [
-    { key: 'power', label: 'Power', rank: ranking.power_rank, tied: ranking.power_rank_tied, tappable: true },
-    { key: 'franchise', label: 'Franchise', rank: ranking.franchise_rank, tied: ranking.franchise_rank_tied, tappable: true },
-    { key: 'draft', label: 'Draft Capital', rank: ranking.draft_capital_rank, tied: ranking.draft_capital_rank_tied },
-    { key: 'starters', label: 'Starters', rank: ranking.starter_rank, tied: ranking.starter_rank_tied },
-    { key: 'bench', label: 'Bench', rank: ranking.bench_rank, tied: ranking.bench_rank_tied },
-    { key: 'age', label: 'Age', rank: ranking.age_rank, tied: ranking.age_rank_tied },
-  ].filter((metric) => metric.rank != null);
+  const metrics: RankMetric[] = [
+    { key: 'power', label: 'Power', icon: 'flash', rank: ranking.power_rank, tied: ranking.power_rank_tied, tappable: true },
+    { key: 'franchise', label: 'Franchise', icon: 'star', rank: ranking.franchise_rank, tied: ranking.franchise_rank_tied, tappable: true },
+    { key: 'draft', label: 'Draft Capital', icon: 'file-tray-stacked-outline', rank: ranking.draft_capital_rank, tied: ranking.draft_capital_rank_tied },
+    { key: 'starters', label: 'Starters', icon: 'american-football-outline', rank: ranking.starter_rank, tied: ranking.starter_rank_tied },
+    { key: 'bench', label: 'Bench', icon: 'people-outline', rank: ranking.bench_rank, tied: ranking.bench_rank_tied },
+    { key: 'age', label: 'Age', icon: 'hourglass-outline', rank: ranking.age_rank, tied: ranking.age_rank_tied },
+  ];
+  return metrics.filter((metric) => metric.rank != null);
 }
 
 type RosterSection = { title: string; data: RankedPlayer[] };
@@ -295,6 +303,7 @@ function TeamSnapshotSection({
               <MetricCard
                 key={metric.key}
                 label={metric.label}
+                icon={metric.icon}
                 value={metric.rank != null ? formatRank(metric.rank, metric.tied) : null}
                 percentile={percentile}
                 valueColor={percentile != null ? percentileColor(percentile, colors) : undefined}
