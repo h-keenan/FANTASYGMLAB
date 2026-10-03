@@ -245,12 +245,14 @@ def test_concurrent_requests_for_same_key_single_flight(monkeypatch):
     """Two concurrent cache misses for the same key must run the expensive
     simulation exactly once, not twice.
 
-    functools.lru_cache alone does not guarantee this: its internal lock
-    only protects the cache dict during lookup/insert, not the wrapped
-    call itself, so two threads that both miss before either finishes
-    would otherwise both run the real (here: stubbed, slow) computation.
-    build_league_playoff_odds_cached's per-key lock (_playoff_odds_lock_for)
-    is what actually prevents that double-run.
+    This is now enforced by a Redis-backed distributed lock
+    (modules.redis_cache.redis_single_flight_cache), not a per-process
+    functools.lru_cache + threading.Lock pair — the old in-process pair
+    only protected one uvicorn worker; under docker-compose.yml's multiple
+    mobile-api workers each would get its own separate lock/cache, so the
+    same simulation could still run once per worker. tests/conftest.py's
+    autouse fakeredis fixture backs build_league_playoff_odds_cached with a
+    real (fake) Redis here, so this test exercises the actual code path.
     """
 
     call_count = 0
@@ -264,7 +266,6 @@ def test_concurrent_requests_for_same_key_single_flight(monkeypatch):
         return {"ok": True, "reason": "", "league_id": league_id, "lens": lens}
 
     monkeypatch.setattr(sim, "build_league_playoff_odds", _slow_stub)
-    sim._build_league_playoff_odds_cached.cache_clear()
 
     league_id = "test-single-flight-league"
     results: list[dict] = []
@@ -288,32 +289,31 @@ def test_concurrent_requests_for_same_key_single_flight(monkeypatch):
     assert all(r["league_id"] == league_id for r in results)
 
 
-def test_lock_prune_drops_only_stale_unlocked_entries():
-    """The lock-dict safety valve must never drop a lock that's still held,
-    and must never drop a lock for the *current* bucket (it could still be
-    requested again very soon)."""
+def test_playoff_odds_cache_hit_in_one_call_serves_a_separate_call_without_recomputing(monkeypatch):
+    """Redis-backed cache replacement for the old per-process lock-dict
+    pruning test (which tested an in-memory structure that no longer
+    exists after this moved to modules.redis_cache.redis_single_flight_cache
+    — see docker-compose.yml's mobile-api comment / docs/SELF_HOSTED_MIGRATION.md
+    for why that in-process dict was replaced).
 
-    sim._playoff_odds_locks.clear()
-    current_bucket = sim._playoff_odds_cache_bucket()
-    stale_bucket = current_bucket - 1
+    What actually matters post-migration: a cache entry written by one
+    call is visible to a completely separate call for the same key (not
+    just the one call that computed it) without recomputing — this is the
+    property that makes a cache hit in one mobile-api worker able to serve
+    a request that lands on a different worker, which the old per-process
+    lru_cache could never do."""
 
-    held_stale_key = ("league-held", "Dynasty", "db", sim.DEFAULT_TRIALS, stale_bucket)
-    held_lock = sim._playoff_odds_lock_for(held_stale_key)
-    held_lock.acquire()
-    try:
-        # Push the dict over the prune threshold with stale, unlocked keys.
-        for i in range(sim._PLAYOFF_ODDS_LOCK_PRUNE_THRESHOLD + 5):
-            sim._playoff_odds_lock_for((f"league-{i}", "Dynasty", "db", sim.DEFAULT_TRIALS, stale_bucket))
-        current_key = ("league-current", "Dynasty", "db", sim.DEFAULT_TRIALS, current_bucket)
-        sim._playoff_odds_lock_for(current_key)
+    call_count = 0
 
-        assert held_stale_key in sim._playoff_odds_locks, "a still-held lock must never be pruned"
-        assert current_key in sim._playoff_odds_locks, "the current bucket's lock must never be pruned"
-        stale_unlocked_key = ("league-0", "Dynasty", "db", sim.DEFAULT_TRIALS, stale_bucket)
-        assert stale_unlocked_key not in sim._playoff_odds_locks, (
-            "a stale, unheld lock from an old bucket should actually get pruned once the "
-            "dict grows past the threshold -- otherwise the safety valve never fires"
-        )
-    finally:
-        held_lock.release()
-        sim._playoff_odds_locks.clear()
+    def _counting_stub(league_id, *, lens, players_db_path, n_trials, rng):
+        nonlocal call_count
+        call_count += 1
+        return {"ok": True, "reason": "", "league_id": league_id, "lens": lens}
+
+    monkeypatch.setattr(sim, "build_league_playoff_odds", _counting_stub)
+
+    first = sim.build_league_playoff_odds_cached(league_id="league-cache-hit", lens="Dynasty", players_db_path="db")
+    second = sim.build_league_playoff_odds_cached(league_id="league-cache-hit", lens="Dynasty", players_db_path="db")
+
+    assert call_count == 1, "the second call must hit the Redis-shared cache entry, not recompute"
+    assert first == second == {"ok": True, "reason": "", "league_id": "league-cache-hit", "lens": "Dynasty"}

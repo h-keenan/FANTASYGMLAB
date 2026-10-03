@@ -1,3 +1,8 @@
 pytest>=8.4,<10
 playwright==1.54.0
 qrcode[pil]>=8.0,<9
+# In-memory Redis-compatible test double for modules/redis_cache.py's
+# rate limiter + single-flight cache tests — lets CI (no real Redis
+# service container) exercise the actual Redis-backed code paths. See
+# tests/conftest.py's autouse _fake_redis_for_tests fixture.
+fakeredis>=2,<3

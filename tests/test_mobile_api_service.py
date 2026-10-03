@@ -26,28 +26,19 @@ def _client(monkeypatch):
     return TestClient(mobile_api_service.app)
 
 
-@pytest.fixture(autouse=True)
-def _clear_trade_hub_ideas_cache():
-    # trade_hub_engine._generate_trade_idea_records_cached is keyed by
-    # (league_id, roster_id, strategy, lens, players_db_path, time-bucket) —
-    # tests reusing the same league_id/roster combo within the same 30s
-    # wall-clock bucket would otherwise see a PRIOR test's mocked
-    # modules.trade_hub_engine.generate_trade_idea_records result instead of
-    # their own, since the cache sits between the caller (both the Trade Hub
-    # endpoint and Dashboard's trade tile) and that mockable call.
-    from modules import league_rankings, playoff_simulator, trade_hub_engine
-
-    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
-    league_rankings._build_league_rankings_frame_cached.cache_clear()
-    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
-    playoff_simulator._build_league_playoff_odds_cached.cache_clear()
-    playoff_simulator._playoff_odds_locks.clear()
-    yield
-    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
-    league_rankings._build_league_rankings_frame_cached.cache_clear()
-    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
-    playoff_simulator._build_league_playoff_odds_cached.cache_clear()
-    playoff_simulator._playoff_odds_locks.clear()
+# A fixture named `_clear_trade_hub_ideas_cache` used to live here,
+# explicitly clearing each of modules.trade_hub_engine/league_rankings/
+# playoff_simulator's per-process functools.lru_cache + lock-dict single-
+# flight caches around every test in this file (so tests reusing the same
+# league_id/roster combo within the same 30s wall-clock bucket wouldn't see
+# a PRIOR test's mocked result). Those caches are now Redis-backed (see
+# modules/redis_cache.py) and keyed by a hash of the same
+# (league_id, roster_id, strategy, lens, players_db_path, time-bucket)-
+# shaped tuples, backed in tests by tests/conftest.py's autouse
+# `_fake_redis_for_tests` fixture, which already gives every test (this
+# file's tests included) a brand-new, empty fakeredis instance — so the
+# cross-test leakage this fixture guarded against can no longer happen,
+# and the explicit clearing is redundant.
 
 
 def test_render_yaml_documents_mobile_api_service():
@@ -868,8 +859,6 @@ def test_draft_center_and_draft_picks_share_one_cached_league_summary(monkeypatc
     client = _client(monkeypatch)
     from modules import league_rankings
 
-    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
-
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
@@ -915,8 +904,6 @@ def test_draft_center_and_draft_picks_share_one_cached_league_summary(monkeypatc
     assert draft_center_response.status_code == 200
     assert draft_picks_response.status_code == 200
     assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
-
-    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
 
 
 def test_draft_picks_blends_crowd_scouting_signal_when_enabled(monkeypatch):
@@ -4377,8 +4364,6 @@ def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch):
     client = _client(monkeypatch)
     from modules import trade_hub_engine
 
-    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
-
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
     call_count = {"n": 0}
     real_generate = trade_hub_engine.generate_trade_idea_records
@@ -4433,8 +4418,6 @@ def test_dashboard_and_trade_hub_share_one_cached_idea_search(monkeypatch):
     assert trade_hub_response.status_code == 200
     assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
 
-    trade_hub_engine._generate_trade_idea_records_cached.cache_clear()
-
 
 def test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame(monkeypatch):
     # Dashboard's power/franchise rank lookup and the Team Rankings screen
@@ -4444,8 +4427,6 @@ def test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame(monk
     # pass.
     client = _client(monkeypatch)
     from modules import league_rankings, trade_hub_engine
-
-    league_rankings._build_league_rankings_frame_cached.cache_clear()
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
     call_count = {"n": 0}
@@ -4498,8 +4479,6 @@ def test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame(monk
     assert dashboard_response.status_code == 200
     assert team_rankings_response.status_code == 200
     assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
-
-    league_rankings._build_league_rankings_frame_cached.cache_clear()
 
 
 def _fake_daily_gm_briefing(count: int):

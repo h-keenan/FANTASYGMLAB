@@ -81,7 +81,6 @@ import logging
 import os
 import re
 import sys
-import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -131,6 +130,7 @@ from modules import (
     push_tokens,
     push_triggers,
     rankings,
+    redis_cache,
     saved_leagues,
     sleeper,
     sleeper_leagues,
@@ -210,14 +210,35 @@ def _report_to_sentry(exc: BaseException) -> None:
 
 # --- Rate limiting -------------------------------------------------------
 #
-# No Redis/external cache anywhere in this stack (checked: the only "redis"
-# hit in the whole repo is a test asserting a *different* module never
-# introduces one — see tests/test_production_interaction_investigation.py).
-# This is also a single always-on instance (see render.yaml), so a small
-# hand-rolled in-memory fixed-window counter is enough: no new dependency,
-# no cross-instance coordination problem to solve, and it is trivially
-# testable. A fixed window (vs. a sliding log) can allow a short burst right
-# at a window boundary — an accepted tradeoff for simplicity at this scale.
+# Backed by Redis (see modules/redis_cache.py and docker-compose.yml's
+# `redis` service) rather than an in-memory dict: mobile-api now runs
+# multiple uvicorn worker processes (see docker-compose.yml's mobile-api
+# comment), each with its own separate memory, so a per-process counter
+# would silently turn a "limit requests per client per window" rule into
+# "limit*N requests per client per window" — a correctness regression, not
+# just a perf one. Redis is one shared counter every worker increments, so
+# the effective limit stays exactly what RATE_LIMIT_*_MAX says regardless
+# of worker count.
+#
+# Counter pattern: plain INCR + EXPIRE (set the TTL only on the first
+# increment in a window — see hit() below) on a key namespaced by the
+# window's own start timestamp. This doesn't need a Lua script to be
+# correct: INCR is atomic on its own, so concurrent callers in the same
+# window always get distinct, strictly-increasing counts (no lost
+# increments), and because each window's key is unique (window_start is
+# part of the key), a request that never gets around to setting EXPIRE
+# (e.g. the process is killed between INCR and EXPIRE) only leaks that one
+# already-dead key in Redis — it can never be reused by a later window, so
+# there's no correctness exposure, just a tiny, self-limiting memory cost.
+# A fixed window (vs. a sliding log) can still allow a short burst right at
+# a window boundary — the same accepted tradeoff as before this migration.
+#
+# Fails OPEN on any Redis error: see modules/redis_cache.py's module
+# docstring for why (this is an auxiliary system, not the main request
+# path, matching this codebase's existing "never let an auxiliary system
+# take the main path down" philosophy — e.g. Team Situation fetch
+# failures). A Redis outage means rate limiting is simply off until it
+# recovers, never a 500 on every request.
 #
 # Limits are deliberately two-tier rather than per-route: everything this
 # service serves is either a cheap read (GET) or a comparatively expensive/
@@ -239,69 +260,53 @@ RATE_LIMIT_GENERAL_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_GENERAL_WINDO
 RATE_LIMIT_MUTATING_MAX = int(os.environ.get("RATE_LIMIT_MUTATING_MAX", "20"))
 RATE_LIMIT_MUTATING_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_MUTATING_WINDOW_SECONDS", "60"))
 _RATE_LIMIT_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-# Safety valve so a flood of distinct client keys (spoofed IPs, etc.) can't
-# grow this dict unboundedly over a long-lived process's uptime.
-_RATE_LIMIT_MAX_TRACKED_KEYS = 20_000
 
 
-class _InMemoryFixedWindowRateLimiter:
-    """Per-key request counter over a fixed wall-clock window.
-
-    Thread-safe (uvicorn can run request handling across a small worker
-    pool for sync code paths); cheap enough per-request to not matter next
-    to this service's real work (Sleeper/Supabase calls, pandas scoring).
+class _RedisFixedWindowRateLimiter:
+    """Per-key request counter over a fixed wall-clock window, shared across
+    every mobile-api worker process via Redis — see this section's module
+    comment above for the counter pattern and fail-open behavior.
     """
-
-    # Floor between full _prune() scans, independent of how often hit() is
-    # called. Without this, once _buckets stays above
-    # _RATE_LIMIT_MAX_TRACKED_KEYS (e.g. sustained traffic from more than
-    # 20k distinct live IP/token keys within one window — plausible at
-    # scale, not just a one-time-visitor flood), _prune only removes STALE
-    # (previous-window) entries, so a dict full of CURRENT-window keys never
-    # drops back under the threshold. That previously meant every single
-    # subsequent hit() paid a full O(len(_buckets)) dict scan while holding
-    # _lock, serializing every request in the process on that scan. This
-    # cooldown caps that cost to at most one scan per interval, regardless
-    # of request volume.
-    _PRUNE_MIN_INTERVAL_SECONDS = 5.0
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._buckets: dict[str, tuple[float, int]] = {}
-        self._last_prune_at = 0.0
 
     def hit(self, key: str, limit: int, window_seconds: int) -> tuple[bool, float]:
         now = time.time()
         window_start = (now // window_seconds) * window_seconds
-        with self._lock:
-            window_start_stored, count = self._buckets.get(key, (window_start, 0))
-            if window_start_stored != window_start:
-                window_start_stored, count = window_start, 0
-            if count >= limit:
-                retry_after = max(0.0, window_seconds - (now - window_start_stored))
-                return False, retry_after
-            self._buckets[key] = (window_start_stored, count + 1)
-            if (
-                len(self._buckets) > _RATE_LIMIT_MAX_TRACKED_KEYS
-                and (now - self._last_prune_at) >= self._PRUNE_MIN_INTERVAL_SECONDS
-            ):
-                self._last_prune_at = now
-                self._prune(now, window_seconds)
+        redis_key = f"ratelimit:{key}:{int(window_start)}:{window_seconds}"
+        try:
+            client = redis_cache.get_redis_client()
+            count = client.incr(redis_key)
+            if count == 1:
+                # Only the caller who just created this window's key sets
+                # its expiry — repeating EXPIRE on every hit would keep
+                # pushing the key's death further out on sustained traffic,
+                # turning this fixed window into a sliding one.
+                client.expire(redis_key, window_seconds)
+        except redis_cache.RedisError:
+            logger.warning(
+                "Redis unreachable for rate limiter key %s; failing open (request allowed).",
+                key,
+                exc_info=True,
+            )
             return True, 0.0
 
-    def _prune(self, now: float, window_seconds: int) -> None:
-        cutoff = now - window_seconds
-        stale = [key for key, (window_start, _count) in self._buckets.items() if window_start < cutoff]
-        for key in stale:
-            self._buckets.pop(key, None)
+        if count > limit:
+            retry_after = max(0.0, window_seconds - (now - window_start))
+            return False, retry_after
+        return True, 0.0
 
     def reset(self) -> None:
-        with self._lock:
-            self._buckets.clear()
-            self._last_prune_at = 0.0
+        """Test-only: drop every tracked rate-limit counter so tests don't
+        leak state across cases sharing one (fakeredis) instance."""
+        try:
+            client = redis_cache.get_redis_client()
+            keys = list(client.scan_iter(match="ratelimit:*"))
+            if keys:
+                client.delete(*keys)
+        except redis_cache.RedisError:
+            pass
 
 
-_rate_limiter = _InMemoryFixedWindowRateLimiter()
+_rate_limiter = _RedisFixedWindowRateLimiter()
 
 
 def _client_rate_limit_key(request: Request) -> str:

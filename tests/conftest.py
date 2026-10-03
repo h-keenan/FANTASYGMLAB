@@ -9,7 +9,41 @@ from pathlib import Path
 import shutil
 from unittest.mock import patch
 
+import fakeredis
 import pytest
+
+from modules import redis_cache
+
+
+@pytest.fixture(autouse=True)
+def _fake_redis_for_tests():
+    """Every test gets a private, flushed in-memory Redis-compatible store
+    (fakeredis) instead of a real Redis server: CI has no Redis service
+    container, and the three modules.redis_cache-backed single-flight
+    caches plus services.mobile_api_service's rate limiter all call
+    modules.redis_cache.get_redis_client() internally, so this is the one
+    place that needs to swap in a test double for all of them at once.
+
+    A fresh fakeredis.FakeServer() per test (not a module-level shared one)
+    means no rate-limit counter or single-flight cache entry can ever leak
+    from one test into another.
+
+    IMPORTANT: FakeRedis() must be constructed with an explicit shared
+    `server=` instance here. Without it, fakeredis silently gives each
+    *connection* its own independent in-memory store (confirmed: two
+    threads sharing one `fakeredis.FakeRedis()` client with no explicit
+    server can each see a completely different store), which would quietly
+    break every single-flight test's concurrency assertions (each thread's
+    SET NX would appear to always succeed) while still importing and
+    running without error — a silent correctness hole, not a crash.
+    """
+
+    fake = fakeredis.FakeRedis(server=fakeredis.FakeServer())
+    redis_cache.set_redis_client_for_testing(fake)
+    try:
+        yield fake
+    finally:
+        redis_cache.reset_redis_client_for_testing()
 
 
 @pytest.fixture

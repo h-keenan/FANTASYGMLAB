@@ -431,13 +431,14 @@ def test_build_league_rankings_frame_cached_concurrent_misses_single_flight(monk
     run the expensive league-wide ranking pass exactly once, not once per
     caller.
 
-    functools.lru_cache alone does not guarantee this: its internal lock
-    only protects the cache dict during lookup/insert, not the wrapped
-    call itself, so N threads that all miss before any of them finishes
-    would otherwise each independently redo the real (here: stubbed, slow)
-    build_league_rankings_frame pass. build_league_rankings_frame_cached's
-    per-key lock (_league_rankings_lock_for) is what actually prevents
-    that."""
+    This is now enforced by a Redis-backed distributed lock
+    (modules.redis_cache.redis_single_flight_cache), not a per-process
+    functools.lru_cache + threading.Lock pair — the old in-process pair
+    only protected one uvicorn worker; under docker-compose.yml's multiple
+    mobile-api workers each would get its own separate lock/cache, so the
+    same pass could still run once per worker. tests/conftest.py's autouse
+    fakeredis fixture backs build_league_rankings_frame_cached with a real
+    (fake) Redis here, so this test exercises the actual code path."""
 
     _patch_cache_ingredients(monkeypatch)
 
@@ -452,7 +453,6 @@ def test_build_league_rankings_frame_cached_concurrent_misses_single_flight(monk
         return pd.DataFrame([{"league_id": league_id, "ok": True}])
 
     monkeypatch.setattr(league_rankings, "build_league_rankings_frame", _slow_stub)
-    league_rankings._build_league_rankings_frame_cached.cache_clear()
 
     league_id = "test-single-flight-league"
     results: list[pd.DataFrame] = []
@@ -477,7 +477,8 @@ def test_build_league_rankings_frame_cached_concurrent_misses_single_flight(monk
 
 
 def test_build_league_summary_and_draft_capital_cached_concurrent_misses_single_flight(monkeypatch):
-    """Same single-flight guarantee as the rankings-frame cache above, for
+    """Same single-flight guarantee as the rankings-frame cache above (now
+    Redis-backed — see that test's docstring), for
     build_league_summary_and_draft_capital_cached (Draft Center/Draft
     Picks' shared cache)."""
 
@@ -497,7 +498,6 @@ def test_build_league_summary_and_draft_capital_cached_concurrent_misses_single_
         )
 
     monkeypatch.setattr(league_rankings, "build_league_summary_and_draft_capital", _slow_stub)
-    league_rankings._build_league_summary_and_draft_capital_cached.cache_clear()
 
     league_id = "test-single-flight-league-2"
     results: list[tuple[pd.DataFrame, pd.DataFrame]] = []

@@ -13,15 +13,13 @@ function so a caller only needs a league_id and a valued players frame.
 
 from __future__ import annotations
 
-import threading
 import time
 from datetime import datetime
-from functools import lru_cache
 from typing import Any
 
 import pandas as pd
 
-from modules import league_value_settings, player_eligibility, rankings, sleeper, trade_ideas
+from modules import league_value_settings, player_eligibility, rankings, redis_cache, sleeper, trade_ideas
 from modules.league_value_settings import _safe_float, _safe_positive_int
 from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.team_eval import build_league_summary, normalize_team_strategy, team_strategy_label
@@ -311,51 +309,29 @@ def _league_rankings_frame_cache_bucket() -> int:
     return int(time.time() // LEAGUE_RANKINGS_FRAME_TTL_SECONDS)
 
 
-# Per-cache-key single-flight locks, shared by both caches below (they key
-# on the exact same (league_id, lens, players_db_path, bucket) shape) — same
-# pattern, and same reason, as modules.playoff_simulator's
-# _playoff_odds_lock_for and modules.trade_hub_engine's
-# _trade_hub_ideas_lock_for: functools.lru_cache's own internal lock only
-# protects the cache dict itself during a lookup/insert, it does NOT
-# serialize the wrapped function's *execution*. Without this, N concurrent
-# requests that all miss the same key before the first one finishes would
-# each independently redo the full league-wide ranking/draft-capital pass
-# instead of sharing one — directly contradicting these caches' own
-# documented purpose (Dashboard and Team Rankings, or Draft Center and
-# Draft Picks, sharing one entry instead of each recomputing it). On this
-# service's single uvicorn worker (see docker-compose.yml's mobile-api
-# comment), every duplicate run also holds the one process's GIL back-to-
-# back, stalling every other in-flight request for that much longer.
-_LEAGUE_RANKINGS_LOCK_PRUNE_THRESHOLD = 500
-
-_league_rankings_locks: dict[tuple[Any, ...], threading.Lock] = {}
-_league_rankings_locks_guard = threading.Lock()
-
-
-def _league_rankings_lock_for(key: tuple[Any, ...]) -> threading.Lock:
-    with _league_rankings_locks_guard:
-        lock = _league_rankings_locks.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _league_rankings_locks[key] = lock
-        if len(_league_rankings_locks) > _LEAGUE_RANKINGS_LOCK_PRUNE_THRESHOLD:
-            # Safe to drop any lock from an older bucket: both callers below
-            # always pass the *current* bucket, so a key whose bucket
-            # doesn't match the one we were just asked for can never be
-            # requested again. Skip anything still held, just in case a
-            # build genuinely spans a bucket rollover.
-            current_bucket = key[-1]
-            stale = [
-                existing_key
-                for existing_key, existing_lock in _league_rankings_locks.items()
-                if existing_key[-1] != current_bucket and not existing_lock.locked()
-            ]
-            for existing_key in stale:
-                _league_rankings_locks.pop(existing_key, None)
-        return lock
+# Redis-backed single-flight + cache (modules.redis_cache.redis_single_flight_cache),
+# shared by both caches below (they key on the exact same
+# (league_id, lens, players_db_path, bucket) shape) — same pattern, and
+# same reason, as modules.playoff_simulator's and
+# modules.trade_hub_engine's own caches: without a single-flight guard, N
+# concurrent requests that all miss the same key before the first one
+# finishes would each independently redo the full league-wide
+# ranking/draft-capital pass instead of sharing one — directly
+# contradicting these caches' own documented purpose (Dashboard and Team
+# Rankings, or Draft Center and Draft Picks, sharing one entry instead of
+# each recomputing it).
+#
+# This used to be a per-process threading.Lock + functools.lru_cache pair,
+# which only protected ONE uvicorn worker: under docker-compose.yml's
+# multiple mobile-api workers, each worker has its own process memory, so
+# that old pair would let the same expensive pass run redundantly once per
+# worker AND a cache hit in worker A would never help a request that
+# happened to land on worker B. Redis fixes both: the distributed lock
+# makes only one worker, cluster-wide, actually run a given pass, and the
+# cached result lives in Redis, not in any one worker's memory.
+_LEAGUE_RANKINGS_LOCK_TIMEOUT_SECONDS = 15.0
 
 
-@lru_cache(maxsize=256)
 def _build_league_summary_and_draft_capital_cached(
     league_id: str,
     lens: str,
@@ -405,17 +381,21 @@ def build_league_summary_and_draft_capital_cached(
     `build_league_rankings_frame` being called. Returns copies so a caller
     mutating either frame never corrupts the cached entry.
 
-    Single-flight per cache key: see `_league_rankings_lock_for`'s
-    docstring-comment for why this needs its own lock on top of
-    `lru_cache`."""
+    Single-flight + cache, now shared across every mobile-api worker via
+    Redis: see modules.redis_cache.redis_single_flight_cache and this
+    module's own comment above `_build_league_summary_and_draft_capital_cached`."""
 
     key = (league_id, lens, players_db_path, _league_rankings_frame_cache_bucket())
-    with _league_rankings_lock_for(key):
-        df_summary, draft_capital_summary = _build_league_summary_and_draft_capital_cached(*key)
+    cache_key = redis_cache.build_cache_key("league_summary_and_draft_capital", *key)
+    df_summary, draft_capital_summary = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=LEAGUE_RANKINGS_FRAME_TTL_SECONDS,
+        compute=lambda: _build_league_summary_and_draft_capital_cached(*key),
+        lock_timeout_seconds=_LEAGUE_RANKINGS_LOCK_TIMEOUT_SECONDS,
+    )
     return df_summary.copy(), draft_capital_summary.copy()
 
 
-@lru_cache(maxsize=256)
 def _build_league_rankings_frame_cached(
     league_id: str,
     lens: str,
@@ -456,13 +436,19 @@ def build_league_rankings_frame_cached(
     independently. Returns a copy so a caller mutating the frame (e.g.
     adding display-only columns) never corrupts the cached entry.
 
-    Single-flight per cache key: see `_league_rankings_lock_for`'s
-    docstring-comment for why this needs its own lock on top of
-    `lru_cache`."""
+    Single-flight + cache, now shared across every mobile-api worker via
+    Redis: see modules.redis_cache.redis_single_flight_cache and this
+    module's own comment above `_build_league_summary_and_draft_capital_cached`."""
 
     key = (league_id, lens, players_db_path, _league_rankings_frame_cache_bucket())
-    with _league_rankings_lock_for(key):
-        return _build_league_rankings_frame_cached(*key).copy()
+    cache_key = redis_cache.build_cache_key("league_rankings_frame", *key)
+    frame = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=LEAGUE_RANKINGS_FRAME_TTL_SECONDS,
+        compute=lambda: _build_league_rankings_frame_cached(*key),
+        lock_timeout_seconds=_LEAGUE_RANKINGS_LOCK_TIMEOUT_SECONDS,
+    )
+    return frame.copy()
 
 
 def draft_year_columns(df: pd.DataFrame) -> list[str]:
