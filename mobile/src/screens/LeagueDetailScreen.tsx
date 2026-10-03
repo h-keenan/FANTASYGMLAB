@@ -16,11 +16,24 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SectionHeading from '../components/SectionHeading';
+import StorylineSummaryCard from '../components/StorylineSummaryCard';
 import TeamAvatar from '../components/TeamAvatar';
-import { api, type DashboardItem } from '../lib/api';
+import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
+import WaiverRecommendationCard from '../components/WaiverRecommendationCard';
+import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
+import {
+  api,
+  type DashboardItem,
+  type MatchupResponse,
+  type TeamSnapshot,
+  type WaiverPriorityAdd,
+  type WeeklyRecap,
+} from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { setLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
+import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { gradients, lightGradients, radii, spacing, type ThemeColors } from '../theme';
@@ -47,10 +60,16 @@ interface MyTeamInfo {
 // Same icon/color per destination GmOrb's own "Where to Go" sheet already
 // uses for these routes (Matchup/Waivers = success, Teams = violet,
 // Alerts = danger) — one semantic mapping app-wide, not a fresh set of
-// colors invented for this screen. My Team and Recap are deliberately left
-// out: they already have their own richer strip cards below (real roster
-// data / "week N recap ready"), so a plain nav tile for the same
-// destination would just be a second, weaker way to do the same thing.
+// colors invented for this screen. Matchup and Waivers now also have inline
+// compact summaries above (coridian_'s 2026-10 brief), but the full
+// Matchup screen (suggested starters, opponent lineup) and full Waivers
+// screen (search, filters, Best Available, Stash/Watchlist/FAAB boards)
+// have real functionality the compact summaries don't cover, so the nav
+// tiles stay. My Team is left out of this grid: it already has its own
+// richer strip card below with real roster data, so a plain nav tile for
+// the same destination would just be a second, weaker way to do the same
+// thing. Recap has no tile here either — the inline Storylines section
+// above is its entry point now.
 function leagueQuickActions(
   colors: ThemeColors,
 ): Array<{
@@ -83,8 +102,11 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [summary, setSummary] = useState<LeagueSummary | null>(null);
   const [dashboardItems, setDashboardItems] = useState<DashboardItem[]>([]);
   const [dashboardQuiet, setDashboardQuiet] = useState(false);
+  const [teamSnapshot, setTeamSnapshot] = useState<TeamSnapshot | null>(null);
+  const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
+  const [recap, setRecap] = useState<WeeklyRecap | null>(null);
+  const [priorityAdds, setPriorityAdds] = useState<WaiverPriorityAdd[]>([]);
   const [myTeam, setMyTeam] = useState<MyTeamInfo | null>(null);
-  const [recapReady, setRecapReady] = useState<number | null>(null);
   const [myPlayoffOdds, setMyPlayoffOdds] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,15 +135,23 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
 
       async function load() {
         try {
-          const [leagueResult, dashboardResult, myRosterResult, profilesResult, recapResult, playoffOddsResult] =
-            await Promise.all([
-              api.getLeague(leagueId).catch(() => null),
-              api.getLeagueDashboard(leagueId).catch(() => null),
-              api.getMyRoster(leagueId).catch(() => null),
-              api.getLeagueTeamProfiles(leagueId).catch(() => null),
-              api.getLeagueRecap(leagueId).catch(() => null),
-              api.getLeaguePlayoffOdds(leagueId).catch(() => null),
-            ]);
+          const [
+            leagueResult,
+            dashboardResult,
+            myRosterResult,
+            profilesResult,
+            recapResult,
+            playoffOddsResult,
+            waiversResult,
+          ] = await Promise.all([
+            api.getLeague(leagueId).catch(() => null),
+            api.getLeagueDashboard(leagueId).catch(() => null),
+            api.getMyRoster(leagueId).catch(() => null),
+            api.getLeagueTeamProfiles(leagueId).catch(() => null),
+            api.getLeagueRecap(leagueId).catch(() => null),
+            api.getLeaguePlayoffOdds(leagueId).catch(() => null),
+            api.getLeagueWaivers(leagueId).catch(() => null),
+          ]);
           if (cancelled) return;
 
           if (leagueResult?.league) {
@@ -138,6 +168,7 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           if (dashboardResult) {
             setDashboardItems(dashboardResult.items ?? []);
             setDashboardQuiet(dashboardResult.quiet);
+            setTeamSnapshot(dashboardResult.team_snapshot);
           }
 
           const roster = myRosterResult?.roster as { roster_id?: unknown; players?: unknown } | null | undefined;
@@ -157,7 +188,11 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           }
 
           if (recapResult?.recap && !recapResult.recap.incomplete) {
-            setRecapReady(recapResult.recap.week);
+            setRecap(recapResult.recap);
+          }
+
+          if (waiversResult) {
+            setPriorityAdds(waiversResult.priority_adds ?? []);
           }
 
           if (rosterIdForOdds && playoffOddsResult && !playoffOddsResult.reason) {
@@ -174,6 +209,17 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       }
 
       void load();
+      // Independent, best-effort — the matchup card is an entry point, not
+      // core to the page load above, so a bye week or a league without a
+      // current week simply means no card rather than an error state for
+      // the rest of the screen (same contract as Next Move's own matchup
+      // fetch in DashboardScreen).
+      api
+        .getLeagueMatchup(leagueId)
+        .then((result) => {
+          if (!cancelled) setMatchup(result);
+        })
+        .catch(() => {});
       return () => {
         cancelled = true;
       };
@@ -203,8 +249,101 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       <ScrollView style={styles.list} contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenInfoNote
-        text={`League Overview is home base for ${leagueName} — league context and quick access to everything else. For personalized recommendations, see Next Move.`}
+        text={`League Overview is home base for ${leagueName} — your matchup, injury concerns, storylines, and waiver suggestions, plus quick access to everything else. For the full personalized briefing, see Next Move.`}
       />
+
+      {/* DOMINANT MODULE — the matchup leads the page per coridian_'s
+          2026-10 brief ("at the very top should be the matchup"). Everything
+          below supports it: injury concerns, storylines, waiver suggestions,
+          then the Today's Game Plan entry point and the rest of this
+          screen's nav/context (UI_HIERARCHY_DIRECTIVE §6's "one dominant
+          module per screen" — this explicit, page-specific instruction
+          supersedes that directive's own §19 example for this screen, same
+          as mobile/AGENTS.md's "page-specific prompts... may change
+          composition and information hierarchy" clause allows). */}
+      {matchup ? (
+        <WeeklyMatchupCard
+          matchup={matchup}
+          glow
+          onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
+        />
+      ) : null}
+
+      {/* Injury concerns — same already-computed team-health read Next
+          Move's Needs Attention group shows, promoted into its own section
+          here per coridian_'s brief. */}
+      {hasHealthContext(teamSnapshot) ? (
+        <View style={styles.groupSection}>
+          <SectionHeading title="Injury Concerns" icon="pulse-outline" />
+          <AnimatedCard style={styles.groupCard}>
+            <TeamHealthContextBlock
+              snapshot={teamSnapshot!}
+              last
+              onPlayerPress={(player) =>
+                navigation.navigate('PlayerDetail', {
+                  player: {
+                    player_id: player.player_id,
+                    name: player.name || null,
+                    position: player.position || null,
+                    team: player.team || null,
+                    age: null,
+                    status: null,
+                    injury_status: player.injury_status || null,
+                    tier: player.tier || null,
+                    score: player.player_value_score,
+                    overall_rank: null,
+                    position_rank: null,
+                    rank_unavailable_reason: null,
+                    opportunity_label: null,
+                  },
+                  leagueId,
+                  leagueName,
+                })
+              }
+            />
+          </AnimatedCard>
+        </View>
+      ) : null}
+
+      {/* Storylines — this week's recap headline + top stories. Absorbs the
+          old standalone "Week N recap ready" strip card (see Feature
+          Parity note in the PR description): same destination, richer
+          inline preview. */}
+      {recap ? (
+        <View style={styles.groupSection}>
+          <SectionHeading title="Storylines" icon="newspaper-outline" />
+          <StorylineSummaryCard recap={recap} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+        </View>
+      ) : null}
+
+      {/* Waiver suggestions — the same Priority Adds the Waivers screen
+          surfaces, condensed to the top couple of compact rows. */}
+      {priorityAdds.length > 0 ? (
+        <View style={styles.groupSection}>
+          <SectionHeading title="Waiver Suggestions" icon="swap-horizontal-outline" />
+          <AnimatedCard style={styles.groupCard}>
+            {priorityAdds.slice(0, 3).map((player, index) => (
+              <WaiverRecommendationCard
+                key={player.player_id}
+                player={player}
+                variant="compact"
+                showDivider={index < Math.min(priorityAdds.length, 3) - 1}
+                onPress={() =>
+                  navigation.navigate('PlayerDetail', {
+                    player: rankedPlayerFromWaiverPlayer(player),
+                    leagueId,
+                    leagueName,
+                  })
+                }
+              />
+            ))}
+          </AnimatedCard>
+        </View>
+      ) : null}
+
+      {/* Entry point to the full Next Move briefing — demoted from its old
+          "first card on the page" position now that the matchup leads, but
+          still present (feature parity) one tap away. */}
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName })}
@@ -271,17 +410,6 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
         </AnimatedCard>
       ) : null}
 
-      {recapReady !== null ? (
-        <AnimatedCard
-          style={styles.stripCard}
-          onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
-        >
-          <IconCircle name="newspaper-outline" color={colors.accent} size={36} />
-          <AppText style={styles.stripTextGroup2}>Week {recapReady} recap ready</AppText>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-        </AnimatedCard>
-      ) : null}
-
       {myPlayoffOdds !== null ? (
         <AnimatedCard
           style={styles.stripCard}
@@ -331,6 +459,12 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.md,
   },
   heroButtonText: { fontSize: 12, fontWeight: '700', color: colors.background },
+  // Shared "grouped surface" wrapper for Injury Concerns / Waiver
+  // Suggestions — a SectionHeading over one AnimatedCard, matching Next
+  // Move's own Needs Attention/Opportunities grouped-surface pattern
+  // (Magna Carta §12: one card with internal dividers, not card-per-item).
+  groupSection: {},
+  groupCard: { padding: spacing.lg, paddingVertical: spacing.xs },
   contextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   contextText: { fontSize: 12, fontWeight: '500', color: colors.textSecondary, letterSpacing: 0.2 },
   stripCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, gap: spacing.sm },

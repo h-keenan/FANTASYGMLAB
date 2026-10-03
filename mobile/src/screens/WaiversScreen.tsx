@@ -33,6 +33,7 @@ import WaiverRecommendationCard, {
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
+import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
@@ -171,7 +172,8 @@ export default function WaiversScreen({ route, navigation }: Props) {
   }, [freeAgents]);
 
   const openPlayer = useCallback(
-    (player: WaiverPlayer) => navigation.navigate('PlayerDetail', { player: toRankedPlayer(player), leagueId, leagueName }),
+    (player: WaiverPlayer) =>
+      navigation.navigate('PlayerDetail', { player: rankedPlayerFromWaiverPlayer(player), leagueId, leagueName }),
     [navigation, leagueId, leagueName],
   );
 
@@ -317,26 +319,11 @@ export default function WaiversScreen({ route, navigation }: Props) {
 
 // PlayerDetail's route param still expects the /rankings RankedPlayer shape
 // (canonical_* ranks); waivers intentionally computes wire-relative ranks
-// instead (see api.ts's WaiverPlayer doc comment), so this only forwards the
-// fields Quick View actually reads rather than pretending the rank fields
-// mean the same thing.
-function toRankedPlayer(player: WaiverPlayer) {
-  return {
-    player_id: player.player_id,
-    name: player.name,
-    position: player.position,
-    team: player.team,
-    age: player.age,
-    status: player.status,
-    injury_status: player.injury_status,
-    tier: player.tier,
-    score: player.score,
-    overall_rank: null,
-    position_rank: null,
-    rank_unavailable_reason: null,
-    opportunity_label: null,
-  };
-}
+// instead (see api.ts's WaiverPlayer doc comment), so
+// rankedPlayerFromWaiverPlayer (lib/playerStubs.ts, shared with League
+// Overview's compact Waiver Suggestions section) only forwards the fields
+// Quick View actually reads rather than pretending the rank fields mean the
+// same thing.
 
 function SecondaryWaiverBoard({
   isPremium,
