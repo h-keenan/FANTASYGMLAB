@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';
-import CompactPlayerModule from '../components/CompactPlayerModule';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -20,11 +19,12 @@ import PlayerInsightRow from '../components/PlayerInsightRow';
 import NewBadge from '../components/NewBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
+import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
 import {
   api,
   type DashboardEntitlementInfo,
   type DashboardItem,
-  type InjuryImpactPlayer,
   type MatchupResponse,
   type PresentationAsset,
   type RankedPlayer,
@@ -38,7 +38,6 @@ import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGr
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import BrandHeaderBar from '../components/BrandHeaderBar';
-import TeamAvatar from '../components/TeamAvatar';
 import BrandMark from '../components/BrandMark';
 import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -197,14 +196,6 @@ function groupDashboardItems(items: DashboardItem[]): {
     else opportunity.push(item); // waiver_opportunity, league_movement
   }
   return { topPriority, watch, opportunity };
-}
-
-function hasHealthContext(snapshot: TeamSnapshot | null): boolean {
-  if (!snapshot) return false;
-  const players = snapshot.top_injury_impact_players ?? [];
-  const keyInjuries = snapshot.key_injuries_summary?.trim() ?? '';
-  const fallbackSummary = snapshot.top_injury_impact_summary?.trim() ?? '';
-  return players.length > 0 || Boolean(keyInjuries) || Boolean(fallbackSummary);
 }
 
 export default function DashboardScreen({ route, navigation }: Props) {
@@ -419,9 +410,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       {matchup ? (
         <WeeklyMatchupCard
           matchup={matchup}
-          leagueId={leagueId}
-          leagueName={leagueName}
-          navigation={navigation}
+          onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
         />
       ) : null}
       {teamSnapshot ? (
@@ -666,205 +655,6 @@ function TeamSnapshotRow({
           style={styles.snapshotTileHalf}
         />
       </View>
-    </View>
-  );
-}
-
-/**
- * Dashboard entry point for the weekly matchup. Demoted from its old
- * "second card on the screen" position into secondary context — "who am I
- * playing" is useful, but it isn't the answer to "what should I do next,"
- * which the Hero above now owns outright (Magna Carta §33/§4). No longer
- * `glow`'d for the same reason: §15 reserves the restrained glow treatment
- * for the one module that actually dominates the page.
- *
- * Shows the season-value edge, NOT a points projection: the app has no
- * weekly-projection feed (see services/mobile_api_service.py's
- * SEASON_VALUE_BASIS_LABEL), so the number here is a season-long
- * value/opportunity total and the card says so on its face.
- */
-function WeeklyMatchupCard({
-  matchup,
-  leagueId,
-  leagueName,
-  navigation,
-}: {
-  matchup: MatchupResponse;
-  leagueId: string;
-  leagueName: string;
-  navigation: DashboardNavigation;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const mine = matchup.my_team;
-  const opponent = matchup.opponent;
-  const comparison = matchup.comparison;
-  if (!mine || !opponent || !comparison) return null;
-
-  const edgeColor =
-    comparison.edge === 'you'
-      ? colors.successBright
-      : comparison.edge === 'opponent'
-        ? colors.danger
-        : colors.textSecondary;
-
-  return (
-    <AnimatedCard
-      style={StyleSheet.flatten([styles.card, { borderLeftColor: colors.accent } as ViewStyle])}
-      onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}
-    >
-      <View style={styles.cardHeaderRow}>
-        <Ionicons name="american-football" size={15} color={colors.accent} style={styles.cardIcon} />
-        <AppText style={[styles.cardLabel, { color: colors.accent }]}>
-          {matchup.week != null ? `WEEK ${matchup.week} MATCHUP` : 'THIS WEEK’S MATCHUP'}
-        </AppText>
-      </View>
-      <AppText style={styles.cardHeadline}>vs {opponent.team_name}</AppText>
-
-      <View style={styles.matchupValueRow}>
-        <View style={styles.matchupValueSide}>
-          <TeamAvatar
-            avatarId={mine.avatar_url}
-            size={40}
-            style={StyleSheet.flatten([styles.matchupAvatar, { borderColor: colors.accent }])}
-          />
-          <AppText style={styles.matchupSideLabel}>YOU</AppText>
-          <AppText style={styles.matchupSideValue}>{Math.round(comparison.my_season_value).toLocaleString()}</AppText>
-        </View>
-        <AppText style={styles.matchupVersus}>VS</AppText>
-        <View style={[styles.matchupValueSide, styles.matchupValueSideRight]}>
-          <TeamAvatar
-            avatarId={opponent.avatar_url}
-            size={40}
-            style={StyleSheet.flatten([styles.matchupAvatar, { borderColor: colors.danger }])}
-          />
-          <AppText style={styles.matchupSideLabel}>THEM</AppText>
-          <AppText style={styles.matchupSideValue}>{Math.round(comparison.opponent_season_value).toLocaleString()}</AppText>
-        </View>
-      </View>
-
-      <AppText style={[styles.matchupEdge, { color: edgeColor }]}>
-        {comparison.headline}
-        {comparison.edge === 'even'
-          ? ''
-          : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}
-      </AppText>
-      {/* Straight from the API, never paraphrased into something stronger. */}
-      <AppText style={styles.matchupBasis}>{comparison.basis_label}</AppText>
-
-      <View style={styles.destButton}>
-        <AppText style={styles.destButtonText}>SEE SUGGESTED STARTERS</AppText>
-      </View>
-    </AnimatedCard>
-  );
-}
-
-/** The "why" portion of an injury-impact card's context line — status,
- * roster relevance, impact contribution, and freshness caveat. Identity
- * (name/position/team/tier) is now rendered by CompactPlayerModule itself,
- * so this only covers what that module can't show. Mirrors the engine's own
- * top_injury_impact_summary wording (status, impact N, freshness) that web
- * renders, trimmed for a phone-width row. */
-function injuryImpactContextLine(player: InjuryImpactPlayer): string {
-  const status = player.injury_status || player.injury_level;
-  return [
-    status,
-    player.roster_relevance,
-    player.impact_contribution != null ? `impact ${player.impact_contribution}` : '',
-    // Only surface freshness when it undercuts the read — "current"/"recent"
-    // updates need no caveat, the same way web only notes stale/unknown ones.
-    ['stale', 'aging', 'update unknown'].includes(player.freshness_label) ? player.freshness_label : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-}
-
-/** The "why" behind an injury-driven Watch flag: which injuries, and which
- * players are actually carrying the impact. Same already-computed fields
- * web shows as its "Key injuries:" caption plus the injury impact note —
- * rendered in the bulleted label/items style TeamRosterScreen already uses
- * for archetype strengths and risks.
- *
- * Folded into the Needs Attention grouped surface (as its own leading
- * block, not a separate bordered card) rather than standing alone the way
- * it used to — same "urgent risk" tier as the Watch rows next to it, so it
- * no longer competes with them for identical visual weight (Magna Carta
- * §12: one grouped surface with internal dividers, not card-per-item).
- * Caller (`NeedsAttentionSection`) already checks `hasHealthContext` before
- * rendering this. */
-function TeamHealthContextBlock({
-  snapshot,
-  last,
-  leagueId,
-  leagueName,
-  navigation,
-}: {
-  snapshot: TeamSnapshot;
-  last: boolean;
-  leagueId: string;
-  leagueName: string;
-  navigation: DashboardNavigation;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const players = snapshot.top_injury_impact_players ?? [];
-  const keyInjuries = snapshot.key_injuries_summary?.trim() ?? '';
-  const fallbackSummary = snapshot.top_injury_impact_summary?.trim() ?? '';
-
-  return (
-    <View style={[styles.healthBlock, !last && styles.groupDivider]}>
-      <View style={styles.cardHeaderRow}>
-        <Ionicons name="pulse-outline" size={15} color={colors.danger} style={styles.cardIcon} />
-        <AppText style={[styles.cardLabel, { color: colors.danger }]} numberOfLines={1}>
-          {(snapshot.health_flag || 'Health context').toUpperCase()}
-        </AppText>
-      </View>
-      {keyInjuries ? <AppText style={styles.healthSummary}>Key injuries: {keyInjuries}</AppText> : null}
-      {players.length > 0 ? (
-        <View style={styles.detailListGroup}>
-          <AppText style={styles.detailListLabel}>Driving the flag</AppText>
-          {players.map((player, index) => (
-            <CompactPlayerModule
-              key={`${player.player_id || player.name}-${index}`}
-              playerId={player.player_id || null}
-              name={player.name}
-              position={player.position || null}
-              team={player.team || null}
-              tier={player.tier || null}
-              value={player.player_value_score}
-              valueLabel="VALUE"
-              contextLine={injuryImpactContextLine(player)}
-              style={styles.injuryPlayerRow}
-              onPress={
-                player.player_id
-                  ? () =>
-                      navigation.navigate('PlayerDetail', {
-                        player: {
-                          player_id: player.player_id,
-                          name: player.name || null,
-                          position: player.position || null,
-                          team: player.team || null,
-                          age: null,
-                          status: null,
-                          injury_status: player.injury_status || null,
-                          tier: player.tier || null,
-                          score: player.player_value_score,
-                          overall_rank: null,
-                          position_rank: null,
-                          rank_unavailable_reason: null,
-                          opportunity_label: null,
-                        },
-                        leagueId,
-                        leagueName,
-                      })
-                  : undefined
-              }
-            />
-          ))}
-        </View>
-      ) : fallbackSummary ? (
-        <AppText style={styles.detailListItem}>{fallbackSummary}</AppText>
-      ) : null}
     </View>
   );
 }
@@ -1172,9 +962,27 @@ function NeedsAttentionSection({
             <TeamHealthContextBlock
               snapshot={snapshot!}
               last={rowItems.length === 0}
-              leagueId={leagueId}
-              leagueName={leagueName}
-              navigation={navigation}
+              onPlayerPress={(player) =>
+                navigation.navigate('PlayerDetail', {
+                  player: {
+                    player_id: player.player_id,
+                    name: player.name || null,
+                    position: player.position || null,
+                    team: player.team || null,
+                    age: null,
+                    status: null,
+                    injury_status: player.injury_status || null,
+                    tier: player.tier || null,
+                    score: player.player_value_score,
+                    overall_rank: null,
+                    position_rank: null,
+                    rank_unavailable_reason: null,
+                    opportunity_label: null,
+                  },
+                  leagueId,
+                  leagueName,
+                })
+              }
             />
           ) : null}
           {rowItems.map((item, index) => (
@@ -1278,8 +1086,6 @@ function createStyles(colors: ThemeColors) {
   // dividers, per Magna Carta §12, instead of a full card per item.
   groupSection: { marginBottom: spacing.md },
   groupCard: { padding: spacing.lg, paddingVertical: spacing.xs },
-  groupDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
-  healthBlock: { paddingVertical: spacing.md, gap: spacing.sm },
   pulseSection: { marginTop: spacing.lg },
   pulseGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   pulseTile: {
@@ -1307,26 +1113,6 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.md,
   },
   checkInText: { fontSize: 12, fontWeight: '600', color: colors.accent, flexShrink: 1 },
-  matchupValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.md,
-  },
-  matchupValueSide: { flex: 1 },
-  matchupValueSideRight: { alignItems: 'flex-end' },
-  matchupAvatar: { borderWidth: 2, marginBottom: spacing.xs },
-  matchupSideLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
-  matchupSideValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
-  matchupVersus: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    color: colors.textTertiary,
-    paddingHorizontal: spacing.sm,
-  },
-  matchupEdge: { fontSize: 13, fontWeight: '700', marginTop: spacing.md },
-  matchupBasis: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
   snapshotSection: { marginBottom: spacing.md },
   snapshotRow: {
     flexDirection: 'row',
@@ -1337,19 +1123,6 @@ function createStyles(colors: ThemeColors) {
   // only) — see the comment at the call site.
   snapshotTileThird: { minWidth: '30%', flexBasis: '30%' },
   snapshotTileHalf: { minWidth: '48%', flexBasis: '48%' },
-  healthSummary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  // Matches TeamRosterScreen's archetype strengths/risks list styling.
-  detailListGroup: { gap: spacing.sm },
-  detailListLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 2,
-  },
-  detailListItem: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  injuryPlayerRow: { paddingVertical: spacing.xs },
   card: {
     borderLeftWidth: 4,
     padding: spacing.lg,
