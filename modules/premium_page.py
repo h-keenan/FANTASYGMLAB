@@ -111,6 +111,14 @@ PREMIUM_INCLUDED_NOW = (
         "GM Targets (full board)",
         "Save up to fifty players per league with PQV Add/Remove and workflow handoffs.",
     ),
+    (
+        # Real, shipped, premium.PREMIUM-gated feature (modules/portfolio_page.py,
+        # mobile's GET /v1/portfolio) that was missing from this canonical list —
+        # found during the welcome/paywall thoroughness pass. Added here (the
+        # single source of truth) rather than inventing paywall copy for it.
+        "Portfolio",
+        "Your record, rank, and top need or opportunity across every saved league in one place.",
+    ),
 )
 
 
@@ -142,6 +150,10 @@ MOBILE_PREMIUM_BENEFIT_LINES: tuple[dict[str, str], ...] = (
     {
         "title": "GM Targets (full board)",
         "line": "GM Targets watchlist up to 50 players (Free is capped at 3)",
+    },
+    {
+        "title": "Portfolio",
+        "line": "Portfolio — your record, rank, and top need across every saved league, not just one",
     },
 )
 
@@ -200,6 +212,7 @@ CAPABILITY_GLYPHS = {
     "Advanced roster decisions": "roster",
     "Decision Memory": "history",
     "GM Targets (full board)": "roster",
+    "Portfolio": "league",
 }
 
 
