@@ -32,6 +32,7 @@ import {
   type CompareTextRow,
 } from '../lib/playerCompare';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -188,6 +189,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
   const [search, setSearch] = useState('');
@@ -251,12 +253,36 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
     };
   }, [player, playerB]);
 
+  // Pre-search suggestions: the same position (same convention PlayersScreen/
+  // WaiversScreen use for position filtering) and sorted by proximity to the
+  // base player's own value score, not globally top-down. Showing the whole
+  // pool ranked by raw score buries real compare/trade candidates (similar
+  // value tier) under every "Generational" player in the game, which is the
+  // exact complaint — it should look "around" the base player's level, both
+  // above and below, not start at the #1 overall player regardless of position.
+  const defaultSuggestions = useMemo(() => {
+    if (!candidates) return [];
+    const pool = player.position ? candidates.filter((p) => p.position === player.position) : candidates;
+    const baseScore = player.score;
+    if (baseScore == null) return pool.slice(0, 50);
+    return [...pool]
+      .sort((a, b) => {
+        const distanceA = a.score == null ? Infinity : Math.abs(a.score - baseScore);
+        const distanceB = b.score == null ? Infinity : Math.abs(b.score - baseScore);
+        return distanceA - distanceB;
+      })
+      .slice(0, 50);
+  }, [candidates, player.position, player.score]);
+
   const filteredCandidates = useMemo(() => {
     if (!candidates) return [];
     const query = search.trim().toLowerCase();
-    if (!query) return candidates.slice(0, 50);
+    // Once the user actually types a name, search the full pool by name
+    // match (unrestricted by position/value window) — only the default,
+    // pre-search suggestion list is scoped to the base player's own level.
+    if (!query) return defaultSuggestions;
     return candidates.filter((p) => (p.name ?? '').toLowerCase().includes(query)).slice(0, 50);
-  }, [candidates, search]);
+  }, [candidates, search, defaultSuggestions]);
 
   if (!playerB) {
     return (
@@ -364,7 +390,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
                 : null}
             </AnalyticsSection>
           ) : null}
-          {narrative ? (
+          {narrative && showExplanations ? (
             <AnalyticsSection title="Decision Fit" icon="chatbubble-ellipses-outline">
               <NarrativeCompareBlock sideA={sides[0]} sideB={sides[1]} narrative={narrative} />
             </AnalyticsSection>

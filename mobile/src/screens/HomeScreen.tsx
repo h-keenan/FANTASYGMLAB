@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
   Modal,
   RefreshControl,
   StyleSheet,
@@ -67,6 +68,14 @@ export default function HomeScreen({ navigation }: Props) {
   const [addBusy, setAddBusy] = useState(false);
   const [addOptions, setAddOptions] = useState<SleeperLeagueOption[] | null>(null);
   const [addMessage, setAddMessage] = useState<string | null>(null);
+  // Fix (welcome audit, tester feedback "I don't even know where to start"):
+  // a brand-new user with no existing Sleeper account/league has no path
+  // forward on this screen otherwise — this toggles the honest "we don't
+  // host leagues, here's where to make one" explainer. Also auto-opened
+  // below the moment a real search comes back empty, so the explanation
+  // appears exactly when it's needed, not only for someone who happens to
+  // notice the persistent link first.
+  const [showNoLeagueHelp, setShowNoLeagueHelp] = useState(false);
   // Set only when the server refuses a save with reason "at_cap" — the copy
   // is derived from the cap the server sent, never a hardcoded number.
   const [addCapMessage, setAddCapMessage] = useState<string | null>(null);
@@ -92,6 +101,7 @@ export default function HomeScreen({ navigation }: Props) {
     setAddOptions(null);
     setAddMessage(null);
     setAddCapMessage(null);
+    setShowNoLeagueHelp(false);
   };
 
   // Renames only this account's saved_leagues row (RLS-scoped to
@@ -245,6 +255,11 @@ export default function HomeScreen({ navigation }: Props) {
       setAddOptions(result.leagues);
       if (!result.ok || result.leagues.length === 0) {
         setAddMessage(result.message || 'No leagues found for that Sleeper username.');
+        // A real zero-result search is exactly the moment someone with no
+        // Sleeper account/league actually needs this explanation — surface
+        // it automatically rather than relying on them to notice the
+        // persistent link themselves.
+        setShowNoLeagueHelp(true);
       }
     } catch (error) {
       setAddOptions(null);
@@ -426,6 +441,20 @@ export default function HomeScreen({ navigation }: Props) {
                   }
                 : undefined
             }
+            // Same gap this fixes everywhere else on this screen: a user
+            // with zero saved leagues lands on exactly this empty state —
+            // give them the explainer from here too, not only from inside
+            // the modal they'd have to already know to open.
+            secondaryLabel={!leaguesError ? "Don't have a Sleeper league yet?" : undefined}
+            onPressSecondary={
+              !leaguesError
+                ? () => {
+                    setAddQuery(me?.sleeper_username ?? '');
+                    setAddOpen(true);
+                    setShowNoLeagueHelp(true);
+                  }
+                : undefined
+            }
           />
         }
         renderItem={({ item, index }) => {
@@ -501,6 +530,40 @@ export default function HomeScreen({ navigation }: Props) {
               returnKeyType="search"
               maxLength={64}
             />
+
+            {/* Fix (welcome audit): a persistent, always-available affordance
+                for a brand-new user who has no Sleeper account/league at
+                all — not only shown reactively after a failed search (see
+                findLeagues' auto-expand above), since someone might never
+                attempt a search in the first place without this nudge. */}
+            <TouchableOpacity
+              onPress={() => setShowNoLeagueHelp((value) => !value)}
+              hitSlop={8}
+              style={styles.noLeagueToggle}
+            >
+              <AppText style={styles.noLeagueToggleText}>Don't have a Sleeper league yet?</AppText>
+              <Ionicons
+                name={showNoLeagueHelp ? 'chevron-up' : 'chevron-down'}
+                size={14}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+            {showNoLeagueHelp ? (
+              <View style={styles.noLeagueCard}>
+                <AppText style={styles.noLeagueText}>
+                  FantasyGM Lab is a GM assistant for a league you already have on Sleeper — it
+                  doesn't create or host leagues itself. Create a free league in the Sleeper app
+                  (or at sleeper.com), then come back here and search your Sleeper username.
+                </AppText>
+                <TouchableOpacity
+                  style={styles.noLeagueButton}
+                  onPress={() => void Linking.openURL('https://sleeper.com')}
+                >
+                  <AppText style={styles.noLeagueButtonText}>Open Sleeper</AppText>
+                  <Ionicons name="open-outline" size={14} color={colors.accent} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             {addCapMessage ? (
               <View style={styles.capLockInModal}>
@@ -695,6 +758,31 @@ function createStyles(colors: ThemeColors) {
   capLock: { marginBottom: spacing.sm },
   capLockInModal: { marginTop: spacing.md },
   addError: { fontSize: 12, color: colors.danger, marginTop: spacing.sm, lineHeight: 16 },
+  noLeagueToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    marginTop: spacing.md,
+  },
+  noLeagueToggleText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  noLeagueCard: {
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  noLeagueText: { fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  noLeagueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+  },
+  noLeagueButtonText: { fontSize: 13, fontWeight: '700', color: colors.accent },
   addOptions: { marginTop: spacing.md },
   addOptionsLabel: {
     ...typography.kicker,

@@ -21,12 +21,19 @@ export default function EmptyState({
   subtitle,
   actionLabel,
   onPressAction,
+  secondaryLabel,
+  onPressSecondary,
 }: {
   icon: IconName;
   title: string;
   subtitle?: string;
   actionLabel?: string;
   onPressAction?: () => void;
+  /** Optional lightweight text link under the primary action — for a
+   * secondary path (e.g. "Don't have a league yet?") that shouldn't compete
+   * visually with the main CTA button above it. */
+  secondaryLabel?: string;
+  onPressSecondary?: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -38,6 +45,11 @@ export default function EmptyState({
       {actionLabel && onPressAction ? (
         <TouchableOpacity style={styles.button} onPress={onPressAction}>
           <AppText style={styles.buttonText}>{actionLabel}</AppText>
+        </TouchableOpacity>
+      ) : null}
+      {secondaryLabel && onPressSecondary ? (
+        <TouchableOpacity onPress={onPressSecondary} hitSlop={8} style={styles.secondaryLink}>
+          <AppText style={styles.secondaryLinkText}>{secondaryLabel}</AppText>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -63,5 +75,12 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.accent,
     },
     buttonText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+    secondaryLink: { marginTop: spacing.sm, padding: spacing.xs },
+    secondaryLinkText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textDecorationLine: 'underline',
+    },
   });
 }

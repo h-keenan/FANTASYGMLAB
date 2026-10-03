@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,6 +16,7 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
+import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -279,8 +280,23 @@ export default function RecapScreen({ route, navigation }: Props) {
       <GridBackground />
       {weekPicker}
       {loading ? (
-        <View style={styles.inlineLoadingRow}>
-          <ActivityIndicator color={colors.accent} />
+        // A week switch intentionally clears the prior week's recap rather
+        // than leaving it on screen as if still current (same clear-then-
+        // hydrate call as web's dashboard_loading_state.py) — but that used
+        // to swap the whole story list for a bare spinner centered in the
+        // now-empty scroll area. These shapes stand in for the headline +
+        // hero story card + grouped rows about to replace them instead.
+        <View style={styles.content}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerTextGroup}>
+              <SkeletonBlock width={90} height={11} />
+              <SkeletonBlock width="75%" height={22} style={styles.recapSkeletonHeadline} />
+            </View>
+          </View>
+          <SkeletonBlock height={150} radius={radii.md} style={styles.leadCard} />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
         </View>
       ) : (
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
@@ -338,12 +354,15 @@ export default function RecapScreen({ route, navigation }: Props) {
  * the list below it (Magna Carta §12/§15: reserve glow for the one thing on
  * a screen that genuinely matters most).
  *
- * The AnimatedCard's cyan glow rim stays the universal "this is the hero"
- * signal used app-wide (Dashboard/GmPlan/Alerts/Matchup/Waiver all glow the
- * same color) — per-category *content* inside the card (icon ring, avatar
- * ring, tinted header panel, headline number) carries the story's own
- * semantic color instead, so the hero still reads as distinct per category
- * without redefining what "glow" means globally.
+ * The glow rim+shadow is tinted to the story's own category color
+ * (`glowColor={meta.color}`) rather than AnimatedCard's default brand cyan —
+ * this card's content (icon ring, avatar ring, tinted header panel, headline
+ * number) already carries that same semantic color, and a cyan rim wrapped
+ * around gold/red/green/violet content read as two unrelated accents
+ * clashing rather than one cohesive highlight (coridian_, 2026-10-02: "I
+ * like the color, but the two-tone does not work"). Dashboard/GmPlan/
+ * Alerts/Matchup/Waiver's own `glow` cards are unaffected — they don't pass
+ * `glowColor`, so they keep the universal cyan rim.
  */
 function LeadStoryCard({
   story,
@@ -365,7 +384,7 @@ function LeadStoryCard({
   const showHeaderMetric = Boolean(story.metric_label) && !isMatchup;
 
   return (
-    <AnimatedCard glow style={styles.leadCard} onPress={onPress}>
+    <AnimatedCard glow glowColor={meta.color} style={styles.leadCard} onPress={onPress}>
       <View style={[styles.leadTintPanel, { backgroundColor: `${meta.color}17` }]}>
         <View style={styles.leadHeaderRow}>
           <IconCircle
@@ -751,7 +770,7 @@ function createStyles(colors: ThemeColors) {
   weekPillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
   weekPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   weekPillTextActive: { color: colors.accent },
-  inlineLoadingRow: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  recapSkeletonHeadline: { marginTop: spacing.xs },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

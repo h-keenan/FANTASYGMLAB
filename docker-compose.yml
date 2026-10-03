@@ -76,6 +76,15 @@ services:
     command: ["sh", "-c", "streamlit run app.py --server.address 0.0.0.0 --server.port $$PORT --server.headless true"]
     environment:
       PORT: "8080"
+      # Render sets its own RENDER/RENDER_SERVICE_ID/RENDER_EXTERNAL_URL
+      # markers automatically; nothing does that here. Without this,
+      # modules/app_config.py's is_managed_cloud_host() cannot tell this
+      # production box apart from a contributor's local checkout, which
+      # silently disables the managed-host config safety net (missing
+      # Supabase config fails open instead of fail-closed with a clear
+      # st.error()) and unlocks customer-unsafe debug/premium-override
+      # switches by default. See docs/SELF_HOSTED_MIGRATION.md.
+      DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
     mem_limit: 4g
@@ -133,6 +142,8 @@ services:
     environment:
       PORT: "8080"
       MOBILE_API_WORKERS: "${MOBILE_API_WORKERS:-4}"
+      # See the "web" service's DYNASTYGM_SELF_HOSTED comment above.
+      DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
     # See this file's top-of-file resource-limit comment for the full
@@ -189,6 +200,8 @@ services:
     command: ["sh", "-c", "uvicorn services.stripe_webhook_service:app --host 0.0.0.0 --port $$PORT"]
     environment:
       PORT: "8080"
+      # See the "web" service's DYNASTYGM_SELF_HOSTED comment above.
+      DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
     mem_limit: 512m
@@ -213,6 +226,8 @@ services:
     command: ["sh", "-c", "uvicorn services.revenuecat_webhook_service:app --host 0.0.0.0 --port $$PORT"]
     environment:
       PORT: "8080"
+      # See the "web" service's DYNASTYGM_SELF_HOSTED comment above.
+      DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
     mem_limit: 512m
@@ -248,11 +263,22 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    # condition: service_healthy (not the bare list form) so Caddy starts
+    # proxying only once each app container's own healthcheck above passes,
+    # not merely once the container process has started — `web` in
+    # particular spends real time on cold imports/pip-installed deps before
+    # /_stcore/health responds, and Caddy proxying to it too early produces
+    # exactly the kind of partially-broken first-load experience ("page up,
+    # but pieces of it fail") this stack should not risk on every restart.
     depends_on:
-      - web
-      - mobile-api
-      - stripe-webhook
-      - revenuecat-webhook
+      web:
+        condition: service_healthy
+      mobile-api:
+        condition: service_healthy
+      stripe-webhook:
+        condition: service_healthy
+      revenuecat-webhook:
+        condition: service_healthy
     networks:
       - internal
 

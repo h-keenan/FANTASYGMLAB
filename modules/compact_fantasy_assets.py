@@ -185,6 +185,11 @@ def presentation_asset(asset: Mapping[str, Any] | None) -> dict[str, Any]:
         "injury_level": _text(asset.get("injury_level")),
         "opportunity_explanation": _text(asset.get("opportunity_explanation")),
         "tier": _text(asset.get("player_tier")),
+        # 0-99 "OVR" badge next to the tier ring (coridian_: the colored ring
+        # alone doesn't say how good two similarly-tiered players actually
+        # are) — None when the caller's pool couldn't compute one, same
+        # "too thin to rank" contract as every other overall_rating field.
+        "overall_rating": asset.get("overall_rating"),
     }
 
 

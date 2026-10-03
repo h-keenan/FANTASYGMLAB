@@ -367,11 +367,13 @@ export default function MatchupScreen({ route, navigation }: Props) {
                   {realComparison.edge === 'even' ? '' : ` (${realComparison.margin > 0 ? '+' : ''}${realComparison.margin.toFixed(1)})`}
                 </AppText>
               </View>
-              {/* Rendered straight from the API so this line can never drift
-                  into claiming more than the data behind it. */}
-              <AppText style={styles.basisLabel}>{realComparison.basis_label}</AppText>
-              {/* Season-value comparison stays visible, just folded in as
-                  supporting context underneath the live one — never buried. */}
+              {/* `realComparison.basis_label` ("Your actual current-week
+                  lineup and live points, straight from Sleeper.") used to
+                  render here too, but it only restated what the headline
+                  above (and the LIVE badge) already say — dropped as
+                  redundant. Season-value comparison stays visible, folded
+                  in as supporting context underneath the live one — never
+                  buried — since its number is new information. */}
               <AppText style={styles.secondaryBasisLabel}>
                 By season value: {comparison.headline}
                 {comparison.edge === 'even' ? '' : ` (${comparison.margin > 0 ? '+' : ''}${Math.round(comparison.margin).toLocaleString()})`}

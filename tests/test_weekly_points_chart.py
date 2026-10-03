@@ -149,8 +149,8 @@ def test_cached_season_player_weekly_reads_disk_without_fetching(tmp_path, monke
         assert sleeper.cached_season_player_weekly("4046", 2025) == [
             {"week": 1, "fantasy_points_ppr": 12.0}
         ]
-        # No weekly retention (prior seasons), unknown player, missing cache,
-        # and a blank id all fail soft rather than fetching.
+        # Unknown player, a season with no cache file on disk yet, and a
+        # blank id all fail soft rather than fetching.
         assert sleeper.cached_season_player_weekly("9999", 2025) == []
         assert sleeper.cached_season_player_weekly("4046", 2024) == []
         assert sleeper.cached_season_player_weekly("", 2025) == []

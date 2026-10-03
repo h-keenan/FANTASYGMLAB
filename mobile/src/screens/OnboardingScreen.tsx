@@ -60,6 +60,21 @@ const SLIDES: Slide[] = [
     headline: 'Your Next Move is home base',
     body: 'The Dashboard leads with your top priority action first. Everything else on the page supports that one call.',
   },
+  // New slide (welcome/paywall thoroughness pass, 2026-10-02): a tester who
+  // finished the whole tutorial without Premium ever once being mentioned
+  // had no way to know it existed short of noticing a small pill on Home.
+  // Deliberately informational, not a hard sell — no purchase CTA here, just
+  // real feature names (grounded in modules/premium_page.py's
+  // PREMIUM_INCLUDED_NOW/MOBILE_PREMIUM_BENEFIT_LINES, the same list the
+  // Paywall itself renders) and a pointer to where it lives. Keeps this
+  // same two-line headline+body shape as every other slide rather than a
+  // special-cased layout.
+  {
+    key: 'premium',
+    icon: 'star-outline',
+    headline: 'Go deeper with Premium',
+    body: 'Full League Pulse, the complete waiver board, every Trade Hub idea, and Portfolio across every league — find plans anytime from the GM orb.',
+  },
   {
     key: 'team-stance',
     icon: 'compass-outline',

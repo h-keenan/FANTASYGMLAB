@@ -1,0 +1,48 @@
+name: Trade Outcome Result Sweep
+
+# Migrated from Render cron fantasygm-lab-trade-outcome-result-sweep (see
+# render.yaml history) per the cron-migration audit: a standalone batch job
+# with zero runtime dependency on the live Render web services — only talks
+# to Supabase + Sleeper. Schedule matches the old Render cron exactly: daily
+# at 13:00 UTC.
+#
+# Deliberately separate from the push-trigger sweep: this one sends no push
+# and no popup — it only computes a real production/value-score comparison
+# for confirmed ('yes') trades a few weeks old and stores it for the mobile
+# Trade History screen to read on its own next visit (see
+# modules/trade_outcome_results.py). Runs once a day since, by design, it
+# only ever has new eligible rows after a multi-week delay.
+#
+# Required GitHub repo/environment secrets (same names Render's
+# fantasygm-lab-trade-outcome-result-sweep cron used):
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+
+on:
+  schedule:
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trade-outcome-result-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run trade outcome result sweep
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/run_trade_outcome_result_sweep.py

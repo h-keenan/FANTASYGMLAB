@@ -16,6 +16,7 @@ import { api, type GmPlanFocusArea, type GmPlanResponse } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -131,6 +132,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
 function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const icon = FOCUS_META[focusArea.key]?.icon ?? 'ellipse-outline';
 
@@ -167,7 +169,7 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
                   icon="swap-horizontal-outline"
                   color={injuryDisplay ? colors.danger : colors.premium}
                   headline={`${item.my_player} → ${theirPlayerLabel} (${item.partner_team_name})`}
-                  detail={item.rationale || item.trade_confidence_label}
+                  detail={showExplanations ? item.rationale || item.trade_confidence_label : item.trade_confidence_label}
                   last={last}
                 />
               );

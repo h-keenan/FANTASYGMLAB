@@ -164,133 +164,20 @@ services:
       - key: REVENUECAT_BILLING_MODE
         sync: false
         # test until live-billing review; must match SANDBOX vs PRODUCTION events
-  # Basic automated push-trigger sweep (mobile). Deployed 2026-09-21 (crn-dao76krtqb8s73e64hg0)
-  # after finding this Blueprint entry had never been synced — that, plus
-  # the push_tokens/push_notification_log tables never being created, was
-  # the entire "notifications don't work" root cause; all three are fixed
-  # and live now. Every run: checks every registered push token's Sleeper
-  # leagues for a new top_priority/watch "Next Move" item
-  # (modules.push_triggers) and pushes it once via Expo — see
-  # modules/push_triggers.py's module docstring.
-  - type: cron
-    name: fantasygm-lab-push-trigger-sweep
-    branch: main
-    runtime: python
-    schedule: "*/30 * * * *"
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_push_trigger_sweep.py
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.10
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-  # Quiet Trade Outcomes "did it actually work?" result sweep (mobile).
-  # Deliberately separate from the push-trigger sweep above: this one sends
-  # no push and no popup — it only computes a real production/value-score
-  # comparison for confirmed ('yes') trades a few weeks old and stores it
-  # for the mobile Trade History screen to read on its own next visit (see
-  # modules/trade_outcome_results.py). Runs once a day (not */30 * * * *)
-  # since, by design, it only ever has new eligible rows after a multi-week
-  # delay — no reason to pay a real player-valuation pass every 30 minutes.
-  - type: cron
-    name: fantasygm-lab-trade-outcome-result-sweep
-    branch: main
-    runtime: python
-    schedule: "0 13 * * *"
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_trade_outcome_result_sweep.py
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.10
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-  # Auto-refresh data/players.db (P0 fix — see PR #818's postmortem:
-  # players.db sat ~11 weeks stale in production with no scheduled refresh
-  # anywhere). Render persistent disks are single-service and unreachable
-  # from any other service or from a job/cron run at all
-  # (https://render.com/docs/disks); fantasygm-lab and
-  # fantasygm-lab-mobile-api are two independently-deployed services that
-  # each read "data/players.db" from their own git checkout, and neither
-  # has a `disk:` block today. So a shared-disk cron cannot reach both
-  # running services — the only mechanism that does is a new commit on the
-  # branch they both already auto-deploy from (autoDeploy: true, branch:
-  # main). This cron rebuilds players.db (scripts/refresh_players_db_subprocess.py,
-  # the same code the manual refresh script uses) and — only when that
-  # rebuild genuinely succeeded and changed the file's content, see
-  # scripts/refresh_and_commit_players_db.py's module docstring for the
-  # full safety contract — commits it (plus any changed sibling cache
-  # files, e.g. data/sleeper_players.json) and pushes straight to main,
-  # which lets Render's existing auto-deploy pick it up on both services.
-  # Schedule: every 6 hours. Injury/roster status is the single most
-  # time-sensitive field players.db carries — it changes throughout the
-  # week, especially close to game days (Wed/Thu/Sun/Mon) — so a same-day
-  # cadence keeps that reasonably fresh without hammering Sleeper/
-  # FantasyCalc's APIs; FantasyCalc's own on-disk cache already uses a 6h
-  # TTL (modules/fantasycalc.py), so this lines up with staleness the app
-  # already tolerates elsewhere rather than introducing a new bar.
-  - type: cron
-    name: fantasygm-lab-players-db-refresh
-    branch: main
-    runtime: python
-    schedule: "0 */6 * * *"
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/refresh_and_commit_players_db.py
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.10
-      # Fine-grained GitHub PAT scoped to this repo only, Contents: write
-      # permission — used solely to push the refreshed data/players.db (and
-      # any changed sibling cache files) to main. No other scope needed.
-      - key: GITHUB_PUSH_TOKEN
-        sync: false
-      - key: GITHUB_REPO_SLUG
-        value: h-keenan/FANTASYGMLAB
-  # Frequent injury-status-only sync for data/players.db — deliberately
-  # separate from, and far more frequent than, the full rebuild cron right
-  # above. That 6-hour full rebuild recomputes every column (valuation,
-  # scoring, usage shares, stats joins, ...), which is overkill to run more
-  # often just to catch injury-status churn; but 6 hours is too coarse for
-  # injury status specifically — a player ruled OUT (or upgraded/downgraded
-  # between Questionable/Doubtful) on a Friday afternoon could otherwise sit
-  # stale in players.db for most of a game week. modules.sleeper.
-  # get_players() already fetches Sleeper's full raw player list —
-  # status/injury_status included — cheaply (no valuation recompute, its
-  # own 5-minute disk cache), so this cron does only that fetch and PATCHes
-  # the status/injury_status columns directly onto matching player_id rows
-  # in the existing SQLite file (scripts/sync_injury_status.py). It never
-  # runs build_players_table() and never touches any valuation/score/usage
-  # column; a Sleeper player_id not yet present in players.db is skipped
-  # (only a full rebuild inserts new rows — see that script's docstring).
-  # Schedule: every 30 minutes, matching fantasygm-lab-push-trigger-sweep's
-  # cadence above — frequent enough that a mid-week injury designation
-  # change reaches the app same-cycle, without meaningfully increasing load
-  # on Sleeper's API given its own 5-minute cache already dedupes fetches
-  # that land close together with the full-rebuild cron or the live app.
-  # Race safety vs. the full-rebuild cron above: both scripts call
-  # sync_to_latest_branch() (fetch + hard-reset to origin/main) before
-  # diffing, and neither ever force-pushes, so if both happen to run close
-  # together the loser's plain fast-forward push is cleanly rejected (never
-  # clobbers the winner) and its dropped update is simply recomputed and
-  # retried on that cron's own next cycle — see scripts/sync_injury_status.py's
-  # module docstring for the full reasoning.
-  - type: cron
-    name: fantasygm-lab-injury-status-sync
-    branch: main
-    runtime: python
-    schedule: "*/30 * * * *"
-    buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/sync_injury_status.py
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.10
-      # Same fine-grained GitHub PAT as fantasygm-lab-players-db-refresh —
-      # used solely to push the patched data/players.db (and the changed
-      # data/sleeper_players.json cache sibling, when applicable) to main.
-      - key: GITHUB_PUSH_TOKEN
-        sync: false
-      - key: GITHUB_REPO_SLUG
-        value: h-keenan/FANTASYGMLAB
+  # The 4 cron jobs that used to live here (fantasygm-lab-push-trigger-sweep,
+  # fantasygm-lab-trade-outcome-result-sweep, fantasygm-lab-players-db-refresh,
+  # fantasygm-lab-injury-status-sync) moved to GitHub Actions scheduled
+  # workflows, per the cron-migration audit's recommendation: all 4 are
+  # standalone batch jobs with zero runtime dependency on the live Render web
+  # services above, and this repo already runs GitHub Actions for CI
+  # ("Delivery Validation" in .github/workflows/ci.yml), so the
+  # secrets-management pattern was already proven here. Removed here (rather
+  # than left running alongside their GitHub Actions equivalents) to avoid
+  # double-executing the same sweeps/refreshes and risking duplicate git
+  # commits/push notifications. See:
+  #   .github/workflows/push-trigger-sweep.yml
+  #   .github/workflows/trade-outcome-result-sweep.yml
+  #   .github/workflows/players-db-refresh.yml
+  #   .github/workflows/injury-status-sync.yml
+  # Each documents its own required secrets and schedule (unchanged from the
+  # Render cron it replaces) in its header comment.

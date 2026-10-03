@@ -142,3 +142,64 @@ def test_league_ownership_is_recomputed_without_provider_calls():
         league_b = player_state_authority.waiver_actionable_player_pool(frame, {"r": ["b"]})
     assert league_a["player_id"].tolist() == ["b"]
     assert league_b["player_id"].tolist() == ["a"]
+
+
+def test_zero_snap_role_blocked_player_is_not_ranked_despite_high_value_score():
+    """Regression for the real waiver-add bug report where a 0%-snap RB with
+    rankings.py's ``workload_trend == "Blocked"`` label (role trending down,
+    no live path to touches) still surfaced as a Priority Add because his
+    long-horizon ``value_score`` (dynasty age-curve/draft-capital, not
+    current usage) cleared the "elite wire value" cutoff.
+
+    A player rankings.py itself has already judged to have no current role
+    must never outrank, or even qualify alongside, a healthy free agent with
+    a real current role, no matter how high his legacy value score reads.
+    """
+
+    blocked = _player(
+        "blocked-high-value",
+        position="RB",
+        fantasy_positions=["RB"],
+        age=23,
+        dynasty_score=3760,
+        value_score=3760,
+        opportunity_label="Buried Depth",
+        workload_trend="Blocked",
+        projected_starter=False,
+        snap_share=0.0,
+    )
+    healthy = _player(
+        "healthy-role",
+        position="RB",
+        fantasy_positions=["RB"],
+        age=27,
+        dynasty_score=1200,
+        value_score=1200,
+        opportunity_label="Committee Back",
+        workload_trend="Rising",
+        projected_starter=False,
+        snap_share=0.45,
+    )
+
+    ranked = waivers_ui.rank_priority_add_candidates(
+        pd.DataFrame([blocked, healthy]),
+        score_field="value_score",
+        needed_positions=["RB"],
+        league_settings={"qb_format": "1QB"},
+        roster_df=pd.DataFrame(),
+        max_items=6,
+    )
+    assert "blocked-high-value" not in ranked["player_id"].astype(str).tolist()
+    assert ranked["player_id"].astype(str).tolist() == ["healthy-role"]
+
+    # Even with no roster-need competition at all, a role-blocked zero-usage
+    # player must not clear the ranker on value score alone.
+    solo = waivers_ui.rank_priority_add_candidates(
+        pd.DataFrame([blocked]),
+        score_field="value_score",
+        needed_positions=[],
+        league_settings={"qb_format": "1QB"},
+        roster_df=pd.DataFrame(),
+        max_items=6,
+    )
+    assert solo.empty

@@ -146,9 +146,19 @@ def _age_hours(path: Path) -> float | None:
 
 def _environment_label(environ: Mapping[str, Any] | None = None) -> str:
     env = os.environ if environ is None else environ
-    if app_config.is_managed_cloud_host(environ=env):
+    on_render = (
+        str(env.get("RENDER") or "").strip().casefold() in app_config.TRUE_CONFIG_VALUES
+        or bool(str(env.get("RENDER_SERVICE_ID") or "").strip())
+        or bool(str(env.get("RENDER_EXTERNAL_URL") or "").strip())
+    )
+    if on_render:
         service = str(env.get("RENDER_SERVICE_NAME") or env.get("RENDER_SERVICE_ID") or "render")
         return f"render:{service}"
+    if app_config.is_managed_cloud_host(environ=env):
+        # Self-hosted docker-compose stack (docs/SELF_HOSTED_MIGRATION.md) —
+        # distinct from the "render:" labels above so this ops dashboard
+        # never implies the self-hosted box is a local/dev checkout.
+        return "self_hosted"
     return "local"
 
 

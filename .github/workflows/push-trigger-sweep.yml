@@ -1,0 +1,46 @@
+name: Push Trigger Sweep
+
+# Migrated from Render cron fantasygm-lab-push-trigger-sweep (see render.yaml
+# history) per the cron-migration audit: this is a standalone batch job with
+# zero runtime dependency on the live Render web services — it only talks to
+# Supabase REST + Expo's push API — so it has no reason to live on Render at
+# all. Schedule matches the old Render cron exactly: every 30 minutes.
+#
+# Checks every registered push token's Sleeper leagues for a new
+# top_priority/watch "Next Move" item (modules.push_triggers) and pushes it
+# once via Expo; also runs the quiet trade-outcome follow-up nudge sweep. See
+# modules/push_triggers.py's module docstring.
+#
+# Required GitHub repo/environment secrets (same names Render's
+# fantasygm-lab-push-trigger-sweep cron used):
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: push-trigger-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run push trigger sweep
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/run_push_trigger_sweep.py

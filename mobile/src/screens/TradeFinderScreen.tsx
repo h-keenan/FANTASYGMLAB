@@ -28,12 +28,13 @@ import {
   type TradeIdea,
 } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
-import { disabledOpacity, radii, shadows, spacing, type ThemeColors } from '../theme';
+import { radii, shadows, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeFinder'>;
@@ -152,6 +153,7 @@ function ExchangeAssetList({
             position={asset.position}
             team={asset.team}
             tier={asset.tier}
+            overallRating={asset.overall_rating}
             opportunityLabel={asset.role}
             contextLine={asset.age != null ? `Age ${asset.age}` : null}
             injuryLabel={asset.injury_status}
@@ -256,6 +258,7 @@ function ResultCard({
   onPressPick: (asset: PresentationAsset) => void;
 }) {
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
@@ -316,7 +319,7 @@ function ResultCard({
         </View>
       </View>
 
-      {idea.rationale ? (
+      {showExplanations && idea.rationale ? (
         <>
           <AppText style={styles.rationaleLabel}>Why this works</AppText>
           <AppText style={styles.rationale} numberOfLines={4}>
@@ -494,28 +497,38 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
         )}
       />
 
-      <TouchableOpacity
-        style={[
-          styles.searchButton,
-          // Sits above GM Orb's own darkening scrim rather than inside it —
-          // stacked there, the button's solid fill and the scrim gradient
-          // read as one muddy double-treatment at the bottom of the screen.
-          { bottom: orbClearance + spacing.sm },
-          selectedIds.size === 0 && styles.searchButtonDisabled,
-        ]}
-        onPress={search}
-        disabled={searching || selectedIds.size === 0}
-        accessibilityRole="button"
-        accessibilityLabel="Find Trades"
-      >
-        {searching ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <AppText style={styles.searchButtonText}>
-            Find Trades{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-          </AppText>
-        )}
-      </TouchableOpacity>
+      {/* coridian_: "find trades button is glitched and floating" at zero
+          selected. Two prior passes found the absolute-position math itself
+          correct (left/right/bottom all set, no stray relative ancestor) —
+          the real bug was the disabled treatment: a 50%-opacity *solid*
+          floating bar sitting on top of a scrollable list reads as a
+          translucent ghost over whatever roster row happens to be scrolled
+          underneath it, not as a dimmed button. There's nothing useful to
+          do with zero players picked anyway (search is a no-op), so this
+          hides the bar entirely instead of rendering a disabled one — also
+          keeps this screen inside Magna Carta's "no content hidden beneath
+          overlays" rule. */}
+      {selectedIds.size > 0 ? (
+        <TouchableOpacity
+          style={[
+            styles.searchButton,
+            // Sits above GM Orb's own darkening scrim rather than inside it —
+            // stacked there, the button's solid fill and the scrim gradient
+            // read as one muddy double-treatment at the bottom of the screen.
+            { bottom: orbClearance + spacing.sm },
+          ]}
+          onPress={search}
+          disabled={searching}
+          accessibilityRole="button"
+          accessibilityLabel="Find Trades"
+        >
+          {searching ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <AppText style={styles.searchButtonText}>Find Trades ({selectedIds.size})</AppText>
+          )}
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -679,7 +692,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       ...shadows.resting,
     },
-    searchButtonDisabled: { opacity: disabledOpacity },
     searchButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });

@@ -370,6 +370,32 @@ def rank_priority_add_candidates(
         "injury_replacement_fit",
         pd.Series(False, index=candidates.index, dtype="bool"),
     ).fillna(False)
+    # rankings.opportunity_profile() sets workload_trend="Blocked" as the
+    # fallback tier of its own opportunity hierarchy (below Buried Depth/
+    # Handcuff/Committee Back/etc.) precisely for players with no live path
+    # to snaps right now — the same value the Player Detail screen renders
+    # as "Role trending down — Blocked". value_score/dynasty_score are
+    # long-horizon (draft capital, age curve) and can stay high for a young
+    # former-high-pick player years after their real-world role has
+    # collapsed; without this gate that legacy value score alone was enough
+    # to clear the "elite wire value" cutoff below and surface a 0%-snap,
+    # role-blocked player (e.g. Audric Estime, RB) as a Priority Add. A
+    # candidate whose opportunity genuinely reopens (e.g. the player ahead
+    # of them gets hurt) is re-labeled out of "Blocked" upstream in
+    # rankings.py on the next refresh, so gating on this column does not
+    # punish real opportunity swings — only players rankings.py itself has
+    # already judged to have no current role.
+    role_blocked = (
+        candidates.get(
+            "workload_trend",
+            pd.Series("", index=candidates.index, dtype="object"),
+        )
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+        == "blocked"
+    )
 
     kicker_required = int(settings.get("k_count") or 0) > 0
     has_viable_kicker = _roster_has_viable_kicker(
@@ -378,7 +404,7 @@ def rank_priority_add_candidates(
     suppress_kickers = not (kicker_required and not has_viable_kicker)
     qb_format = _qb_format(settings)
 
-    positive = candidates[(~stale) & (scores > 0)].copy()
+    positive = candidates[(~stale) & (~role_blocked) & (scores > 0)].copy()
     if positive.empty:
         return candidates.iloc[0:0].copy()
 

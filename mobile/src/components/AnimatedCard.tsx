@@ -8,7 +8,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useThemeMode } from '../context/ThemeModeContext';
-import { gradients, lightGradients, motion, radii, shadows, spacing, type ThemeColors } from '../theme';
+import { glowShadow, gradients, lightGradients, motion, radii, shadows, spacing, type ThemeColors } from '../theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -21,6 +21,14 @@ interface AnimatedCardProps extends PressableProps {
    * coridian_'s "distinct accents, but don't overdo it," this stays rare on
    * purpose so it still reads as "this one matters" when it shows up. */
   glow?: boolean;
+  /** Overrides the glow rim gradient and drop shadow with a single solid
+   * color instead of the universal brand cyan. For a card whose own content
+   * already carries a semantic/category color (icon, ring, headline number),
+   * passing that same color here keeps the rim+shadow and the content
+   * reading as one accent instead of two unrelated ones clashing (e.g.
+   * RecapScreen's hero card, matched to its featured story's category).
+   * Ignored unless `glow` is also set. */
+  glowColor?: string;
 }
 
 /**
@@ -33,7 +41,7 @@ interface AnimatedCardProps extends PressableProps {
  * corner radius rather than needing a separate clipped wrapper, so it never
  * fights a caller's padding.
  */
-export default function AnimatedCard({ style, children, glow, onPressIn, onPressOut, ...rest }: AnimatedCardProps) {
+export default function AnimatedCard({ style, children, glow, glowColor, onPressIn, onPressOut, ...rest }: AnimatedCardProps) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useSharedValue(1);
@@ -68,8 +76,11 @@ export default function AnimatedCard({ style, children, glow, onPressIn, onPress
 
   if (!glow) return pressable;
 
+  const rimColors = glowColor ? ([glowColor, glowColor] as const) : isDark ? gradients.accent : lightGradients.accent;
+  const rimShadow = glowColor ? glowShadow(glowColor) : shadows.orbGlow;
+
   return (
-    <LinearGradient colors={isDark ? gradients.accent : lightGradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.glowRim}>
+    <LinearGradient colors={rimColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.glowRim, rimShadow]}>
       {pressable}
     </LinearGradient>
   );
@@ -95,10 +106,13 @@ function createStyles(colors: ThemeColors) {
     borderTopRightRadius: radii.md,
     backgroundColor: '#FFFFFF',
   },
+  // Shadow is applied at render time (default `shadows.orbGlow`, or
+  // `glowShadow(glowColor)` when a caller overrides the rim color) rather
+  // than baked in here, so a single `glow` card can tint its own drop
+  // shadow instead of always inheriting brand cyan.
   glowRim: {
     borderRadius: radii.md,
     padding: 1.5,
-    ...shadows.orbGlow,
   },
   cardGlowInner: { borderWidth: 0 },
   });

@@ -39,6 +39,7 @@ import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -597,6 +598,7 @@ function VerdictCard({
   onBuildCounter: () => void;
 }) {
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
   const toneColor = toneColors(colors)[verdict.tone];
@@ -636,27 +638,29 @@ function VerdictCard({
           Hub's cards, applied to the verdict's own value_delta so the two
           surfaces agree on what a value edge looks like. */}
       <TradeValueBar delta={verdict.value_delta} style={styles.verdictValueBar} />
-      <AppText style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</AppText>
-
-      <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
-      <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={toneColor} />
-      <VerdictSection icon="compass-outline" label="Strategy fit" text={verdict.strategy_summary} color={toneColor} />
-      <VerdictSection icon="warning-outline" label="Risk" text={verdict.risk_summary} color={colors.danger} />
-      {verdict.counter_guidance ? (
+      {showExplanations ? (
         <>
-          <VerdictSection
-            icon="swap-horizontal-outline"
-            label="Counter guidance"
-            text={verdict.counter_guidance}
-            color={colors.premium}
-          />
-          {verdict.counter_action && verdict.counter_action.asset_type === 'player' ? (
-            <TouchableOpacity style={styles.counterButton} onPress={onBuildCounter}>
-              <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
-              <AppText style={styles.counterButtonText}>Build the counter</AppText>
-            </TouchableOpacity>
+          <AppText style={[styles.verdictText, styles.verdictRationale]}>{verdict.rationale}</AppText>
+
+          <VerdictSection icon="cash-outline" label="Value" text={verdict.value_summary} color={toneColor} />
+          <VerdictSection icon="people-outline" label="Roster fit" text={verdict.roster_summary} color={toneColor} />
+          <VerdictSection icon="compass-outline" label="Strategy fit" text={verdict.strategy_summary} color={toneColor} />
+          <VerdictSection icon="warning-outline" label="Risk" text={verdict.risk_summary} color={colors.danger} />
+          {verdict.counter_guidance ? (
+            <VerdictSection
+              icon="swap-horizontal-outline"
+              label="Counter guidance"
+              text={verdict.counter_guidance}
+              color={colors.premium}
+            />
           ) : null}
         </>
+      ) : null}
+      {verdict.counter_action && verdict.counter_action.asset_type === 'player' ? (
+        <TouchableOpacity style={styles.counterButton} onPress={onBuildCounter}>
+          <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+          <AppText style={styles.counterButtonText}>Build the counter</AppText>
+        </TouchableOpacity>
       ) : null}
 
       <TradeSharePreviewModal
@@ -717,6 +721,7 @@ function TradeSide({
                   position={item.player.position}
                   team={item.player.team}
                   tier={item.player.tier}
+                  overallRating={item.player.overall_rating}
                   onPress={() => onRemove(item.player.player_id)}
                   showDivider={showDivider}
                 />

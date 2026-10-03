@@ -161,6 +161,19 @@ At this point DNS still points at Render, so nothing public-facing has
 changed yet. Verify the new stack directly against the server's IP before
 touching DNS (see "Pre-cutover verification" below).
 
+`docker-compose.yml` sets `DYNASTYGM_SELF_HOSTED=1` on every app service
+automatically — this is **not** something to add to `.env`. It is the
+marker `modules/app_config.py`'s `is_managed_cloud_host()` needs to treat
+this box the same way it already treats Render (platform-injected
+`RENDER`/`RENDER_SERVICE_ID`/`RENDER_EXTERNAL_URL`): fail closed on missing
+Supabase config instead of silently running as if this were a contributor's
+local checkout, and keep customer-unsafe debug/premium-override switches
+locked. If `docker compose ps` or the app's own behavior ever suggests this
+box is being treated as "local" (e.g. the Founder Ops environment label
+reads anything other than `self_hosted`), check that this var actually
+reached the container (`docker compose exec web env | grep DYNASTYGM_SELF_HOSTED`)
+before debugging anything else.
+
 ### 3.1 Install the systemd unit (start on boot)
 
 ```bash
@@ -255,6 +268,41 @@ Notes:
 - After cutover, update the Stripe webhook endpoint URL and RevenueCat
   webhook URL in their respective dashboards if you repointed those
   subdomains, and re-verify a real signed webhook reaches the new host.
+
+## 5.5. Keeping the box in sync with `main` (no auto-deploy here)
+
+Render auto-deploys on every push to `main` — that behavior does **not**
+exist on this box. Nothing in this repo (no GitHub Actions workflow, no
+webhook, no cron) rebuilds or restarts this stack when `main` changes;
+`.github/workflows/` only runs CI (`ci.yml`), a keep-alive ping
+(`keep-alive.yml`), and auto-merge (`auto-merge.yml`) — none of them touch
+this server. The stack runs whatever was on disk the last time someone ran
+section 3's `docker compose build && docker compose up -d` here, and it
+will keep serving that exact build indefinitely, through any number of
+later merges to `main`, until a human repeats those steps.
+
+Concretely: if this box was stood up once and left alone, it can silently
+drift arbitrarily far behind `main` — including missing later brand-asset,
+styling, or welcome-screen changes that look completely normal in the repo
+and in CI, but were never actually deployed here. If the live site ever
+looks wrong in a way the current `main` branch's code doesn't explain,
+check this first, before assuming it's a code bug:
+
+```bash
+cd /opt/fantasygmlab
+git fetch origin
+git log --oneline HEAD..origin/main   # anything listed here is NOT live yet
+git pull
+docker compose build
+docker compose up -d
+docker compose ps --format 'table {{.Name}}\t{{.Status}}'
+```
+
+Standing up real continuous deployment for this box (e.g. a scheduled or
+webhook-triggered GitHub Actions job that SSHes in and runs the block
+above) is a reasonable follow-up, but is intentionally out of scope here —
+it needs a deploy credential/secret decision this runbook isn't positioned
+to make unilaterally.
 
 ## 6. Rollback plan
 
@@ -413,7 +461,7 @@ migration prep itself.
 |---|---|
 | `Dockerfile` | Multi-stage build (builder installs deps into a venv; runtime stage is a slim Python image + app code). One shared image for all four real services — see the Dockerfile's own header comment for the reasoning. |
 | `.dockerignore` | Keeps the build context to only what the Python services need (excludes `mobile/`, `tests/`, `docs/`, dev/editor state, secrets). |
-| `docker-compose.yml` | Orchestrates `web`, `mobile-api`, `redis`, `stripe-webhook`, `revenuecat-webhook`, and `caddy`; healthchecks on each app service's existing `/health`/`/_stcore/health` endpoint (and `redis-cli ping` for `redis`); `mobile-api` depends on `redis` reporting healthy before it starts; `restart: unless-stopped` everywhere; secrets only via `.env`. |
+| `docker-compose.yml` | Orchestrates `web`, `mobile-api`, `redis`, `stripe-webhook`, `revenuecat-webhook`, and `caddy`; healthchecks on each app service's existing `/health`/`/_stcore/health` endpoint (and `redis-cli ping` for `redis`); `mobile-api` depends on `redis` reporting healthy before it starts, and `caddy` waits on all four app services' healthchecks (`depends_on: condition: service_healthy`) before proxying; `restart: unless-stopped` everywhere; secrets only via `.env`; sets `DYNASTYGM_SELF_HOSTED=1` on every app service (see section 3). |
 | `Caddyfile` | Reverse proxy + automatic HTTPS routing per placeholder subdomain, plus static `file_server` for the marketing site. |
 | `.env.example` | Every required secret/variable name, matching `render.yaml`'s names exactly, with a comment on which Render service/dashboard it comes from. Copy to `.env` (gitignored) and fill in real values. |
 | `deploy/systemd/fantasygmlab.service` | systemd unit so the stack starts on boot and stops cleanly on `systemctl stop`. |

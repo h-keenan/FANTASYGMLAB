@@ -174,6 +174,64 @@ def test_direct_one_for_one_swap_fires_when_no_picks_are_in_play(monkeypatch):
     )
 
 
+def test_trade_finder_surfaces_ideas_for_a_single_protected_asset_on_a_rebuild_team():
+    """Regression for coridian_'s second "0 plausible trades" Trade Finder
+    report: selecting a single core/protected asset (an Elite-tier WR,
+    young, on a Rebuild/Asset-Consolidator team) returned zero ideas even
+    though plain one-for-one swaps against comparably-valued league WRs
+    existed.
+
+    `allow_protected_focus` already lets this asset survive the outgoing-
+    pool filter (`_automatic_outgoing_asset_allowed`), but
+    `evaluate_trade_market_realism` has its OWN, separate protected/
+    cornerstone hard-fail gate keyed on the same `explicit_player_focus` /
+    `focused_player_ids` pair - without threading them through from
+    `_build_trade_ideas_impl` too, every package built around the
+    explicitly-selected protected asset was hard-failed right back out at
+    the market-realism stage. Uses the real (unmocked)
+    evaluate_trade_market_realism/_fit_priority/_trade_fit_context/
+    _trade_reasoning_context pipeline via the synthetic fixture builder
+    scripts/profile_trade_hub.py already uses elsewhere, specifically so
+    this doesn't pass for the wrong reason the way a deterministic-context
+    mock would."""
+
+    from scripts.profile_trade_hub import FixtureSpec, build_fixture
+
+    fixture = build_fixture(FixtureSpec("rebuild-single-focus", 12, 14, "1 QB", strategy="rebuild"))
+    players = fixture["players"]
+    focal_id = "F01-06"
+    idx = players.index[players["player_id"] == focal_id]
+    assert len(idx) == 1
+    players.loc[idx, "value_score"] = 8600
+    players.loc[idx, "dynasty_score"] = 8600
+    players.loc[idx, "fantasycalc_value"] = 8600.0
+    players.loc[idx, "age"] = 23.0
+    players.loc[idx, "player_tier"] = "Elite"
+
+    ideas = trade_ideas.build_trade_ideas(
+        players,
+        "fixture-league",
+        fixture["summary"],
+        1,
+        [focal_id],
+        [],
+        {},
+        max_ideas=20,
+        score_field="value_score",
+        pick_score_multiplier=1.0,
+        team_strategy="rebuild",
+        league_settings=fixture["settings"],
+        draft_status={"draft_year": 2026, "current_year_picks_active": True},
+        adapter=fixture["adapter"],
+        allow_protected_focus=True,
+    )
+
+    assert ideas
+    assert all(
+        any(asset.get("player_id") == focal_id for asset in idea["send_assets"]) for idea in ideas
+    )
+
+
 def test_trade_flame_diagnostics_include_all_generation_stages(monkeypatch):
     events = [
         {

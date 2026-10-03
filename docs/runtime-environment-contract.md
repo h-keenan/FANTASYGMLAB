@@ -22,8 +22,9 @@ not currently deployed** architecture — do not treat it as live.
 
 | Mode | How detected | Missing required config |
 | --- | --- | --- |
-| Local / CI | `RENDER` / `RENDER_SERVICE_ID` / `RENDER_EXTERNAL_URL` unset | App may run without auth/billing; features fail closed |
+| Local / CI | `RENDER` / `RENDER_SERVICE_ID` / `RENDER_EXTERNAL_URL` and `DYNASTYGM_SELF_HOSTED` all unset | App may run without auth/billing; features fail closed |
 | Managed web (`FANTASYGMLAB`) | Render injects those platform vars | Missing Supabase URL/anon, loopback `APP_BASE_URL`, or webhook-only secrets on the web process → `ProductionConfigurationError` (no guest/dev disguise) |
+| Managed web, self-hosted (docs/SELF_HOSTED_MIGRATION.md) | `docker-compose.yml` sets `DYNASTYGM_SELF_HOSTED=1` on every app service | Same fail-closed behavior as Render-managed web — `is_managed_cloud_host()` treats this the same as Render |
 | Webhook (`fantasygmlab-stripe-webhook`) | Separate service | `/ready` returns 503; `/health` stays up. No startup provider calls |
 
 Stripe checkout remains optional on the web process: missing prices/secret
@@ -66,6 +67,7 @@ disables checkout (fail-closed) and does **not** take down the app.
 | `PYTHON_VERSION` | Render Blueprint | runtime | No | Yes (`3.12.10`) | Use `.python-version` | Blueprint | Wrong Python is a deploy issue | Yes |
 | `PORT` | Render | Streamlit / uvicorn | No | Platform | n/a | platform | Process bind | Yes |
 | `RENDER` / `RENDER_SERVICE_ID` / `RENDER_EXTERNAL_URL` | Render | managed-host detection | No | Auto | Unset | unset locally | Local contract | Yes |
+| `DYNASTYGM_SELF_HOSTED` | Self-hosted docker-compose (`docker-compose.yml`) | managed-host detection | No | Auto (set by `docker-compose.yml` on every app service, not `.env`) | Unset | unset locally | Without it, the self-hosted box (docs/SELF_HOSTED_MIGRATION.md) is indistinguishable from a local/dev checkout: `enforce_managed_web_config` no-ops instead of failing closed, and debug/premium-override locks default open | Yes |
 | `RENDER_GIT_COMMIT` / `RENDER_GIT_BRANCH` | Render | `build_identity` | No | Auto | Unset | `DYNASTYGM_BUILD` or `local` | Footer label | Yes |
 | `RENDER_SERVICE_NAME` / `RENDER_DEPLOYED_AT` | Render | Founder Ops label | No | Auto | Unset | process clock | Ops snapshot | Yes |
 

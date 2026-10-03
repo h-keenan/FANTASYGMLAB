@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   Modal,
@@ -16,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import AwardsStrip from '../components/AwardsStrip';
+import CircularProgressRing from '../components/CircularProgressRing';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -27,6 +27,7 @@ import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnaps
 import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
+import SkeletonBlock, { SkeletonCard, SkeletonChart, SkeletonRow } from '../components/SkeletonBlock';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import { injuryTone } from '../lib/injuryDisplay';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
@@ -47,6 +48,7 @@ import {
 import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor, resolvePlayerTier } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -336,11 +338,54 @@ function PercentBar({
   );
 }
 
+/** Snap % specifically, per coridian_'s Discord ask (screenshots of Michael
+ * Mayer's page): "like the overall" — i.e. the same CircularProgressRing
+ * PlayerHero uses for OVR, not the linear bar every other Usage row gets.
+ * Only this one row renders this way; Route %/Target Share/Carry Share etc.
+ * stay on PercentBar below. Percentile/trend-icon treatment is preserved so
+ * this row carries the same context the bar rows do, just laid out beside
+ * the ring instead of under the label. */
+function PercentRing({
+  label,
+  percent,
+  display,
+  percentile,
+}: {
+  label: string;
+  percent: number;
+  display: string;
+  percentile?: number | null;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const pctl = percentileLabel(percentile);
+  return (
+    <View style={styles.percentRingRow}>
+      <View style={styles.percentRingLabelCol}>
+        <AppText style={styles.percentLabel} numberOfLines={1}>
+          {label}
+        </AppText>
+        {pctl ? (
+          <View style={styles.statCellPercentileRow}>
+            <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile, colors)} />
+            <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile, colors) }]}>{pctl}</AppText>
+          </View>
+        ) : null}
+      </View>
+      <CircularProgressRing percent={percent} size={52} strokeWidth={5} valueLabel={display} valueFontScale={0.28} color={colors.accent} />
+    </View>
+  );
+}
+
 /** Usage stats (Snap %, Route %, Target Share, Carry Share, Opportunity)
  * are all shares — a plain number is harder to size up at a glance than a
  * bar, so this renders each as one instead of falling through to the
  * generic StatGrid the other sections use. Renders bare rows only — the
- * caller (AnalyticsSection) supplies the card chrome and "Usage" heading. */
+ * caller (AnalyticsSection) supplies the card chrome and "Usage" heading.
+ *
+ * Snap % is the one exception: coridian_ asked for it specifically to read
+ * "like the overall" OVR ring (Discord, Michael Mayer screenshots) rather
+ * than the linear bar every other usage share still uses here. */
 function UsageRows({ items }: { items: QuickViewStatItem[] }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -353,6 +398,17 @@ function UsageRows({ items }: { items: QuickViewStatItem[] }) {
             <View key={`${item.label}-${index}`} style={styles.percentFallbackRow}>
               <StatCell label={item.label} value={item.value || null} percentile={item.percentile} />
             </View>
+          );
+        }
+        if (item.label === 'Snap %') {
+          return (
+            <PercentRing
+              key={`${item.label}-${index}`}
+              label={item.label}
+              percent={percent}
+              display={item.value}
+              percentile={item.percentile}
+            />
           );
         }
         return (
@@ -438,12 +494,28 @@ function statGroupOrderForPosition(position: string): StatGroupKey[] {
  * always wraps a group of 3+ into multiple rows. This only overrides sizing
  * per-instance via the `style` prop MetricCard already documents for exactly
  * this purpose, so no shared-component default changes. Groups of 1-2 keep
- * the original two-up sizing; 5+ (none currently exist) falls back to it too
- * rather than squeezing five cards into an unreadable single row.
+ * the original two-up sizing.
+ *
+ * 5+ (coridian_: RB's 5-item Production — Games/Rush Att/Rush Yards/Rush
+ * TDs/Targets — and a receiving back's 5-item Efficiency — Targets/Gm,
+ * Rec/Gm, Yards/Catch, Carries/Gm, Yards/Carry all present — both used to
+ * fall through to the 2-up default above, which renders 2+2+1: a trailing
+ * row with one half-empty tile, three rows total where coridian_ wants
+ * "1 or 2 rows"). Every count here is data-driven server-side (see
+ * player_quick_view.py's `_key_stats`/`_efficiency_stats`) and varies by
+ * position and season, so rather than hardcode a 5-item layout, pick
+ * whichever of 3 or 4 columns divides the group without leaving a 1-tile
+ * orphan row, trying 4 (denser) first: 5 -> 3+2, 6 -> 4+2, 7 -> 4+3,
+ * 8 -> 4+4. If neither avoids an orphan (e.g. 9), 3 columns loses fewer
+ * tiles to the trailing row than 4 would at the same count.
  */
 function metricGroupCardStyle(count: number): { minWidth: number; flexBasis: `${number}%` } {
   if (count === 3) return { minWidth: 88, flexBasis: '31%' };
   if (count === 4) return { minWidth: 76, flexBasis: '23%' };
+  if (count >= 5) {
+    if (count % 4 !== 1) return { minWidth: 76, flexBasis: '23%' };
+    return { minWidth: 88, flexBasis: '31%' };
+  }
   return { minWidth: 120, flexBasis: '46%' };
 }
 
@@ -535,7 +607,7 @@ function TrendsSection({ playerId, yearsInLeague }: { playerId: string; yearsInL
         </View>
       ) : null}
       {loading || weeks === null ? (
-        <ActivityIndicator style={styles.loader} color={colors.accent} />
+        <SkeletonChart />
       ) : (
         <WeeklyPointsChart weeks={weeks} />
       )}
@@ -628,7 +700,15 @@ function CareerSection({ playerId }: { playerId: string }) {
   }, [playerId]);
 
   if (seasons === null) {
-    return <ActivityIndicator style={styles.loader} color={colors.accent} />;
+    // Shaped like the two most recent CareerSeasonCard entries (header +
+    // stat-tile grid) rather than a bare spinner floating above an
+    // otherwise-empty tab.
+    return (
+      <>
+        <SkeletonCard rows={4} />
+        <SkeletonCard rows={4} style={styles.cardSpaced} />
+      </>
+    );
   }
   if (seasons.length === 0) {
     return <AppText style={styles.notice}>No season history available for this player yet.</AppText>;
@@ -773,7 +853,15 @@ function ScheduleSection({ playerId }: { playerId: string }) {
   }, [playerId]);
 
   if (weeks === null) {
-    return <ActivityIndicator style={styles.loader} color={colors.accent} />;
+    // Row-shaped — matches ScheduleRow's own avatar-less row layout better
+    // than a lone centered spinner over empty space.
+    return (
+      <View style={styles.card}>
+        {Array.from({ length: 5 }, (_, index) => (
+          <SkeletonRow key={index} />
+        ))}
+      </View>
+    );
   }
   if (weeks.length === 0) {
     return <AppText style={styles.notice}>No schedule available for this player's team yet.</AppText>;
@@ -900,13 +988,14 @@ function InsightChipsRow({ model }: { model: QuickViewModel }) {
 
 function ModelSection({ model }: { model: QuickViewModel }) {
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const trendKey = (model.workload_trend ?? '').toLowerCase();
   const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
   return (
     <View style={styles.card}>
       <SectionHeading title="Model Breakdown" icon="analytics-outline" />
-      {model.decision_fit_narrative ? (
+      {showExplanations && model.decision_fit_narrative ? (
         <AppText style={styles.decisionFitNarrative}>{model.decision_fit_narrative}</AppText>
       ) : null}
       <StatGrid
@@ -979,6 +1068,11 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   });
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [newsModalOpen, setNewsModalOpen] = useState(false);
+  // Overall + Snapshot module: collapsed by default, tapping the hero's OVR
+  // ring reveals the Snapshot detail in place (coridian_, Discord — "if you
+  // tap on the overall, it gives you the expanded information") instead of
+  // the Snapshot card always sitting below the tab bar taking up space.
+  const [snapshotExpanded, setSnapshotExpanded] = useState(false);
 
   useScreenHeaderTitle(navigation, player.name ?? 'Player');
 
@@ -1338,6 +1432,8 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       overallRating={overallRating}
       ringColor={overallRating !== null ? percentileColor(overallRating, colors) : colors.accent}
       glowColor={tierIdentity.color}
+      expanded={snapshotExpanded}
+      onToggleExpand={overallRating !== null ? () => setSnapshotExpanded((value) => !value) : undefined}
     >
       {heroActions}
     </PlayerHero>,
@@ -1349,14 +1445,20 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   // segmented tab bar, not above it as the RB concept/previous fidelity pass
   // had it. Built once here and pushed at the right spot in each branch
   // below rather than duplicated.
-  const snapshotNode = (
+  //
+  // Per coridian_'s later "overall + snapshot, one module, tap to expand"
+  // ask, this (and the rank-unavailable note that explains it) only
+  // mounts once `snapshotExpanded` is true — toggled by tapping the OVR
+  // ring in the hero above. Collapsed, it takes up no space at all; the
+  // data itself is unchanged (same PlayerSnapshotCard, same snapshotItems).
+  const snapshotNode = snapshotExpanded ? (
     <PlayerSnapshotCard
       key="snapshot"
       valueScore={player.score != null ? Math.round(player.score) : null}
       items={snapshotItems}
     />
-  );
-  const rankNoteNode = rank.rank_unavailable_reason ? (
+  ) : null;
+  const rankNoteNode = snapshotExpanded && rank.rank_unavailable_reason ? (
     <AppText key="rank-note" style={styles.notice}>
       {rank.rank_unavailable_reason}
     </AppText>
@@ -1367,10 +1469,30 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   if (loading) {
     // No tab bar exists yet during the initial fetch, so there's nothing
     // for Snapshot to sit "below" — render it right after the hero same as
-    // before.
-    content.push(snapshotNode);
+    // before (still gated on snapshotExpanded, same as the non-loading
+    // branch below). Below that, a bare spinner used to float alone in the
+    // large empty area where the Stats tab's analytics cards are about to
+    // render (coridian_'s screenshot report) — these skeleton shapes stand
+    // in for that eventual Fantasy Output / Production / paired
+    // Usage+Efficiency layout instead, so the loading moment reads as
+    // "content is coming", not "the screen is stuck".
+    if (snapshotNode) content.push(snapshotNode);
     if (rankNoteNode) content.push(rankNoteNode);
-    content.push(<ActivityIndicator key="loading" style={styles.loader} color={colors.accent} />);
+    content.push(
+      <View key="loading" style={styles.statsSkeletonWrap}>
+        <SkeletonBlock width={120} height={13} style={styles.statsSkeletonLabel} />
+        <SkeletonCard rows={2} />
+        <SkeletonCard rows={4} style={styles.cardSpaced} />
+        <View style={styles.pairedRow}>
+          <View style={styles.pairedCol}>
+            <SkeletonCard rows={2} />
+          </View>
+          <View style={styles.pairedCol}>
+            <SkeletonCard rows={2} />
+          </View>
+        </View>
+      </View>,
+    );
   } else {
     const showTabs = Boolean(stats?.seasons.length || model);
     if (showTabs) {
@@ -1383,7 +1505,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     }
     // Below the tab bar (or right after the hero when there's no stats/model
     // to build tabs from at all) — see the QB-concept note above.
-    content.push(snapshotNode);
+    if (snapshotNode) content.push(snapshotNode);
     if (rankNoteNode) content.push(rankNoteNode);
 
     if (activeTab === 'stats' && season) {
@@ -1840,6 +1962,13 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     backgroundColor: colors.accent,
   },
+  percentRingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  percentRingLabelCol: { flex: 1, gap: 4, paddingRight: spacing.sm },
   seasonCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1866,7 +1995,8 @@ function createStyles(colors: ThemeColors) {
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  loader: { marginTop: spacing.xl },
+  statsSkeletonWrap: { marginTop: spacing.sm },
+  statsSkeletonLabel: { marginBottom: spacing.sm },
   scheduleDisclaimer: {
     fontSize: 11,
     color: colors.textTertiary,
