@@ -250,7 +250,8 @@ def cached_season_player_weekly(player_id: str, season: int | None = None) -> Li
     The read side of ``get_season_player_stats``'s ``retain_weekly`` output,
     for callers that must not block a render on an 18-week rebuild. Empty
     list whenever the cache is missing, unreadable, or was written without
-    weekly retention (prior seasons are).
+    weekly retention (e.g. an old cache file written before prior seasons
+    retained weekly rows, or an explicit ``retain_weekly=False`` rebuild).
     """
 
     identifier = str(player_id or "").strip()
@@ -283,18 +284,19 @@ def get_season_player_stats(
 ) -> Dict[str, Dict[str, Any]]:
     """Load cached Sleeper weekly production and aggregate it into season totals.
 
-    When rebuilding from the network, weekly observations for the active season are
-    retained on each player record under ``weekly`` (same provider calls as before).
-    Prior-season rebuilds skip weekly retention to limit cache size.
+    When rebuilding from the network, weekly observations are retained on each
+    player record under ``weekly`` (same provider calls as before, no extra
+    fetches) — including prior-season rebuilds. The self-hosted deployment has
+    abundant local disk, so there is no longer a storage-size reason to evict
+    prior-season weekly granularity; each season's aggregate (with its weekly
+    rows) is cached on disk at ``PLAYER_STATS_CACHE_TEMPLATE`` and only the
+    requested season is read into memory per call, so retaining history here
+    does not grow process memory over time.
     """
     _ensure_data_dir()
     selected_season = int(season or default_player_stats_season())
     cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected_season)
-    keep_weekly = (
-        bool(retain_weekly)
-        if retain_weekly is not None
-        else selected_season == default_player_stats_season()
-    )
+    keep_weekly = bool(retain_weekly) if retain_weekly is not None else True
 
     if not refresh and os.path.exists(cache_path):
         try:
@@ -360,7 +362,10 @@ def get_prior_season_player_stats(
     """Load the prior NFL season aggregate via the same Sleeper week→cache path.
 
     Fail-neutral: returns {} when the prior season cannot be loaded. Never invents
-    player rows. Uses the longer prior-season TTL once cached.
+    player rows. Uses the longer prior-season TTL once cached. Weekly rows are
+    retained on disk here too (self-hosted storage is abundant; see
+    ``get_season_player_stats``'s docstring) — callers that only want season
+    aggregates can simply ignore the ``weekly`` key on each record.
     """
 
     try:
@@ -368,7 +373,7 @@ def get_prior_season_player_stats(
             season=prior_player_stats_season(),
             refresh=refresh,
             max_week=max_week,
-            retain_weekly=False,
+            retain_weekly=True,
         )
     except Exception:
         return {}
