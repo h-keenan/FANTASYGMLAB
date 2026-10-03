@@ -67,6 +67,28 @@ def test_local_host_still_honors_debug_flags():
     assert performance.debug_enabled(environ=local, secrets={})
 
 
+def test_self_hosted_box_is_recognized_as_managed_without_render_markers():
+    # docs/SELF_HOSTED_MIGRATION.md's docker-compose stack sets only
+    # DYNASTYGM_SELF_HOSTED (never a RENDER* var -- those are Render's own
+    # platform-injected markers, absent off-Render by definition). Without
+    # recognizing this, the self-hosted production box would be
+    # indistinguishable from a contributor's local checkout.
+    self_hosted = {
+        "DYNASTYGM_SELF_HOSTED": "1",
+        "DYNASTYGM_DEBUG_PERF": "true",
+        "DYNASTYGM_PREMIUM_OVERRIDE": "true",
+    }
+    assert app_config.is_managed_cloud_host(environ=self_hosted)
+    assert not app_config.customer_unsafe_debug_allowed(environ=self_hosted, secrets={})
+    assert not performance.debug_enabled(environ=self_hosted, secrets={})
+    assert not premium.premium_override_enabled(environ=self_hosted, secrets={})
+
+    # The escape hatch still works the same way it does on Render.
+    allowed = dict(self_hosted, DYNASTYGM_ALLOW_PROD_DEBUG="1")
+    assert app_config.customer_unsafe_debug_allowed(environ=allowed, secrets={})
+    assert performance.debug_enabled(environ=allowed, secrets={})
+
+
 def test_destination_visibility_helper_locks_experimental_on_managed_hosts():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "customer_unsafe_debug_allowed" in source

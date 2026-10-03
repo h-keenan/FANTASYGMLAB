@@ -16,6 +16,19 @@ from modules.ui_architecture import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_environment_label_distinguishes_render_self_hosted_and_local():
+    assert founder_ops._environment_label({"RENDER": "true"}) == "render:render"
+    assert (
+        founder_ops._environment_label({"RENDER_SERVICE_NAME": "fantasygm-lab", "RENDER": "true"})
+        == "render:fantasygm-lab"
+    )
+    # Self-hosted (docs/SELF_HOSTED_MIGRATION.md) sets DYNASTYGM_SELF_HOSTED,
+    # never a RENDER* marker -- must read as "self_hosted", not "local" and
+    # not fall through to a bogus "render:render" label.
+    assert founder_ops._environment_label({"DYNASTYGM_SELF_HOSTED": "1"}) == "self_hosted"
+    assert founder_ops._environment_label({}) == "local"
+
+
 def test_founder_ops_destination_is_hidden_by_default():
     keys = {page.key for page in current_platform_destinations(False)}
     assert "founder_ops" not in keys
