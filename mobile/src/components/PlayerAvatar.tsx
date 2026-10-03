@@ -67,6 +67,19 @@ export default function PlayerAvatar({ playerId, size = 40, tier, style, onLoadS
       source={{ uri: `${SLEEPER_HEADSHOT_BASE}/${playerId}.jpg` }}
       style={[dimension, ring, style] as StyleProp<ImageStyle>}
       cachePolicy="disk"
+      // Checked ~45 real Sleeper headshots across positions/eras: every
+      // source photo is landscape (roughly 300x200-350x254), so `cover`
+      // against this square avatar box always crops left/right only — the
+      // full photo height (and whatever headroom Sleeper framed above the
+      // helmet) already shows with zero vertical slack to shift. `top`
+      // is therefore a no-op on every image sampled today, same pixels as
+      // the previous implicit `center` default; it's set explicitly (rather
+      // than left to center) as a defensive default in case a future/rare
+      // headshot ships portrait-oriented, where it would anchor the
+      // face/helmet instead of letting a center crop clip it. `contentFit`
+      // is made explicit too so this isn't relying on expo-image's default.
+      contentFit="cover"
+      contentPosition="top"
       onLoad={() => onLoadSettle?.()}
       onError={() => {
         setFailed(true);
