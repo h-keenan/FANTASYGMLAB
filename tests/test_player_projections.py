@@ -316,12 +316,69 @@ def test_project_player_week_insufficient_player_data(round_robin_schedule):
 
 
 def test_project_player_week_unsupported_position(round_robin_schedule):
-    players = _players_fixture()
+    players = dict(_players_fixture())
+    players["lb_a1"] = {"position": "LB", "team": "AAA"}
 
-    result = pp.project_player_week("k_a1", week=5, season=2099, players=players)
+    result = pp.project_player_week("lb_a1", week=5, season=2099, players=players)
 
     assert result["status"] == "unsupported_position"
+    assert result["position"] == "LB"
+
+
+def test_project_player_week_ok_for_kicker_with_neutral_opponent_multiplier(round_robin_schedule):
+    """Kickers (K) get a real projection from their own recent-scoring
+    trend, same as every other position — see coridian_'s report that Cam
+    Little (K) showed no projection at all. Unlike QB/RB/WR/TE, a kicker
+    never gets an opponent-defense multiplier (no meaningful
+    points-allowed-to-kickers signal exists), so the multiplier is always
+    exactly neutral (1.0) and confidence can reach "medium" but not "high".
+    """
+
+    players = dict(_players_fixture())
+    weekly_stats = dict(_weekly_stats_fixture())
+    weekly_stats["k_a1"] = {"weekly": [
+        {"week": 1, "fantasy_points_ppr": 9.0},
+        {"week": 3, "fantasy_points_ppr": 11.0},
+    ]}
+
+    # Defense-strength-by-position map built from the normal (non-K) offensive
+    # fixture data — deliberately has no "K" entry for any team, matching
+    # real production behavior (team_defense_points_allowed_by_position never
+    # tracks K).
+    defense_strength = pp.team_defense_points_allowed_by_position(
+        2099, upto_week=4, weekly_stats=weekly_stats, players=players
+    )
+    assert "K" not in defense_strength.get("DDD", {})
+
+    result = pp.project_player_week(
+        "k_a1",
+        week=5,
+        season=2099,
+        players=players,
+        player_weekly_rows=weekly_stats["k_a1"]["weekly"],
+        defense_strength=defense_strength,
+    )
+
+    assert result["status"] == "ok"
     assert result["position"] == "K"
+    assert result["opponent"] == "DDD"  # AAA plays DDD in week 5
+    assert result["point_estimate"] is not None
+    assert result["point_estimate"] > 0
+    assert result["low"] <= result["point_estimate"] <= result["high"]
+    assert result["basis"]["opponent_multiplier"] == 1.0
+    assert result["basis"]["opponent_defense_has_signal"] is False
+    assert result["confidence"] in {"low", "medium"}
+
+
+def test_project_player_week_kicker_insufficient_data_is_honest_not_zero(round_robin_schedule):
+    players = _players_fixture()
+
+    result = pp.project_player_week(
+        "k_a1", week=5, season=2099, players=players, player_weekly_rows=[],
+    )
+
+    assert result["status"] == "insufficient_player_data"
+    assert "point_estimate" not in result
 
 
 def test_project_player_week_no_team_is_not_a_zero(round_robin_schedule):
