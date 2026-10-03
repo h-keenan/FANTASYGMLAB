@@ -1,0 +1,77 @@
+name: Players DB Refresh
+
+# Migrated from Render cron fantasygm-lab-players-db-refresh (see render.yaml
+# history) per the cron-migration audit: a standalone batch job with zero
+# runtime dependency on the live Render web services — it only talks to
+# Sleeper/FantasyCalc and pushes a commit straight to main, which both
+# always-on Render web services then pick up via their existing
+# autoDeploy: true. Schedule matches the old Render cron exactly: every 6
+# hours.
+#
+# Rebuilds data/players.db (scripts/refresh_players_db_subprocess.py) and —
+# only when that rebuild genuinely succeeded and changed the file's content
+# (see scripts/refresh_and_commit_players_db.py's module docstring for the
+# full safety contract) — commits it (plus any changed sibling cache files)
+# and pushes to main.
+#
+# Required GitHub repo/environment secrets: none beyond the built-in
+# GITHUB_TOKEN (see note below).
+#
+# GITHUB_TOKEN vs. a manually-provisioned GITHUB_PUSH_TOKEN:
+# Render's cron used a fine-grained PAT (GITHUB_PUSH_TOKEN) scoped to this
+# repo's Contents: write permission, because Render has no concept of a
+# repo-scoped, auto-rotated token. GitHub Actions does: every run gets an
+# ephemeral, repo-scoped GITHUB_TOKEN for free. The push logic in
+# scripts/refresh_and_commit_players_db.py / scripts/sync_injury_status.py
+# only ever does `https://x-access-token:<token>@github.com/<slug>.git` +
+# `git push <url> HEAD:<branch>` — that format accepts GITHUB_TOKEN exactly
+# like a PAT, so no code change was needed. This workflow passes the
+# built-in token through the script's existing GITHUB_PUSH_TOKEN/
+# GITHUB_REPO_SLUG env vars unchanged, which drops one manually-managed
+# secret entirely. `permissions: contents: write` below is required for the
+# default GITHUB_TOKEN to have push rights at all (it is read-only by
+# default on many repos).
+#
+# Push-loop safety: this workflow pushes a plain commit to main (not a PR).
+# .github/workflows/ci.yml's "Delivery Validation" does run its `test` job
+# again on any push to main, but .github/workflows/auto-merge.yml's
+# "Trusted Delivery" only acts when the completed workflow run's event is
+# `pull_request` — a plain push to main never satisfies that, so this does
+# not chain into any merge/dispatch loop. Worst case is one extra
+# "Delivery Validation" run per successful refresh commit, which is the
+# same thing that already happens for every ordinary merge to main today.
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: players-db-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The script manages its own git auth via an explicit push URL
+          # (see GITHUB_PUSH_TOKEN below); persisting actions/checkout's own
+          # credential on the `origin` remote would layer a second,
+          # conflicting Authorization header onto the same github.com host.
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Refresh and commit players.db
+        env:
+          GITHUB_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_SLUG: ${{ github.repository }}
+        run: python scripts/refresh_and_commit_players_db.py
