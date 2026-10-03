@@ -663,6 +663,7 @@ _FALLBACK_PREMIUM_BENEFIT_LINES = [
     "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
     "Every Trade Hub idea, not just the first 2 (skip the ads)",
     "GM Targets watchlist up to 50 players (Free is capped at 3)",
+    "Portfolio — your record, rank, and top need across every saved league, not just one",
 ]
 
 

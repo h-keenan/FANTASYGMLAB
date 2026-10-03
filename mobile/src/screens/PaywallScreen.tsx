@@ -12,7 +12,7 @@ import GridBackground from '../components/GridBackground';
 import SectionHeading from '../components/SectionHeading';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
-import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
+import { PACKAGE_TYPE, type PurchasesOffering, type PurchasesPackage } from 'react-native-purchases';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
@@ -43,7 +43,59 @@ const FALLBACK_FEATURES = [
   'The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist',
   'Every Trade Hub idea, not just the first 2 (skip the ads)',
   'GM Targets watchlist up to 50 players (Free is capped at 3)',
+  'Portfolio — your record, rank, and top need across every saved league, not just one',
 ];
+
+// Apple App Store Review Guideline 3.1.2 requires a subscription's length to
+// be clearly displayed. `pack.product.title` is whatever display name is
+// configured in App Store Connect/Play Console — it is not guaranteed to
+// spell out the billing period, so the period shown on this screen is
+// derived deterministically from RevenueCat's own `packageType` instead of
+// trusting store-side copy to mention it. Keeps LIFETIME/CUSTOM/UNKNOWN safe
+// (no current FantasyGM Lab offering uses them, but this must never render
+// blank or throw if one is ever added).
+function packagePeriodLabel(type: PurchasesPackage['packageType']): string {
+  switch (type) {
+    case PACKAGE_TYPE.ANNUAL:
+      return 'Annual';
+    case PACKAGE_TYPE.SIX_MONTH:
+      return '6 Months';
+    case PACKAGE_TYPE.THREE_MONTH:
+      return '3 Months';
+    case PACKAGE_TYPE.TWO_MONTH:
+      return '2 Months';
+    case PACKAGE_TYPE.MONTHLY:
+      return 'Monthly';
+    case PACKAGE_TYPE.WEEKLY:
+      return 'Weekly';
+    case PACKAGE_TYPE.LIFETIME:
+      return 'Lifetime';
+    default:
+      return '';
+  }
+}
+
+// Matches the billing cadence a periodLabel implies, for an explicit
+// "$X.XX / year" (etc.) price line rather than a bare currency amount with
+// no stated interval.
+function packagePriceSuffix(type: PurchasesPackage['packageType']): string {
+  switch (type) {
+    case PACKAGE_TYPE.ANNUAL:
+      return '/yr';
+    case PACKAGE_TYPE.SIX_MONTH:
+      return '/6mo';
+    case PACKAGE_TYPE.THREE_MONTH:
+      return '/3mo';
+    case PACKAGE_TYPE.TWO_MONTH:
+      return '/2mo';
+    case PACKAGE_TYPE.MONTHLY:
+      return '/mo';
+    case PACKAGE_TYPE.WEEKLY:
+      return '/wk';
+    default:
+      return '';
+  }
+}
 
 export default function PaywallScreen({ navigation }: Props) {
   const orbClearance = useOrbClearance();
@@ -71,7 +123,13 @@ export default function PaywallScreen({ navigation }: Props) {
       const current = await getCurrentOffering();
       if (!mountedRef.current) return;
       setOffering(current);
+      // Keyed off packageType (RevenueCat's own predefined-package enum), not
+      // the offering's custom `identifier` string — the identifier is just
+      // whatever this one offering happens to be named in the RevenueCat
+      // dashboard, while packageType is the stable signal for "this is the
+      // annual plan" regardless of naming.
       const preferred =
+        current?.availablePackages.find((p) => p.packageType === PACKAGE_TYPE.ANNUAL) ??
         current?.availablePackages.find((p) => p.identifier === 'annual') ??
         current?.availablePackages[0] ??
         null;
@@ -208,7 +266,12 @@ export default function PaywallScreen({ navigation }: Props) {
           <View style={styles.packages}>
             {packages.map((pack) => {
               const isSelected = pack.identifier === selectedId;
-              const isAnnual = pack.identifier === 'annual';
+              // packageType (RevenueCat's predefined-package enum), not the
+              // offering's custom `identifier` string — see loadOffering's
+              // own note above.
+              const isAnnual = pack.packageType === PACKAGE_TYPE.ANNUAL || pack.identifier === 'annual';
+              const periodLabel = packagePeriodLabel(pack.packageType);
+              const priceSuffix = packagePriceSuffix(pack.packageType);
               return (
                 <AnimatedCard
                   key={pack.identifier}
@@ -223,14 +286,49 @@ export default function PaywallScreen({ navigation }: Props) {
                       style={styles.packageRadio}
                     />
                     <View style={styles.packageLabelGroup}>
-                      <AppText style={styles.packageTitle}>{pack.product.title || pack.identifier}</AppText>
-                      {isAnnual ? (
-                        <View style={styles.bestValueBadge}>
-                          <AppText style={styles.bestValueBadgeText}>Best value</AppText>
-                        </View>
+                      <View style={styles.packageTitleRow}>
+                        {/* Apple App Store Review Guideline 3.1.2: subscription
+                            length must be clearly displayed — this is the bold,
+                            primary label on every plan row, derived from
+                            RevenueCat's own packageType rather than trusting
+                            store-configured copy to mention it (see
+                            packagePeriodLabel above). */}
+                        <AppText style={styles.packageTitle}>
+                          {periodLabel || pack.product.title || pack.identifier}
+                        </AppText>
+                        {isAnnual ? (
+                          <View style={styles.bestValueBadge}>
+                            <AppText style={styles.bestValueBadgeText}>Best value</AppText>
+                          </View>
+                        ) : null}
+                      </View>
+                      {/* Store-configured subscription title (3.1.2's other
+                          requirement, distinct from the length above) — shown
+                          only when it adds information beyond the period
+                          label already shown. */}
+                      {pack.product.title && pack.product.title !== periodLabel ? (
+                        <AppText style={styles.packageSubtitle} numberOfLines={1}>
+                          {pack.product.title}
+                        </AppText>
                       ) : null}
                     </View>
-                    <AppText style={styles.packagePrice}>{pack.product.priceString}</AppText>
+                    <View style={styles.packagePriceGroup}>
+                      <AppText style={styles.packagePrice}>
+                        {pack.product.priceString}
+                        {priceSuffix ? (
+                          <AppText style={styles.packagePriceSuffix}>{priceSuffix}</AppText>
+                        ) : null}
+                      </AppText>
+                      {/* Real SDK-provided equivalent monthly price (never a
+                          client-computed approximation) — helps the annual
+                          plan's value read clearly at a glance without
+                          inventing a number RevenueCat didn't give us. */}
+                      {isAnnual && pack.product.pricePerMonthString ? (
+                        <AppText style={styles.packagePriceSub}>
+                          {pack.product.pricePerMonthString}/mo
+                        </AppText>
+                      ) : null}
+                    </View>
                   </View>
                 </AnimatedCard>
               );
@@ -253,10 +351,23 @@ export default function PaywallScreen({ navigation }: Props) {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={onRestore} disabled={restoring} style={styles.restoreButton}>
-        <AppText style={styles.restoreButtonText}>
-          {restoring ? 'Restoring…' : 'Restore purchases'}
-        </AppText>
+      {/* Upgraded from a bare text link to a real bordered secondary button
+          (same recipe LoginScreen's socialButton already uses: 1px border +
+          surfaceSolid fill) — an earlier audit confirmed Restore Purchases
+          existed, but "exists" and "genuinely easy to find" aren't the same
+          thing on a screen this conversion-critical. Still visually
+          subordinate to the cyan primary Continue button above it (Magna
+          Carta button hierarchy), just no longer easy to miss entirely. */}
+      <TouchableOpacity
+        onPress={onRestore}
+        disabled={restoring}
+        style={[styles.restoreButton, restoring && styles.primaryButtonDisabled]}
+      >
+        {restoring ? (
+          <ActivityIndicator color={colors.textPrimary} />
+        ) : (
+          <AppText style={styles.restoreButtonText}>Restore purchases</AppText>
+        )}
       </TouchableOpacity>
 
       <AppText style={styles.disclosure}>
@@ -316,9 +427,18 @@ function createStyles(colors: ThemeColors) {
   packages: { gap: spacing.sm, marginBottom: spacing.lg },
   packageRow: { flexDirection: 'row', alignItems: 'center' },
   packageRadio: { marginRight: spacing.sm },
-  packageLabelGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  packageLabelGroup: { flex: 1, marginRight: spacing.sm },
+  packageTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   packageTitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  // Store-configured product title, shown under the period label — only
+  // rendered when it says something the period label doesn't already.
+  packageSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  packagePriceGroup: { alignItems: 'flex-end' },
   packagePrice: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  packagePriceSuffix: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  // Real RevenueCat-provided per-month equivalent for the annual plan — never
+  // a client-side computed approximation.
+  packagePriceSub: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   bestValueBadge: {
     backgroundColor: colors.premiumMuted,
     paddingHorizontal: spacing.sm,
@@ -335,8 +455,18 @@ function createStyles(colors: ThemeColors) {
   },
   primaryButtonDisabled: { opacity: disabledOpacity },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  restoreButton: { alignItems: 'center', marginTop: spacing.lg },
-  restoreButtonText: { color: colors.accent, fontSize: 14, fontWeight: '500' },
+  restoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    marginTop: spacing.md,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSolid,
+  },
+  restoreButtonText: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
   disclosure: {
     fontSize: 11,
     color: colors.textTertiary,
