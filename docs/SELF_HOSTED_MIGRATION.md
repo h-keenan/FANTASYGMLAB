@@ -341,36 +341,70 @@ host serves live web traffic, so they're decoupled from this cutover
 either way (they already push results to Supabase or to `main` via a
 scoped PAT — they don't need to run on the same box as the web services).
 
-## 7.5. Resource isolation and worker count (read before changing either)
+## 7.5. Resource isolation, Redis, and worker count (read before changing any of this)
 
 Two things are genuinely different here vs. Render, both purely because
 this box colocates every service instead of giving each one its own
-isolated instance:
+isolated instance — plus a third, newer piece (Redis) that the other two
+now depend on:
 
 **Per-container memory/CPU limits.** `docker-compose.yml` sets an explicit
-`mem_limit`/`cpus` on every service (`web`/`mobile-api`: 4GB RAM, 2 CPUs
-each; `stripe-webhook`/`revenuecat-webhook`: 512MB, 0.5 CPUs each;
-`caddy`: 256MB, 0.5 CPUs) — sized for the 16GB RAM / 4-core / 8-thread box
-this was prepped for, leaving real headroom (~6.75GB RAM, ~2.5 logical
-threads) for the host and Docker itself. On Render, one service leaking
-memory or pegging CPU couldn't affect the others; on this box, without a
-limit, it could — these limits are the new guardrail that replaces that
-isolation. If you resize the box, resize these proportionally rather than
-removing them.
+`mem_limit`/`cpus` on every service, sized for a 16GB RAM / 6-core /
+12-thread box (per the latest hardware spec for this migration — confirm
+this is still the actual box before relying on the exact numbers below; an
+older "4-core/8-thread" figure was used for the original single-worker
+sizing and is now stale):
+`web`: 4GB RAM / 2 CPUs; `mobile-api`: 7GB RAM / 4 CPUs (see below for why
+this grew); `redis`: 256MB / 0.25 CPUs; `stripe-webhook`/
+`revenuecat-webhook`: 512MB / 0.5 CPUs each; `caddy`: 256MB / 0.5 CPUs —
+leaving real headroom (~3.5GB RAM, ~4.25 logical threads) for the host and
+Docker itself. On Render, one service leaking memory or pegging CPU
+couldn't affect the others; on this box, without a limit, it could — these
+limits are the guardrail that replaces that isolation. If you resize the
+box, resize these proportionally rather than removing them.
 
-**`mobile-api` stays single-worker.** It would be tempting to add
-`--workers 4` to `mobile-api`'s uvicorn command to use the extra cores —
-**don't**, not without first moving its state out of process memory.
-`services/mobile_api_service.py` keeps an in-memory rate limiter
-(`_InMemoryFixedWindowRateLimiter`) and a warmed `rankings.load_players`
-cache, both scoped to a single process. Multiple worker processes would
-each get their own independent copy of both: the rate limiter's effective
-per-client limit would silently become `limit * worker_count` instead of
-`limit` (a correctness regression, not just a perf question), and the
-player-data cache would be duplicated in memory per worker. See
+**`mobile-api` now runs multiple workers, backed by Redis.** It used to be
+single-worker on purpose: `services/mobile_api_service.py` kept an
+in-memory rate limiter and three `@lru_cache` + `threading.Lock`
+single-flight caches (`modules.trade_hub_engine`, `modules.league_rankings`
+x2, `modules.playoff_simulator`), all scoped to one process's memory.
+Multiple worker processes would each get their own independent copy of all
+of that: the rate limiter's effective per-client limit would silently
+become `limit * worker_count` instead of `limit` (a correctness
+regression, not just a perf question), and the single-flight caches would
+stop actually sharing work across workers (the exact problem they exist to
+avoid, just moved up one level).
+
+That state now lives in Redis instead (see the new `redis` service and
+`modules/redis_cache.py`), which is what makes `--workers` safe:
+`mobile-api`'s command now reads
+`--workers $$MOBILE_API_WORKERS` (env var, default 4 — see
 `docker-compose.yml`'s own comment on the `mobile-api` service for the
-full reasoning. Revisit this only alongside moving the rate limiter to a
-shared store (e.g. Redis) — not before.
+box-spec/sizing reasoning), and `depends_on: redis: condition:
+service_healthy` means **Redis must come up healthy before mobile-api
+starts** — Compose enforces this ordering automatically on `docker compose
+up`, but it's worth knowing about if you ever start services individually
+(`docker compose up mobile-api` with `redis` not already running will wait
+on it, not skip the dependency).
+
+One piece of per-process state did **not** move to Redis, and isn't in
+scope here: the warmed `rankings.load_players` player table
+(`_warm_players_cache_at_startup`). Each `mobile-api` worker still loads
+and holds its own copy of that in memory — this is why `mobile-api`'s
+`mem_limit` grew substantially (not just to cover Redis-related changes)
+when `--workers` went from 1 to 4.
+
+**Redis itself** (`redis:7-alpine`, `--maxmemory 200mb --maxmemory-policy
+allkeys-lru`) is a simple, disposable state store here, not a database: no
+persistence volume is configured on purpose, since every single thing
+cached in it (rate-limit counters, the three ~30s-TTL single-flight cache
+entries) is safe to lose on a restart — every reader of it already
+degrades gracefully (fails open / recomputes) if a key it expects isn't
+there, by the same design that makes it safe if Redis is unreachable
+entirely (see `modules/redis_cache.py`'s module docstring). If you ever
+point `REDIS_URL` at a Redis instance shared with something else, keep
+that "disposable, no data of record" assumption true for whatever else
+shares it, or give this stack its own instance/database index instead.
 
 ## 8. Logging and monitoring on the self-hosted box
 
@@ -427,7 +461,7 @@ migration prep itself.
 |---|---|
 | `Dockerfile` | Multi-stage build (builder installs deps into a venv; runtime stage is a slim Python image + app code). One shared image for all four real services — see the Dockerfile's own header comment for the reasoning. |
 | `.dockerignore` | Keeps the build context to only what the Python services need (excludes `mobile/`, `tests/`, `docs/`, dev/editor state, secrets). |
-| `docker-compose.yml` | Orchestrates `web`, `mobile-api`, `stripe-webhook`, `revenuecat-webhook`, and `caddy`; healthchecks on each app service's existing `/health`/`/_stcore/health` endpoint; `caddy` waits on those healthchecks (`depends_on: condition: service_healthy`) before proxying; `restart: unless-stopped` everywhere; secrets only via `.env`; sets `DYNASTYGM_SELF_HOSTED=1` on every app service (see section 3). |
+| `docker-compose.yml` | Orchestrates `web`, `mobile-api`, `redis`, `stripe-webhook`, `revenuecat-webhook`, and `caddy`; healthchecks on each app service's existing `/health`/`/_stcore/health` endpoint (and `redis-cli ping` for `redis`); `mobile-api` depends on `redis` reporting healthy before it starts, and `caddy` waits on all four app services' healthchecks (`depends_on: condition: service_healthy`) before proxying; `restart: unless-stopped` everywhere; secrets only via `.env`; sets `DYNASTYGM_SELF_HOSTED=1` on every app service (see section 3). |
 | `Caddyfile` | Reverse proxy + automatic HTTPS routing per placeholder subdomain, plus static `file_server` for the marketing site. |
 | `.env.example` | Every required secret/variable name, matching `render.yaml`'s names exactly, with a comment on which Render service/dashboard it comes from. Copy to `.env` (gitignored) and fill in real values. |
 | `deploy/systemd/fantasygmlab.service` | systemd unit so the stack starts on boot and stops cleanly on `systemctl stop`. |

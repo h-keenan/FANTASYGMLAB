@@ -15,7 +15,7 @@
 #
 # Per-service resource limits (`mem_limit`/`cpus` below): on Render, every
 # service got its own isolated instance, so one runaway service could not
-# starve another. Colocating all five containers on one shared box removes
+# starve another. Colocating all six containers on one shared box removes
 # that isolation — a leak or a CPU-bound spike (pandas/Monte Carlo work in
 # `web` or `mobile-api`) in one container could otherwise exhaust the host's
 # RAM/CPU and take the others down with it. `mem_limit`/`cpus` are the
@@ -25,20 +25,39 @@
 # actually runs (see docs/SELF_HOSTED_MIGRATION.md and
 # deploy/systemd/fantasygmlab.service).
 #
-# Sized for the actual target box (16GB RAM, 4-core/8-thread 7th-gen i5):
-# `web` and `mobile-api` do the real pandas/Monte Carlo/player-cache work,
-# so they get the largest share; the two webhook services only handle
-# occasional small Stripe/RevenueCat POSTs; Caddy just proxies. Total
-# mem_limit across all five is 9.25GB, leaving ~6.75GB headroom for the
-# host OS/Docker itself; total cpus is 5.5 of the 8 logical threads,
-# leaving headroom rather than pinning every thread even if all five
-# happened to spike at once. These are ceilings, not reservations, so
-# normal (non-spiking) operation is unaffected — they only bound the
-# worst case. Sign-off note: this is a real production resource-limit
-# change (new, not tightening something that worked before) — flagging for
-# coridian_ to confirm before this ships to the actual box, even though the
-# values themselves are deliberately conservative (safe headroom, not
-# tight enough to cause normal-load throttling).
+# Sized for the target box at 16GB RAM / 6-core / 12-thread (per coridian_'s
+# latest hardware spec for this migration — NOTE: this supersedes an older
+# "4-core/8-thread" figure still referenced in some comments/docs below and
+# in tests/test_self_hosted_resource_isolation.py's prior version; flagging
+# for coridian_ to confirm the 6c/12t figure is the real, current box before
+# this ships, since the whole mobile-api worker-count/resource sizing below
+# is derived from it): `web` and `mobile-api` do the real pandas/Monte
+# Carlo/player-cache work, so they get the largest share; `redis` is a
+# small, fast in-memory state store (not a database) so it needs very
+# little; the two webhook services only handle occasional small
+# Stripe/RevenueCat POSTs; Caddy just proxies.
+#
+# `mobile-api` specifically now runs multiple uvicorn worker processes
+# (see its own command/comment below) instead of one, which is why its
+# mem_limit/cpus grew substantially from the single-worker figures this
+# file used to carry: each worker is a separate Python process with its own
+# copy of every in-process-only structure that ISN'T in Redis — most
+# notably the warmed `rankings.load_players` player table (pandas
+# DataFrame), which this migration deliberately did NOT move to Redis (out
+# of scope — only the rate limiter and the three single-flight caches
+# moved there). So memory scales roughly linearly with worker count for
+# that piece, even though Redis now means the trade-hub/league-rankings/
+# playoff-odds caches are NOT duplicated per worker the way they used to
+# be. Total mem_limit across all six is ~12.5GB, leaving ~3.5GB headroom
+# for the host OS/Docker itself; total cpus is ~7.75 of the 12 logical
+# threads, leaving ~4.25 threads of headroom. These are ceilings, not
+# reservations, so normal (non-spiking) operation is unaffected — they
+# only bound the worst case. Sign-off note: this is a real production
+# resource-limit change (new, not tightening something that worked
+# before) — flagging for coridian_ to confirm before this ships to the
+# actual box, even though the values themselves are deliberately
+# conservative (safe headroom, not tight enough to cause normal-load
+# throttling) given the stated 6c/12t spec.
 
 services:
   web:
@@ -86,43 +105,87 @@ services:
       dockerfile: Dockerfile
     image: fantasygmlab-app:latest
     # See the "web" service's command comment above for why this is
-    # wrapped in sh -c and uses the doubled "$$PORT".
+    # wrapped in sh -c and uses the doubled "$$PORT"/"$$MOBILE_API_WORKERS".
     #
-    # Deliberately no `--workers N`: this box has 4 cores/8 threads, so
-    # multiple uvicorn worker PROCESSES could plausibly help throughput
-    # under concurrent load. But this service keeps two pieces of state
-    # in process memory that are not shared across processes:
-    #   1. `_rate_limiter` (an in-memory fixed-window counter — see
-    #      services/mobile_api_service.py's "Rate limiting" section).
-    #      With N worker processes, each gets its own counter, so the
-    #      *effective* per-client limit becomes limit*N instead of limit —
-    #      a silent correctness regression, not just a perf tradeoff.
-    #   2. The warmed `rankings.load_players` cache populated by
-    #      `_warm_players_cache_at_startup` in this process's lifespan —
-    #      with N workers each would redo that warm-up independently
-    #      (acceptable: happens once at startup, in parallel) but then
-    #      hold its own independent copy in memory.
-    # (1) is the blocker: moving to multiple workers safely needs the rate
-    # limiter's state moved to a shared store (e.g. Redis) first, so a
-    # client's request count is consistent across whichever worker handles
-    # it. Until that lands, single-worker (today's behavior, unchanged) is
-    # the correct choice here, not just the cautious one — flip this only
-    # alongside that migration, not before it.
-    command: ["sh", "-c", "uvicorn services.mobile_api_service:app --host 0.0.0.0 --port $$PORT"]
+    # Now runs multiple uvicorn worker PROCESSES (`--workers`) to actually
+    # use the box's cores under concurrent load — previously pinned to one
+    # worker because this service kept two pieces of state in process
+    # memory that were not shared across processes:
+    #   1. `_rate_limiter` (was an in-memory fixed-window counter). With N
+    #      worker processes and no shared store, the *effective* per-client
+    #      limit silently becomes limit*N instead of limit — a correctness
+    #      regression, not just a perf tradeoff.
+    #   2. The three `@lru_cache` + per-process `threading.Lock`
+    #      single-flight caches (modules.trade_hub_engine,
+    #      modules.league_rankings x2, modules.playoff_simulator): under N
+    #      workers each kept its own separate cache/lock, so the same
+    #      expensive computation (e.g. Trade Hub's ~150-300ms idea-
+    #      generation pass) could still run redundantly across workers, and
+    #      a cache hit in worker A never helped a request landing on
+    #      worker B.
+    # Both are now backed by Redis (see the `redis` service below and
+    # modules/redis_cache.py) instead of per-process memory, so every
+    # worker shares one counter and one cache/lock per key — this is what
+    # makes `--workers` safe here, not just desirable. `depends_on` below
+    # requires `redis` to report healthy before this service starts, since
+    # neither piece of state has a non-Redis fallback path other than
+    # failing open (see modules/redis_cache.py's module docstring) --
+    # correct, but not the steady-state this should run in.
+    #
+    # MOBILE_API_WORKERS defaults to 4: on the stated 6-core/12-thread box,
+    # that leaves `web`'s 2 cores, the two webhooks' 1 combined core,
+    # caddy's 0.5, and redis' 0.25 all still fitting comfortably under the
+    # 12 logical threads with real headroom (see this file's top-of-file
+    # resource-limit comment for the full budget) -- override via `.env`
+    # if the actual box differs from that spec.
+    command: ["sh", "-c", "uvicorn services.mobile_api_service:app --host 0.0.0.0 --port $$PORT --workers $$MOBILE_API_WORKERS"]
     environment:
       PORT: "8080"
+      MOBILE_API_WORKERS: "${MOBILE_API_WORKERS:-4}"
       # See the "web" service's DYNASTYGM_SELF_HOSTED comment above.
       DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
-    mem_limit: 4g
-    cpus: 2.0
+    # See this file's top-of-file resource-limit comment for the full
+    # reasoning: scaled up from the old single-worker 4g/2.0 to cover N
+    # worker processes, each with its own copy of the warmed player-table
+    # cache (not moved to Redis by this change) plus Python/library
+    # overhead, while Redis absorbs the trade-hub/league-rankings/
+    # playoff-odds caches that used to also duplicate per worker.
+    mem_limit: 7g
+    cpus: 4.0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  redis:
+    # Official slim image — this is a simple shared state store (rate
+    # limiter counters + three ~30s-TTL single-flight caches, all disposable
+    # and cheap to regenerate), not a database holding data of record, so
+    # no persistence volume is configured on purpose: a restart losing this
+    # container's contents just means every worker briefly recomputes/
+    # re-counts from scratch, which is exactly the safe fail-open/fail-cold
+    # behavior modules/redis_cache.py and services/mobile_api_service.py's
+    # rate limiter are already built to tolerate.
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "200mb", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: 256m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
     networks:
       - internal

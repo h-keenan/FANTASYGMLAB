@@ -98,14 +98,12 @@ certainty on its own, without any special-cased override.
 
 from __future__ import annotations
 
-import threading
 import time
-from functools import lru_cache
 from typing import Any, Sequence
 
 import numpy as np
 
-from modules import league_rankings, league_recaps, league_standings, sleeper
+from modules import league_rankings, league_recaps, league_standings, redis_cache, sleeper
 
 # Logistic-regression (no intercept) fit of win probability on z-scored
 # power_score differential needs enough same-season games to be more
@@ -561,7 +559,6 @@ def build_league_playoff_odds(
     }
 
 
-@lru_cache(maxsize=128)
 def _build_league_playoff_odds_cached(
     league_id: str,
     lens: str,
@@ -580,51 +577,26 @@ def _build_league_playoff_odds_cached(
     )
 
 
-
-# Per-cache-key single-flight locks. functools.lru_cache's own internal
-# lock only protects the cache dict itself during a lookup/insert — it
-# does NOT serialize the wrapped function's *execution*, so N concurrent
-# requests that all miss the same (league_id, lens, players_db_path,
-# n_trials, bucket) key before the first one finishes would each
-# independently pay the full DEFAULT_TRIALS=3000-trial simulation cost
-# instead of sharing one. That directly contradicts this cache's own
-# purpose (see PLAYOFF_ODDS_TTL_SECONDS's comment: "collapsing many
-# requests from many users ... down to roughly one real simulation run").
-# A concrete trigger: every league member's app polling/opening at once
-# right after a 3-hour TTL rollover, or the mobile client's own
-# navigation retries. A lock keyed by the exact same cache key (bucket
-# included) makes only the first caller for a given key actually run the
-# simulation; every other concurrent caller for that key blocks here and
-# then gets the now-warm lru_cache result back immediately instead of
-# redoing the work.
-_PLAYOFF_ODDS_LOCK_PRUNE_THRESHOLD = 500
-
-_playoff_odds_locks: dict[tuple[Any, ...], threading.Lock] = {}
-_playoff_odds_locks_guard = threading.Lock()
-
-
-def _playoff_odds_lock_for(key: tuple[Any, ...]) -> threading.Lock:
-    with _playoff_odds_locks_guard:
-        lock = _playoff_odds_locks.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _playoff_odds_locks[key] = lock
-        if len(_playoff_odds_locks) > _PLAYOFF_ODDS_LOCK_PRUNE_THRESHOLD:
-            # Safe to drop any lock from an older bucket: this function's
-            # only caller always passes the *current* bucket (see
-            # build_league_playoff_odds_cached below), so a key whose
-            # bucket doesn't match the one we were just asked for can
-            # never be requested again. Skip anything still held, just in
-            # case a simulation genuinely spans a bucket rollover.
-            current_bucket = key[-1]
-            stale = [
-                existing_key
-                for existing_key, existing_lock in _playoff_odds_locks.items()
-                if existing_key[-1] != current_bucket and not existing_lock.locked()
-            ]
-            for existing_key in stale:
-                _playoff_odds_locks.pop(existing_key, None)
-        return lock
+# Redis-backed single-flight + cache (modules.redis_cache.redis_single_flight_cache):
+# without a single-flight guard, N concurrent requests that all miss the
+# same (league_id, lens, players_db_path, n_trials, bucket) key before the
+# first one finishes would each independently pay the full
+# DEFAULT_TRIALS=3000-trial simulation cost instead of sharing one. That
+# directly contradicts this cache's own purpose (see
+# PLAYOFF_ODDS_TTL_SECONDS's comment: "collapsing many requests from many
+# users ... down to roughly one real simulation run"). A concrete trigger:
+# every league member's app polling/opening at once right after a 3-hour
+# TTL rollover, or the mobile client's own navigation retries.
+#
+# This used to be a per-process threading.Lock + functools.lru_cache pair,
+# which only protected ONE uvicorn worker: under docker-compose.yml's
+# multiple mobile-api workers, each worker has its own process memory, so
+# that old pair would let the same simulation run redundantly once per
+# worker AND a cache hit in worker A would never help a request that
+# happened to land on worker B. Redis fixes both: the distributed lock
+# makes only one worker, cluster-wide, actually run a given simulation,
+# and the cached result lives in Redis, not in any one worker's memory.
+_PLAYOFF_ODDS_LOCK_TIMEOUT_SECONDS = 15.0
 
 
 def build_league_playoff_odds_cached(
@@ -636,11 +608,16 @@ def build_league_playoff_odds_cached(
 ) -> dict[str, Any]:
     """Cached front door — see ``PLAYOFF_ODDS_TTL_SECONDS``/module docstring.
 
-    Single-flight per (league_id, lens, players_db_path, n_trials, bucket):
-    see ``_playoff_odds_lock_for``'s docstring-comment for why this needs
-    its own lock on top of ``lru_cache``.
+    Single-flight + cache, now shared across every mobile-api worker via
+    Redis: see ``modules.redis_cache.redis_single_flight_cache`` and this
+    module's own comment above.
     """
 
     key = (league_id, lens, players_db_path, n_trials, _playoff_odds_cache_bucket())
-    with _playoff_odds_lock_for(key):
-        return _build_league_playoff_odds_cached(*key)
+    cache_key = redis_cache.build_cache_key("playoff_odds", *key)
+    return redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=PLAYOFF_ODDS_TTL_SECONDS,
+        compute=lambda: _build_league_playoff_odds_cached(*key),
+        lock_timeout_seconds=_PLAYOFF_ODDS_LOCK_TIMEOUT_SECONDS,
+    )

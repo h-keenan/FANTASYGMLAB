@@ -23,10 +23,8 @@ implementation (see modules/trade_trust.py).
 
 from __future__ import annotations
 
-import threading
 import time
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any, Mapping
 
 import pandas as pd
@@ -35,6 +33,7 @@ from modules import league_value_settings
 from modules import player_eligibility
 from modules import player_quick_view
 from modules import rankings
+from modules import redis_cache
 from modules import sleeper
 from modules import trade_hub_ui
 from modules import trade_ideas as trade_ideas_module
@@ -524,7 +523,6 @@ def _trade_hub_ideas_cache_bucket() -> int:
     return int(time.time() // TRADE_HUB_IDEAS_TTL_SECONDS)
 
 
-@lru_cache(maxsize=256)
 def _generate_trade_idea_records_cached(
     league_id: str,
     roster_id: int,
@@ -565,54 +563,28 @@ def _generate_trade_idea_records_cached(
     )
 
 
-# Per-cache-key single-flight locks — same pattern, and same reason, as
-# modules.playoff_simulator's _playoff_odds_lock_for: functools.lru_cache's
-# own internal lock only protects the cache dict itself during a
-# lookup/insert, it does NOT serialize the wrapped function's *execution*.
-# Without this, N concurrent requests that all miss the same (league_id,
-# roster_id, strategy, lens, untouchables, gm_targets, bucket) key before
-# the first one finishes would each independently pay the full
+# Redis-backed single-flight + cache (modules.redis_cache.redis_single_flight_cache)
+# — same pattern, and same reason, as modules.playoff_simulator and
+# modules.league_rankings use for their own caches below: without a
+# single-flight guard, N concurrent requests that all miss the same
+# (league_id, roster_id, strategy, lens, untouchables, gm_targets, bucket)
+# key before the first finishes would each independently pay the full
 # build_trade_ideas search cost (measured at ~150-300ms of mostly
 # pure-Python, GIL-held work per call for a realistic 12-14 team dynasty
 # league — see scripts/profile_trade_hub.py) instead of sharing one. That
 # directly contradicts this cache's own documented purpose above (one
-# shared entry per 30s window across every caller), and on this service's
-# single uvicorn worker (see docker-compose.yml's mobile-api comment),
-# every one of those duplicate runs holds the one process's GIL back-to-
-# back, stalling every other in-flight request for that much longer than
-# necessary. A concrete trigger: the Dashboard's Top Trade Opportunity tile
-# and the Trade Hub screen both cold-loading for the same user/league
-# within the same request burst (a real multi-screen session, or the
-# mobile client's own navigation retries) — both ask for the exact same
-# cache key.
-_TRADE_HUB_IDEAS_LOCK_PRUNE_THRESHOLD = 500
-
-_trade_hub_ideas_locks: dict[tuple[Any, ...], threading.Lock] = {}
-_trade_hub_ideas_locks_guard = threading.Lock()
-
-
-def _trade_hub_ideas_lock_for(key: tuple[Any, ...]) -> threading.Lock:
-    with _trade_hub_ideas_locks_guard:
-        lock = _trade_hub_ideas_locks.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _trade_hub_ideas_locks[key] = lock
-        if len(_trade_hub_ideas_locks) > _TRADE_HUB_IDEAS_LOCK_PRUNE_THRESHOLD:
-            # Safe to drop any lock from an older bucket: this function's
-            # only caller always passes the *current* bucket (see
-            # generate_trade_idea_records_cached below), so a key whose
-            # bucket doesn't match the one we were just asked for can never
-            # be requested again. Skip anything still held, just in case a
-            # search genuinely spans a bucket rollover.
-            current_bucket = key[-1]
-            stale = [
-                existing_key
-                for existing_key, existing_lock in _trade_hub_ideas_locks.items()
-                if existing_key[-1] != current_bucket and not existing_lock.locked()
-            ]
-            for existing_key in stale:
-                _trade_hub_ideas_locks.pop(existing_key, None)
-        return lock
+# shared entry per 30s window across every caller).
+#
+# This used to be a per-process threading.Lock + functools.lru_cache pair,
+# which only protected ONE uvicorn worker: under docker-compose.yml's
+# multiple mobile-api workers, each worker has its own process memory, so
+# that old pair would let the same expensive search run redundantly once
+# per worker AND a cache hit in worker A would never help a request that
+# happened to land on worker B. The Redis-backed version below fixes both:
+# the distributed lock makes only one worker, cluster-wide, actually run a
+# given search, and the cached result lives in Redis, not in any one
+# worker's memory, so every worker serves it.
+_TRADE_HUB_IDEAS_LOCK_TIMEOUT_SECONDS = 15.0
 
 
 def generate_trade_idea_records_cached(
@@ -639,13 +611,13 @@ def generate_trade_idea_records_cached(
     GM Targets never see each other's untouchable/target tagging.
 
     `team_stance` (the caller's own declared Team Situation) is applied
-    OUTSIDE the lru_cache boundary — a stance-aware rationale clause is a
-    cheap string append, not worth invalidating/duplicating the expensive
-    search cache entry over. See modules.trade_ideas.apply_team_stance_framing.
+    OUTSIDE the cache boundary — a stance-aware rationale clause is a cheap
+    string append, not worth invalidating/duplicating the expensive search
+    cache entry over. See modules.trade_ideas.apply_team_stance_framing.
 
-    Single-flight per cache key: see `_trade_hub_ideas_lock_for`'s
-    docstring-comment for why this needs its own lock on top of
-    `lru_cache`."""
+    Single-flight + cache, now shared across every mobile-api worker via
+    Redis: see modules.redis_cache.redis_single_flight_cache and this
+    module's own comment above it."""
 
     key = (
         league_id,
@@ -657,8 +629,13 @@ def generate_trade_idea_records_cached(
         tuple(sorted({str(pid) for pid in gm_target_player_ids if str(pid)})),
         _trade_hub_ideas_cache_bucket(),
     )
-    with _trade_hub_ideas_lock_for(key):
-        records = _generate_trade_idea_records_cached(*key)
+    cache_key = redis_cache.build_cache_key("trade_hub_ideas", *key)
+    records = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=TRADE_HUB_IDEAS_TTL_SECONDS,
+        compute=lambda: _generate_trade_idea_records_cached(*key),
+        lock_timeout_seconds=_TRADE_HUB_IDEAS_LOCK_TIMEOUT_SECONDS,
+    )
     return trade_ideas_module.apply_team_stance_framing(records, team_stance)
 
 

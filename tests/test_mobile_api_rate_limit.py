@@ -1,12 +1,19 @@
-"""services/mobile_api_service.py's in-memory rate limiting middleware.
+"""services/mobile_api_service.py's Redis-backed rate limiting middleware.
 
-Before this fix, one client could hammer any endpoint with no limit at all.
-These tests force the limiter on (it is disabled by default under pytest —
-see _RateLimitMiddleware.dispatch — so the hundreds of other tests sharing
-this one process/module never collide on the same in-memory buckets) and
-confirm it actually triggers under repeated requests, returns a clean 429
-(not a raw exception), and tracks the tighter mutating-endpoint tier
-separately from the generous general-GET tier.
+Before the original fix, one client could hammer any endpoint with no
+limit at all. These tests force the limiter on (it is disabled by default
+under pytest — see _RateLimitMiddleware.dispatch — so the hundreds of
+other tests sharing this one process/module never collide on the same
+counters) and confirm it actually triggers under repeated requests,
+returns a clean 429 (not a raw exception), and tracks the tighter
+mutating-endpoint tier separately from the generous general-GET tier.
+
+The limiter's backing store moved from an in-memory dict to Redis (see
+modules/redis_cache.py) so every mobile-api worker process shares one
+counter per client/scope instead of each enforcing its own separate
+budget. tests/conftest.py's autouse `_fake_redis_for_tests` fixture points
+it at a fresh fakeredis instance for every test here, so these tests
+exercise the real Redis-backed code path without a live Redis server.
 """
 
 from __future__ import annotations
@@ -107,44 +114,55 @@ def test_rate_limiting_is_inert_by_default_under_pytest(monkeypatch):
         assert client.get("/health").status_code == 200
 
 
-def test_prune_is_throttled_once_bucket_count_stays_over_the_cap(monkeypatch):
-    """Regression test for a lock-contention bug: once `_buckets` stays
-    above `_RATE_LIMIT_MAX_TRACKED_KEYS` with all-current-window (non-stale)
-    keys, `_prune` can't remove anything, so the old code re-ran a full
-    O(len(_buckets)) dict scan — while holding the limiter's lock — on
-    EVERY subsequent `hit()` call, serializing every request in the process
-    on that scan. The fix caps actual prune attempts to at most one per
-    `_PRUNE_MIN_INTERVAL_SECONDS`, regardless of call volume."""
+def test_hit_fails_open_when_redis_is_unreachable(monkeypatch):
+    """The rate limiter is an auxiliary system, not the main request path
+    (same philosophy as e.g. Team Situation fetch failures elsewhere in
+    this codebase) — a Redis outage must degrade to "requests are allowed,
+    unthrottled" rather than ever raising out of hit() and 500ing the
+    request.
+    """
 
     pytest.importorskip("httpx")
+    from modules import redis_cache
     from services import mobile_api_service
 
-    limiter = mobile_api_service._InMemoryFixedWindowRateLimiter()
-    cap = mobile_api_service._RATE_LIMIT_MAX_TRACKED_KEYS
+    class _BrokenRedisClient:
+        def incr(self, *_args, **_kwargs):
+            raise redis_cache.RedisError("connection refused")
 
-    # Seed the limiter past the cap with distinct, all-current-window keys
-    # (nothing stale to collect) — the exact scenario where the old code
-    # would scan on every single call and never shrink.
-    for i in range(cap + 10):
-        limiter.hit(f"client-{i}", limit=1_000_000, window_seconds=60)
+        def expire(self, *_args, **_kwargs):
+            raise redis_cache.RedisError("connection refused")
 
-    prune_calls = []
-    original_prune = limiter._prune
+    monkeypatch.setattr(redis_cache, "get_redis_client", lambda: _BrokenRedisClient())
 
-    def _counting_prune(now, window_seconds):
-        prune_calls.append(now)
-        return original_prune(now, window_seconds)
+    limiter = mobile_api_service._RedisFixedWindowRateLimiter()
+    allowed, retry_after = limiter.hit("client-x", limit=1, window_seconds=60)
+    assert allowed is True
+    assert retry_after == 0.0
 
-    monkeypatch.setattr(limiter, "_prune", _counting_prune)
+    # Repeated hits past what the limit would normally allow still pass —
+    # there is no in-memory fallback counter either; Redis down means
+    # "not currently rate limited," full stop, until it recovers.
+    for _ in range(5):
+        allowed, _retry_after = limiter.hit("client-x", limit=1, window_seconds=60)
+        assert allowed is True
 
-    # Many more hits in rapid succession, still over the cap and still
-    # within the cooldown window — must not re-scan every time.
-    for i in range(200):
-        limiter.hit(f"client-extra-{i}", limit=1_000_000, window_seconds=60)
 
-    assert len(prune_calls) <= 1
+def test_repeated_get_requests_still_return_a_clean_429_end_to_end_when_redis_is_unreachable_is_not_the_case(
+    monkeypatch,
+):
+    """Sanity companion to the fail-open test above: with Redis actually
+    reachable (the default fakeredis fixture), the end-to-end 429 behavior
+    asserted earlier in this file is the real, exercised path — this isn't
+    accidentally always falling into the fail-open branch."""
 
-    # After the cooldown elapses, a prune attempt is allowed again.
-    limiter._last_prune_at -= mobile_api_service._InMemoryFixedWindowRateLimiter._PRUNE_MIN_INTERVAL_SECONDS + 1
-    limiter.hit("client-after-cooldown", limit=1_000_000, window_seconds=60)
-    assert len(prune_calls) >= 1
+    client, mobile_api_service = _client(monkeypatch)
+    _force_rate_limiting(
+        monkeypatch,
+        mobile_api_service,
+        RATE_LIMIT_GENERAL_MAX=1,
+        RATE_LIMIT_GENERAL_WINDOW_SECONDS=60,
+    )
+
+    assert client.get("/health").status_code == 200
+    assert client.get("/health").status_code == 429
