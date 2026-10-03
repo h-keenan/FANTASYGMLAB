@@ -8,6 +8,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
 import { radii, spacing, type ThemeColors } from '../theme';
 
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
 /**
  * Compact 2-column stat card for the Stats tab's analytic groups (Fantasy
  * Scoring / Production / Receiving / Efficiency) — coridian_'s concept-sheet
@@ -21,6 +23,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  */
 export default function MetricCard({
   label,
+  icon,
   value,
   percentile,
   valueColor,
@@ -29,6 +32,14 @@ export default function MetricCard({
   style,
 }: {
   label: string;
+  /** Small glyph in front of the label (e.g. a trophy for Power, a star for
+   * Franchise) — coridian_'s ask for the Roster Analysis tiles to "pop"
+   * instead of reading as plain text. Same leading-icon-before-title
+   * pattern AnalyticsSection's header already uses, just scoped to one
+   * tile's label instead of a whole card header. Optional so every other
+   * MetricCard caller (Dashboard snapshot, PlayerDetail stat grids, etc.)
+   * keeps its plain text-only label unchanged. */
+  icon?: IoniconName;
   value: string | number | null;
   percentile?: number | null;
   /** Overrides the value text color — for emphasizing an especially
@@ -59,9 +70,12 @@ export default function MetricCard({
   const content = (
     <>
       <View style={styles.labelRow}>
-        <AppText style={styles.label} numberOfLines={1}>
-          {label}
-        </AppText>
+        <View style={styles.labelTextRow}>
+          {icon ? <Ionicons name={icon} size={11} color={colors.accent} style={styles.labelIcon} /> : null}
+          <AppText style={styles.label} numberOfLines={1}>
+            {label}
+          </AppText>
+        </View>
         {/* Same chevron-forward + textTertiary affordance InsightRow/
          * AwardsStrip/WaiverRecommendationCard already use to mark a row as
          * tappable — reused here rather than inventing a card-specific
@@ -115,6 +129,8 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
       marginBottom: 3,
     },
+    labelTextRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+    labelIcon: { marginRight: 4 },
     label: {
       flexShrink: 1,
       fontSize: 10,

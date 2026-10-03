@@ -35,6 +35,7 @@ export default function TeamAnalysisPanel({
   onOpenDraftCenter,
   onOpenStarters,
   onOpenBench,
+  onOpenAge,
 }: {
   team: TeamRanking;
   leagueSize: number;
@@ -58,12 +59,16 @@ export default function TeamAnalysisPanel({
    * those two tiles simply stay non-tappable there. */
   onOpenStarters?: () => void;
   onOpenBench?: () => void;
+  /** Age tile destination — same shared Teams leaderboard Power/Franchise
+   * already open, pointed at the Age metric (see TeamsScreen's
+   * `METRIC_CONFIG`) instead of a screen that doesn't exist. */
+  onOpenAge?: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const metrics = useMemo(
-    () => buildRankMetrics(team, { onOpenTeams, onOpenDraftCenter, onOpenStarters, onOpenBench }),
-    [team, onOpenTeams, onOpenDraftCenter, onOpenStarters, onOpenBench],
+    () => buildRankMetrics(team, { onOpenTeams, onOpenDraftCenter, onOpenStarters, onOpenBench, onOpenAge }),
+    [team, onOpenTeams, onOpenDraftCenter, onOpenStarters, onOpenBench, onOpenAge],
   );
   const hasTradeContext = team.trade_tendency && team.trade_tendency !== 'Neutral';
 
@@ -77,6 +82,7 @@ export default function TeamAnalysisPanel({
               <MetricCard
                 key={metric.key}
                 label={metric.label}
+                icon={metric.icon}
                 value={metric.rank != null ? formatRank(metric.rank, metric.tied) : null}
                 percentile={percentile}
                 valueColor={percentile != null ? percentileColor(percentile, colors) : undefined}
@@ -138,9 +144,15 @@ export function hasRosterAnalysis(team: TeamRanking): boolean {
   );
 }
 
+type IoniconName = React.ComponentProps<typeof InsightRow>['icon'];
+
 interface RankMetric {
   key: string;
   label: string;
+  /** Leading glyph on the tile label (coridian_: these tags "need some sort
+   * of glyph icon, something to pop") — chosen per metric below, same
+   * Ionicons set already used throughout the app. */
+  icon: IoniconName;
   rank: number | null;
   /** 2+ teams share this exact dense rank — renders "T4" instead of "#4"
    * (see modules.league_rankings.add_rank_tie_metadata on the backend). */
@@ -151,14 +163,13 @@ interface RankMetric {
 }
 
 /**
- * Age has no destination anywhere in the app — there's no standalone screen
- * that shows "why is my roster's age rank what it is," and TeamRosterScreen
- * (the one screen that lists this team's players individually) doesn't
- * render per-player age at all (`PlayerIdentityRow` has no age slot), so
- * routing there would land on a screen that doesn't actually answer the
- * question. Left non-interactive deliberately rather than wired to a
- * destination that doesn't show age, per this task's explicit guidance to
- * prefer an honest exception over a bad drill-down.
+ * Age used to have no destination anywhere in the app — there was no
+ * standalone screen that answered "why is my roster's age rank what it
+ * is." TeamsScreen (the shared league leaderboard Power/Franchise already
+ * open) now takes a `metric` param and already has every team's
+ * `age_rank`/`average_age` from the same `getLeagueTeamRankings` call it
+ * uses for Power, so Age opens that same leaderboard sorted/labeled by Age
+ * instead of needing a new screen or per-player breakdown.
  */
 function buildRankMetrics(
   team: TeamRanking,
@@ -167,16 +178,24 @@ function buildRankMetrics(
     onOpenDraftCenter?: () => void;
     onOpenStarters?: () => void;
     onOpenBench?: () => void;
+    onOpenAge?: () => void;
   },
 ): RankMetric[] {
-  return [
-    { key: 'power', label: 'Power', rank: team.power_rank, tied: team.power_rank_tied, onPress: callbacks.onOpenTeams },
-    { key: 'franchise', label: 'Franchise', rank: team.franchise_rank, tied: team.franchise_rank_tied, onPress: callbacks.onOpenTeams },
-    { key: 'draft', label: 'Draft Capital', rank: team.draft_capital_rank, tied: team.draft_capital_rank_tied, onPress: callbacks.onOpenDraftCenter },
-    { key: 'starters', label: 'Starters', rank: team.starter_rank, tied: team.starter_rank_tied, onPress: callbacks.onOpenStarters },
-    { key: 'bench', label: 'Bench', rank: team.bench_rank, tied: team.bench_rank_tied, onPress: callbacks.onOpenBench },
-    { key: 'age', label: 'Age', rank: team.age_rank, tied: team.age_rank_tied },
-  ].filter((metric) => metric.rank != null);
+  const metrics: RankMetric[] = [
+    // flash: Power = overall roster strength/firepower.
+    { key: 'power', label: 'Power', icon: 'flash', rank: team.power_rank, tied: team.power_rank_tied, onPress: callbacks.onOpenTeams },
+    // star: Franchise = long-term franchise value, not a single-season read.
+    { key: 'franchise', label: 'Franchise', icon: 'star', rank: team.franchise_rank, tied: team.franchise_rank_tied, onPress: callbacks.onOpenTeams },
+    // file-tray-stacked: Draft Capital = the stack of picks a team holds.
+    { key: 'draft', label: 'Draft Capital', icon: 'file-tray-stacked-outline', rank: team.draft_capital_rank, tied: team.draft_capital_rank_tied, onPress: callbacks.onOpenDraftCenter },
+    // american-football: Starters = the active lineup on the field.
+    { key: 'starters', label: 'Starters', icon: 'american-football-outline', rank: team.starter_rank, tied: team.starter_rank_tied, onPress: callbacks.onOpenStarters },
+    // people: Bench = the depth of reserve players behind the starters.
+    { key: 'bench', label: 'Bench', icon: 'people-outline', rank: team.bench_rank, tied: team.bench_rank_tied, onPress: callbacks.onOpenBench },
+    // hourglass: Age = where a roster sits on its aging timeline.
+    { key: 'age', label: 'Age', icon: 'hourglass-outline', rank: team.age_rank, tied: team.age_rank_tied, onPress: callbacks.onOpenAge },
+  ];
+  return metrics.filter((metric) => metric.rank != null);
 }
 
 /**

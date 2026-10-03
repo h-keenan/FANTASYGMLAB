@@ -72,7 +72,16 @@ export type RootStackParamList = {
   Dashboard: { leagueId: string; leagueName: string };
   TradeHub: { leagueId: string; leagueName: string };
   TradeFinder: { leagueId: string; leagueName: string };
-  Teams: { leagueId: string; leagueName: string };
+  // `metric` picks which TeamRanking rank field the leaderboard sorts/labels
+  // by (defaults to 'power' when omitted, matching every pre-existing
+  // caller) — added so My Team's Age tile (TeamAnalysisPanel) can drill
+  // into a real per-team Age tier list via this same shared leaderboard
+  // instead of needing a standalone screen.
+  Teams: {
+    leagueId: string;
+    leagueName: string;
+    metric?: 'power' | 'franchise' | 'draft_capital' | 'starter' | 'bench' | 'age';
+  };
   PlayoffOdds: { leagueId: string; leagueName: string };
   DraftCenter: { leagueId: string; leagueName: string };
   PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };
