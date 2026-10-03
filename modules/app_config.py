@@ -63,6 +63,18 @@ DEV_REVIEW_CONFIG_KEY = "DYNASTYGM_DEV_REVIEW"
 # Explicit escape hatch only. Never set on customer-facing Render services.
 ALLOW_PROD_DEBUG_KEY = "DYNASTYGM_ALLOW_PROD_DEBUG"
 
+# Self-hosted docker-compose stack (docs/SELF_HOSTED_MIGRATION.md) sets this
+# itself on every app service (docker-compose.yml's `environment:` block) —
+# it is not something an operator fills into `.env`. Render's own markers
+# (RENDER / RENDER_SERVICE_ID / RENDER_EXTERNAL_URL) are platform-injected
+# and obviously absent off-Render, so without this flag a self-hosted
+# production box serving real customer traffic was indistinguishable from a
+# contributor's local/dev checkout: enforce_managed_web_config() silently
+# no-op'd instead of failing closed on missing Supabase config, and
+# customer_unsafe_debug_allowed()/founder ops env labeling treated it as
+# "local". See docs/SELF_HOSTED_MIGRATION.md for the deployment this guards.
+SELF_HOSTED_FLAG_KEY = "DYNASTYGM_SELF_HOSTED"
+
 
 class ProductionConfigurationError(RuntimeError):
     """Managed-host configuration is incomplete or unsafe. Message must never include secret values."""
@@ -177,7 +189,13 @@ def config_bool(
 
 
 def is_managed_cloud_host(*, environ: Mapping[str, Any] | None = None) -> bool:
-    """True on Render (and similar) managed hosts where customer traffic is served."""
+    """True on Render (and similar) managed hosts where customer traffic is served.
+
+    "Similar" includes the self-hosted docker-compose stack from
+    docs/SELF_HOSTED_MIGRATION.md, which sets ``DYNASTYGM_SELF_HOSTED`` on
+    every app service precisely so it is recognized here, the same as
+    Render's own platform-injected markers.
+    """
 
     env = os.environ if environ is None else environ
     render_flag = _safe_text(env.get("RENDER")).casefold()
@@ -186,6 +204,8 @@ def is_managed_cloud_host(*, environ: Mapping[str, Any] | None = None) -> bool:
     if _safe_text(env.get("RENDER_SERVICE_ID")):
         return True
     if _safe_text(env.get("RENDER_EXTERNAL_URL")):
+        return True
+    if _safe_text(env.get(SELF_HOSTED_FLAG_KEY)).casefold() in TRUE_CONFIG_VALUES:
         return True
     return False
 

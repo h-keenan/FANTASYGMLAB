@@ -99,6 +99,41 @@ def test_mobile_api_runs_single_worker_with_documented_rationale():
     assert "per-process state that is not shared across processes" in text or "not shared across processes" in text
 
 
+def test_every_app_service_sets_self_hosted_managed_host_marker():
+    # Render injects RENDER/RENDER_SERVICE_ID/RENDER_EXTERNAL_URL itself;
+    # nothing does that here, so docker-compose.yml must set
+    # DYNASTYGM_SELF_HOSTED explicitly on every app service or
+    # modules/app_config.py's is_managed_cloud_host() silently treats this
+    # production box as a contributor's local checkout (see
+    # docs/SELF_HOSTED_MIGRATION.md).
+    text = _compose_text()
+    for name in ("web", "mobile-api", "stripe-webhook", "revenuecat-webhook"):
+        service_header = f"\n  {name}:\n"
+        start = text.index(service_header) + len(service_header)
+        rest = text[start:]
+        other_headers = [
+            rest.find(f"\n  {other}:")
+            for other in ("mobile-api", "stripe-webhook", "revenuecat-webhook", "caddy")
+            if other != name and rest.find(f"\n  {other}:") != -1
+        ]
+        end = min(other_headers) if other_headers else len(rest)
+        block = rest[:end]
+        assert 'DYNASTYGM_SELF_HOSTED: "1"' in block, f"{name} missing DYNASTYGM_SELF_HOSTED"
+
+
+def test_caddy_waits_for_healthy_app_services_before_proxying():
+    # The bare depends_on list form only waits for the container process to
+    # start, not for its healthcheck to pass -- `web` in particular spends
+    # real time on cold imports before /_stcore/health responds, so Caddy
+    # needs the long-form `condition: service_healthy` to avoid proxying to
+    # an app service that isn't actually ready yet.
+    text = _compose_text()
+    depends_on_block = text[text.index("depends_on:", text.index("\n  caddy:")) :]
+    for name in ("web", "mobile-api", "stripe-webhook", "revenuecat-webhook"):
+        assert f"{name}:\n" in depends_on_block
+    assert depends_on_block.count("condition: service_healthy") == 4
+
+
 def test_rate_limiter_is_in_memory_per_process_not_shared():
     # Guards the actual premise behind "single worker is correct for now":
     # if someone later wires the rate limiter up to a shared store (e.g.
