@@ -96,6 +96,16 @@ services:
       retries: 3
       start_period: 20s
     restart: unless-stopped
+    # `web` also calls into modules/league_rankings.py and
+    # modules/trade_hub_engine.py, both of which now route through
+    # modules/redis_cache.redis_single_flight_cache (see the `mobile-api`
+    # service's Redis migration comment below). Without this, `web` can
+    # start serving requests before Redis's healthcheck passes, and every
+    # affected cache call pays its ~0.5s socket_connect_timeout/
+    # socket_timeout before falling back uncached on each stack restart.
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - internal
 

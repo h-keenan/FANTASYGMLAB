@@ -185,11 +185,16 @@ def test_secondary_search_session_cache_wraps_both_hub_call_sites():
         assert "cache_get(" in block
         assert "cache_put(" in block
         assert 'cache_status = "hit"' in block
-        assert "st.spinner(" in block
-        spinner_idx = block.index("st.spinner(")
+        # Anti-jump: a cache-miss fetch is wrapped in a shape-matched hydrate
+        # placeholder (modules/dashboard_loading_state.hydrate_placeholder),
+        # not a bare st.spinner(...) that collapses to nothing and lets the
+        # differently-sized real content reflow the page.
+        assert "st.spinner(" not in block
+        assert "hydrate_placeholder(" in block
+        placeholder_idx = block.index("hydrate_placeholder(")
         call_idx = block.index("= cached_player_trade_hub_ideas(")
         get_idx = block.index("cache_get(")
-        assert get_idx < spinner_idx < call_idx
+        assert get_idx < placeholder_idx < call_idx
         assert "prefetched_roster_map=" in block
         assert "freeze_player_search_roster_map(" not in block
         assert "exclusive_find_block(" in block

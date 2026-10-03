@@ -280,6 +280,34 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
     max-width: 40rem;
 }
 
+/* Shape modifiers for non-Dashboard surfaces reusing the hydrate-card
+   primitives above (Trade Hub search, Player Quick View's weekly-points
+   chart, league-loading, player news) -- see
+   modules/dashboard_loading_state.py's hydrate_placeholder(). Each only
+   resizes/recounts the skeleton rows so the reserved height roughly matches
+   that surface's real content, avoiding the layout jump a bare
+   st.spinner(...) leaves behind when it collapses to nothing. */
+.dashboard-hydrate-placeholder--cards {
+    min-height: 15rem;
+}
+.dashboard-hydrate-placeholder--chart {
+    min-height: 14.5rem;
+}
+.dashboard-hydrate-placeholder--chart .dashboard-hydrate-skeleton-row {
+    height: 13rem;
+    min-height: 13rem;
+}
+.dashboard-hydrate-placeholder--list {
+    min-height: 12rem;
+}
+.dashboard-hydrate-placeholder--list .dashboard-hydrate-skeleton-row {
+    height: 2.5rem;
+    min-height: 2.5rem;
+}
+.dashboard-hydrate-placeholder--generic {
+    min-height: 6rem;
+}
+
 div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid,
 div[class*="st-key-dashboard_team_snapshot"] .summary-tile-grid-compact {
     background: var(--border-standard);

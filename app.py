@@ -1981,7 +1981,12 @@ def render_trade_return_explorer(
         cached_payload = player_search.cache_get(st.session_state, search_sig)
         _cache_meta["cache_status"] = "hit" if cached_payload is not None else "miss"
     if cached_payload is None:
-        with st.spinner("Searching realistic return packages..."):
+        from modules import dashboard_loading_state as _dash_load
+
+        with _dash_load.hydrate_placeholder(
+            _dash_load.ROUTE_TRADE_HUB_SEARCH,
+            title="Searching realistic return packages...",
+        ):
             search_result = cached_player_trade_hub_ideas(
                 df_players=all_players_df,
                 league_id=league_id,
@@ -3987,7 +3992,12 @@ def _render_pqv_weekly_points(*, player_id: str, player_name: str = "", show_hea
 
     allow_fetch = selected_season != default_season
     if allow_fetch:
-        with st.spinner(f"Loading {selected_season} weekly points…"):
+        from modules import dashboard_loading_state as _dash_load
+
+        with _dash_load.hydrate_placeholder(
+            _dash_load.ROUTE_PLAYER_QUICK_VIEW_WEEKLY_POINTS,
+            title=f"Loading {selected_season} weekly points…",
+        ):
             weeks = _cached_player_weekly_points(identifier, selected_season, True)
     else:
         weeks = _cached_player_weekly_points(identifier, selected_season, False)
@@ -6160,7 +6170,12 @@ def render_home_launch_screen(
                 loader_called = False
                 loader_count = 0
                 try:
-                    with st.spinner(product_copy.LOADING_LEAGUES):
+                    from modules import dashboard_loading_state as _dash_load
+
+                    with _dash_load.hydrate_placeholder(
+                        _dash_load.ROUTE_LEAGUE_LOADING,
+                        title=product_copy.LOADING_LEAGUES,
+                    ):
                         loader_called = True
                         loaded = load_leagues_for_username(
                             launch_username_input, source="launch"
@@ -16729,7 +16744,12 @@ def main():
             )
 
             if st.button(product_copy.LOAD_LEAGUES_CTA, key="sidebar_load_leagues_cta"):
-                with st.spinner(product_copy.LOADING_LEAGUES):
+                from modules import dashboard_loading_state as _dash_load
+
+                with _dash_load.hydrate_placeholder(
+                    _dash_load.ROUTE_LEAGUE_LOADING,
+                    title=product_copy.LOADING_LEAGUES,
+                ):
                     load_leagues_for_username(
                         st.session_state.get("username_input", ""), source="sidebar"
                     )
@@ -22014,7 +22034,12 @@ def main():
                     or roster_news_key not in st.session_state
                     or now - last_roster_fetch > 900
                 ):
-                    with st.spinner("Loading player-specific news..."):
+                    from modules import dashboard_loading_state as _dash_load
+
+                    with _dash_load.hydrate_placeholder(
+                        _dash_load.ROUTE_PLAYER_NEWS,
+                        title="Loading player-specific news...",
+                    ):
                         st.session_state[roster_news_key] = fetch_roster_news(
                             my_names,
                             force_refresh=refresh_news,
@@ -22027,7 +22052,12 @@ def main():
                 if not roster_news:
                     last_fetch = st.session_state.get("news_last_fetch", 0)
                     if refresh_news or not st.session_state.get("news") or now - last_fetch > 900:
-                        with st.spinner("Checking fallback NFL headlines..."):
+                        from modules import dashboard_loading_state as _dash_load
+
+                        with _dash_load.hydrate_placeholder(
+                            _dash_load.ROUTE_NFL_HEADLINES_FALLBACK,
+                            title="Checking fallback NFL headlines...",
+                        ):
                             st.session_state["news"] = fetch_news() or []
                             st.session_state["news_last_fetch"] = now
                     all_news = st.session_state.get("news", [])
@@ -22977,7 +23007,12 @@ def main():
                         "hit" if cached_hub_payload is not None else "miss"
                     )
                 if cached_hub_payload is None:
-                    with st.spinner("Searching acquisition paths..."):
+                    from modules import dashboard_loading_state as _dash_load
+
+                    with _dash_load.hydrate_placeholder(
+                        _dash_load.ROUTE_TRADE_HUB_ACQUISITION_SEARCH,
+                        title="Searching acquisition paths...",
+                    ):
                         hub_search_result = cached_player_trade_hub_ideas(
                             df_players=trade_hub_df,
                             league_id=selected_league_id,
