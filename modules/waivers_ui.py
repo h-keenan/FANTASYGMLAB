@@ -349,6 +349,36 @@ def rank_priority_add_candidates(
         candidates = free_agents.copy()
     if candidates.empty:
         return candidates
+
+    # NFL-roster attachment (team/status/active, filtered above) answers
+    # "is this a real, rosterable current player." It says nothing about
+    # whether that player actually has a role right now. rankings.py's own
+    # opportunity/workload signal — the same `workload_trend` value the
+    # Player Detail screen renders as e.g. "Role trending down — Blocked" —
+    # is the authoritative source for that, and it was never consulted here:
+    # a buried-depth player with effectively 0% snap share could still win
+    # Priority Adds purely on dynasty value score (market/age-curve/draft
+    # capital), which is a long-horizon signal and not a "play this week"
+    # signal. Regression: Audric Estime (RB) — Snap % 0%, workload_trend
+    # "Blocked", Position Rank 40 of RBs — was surfacing as a recommended
+    # waiver ADD on dynasty value score alone. A player whose current role
+    # is flagged "Blocked" is never a sensible immediate add, so exclude
+    # them from Priority Add ranking the same way the NFL-roster-status
+    # gate above excludes IR/retired/practice-squad players — missing the
+    # column (older/internal test frames) leaves candidates unaffected.
+    blocked_role = (
+        candidates.get("workload_trend", pd.Series("", index=candidates.index, dtype="object"))
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+        .eq("blocked")
+    )
+    if blocked_role.any():
+        candidates = candidates.loc[~blocked_role].copy()
+    if candidates.empty:
+        return candidates
+
     settings = league_settings or {}
     needed = {
         str(pos).upper()
@@ -370,6 +400,30 @@ def rank_priority_add_candidates(
         "injury_replacement_fit",
         pd.Series(False, index=candidates.index, dtype="bool"),
     ).fillna(False)
+    # rankings.compute_depth_opportunity sets workload_trend="Blocked" as the
+    # bottom rung of its own opportunity hierarchy (below Buried Depth/
+    # Handcuff) precisely for players with no live path to snaps right now.
+    # value_score/dynasty_score are long-horizon (draft capital, age curve)
+    # and can stay high for a young former-high-pick player years after their
+    # real-world role has collapsed — without this gate those legacy-value
+    # scores alone were enough to clear the "elite wire value" cutoff below
+    # and surface a 0%-snap, role-blocked player as a Priority Add. A
+    # candidate whose own opportunity genuinely reopened (e.g. the player
+    # ahead of them got hurt) is re-labeled out of "Blocked" upstream in
+    # rankings.py, so gating on this column alone does not punish real
+    # opportunity swings — only players rankings.py itself judged to have no
+    # current role.
+    role_blocked = (
+        candidates.get(
+            "workload_trend",
+            pd.Series("", index=candidates.index, dtype="object"),
+        )
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+        == "blocked"
+    )
 
     kicker_required = int(settings.get("k_count") or 0) > 0
     has_viable_kicker = _roster_has_viable_kicker(
@@ -378,7 +432,7 @@ def rank_priority_add_candidates(
     suppress_kickers = not (kicker_required and not has_viable_kicker)
     qb_format = _qb_format(settings)
 
-    positive = candidates[(~stale) & (scores > 0)].copy()
+    positive = candidates[(~stale) & (~role_blocked) & (scores > 0)].copy()
     if positive.empty:
         return candidates.iloc[0:0].copy()
 
