@@ -31,6 +31,13 @@ export interface PlayerIdentityRowProps {
    * render OverallRatingBadge outside this component instead. Renders
    * nothing for null/undefined, same as OverallRatingBadge itself. */
   overallRating?: number | null;
+  /** This player's league-wide/pool "RB1"-style position rank (never a
+   * team-roster-relative rank — see lib/positionRankPrestige.ts) — pass the
+   * same value a row already renders as its own separate rank pill, if any.
+   * Forwarded straight to OverallRatingBadge's `positionRank`, so a top-5
+   * rank renders the crowned, prestige-tinted OVR badge instead of the
+   * plain percentile-tinted one. Ignored when `overallRating` is absent. */
+  positionRank?: number | null;
   /** Lineup slot label (QB/RB/FLEX/...) shown as a small chip on the left —
    * omit for contexts with no lineup slot (e.g. a plain roster list). When
    * `slot` is a single-position label that exactly matches `position`
@@ -118,6 +125,7 @@ export default function PlayerIdentityRow({
   team,
   tier,
   overallRating,
+  positionRank,
   slot,
   opportunityLabel,
   contextLine,
@@ -197,7 +205,7 @@ export default function PlayerIdentityRow({
           ) : null}
           {/* Last in the meta row, per UI_HIERARCHY_DIRECTIVE.md §11: OVR is
            * a supporting metric, never ahead of identity/position/team/tier. */}
-          <OverallRatingBadge rating={overallRating} />
+          <OverallRatingBadge rating={overallRating} positionRank={positionRank} />
         </View>
         {labelBits.length > 0 ? (
           <AppText style={styles.label} numberOfLines={1}>
