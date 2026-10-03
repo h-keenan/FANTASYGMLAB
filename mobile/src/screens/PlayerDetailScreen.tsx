@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   Modal,
@@ -28,6 +27,7 @@ import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnaps
 import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
+import SkeletonBlock, { SkeletonCard, SkeletonChart, SkeletonRow } from '../components/SkeletonBlock';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import { injuryTone } from '../lib/injuryDisplay';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
@@ -607,7 +607,7 @@ function TrendsSection({ playerId, yearsInLeague }: { playerId: string; yearsInL
         </View>
       ) : null}
       {loading || weeks === null ? (
-        <ActivityIndicator style={styles.loader} color={colors.accent} />
+        <SkeletonChart />
       ) : (
         <WeeklyPointsChart weeks={weeks} />
       )}
@@ -700,7 +700,15 @@ function CareerSection({ playerId }: { playerId: string }) {
   }, [playerId]);
 
   if (seasons === null) {
-    return <ActivityIndicator style={styles.loader} color={colors.accent} />;
+    // Shaped like the two most recent CareerSeasonCard entries (header +
+    // stat-tile grid) rather than a bare spinner floating above an
+    // otherwise-empty tab.
+    return (
+      <>
+        <SkeletonCard rows={4} />
+        <SkeletonCard rows={4} style={styles.cardSpaced} />
+      </>
+    );
   }
   if (seasons.length === 0) {
     return <AppText style={styles.notice}>No season history available for this player yet.</AppText>;
@@ -845,7 +853,15 @@ function ScheduleSection({ playerId }: { playerId: string }) {
   }, [playerId]);
 
   if (weeks === null) {
-    return <ActivityIndicator style={styles.loader} color={colors.accent} />;
+    // Row-shaped — matches ScheduleRow's own avatar-less row layout better
+    // than a lone centered spinner over empty space.
+    return (
+      <View style={styles.card}>
+        {Array.from({ length: 5 }, (_, index) => (
+          <SkeletonRow key={index} />
+        ))}
+      </View>
+    );
   }
   if (weeks.length === 0) {
     return <AppText style={styles.notice}>No schedule available for this player's team yet.</AppText>;
@@ -1454,10 +1470,29 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     // No tab bar exists yet during the initial fetch, so there's nothing
     // for Snapshot to sit "below" — render it right after the hero same as
     // before (still gated on snapshotExpanded, same as the non-loading
-    // branch below).
+    // branch below). Below that, a bare spinner used to float alone in the
+    // large empty area where the Stats tab's analytics cards are about to
+    // render (coridian_'s screenshot report) — these skeleton shapes stand
+    // in for that eventual Fantasy Output / Production / paired
+    // Usage+Efficiency layout instead, so the loading moment reads as
+    // "content is coming", not "the screen is stuck".
     if (snapshotNode) content.push(snapshotNode);
     if (rankNoteNode) content.push(rankNoteNode);
-    content.push(<ActivityIndicator key="loading" style={styles.loader} color={colors.accent} />);
+    content.push(
+      <View key="loading" style={styles.statsSkeletonWrap}>
+        <SkeletonBlock width={120} height={13} style={styles.statsSkeletonLabel} />
+        <SkeletonCard rows={2} />
+        <SkeletonCard rows={4} style={styles.cardSpaced} />
+        <View style={styles.pairedRow}>
+          <View style={styles.pairedCol}>
+            <SkeletonCard rows={2} />
+          </View>
+          <View style={styles.pairedCol}>
+            <SkeletonCard rows={2} />
+          </View>
+        </View>
+      </View>,
+    );
   } else {
     const showTabs = Boolean(stats?.seasons.length || model);
     if (showTabs) {
@@ -1960,7 +1995,8 @@ function createStyles(colors: ThemeColors) {
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  loader: { marginTop: spacing.xl },
+  statsSkeletonWrap: { marginTop: spacing.sm },
+  statsSkeletonLabel: { marginBottom: spacing.sm },
   scheduleDisclaimer: {
     fontSize: 11,
     color: colors.textTertiary,

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,6 +16,7 @@ import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
+import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -279,8 +280,23 @@ export default function RecapScreen({ route, navigation }: Props) {
       <GridBackground />
       {weekPicker}
       {loading ? (
-        <View style={styles.inlineLoadingRow}>
-          <ActivityIndicator color={colors.accent} />
+        // A week switch intentionally clears the prior week's recap rather
+        // than leaving it on screen as if still current (same clear-then-
+        // hydrate call as web's dashboard_loading_state.py) — but that used
+        // to swap the whole story list for a bare spinner centered in the
+        // now-empty scroll area. These shapes stand in for the headline +
+        // hero story card + grouped rows about to replace them instead.
+        <View style={styles.content}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerTextGroup}>
+              <SkeletonBlock width={90} height={11} />
+              <SkeletonBlock width="75%" height={22} style={styles.recapSkeletonHeadline} />
+            </View>
+          </View>
+          <SkeletonBlock height={150} radius={radii.md} style={styles.leadCard} />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
         </View>
       ) : (
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
@@ -754,7 +770,7 @@ function createStyles(colors: ThemeColors) {
   weekPillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
   weekPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   weekPillTextActive: { color: colors.accent },
-  inlineLoadingRow: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  recapSkeletonHeadline: { marginTop: spacing.xs },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
