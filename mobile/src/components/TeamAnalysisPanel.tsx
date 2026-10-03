@@ -30,6 +30,7 @@ import { spacing, type ThemeColors } from '../theme';
 export default function TeamAnalysisPanel({
   team,
   leagueSize,
+  showExplanations,
   onOpenTeams,
   onOpenDraftCenter,
   onOpenStarters,
@@ -37,6 +38,11 @@ export default function TeamAnalysisPanel({
 }: {
   team: TeamRanking;
   leagueSize: number;
+  /** Density setting (DensityContext's `showExplanations`) — hides the
+   * archetype "why" narrative + strengths/risks/recommendations elaboration
+   * in Compact mode, while the rank matrix above (the actual Power/Starter/
+   * Draft Capital/etc. calls) always stays visible. */
+  showExplanations: boolean;
   onOpenTeams?: () => void;
   /** Draft Capital tile destination — Draft Center's own posture header
    * surfaces this exact `draft_capital_rank` for the signed-in user's team,
@@ -80,10 +86,10 @@ export default function TeamAnalysisPanel({
           })}
         </View>
       ) : null}
-      {team.archetype_explanation ? (
+      {showExplanations && team.archetype_explanation ? (
         <AppText style={styles.explanation}>{team.archetype_explanation}</AppText>
       ) : null}
-      {team.archetype_strengths.length > 0 ? (
+      {showExplanations && team.archetype_strengths.length > 0 ? (
         <DetailList
           label="Strengths"
           items={team.archetype_strengths}
@@ -91,7 +97,7 @@ export default function TeamAnalysisPanel({
           icon="checkmark-circle-outline"
         />
       ) : null}
-      {team.archetype_risks.length > 0 ? (
+      {showExplanations && team.archetype_risks.length > 0 ? (
         <DetailList
           label="Risks"
           items={team.archetype_risks}
@@ -99,7 +105,7 @@ export default function TeamAnalysisPanel({
           icon="alert-circle-outline"
         />
       ) : null}
-      {team.archetype_recommendations.length > 0 ? (
+      {showExplanations && team.archetype_recommendations.length > 0 ? (
         <DetailList
           label="Recommendations"
           items={team.archetype_recommendations}

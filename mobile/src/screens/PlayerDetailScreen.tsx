@@ -47,6 +47,7 @@ import {
 import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor, resolvePlayerTier } from '../lib/playerTier';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -900,13 +901,14 @@ function InsightChipsRow({ model }: { model: QuickViewModel }) {
 
 function ModelSection({ model }: { model: QuickViewModel }) {
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const trendKey = (model.workload_trend ?? '').toLowerCase();
   const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
   return (
     <View style={styles.card}>
       <SectionHeading title="Model Breakdown" icon="analytics-outline" />
-      {model.decision_fit_narrative ? (
+      {showExplanations && model.decision_fit_narrative ? (
         <AppText style={styles.decisionFitNarrative}>{model.decision_fit_narrative}</AppText>
       ) : null}
       <StatGrid

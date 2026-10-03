@@ -29,6 +29,7 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -130,6 +131,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [starters, setStarters] = useState<LineupPlayer[]>([]);
@@ -252,6 +254,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
             <TeamAnalysisPanel
               team={myTeam}
               leagueSize={leagueSize}
+              showExplanations={showExplanations}
               onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
               onOpenDraftCenter={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
               onOpenStarters={() => setActiveTab('overview')}

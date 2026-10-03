@@ -32,6 +32,7 @@ import {
   type CompareTextRow,
 } from '../lib/playerCompare';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -188,6 +189,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
   const [search, setSearch] = useState('');
@@ -364,7 +366,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
                 : null}
             </AnalyticsSection>
           ) : null}
-          {narrative ? (
+          {narrative && showExplanations ? (
             <AnalyticsSection title="Decision Fit" icon="chatbubble-ellipses-outline">
               <NarrativeCompareBlock sideA={sides[0]} sideB={sides[1]} narrative={narrative} />
             </AnalyticsSection>
