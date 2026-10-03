@@ -6537,6 +6537,151 @@ def test_my_team_bench_distinguishes_ir_and_taxi_from_plain_bench(monkeypatch):
         assert bench_by_id[player_id]["roster_slot"] == "bench"
 
 
+def _fake_eligible_roster_frame():
+    """A roster frame that runs through the REAL
+    modules.player_eligibility.filter_current_fantasy_players (unlike
+    _fake_roster_frame's callers, which all bypass it with a passthrough
+    mock), so every row needs enough of the real eligibility signal columns
+    (sport/active/fantasycalc_value/depth_chart/news_updated) to actually
+    pass `player_eligibility`.
+
+    `my_ir_player` mirrors a real Sleeper IR designation: `status` is
+    "Injured Reserve" (a CURRENT_STATUS_TERMS entry) but Sleeper's `active`
+    flag is False — exactly the combination data/sleeper_players.json shows
+    for plenty of real IR players (off the active 53-man roster), and the
+    exact combination that used to make player_eligibility() return
+    eligible=False via its unconditional `active is False` check before a
+    genuine reserve/IR status ever got a chance to be corroborated.
+    """
+
+    now_ms = int(time.time() * 1000)
+    positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "RB", "WR"]
+    rows = []
+    for i, position in enumerate(positions, start=1):
+        rows.append(
+            {
+                "player_id": f"my{i}",
+                "name": f"My Player {i}",
+                "position": position,
+                "team": "KC",
+                "age": 26,
+                "years_exp": 4,
+                "sport": "nfl",
+                "active": True,
+                "status": "Active",
+                "injury_status": None,
+                "news_updated": now_ms,
+                "depth_chart_order": 1,
+                "depth_chart_position": position,
+                "fantasycalc_value": 3000,
+                "score": 3000,
+                "dynasty_score": 3000,
+                "value_score": 3000,
+                "rebuild_score": 3000,
+                "market_score": 3000,
+                "role_score": 3000,
+                "opportunity_score": 3000,
+                "scarcity_score": 0,
+                "risk_multiplier": 1.0,
+            }
+        )
+    # The rostered IR player — deliberately the weakest pre-discount score
+    # on the roster so it lands in bench on season value alone, same as a
+    # real IR-tagged bench player would.
+    rows.append(
+        {
+            "player_id": "my_ir_player",
+            "name": "Injured Starter",
+            "position": "RB",
+            "team": "KC",
+            "age": 25,
+            "years_exp": 3,
+            "sport": "nfl",
+            "active": False,
+            "status": "Injured Reserve",
+            "injury_status": "IR",
+            "news_updated": now_ms,
+            "depth_chart_order": 1,
+            "depth_chart_position": "RB",
+            "fantasycalc_value": 500,
+            "score": 500,
+            "dynasty_score": 500,
+            "value_score": 500,
+            "rebuild_score": 500,
+            "market_score": 500,
+            "role_score": 500,
+            "opportunity_score": 500,
+            "scarcity_score": 0,
+            "risk_multiplier": 1.0,
+        }
+    )
+    return pd.DataFrame(rows)
+
+
+def test_my_team_ir_player_gets_a_real_value_score(monkeypatch):
+    """Root-cause regression for the "IR players show no value" bug.
+
+    Unlike the other /my-team tests, this one does NOT mock
+    modules.player_eligibility.filter_current_fantasy_players — it runs the
+    real eligibility pipeline so a genuine IR player (Sleeper `active: false`
+    + status "Injured Reserve") must come out the other end with a real,
+    non-null value_score, exactly like every other roster-status group
+    (starter/bench/taxi) — not silently dropped to a blank "— value" like
+    the reinstated-Inactive case in
+    test_my_team_reinstates_rostered_inactive_player_instead_of_hiding_them
+    (which is the one case that's deliberately score-less: a player the
+    valued pool never had any data for at all)."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_ir_player"]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {
+                        "roster_id": 1,
+                        "owner_id": "sleeper-user-1",
+                        "players": my_roster_ids,
+                        "reserve": ["my_ir_player"],
+                        "taxi": [],
+                    },
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch(
+                        "modules.rankings.load_players", return_value=_fake_eligible_roster_frame()
+                    ):
+                        with patch("modules.sleeper.get_players", return_value={}):
+                            response = client.get(
+                                "/v1/leagues/abc/my-team",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+
+    all_players = body["starters"] + body["bench"]
+    ir_player = next((p for p in all_players if p["player_id"] == "my_ir_player"), None)
+    assert ir_player is not None, "a genuinely rostered IR player must never silently vanish"
+    assert ir_player["roster_slot"] == "ir"
+    # The actual bug: this used to come back None (blank "— value" on the
+    # client) purely because Sleeper's `active: false` short-circuited
+    # eligibility before the "Injured Reserve" status was ever corroborated.
+    assert ir_player["score"] is not None
+    assert isinstance(ir_player["score"], (int, float))
+    assert ir_player["score"] > 0
+
+
 def test_my_team_overall_rating_is_percentiled_against_the_full_league_pool(monkeypatch):
     """The roster itself only has 4 WRs — well under PERCENTILE_MIN_POOL — so
     overall_rating must come from the FULL players_df pool (every eligible

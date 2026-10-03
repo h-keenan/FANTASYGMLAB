@@ -35,6 +35,13 @@ CURRENT_STATUS_TERMS = {
     "questionable",
     "doubtful",
 }
+# Genuine injured-reserve-type designations — a team still holds this
+# player's rights, he's a real dynasty asset, and Sleeper's player feed
+# routinely reports `active: false` for exactly these players (their IR
+# placement means they're off the active 53-man roster) even though the
+# status itself is explicitly a CURRENT_STATUS_TERMS entry. See
+# RESERVE_STATUS_TERMS usage in player_eligibility() below.
+RESERVE_STATUS_TERMS = {"injured reserve", "ir", "pup", "nfi"}
 FREE_AGENT_TEAM_MARKERS = {"", "FA", "FREE AGENT", "FREE_AGENT", "NONE", "N/A", "NA"}
 NEWS_FRESHNESS_DAYS = 730
 UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS = 180
@@ -178,7 +185,16 @@ def player_eligibility(
         return {"eligible": False, "reason": "non_nfl_record", "current_signal": False}
     if not positions:
         return {"eligible": False, "reason": "invalid_fantasy_position", "current_signal": False}
-    if active is False:
+    # Sleeper sets `active: false` on plenty of genuinely-current IR/PUP/NFI
+    # players (it tracks active-53-man-roster presence, not fantasy
+    # relevance) — e.g. a season-ending-injury star is still clearly a
+    # current dynasty asset. Short-circuiting here on `active` alone used to
+    # drop every such player from the valued pool outright (root cause of
+    # the IR-section-shows-no-value bug), even though `status` explicitly
+    # says this is a reserve designation rather than a real inactive/retired
+    # one. Fall through to the normal status + current-signal corroboration
+    # below instead of auto-disqualifying.
+    if active is False and status not in RESERVE_STATUS_TERMS:
         return {"eligible": False, "reason": "explicitly_inactive", "current_signal": False}
     if any(term in status for term in INELIGIBLE_STATUS_TERMS):
         return {"eligible": False, "reason": "retired_or_inactive_status", "current_signal": False}
