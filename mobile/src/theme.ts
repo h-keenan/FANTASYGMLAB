@@ -368,6 +368,25 @@ export const shadows = {
 /** Legacy alias — prefer `shadows.resting` in new code. */
 export const cardShadow = shadows.resting;
 
+/**
+ * Parametrized version of `shadows.orbGlow` — same shape/intensity, but
+ * tintable per call instead of hardcoding the brand cyan. For a glowing
+ * card whose content already carries its own semantic color (e.g.
+ * RecapScreen's hero card matching its featured story's category), the
+ * drop shadow needs to match that color too, or the shadow alone reads as a
+ * second, unrelated cyan accent bleeding out from behind on-brand content
+ * (coridian_, 2026-10-02: "I like the color, but the two-tone does not
+ * work"). `shadows.orbGlow` itself is untouched — GmOrb/OnboardingScreen's
+ * brand-cyan glow keeps using it directly.
+ */
+export function glowShadow(color: string) {
+  return Platform.select({
+    ios: { shadowColor: color, shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 0 } },
+    android: {},
+    default: {},
+  });
+}
+
 /** Named springs/easings for reanimated — see AnimatedCard/GmOrb for usage. */
 export const motion = {
   pressSpring: { damping: 18, stiffness: 320, mass: 0.7 },
