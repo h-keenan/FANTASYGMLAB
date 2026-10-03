@@ -494,12 +494,28 @@ function statGroupOrderForPosition(position: string): StatGroupKey[] {
  * always wraps a group of 3+ into multiple rows. This only overrides sizing
  * per-instance via the `style` prop MetricCard already documents for exactly
  * this purpose, so no shared-component default changes. Groups of 1-2 keep
- * the original two-up sizing; 5+ (none currently exist) falls back to it too
- * rather than squeezing five cards into an unreadable single row.
+ * the original two-up sizing.
+ *
+ * 5+ (coridian_: RB's 5-item Production — Games/Rush Att/Rush Yards/Rush
+ * TDs/Targets — and a receiving back's 5-item Efficiency — Targets/Gm,
+ * Rec/Gm, Yards/Catch, Carries/Gm, Yards/Carry all present — both used to
+ * fall through to the 2-up default above, which renders 2+2+1: a trailing
+ * row with one half-empty tile, three rows total where coridian_ wants
+ * "1 or 2 rows"). Every count here is data-driven server-side (see
+ * player_quick_view.py's `_key_stats`/`_efficiency_stats`) and varies by
+ * position and season, so rather than hardcode a 5-item layout, pick
+ * whichever of 3 or 4 columns divides the group without leaving a 1-tile
+ * orphan row, trying 4 (denser) first: 5 -> 3+2, 6 -> 4+2, 7 -> 4+3,
+ * 8 -> 4+4. If neither avoids an orphan (e.g. 9), 3 columns loses fewer
+ * tiles to the trailing row than 4 would at the same count.
  */
 function metricGroupCardStyle(count: number): { minWidth: number; flexBasis: `${number}%` } {
   if (count === 3) return { minWidth: 88, flexBasis: '31%' };
   if (count === 4) return { minWidth: 76, flexBasis: '23%' };
+  if (count >= 5) {
+    if (count % 4 !== 1) return { minWidth: 76, flexBasis: '23%' };
+    return { minWidth: 88, flexBasis: '31%' };
+  }
   return { minWidth: 120, flexBasis: '46%' };
 }
 
