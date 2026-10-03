@@ -55,6 +55,14 @@ Known, deliberate simplifications (first pass — do not over-engineer):
 - Uncertainty bands are a plain-language "low/mid/high" estimate, not a
   statistically rigorous confidence interval — this codebase does not claim
   precision it does not have (see modules.methodology_page.CONFIDENCE_COPY).
+- Kickers (K) get a real projection from the same recent-scoring-trend
+  formula as every other position, but never an opponent-defense
+  multiplier — ``team_defense_points_allowed_by_position`` intentionally
+  doesn't track K (see ``OFFENSIVE_POSITIONS``'s docstring comment), so
+  ``_opponent_multiplier`` naturally falls back to its neutral (1.0, no
+  signal) default for every kicker matchup. A kicker's confidence is
+  therefore capped at "medium" — never "high" — since ``_confidence_label``
+  requires a defense signal for "high".
 
 Nothing in this module is wired into any screen, endpoint, or the existing
 ``value_score``/ranking/lineup-optimization paths — that is deliberately left
@@ -67,7 +75,26 @@ from typing import Any, Dict, List, Optional
 
 from modules import nfl_schedule, sleeper
 
+# Positions with a real opponent-defense-strength-by-position signal (see
+# ``team_defense_points_allowed_by_position``). Kickers are deliberately
+# excluded from this set: "points allowed to kickers" isn't a meaningful
+# defense-strength signal the way it is for QB/RB/WR/TE — a kicker's scoring
+# chances are driven almost entirely by his *own* offense's ability to drive
+# into scoring range, not by the opposing defense being specifically weak
+# against kickers. Sleeper/nflverse also don't track anything like
+# "points allowed to opposing kickers" as a real defensive stat.
 OFFENSIVE_POSITIONS: tuple[str, ...] = ("QB", "RB", "WR", "TE")
+
+# A kicker still gets a real weekly projection (see ``project_player_week``)
+# built the same way as every other position — his own recency-weighted
+# recent-scoring trend — just without an opponent-defense multiplier (see
+# ``OFFENSIVE_POSITIONS`` above for why). ``PROJECTABLE_POSITIONS`` is the
+# full set of positions ``project_player_week`` will produce a projection
+# for; ``OFFENSIVE_POSITIONS`` stays narrower because it also gates the
+# defense-strength-by-position aggregation, which only makes sense for
+# skill-position offense.
+KICKER_POSITION = "K"
+PROJECTABLE_POSITIONS: tuple[str, ...] = OFFENSIVE_POSITIONS + (KICKER_POSITION,)
 
 # --- Defense-strength-by-position tuning -----------------------------------
 DEFENSE_MAX_WEEKS_BACK = 8
@@ -402,8 +429,13 @@ def project_player_week(
     - ``"insufficient_player_data"`` — no usable recent-week production to
       build a trend from (new player, or none played the relevant weeks
       yet). No projection is fabricated from nothing.
-    - ``"unsupported_position"`` — position isn't one of QB/RB/WR/TE (no
-      defense-strength-by-position signal exists for K/DEF/IDP).
+    - ``"unsupported_position"`` — position isn't one of QB/RB/WR/TE/K (no
+      recent-scoring-trend projection is attempted for DEF/IDP). A kicker
+      (K) still gets a real ``"ok"`` projection from his own recent-scoring
+      trend; he just never gets an opponent-defense-strength multiplier
+      (``basis.opponent_defense_has_signal`` is always ``False`` for K — see
+      ``OFFENSIVE_POSITIONS``'s docstring comment for why), so his
+      confidence can reach at most "medium", never "high".
     - ``"unknown_player"`` / ``"no_team"`` — player not found, or has no
       current team (free agent/retired) so no schedule applies.
 
@@ -426,7 +458,7 @@ def project_player_week(
     position = str(player.get("position") or "").strip().upper()
     team = player.get("team")
 
-    if position not in OFFENSIVE_POSITIONS:
+    if position not in PROJECTABLE_POSITIONS:
         return {"status": "unsupported_position", "player_id": player_id, "position": position or None}
 
     if not team:
