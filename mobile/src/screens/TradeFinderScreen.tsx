@@ -153,6 +153,7 @@ function ExchangeAssetList({
             position={asset.position}
             team={asset.team}
             tier={asset.tier}
+            overallRating={asset.overall_rating}
             opportunityLabel={asset.role}
             contextLine={asset.age != null ? `Age ${asset.age}` : null}
             injuryLabel={asset.injury_status}

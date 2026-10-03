@@ -1513,6 +1513,12 @@ export interface PresentationAsset {
   injury_level?: string;
   opportunity_explanation?: string;
   tier?: string;
+  // 0-99 "OVR" badge alongside the tier ring's color — see
+  // modules.trade_hub_engine.generate_trade_idea_records' comment for how
+  // it's computed. Null when the pool was too thin to rank, same contract
+  // as every other overall_rating field (OverallRatingBadge renders
+  // nothing for null).
+  overall_rating?: number | null;
   season?: string;
   round?: string;
   pick_no?: number;

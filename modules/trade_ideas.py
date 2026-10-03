@@ -866,6 +866,13 @@ def _player_asset(
         "opportunity_label": str(row.get("opportunity_label") or ""),
         "opportunity_explanation": str(row.get("opportunity_explanation") or ""),
         "role": role,
+        # 0-99 "OVR" badge alongside the tier ring — see
+        # trade_hub_engine.generate_trade_idea_records' comment for how this
+        # column is computed. `row.get` already returns None for any caller
+        # whose pool never had the column added (gm_plan/gm_targets/live
+        # draft), which is exactly "no rating available", same as every
+        # other overall_rating field in the app.
+        "overall_rating": row.get("overall_rating"),
     }
     asset["is_protected"] = (
         _is_core_or_protected_starter(asset)
