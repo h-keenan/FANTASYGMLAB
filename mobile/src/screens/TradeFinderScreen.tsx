@@ -28,6 +28,7 @@ import {
   type TradeIdea,
 } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -256,6 +257,7 @@ function ResultCard({
   onPressPick: (asset: PresentationAsset) => void;
 }) {
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
@@ -316,7 +318,7 @@ function ResultCard({
         </View>
       </View>
 
-      {idea.rationale ? (
+      {showExplanations && idea.rationale ? (
         <>
           <AppText style={styles.rationaleLabel}>Why this works</AppText>
           <AppText style={styles.rationale} numberOfLines={4}>

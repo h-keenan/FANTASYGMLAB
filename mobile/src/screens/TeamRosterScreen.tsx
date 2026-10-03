@@ -24,6 +24,7 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -102,6 +103,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
+  const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { ownerName, playerIds, leagueId, leagueName, rosterId } = route.params;
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
@@ -202,6 +204,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
           <TeamSnapshotSection
             ranking={ranking}
             leagueSize={leagueSize}
+            showExplanations={showExplanations}
             onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
           />
         ) : null}
@@ -250,10 +253,12 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
 function TeamSnapshotSection({
   ranking,
   leagueSize,
+  showExplanations,
   onOpenTeams,
 }: {
   ranking: TeamRanking;
   leagueSize: number;
+  showExplanations: boolean;
   onOpenTeams: () => void;
 }) {
   const { colors } = useThemeMode();
@@ -299,16 +304,16 @@ function TeamSnapshotSection({
           })}
         </View>
       ) : null}
-      {ranking.archetype_explanation ? (
+      {showExplanations && ranking.archetype_explanation ? (
         <AppText style={styles.archetypeExplanation}>{ranking.archetype_explanation}</AppText>
       ) : null}
-      {ranking.archetype_strengths.length > 0 ? (
+      {showExplanations && ranking.archetype_strengths.length > 0 ? (
         <ArchetypeDetailList label="Strengths" items={ranking.archetype_strengths} color={colors.success} />
       ) : null}
-      {ranking.archetype_risks.length > 0 ? (
+      {showExplanations && ranking.archetype_risks.length > 0 ? (
         <ArchetypeDetailList label="Risks" items={ranking.archetype_risks} color={colors.danger} />
       ) : null}
-      {ranking.archetype_recommendations.length > 0 ? (
+      {showExplanations && ranking.archetype_recommendations.length > 0 ? (
         <ArchetypeDetailList label="Recommendations" items={ranking.archetype_recommendations} color={colors.accent} />
       ) : null}
     </AnalyticsSection>
