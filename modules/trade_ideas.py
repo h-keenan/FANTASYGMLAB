@@ -3582,6 +3582,24 @@ def _build_trade_ideas_impl(
     ]
     my_pick_assets = [pick for pick in my_pick_assets if int(pick.get("round") or 99) <= 3]
 
+    # Trade Finder's explicit "search around exactly this selection" intent
+    # — the same flag that already lets `_automatic_outgoing_asset_allowed`
+    # below evaluate a protected/core outgoing asset instead of silently
+    # dropping it from the pool. `evaluate_trade_market_realism` has its own,
+    # separate protected/cornerstone hard-fail gate (`protected_blocks_
+    # automatic_board`, `allow_focused_core_move`) keyed on this same
+    # `explicit_player_focus` + `focused_player_ids` pair — without passing
+    # them through from here too, a selection built entirely around a
+    # core/protected asset (an Elite-tier player on a Rebuild team, say)
+    # clears the pool filter above only to have every resulting package
+    # hard-failed right back out at the market-realism stage, so Trade
+    # Finder still reports zero plausible trades for exactly the kind of
+    # asset someone most wants to shop.
+    explicit_player_focus = bool(allow_protected_focus and trade_block_names)
+    focused_player_ids = (
+        [str(pid) for pid in my_trade_block_df["player_id"].astype(str)] if trade_block_names else []
+    )
+
     with profile.stage("outgoing_asset_filtering"):
         base_my_player_assets = [
             _player_asset(
@@ -3598,7 +3616,7 @@ def _build_trade_ideas_impl(
                 for asset in base_my_player_assets
                 if _automatic_outgoing_asset_allowed(
                     asset,
-                    explicit_player_focus=bool(allow_protected_focus and trade_block_names),
+                    explicit_player_focus=explicit_player_focus,
                 )
             ]
 
@@ -3691,6 +3709,8 @@ def _build_trade_ideas_impl(
                     league_settings=league_settings,
                     send_score=profile.score(send_assets),
                     receive_score=profile.score(receive_assets),
+                    explicit_player_focus=explicit_player_focus,
+                    focused_player_ids=focused_player_ids,
                 ),
             )
             if market_context.get("hard_fail"):
