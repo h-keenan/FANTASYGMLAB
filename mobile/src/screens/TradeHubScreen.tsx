@@ -18,6 +18,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
@@ -157,6 +158,25 @@ function ideaToShareVerdict(idea: TradeIdea): TradeVerdict {
     value_delta: gain,
     tone: 'idea',
   };
+}
+
+/**
+ * Stand-in for a loading `TradeIdeaCard` — partner row (avatar + name/value
+ * shape) plus a value-bar-shaped line, inside the same bordered card chrome
+ * `TradeIdeaCard` itself renders in. Replaces the bare `ActivityIndicator`
+ * that used to float alone above an otherwise-empty FlatList while the
+ * first page of ideas was still loading (nothing below the header/tabs
+ * hints at trade cards being on the way).
+ */
+function TradeIdeaSkeletonCard() {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={[styles.card, styles.skeletonCard]}>
+      <SkeletonRow />
+      <SkeletonBlock height={36} style={styles.skeletonValueBlock} />
+    </View>
+  );
 }
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHub'>;
@@ -363,7 +383,13 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
             <IdeaSummaryRow ideas={ideas} />
           ) : null}
-          {activeLoading ? <ActivityIndicator style={styles.loading} color={colors.accent} /> : null}
+          {activeLoading ? (
+            <View style={styles.skeletonWrap}>
+              <TradeIdeaSkeletonCard />
+              <TradeIdeaSkeletonCard />
+              <TradeIdeaSkeletonCard />
+            </View>
+          ) : null}
           {activeError ? <AppText style={styles.error}>{activeError}</AppText> : null}
           {isForYou && notReadyReason ? (
             <AppText style={styles.notReadyText}>
@@ -1035,6 +1061,9 @@ function createStyles(colors: ThemeColors) {
   },
   loadMoreButtonText: { fontSize: 14, fontWeight: '700', color: colors.accent },
   loading: { marginVertical: spacing.xl },
+  skeletonWrap: { marginTop: spacing.sm },
+  skeletonCard: { padding: spacing.md },
+  skeletonValueBlock: { marginTop: spacing.md },
   error: { color: colors.danger, textAlign: 'center', marginTop: spacing.lg },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20, marginTop: spacing.xl },
   empty: { textAlign: 'center', color: colors.textSecondary, marginTop: spacing.xl, lineHeight: 20 },
