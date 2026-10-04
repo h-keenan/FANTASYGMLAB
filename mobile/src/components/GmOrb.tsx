@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -516,6 +517,7 @@ export default function GmOrb() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
   const [recapReady, setRecapReady] = useState(false);
@@ -535,6 +537,30 @@ export default function GmOrb() {
   const league = open ? currentLeagueContext() : null;
   const currentRouteName = open && navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Lightweight destination search — substring match against label +
+  // subtitle across the same three static destination lists the
+  // categorized sections below already render through NavRow, nothing
+  // computed server-side or fuzzy-matched. League/GM Tools destinations are
+  // only searchable while a league is open, matching the categorized view
+  // below (which hides those two groups entirely without one) — a league-
+  // gated destination would otherwise appear in results but silently no-op
+  // on tap (see `go()`).
+  const searchableDestinations = useMemo(
+    () => [
+      ...(league ? coreLeagueDestinations(colors) : []),
+      ...(league ? gmToolsDestinations(colors) : []),
+      ...generalDestinations(colors),
+    ],
+    [colors, league],
+  );
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const searchResults = useMemo(() => {
+    if (!normalizedQuery) return [];
+    return searchableDestinations.filter((destination) =>
+      `${destination.label} ${destination.subtitle}`.toLowerCase().includes(normalizedQuery),
+    );
+  }, [searchableDestinations, normalizedQuery]);
 
   const sheetY = useSharedValue(400);
   const backdropOpacity = useSharedValue(0);
@@ -675,6 +701,7 @@ export default function GmOrb() {
   const openSheet = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSearchQuery('');
     setVisible(true);
     setOpen(true);
     sheetY.value = withSpring(0, motion.sheetSpring);
@@ -792,78 +819,118 @@ export default function GmOrb() {
           <AppText style={styles.sheetKicker}>FantasyGM Lab</AppText>
           <AppText style={styles.sheetTitle}>Where to go</AppText>
 
-          <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
-            {league ? (
-              <>
-                {/* Concept sheet labels this section with the actual league
-                    name ("KEEPER LEAGUE"), not a generic "League" literal —
-                    matches the screen's own title bar right behind the
-                    sheet, which already shows the same name as its
-                    subtitle. Falls back to the generic label only in the
-                    (practically unreachable, since this whole branch is
-                    gated on `league`) case of a blank name. This also
-                    satisfies the brief's "surface current league context
-                    near the top" ask (§3) without a separate chip: the very
-                    first thing in the list is already labeled with the
-                    active league's name. */}
-                <NavSection label={league.leagueName || 'League'}>
-                  {coreLeagueDestinations(colors).map((destination) => (
-                    <NavRow
-                      key={destination.route}
-                      destination={destination}
-                      isCurrent={destination.route === currentRouteName}
-                      unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
-                      onPress={() => go(destination)}
-                    />
-                  ))}
-                </NavSection>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search where to go"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholderTextColor={colors.textTertiary}
+            accessibilityLabel="Search destinations"
+          />
 
-                <NavSection label="GM Tools">
-                  {gmToolsDestinations(colors).map((destination) => (
+          <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
+            {normalizedQuery ? (
+              // A query flattens the categorized League/GM Tools/General
+              // groups into one plain match list — same NavRow, same
+              // unreadCount/hasNew badges, just no section labels since
+              // results can span every group at once.
+              searchResults.length > 0 ? (
+                searchResults.map((destination) => (
+                  <NavRow
+                    key={destination.route}
+                    destination={destination}
+                    isCurrent={destination.route === currentRouteName}
+                    unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
+                    hasNew={
+                      destination.route === 'TradeHub'
+                        ? tradeHubHasNew
+                        : destination.route === 'Recap'
+                          ? recapReady
+                          : false
+                    }
+                    onPress={() => go(destination)}
+                  />
+                ))
+              ) : (
+                <AppText style={styles.sectionNote}>No destinations match "{searchQuery.trim()}".</AppText>
+              )
+            ) : (
+              <>
+                {league ? (
+                  <>
+                    {/* Concept sheet labels this section with the actual league
+                        name ("KEEPER LEAGUE"), not a generic "League" literal —
+                        matches the screen's own title bar right behind the
+                        sheet, which already shows the same name as its
+                        subtitle. Falls back to the generic label only in the
+                        (practically unreachable, since this whole branch is
+                        gated on `league`) case of a blank name. This also
+                        satisfies the brief's "surface current league context
+                        near the top" ask (§3) without a separate chip: the very
+                        first thing in the list is already labeled with the
+                        active league's name. */}
+                    <NavSection label={league.leagueName || 'League'}>
+                      {coreLeagueDestinations(colors).map((destination) => (
+                        <NavRow
+                          key={destination.route}
+                          destination={destination}
+                          isCurrent={destination.route === currentRouteName}
+                          unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
+                          onPress={() => go(destination)}
+                        />
+                      ))}
+                    </NavSection>
+
+                    <NavSection label="GM Tools">
+                      {gmToolsDestinations(colors).map((destination) => (
+                        <NavRow
+                          key={destination.route}
+                          destination={destination}
+                          isCurrent={destination.route === currentRouteName}
+                          hasNew={
+                            destination.route === 'TradeHub'
+                              ? tradeHubHasNew
+                              : destination.route === 'Recap'
+                                ? recapReady
+                                : false
+                          }
+                          onPress={() => go(destination)}
+                        />
+                      ))}
+                    </NavSection>
+                  </>
+                ) : (
+                  <AppText style={styles.sectionNote}>
+                    Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
+                  </AppText>
+                )}
+
+                {/* Switch League moved here — trailing GM Tools, ahead of General
+                    — to match the structural order shown in all three concept
+                    screenshots (League destinations -> GM Tools ending in Recap
+                    -> SWITCH LEAGUE -> GENERAL). Previously this rendered first,
+                    above every destination, which none of the concept images
+                    actually show; re-inspecting them directly during the V2
+                    restructure pass caught the mismatch. Purely a position
+                    change — same component, same props, same switching logic. */}
+                {league || savedLeagues.length > 1 ? (
+                  <LeagueSwitcher league={league} savedLeagues={savedLeagues} onSwitch={switchToLeague} />
+                ) : null}
+
+                <NavSection label="General">
+                  {generalDestinations(colors).map((destination) => (
                     <NavRow
                       key={destination.route}
                       destination={destination}
                       isCurrent={destination.route === currentRouteName}
-                      hasNew={
-                        destination.route === 'TradeHub'
-                          ? tradeHubHasNew
-                          : destination.route === 'Recap'
-                            ? recapReady
-                            : false
-                      }
                       onPress={() => go(destination)}
                     />
                   ))}
                 </NavSection>
               </>
-            ) : (
-              <AppText style={styles.sectionNote}>
-                Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
-              </AppText>
             )}
-
-            {/* Switch League moved here — trailing GM Tools, ahead of General
-                — to match the structural order shown in all three concept
-                screenshots (League destinations -> GM Tools ending in Recap
-                -> SWITCH LEAGUE -> GENERAL). Previously this rendered first,
-                above every destination, which none of the concept images
-                actually show; re-inspecting them directly during the V2
-                restructure pass caught the mismatch. Purely a position
-                change — same component, same props, same switching logic. */}
-            {league || savedLeagues.length > 1 ? (
-              <LeagueSwitcher league={league} savedLeagues={savedLeagues} onSwitch={switchToLeague} />
-            ) : null}
-
-            <NavSection label="General">
-              {generalDestinations(colors).map((destination) => (
-                <NavRow
-                  key={destination.route}
-                  destination={destination}
-                  isCurrent={destination.route === currentRouteName}
-                  onPress={() => go(destination)}
-                />
-              ))}
-            </NavSection>
           </ScrollView>
         </Animated.View>
       </Modal>
@@ -961,7 +1028,23 @@ function createStyles(colors: ThemeColors) {
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  sheetTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.lg },
+  sheetTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  // Same searchInput treatment Players/Waivers already use (border + sm
+  // radius + background-toned fill) — this sheet's background is
+  // `backgroundElevated`, so the input itself still uses the app's base
+  // `background` tone to read as a distinct field rather than disappearing
+  // into the sheet.
+  searchInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    fontSize: 15,
+    backgroundColor: colors.background,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
   sheetContent: { paddingBottom: spacing.md },
   sectionLabel: {
     fontSize: 12,

@@ -32,6 +32,7 @@ export default function TeamAnalysisPanel({
   leagueSize,
   showExplanations,
   onOpenTeams,
+  onOpenFranchise,
   onOpenDraftCenter,
   onOpenStarters,
   onOpenBench,
@@ -45,6 +46,13 @@ export default function TeamAnalysisPanel({
    * Draft Capital/etc. calls) always stays visible. */
   showExplanations: boolean;
   onOpenTeams?: () => void;
+  /** Franchise tile destination — the same shared Teams leaderboard Power
+   * already opens, pointed at the Franchise metric (see TeamsScreen's
+   * `METRIC_CONFIG`), exactly like `onOpenAge` below does for Age. Previously
+   * missing, so the Franchise tile fell through to `onOpenTeams` (Power's
+   * own callback) and silently opened the Power-sorted leaderboard instead
+   * of a Franchise-sorted one. */
+  onOpenFranchise?: () => void;
   /** Draft Capital tile destination — Draft Center's own posture header
    * surfaces this exact `draft_capital_rank` for the signed-in user's team,
    * so it's a real drill-down, not a re-navigation to the same data. */
@@ -67,8 +75,16 @@ export default function TeamAnalysisPanel({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const metrics = useMemo(
-    () => buildRankMetrics(team, { onOpenTeams, onOpenDraftCenter, onOpenStarters, onOpenBench, onOpenAge }),
-    [team, onOpenTeams, onOpenDraftCenter, onOpenStarters, onOpenBench, onOpenAge],
+    () =>
+      buildRankMetrics(team, {
+        onOpenTeams,
+        onOpenFranchise,
+        onOpenDraftCenter,
+        onOpenStarters,
+        onOpenBench,
+        onOpenAge,
+      }),
+    [team, onOpenTeams, onOpenFranchise, onOpenDraftCenter, onOpenStarters, onOpenBench, onOpenAge],
   );
   const hasTradeContext = team.trade_tendency && team.trade_tendency !== 'Neutral';
 
@@ -175,6 +191,7 @@ function buildRankMetrics(
   team: TeamRanking,
   callbacks: {
     onOpenTeams?: () => void;
+    onOpenFranchise?: () => void;
     onOpenDraftCenter?: () => void;
     onOpenStarters?: () => void;
     onOpenBench?: () => void;
@@ -185,7 +202,7 @@ function buildRankMetrics(
     // flash: Power = overall roster strength/firepower.
     { key: 'power', label: 'Power', icon: 'flash', rank: team.power_rank, tied: team.power_rank_tied, onPress: callbacks.onOpenTeams },
     // star: Franchise = long-term franchise value, not a single-season read.
-    { key: 'franchise', label: 'Franchise', icon: 'star', rank: team.franchise_rank, tied: team.franchise_rank_tied, onPress: callbacks.onOpenTeams },
+    { key: 'franchise', label: 'Franchise', icon: 'star', rank: team.franchise_rank, tied: team.franchise_rank_tied, onPress: callbacks.onOpenFranchise },
     // file-tray-stacked: Draft Capital = the stack of picks a team holds.
     { key: 'draft', label: 'Draft Capital', icon: 'file-tray-stacked-outline', rank: team.draft_capital_rank, tied: team.draft_capital_rank_tied, onPress: callbacks.onOpenDraftCenter },
     // american-football: Starters = the active lineup on the field.
