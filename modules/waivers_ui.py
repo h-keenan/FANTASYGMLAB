@@ -31,6 +31,85 @@ GENERIC_DYNASTY_VALUE_PREFIX = (
 )
 
 
+def annotate_sleeper_trending_add(
+    free_agents: pd.DataFrame,
+    trending_map: dict | None = None,
+) -> pd.DataFrame:
+    """Attach Sleeper's GLOBAL trending-add signal to each free-agent row.
+
+    ``trending_map`` is ``modules.sleeper.trending_add_rank_map()``'s output
+    (``player_id -> {"count": int, "rank": int}``) — callers fetch it once
+    per request/render (one Sleeper call) and pass it in here rather than
+    this function reaching the network itself, so both the web route
+    (app.py) and the mobile endpoint (services/mobile_api_service.py) share
+    this exact same join instead of duplicating it.
+
+    This is deliberately labeled "sleeper_trending_add*", not just
+    "trending*" — this codebase already uses "trending" for a different,
+    roster-internal signal (role/usage trend, e.g. rankings.py's "Usage
+    trending up/down"). Sleeper's trending-add list is a completely
+    different thing: cross-league, platform-wide add velocity over the last
+    24h, NOT scoped to this league. Adds three columns, all "not trending"
+    when ``trending_map`` is empty/None or a given player has no entry:
+      - ``sleeper_trending_add`` (bool) — currently on Sleeper's global
+        trending-add list.
+      - ``sleeper_trending_add_count`` (Optional[int]) — Sleeper's own
+        24h add count for this player.
+      - ``sleeper_trending_add_rank`` (Optional[int]) — 1-indexed rank
+        within that global list (1 = most added across all of Sleeper).
+    """
+
+    if free_agents is None or free_agents.empty or "player_id" not in free_agents.columns:
+        return free_agents
+
+    annotated = free_agents.copy()
+    mapping = trending_map or {}
+    player_ids = annotated["player_id"].astype(str)
+    if not mapping:
+        annotated["sleeper_trending_add"] = False
+        annotated["sleeper_trending_add_count"] = None
+        annotated["sleeper_trending_add_rank"] = None
+        return annotated
+
+    annotated["sleeper_trending_add"] = player_ids.isin(set(mapping.keys()))
+    # Built as plain Python lists on an object-dtype Series (not .map(), which
+    # would upcast a None/int mix to float64 and silently turn "not trending"
+    # into NaN instead of a real None) — downstream readers (the web badge
+    # helper below, mobile's _clean_json_value) check `is None`/truthiness
+    # directly.
+    annotated["sleeper_trending_add_count"] = pd.Series(
+        [mapping.get(pid, {}).get("count") for pid in player_ids],
+        index=annotated.index,
+        dtype="object",
+    )
+    annotated["sleeper_trending_add_rank"] = pd.Series(
+        [mapping.get(pid, {}).get("rank") for pid in player_ids],
+        index=annotated.index,
+        dtype="object",
+    )
+    return annotated
+
+
+def sleeper_trending_add_badge_html(row) -> str:
+    """Small badge for a free-agent row on Sleeper's global trending-add list.
+
+    Empty string for a row that isn't trending (the common case) — rendered
+    inline with the other recommendation badges, never implying this is a
+    league-specific popularity signal (see annotate_sleeper_trending_add's
+    docstring: it is explicitly cross-league/platform-wide).
+    """
+
+    if not bool(row.get("sleeper_trending_add")):
+        return ""
+    count = row.get("sleeper_trending_add_count")
+    try:
+        count_i = int(count) if count is not None and str(count).strip() else None
+    except (TypeError, ValueError):
+        count_i = None
+    label = f"Trending across Sleeper (+{count_i:,})" if count_i else "Trending across Sleeper"
+    return ui_primitives.status_badge_html(label, variant="information")
+
+
 def _inject_waivers_presentation_css() -> None:
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
     # Trade Ideas' confidence-ring visual language (modules.trade_visual_language)
@@ -955,6 +1034,7 @@ def render_free_agent_cards(
                 if priority_confidence_label
                 else ""
             )
+            trending_badge_html = sleeper_trending_add_badge_html(row)
             faab_guidance = waiver_faab_guidance_for_row(
                 row,
                 score_field=score_field,
@@ -978,6 +1058,7 @@ def render_free_agent_cards(
                 "<div class='waiver-recommendation-row'>"
                 + recommendation_badge
                 + priority_confidence_html
+                + trending_badge_html
                 + "</div>"
                 + "<div class='waiver-compact-metrics'>"
                 + (f"<span>{escape(confidence)} confidence</span>" if confidence else "")

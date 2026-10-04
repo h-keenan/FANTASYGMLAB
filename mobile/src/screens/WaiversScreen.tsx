@@ -30,6 +30,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import WaiverRecommendationCard, {
   waiverInjuryDisplay,
   waiverOpponentContext,
+  waiverTrendingAddLabel,
 } from '../components/WaiverRecommendationCard';
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -463,6 +464,7 @@ function FreeAgentRow({
           injuryTone={injury.tone}
           ruledOut={injury.ruledOut}
           contextLine={contextLine}
+          trendingAddLabel={waiverTrendingAddLabel(player)}
           onPress={onPress}
           showDivider={false}
         />

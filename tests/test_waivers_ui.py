@@ -539,6 +539,62 @@ class TestWaiversUI(unittest.TestCase):
         )
         self.assertNotIn("tvl-conf", html)
 
+    def test_trending_badge_renders_for_sleeper_global_trending_add(self):
+        html, _, _ = self._render_card(
+            {
+                "player_id": "trend-1",
+                "name": "Trending Player",
+                "position": "WR",
+                "team": "SEA",
+                "age": 23,
+                "value_score": 40,
+                "position_rank": 5,
+                "stale_free_agent": False,
+                "sleeper_trending_add": True,
+                "sleeper_trending_add_count": 1284,
+            }
+        )
+        self.assertIn("Trending across Sleeper", html)
+        self.assertIn("1,284", html)
+
+    def test_trending_badge_absent_when_not_trending(self):
+        html, _, _ = self._render_card(
+            {
+                "player_id": "trend-2",
+                "name": "Quiet Player",
+                "position": "WR",
+                "team": "SEA",
+                "age": 23,
+                "value_score": 40,
+                "position_rank": 5,
+                "stale_free_agent": False,
+                "sleeper_trending_add": False,
+            }
+        )
+        self.assertNotIn("Trending across Sleeper", html)
+
+    def test_annotate_sleeper_trending_add_marks_only_mapped_players(self):
+        free_agents = pd.DataFrame(
+            [
+                {"player_id": "100", "name": "A"},
+                {"player_id": "200", "name": "B"},
+            ]
+        )
+        annotated = waivers_ui.annotate_sleeper_trending_add(
+            free_agents, {"100": {"count": 42, "rank": 1}}
+        )
+        self.assertTrue(bool(annotated.loc[0, "sleeper_trending_add"]))
+        self.assertEqual(annotated.loc[0, "sleeper_trending_add_count"], 42)
+        self.assertEqual(annotated.loc[0, "sleeper_trending_add_rank"], 1)
+        self.assertFalse(bool(annotated.loc[1, "sleeper_trending_add"]))
+        self.assertIsNone(annotated.loc[1, "sleeper_trending_add_count"])
+
+    def test_annotate_sleeper_trending_add_defaults_when_map_empty(self):
+        free_agents = pd.DataFrame([{"player_id": "100", "name": "A"}])
+        annotated = waivers_ui.annotate_sleeper_trending_add(free_agents, None)
+        self.assertFalse(bool(annotated.loc[0, "sleeper_trending_add"]))
+        self.assertIsNone(annotated.loc[0, "sleeper_trending_add_count"])
+
     def test_empty_board_uses_canonical_empty_state(self):
         with patch.object(
             waivers_ui.ui_primitives,

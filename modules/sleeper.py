@@ -1030,3 +1030,101 @@ def get_roster_profile(league_id: str, roster_id: int) -> Dict[str, Any]:
 
     profiles = get_league_roster_profiles(league_id)
     return profiles.get(str(roster_id), {})
+
+
+# Sleeper's trending endpoint (/players/nfl/trending/{add|drop}) is a
+# CROSS-LEAGUE, GLOBAL signal — "how many Sleeper rosters across every
+# league adopted/dropped this player in the last N hours," not anything
+# scoped to one league. It is deliberately a different, global cache from
+# the per-league LIVE_LEAGUE_ENDPOINT_TTL_SECONDS bucket above: this data
+# has no single league to key on, and global add/drop velocity does not
+# need 30s freshness the way a live roster does, so it gets its own, longer
+# TTL bucket instead of reusing _live_league_cache_bucket.
+TRENDING_ENDPOINT_TTL_SECONDS = 10 * 60
+
+
+def _trending_cache_bucket() -> int:
+    return int(time.time() // TRENDING_ENDPOINT_TTL_SECONDS)
+
+
+@lru_cache(maxsize=8)
+def _get_trending_players_cached(
+    trend_type: str, lookback_hours: int, limit: int, _bucket: int
+) -> List[Dict[str, Any]]:
+    url = (
+        f"{SLEEPER_BASE}/players/nfl/trending/{trend_type}"
+        f"?lookback_hours={lookback_hours}&limit={limit}"
+    )
+    try:
+        data = _request_json(f"sleeper_trending_{trend_type}", url, timeout=5)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def get_trending_players(
+    trend_type: str = "add",
+    *,
+    lookback_hours: int = 24,
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """Sleeper's global trending players over the last ``lookback_hours``.
+
+    This is explicitly NOT a league-scoped signal — it's cross-league add/drop
+    velocity across the whole Sleeper platform ("how many Sleeper rosters
+    everywhere picked this player up"), the same list Sleeper's own waiver
+    wire UI surfaces as "Trending". Returns Sleeper's raw
+    ``[{"player_id": "...", "count": N}, ...]`` list, already ordered by
+    Sleeper (most-added/dropped first). ``trend_type`` is ``"add"`` or
+    ``"drop"``; anything else is treated as ``"add"``. Fail-neutral: ``[]``
+    on any provider failure, never raises.
+    """
+
+    normalized_type = trend_type if trend_type in ("add", "drop") else "add"
+    normalized_hours = max(1, int(lookback_hours or 24))
+    normalized_limit = max(1, min(int(limit or 50), 200))
+    return _get_trending_players_cached(
+        normalized_type,
+        normalized_hours,
+        normalized_limit,
+        _trending_cache_bucket(),
+    )
+
+
+def trending_add_rank_map(*, lookback_hours: int = 24, limit: int = 50) -> Dict[str, Dict[str, int]]:
+    """``player_id -> {"count": int, "rank": int}`` from Sleeper's global trending-add list.
+
+    ``rank`` is 1-indexed position within Sleeper's own ordering (1 = most
+    globally added in the last ``lookback_hours``). Convenience wrapper for
+    callers (web Waivers, mobile's waivers endpoint) that just want to flag
+    "this free agent is on Sleeper's global trending-add list right now"
+    without re-deriving rank/count from the raw list themselves. Players not
+    on the list are simply absent from the returned mapping.
+    """
+
+    rows = get_trending_players("add", lookback_hours=lookback_hours, limit=limit)
+    mapping: Dict[str, Dict[str, int]] = {}
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+        player_id = str(row.get("player_id") or "").strip()
+        if not player_id or player_id in mapping:
+            continue
+        try:
+            count = int(row.get("count") or 0)
+        except (TypeError, ValueError):
+            count = 0
+        mapping[player_id] = {"count": count, "rank": index + 1}
+    return mapping
+
+
+def clear_trending_player_caches() -> None:
+    """Drop the in-process cache for Sleeper's global trending-add/drop lists.
+
+    Separate from clear_live_league_endpoint_caches() (trending has no
+    league to key on) — exposed mainly for tests; the time-bucketed TTL
+    above already self-expires this in both the web app and mobile's
+    long-lived process without anyone calling this.
+    """
+
+    _get_trending_players_cached.cache_clear()

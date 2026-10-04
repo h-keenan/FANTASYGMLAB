@@ -547,6 +547,19 @@ export interface WaiverPlayer {
   stale_free_agent: boolean;
   injury_replacement_fit: boolean;
   injury_replacement_note: string;
+  // Sleeper's GLOBAL trending-add signal (modules.sleeper.trending_add_rank_map
+  // / modules.waivers_ui.annotate_sleeper_trending_add on the backend) —
+  // cross-league, last-24h add velocity across every league on Sleeper, NOT
+  // scoped to this league. Deliberately distinct from this app's own
+  // internal "usage trending up/down" role signal (see RankedPlayer's
+  // usage_trend) — never present this as "trending in your league."
+  sleeper_trending_add: boolean;
+  // Sleeper's own 24h global add count when sleeper_trending_add is true;
+  // null when not trending or the count is unavailable.
+  sleeper_trending_add_count: number | null;
+  // 1-indexed rank within Sleeper's global trending-add list (1 = most
+  // added across all of Sleeper in the last 24h); null when not trending.
+  sleeper_trending_add_rank: number | null;
   // This week's real NFL opponent (context only — never factored into
   // score/position_rank/overall_rank above). Null in the offseason/draft
   // or when the team code has no schedule match.

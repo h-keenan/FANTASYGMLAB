@@ -5276,6 +5276,13 @@ def _project_waiver_row(
         "stale_free_agent": bool(row.get("stale_free_agent") or False),
         "injury_replacement_fit": bool(row.get("injury_replacement_fit") or False),
         "injury_replacement_note": _clean_json_value(row.get("injury_replacement_note")) or "",
+        # Sleeper's GLOBAL trending-add signal — cross-league, last-24h add
+        # velocity across all of Sleeper, NOT scoped to this league (see
+        # waivers_ui.annotate_sleeper_trending_add). sleeper_trending_add_rank
+        # is 1-indexed within that global list (1 = most added platform-wide).
+        "sleeper_trending_add": bool(row.get("sleeper_trending_add") or False),
+        "sleeper_trending_add_count": _clean_json_value(row.get("sleeper_trending_add_count")),
+        "sleeper_trending_add_rank": _clean_json_value(row.get("sleeper_trending_add_rank")),
         # 0-99 "OVR" badge — see player_quick_view.overall_ratings_for_pool.
         # Percentiled against the full league-eligible pool (attached to
         # `valued` in get_league_waivers before the free-agent-only filter
@@ -5401,6 +5408,14 @@ def get_league_waivers(
     free_agents["stale_free_agent"] = free_agents.apply(rankings.is_probably_stale_free_agent, axis=1)
     free_agents.loc[free_agents["stale_free_agent"], ["dynasty_score", "value_score"]] = 0
     free_agents = free_agents.sort_values(["stale_free_agent", score_field], ascending=[True, False])
+    # Sleeper's global trending-add signal (cross-league, last 24h — see
+    # waivers_ui.annotate_sleeper_trending_add's docstring), fetched once per
+    # request here so players/priority_adds/stash/watchlist/faab below all
+    # inherit it for free (every one of those is a subset/copy of
+    # free_agents). Mirrors app.py's web route.
+    free_agents = waivers_ui.annotate_sleeper_trending_add(
+        free_agents, sleeper.trending_add_rank_map()
+    )
 
     score_series = pd.to_numeric(free_agents.get(score_field, 0), errors="coerce").fillna(0)
     free_agents["position_rank"] = (

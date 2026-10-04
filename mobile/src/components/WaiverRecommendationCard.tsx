@@ -39,6 +39,22 @@ export function waiverOpponentContext(player: {
   return player.opportunity_label ?? null;
 }
 
+/** Sleeper's GLOBAL (cross-league, last-24h) trending-add label for a free
+ * agent, or null when the player isn't on Sleeper's trending-add list right
+ * now. Deliberately says "Sleeper"/"across Sleeper," never "in your league"
+ * — this is a platform-wide add-velocity signal, not anything scoped to
+ * this league (see api.ts's WaiverPlayer.sleeper_trending_add doc comment).
+ * Shared by WaiversScreen's plain free-agent rows and this card's own
+ * identity row so both read the exact same label off PlayerIdentityRow. */
+export function waiverTrendingAddLabel(player: {
+  sleeper_trending_add?: boolean;
+  sleeper_trending_add_count?: number | null;
+}): string | null {
+  if (!player.sleeper_trending_add) return null;
+  const count = player.sleeper_trending_add_count;
+  return count ? `Trending on Sleeper +${count.toLocaleString()}` : 'Trending on Sleeper';
+}
+
 // Concept-image fidelity: the concept shows a small colored classification
 // pill (its mock copy: "IMPACT"/"STARTER") next to every recommendation's
 // value number, including the secondary/compact rows below the top target.
@@ -125,6 +141,7 @@ export default function WaiverRecommendationCard({
       injuryTone={injury.tone}
       ruledOut={injury.ruledOut}
       contextLine={contextLine}
+      trendingAddLabel={waiverTrendingAddLabel(player)}
       showDivider={false}
     />
   );
