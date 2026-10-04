@@ -6,8 +6,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules import league_history as history
+from modules import league_history_ui
 from modules import league_recaps
 from modules import league_recaps_ui
+from modules import transaction_grades
 from modules.app_styles import APP_CSS
 from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
 from modules.notification_center import compose_activity_inbox
@@ -628,3 +630,78 @@ def test_gm_orb_lists_league_recaps_under_core_via_category_not_group():
     assert '"League Overview"' in core
     assert core.index("League Overview") < core.index("League Recaps / History")
     assert '"League Recaps / History"' not in support
+
+
+def test_recaps_story_grading_reuses_cached_transaction_grades():
+    """render_league_recaps_page's post-recap story-grading loop used to be
+    its own private O(visible x total) later_events rescan calling
+    transaction_grades.grade_transaction with no caching at all (the same bug
+    as league_history_ui, lines ~426-449 pre-fix). It now routes through
+    league_history_ui.cached_transaction_grades, so a bare Streamlit rerun
+    (e.g. re-selecting the same archive week) with unchanged
+    transactions/player_lookup/current_week must not re-invoke
+    grade_transaction a second time."""
+    league_history_ui.cached_transaction_grades.clear()
+
+    trade = _trade()
+
+    class _Session(dict):
+        pass
+
+    def _container(*_args, **_kwargs):
+        ctx = MagicMock()
+        ctx.__enter__ = MagicMock(return_value=ctx)
+        ctx.__exit__ = MagicMock(return_value=False)
+        return ctx
+
+    session = _Session()
+    html_chunks: list[str] = []
+    call_counts_after_each_render: list[int] = []
+
+    with (
+        patch.object(league_recaps_ui.st, "session_state", session),
+        patch.object(league_recaps_ui, "inject_global_styles"),
+        patch.object(league_recaps_ui, "render_html_fragment", side_effect=lambda html: html_chunks.append(html)),
+        patch.object(league_recaps_ui.st, "caption"),
+        patch.object(
+            league_recaps_ui.st,
+            "pills",
+            side_effect=["Recaps", "This week · 7", "Recaps", "This week · 7"],
+        ),
+        patch.object(league_recaps_ui.st, "container", side_effect=_container),
+        patch.object(league_recaps_ui.st, "button", return_value=False),
+        patch.object(league_recaps_ui.deferred_rendering, "mark_deferred_section_ready"),
+        patch.object(
+            league_recaps_ui.league_history_ui,
+            "cached_season_history_payload",
+            return_value={"profiles": PROFILES, "transactions": []},
+        ),
+        patch.object(
+            league_recaps_ui.league_history,
+            "normalize_season_payload",
+            return_value=[trade],
+        ),
+        patch.object(
+            transaction_grades, "grade_transaction", wraps=transaction_grades.grade_transaction
+        ) as spy,
+    ):
+        for _ in range(2):
+            league_recaps_ui.render_league_recaps_page(
+                home_league_id="L1",
+                season="2025",
+                league={"settings": {"last_scored_leg": 7}},
+                player_lookup=PLAYERS,
+                current_profiles=PROFILES,
+                matchups=_matchups(),
+                movement=None,
+                render_section_header=lambda *a, **k: None,
+            )
+            call_counts_after_each_render.append(spy.call_count)
+
+    assert call_counts_after_each_render[0] > 0, "the trade story must be graded at least once"
+    assert call_counts_after_each_render[1] == call_counts_after_each_render[0], (
+        "a rerun with unchanged transactions/player_lookup/current_week must "
+        "not re-invoke grade_transaction"
+    )
+    joined = "\n".join(html_chunks)
+    assert "dg-recap-grade" in joined, "the trade story's grade must actually render"
