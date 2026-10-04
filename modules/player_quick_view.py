@@ -1447,6 +1447,10 @@ def _accolade_emblem_svg(kind: str) -> str:
             "<circle cx='16' cy='16' r='6' fill='none' stroke='currentColor' stroke-width='1.6'/>"
             "<circle cx='16' cy='16' r='2.2' fill='currentColor'/>"
         ),
+        "bellcow": (
+            "<path d='M16 21.27L22.18 25l-1.64-7.03L26 13.24l-7.19-.61L16 6 13.19 12.63 6 13.24"
+            "l5.46 4.73L9.82 25z' fill='currentColor'/>"
+        ),
     }.get(kind, "")
     if not mark:
         mark = (
@@ -1470,6 +1474,8 @@ def _accolade_kind(badge: PlayerBadge) -> str:
         return "scores"
     if family == "workhorse":
         return "workhorse"
+    if family == "bellcow":
+        return "bellcow"
     if family == "targets" or "target" in family:
         return "targets"
     return "finish"
