@@ -3721,6 +3721,10 @@ def test_player_awards_returns_real_badges_for_a_qualifying_season(monkeypatch):
     assert any(award["short_label"] == "1,500+ Rec Yds" for award in body["awards"])
     for award in body["awards"]:
         assert award["tier"] in {"gold", "silver", "bronze", None}
+        # `family` drives AwardsStrip's per-award icon on mobile, the same
+        # way modules.player_quick_view._accolade_kind drives the web app's
+        # SVG emblem — must round-trip to the client.
+        assert award["family"]
 
 
 def test_register_push_token_requires_auth(monkeypatch):

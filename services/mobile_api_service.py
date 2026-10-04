@@ -3471,6 +3471,7 @@ def _project_award(badge: player_awards.PlayerBadge) -> dict[str, Any]:
     return {
         "badge_id": badge.badge_id,
         "category": badge.category,
+        "family": badge.family,
         "title": badge.title,
         "short_label": badge.short_label,
         "tier": badge.tier,

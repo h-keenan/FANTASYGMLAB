@@ -1267,6 +1267,11 @@ export interface QuickViewResponse {
 export interface PlayerAward {
   badge_id: string;
   category: string;
+  /** modules/player_awards.py's PlayerBadge.family, e.g. "workhorse",
+   * "bellcow", "targets", "pass-yards" — drives the per-award icon in
+   * AwardsStrip, mirroring the web app's _accolade_kind/_accolade_emblem_svg
+   * special-casing (modules/player_quick_view.py). */
+  family: string;
   title: string;
   short_label: string;
   tier: 'gold' | 'silver' | 'bronze' | null;
