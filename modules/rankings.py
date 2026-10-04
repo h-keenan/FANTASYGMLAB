@@ -1503,7 +1503,12 @@ def production_usage_frame(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def role_score(position: str, depth_chart_position, market_score: float = 0.0) -> int:
+def role_score(
+    position: str,
+    depth_chart_position,
+    market_score: float = 0.0,
+    depth_chart_order=None,
+) -> int:
     """Depth-structure role score. Market is unused when depth is present."""
 
     position = str(position or "").upper()
@@ -1522,6 +1527,29 @@ def role_score(position: str, depth_chart_position, market_score: float = 0.0) -
         return 8000
     if "BACKUP" in depth:
         return 3600
+
+    # ``depth`` is non-empty but matched none of the recognized patterns —
+    # e.g. Sleeper slot/specialist labels like "SWR" (slot WR), "RWR"/"LWR",
+    # "NB" (nickel back). This used to fall straight through to a flat 4200
+    # default *regardless of* ``depth_chart_order`` — a real structural
+    # signal Sleeper supplies right alongside ``depth_chart_position`` (and
+    # the exact one ``depth_chart_slot``/``opportunity_profile`` already
+    # consult for this same "unrecognized string" case). Real-world bug this
+    # produced: Chimere Dike (2026 WR, TEN) — depth_chart_position "SWR",
+    # depth_chart_order 5, 7% snap share, 2 targets in 3 games — got role_score
+    # 4200, HIGHER than an explicitly recognized BACKUP (3600) or numeric WR3
+    # (3300), purely because his real "5th string" signal was never read.
+    # Consult it now, with the same slot->score ladder used above, before
+    # giving up and returning the neutral default.
+    order = _safe_int(depth_chart_order)
+    if order and order > 0:
+        if order == 1:
+            return 8500
+        if order == 2:
+            return 5600
+        if order == 3:
+            return 3300
+        return 2200
     return 4200
 
 
@@ -1835,7 +1863,26 @@ def opportunity_profile(
     elif label in {"Starter At Risk"}:
         workload_trend = "Fragile"
     elif label == "Backup With Upside":
-        workload_trend = "Rising"
+        # "Backup With Upside" is assigned purely from age/experience
+        # (``young_upside``) independent of any real recent-usage trend —
+        # it describes long-term age-based optimism, not "this player's
+        # workload is rising right now." This used to hardcode "Rising"
+        # unconditionally (inconsistent with the Strong Opportunity/
+        # Committee Back branch directly above, which correctly checks
+        # ``workload_rising``), so a young player with a buried, flat, or
+        # declining real workload still got told his role was "Rising."
+        # That silently defeated both: waivers_ui.rank_priority_add_
+        # candidates' own ``workload_trend == "Blocked"`` gate (added in
+        # the "Gate role-blocked, zero-usage players out of waiver Priority
+        # Adds" fix), and anything downstream judging current role off this
+        # field — a near-zero-usage young backup (e.g. Chimere Dike: 7%
+        # snap share, 2 targets in 3 games) was mislabeled "Rising" instead
+        # of reflecting that he has no live path to touches right now. Only
+        # claim "Rising" when there is an actual substantiating trend
+        # signal (``workload_rising``, the same bump-sign flag used above);
+        # otherwise fall through to "Blocked" like every other no-current-
+        # role label.
+        workload_trend = "Rising" if workload_rising else "Blocked"
     elif label == "Handcuff":
         workload_trend = "Contingent"
     else:
@@ -3158,13 +3205,17 @@ def apply_role_and_opportunity(df: pd.DataFrame) -> pd.DataFrame:
         else [None] * n
     )
     markets = work["market_score"].tolist() if "market_score" in work.columns else [0.0] * n
+    depth_orders = (
+        work["depth_chart_order"].tolist() if "depth_chart_order" in work.columns else [None] * n
+    )
     work["role_score"] = [
         role_score(
             position,
             depth,
             market if pd.notna(market) else 0.0,
+            depth_order,
         )
-        for position, depth, market in zip(positions, depths, markets)
+        for position, depth, market, depth_order in zip(positions, depths, markets, depth_orders)
     ]
 
     def _values(column: str):
