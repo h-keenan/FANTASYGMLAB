@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -245,6 +246,107 @@ def test_history_deep_links_and_session_cache_do_not_duplicate():
     assert teaser is not None
     assert teaser["title"] == "Week 7 is ready"
     assert league_recaps.dashboard_teaser({}, league_id="L1") is None
+
+
+def test_get_or_build_weekly_recap_cache_hit_skips_expensive_build():
+    """A repeated call with no new data must hit the session cache and never
+    re-run build_weekly_recap's story-generator passes at all — the cache
+    lookup has to gate the expensive call, not just run alongside it."""
+
+    session: dict = {}
+    first = league_recaps.get_or_build_weekly_recap(
+        session,
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_trade(), _waiver()],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    with patch("modules.league_recaps.build_weekly_recap") as mock_build:
+        second = league_recaps.get_or_build_weekly_recap(
+            session,
+            league_id="L1",
+            season="2025",
+            week=7,
+            transactions=[_trade(), _waiver()],
+            matchups=_matchups(),
+            profiles=PROFILES,
+        )
+    mock_build.assert_not_called()
+    assert second == first
+    assert len(session[league_recaps.SESSION_CACHE_KEY]) == 1
+
+
+def test_get_or_build_weekly_recap_cache_miss_still_builds_and_updates():
+    """Sanity check for the reordering: a genuine change (a new transaction)
+    must still take the build path and refresh the cached entry."""
+
+    session: dict = {}
+    first = league_recaps.get_or_build_weekly_recap(
+        session,
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_trade()],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    with patch(
+        "modules.league_recaps.build_weekly_recap", wraps=league_recaps.build_weekly_recap
+    ) as spy_build:
+        second = league_recaps.get_or_build_weekly_recap(
+            session,
+            league_id="L1",
+            season="2025",
+            week=7,
+            transactions=[_trade(), _waiver()],
+            matchups=_matchups(),
+            profiles=PROFILES,
+        )
+    spy_build.assert_called_once()
+    assert second["fingerprint"] != first["fingerprint"]
+    assert len(session[league_recaps.SESSION_CACHE_KEY]) == 2
+
+
+def test_build_matchup_history_rows_matches_sequential_calls():
+    """Parallelizing the per-week fetches must not change the combined
+    result vs. the old one-week-at-a-time loop: same rows, same order,
+    every week fetched exactly once."""
+
+    calls: list[tuple[str, int]] = []
+
+    def fetch(league_id, week):
+        calls.append((league_id, week))
+        return [
+            {"roster_id": 1, "matchup_id": week, "points": float(week)},
+            {"roster_id": 2, "matchup_id": week, "points": float(week) + 10},
+            {"roster_id": 0, "matchup_id": week, "points": 5.0},  # dropped: no roster_id
+        ]
+
+    rows = league_recaps.build_matchup_history_rows("L1", 4, fetch_matchups=fetch)
+
+    expected_rows: list[dict] = []
+    for week in range(1, 5):
+        expected_rows.append({"week": week, "roster_id": 1, "matchup_id": week, "points": float(week)})
+        expected_rows.append({"week": week, "roster_id": 2, "matchup_id": week, "points": float(week) + 10})
+    assert rows == expected_rows
+    assert sorted(calls) == [("L1", week) for week in range(1, 5)]
+    assert len(calls) == 4
+
+
+def test_build_matchup_history_rows_preserves_week_order_despite_timing():
+    """Weeks that finish fetching out of order (slower calls for earlier
+    weeks) must still be assembled in week order, not completion order."""
+
+    def slow_fetch(league_id, week):
+        # Earlier weeks sleep longer, so if row order followed completion
+        # order instead of week number this would come back shuffled.
+        time.sleep(0.02 * (6 - week))
+        return [{"roster_id": 1, "matchup_id": week, "points": float(week)}]
+
+    rows = league_recaps.build_matchup_history_rows("L1", 5, fetch_matchups=slow_fetch)
+    assert [row["week"] for row in rows] == [1, 2, 3, 4, 5]
 
 
 def test_current_value_lens_is_labeled_and_never_called_historical():
