@@ -5027,6 +5027,159 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monk
     assert failed_by_id["league-boom"]["reason"] == "unavailable"
 
 
+def test_portfolio_fanout_preserves_saved_league_order_despite_uneven_completion(monkeypatch):
+    """GET /v1/portfolio parallelizes the per-league fan-out (team_stance +
+    GM Targets + build_league_summary) across a thread pool instead of the
+    old one-league-at-a-time loop. `leagues`/`failed_leagues` must still
+    come back in the SAME order account_store.fetch_saved_leagues returned
+    them — even when a LATER saved league's (mocked) engine call finishes
+    before an EARLIER one — proving the ordering comes from zipping worker
+    results back against `saved_rows`, never from whichever worker happens
+    to finish first.
+    """
+    from services import mobile_api_service
+
+    saved_rows = [
+        {"league_id": "league-slow", "league_name": "Slow League"},
+        {"league_id": "league-fast", "league_name": "Fast League"},
+        {"league_id": "league-skip", "league_name": "Skip League"},
+        {"league_id": "league-boom", "league_name": "Boom League"},
+    ]
+    monkeypatch.setattr(
+        mobile_api_service.account_store, "fetch_saved_leagues", lambda *a, **k: (saved_rows, "")
+    )
+    monkeypatch.setattr(mobile_api_service, "_fetch_team_stance", lambda *a, **k: "")
+    monkeypatch.setattr(mobile_api_service, "_fetch_gm_target_player_ids", lambda *a, **k: ((), ()))
+
+    # Only the FIRST saved league sleeps — everything else resolves near-
+    # instantly, so if result order leaked from completion order instead of
+    # input order, "league-slow" would land last instead of first.
+    SLOW_LEAGUE_DELAY_S = 0.12
+
+    def _fake_build_league_summary(*, league_id, **_kwargs):
+        if league_id == "league-slow":
+            time.sleep(SLOW_LEAGUE_DELAY_S)
+        if league_id == "league-skip":
+            return {"ok": False, "reason": "not_a_member_of_league"}
+        if league_id == "league-boom":
+            raise RuntimeError("Sleeper is unreachable")
+        return {
+            "ok": True,
+            "reason": "",
+            "team_name": f"Team for {league_id}",
+            "wins": 1,
+            "losses": 2,
+            "ties": 0,
+            "health_flag": "Stable",
+            "power_rank": 3,
+            "power_rank_tied": False,
+            "top_item": None,
+        }
+
+    monkeypatch.setattr(
+        mobile_api_service.dashboard_engine, "build_league_summary", _fake_build_league_summary
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [row["league_id"] for row in body["leagues"]] == ["league-slow", "league-fast"]
+    assert [row["league_id"] for row in body["failed_leagues"]] == ["league-skip", "league-boom"]
+
+
+def test_portfolio_fanout_runs_concurrently_and_is_faster_than_sequential(monkeypatch):
+    """The whole point of parallelizing the per-league fan-out: N saved
+    leagues should cost roughly the slowest ONE league's latency, not the
+    sum of all N. Each of the three per-league calls the old sequential
+    loop made one at a time (team_stance, GM Targets,
+    build_league_summary) sleeps DELAY_S here, so a sequential loop over
+    NUM_LEAGUES leagues would cost roughly NUM_LEAGUES * 3 * DELAY_S;
+    parallelized across the fan-out's thread pool (well under its worker
+    cap), every league's slowest call overlaps and the whole request
+    should finish in close to 3 * DELAY_S regardless of NUM_LEAGUES.
+    """
+    from services import mobile_api_service
+
+    DELAY_S = 0.1
+    NUM_LEAGUES = 6
+    saved_rows = [
+        {"league_id": f"league-{i}", "league_name": f"League {i}"} for i in range(NUM_LEAGUES)
+    ]
+    monkeypatch.setattr(
+        mobile_api_service.account_store, "fetch_saved_leagues", lambda *a, **k: (saved_rows, "")
+    )
+
+    def _slow_fetch_team_stance(*_args, **_kwargs):
+        time.sleep(DELAY_S)
+        return ""
+
+    def _slow_fetch_gm_target_player_ids(*_args, **_kwargs):
+        time.sleep(DELAY_S)
+        return (), ()
+
+    def _slow_build_league_summary(*, league_id, **_kwargs):
+        time.sleep(DELAY_S)
+        return {
+            "ok": True,
+            "reason": "",
+            "team_name": f"Team {league_id}",
+            "wins": 1,
+            "losses": 0,
+            "ties": 0,
+            "health_flag": "Stable",
+            "power_rank": 1,
+            "power_rank_tied": False,
+            "top_item": None,
+        }
+
+    monkeypatch.setattr(mobile_api_service, "_fetch_team_stance", _slow_fetch_team_stance)
+    monkeypatch.setattr(
+        mobile_api_service, "_fetch_gm_target_player_ids", _slow_fetch_gm_target_player_ids
+    )
+    monkeypatch.setattr(
+        mobile_api_service.dashboard_engine, "build_league_summary", _slow_build_league_summary
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    # What the OLD one-league-at-a-time loop would have cost — the
+    # regression this test guards against.
+    sequential_baseline_s = NUM_LEAGUES * 3 * DELAY_S
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        started = time.perf_counter()
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        elapsed_s = time.perf_counter() - started
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["leagues"]) == NUM_LEAGUES
+
+    # Comfortably under the sequential baseline — a true parallel run lands
+    # near 3 * DELAY_S regardless of NUM_LEAGUES; this generous margin
+    # (well over half the sequential sum) absorbs CI scheduling jitter
+    # without being able to pass a loop that secretly stayed sequential.
+    assert elapsed_s < sequential_baseline_s * 0.6
+
+
 # --- GM Plan (season-phase-aware roadmap, additive on top of existing engines) ---
 #
 # GM Plan is a NEW aggregation layer, distinct from both the Dashboard's
