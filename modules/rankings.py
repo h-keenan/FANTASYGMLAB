@@ -1573,6 +1573,151 @@ def depth_chart_slot(position: str, depth_chart_position, depth_chart_order=None
     return order_value if order_value and order_value > 0 else None
 
 
+def _team_starting_qb_candidate_pass_rate(record: Dict[str, Any]) -> float | None:
+    """A QB candidate row's season pass-attempts-per-game, preferring an
+    already-computed ``pass_att_pg`` column (if a caller's frame has one)
+    and otherwise deriving it from ``pass_attempts``/``games_played`` via
+    the same ``_safe_rate`` helper ``production_usage_score`` uses."""
+
+    direct = record.get("pass_att_pg")
+    if direct is not None:
+        try:
+            value = float(direct)
+            if np.isfinite(value):
+                return value
+        except Exception:
+            pass
+    return _safe_rate(record.get("pass_attempts"), record.get("games_played"))
+
+
+def _team_starting_qb_best_by_pass_rate(candidates: List[Dict[str, Any]]) -> Dict[str, Any] | None:
+    rated = [
+        (record, _team_starting_qb_candidate_pass_rate(record))
+        for record in candidates
+    ]
+    rated = [(record, rate) for record, rate in rated if rate is not None]
+    if not rated:
+        return None
+    rated.sort(key=lambda pair: pair[1], reverse=True)
+    return rated[0][0]
+
+
+def team_starting_qb_quality(
+    team: str,
+    players_df: pd.DataFrame,
+) -> tuple[float | None, Dict[str, Any]]:
+    """0..1 "team passing-offense tier" signal for ``team``'s current
+    starting QB — reuses ``_usage_quality_from_rates``'s existing QB-quality
+    scoring rather than reimplementing it, so a WR/TE's weekly projection
+    can be nudged by whether their own team's passing offense is elite or
+    thin (see ``modules.player_projections.project_player_week``'s
+    ``team_qb_quality_multiplier``, the only caller of this signal — never
+    wired into ``value_score``/dynasty valuation, which is explicitly out
+    of scope here).
+
+    Selection: among ``players_df`` rows with ``position == "QB"`` and
+    ``team == team``, picks the one with the lowest (best) real
+    ``depth_chart_slot`` (via the existing ``depth_chart_slot`` helper). A
+    tie at the best slot, or no usable depth-chart data at all for any
+    candidate, falls back to whichever candidate has the highest season
+    ``pass_att_pg`` (direct column if present, else derived from
+    ``pass_attempts``/``games_played``).
+
+    Returns ``(quality, info)``:
+    - ``quality`` — the selected QB's ``_usage_quality_from_rates`` score
+      (0..1), or ``None`` when no team/position match exists, or when a QB
+      was identified but has no usable passing-volume evidence at all
+      (e.g. a true rookie backup with zero recorded attempts).
+    - ``info`` — a transparent debug dict: ``team``, ``qb_count``,
+      ``selected_player_id``, ``selection_method`` ("depth_chart" |
+      "depth_chart_tie_broken_by_pass_att_pg" | "depth_chart_tie_unresolved"
+      | "pass_att_pg_fallback" | "no_signal" | None when there is no QB on
+      the roster at all), ``pass_att_pg``, and ``quality_detail`` (the
+      human-readable string ``_usage_quality_from_rates`` returns).
+
+    Never raises on a missing/empty frame or missing columns — returns
+    ``(None, info)`` instead, matching this module's "never fabricate a
+    signal from nothing" convention (see ``_opponent_multiplier`` in
+    ``modules.player_projections`` for the analogous pattern on the
+    opponent-defense side).
+    """
+
+    team_norm = str(team or "").strip().upper()
+    info: Dict[str, Any] = {
+        "team": team_norm or None,
+        "qb_count": 0,
+        "selected_player_id": None,
+        "selection_method": None,
+        "pass_att_pg": None,
+        "quality_detail": None,
+    }
+    if not team_norm or players_df is None or getattr(players_df, "empty", True):
+        return None, info
+    if not {"position", "team"}.issubset(set(players_df.columns)):
+        return None, info
+
+    position_series = players_df["position"].astype(str).str.upper()
+    team_series = players_df["team"].astype(str).str.upper()
+    qbs = players_df.loc[(position_series == "QB") & (team_series == team_norm)]
+    records = qbs.to_dict("records")
+    info["qb_count"] = len(records)
+    if not records:
+        return None, info
+
+    slotted = [
+        (depth_chart_slot("QB", record.get("depth_chart_position"), record.get("depth_chart_order")), record)
+        for record in records
+    ]
+    slotted = [(slot, record) for slot, record in slotted if slot is not None]
+
+    chosen: Dict[str, Any] | None = None
+    selection_method: str | None = None
+    if slotted:
+        best_slot = min(slot for slot, _record in slotted)
+        tied = [record for slot, record in slotted if slot == best_slot]
+        if len(tied) == 1:
+            chosen = tied[0]
+            selection_method = "depth_chart"
+        else:
+            tie_broken = _team_starting_qb_best_by_pass_rate(tied)
+            if tie_broken is not None:
+                chosen = tie_broken
+                selection_method = "depth_chart_tie_broken_by_pass_att_pg"
+            else:
+                chosen = tied[0]
+                selection_method = "depth_chart_tie_unresolved"
+
+    if chosen is None:
+        fallback = _team_starting_qb_best_by_pass_rate(records)
+        if fallback is not None:
+            chosen = fallback
+            selection_method = "pass_att_pg_fallback"
+
+    if chosen is None:
+        # A QB is on the roster but neither depth-chart nor pass-volume
+        # data distinguishes one — still report who, just with no signal.
+        chosen = records[0]
+        selection_method = "no_signal"
+
+    pass_rate = _team_starting_qb_candidate_pass_rate(chosen)
+    quality, detail = _usage_quality_from_rates(
+        "QB",
+        rates={
+            "pass_att_pg": pass_rate,
+            "rush_yd_pg": _safe_rate(chosen.get("rushing_yards"), chosen.get("games_played")),
+        },
+    )
+    info.update(
+        {
+            "selected_player_id": chosen.get("player_id"),
+            "selection_method": selection_method,
+            "pass_att_pg": round(pass_rate, 2) if pass_rate is not None else None,
+            "quality_detail": detail,
+        }
+    )
+    return quality, info
+
+
 def normalize_snap_share(snap_share) -> float | None:
     """Normalize Sleeper season snap share to a 0..1 fraction. None when absent/invalid."""
 

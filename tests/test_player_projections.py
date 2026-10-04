@@ -441,14 +441,17 @@ def test_project_player_week_trend_is_invariant_to_target_week_distance(extended
     near = pp.project_player_week(
         "wr_a1", week=4, season=2099, players=players,
         player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
     )
     far = pp.project_player_week(
         "wr_a1", week=9, season=2099, players=players,
         player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
     )
     way_far = pp.project_player_week(
         "wr_a1", week=10, season=2099, players=players,
         player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
     )
 
     for result in (near, far, way_far):
@@ -487,6 +490,7 @@ def test_project_player_week_recent_trend_still_drops_old_games_for_actively_pla
     result = pp.project_player_week(
         "wr_a1", week=9, season=2099, players=players,
         player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
     )
 
     assert result["status"] == "ok"
@@ -518,3 +522,166 @@ def test_opponent_multiplier_neutral_when_no_signal():
 
     assert multiplier == 1.0
     assert has_signal is False
+
+
+# ---------------------------------------------------------------------------
+# Team starting-QB-quality signal (WR/TE only)
+# ---------------------------------------------------------------------------
+
+
+def _team_qb_quality_entry(quality: float, *, player_id: str = "qb") -> dict:
+    return {
+        "quality": quality,
+        "qb_count": 1,
+        "selected_player_id": player_id,
+        "selection_method": "depth_chart",
+        "pass_att_pg": 30.0,
+        "quality_detail": "QB pass_att/g=30.0",
+    }
+
+
+def test_team_qb_quality_multiplier_is_bounded_above():
+    team_qb_quality = {
+        "ELITE": _team_qb_quality_entry(0.95),
+        "AVG1": _team_qb_quality_entry(0.5),
+        "AVG2": _team_qb_quality_entry(0.5),
+    }
+
+    multiplier, has_signal = pp._team_qb_quality_multiplier(team_qb_quality, "ELITE")
+
+    assert has_signal is True
+    low, high = pp._TEAM_QB_QUALITY_MULTIPLIER_BOUNDS
+    assert low <= multiplier <= high
+    assert multiplier == pytest.approx(high)
+
+
+def test_team_qb_quality_multiplier_is_bounded_below():
+    team_qb_quality = {
+        "WEAK": _team_qb_quality_entry(0.05),
+        "AVG1": _team_qb_quality_entry(0.5),
+        "AVG2": _team_qb_quality_entry(0.5),
+    }
+
+    multiplier, has_signal = pp._team_qb_quality_multiplier(team_qb_quality, "WEAK")
+
+    assert has_signal is True
+    low, high = pp._TEAM_QB_QUALITY_MULTIPLIER_BOUNDS
+    assert low <= multiplier <= high
+    assert multiplier == pytest.approx(low)
+
+
+def test_team_qb_quality_multiplier_neutral_when_no_signal():
+    multiplier, has_signal = pp._team_qb_quality_multiplier({}, "GHOST")
+
+    assert multiplier == 1.0
+    assert has_signal is False
+
+
+def test_team_qb_quality_multiplier_neutral_with_single_team_sample():
+    # A single team's quality score can't be compared to a "league
+    # average" of just itself — that would always normalize to a false 1.0
+    # ratio, so this must stay neutral/no-signal instead.
+    team_qb_quality = {"LONE": _team_qb_quality_entry(0.9)}
+
+    multiplier, has_signal = pp._team_qb_quality_multiplier(team_qb_quality, "LONE")
+
+    assert multiplier == 1.0
+    assert has_signal is False
+
+
+def test_project_player_week_wr_projection_moves_both_directions_with_team_qb_quality(round_robin_schedule):
+    players = _players_fixture()
+    weekly_stats = _weekly_stats_fixture()
+    defense_strength = pp.team_defense_points_allowed_by_position(
+        2099, upto_week=5, weekly_stats=weekly_stats, players=players
+    )
+
+    neutral_quality = {
+        "CCC": _team_qb_quality_entry(0.5, player_id="qb_c1"),
+        "ZZZ": _team_qb_quality_entry(0.5, player_id="qb_z1"),
+    }
+    better_quality = {
+        "CCC": _team_qb_quality_entry(0.9, player_id="qb_c1"),
+        "ZZZ": _team_qb_quality_entry(0.5, player_id="qb_z1"),
+    }
+    worse_quality = {
+        "CCC": _team_qb_quality_entry(0.2, player_id="qb_c1"),
+        "ZZZ": _team_qb_quality_entry(0.5, player_id="qb_z1"),
+    }
+
+    def _project(team_qb_quality):
+        return pp.project_player_week(
+            "wr_c1",
+            week=6,
+            season=2099,
+            players=players,
+            player_weekly_rows=weekly_stats["wr_c1"]["weekly"],
+            defense_strength=defense_strength,
+            team_qb_quality=team_qb_quality,
+            weekly_stats={},
+        )
+
+    neutral = _project(neutral_quality)
+    better = _project(better_quality)
+    worse = _project(worse_quality)
+
+    assert neutral["status"] == "ok"
+    assert neutral["basis"]["team_qb_quality_multiplier"] == pytest.approx(1.0)
+    assert neutral["basis"]["team_qb_quality_has_signal"] is True
+
+    low, high = pp._TEAM_QB_QUALITY_MULTIPLIER_BOUNDS
+    assert better["basis"]["team_qb_quality_multiplier"] == pytest.approx(high)
+    assert worse["basis"]["team_qb_quality_multiplier"] == pytest.approx(low)
+    assert low <= better["basis"]["team_qb_quality_multiplier"] <= high
+    assert low <= worse["basis"]["team_qb_quality_multiplier"] <= high
+
+    # Both directions of the audit's ask: a better team QB situation must
+    # raise the point estimate above neutral, a worse one must lower it.
+    assert better["point_estimate"] > neutral["point_estimate"] > worse["point_estimate"]
+    assert better["basis"]["team_starting_qb_player_id"] == "qb_c1"
+
+
+def test_project_player_week_qb_and_rb_unaffected_by_team_qb_quality_signal(round_robin_schedule):
+    """QB/RB projections must be completely untouched by this new signal —
+    even when a deliberately extreme team_qb_quality map is injected (one
+    that would swing a WR/TE projection to the bound), the QB/RB point
+    estimate and basis must be identical to the no-signal-at-all case."""
+
+    players = _players_fixture()
+    weekly_stats = _weekly_stats_fixture()
+    defense_strength = pp.team_defense_points_allowed_by_position(
+        2099, upto_week=4, weekly_stats=weekly_stats, players=players
+    )
+    extreme_team_qb_quality = {
+        "AAA": _team_qb_quality_entry(1.0, player_id="qb_a1"),
+        "BBB": _team_qb_quality_entry(0.01, player_id="qb_b1"),
+    }
+
+    # AAA (qb_a1) plays in week 5; BBB (rb_b1) has a bye in week 5 (see
+    # round_robin_schedule's docstring), so each player is projected for a
+    # week its own team actually plays.
+    for player_id, week in (("qb_a1", 5), ("rb_b1", 4)):
+        with_signal = pp.project_player_week(
+            player_id,
+            week=week,
+            season=2099,
+            players=players,
+            player_weekly_rows=weekly_stats[player_id]["weekly"],
+            defense_strength=defense_strength,
+            team_qb_quality=extreme_team_qb_quality,
+            weekly_stats=weekly_stats,
+        )
+        without_signal = pp.project_player_week(
+            player_id,
+            week=week,
+            season=2099,
+            players=players,
+            player_weekly_rows=weekly_stats[player_id]["weekly"],
+            defense_strength=defense_strength,
+        )
+
+        assert with_signal["point_estimate"] == pytest.approx(without_signal["point_estimate"])
+        assert with_signal["basis"]["team_qb_quality_multiplier"] == 1.0
+        assert with_signal["basis"]["team_qb_quality_has_signal"] is False
+        assert with_signal["basis"]["team_qb_quality_score"] is None
+        assert with_signal["basis"] == without_signal["basis"]
