@@ -190,6 +190,10 @@ def test_news_source_normalization_and_card_contract():
         )
         == "RotoWire"
     )
+    assert (
+        player_quick_view.normalize_news_source("https://www.profootballrumors.com/feed")
+        == "Pro Football Rumors"
+    )
     assert player_quick_view.normalize_news_source("Unknown Desk") == "Unknown Desk"
     card = player_quick_view.news_card_html(
         player_quick_view.NewsItem(
