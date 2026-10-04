@@ -176,19 +176,45 @@ function findRosterRecommendation(
   return null;
 }
 
-function rosterRecommendationDetail(rec: RosterRecommendation): string {
+/** Whether this row's own STARTER/BENCH verdict would repeat the gold
+ * "STARTER" tier pill PlayerTags already renders one row above. playerTier.ts
+ * defines a real `tierId === 'starter'` tier, distinct from `impact_starter` /
+ * `contributor` / etc. — only that exact id collides, so this checks the
+ * caller's already-resolved `tierIdentity.tierId` directly rather than a
+ * label string, and only when this player is ALSO the recommended starter
+ * (the bench case never collides with anything PlayerTags renders). */
+function isRosterRecStarterDuplicate(rec: RosterRecommendation, tierId: string): boolean {
+  return rec.isStarter && tierId === 'starter';
+}
+
+/** Eyebrow label for the roster-rec InsightRow — omitted entirely in the one
+ * collision case above (rec.isStarter tier STARTER pill already covers it).
+ * BENCH is untouched; there's no pill it could collide with. */
+function rosterRecLabel(rec: RosterRecommendation, tierId: string): string | null {
+  if (isRosterRecStarterDuplicate(rec, tierId)) return null;
+  return rec.isStarter ? 'STARTER' : 'BENCH';
+}
+
+function rosterRecommendationDetail(rec: RosterRecommendation, tierId: string): string {
   if (rec.isStarter) {
     const slot = rec.player.slot ? ` at ${rec.player.slot}` : '';
     // Recommendation-clarity audit: rosterRecTone (below) colors this whole
-    // card amber/red whenever the starter carries an injury_label (caution)
+    // row amber/red whenever the starter carries an injury_label (caution)
     // or is ruled_out (danger) — but this line previously always showed
-    // opportunity_label instead, so a caution/danger-colored card could read
+    // opportunity_label instead, so a caution/danger-colored row could read
     // with no visible reason at all, or a routine opportunity note that had
     // nothing to do with the color. Prefer the injury reason — the actual
     // thing driving the color — falling back to the opportunity note only
     // for a clean, healthy (success/neutral) starter. Both fields were
     // already fetched for this same object; no new data or computation.
     const why = rec.player.injury_label || rec.player.opportunity_label;
+    // Collision case: the STARTER eyebrow above is suppressed (see
+    // rosterRecLabel), so this headline is this row's entire message — lead
+    // straight into the slot/reason instead of the fuller "...on your
+    // roster" phrasing used when the eyebrow is still there to carry that.
+    if (isRosterRecStarterDuplicate(rec, tierId)) {
+      return `Suggested starter${slot}${why ? ` — ${why}` : ''}`;
+    }
     return `Suggested starter${slot} on your roster${why ? ` — ${why}` : ''}`;
   }
   return `Not in your suggested starting lineup this week${
@@ -1338,77 +1364,62 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const hasWatchControls = watching !== null;
   const hasNews = newsItems.length > 0;
 
-  // "Add to GM Targets" / untouchable-toggle / Compare / the news-status pill
-  // now render as ONE row (coridian_'s concept sheet: 3 pill controls in a
-  // single line, not a separate status bar above the actions) instead of the
-  // old standalone NewsImpactBadge line sitting above its own watchRow.
+  // Below the tag-pill row: three light rows, top to bottom, per the
+  // Hierarchy Directive's prescribed Player Detail order (status/news before
+  // primary actions) — de-boxed Roster Recommendation line (shared
+  // InsightRow, no outer bordered card), then Injury/News on its own line,
+  // then the action buttons. Replaces the old stacked rosterRecCard (a full
+  // bordered+background box) plus one combined actionRow that also crammed
+  // the news pill in alongside the buttons.
   const heroActions = (
     <>
       <PlayerTags tags={tags} />
       {rosterRec ? (
-        <View style={[styles.rosterRecCard, { borderColor: rosterRecColor }]}>
-          <View
-            style={[
-              styles.rosterRecBadge,
-              rosterRecToneValue === 'neutral'
-                ? { backgroundColor: colors.backgroundElevated }
-                : { backgroundColor: rosterRecColor },
-            ]}
-          >
-            <AppText
-              style={[
-                styles.rosterRecBadgeText,
-                rosterRecToneValue === 'neutral'
-                  ? { color: colors.textSecondary }
-                  : { color: contrastTextColor(rosterRecColor) },
-              ]}
-            >
-              {rosterRec.isStarter ? 'STARTER' : 'BENCH'}
-            </AppText>
-          </View>
-          <View style={styles.rosterRecTextGroup}>
-            <AppText style={styles.rosterRecTitle}>Roster Recommendation</AppText>
-            <AppText style={styles.rosterRecDetail}>{rosterRecommendationDetail(rosterRec)}</AppText>
-          </View>
+        <InsightRow
+          icon={rosterRec.isStarter ? 'checkmark-circle-outline' : 'remove-circle-outline'}
+          color={rosterRecColor}
+          label={rosterRecLabel(rosterRec, tierIdentity.tierId)}
+          headline={rosterRecommendationDetail(rosterRec, tierIdentity.tierId)}
+          last
+        />
+      ) : null}
+      {hasNews ? (
+        <View style={styles.newsRow}>
+          <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
         </View>
       ) : null}
-      {hasWatchControls || hasNews ? (
+      {hasWatchControls ? (
         <View style={styles.actionRow}>
-          {hasWatchControls ? (
-            <>
-              <TouchableOpacity
-                style={[styles.watchButton, watching && styles.watchButtonActive]}
-                onPress={toggleWatch}
-                disabled={watchBusy}
-              >
-                <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
-                  {watching ? '★ Watching' : '☆ Add to GM Targets'}
-                </AppText>
-              </TouchableOpacity>
-              {watching ? (
-                <TouchableOpacity
-                  style={[styles.untouchableButton, untouchable && styles.untouchableButtonActive]}
-                  onPress={toggleUntouchable}
-                  disabled={untouchableBusy}
-                  accessibilityLabel={untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
-                >
-                  <Ionicons
-                    name={untouchable ? 'lock-closed' : 'lock-open-outline'}
-                    size={16}
-                    color={untouchable ? colors.background : colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity
-                style={styles.compareButton}
-                onPress={() => navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
-              >
-                <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
-                <AppText style={styles.compareButtonText}>Compare</AppText>
-              </TouchableOpacity>
-            </>
+          <TouchableOpacity
+            style={[styles.watchButton, watching && styles.watchButtonActive]}
+            onPress={toggleWatch}
+            disabled={watchBusy}
+          >
+            <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
+              {watching ? '★ Watching' : '☆ Add to GM Targets'}
+            </AppText>
+          </TouchableOpacity>
+          {watching ? (
+            <TouchableOpacity
+              style={[styles.untouchableButton, untouchable && styles.untouchableButtonActive]}
+              onPress={toggleUntouchable}
+              disabled={untouchableBusy}
+              accessibilityLabel={untouchable ? 'Remove untouchable flag' : 'Mark untouchable'}
+            >
+              <Ionicons
+                name={untouchable ? 'lock-closed' : 'lock-open-outline'}
+                size={16}
+                color={untouchable ? colors.background : colors.textSecondary}
+              />
+            </TouchableOpacity>
           ) : null}
-          <NewsImpactBadge items={newsItems} onPress={() => setNewsModalOpen(true)} />
+          <TouchableOpacity
+            style={styles.compareButton}
+            onPress={() => navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
+          >
+            <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
+            <AppText style={styles.compareButtonText}>Compare</AppText>
+          </TouchableOpacity>
         </View>
       ) : null}
     </>
@@ -1749,17 +1760,31 @@ function createStyles(colors: ThemeColors) {
   root: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.xl, paddingBottom: spacing.xl * 4 },
-  actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  // The injury/news pill used to live inside actionRow (flexWrap, sharing a
+  // line with the buttons) — now its own row, positioned above actionRow, so
+  // it never crowds or unpredictably wraps against the buttons.
+  newsRow: { marginTop: spacing.sm },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  // Primary CTA of this row (Magna Carta §17 button hierarchy /
+  // Hierarchy Directive §14: one primary action per module) — solid accent
+  // fill + white bold text, the same filled-button convention this app uses
+  // elsewhere (e.g. PaywallScreen's primaryButton), not a one-off treatment.
   watchButton: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
+    backgroundColor: colors.accent,
   },
-  watchButtonActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  watchButtonText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  watchButtonTextActive: { color: '#fff' },
+  // Already-added state: quieter "done" confirmation rather than a second
+  // competing solid button — accent outline on a neutral fill instead of the
+  // bold CTA treatment above.
+  watchButtonActive: {
+    backgroundColor: colors.backgroundElevated,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  watchButtonText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  watchButtonTextActive: { color: colors.accent },
   untouchableButton: {
     width: 34,
     height: 34,
@@ -1770,6 +1795,8 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
   },
   untouchableButtonActive: { backgroundColor: colors.premium, borderColor: colors.premium },
+  // True secondary (ghost/no-border, lighter weight) — no longer shares the
+  // primary button's chrome (same 1px cardBorder + near-equal text weight).
   compareButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1777,26 +1804,8 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
   },
-  compareButtonText: { fontSize: 13, fontWeight: '600', color: colors.accent },
-  rosterRecCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    backgroundColor: colors.surface,
-  },
-  rosterRecBadge: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radii.pill },
-  rosterRecBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
-  rosterRecTextGroup: { flex: 1 },
-  rosterRecTitle: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
-  rosterRecDetail: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  compareButtonText: { fontSize: 13, fontWeight: '500', color: colors.accent },
   newsImpactBadge: {
     flexDirection: 'row',
     alignItems: 'center',
