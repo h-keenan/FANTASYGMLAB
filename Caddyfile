@@ -24,6 +24,18 @@
 	email {$CADDY_ACME_EMAIL}
 }
 
+# Shared response compression — applied to the proxied app/API responses and
+# the static marketing site below. zstd is tried first (better ratio/speed
+# than gzip when the client supports it, e.g. recent Chrome/Firefox/curl),
+# falling back to gzip for older clients; Caddy negotiates via the request's
+# Accept-Encoding header, so clients that send neither get an uncompressed
+# response same as today. Not applied to the two webhook endpoints — those
+# are small, infrequent, machine-to-machine payloads where compression has
+# no measurable upside.
+(encode_responses) {
+	encode zstd gzip
+}
+
 # --- fantasygm-lab (Streamlit web app) --------------------------------------
 # Matches render.yaml's healthCheckPath (/_stcore/health) and startCommand
 # (streamlit run ... --server.port $PORT) — see docker-compose.yml's `web`
@@ -31,6 +43,7 @@
 # forwards the Connection/Upgrade headers Caddy already handles by default
 # for HTTP/1.1 upstreams.
 {$APP_DOMAIN} {
+	import encode_responses
 	reverse_proxy web:8080
 }
 
@@ -43,7 +56,27 @@
 # after pulling marketing asset changes to refresh it before the next
 # `docker compose up -d`.
 {$MARKETING_DOMAIN}, {$MARKETING_DOMAIN_WWW} {
+	import encode_responses
 	root * /srv/static/landing
+
+	# Filenames here are NOT content-hashed/fingerprinted (checked-in as
+	# plain names like landing.css, favicon.png — see
+	# scripts/build_static_landing_assets.py), so a long, unconditional
+	# max-age would risk serving a stale asset after a deploy until it
+	# expires. must-revalidate keeps every cache honest past max-age
+	# instead of serving stale-while-offline. Images/fonts change rarely
+	# once published, so they get a longer window than CSS/JS, which are
+	# more likely to change on a given deploy.
+	@static_long path *.jpg *.jpeg *.png *.gif *.webp *.svg *.ico *.woff *.woff2 *.ttf *.eot
+	header @static_long Cache-Control "public, max-age=86400, must-revalidate"
+
+	@static_short path *.css *.js
+	header @static_short Cache-Control "public, max-age=3600, must-revalidate"
+
+	# index.html, robots.txt, sitemap.xml intentionally get no
+	# Cache-Control here — they're the files most likely to change on a
+	# deploy and aren't fingerprinted, so they fall back to normal
+	# conditional revalidation rather than being cached outright.
 	header /* {
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
@@ -53,6 +86,7 @@
 
 # --- fantasygm-lab-mobile-api ------------------------------------------------
 {$MOBILE_API_DOMAIN} {
+	import encode_responses
 	reverse_proxy mobile-api:8080
 }
 
