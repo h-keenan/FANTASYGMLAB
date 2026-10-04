@@ -74,6 +74,14 @@ export interface PlayerIdentityRowProps {
    * screen-local color helper — kept optional so Matchup/Trade Hub/etc.
    * are unaffected. */
   injuryTone?: 'risk' | 'watch';
+  /** Small informational pill for Sleeper's GLOBAL trending-add signal
+   * (cross-league, last-24h add velocity across all of Sleeper — see
+   * WaiverRecommendationCard's `waiverTrendingAddLabel` helper and api.ts's
+   * WaiverPlayer.sleeper_trending_add doc comment). Pass the pre-built
+   * label text (e.g. "Trending on Sleeper +482") or null/undefined to
+   * render nothing — this component never fabricates the label itself, and
+   * never implies a league-specific signal. */
+  trendingAddLabel?: string | null;
   /** Optional bold value shown at the trailing edge, e.g. a value score
    * ("82") — same trailing-block contract as DraftPickAssetRow's
    * `trailingValue`, so a player row and a pick row can sit in the same
@@ -132,6 +140,7 @@ export default function PlayerIdentityRow({
   injuryLabel,
   ruledOut,
   injuryTone = 'risk',
+  trendingAddLabel,
   trailingValue,
   trailingCaption,
   secondaryTrailingValue,
@@ -203,6 +212,13 @@ export default function PlayerIdentityRow({
               {team}
             </AppText>
           ) : null}
+          {trendingAddLabel ? (
+            <View style={styles.trendingPill}>
+              <AppText style={styles.trendingPillText} numberOfLines={1}>
+                {trendingAddLabel}
+              </AppText>
+            </View>
+          ) : null}
           {/* Last in the meta row, per UI_HIERARCHY_DIRECTIVE.md §11: OVR is
            * a supporting metric, never ahead of identity/position/team/tier. */}
           <OverallRatingBadge rating={overallRating} positionRank={positionRank} />
@@ -267,6 +283,17 @@ function createStyles(colors: ThemeColors) {
     name: { flex: 1, fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
     team: { fontSize: 11, color: colors.textSecondary },
+    // Same muted-fill/bright-text pairing as the "CURRENT" nav badge
+    // (colors.accentMuted/accent) — a neutral, purely informational tone,
+    // distinct from the injury pill's risk/watch colors and from
+    // TierBadge/OverallRatingBadge's own prestige colors.
+    trendingPill: {
+      backgroundColor: colors.accentMuted,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.xs + 2,
+      paddingVertical: 1,
+    },
+    trendingPillText: { fontSize: 9.5, fontWeight: '700', color: colors.accent },
     label: { fontSize: 10.5, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.3 },
     context: { fontSize: 11, color: colors.textTertiary },
     // Colors (background/text) are applied inline per-row from

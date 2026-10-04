@@ -106,6 +106,7 @@ from modules.sleeper import (
     get_rosters,
     get_transactions,
     get_user_roster_id,
+    trending_add_rank_map,
 )
 from modules.faab import (
     recommend_faab,
@@ -18949,6 +18950,15 @@ def main():
                         ["stale_free_agent", score_field],
                         ascending=[True, False],
                     )
+                # Sleeper's global trending-add signal (cross-league, last
+                # 24h — see annotate_sleeper_trending_add's docstring),
+                # fetched once per render here so every section below
+                # (Priority Adds, Stash/Watchlist/FAAB, Waiver Snapshot)
+                # inherits it for free as free_agents_ranked/
+                # featured_free_agents/etc. all .copy() from free_agents.
+                free_agents = waivers_ui.annotate_sleeper_trending_add(
+                    free_agents, trending_add_rank_map()
+                )
 
             performance.record_timing(
                 "waivers_context_and_inventory",
