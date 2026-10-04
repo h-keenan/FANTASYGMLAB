@@ -1,3 +1,4 @@
+import time
 from html import escape
 from typing import Callable
 
@@ -17,7 +18,13 @@ from modules.player_cards import (
 )
 from modules.player_tier_identity import resolve_player_tier_identity
 from modules import player_profile_ui
+from modules import player_eligibility
+from modules import player_quick_view
 from modules import player_state_authority
+from modules import league_value_settings
+from modules import rankings
+from modules import redis_cache
+from modules import sleeper
 from modules.faab import format_faab_block_html, recommend_faab_guidance
 from modules.html_rendering import inject_global_styles
 from modules.trade_visual_language import TRADE_VISUAL_LANGUAGE_CSS, confidence_indicator_html
@@ -29,6 +36,149 @@ WAIVER_CARD_WHY_MAX_CHARS = 140
 GENERIC_DYNASTY_VALUE_PREFIX = (
     "Dynasty value opportunity even without a primary positional need"
 )
+
+
+# Same live-time-bucket idiom modules.trade_hub_engine/modules.league_rankings/
+# modules.playoff_simulator already use for their own Redis-backed caches: a
+# 30s window is short enough that a fresh add/drop or injury designation
+# shows up on the wire within half a minute (this data's whole point is
+# "what can I act on right now"), long enough that the flood of mobile
+# clients polling Waivers during a live waiver period share one computed
+# pool instead of each re-running it.
+WAIVER_POOL_TTL_SECONDS = 30
+
+
+def _waiver_pool_cache_bucket() -> int:
+    return int(time.time() // WAIVER_POOL_TTL_SECONDS)
+
+
+# Redis-backed single-flight + cache (modules.redis_cache.redis_single_flight_cache)
+# — same pattern, and same reason, as modules.trade_hub_engine's and
+# modules.league_rankings's own caches: services/mobile_api_service.py's
+# `/v1/leagues/{league_id}/waivers` endpoint used to run this exact pool build
+# (apply_valuation_lens over the WHOLE league-eligible pool, the overall_rating
+# percentile pass, a row-wise `.apply(rankings.is_probably_stale_free_agent,
+# axis=1)` over every free agent, then position/overall ranking) from scratch
+# on every single request — every GM checking the wire pays the full cost
+# independently, even though none of this depends on who's asking, only on
+# (league_id, lens) and how recently a roster actually changed. Without a
+# single-flight guard, N concurrent requests that all miss the same key before
+# the first one finishes would each independently redo this pass instead of
+# sharing one.
+#
+# Deliberately scoped to ONLY the league-wide, asker-independent part of the
+# endpoint's pipeline. The per-roster work that follows it in the endpoint
+# (modules.trade_analyzer_fit.build_team_needs_assessment, injury context,
+# team_eval.suggest_optimal_lineup) runs over one caller's own ~15-25 man
+# roster, not the full free-agent pool — cheap enough, and different enough
+# per caller/roster_id, that folding it into this cache would only fragment
+# the one entry every GM in the league could otherwise share. Same "outside
+# the cache boundary" call modules.trade_hub_engine makes for team_stance.
+_WAIVER_POOL_LOCK_TIMEOUT_SECONDS = 15.0
+
+
+def _build_waiver_free_agent_pool_cached(
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+    _bucket: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    league = sleeper.get_league(league_id)
+    if not league:
+        return pd.DataFrame(), pd.DataFrame()
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(players_db_path)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(players_db_path)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="mobile_api_waivers", league=league
+    )
+    if players_df.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
+    score_field = league_value_settings.valuation_score_field(lens)
+    # Percentiled against the full league-eligible pool (rostered players
+    # included), matching the hero ring's denominator — see
+    # _project_waiver_row's overall_rating comment in
+    # services/mobile_api_service.py.
+    valued["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(
+        valued, score_column=score_field
+    )
+
+    rosters = sleeper.get_rosters(league_id)
+    roster_player_map = {
+        str(roster.get("roster_id")): tuple(
+            str(pid) for pid in (roster.get("players") or []) if pid is not None
+        )
+        for roster in rosters
+        if roster.get("roster_id") is not None
+    }
+
+    free_agents = player_state_authority.waiver_actionable_player_pool(
+        valued, roster_player_map, surface="mobile_api_waivers"
+    )
+    if free_agents.empty:
+        return valued, free_agents
+
+    free_agents = free_agents.copy()
+    free_agents["stale_free_agent"] = free_agents.apply(rankings.is_probably_stale_free_agent, axis=1)
+    free_agents.loc[free_agents["stale_free_agent"], ["dynasty_score", "value_score"]] = 0
+    free_agents = free_agents.sort_values(["stale_free_agent", score_field], ascending=[True, False])
+    # Sleeper's global trending-add signal (cross-league, last 24h — see
+    # annotate_sleeper_trending_add's docstring) — folded into this cached
+    # pool build too, rather than fetched once per request outside it, so a
+    # cache hit skips this network call as well.
+    free_agents = annotate_sleeper_trending_add(free_agents, sleeper.trending_add_rank_map())
+
+    score_series = pd.to_numeric(free_agents.get(score_field, 0), errors="coerce").fillna(0)
+    free_agents["position_rank"] = (
+        free_agents.groupby("position")[score_field]
+        .rank(method="first", ascending=False)
+        .fillna(0)
+        .astype(int)
+    )
+    free_agents["overall_rank"] = score_series.rank(method="first", ascending=False).fillna(0).astype(int)
+    return valued, free_agents
+
+
+def build_waiver_free_agent_pool_cached(
+    *,
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Cached front door for the Waivers endpoint's league-wide free-agent
+    pool build — resolves its own league/settings/players_df from just
+    (league_id, lens, players_db_path) rather than accepting them as
+    arguments, so every caller asking about the same league/lens combo
+    within the same 30s window hits one cache entry instead of each
+    independently re-running `apply_valuation_lens` over the whole eligible
+    pool, the overall-rating percentile pass, the row-wise
+    `is_probably_stale_free_agent` check, and position/overall ranking.
+
+    Returns `(valued, free_agents)`: `valued` is the full league-eligible
+    pool (rostered players included — the endpoint needs it to slice out
+    the caller's own roster for team-needs/injury context), `free_agents`
+    is the unowned subset with `stale_free_agent`, the Sleeper trending-add
+    columns, and `position_rank`/`overall_rank` already attached. Both are
+    returned as copies so a caller mutating either (e.g. adding
+    `injury_replacement_fit`) never corrupts the cached entry.
+
+    Single-flight + cache, shared across every mobile-api worker via Redis:
+    see modules.redis_cache.redis_single_flight_cache and this module's own
+    comment above `_build_waiver_free_agent_pool_cached`."""
+
+    key = (league_id, lens, players_db_path, _waiver_pool_cache_bucket())
+    cache_key = redis_cache.build_cache_key("waiver_free_agent_pool", *key)
+    valued, free_agents = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=WAIVER_POOL_TTL_SECONDS,
+        compute=lambda: _build_waiver_free_agent_pool_cached(*key),
+        lock_timeout_seconds=_WAIVER_POOL_LOCK_TIMEOUT_SECONDS,
+    )
+    return valued.copy(), free_agents.copy()
 
 
 def annotate_sleeper_trending_add(

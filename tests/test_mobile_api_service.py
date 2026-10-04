@@ -5897,6 +5897,185 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
     assert target["overall_rank"] == 1
 
 
+def test_waiver_free_agent_pool_cached_concurrent_misses_single_flight(monkeypatch):
+    """Two concurrent cache misses for the same (league_id, lens, ...) key
+    must run the expensive free-agent-pool build
+    (modules.player_state_authority.waiver_actionable_player_pool, the real
+    computation behind modules.waivers_ui.build_waiver_free_agent_pool_cached)
+    exactly once, not once per caller.
+
+    Same Redis-backed single-flight guarantee
+    (modules.redis_cache.redis_single_flight_cache) modules.league_rankings
+    and modules.trade_hub_engine already enforce for their own caches — see
+    tests/test_league_rankings.py's equivalent test. tests/conftest.py's
+    autouse fakeredis fixture backs this cache with a real (fake) Redis
+    here, so this exercises the actual code path, not a mock of it.
+    """
+
+    import threading
+
+    from modules import player_state_authority, waivers_ui
+
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    monkeypatch.setattr("modules.sleeper.get_league", lambda _league_id: _TRADE_ANALYZER_LEAGUE)
+    monkeypatch.setattr(
+        "modules.sleeper.get_rosters",
+        lambda _league_id: [
+            {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+            {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+        ],
+    )
+    monkeypatch.setattr("modules.sleeper.trending_add_rank_map", lambda: {})
+    monkeypatch.setattr("modules.rankings.load_players", lambda _db_path: roster_frame)
+    monkeypatch.setattr(
+        "modules.player_eligibility.filter_current_fantasy_players",
+        lambda df, **_kwargs: df,
+    )
+    monkeypatch.setattr(
+        "modules.player_state_authority.filter_current_fantasy_players",
+        lambda df, **_kwargs: df,
+    )
+
+    call_count = 0
+    call_count_lock = threading.Lock()
+    real_pool = player_state_authority.waiver_actionable_player_pool
+
+    def _slow_wrapped_pool(valued, roster_player_map, **kwargs):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        time.sleep(0.2)
+        return real_pool(valued, roster_player_map, **kwargs)
+
+    monkeypatch.setattr(
+        "modules.player_state_authority.waiver_actionable_player_pool",
+        _slow_wrapped_pool,
+    )
+
+    league_id = "test-waiver-pool-single-flight"
+    results: list[tuple[pd.DataFrame, pd.DataFrame]] = []
+    results_lock = threading.Lock()
+
+    def _call():
+        result = waivers_ui.build_waiver_free_agent_pool_cached(
+            league_id=league_id, lens="Dynasty", players_db_path="unused.db"
+        )
+        with results_lock:
+            results.append(result)
+
+    threads = [threading.Thread(target=_call) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert call_count == 1, "concurrent misses for the same key must single-flight to one real computation"
+    assert len(results) == 8
+    for valued, free_agents in results:
+        # target_rb is the only unowned player in the fixture -- every
+        # caller must see this exact, real result, not a stale/wrong or
+        # cross-caller-contaminated one.
+        assert list(free_agents["player_id"]) == ["target_rb"]
+        assert bool(free_agents.iloc[0]["stale_free_agent"]) is False
+        assert valued.shape[0] == len(roster_frame)
+
+
+def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypatch):
+    """A second request for the same (league_id, lens) within the cache's
+    30s window must be a genuine cache hit — the expensive free-agent-pool
+    build (modules.player_state_authority.waiver_actionable_player_pool)
+    runs exactly once across both requests — while both responses still
+    carry the real, correctly-computed free-agent data (not a stale or
+    wrong cached shape)."""
+
+    import threading
+
+    from modules import player_state_authority
+
+    client = _client(monkeypatch)
+
+    auth_user_response_1 = Mock(status_code=200)
+    auth_user_response_1.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response_1 = Mock(status_code=200)
+    profile_response_1.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    auth_user_response_2 = Mock(status_code=200)
+    auth_user_response_2.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response_2 = Mock(status_code=200)
+    profile_response_2.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+
+    call_count = 0
+    call_count_lock = threading.Lock()
+    real_pool = player_state_authority.waiver_actionable_player_pool
+
+    def _counted_pool(valued, roster_player_map, **kwargs):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        return real_pool(valued, roster_player_map, **kwargs)
+
+    with patch(
+        "requests.get",
+        side_effect=[
+            auth_user_response_1,
+            profile_response_1,
+            auth_user_response_2,
+            profile_response_2,
+        ],
+    ):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=roster_frame):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            with patch(
+                                "modules.player_state_authority.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                with patch(
+                                    "modules.player_state_authority.waiver_actionable_player_pool",
+                                    side_effect=_counted_pool,
+                                ):
+                                    response_1 = client.get(
+                                        "/v1/leagues/abc/waivers",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+                                    response_2 = client.get(
+                                        "/v1/leagues/abc/waivers",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response_1.status_code == 200
+    assert response_2.status_code == 200
+    assert call_count == 1, "second request within the cache window must be a cache hit, not a recomputation"
+
+    for body in (response_1.json(), response_2.json()):
+        assert body["ok"] is True
+        player_ids = [p["player_id"] for p in body["players"]]
+        assert player_ids == ["target_rb"]
+        assert body["available_count"] == 1
+        target = body["players"][0]
+        assert target["stale_free_agent"] is False
+        assert target["position_rank"] == 1
+        assert target["overall_rank"] == 1
+        assert body["avg_wire_score"] == round(target["score"])
+
+
 def test_project_priority_add_carries_the_real_waiver_confidence_label(monkeypatch):
     """A Priority Add's confidence badge (High/Medium/Low) must reach the
     mobile payload — the same real priority_need_fit/priority_value_opportunity
