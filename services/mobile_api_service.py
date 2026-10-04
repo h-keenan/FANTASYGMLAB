@@ -5454,37 +5454,20 @@ def get_league_waivers(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_waivers", league=league
-    )
-    if players_df.empty:
-        return {"ok": True, "players": [], "priority_adds": [], "needed_positions": [], "reason": "no_player_data"}
-
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
-    # Percentiled against the full league-eligible pool (rostered players
-    # included) BEFORE the free-agent-only filter below narrows it — see
-    # _project_waiver_row's overall_rating comment for why the wire-relative
-    # free-agent pool would be the wrong denominator for this number.
-    valued["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(
-        valued, score_column=score_field
+    # The league-wide, asker-independent part of this pipeline (valuation
+    # lens, overall-rating percentiles, the stale-free-agent row-wise check,
+    # Sleeper trending-add, position/overall ranking) is identical for every
+    # caller asking about this (league_id, lens) combo within the same live
+    # window, so it's single-flighted + Redis-cached — see
+    # modules.waivers_ui.build_waiver_free_agent_pool_cached and the big
+    # comment above its private compute function for why only this part
+    # (not the per-roster work below) is in the cache boundary.
+    valued, free_agents = waivers_ui.build_waiver_free_agent_pool_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-
-    rosters = sleeper.get_rosters(league_id)
-    roster_player_map = {
-        str(roster.get("roster_id")): tuple(
-            str(pid) for pid in (roster.get("players") or []) if pid is not None
-        )
-        for roster in rosters
-        if roster.get("roster_id") is not None
-    }
-
-    free_agents = player_state_authority.waiver_actionable_player_pool(
-        valued, roster_player_map, surface="mobile_api_waivers"
-    )
+    if valued.empty:
+        return {"ok": True, "players": [], "priority_adds": [], "needed_positions": [], "reason": "no_player_data"}
     if free_agents.empty:
         return {
             "ok": True,
@@ -5496,27 +5479,16 @@ def get_league_waivers(
             "reason": "",
         }
 
-    free_agents = free_agents.copy()
-    free_agents["stale_free_agent"] = free_agents.apply(rankings.is_probably_stale_free_agent, axis=1)
-    free_agents.loc[free_agents["stale_free_agent"], ["dynasty_score", "value_score"]] = 0
-    free_agents = free_agents.sort_values(["stale_free_agent", score_field], ascending=[True, False])
-    # Sleeper's global trending-add signal (cross-league, last 24h — see
-    # waivers_ui.annotate_sleeper_trending_add's docstring), fetched once per
-    # request here so players/priority_adds/stash/watchlist/faab below all
-    # inherit it for free (every one of those is a subset/copy of
-    # free_agents). Mirrors app.py's web route.
-    free_agents = waivers_ui.annotate_sleeper_trending_add(
-        free_agents, sleeper.trending_add_rank_map()
-    )
+    rosters = sleeper.get_rosters(league_id)
+    roster_player_map = {
+        str(roster.get("roster_id")): tuple(
+            str(pid) for pid in (roster.get("players") or []) if pid is not None
+        )
+        for roster in rosters
+        if roster.get("roster_id") is not None
+    }
 
     score_series = pd.to_numeric(free_agents.get(score_field, 0), errors="coerce").fillna(0)
-    free_agents["position_rank"] = (
-        free_agents.groupby("position")[score_field]
-        .rank(method="first", ascending=False)
-        .fillna(0)
-        .astype(int)
-    )
-    free_agents["overall_rank"] = score_series.rank(method="first", ascending=False).fillna(0).astype(int)
     avg_wire_score = int(score_series.mean()) if len(score_series) else 0
 
     roster_id = str(my_roster.get("roster_id") or "")
