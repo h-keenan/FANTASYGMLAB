@@ -416,6 +416,38 @@ def _opponent_multiplier(
 # ---------------------------------------------------------------------------
 
 
+def _most_recent_played_week(weekly_rows: List[Dict[str, Any]], *, before_week: int) -> int:
+    """The real "as-of" week to anchor a player's recency window on.
+
+    This is the latest week actually reflected in ``weekly_rows`` (strictly
+    before ``before_week``, the week being projected) — NOT
+    ``before_week - 1`` itself. Anchoring the lookback window on the week
+    being projected (as this module used to do) silently ages games out of
+    the window purely because a *later* week is being projected, even
+    though no additional real time — and no additional games — has
+    actually passed since those games were played. A player last seen in
+    week 3 must get the exact same recency-weighted trend whether he's
+    being projected for week 4 or week 9; only the opponent (and its
+    matchup multiplier) should vary across a loop like
+    ``services.mobile_api_service.get_player_schedule``'s per-remaining-
+    week projection loop. Falls back to ``before_week - 1`` when there is
+    no usable row at all, so ``_player_recent_trend`` still returns
+    ``None`` (and ``project_player_week`` still reports
+    ``"insufficient_player_data"``) exactly as before for a player with no
+    recorded games.
+    """
+
+    played_weeks = [
+        int(row["week"])
+        for row in (weekly_rows or [])
+        if isinstance(row, dict)
+        and row.get("week") is not None
+        and row.get("fantasy_points_ppr") is not None
+        and int(row["week"]) < int(before_week)
+    ]
+    return max(played_weeks) if played_weeks else int(before_week) - 1
+
+
 def _player_recent_trend(
     weekly_rows: List[Dict[str, Any]],
     *,
@@ -582,7 +614,15 @@ def project_player_week(
         if player_weekly_rows is not None
         else sleeper.cached_season_player_weekly(player_id, season)
     )
-    trend = _player_recent_trend(weekly_rows, upto_week=week - 1)
+    # Anchor the recency window on the real "as-of" week — the latest week
+    # actually reflected in this player's own weekly rows — not on
+    # ``week - 1``, the target week being projected. Otherwise, projecting
+    # far enough ahead of a player's last real game silently ages real
+    # games out of the lookback window (or drops the trend to
+    # "insufficient_player_data" entirely) even though zero real time has
+    # passed since those games. See ``_most_recent_played_week``.
+    as_of_week = _most_recent_played_week(weekly_rows, before_week=week)
+    trend = _player_recent_trend(weekly_rows, upto_week=as_of_week)
     if trend is None:
         return {
             "status": "insufficient_player_data",
