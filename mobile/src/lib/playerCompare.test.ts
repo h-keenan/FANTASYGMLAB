@@ -46,6 +46,11 @@ function model(overrides: Partial<QuickViewModel> = {}): QuickViewModel {
     workload_trend: null,
     usage_trend: null,
     decision_fit_narrative: null,
+    market_rating: null,
+    opportunity_rating: null,
+    scarcity_rating: null,
+    role_rating: null,
+    durability_rating: null,
     ...overrides,
   };
 }
