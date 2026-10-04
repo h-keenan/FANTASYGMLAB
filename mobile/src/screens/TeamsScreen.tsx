@@ -13,6 +13,7 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -106,6 +107,26 @@ const METRIC_CONFIG: Record<
   },
 };
 
+/**
+ * In-screen metric switcher tabs — short pill labels for the same six
+ * `METRIC_CONFIG` keys above, in the same order. This screen already fully
+ * supported all six (it reads `metric` once from `route.params`), but with
+ * no in-screen control to change it, every user landed on and stayed on
+ * Power unless a caller happened to deep-link with a specific metric (only
+ * the Age tile did). Reuses `SegmentedTabBar` — the same shared
+ * pill-switcher Player Detail's Stats/Trends/Schedule/Career/Model tabs and
+ * My Team's Overview/Bench/Analysis tabs already use — rather than a
+ * page-local control.
+ */
+const METRIC_TABS: Array<{ key: RankingMetric; label: string }> = [
+  { key: 'power', label: 'Power' },
+  { key: 'franchise', label: 'Franchise' },
+  { key: 'draft_capital', label: 'Draft' },
+  { key: 'starter', label: 'Starters' },
+  { key: 'bench', label: 'Bench' },
+  { key: 'age', label: 'Age' },
+];
+
 interface TeamRow {
   rosterId: number | string;
   teamName: string;
@@ -120,14 +141,33 @@ interface TeamRow {
   tradeTendency: string | null;
 }
 
+/** Metric-independent roster data — fetched once per league focus, not
+ * refetched on every in-screen metric switch. The in-screen switcher below
+ * only needs to re-derive rank/detail/sort per `TeamRanking` already held
+ * here (see the `teams` memo), not re-hit the network. */
+interface BaseTeamRow {
+  rosterId: number | string;
+  teamName: string;
+  avatarId: string;
+  playerIds: string[];
+  isMine: boolean;
+  ranking: TeamRanking | undefined;
+}
+
 export default function TeamsScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName, metric = 'power' } = route.params;
+  const { leagueId, leagueName } = route.params;
+  // Local state, seeded once from `route.params.metric` (e.g. the Age tile's
+  // deep link) rather than read directly from route.params on every render —
+  // the in-screen switcher below changes this same state afterward, and a
+  // user can land on any of the six metrics in-screen regardless of how they
+  // navigated in.
+  const [metric, setMetric] = useState<RankingMetric>(route.params.metric ?? 'power');
   const config = METRIC_CONFIG[metric];
-  const [teams, setTeams] = useState<TeamRow[]>([]);
+  const [baseRows, setBaseRows] = useState<BaseTeamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -164,37 +204,20 @@ export default function TeamsScreen({ route, navigation }: Props) {
           const myRosterId = myRosterResult.roster ? String(myRosterResult.roster.roster_id ?? '') : '';
           const rankingsByRoster = new Map(rankingsResult.teams.map((team) => [team.roster_id, team]));
 
-          const rows: TeamRow[] = rostersResult.rosters.map((roster) => {
+          const rows: BaseTeamRow[] = rostersResult.rosters.map((roster) => {
             const rosterId = String(roster.roster_id ?? '');
             const players = Array.isArray(roster.players) ? roster.players : [];
             const profile = profilesResult.profiles[rosterId];
-            const ranking = rankingsByRoster.get(rosterId);
             return {
               rosterId,
               teamName: profile?.team_name || 'Unclaimed team',
               avatarId: profile?.avatar_id || '',
               playerIds: players.map(String),
               isMine: Boolean(myRosterId) && rosterId === myRosterId,
-              metricRank: ranking ? config.rank(ranking) : null,
-              metricRankTied: ranking ? config.tied(ranking) : false,
-              metricDetail: ranking && config.detail ? config.detail(ranking) : null,
-              recordLabel: ranking?.record_label ?? null,
-              archetypeLabel: ranking?.archetype_label ?? null,
-              tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
+              ranking: rankingsByRoster.get(rosterId),
             };
           });
-          // Pure metric-rank order — no longer pins the caller's own team
-          // first, since that made a rank-4 team appear above rank-1 with
-          // no explanation. The "You" badge + left-accent row below is how a
-          // user finds their own row now instead of it always being #1 in
-          // the list regardless of rank.
-          rows.sort((a, b) => {
-            if (a.metricRank == null && b.metricRank == null) return 0;
-            if (a.metricRank == null) return 1;
-            if (b.metricRank == null) return -1;
-            return a.metricRank - b.metricRank;
-          });
-          setTeams(rows);
+          setBaseRows(rows);
         } catch (err) {
           if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load teams.'));
         } finally {
@@ -206,8 +229,43 @@ export default function TeamsScreen({ route, navigation }: Props) {
       return () => {
         cancelled = true;
       };
-    }, [leagueId, config]),
+      // Metric-independent: fetched once per league focus. The in-screen
+      // switcher re-derives per-metric rank/sort from `baseRows` below
+      // instead of refetching, so switching metrics stays instant/in-place.
+    }, [leagueId]),
   );
+
+  // Per-metric rank/detail + sort, derived from the metric-independent fetch
+  // above — switching `metric` here never re-hits the network.
+  const teams: TeamRow[] = useMemo(() => {
+    const rows = baseRows.map((row) => {
+      const { ranking } = row;
+      return {
+        rosterId: row.rosterId,
+        teamName: row.teamName,
+        avatarId: row.avatarId,
+        playerIds: row.playerIds,
+        isMine: row.isMine,
+        metricRank: ranking ? config.rank(ranking) : null,
+        metricRankTied: ranking ? config.tied(ranking) : false,
+        metricDetail: ranking && config.detail ? config.detail(ranking) : null,
+        recordLabel: ranking?.record_label ?? null,
+        archetypeLabel: ranking?.archetype_label ?? null,
+        tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
+      };
+    });
+    // Pure metric-rank order — no longer pins the caller's own team first,
+    // since that made a rank-4 team appear above rank-1 with no explanation.
+    // The "You" badge + left-accent row below is how a user finds their own
+    // row now instead of it always being #1 in the list regardless of rank.
+    rows.sort((a, b) => {
+      if (a.metricRank == null && b.metricRank == null) return 0;
+      if (a.metricRank == null) return 1;
+      if (b.metricRank == null) return -1;
+      return a.metricRank - b.metricRank;
+    });
+    return rows;
+  }, [baseRows, config]);
 
   // Percentile denominator is the count of teams the backend actually ranked
   // for this metric (not every roster — an unclaimed team has no rank and
@@ -230,6 +288,9 @@ export default function TeamsScreen({ route, navigation }: Props) {
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+      <View style={styles.metricTabBarWrap}>
+        <SegmentedTabBar options={METRIC_TABS} active={metric} onChange={setMetric} />
+      </View>
       <FlatList
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
@@ -381,6 +442,7 @@ function createStyles(colors: ThemeColors) {
   root: { flex: 1, backgroundColor: colors.background },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg },
+  metricTabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   infoNoteWrap: { marginBottom: spacing.md },
   center: {
     flex: 1,
