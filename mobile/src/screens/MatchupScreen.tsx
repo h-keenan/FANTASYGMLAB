@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -29,6 +30,7 @@ import {
   type PlayerWeekProjection,
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -224,9 +226,24 @@ export default function MatchupScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
-  const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const isRestoring = useIsRestoring();
+  // Shares its cache entry with DashboardScreen's own matchup fetch
+  // (queryKeys.matchup) — whichever screen fetches it first warms the cache
+  // for the other.
+  const matchupQuery = useQuery({
+    queryKey: queryKeys.matchup(leagueId),
+    queryFn: () => api.getLeagueMatchup(leagueId),
+    enabled: !isRestoring,
+  });
+  const matchup: MatchupResponse | null = matchupQuery.data ?? null;
+  const loading = isRestoring || matchupQuery.isPending;
+  // Same rule as Dashboard's port: don't blank already-visible cached
+  // content just because a background refetch failed.
+  const error =
+    matchupQuery.isError && !matchup
+      ? toUserErrorMessage(matchupQuery.error, 'Failed to load this week’s matchup.')
+      : null;
 
   useScreenHeaderTitle(navigation, 'Matchup', leagueName);
 
@@ -244,21 +261,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const result = await api.getLeagueMatchup(leagueId);
-          if (!cancelled) setMatchup(result);
-        } catch (err) {
-          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load this week’s matchup.'));
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [leagueId]),
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matchup(leagueId) });
+    }, [queryClient, leagueId]),
   );
 
   if (loading) {
