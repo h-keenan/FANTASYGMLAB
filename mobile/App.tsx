@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 
 import { AuthProvider } from './src/context/AuthContext';
 import { CollegeInterestProvider } from './src/context/CollegeInterestContext';
@@ -24,6 +25,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
 import { registerNotificationTapHandler } from './src/lib/pushNotifications';
+import { asyncStoragePersister, PERSIST_MAX_AGE_MS, queryClient } from './src/lib/queryClient';
 
 // Holds the native splash up past its default auto-hide — AppText (every
 // screen's Text) needs these weight files registered with the native font
@@ -58,28 +60,39 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
-      <SafeAreaProvider>
-        <ThemeModeProvider>
-          <DensityProvider>
-            <GmStanceProvider>
-              <ValuationLensProvider>
-                {/* Outside AuthProvider so the masking flag is armed from
-                    storage before the first authorized request goes out. */}
-                <ShowcaseModeProvider>
-                  <OnboardingProvider>
-                    <CollegeInterestProvider>
-                      <AuthProvider>
-                        <RootNavigator />
-                      </AuthProvider>
-                    </CollegeInterestProvider>
-                  </OnboardingProvider>
-                </ShowcaseModeProvider>
-              </ValuationLensProvider>
-            </GmStanceProvider>
-          </DensityProvider>
-          <ThemedStatusBar />
-        </ThemeModeProvider>
-      </SafeAreaProvider>
+      {/* Wraps everything else so any screen can adopt `useQuery` for the
+          shared "show cached data instantly, refresh in background"
+          behavior — see src/lib/queryClient.ts. The persister restores
+          last session's cache from AsyncStorage before screens mount,
+          which is what lets a cold app start paint from cache too, not
+          just in-memory nav between screens. */}
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: asyncStoragePersister, maxAge: PERSIST_MAX_AGE_MS }}
+      >
+        <SafeAreaProvider>
+          <ThemeModeProvider>
+            <DensityProvider>
+              <GmStanceProvider>
+                <ValuationLensProvider>
+                  {/* Outside AuthProvider so the masking flag is armed from
+                      storage before the first authorized request goes out. */}
+                  <ShowcaseModeProvider>
+                    <OnboardingProvider>
+                      <CollegeInterestProvider>
+                        <AuthProvider>
+                          <RootNavigator />
+                        </AuthProvider>
+                      </CollegeInterestProvider>
+                    </OnboardingProvider>
+                  </ShowcaseModeProvider>
+                </ValuationLensProvider>
+              </GmStanceProvider>
+            </DensityProvider>
+            <ThemedStatusBar />
+          </ThemeModeProvider>
+        </SafeAreaProvider>
+      </PersistQueryClientProvider>
     </GestureHandlerRootView>
   );
 }

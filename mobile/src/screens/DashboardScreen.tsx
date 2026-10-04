@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -41,7 +42,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import BrandMark from '../components/BrandMark';
 import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
-import { getCachedDashboard, setCachedDashboard } from '../lib/dashboardCache';
+import { queryKeys } from '../lib/queryKeys';
 import { formatRank } from '../lib/percentile';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
@@ -204,19 +205,89 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
-  const [items, setItems] = useState<DashboardItem[] | null>(null);
-  const [teamSnapshot, setTeamSnapshot] = useState<TeamSnapshot | null>(null);
-  const [quiet, setQuiet] = useState(false);
-  const [quietReason, setQuietReason] = useState('');
-  const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
-  const [teamRankings, setTeamRankings] = useState<TeamRanking[] | null>(null);
-  const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
-  const [entitlement, setEntitlement] = useState<DashboardEntitlementInfo | null>(null);
   const { showExplanations } = useDensity();
+  const queryClient = useQueryClient();
+  // The persisted AsyncStorage cache restores asynchronously — gating on it
+  // keeps a query from firing (and racing/overwriting) before last session's
+  // cached response has been hydrated back into the in-memory QueryClient.
+  const isRestoring = useIsRestoring();
+
+  // Main dashboard payload — the only one of these three with its own
+  // hand-rolled instant-paint cache before this PR (dashboardCache.ts, now
+  // retired). `useQuery` gives the exact same "show last-known-good
+  // instantly, refresh in background" behavior via the persisted QueryClient
+  // for all three fetches below, not just this one.
+  const dashboardQuery = useQuery({
+    queryKey: queryKeys.dashboard(leagueId),
+    queryFn: () => api.getLeagueDashboard(leagueId),
+    enabled: !isRestoring,
+  });
+  // League Pulse's source data — previously fetched fresh on every focus
+  // with no cache at all, so this section always showed blank/absent until
+  // the request resolved. Now benefits from the same cache-first treatment.
+  const teamRankingsQuery = useQuery({
+    queryKey: queryKeys.teamRankings(leagueId),
+    queryFn: () => api.getLeagueTeamRankings(leagueId),
+    enabled: !isRestoring,
+  });
+  // Weekly Matchup card — same gap as team rankings; also reused verbatim by
+  // MatchupScreen (see that screen's own useQuery), so the two screens now
+  // share one cache entry under queryKeys.matchup(leagueId) instead of each
+  // fetching it independently.
+  const matchupQuery = useQuery({
+    queryKey: queryKeys.matchup(leagueId),
+    queryFn: () => api.getLeagueMatchup(leagueId),
+    enabled: !isRestoring,
+  });
+
+  const dashboardData = dashboardQuery.data;
+  const items: DashboardItem[] | null = dashboardData?.items ?? null;
+  const teamSnapshot: TeamSnapshot | null = dashboardData?.team_snapshot ?? null;
+  const quiet = dashboardData?.quiet ?? false;
+  const quietReason = dashboardData?.quiet_reason ?? '';
+  const entitlement: DashboardEntitlementInfo | null = dashboardData?.entitlement ?? null;
+  const notReadyReason: string | null = dashboardData?.reason || null;
+  const teamRankings: TeamRanking[] | null = teamRankingsQuery.data?.teams ?? null;
+  const matchup: MatchupResponse | null = matchupQuery.data ?? null;
+
+  // No data at all yet (neither a persisted cache hit nor a prior in-memory
+  // fetch) — the one case that still needs a blank-slate spinner. Once any
+  // data exists, it paints immediately and a failed background refetch below
+  // never un-paints it.
+  const loading = isRestoring || dashboardQuery.isPending;
+  // A background refetch failing after we already have content to show
+  // should never blank the whole screen back to an error page — that would
+  // defeat the entire point of showing cached data first. Only surface the
+  // full-page error when there's truly nothing to show instead.
+  const error =
+    dashboardQuery.isError && !dashboardData
+      ? toUserErrorMessage(dashboardQuery.error, 'Failed to load your Next Move briefing.')
+      : null;
+
+  // Diffs each successful dashboard payload's recommendation ids against
+  // what this device last saw — same "Since your last check-in" bookkeeping
+  // the old useFocusEffect did on every live fetch resolution, now
+  // triggered off every successful query resolution (initial or background
+  // refetch) instead.
+  useEffect(() => {
+    if (!dashboardData || dashboardData.reason) return;
+    let cancelled = false;
+    (async () => {
+      const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
+        leagueId,
+        dashboardData.items.map((item) => item.recommendation_id),
+      );
+      if (!cancelled) {
+        setNewRecommendationIds(newIds);
+        setIsFirstVisit(firstVisit);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dashboardData, leagueId]);
 
   useScreenHeaderTitle(navigation, 'Next Move', leagueName);
 
@@ -232,73 +303,16 @@ export default function DashboardScreen({ route, navigation }: Props) {
     });
   }, [navigation, leagueId, styles]);
 
+  // Matches the previous useFocusEffect's cadence (always re-check on
+  // regaining focus) but through React Query: invalidating marks each query
+  // stale and triggers its background refetch if it's currently mounted —
+  // cached data stays on screen throughout, never cleared first.
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        // Perceived-performance floor: paint the last-known-good briefing
-        // immediately (if one exists) instead of a blank spinner while the
-        // live request — real per-request computation server-side — is
-        // still in flight. The fetch below always still runs and replaces
-        // this the moment it resolves; this never substitutes for it.
-        const cached = await getCachedDashboard(leagueId);
-        if (!cancelled && cached && !cached.reason) {
-          setItems(cached.items);
-          setTeamSnapshot(cached.team_snapshot);
-          setEntitlement(cached.entitlement ?? null);
-          setQuiet(cached.quiet);
-          setQuietReason(cached.quiet_reason ?? '');
-          setLoading(false);
-        }
-        try {
-          const result = await api.getLeagueDashboard(leagueId);
-          if (cancelled) return;
-          if (result.reason) {
-            setNotReadyReason(result.reason);
-          } else {
-            setItems(result.items);
-            setTeamSnapshot(result.team_snapshot);
-            setEntitlement(result.entitlement ?? null);
-            setQuiet(result.quiet);
-            setQuietReason(result.quiet_reason ?? '');
-            void setCachedDashboard(leagueId, result);
-            const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
-              leagueId,
-              result.items.map((item) => item.recommendation_id),
-            );
-            if (!cancelled) {
-              setNewRecommendationIds(newIds);
-              setIsFirstVisit(firstVisit);
-            }
-          }
-        } catch (err) {
-          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load your Next Move briefing.'));
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      })();
-      // Independent, best-effort — League Pulse is a bonus section, not
-      // core to the briefing, so a failure here shouldn't touch loading/
-      // error state for the rest of the screen.
-      api
-        .getLeagueTeamRankings(leagueId)
-        .then((result) => {
-          if (!cancelled) setTeamRankings(result.teams);
-        })
-        .catch(() => {});
-      // Also best-effort: the matchup card is an entry point, not the
-      // briefing itself. A bye week, a league without a current week, or a
-      // failed call simply means no card.
-      api
-        .getLeagueMatchup(leagueId)
-        .then((result) => {
-          if (!cancelled) setMatchup(result);
-        })
-        .catch(() => {});
-      return () => {
-        cancelled = true;
-      };
-    }, [leagueId]),
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamRankings(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matchup(leagueId) });
+    }, [queryClient, leagueId]),
   );
 
   if (loading) {
