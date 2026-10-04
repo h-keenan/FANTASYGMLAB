@@ -72,6 +72,27 @@ def tier_schedule(monkeypatch):
     return games
 
 
+def _extended_two_team_games(weeks: int = 10) -> pd.DataFrame:
+    """AAA vs BBB, every week from 1 through ``weeks`` with no bye — long
+    enough to project several weeks past a player's last real game (see
+    the "far out" trend-invariance regression test below)."""
+
+    rows = []
+    for week in range(1, weeks + 1):
+        if week % 2 == 1:
+            rows.append({"season": 2099, "game_type": "REG", "week": week, "home_team": "AAA", "away_team": "BBB", "home_score": 20.0, "away_score": 17.0})
+        else:
+            rows.append({"season": 2099, "game_type": "REG", "week": week, "home_team": "BBB", "away_team": "AAA", "home_score": 17.0, "away_score": 20.0})
+    return pd.DataFrame(rows)
+
+
+@pytest.fixture
+def extended_schedule(monkeypatch):
+    games = _extended_two_team_games()
+    monkeypatch.setattr(nfl_schedule, "load_games", lambda **_: games)
+    return games
+
+
 # ---------------------------------------------------------------------------
 # Defense strength by position
 # ---------------------------------------------------------------------------
@@ -394,6 +415,85 @@ def test_project_player_week_unknown_player(round_robin_schedule):
     result = pp.project_player_week("does_not_exist", week=5, season=2099, players={})
 
     assert result["status"] == "unknown_player"
+
+
+def test_project_player_week_trend_is_invariant_to_target_week_distance(extended_schedule):
+    """Regression for the Juwan-Johnson-style bug: a player's recency-
+    weighted trend must be identical whether he's being projected for next
+    week or several weeks further out, as long as no new games have been
+    played in between. Before the fix, the lookback window was anchored on
+    ``week - 1`` (the TARGET week), not the real as-of week — so a player
+    whose last real game was week 3 got his full 3-game trend when
+    projected for week 4, but only his single best game (week 3) when
+    projected for week 9 (weeks 1-2 aged out of the window purely because
+    a later target week was being projected, not because any real time
+    passed), and lost the trend entirely (``insufficient_player_data``) for
+    weeks far enough out that even week 3 aged out.
+    """
+
+    players = {"wr_a1": {"position": "WR", "team": "AAA"}}
+    weekly_rows = [
+        {"week": 1, "fantasy_points_ppr": 14.4},
+        {"week": 2, "fantasy_points_ppr": 10.6},
+        {"week": 3, "fantasy_points_ppr": 23.3},
+    ]
+
+    near = pp.project_player_week(
+        "wr_a1", week=4, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+    )
+    far = pp.project_player_week(
+        "wr_a1", week=9, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+    )
+    way_far = pp.project_player_week(
+        "wr_a1", week=10, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+    )
+
+    for result in (near, far, way_far):
+        assert result["status"] == "ok"
+        assert result["basis"]["recent_weeks_used"] == [1, 2, 3]
+        assert result["basis"]["recent_games_played"] == 3
+
+    assert near["basis"]["recent_weighted_avg_ppr"] == pytest.approx(far["basis"]["recent_weighted_avg_ppr"])
+    assert near["basis"]["recent_weighted_avg_ppr"] == pytest.approx(way_far["basis"]["recent_weighted_avg_ppr"])
+    # No defense signal was injected (neutral 1.0 multiplier throughout),
+    # so the point estimates themselves must match too.
+    assert near["point_estimate"] == pytest.approx(far["point_estimate"])
+    assert near["point_estimate"] == pytest.approx(way_far["point_estimate"])
+
+
+def test_project_player_week_recent_trend_still_drops_old_games_for_actively_playing_player(extended_schedule):
+    """Guards against overcorrecting the fix above into "every game ever
+    counts forever": a player who HAS played recently must still get a
+    trend built from his actual recent games — weeks far enough before his
+    real last-played week must still fall out of the ``PLAYER_MAX_WEEKS_BACK``
+    lookback window, exactly as before the fix.
+    """
+
+    players = {"wr_a1": {"position": "WR", "team": "AAA"}}
+    weekly_rows = [
+        {"week": 1, "fantasy_points_ppr": 1.0},
+        {"week": 2, "fantasy_points_ppr": 2.0},
+        {"week": 3, "fantasy_points_ppr": 9.0},
+        {"week": 4, "fantasy_points_ppr": 10.0},
+        {"week": 5, "fantasy_points_ppr": 11.0},
+        {"week": 6, "fantasy_points_ppr": 12.0},
+        {"week": 7, "fantasy_points_ppr": 13.0},
+        {"week": 8, "fantasy_points_ppr": 14.0},
+    ]
+
+    result = pp.project_player_week(
+        "wr_a1", week=9, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+    )
+
+    assert result["status"] == "ok"
+    # Real as-of week is 8 (his last played week). With a 6-week lookback,
+    # weeks 1 and 2 (7 and 6 weeks before week 8) must still be excluded.
+    assert result["basis"]["recent_weeks_used"] == [3, 4, 5, 6, 7, 8]
+    assert result["basis"]["recent_games_played"] == 6
 
 
 def test_opponent_multiplier_is_bounded():
