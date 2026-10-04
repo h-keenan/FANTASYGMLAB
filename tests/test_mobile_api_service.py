@@ -2336,6 +2336,114 @@ def test_quick_view_omits_the_overall_rating_when_the_pool_is_too_thin(monkeypat
     assert response.json()["stats"]["overall_rating"] is None
 
 
+def _sub_rated_quick_view_frame(pool_size=20):
+    """Same shape as _rated_quick_view_frame, plus the composite-score inputs
+    and injury/risk multipliers the Model tab's sub-rating chip row
+    (market_rating/opportunity_rating/scarcity_rating/role_rating/
+    durability_rating) ranks against. Subject (9001) tops every composite
+    column and carries a reduced durability pair, so its expected ratings
+    land unambiguously at the scale's top (factors) and a predictable
+    mid-pack value (durability, a direct scale not a position rank)."""
+
+    rows = []
+    for index in range(pool_size):
+        rows.append(
+            {
+                "player_id": f"pool-{index}",
+                "name": f"Pool Player {index}",
+                "position": "WR",
+                "team": "NYJ",
+                "status": "Active",
+                "active": True,
+                "years_exp": 3,
+                "market_score": float(index),
+                "opportunity_score": float(index),
+                "scarcity_score": float(index),
+                "role_score": float(index),
+                "injury_multiplier": 1.0,
+                "non_injury_risk_multiplier": 1.0,
+                "is_current_fantasy_eligible": True,
+                "player_eligibility_reason": "active_fantasy_player",
+                "trust_enforcement": "pass",
+                "trust_evidence_confidence": 1.0,
+                "trust_block_reason": "",
+                "trust_validation_fingerprint": f"fp-{index}",
+            }
+        )
+    subject = dict(rows[0])
+    subject.update(
+        {
+            "player_id": "9001",
+            "name": "Star Wideout",
+            "market_score": 1000.0,
+            "opportunity_score": 1000.0,
+            "scarcity_score": 1000.0,
+            "role_score": 1000.0,
+            "injury_multiplier": 0.8,
+            "non_injury_risk_multiplier": 0.5,
+            "trust_validation_fingerprint": "fp-subject",
+        }
+    )
+    return pd.DataFrame([*rows, subject])
+
+
+def test_quick_view_sends_sub_ratings_for_a_real_pool(monkeypatch):
+    from modules import player_quick_view
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_sub_rated_quick_view_frame()):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    model = response.json()["model"]
+    # Best in the pool on every composite input -> top of the shared 0-99
+    # OVR-ring scale, via the real player_quick_view.sub_ratings engine.
+    assert model["market_rating"] == player_quick_view.OVERALL_RATING_MAX
+    assert model["opportunity_rating"] == player_quick_view.OVERALL_RATING_MAX
+    assert model["scarcity_rating"] == player_quick_view.OVERALL_RATING_MAX
+    assert model["role_rating"] == player_quick_view.OVERALL_RATING_MAX
+    # Durability is a direct 0-99 scaling of injury_multiplier *
+    # non_injury_risk_multiplier (0.8 * 0.5 = 0.4), not a position rank.
+    assert model["durability_rating"] == round(0.8 * 0.5 * player_quick_view.OVERALL_RATING_MAX)
+    # The pre-existing raw composite fields are untouched by the new ratings.
+    assert model["market_score"] == 1000.0
+
+
+def test_quick_view_omits_sub_ratings_when_the_pool_is_too_thin(monkeypatch):
+    from modules import player_quick_view
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    thin = _sub_rated_quick_view_frame(player_quick_view.PERCENTILE_MIN_POOL - 2)
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=thin):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    model = response.json()["model"]
+    assert model["market_rating"] is None
+    assert model["opportunity_rating"] is None
+    assert model["scarcity_rating"] is None
+    assert model["role_rating"] is None
+    # Durability is unaffected by the position-pool gate — it never ranked
+    # against peers in the first place.
+    assert model["durability_rating"] == round(0.8 * 0.5 * player_quick_view.OVERALL_RATING_MAX)
+
+
 def test_quick_view_sends_a_real_prime_window_for_the_players_position_and_age(monkeypatch):
     from modules import rankings
 

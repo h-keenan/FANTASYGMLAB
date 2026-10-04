@@ -1135,6 +1135,19 @@ export interface QuickViewModel {
   // decision_fit_narrative) — null when the position pool is too thin to
   // support a meaningful comparison.
   decision_fit_narrative: string | null;
+  // Market/Opportunity/Scarcity/Role, each re-expressed on the same 0-99
+  // "OVR ring" scale via modules.player_quick_view.sub_ratings — a
+  // position-relative percentile run through the exact same
+  // _overall_rating_from_percentile curve the headline overall_rating uses.
+  // Null under the same thin-pool gate as every other percentile here.
+  market_rating: number | null;
+  opportunity_rating: number | null;
+  scarcity_rating: number | null;
+  role_rating: number | null;
+  // Durability: injury_multiplier * non_injury_risk_multiplier scaled
+  // directly onto the 0-99 range — not position-ranked (see sub_ratings'
+  // docstring for why). Null only when neither multiplier is present.
+  durability_rating: number | null;
 }
 
 export interface WeeklyStatPoint {

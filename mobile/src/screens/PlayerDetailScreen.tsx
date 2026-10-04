@@ -23,14 +23,17 @@ import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
 import MetricCard from '../components/MetricCard';
 import PlayerHero from '../components/PlayerHero';
+import PlayerSharePreviewModal from '../components/PlayerSharePreviewModal';
 import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnapshotCard';
 import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock, { SkeletonCard, SkeletonChart, SkeletonRow } from '../components/SkeletonBlock';
+import SubRatingRow from '../components/SubRatingRow';
 import WeeklyPointsChart from '../components/WeeklyPointsChart';
 import { injuryTone } from '../lib/injuryDisplay';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
+import { playerSubRatings } from '../lib/subRatings';
 import {
   api,
   type CareerSeason,
@@ -1012,6 +1015,37 @@ function InsightChipsRow({ model }: { model: QuickViewModel }) {
   );
 }
 
+/**
+ * Age's own, differently-signed chip — never run through the same
+ * percentile-and-rating treatment SubRatingRow's five factors get.
+ * model.age_score is a signed delta (age_curve_score - market_score when
+ * native age data is absent, which is the common case — see
+ * modules.player_quick_view's decision_fit_narrative docstring and
+ * services.mobile_api_service._project_player_model), not a higher-is-
+ * better percentile: positive means the age curve is adding value versus
+ * pure market, negative means it's discounting it. Colored by sign
+ * (success/danger/neutral) rather than the percentile ramp, and always
+ * shows its own explicit +/- so it can't be misread as a plain rating.
+ */
+function AgeFactorChip({ label, value }: { label: string; value: number | null }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value);
+  const tint = rounded > 0 ? colors.successBright : rounded < 0 ? colors.danger : colors.textSecondary;
+  const signed = rounded > 0 ? `+${rounded}` : String(rounded);
+  return (
+    <View style={[styles.ageChip, { backgroundColor: `${tint}26`, borderColor: `${tint}70` }]}>
+      <AppText style={[styles.ageChipLabel, { color: tint }]} numberOfLines={1}>
+        {label.toUpperCase()}
+      </AppText>
+      <AppText style={[styles.ageChipValue, { color: tint }]} numberOfLines={1}>
+        {signed}
+      </AppText>
+    </View>
+  );
+}
+
 function ModelSection({ model }: { model: QuickViewModel }) {
   const { colors } = useThemeMode();
   const { showExplanations } = useDensity();
@@ -1024,13 +1058,17 @@ function ModelSection({ model }: { model: QuickViewModel }) {
       {showExplanations && model.decision_fit_narrative ? (
         <AppText style={styles.decisionFitNarrative}>{model.decision_fit_narrative}</AppText>
       ) : null}
+      {/* Market/Opportunity/Scarcity/Role/Durability — each a position
+          percentile run through the same 0-99 curve and percentileColor
+          tint as the headline OVR ring (see lib/subRatings + SubRatingRow),
+          replacing the old flat StatGrid of raw, unitless composite-score
+          numbers these five used to show. */}
+      <SubRatingRow ratings={playerSubRatings(model)} />
+      <View style={styles.modelSecondaryRow}>
+        <AgeFactorChip label={model.age_score_label} value={model.age_score} />
+      </View>
       <StatGrid
         items={[
-          { label: 'Market', value: model.market_score != null ? Math.round(model.market_score) : null },
-          { label: 'Opportunity', value: model.opportunity_score != null ? Math.round(model.opportunity_score) : null },
-          { label: 'Scarcity', value: model.scarcity_score != null ? Math.round(model.scarcity_score) : null },
-          { label: 'Role', value: model.role_score != null ? Math.round(model.role_score) : null },
-          { label: model.age_score_label, value: model.age_score != null ? Math.round(model.age_score) : null },
           {
             label: 'Confidence',
             value: model.opportunity_confidence != null ? `${Math.round(model.opportunity_confidence)}%` : null,
@@ -1094,6 +1132,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   });
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [newsModalOpen, setNewsModalOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   // Overall + Snapshot module: collapsed by default, tapping the hero's OVR
   // ring reveals the Snapshot detail in place (coridian_, Discord — "if you
   // tap on the overall, it gives you the expanded information") instead of
@@ -1373,7 +1412,18 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   // the news pill in alongside the buttons.
   const heroActions = (
     <>
-      <PlayerTags tags={tags} />
+      <View style={styles.playerShareRow}>
+        <PlayerTags tags={tags} />
+        <TouchableOpacity
+          style={styles.playerShareButton}
+          onPress={() => setShareOpen(true)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Share ${player.name ?? 'this player'}'s card`}
+        >
+          <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
       {rosterRec ? (
         <InsightRow
           icon={rosterRec.isStarter ? 'checkmark-circle-outline' : 'remove-circle-outline'}
@@ -1750,6 +1800,17 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
     </ScrollView>
     </View>
     <NewsImpactModal visible={newsModalOpen} items={newsItems} onClose={() => setNewsModalOpen(false)} />
+    <PlayerSharePreviewModal
+      visible={shareOpen}
+      onClose={() => setShareOpen(false)}
+      playerId={player.player_id}
+      tier={player.tier}
+      name={player.name ?? 'Unknown player'}
+      position={player.position}
+      team={player.team}
+      overallRating={overallRating}
+      subRatings={model ? playerSubRatings(model) : []}
+    />
     </>
   );
 }
@@ -1806,6 +1867,14 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
   },
   compareButtonText: { fontSize: 13, fontWeight: '500', color: colors.accent },
+  // Always-visible row (unlike the conditional tag/news/action rows around
+  // it) so there is a share entry point regardless of watch/news state —
+  // same icon-only "share-outline" treatment TradeHub's share trigger uses.
+  playerShareRow: { flexDirection: 'row', alignItems: 'center' },
+  // marginLeft: 'auto' (not justifyContent on the row) so the button still
+  // pins to the right edge when PlayerTags renders nothing (it returns null
+  // for an empty tag list) instead of collapsing to the row's start.
+  playerShareButton: { alignItems: 'center', justifyContent: 'center', padding: spacing.xs, marginLeft: 'auto' },
   newsImpactBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1895,6 +1964,19 @@ function createStyles(colors: ThemeColors) {
     lineHeight: 18,
     marginBottom: spacing.sm,
   },
+  modelSecondaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
+  ageChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 1,
+  },
+  ageChipLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
+  ageChipValue: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
   trendText: { fontSize: 12, fontWeight: '600' },
   usageTrendBlock: { marginTop: spacing.sm, gap: spacing.xs },
   usageTrendChip: {

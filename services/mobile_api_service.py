@@ -2758,6 +2758,14 @@ def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None
     "why" sentence naming this player's real strongest/weakest composite
     inputs (modules.player_quick_view.decision_fit_narrative), not a new
     computation over the numbers already in this same dict.
+
+    market_rating/opportunity_rating/scarcity_rating/role_rating/
+    durability_rating are the Model tab's sub-rating chip row — the same
+    four composite-score inputs above (plus a durability read), re-expressed
+    on the 0-99 OVR-ring scale instead of their raw composite units, via
+    modules.player_quick_view.sub_ratings. Kept alongside the raw
+    *_score fields rather than replacing them: those stay the source of
+    truth for decision_fit_narrative and any other raw-unit consumer.
     """
 
     age_score_raw = row.get("age_score") if "age_score" in row.index else None
@@ -2779,6 +2787,10 @@ def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None
         "workload_trend": _clean_json_value(row.get("workload_trend")),
         "usage_trend": _project_usage_trend(row),
         "decision_fit_narrative": player_quick_view.decision_fit_narrative(players_df, row),
+        **{
+            key: _clean_json_value(value)
+            for key, value in player_quick_view.sub_ratings(players_df, row).items()
+        },
     }
 
 
