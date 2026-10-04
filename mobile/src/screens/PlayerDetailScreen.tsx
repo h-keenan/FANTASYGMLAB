@@ -12,6 +12,7 @@ import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import AwardsStrip from '../components/AwardsStrip';
@@ -50,6 +51,7 @@ import {
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor, resolvePlayerTier } from '../lib/playerTier';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -1114,12 +1116,33 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
-  const [stats, setStats] = useState<QuickViewStats | null>(null);
-  const [model, setModel] = useState<QuickViewModel | null>(null);
+  // Gates this query until the persisted AsyncStorage cache has finished
+  // hydrating back into the in-memory QueryClient — same guard
+  // Dashboard/Matchup/Teams/MyTeam use, so it never fires before last
+  // session's cached response for this exact player is restored.
+  const isRestoring = useIsRestoring();
+  // Stats tab's main payload — the only one of this screen's many fetches
+  // ported to `useQuery` so far (see queryKeys.ts's doc comment). Keyed by
+  // player id only: getPlayerQuickView takes no other params that affect the
+  // response, so revisiting the same player (even from a different league)
+  // paints instantly from cache while a background refetch updates in place.
+  // Every other per-tab/enrichment fetch below (news, rank, awards, roster
+  // rec, GM targets) stays on its existing plain fetch-on-mount pattern.
+  const quickViewQuery = useQuery({
+    queryKey: queryKeys.playerQuickView(player.player_id),
+    queryFn: () => api.getPlayerQuickView(player.player_id),
+    enabled: !isRestoring,
+  });
+  const stats: QuickViewStats | null = quickViewQuery.data?.stats ?? null;
+  const model: QuickViewModel | null = quickViewQuery.data?.model ?? null;
+  const bio: QuickViewBio | null = quickViewQuery.data?.bio ?? null;
+  // No data at all yet (neither a persisted cache hit nor a prior in-memory
+  // fetch) — the one case that still needs the skeleton below. A failed
+  // background refetch after data already painted never reverts this to
+  // true, same as Dashboard/Matchup/Teams/MyTeam.
+  const loading = isRestoring || quickViewQuery.isPending;
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
-  const [bio, setBio] = useState<QuickViewBio | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
-  const [loading, setLoading] = useState(true);
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
   const [untouchable, setUntouchable] = useState(false);
@@ -1207,29 +1230,6 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       cancelled = true;
     };
   }, [leagueId, player.player_id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    api
-      .getPlayerQuickView(player.player_id)
-      .then((result) => {
-        if (cancelled) return;
-        setStats(result.stats);
-        setBio(result.bio);
-        setModel(result.model);
-      })
-      .catch(() => {
-        // Quick View is a nice-to-have enrichment — the core rank card above
-        // already rendered, so a failed fetch just leaves those sections out.
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [player.player_id]);
 
   useEffect(() => {
     let cancelled = false;

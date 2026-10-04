@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import BrandedSpinner from '../components/BrandedSpinner';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -19,6 +20,7 @@ import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -167,9 +169,37 @@ export default function TeamsScreen({ route, navigation }: Props) {
   // navigated in.
   const [metric, setMetric] = useState<RankingMetric>(route.params.metric ?? 'power');
   const config = METRIC_CONFIG[metric];
-  const [baseRows, setBaseRows] = useState<BaseTeamRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  // Gates every query below until the persisted AsyncStorage cache has
+  // finished hydrating back into the in-memory QueryClient — same guard
+  // Dashboard/Matchup use, so a query here never fires before last session's
+  // cached response is restored.
+  const isRestoring = useIsRestoring();
+
+  const teamProfilesQuery = useQuery({
+    queryKey: queryKeys.teamProfiles(leagueId),
+    queryFn: () => api.getLeagueTeamProfiles(leagueId),
+    enabled: !isRestoring,
+  });
+  const rostersQuery = useQuery({
+    queryKey: queryKeys.leagueRosters(leagueId),
+    queryFn: () => api.getLeagueRosters(leagueId),
+    enabled: !isRestoring,
+  });
+  const myRosterQuery = useQuery({
+    queryKey: queryKeys.myRoster(leagueId),
+    queryFn: () => api.getMyRoster(leagueId),
+    enabled: !isRestoring,
+  });
+  // Same endpoint Dashboard's League Pulse section and MyTeamScreen's Team
+  // Snapshot both fetch — shares one cache entry under
+  // queryKeys.teamRankings(leagueId) instead of each screen hitting it
+  // independently.
+  const teamRankingsQuery = useQuery({
+    queryKey: queryKeys.teamRankings(leagueId),
+    queryFn: () => api.getLeagueTeamRankings(leagueId),
+    enabled: !isRestoring,
+  });
 
   useScreenHeaderTitle(navigation, config.title, leagueName);
 
@@ -185,55 +215,60 @@ export default function TeamsScreen({ route, navigation }: Props) {
     });
   }, [navigation, leagueId, styles]);
 
+  // Matches the previous useFocusEffect's cadence (always re-check on
+  // regaining focus) but through React Query: invalidating marks each query
+  // stale and triggers its background refetch if it's currently mounted —
+  // cached data stays on screen throughout, never cleared first.
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-
-      async function load() {
-        try {
-          const [profilesResult, rostersResult, myRosterResult, rankingsResult] = await Promise.all([
-            api.getLeagueTeamProfiles(leagueId),
-            api.getLeagueRosters(leagueId),
-            api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
-            api
-              .getLeagueTeamRankings(leagueId)
-              .catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
-          ]);
-          if (cancelled) return;
-
-          const myRosterId = myRosterResult.roster ? String(myRosterResult.roster.roster_id ?? '') : '';
-          const rankingsByRoster = new Map(rankingsResult.teams.map((team) => [team.roster_id, team]));
-
-          const rows: BaseTeamRow[] = rostersResult.rosters.map((roster) => {
-            const rosterId = String(roster.roster_id ?? '');
-            const players = Array.isArray(roster.players) ? roster.players : [];
-            const profile = profilesResult.profiles[rosterId];
-            return {
-              rosterId,
-              teamName: profile?.team_name || 'Unclaimed team',
-              avatarId: profile?.avatar_id || '',
-              playerIds: players.map(String),
-              isMine: Boolean(myRosterId) && rosterId === myRosterId,
-              ranking: rankingsByRoster.get(rosterId),
-            };
-          });
-          setBaseRows(rows);
-        } catch (err) {
-          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load teams.'));
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      }
-
-      void load();
-      return () => {
-        cancelled = true;
-      };
-      // Metric-independent: fetched once per league focus. The in-screen
-      // switcher re-derives per-metric rank/sort from `baseRows` below
-      // instead of refetching, so switching metrics stays instant/in-place.
-    }, [leagueId]),
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamProfiles(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leagueRosters(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.myRoster(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamRankings(leagueId) });
+    }, [queryClient, leagueId]),
   );
+
+  // Metric-independent roster data, derived from the four queries above —
+  // the in-screen metric switcher re-derives per-metric rank/sort from this
+  // below instead of refetching, so switching metrics stays instant/in-place.
+  // `myRosterQuery`/`teamRankingsQuery` are best-effort enrichment (the "You"
+  // badge and rank pills, not core to rendering a row at all), so a failure
+  // on either just falls back to an empty/undefined read here rather than
+  // blocking the whole screen — same soft-fail the old Promise.all
+  // `.catch()` fallbacks gave them.
+  const baseRows: BaseTeamRow[] = useMemo(() => {
+    const profiles = teamProfilesQuery.data?.profiles;
+    const rosters = rostersQuery.data?.rosters;
+    if (!profiles || !rosters) return [];
+    const myRosterId = myRosterQuery.data?.roster
+      ? String(myRosterQuery.data.roster.roster_id ?? '')
+      : '';
+    const rankingsByRoster = new Map(
+      (teamRankingsQuery.data?.teams ?? []).map((team) => [team.roster_id, team]),
+    );
+    return rosters.map((roster) => {
+      const rosterId = String(roster.roster_id ?? '');
+      const players = Array.isArray(roster.players) ? roster.players : [];
+      const profile = profiles[rosterId];
+      return {
+        rosterId,
+        teamName: profile?.team_name || 'Unclaimed team',
+        avatarId: profile?.avatar_id || '',
+        playerIds: players.map(String),
+        isMine: Boolean(myRosterId) && rosterId === myRosterId,
+        ranking: rankingsByRoster.get(rosterId),
+      };
+    });
+  }, [teamProfilesQuery.data, rostersQuery.data, myRosterQuery.data, teamRankingsQuery.data]);
+
+  // Only teamProfiles/rosters are core to rendering any row at all — myRoster
+  // ("You" badge) and teamRankings (rank pills) are best-effort enrichment
+  // that can paint in slightly afterward without blocking the initial list.
+  const loading = isRestoring || teamProfilesQuery.isPending || rostersQuery.isPending;
+  const error =
+    (teamProfilesQuery.isError && !teamProfilesQuery.data) || (rostersQuery.isError && !rostersQuery.data)
+      ? toUserErrorMessage(teamProfilesQuery.error ?? rostersQuery.error, 'Failed to load teams.')
+      : null;
 
   // Per-metric rank/detail + sort, derived from the metric-independent fetch
   // above — switching `metric` here never re-hits the network.
