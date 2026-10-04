@@ -1757,6 +1757,7 @@ _NEWS_SOURCE_DISPLAY_NAMES = {
     "cbssports.com": "CBS Sports",
     "sports.yahoo.com": "Yahoo Sports",
     "nbcsports.com": "Pro Football Talk",
+    "profootballrumors.com": "Pro Football Rumors",
 }
 
 

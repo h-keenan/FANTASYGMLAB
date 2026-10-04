@@ -2421,6 +2421,7 @@ _KNOWN_NEWS_HOSTS = {
     "pff.com": "PFF",
     "si.com": "Sports Illustrated",
     "bleacherreport.com": "Bleacher Report",
+    "profootballrumors.com": "Pro Football Rumors",
 }
 
 _KNOWN_NEWS_NAMES = {
@@ -2440,6 +2441,8 @@ _KNOWN_NEWS_NAMES = {
     "profootballtalk": "PFT",
     "pft": "PFT",
     "pff": "PFF",
+    "profootballrumors": "Pro Football Rumors",
+    "pro football rumors": "Pro Football Rumors",
 }
 
 

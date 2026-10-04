@@ -1597,6 +1597,7 @@ def test_friendly_news_source_maps_known_feed_domains(monkeypatch):
     assert _friendly_news_source("https://www.cbssports.com/rss/headlines/nfl/") == "CBS Sports"
     assert _friendly_news_source("https://sports.yahoo.com/nfl/rss/") == "Yahoo Sports"
     assert _friendly_news_source("https://www.nbcsports.com/profootballtalk.rss") == "Pro Football Talk"
+    assert _friendly_news_source("https://www.profootballrumors.com/feed") == "Pro Football Rumors"
     # Unknown source falls back to the bare domain rather than a raw URL.
     assert _friendly_news_source("https://www.example.com/some/feed.xml") == "example.com"
     assert _friendly_news_source("") == ""
