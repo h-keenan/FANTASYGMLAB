@@ -29,6 +29,13 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 
+// Attempts (including the first) before loadOffering gives up and shows the
+// error state, and the delay multiplier between them (attempt 1 waits 1x,
+// attempt 2 waits 2x, …). Kept short — this is a foreground wait on a screen
+// the user is actively looking at, not a background job.
+const INITIAL_LOAD_MAX_ATTEMPTS = 3;
+const INITIAL_LOAD_BACKOFF_MS = 900;
+
 // Canonical source is modules/premium_page.py (PREMIUM_INCLUDED_NOW /
 // MOBILE_PREMIUM_BENEFIT_LINES) — the same benefit list web's Premium page
 // renders — fetched from GET /v1/me at render time. This copy is only the
@@ -45,6 +52,19 @@ const FALLBACK_FEATURES = [
   'GM Targets watchlist up to 50 players (Free is capped at 3)',
   'Portfolio — your record, rank, and top need across every saved league, not just one',
 ];
+
+// The feature list came back as a flat checklist with every line weighted
+// identically — coridian_ flagged the Premium screen as "not convincing."
+// Rather than inventing stats or new brand assets, these two lines are
+// highlighted because they're the most concretely quantified unlocks already
+// present in the copy (50 vs. a 3-player cap; every idea vs. the first 2) —
+// the clearest "before vs. after" contrast available without fabricating
+// social proof. Matched by substring, not index, since FALLBACK_FEATURES and
+// the live server copy (modules/premium_page.py) must stay text-identical
+// but aren't guaranteed to stay in the same order forever.
+function isHighImpactFeature(feature: string): boolean {
+  return feature.includes('GM Targets') || feature.includes('Trade Hub');
+}
 
 // Apple App Store Review Guideline 3.1.2 requires a subscription's length to
 // be clearly displayed. `pack.product.title` is whatever display name is
@@ -112,13 +132,19 @@ export default function PaywallScreen({ navigation }: Props) {
   const [restoring, setRestoring] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const mountedRef = useRef(true);
 
-  // Shared by the initial load and pull-to-refresh so "Pull down to retry"
-  // (below) is an accurate instruction rather than dead copy — previously
-  // this only ever ran once on mount, with no way to recover from a failed
-  // fetch short of leaving and re-entering the screen.
-  const loadOffering = useCallback(async () => {
+  // Shared by the initial load, pull-to-refresh, and the explicit Retry
+  // button below. This screen is purchase-blocking when it fails, so a
+  // transient cold-start network blip (cellular handoff, slow DNS, a brief
+  // RevenueCat backend hiccup) shouldn't permanently strand the user on an
+  // error that only an undiscoverable pull-down gesture — easy to miss on a
+  // screen most people don't expect to need to scroll — could clear.
+  // Instead every call retries a couple of times with a short backoff
+  // before giving up and surfacing the error state (which still offers both
+  // the gesture and a real button).
+  const loadOffering = useCallback(async (attempt = 1): Promise<void> => {
     try {
       const current = await getCurrentOffering();
       if (!mountedRef.current) return;
@@ -136,9 +162,13 @@ export default function PaywallScreen({ navigation }: Props) {
       setSelectedId(preferred?.identifier ?? null);
       setLoadError(null);
     } catch {
-      if (mountedRef.current) {
-        setLoadError('Could not load subscription options. Pull down to retry.');
+      if (!mountedRef.current) return;
+      if (attempt < INITIAL_LOAD_MAX_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * INITIAL_LOAD_BACKOFF_MS));
+        if (!mountedRef.current) return;
+        return loadOffering(attempt + 1);
       }
+      setLoadError('Could not load subscription options.');
     }
   }, []);
 
@@ -173,6 +203,15 @@ export default function PaywallScreen({ navigation }: Props) {
     setRefreshing(true);
     await Promise.allSettled([loadOffering(), loadFeatures()]);
     if (mountedRef.current) setRefreshing(false);
+  }, [loadOffering, loadFeatures]);
+
+  // Same recovery as onRefresh, surfaced as a real button next to the error
+  // text instead of only the pull-down gesture above — a user who just hit a
+  // purchase-blocking error shouldn't have to know RefreshControl exists.
+  const onRetry = useCallback(async () => {
+    setRetrying(true);
+    await Promise.allSettled([loadOffering(), loadFeatures()]);
+    if (mountedRef.current) setRetrying(false);
   }, [loadOffering, loadFeatures]);
 
   const packages = offering?.availablePackages ?? [];
@@ -245,19 +284,52 @@ export default function PaywallScreen({ navigation }: Props) {
       <AppText style={styles.subtitle}>Founder Beta pricing — locked in for as long as you stay subscribed.</AppText>
 
       <SectionHeading title="What's Included" icon="checkmark-done" />
+      <AppText style={styles.featuresIntro}>
+        Free shows you a preview of each of these. Premium removes every cap.
+      </AppText>
       <View style={styles.featuresCard}>
-        {features.map((feature, index) => (
-          <View key={feature} style={[styles.featureRow, index > 0 && styles.featureRowDivider]}>
-            <Ionicons name="checkmark-circle" size={18} color={colors.success} style={styles.featureIcon} />
-            <AppText style={styles.featureText}>{feature}</AppText>
-          </View>
-        ))}
+        {features.map((feature, index) => {
+          const highImpact = isHighImpactFeature(feature);
+          return (
+            <View key={feature} style={[styles.featureRow, index > 0 && styles.featureRowDivider]}>
+              <Ionicons
+                name="checkmark-circle"
+                size={highImpact ? 20 : 18}
+                color={highImpact ? colors.premium : colors.success}
+                style={styles.featureIcon}
+              />
+              <View style={styles.featureTextCol}>
+                <AppText style={[styles.featureText, highImpact && styles.featureTextHighImpact]}>
+                  {feature}
+                </AppText>
+                {highImpact ? (
+                  <View style={styles.featureBadge}>
+                    <AppText style={styles.featureBadgeText}>Biggest unlock</AppText>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          );
+        })}
       </View>
 
       {loading ? (
         <ActivityIndicator style={styles.loadingIndicator} color={colors.accent} />
       ) : loadError ? (
-        <AppText style={styles.error}>{loadError}</AppText>
+        <View style={styles.loadErrorBlock}>
+          <AppText style={styles.error}>{loadError}</AppText>
+          <TouchableOpacity
+            style={[styles.retryButton, retrying && styles.primaryButtonDisabled]}
+            onPress={onRetry}
+            disabled={retrying}
+          >
+            {retrying ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : (
+              <AppText style={styles.retryButtonText}>Retry</AppText>
+            )}
+          </TouchableOpacity>
+        </View>
       ) : packages.length === 0 ? (
         <AppText style={styles.error}>No subscription plans are available right now.</AppText>
       ) : (
@@ -419,10 +491,31 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.md,
     marginBottom: spacing.xl,
   },
+  featuresIntro: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: spacing.sm + 2 },
   featureRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.hairline },
   featureIcon: { marginRight: spacing.sm, marginTop: 1 },
-  featureText: { flex: 1, color: colors.textPrimary, fontSize: 15, lineHeight: 21 },
+  featureTextCol: { flex: 1 },
+  featureText: { color: colors.textPrimary, fontSize: 15, lineHeight: 21 },
+  // Reuses the same premium/premiumMuted tokens the "Best value" plan badge
+  // below already draws from — no new colors, just applying the existing
+  // "this is the standout option" semantic to the two most concretely
+  // quantified benefits (50 vs. a 3-player cap; every idea vs. the first 2).
+  featureTextHighImpact: { fontWeight: '700' },
+  featureBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.premiumMuted,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    marginTop: spacing.xs,
+  },
+  featureBadgeText: { color: colors.premium, fontSize: 10, fontWeight: '700' },
   loadingIndicator: { marginVertical: spacing.xl },
   packages: { gap: spacing.sm, marginBottom: spacing.lg },
   packageRow: { flexDirection: 'row', alignItems: 'center' },
@@ -476,6 +569,16 @@ function createStyles(colors: ThemeColors) {
   },
   disclosureLink: { color: colors.accent, fontWeight: '600' },
   error: { color: colors.danger, marginBottom: spacing.md },
+  loadErrorBlock: { marginBottom: spacing.md },
+  retryButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  retryButtonText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   successIcon: { marginBottom: spacing.md },
   successTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
   successSubtitle: {
