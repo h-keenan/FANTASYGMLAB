@@ -571,10 +571,13 @@ function HeaderLink({ label, onPress }: { label: string; onPress: () => void }) 
  * an injury pill and a red-toned tier badge (IMPACT STARTER) could read as
  * the same thing: PlayerIdentityRow's TierBadge is a bordered, translucent
  * chip in the meta row and the injury pill is a borderless solid chip in
- * the name row (different shape, different row, different hex — EF4444 vs
- * FF4D4D dark / B91C1C vs D92D2D light) so they were already visually
- * distinct; the real gap here was "Questionable" always rendering in the
- * same red family as a genuine Out/IR status instead of the calmer amber
+ * the name row (different shape, different row — and, since the
+ * color-system audit's 2026-10-03 playerTier follow-up re-hued
+ * `impact_starter` off the danger-red lane entirely, now a different hue
+ * too: F06233/AE3013 copper vs FF4D4D/D92D2D red dark/light, see
+ * playerTier.ts) so they were already visually distinct even before that
+ * fix; the real gap here was "Questionable" always rendering in the same
+ * red family as a genuine Out/IR status instead of the calmer amber
  * `watch` tone the semantic color system calls for. MatchupScreen's
  * lineup rows share this exact LineupPlayer shape and have the identical
  * gap — worth the same fix there in a follow-up pass.

@@ -967,7 +967,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: 8,
   },
   debugOverlayText: {
-    color: '#00FF88',
+    color: colors.diagnosticText,
     fontSize: 11,
     fontFamily: 'Courier',
     textAlign: 'center',

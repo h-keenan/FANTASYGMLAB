@@ -88,6 +88,18 @@ const darkColors = {
   badgeBackground: 'rgba(0,212,255,0.14)',
   badgeText: '#5CE4FF',
   violet: '#8B93FF',
+  // Color-system audit (2026-10-03): promoted out of GmOrb.tsx's
+  // debugOverlayText, which hardcoded '#00FF88' with no light-mode
+  // counterpart at all (the exact "rogue hardcoded color" failure mode this
+  // audit exists to catch). Deliberately NOT an alias of `success`
+  // (#22C55E): that token means "positive/healthy/favorable value" per the
+  // semantic-consistency rule in UI_COLOR_SYSTEM_AUDIT.md §4, and this is a
+  // classic-terminal-green diagnostic readout (raw window/inset pixel
+  // measurements behind the opt-in EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY flag)
+  // with no positive/negative judgment attached — reusing `success` here
+  // would blur that meaning the first time someone reads green-on-black and
+  // assumes "this measurement is good." 15.66:1 against solid black.
+  diagnosticText: '#00FF88',
 };
 
 /**
@@ -154,6 +166,18 @@ const lightColors = {
   badgeBackground: 'rgba(0,119,163,0.12)',
   badgeText: '#0077A3',
   violet: '#6B5FCC',
+  // Color-system audit (2026-10-03): see darkColors.diagnosticText for why
+  // this is its own token rather than `success`. Unlike every other pair in
+  // this file, dark and light share one literal value on purpose: this text
+  // only ever renders inside GmOrb's debug overlay, which paints its own
+  // fixed `rgba(0,0,0,0.75)` scrim regardless of theme mode (see
+  // debugOverlay in GmOrb.tsx) — there is no light backdrop for this token
+  // to adapt to, so independently retuning the light value would just be
+  // picking a different number with no contrast basis. Still routed through
+  // `colors.diagnosticText` (not re-hardcoded) so it's keyed per theme like
+  // everything else and automatically correct if that scrim ever becomes
+  // theme-aware.
+  diagnosticText: '#00FF88',
 };
 
 export type ThemeColors = typeof darkColors;
