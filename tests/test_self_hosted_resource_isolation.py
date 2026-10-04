@@ -52,7 +52,7 @@ def test_every_app_proxy_and_state_service_has_memory_and_cpu_limits():
     text = _compose_text()
     # One (name, mem_limit, cpus) triple per service, in file order.
     expected = [
-        ("web", "4g", "2.0"),
+        ("web", "5g", "3.0"),
         ("mobile-api", "7g", "4.0"),
         ("redis", "256m", "0.25"),
         ("stripe-webhook", "512m", "0.5"),
@@ -73,7 +73,7 @@ def test_resource_limits_leave_headroom_on_target_box():
     # throttled and the host/Docker daemon itself always has room to
     # breathe.
     mem_limits_gb = {
-        "web": 4,
+        "web": 5,
         "mobile-api": 7,
         "redis": 0.25,
         "stripe-webhook": 0.5,
@@ -81,7 +81,7 @@ def test_resource_limits_leave_headroom_on_target_box():
         "caddy": 0.25,
     }
     cpu_limits = {
-        "web": 2.0,
+        "web": 3.0,
         "mobile-api": 4.0,
         "redis": 0.25,
         "stripe-webhook": 0.5,

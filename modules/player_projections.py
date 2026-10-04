@@ -71,9 +71,10 @@ for separate follow-up work.
 
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, Optional
 
-from modules import nfl_schedule, sleeper
+from modules import nfl_schedule, redis_cache, sleeper
 
 # Positions with a real opponent-defense-strength-by-position signal (see
 # ``team_defense_points_allowed_by_position``). Kickers are deliberately
@@ -157,7 +158,7 @@ def _stdev(values: List[float]) -> Optional[float]:
 # ---------------------------------------------------------------------------
 
 
-def team_defense_points_allowed_by_position(
+def _team_defense_points_allowed_by_position_uncached(
     season: int,
     *,
     upto_week: Optional[int] = None,
@@ -166,21 +167,10 @@ def team_defense_points_allowed_by_position(
     max_weeks_back: int = DEFENSE_MAX_WEEKS_BACK,
     half_life_weeks: float = DEFENSE_HALF_LIFE_WEEKS,
 ) -> Dict[str, Dict[str, Dict[str, Any]]]:
-    """Real PPR fantasy points allowed by every team, broken out per offensive
-    skill position, recency-weighted.
-
-    Returns ``{team_code: {position: {"weighted_points_allowed_per_game",
-    "simple_points_allowed_per_game", "games_sampled", "low_sample", "rank",
-    "tier"}}}``. A team/position pair with zero sampled weeks is omitted
-    entirely (never a fabricated 0). ``rank``/``tier`` (1 = toughest / "tough"
-    | "average" | "weak") are computed only among teams with
-    ``games_sampled >= MIN_GAMES_FOR_DEFENSE_TIER`` for that position — a
-    team with a single sampled week gets a value but no rank/tier.
-
-    ``weekly_stats``/``players`` may be injected (tests, or a caller that
-    already has them in hand) to avoid a second fetch; both default to the
-    real cached sources (``modules.sleeper``).
-    """
+    """Real work behind ``team_defense_points_allowed_by_position`` — see
+    that function's docstring for the contract. Split out so the cached
+    front door below can wrap just the expensive aggregation in
+    ``redis_single_flight_cache`` without duplicating it."""
 
     weekly_stats = weekly_stats if weekly_stats is not None else sleeper.get_season_player_stats(season=season)
     players = players if players is not None else sleeper.get_players()
@@ -289,6 +279,101 @@ def team_defense_points_allowed_by_position(
                 entry["tier"] = "average"
 
     return results
+
+
+# Walks every player's weekly stat rows for the whole season to build the
+# per-team/per-position recency-weighted map above — real work, and (like
+# modules.trade_hub_engine/modules.playoff_simulator/modules.league_rankings)
+# identical output for every caller hitting the same (season, upto_week)
+# within the window below, yet until now it was recomputed from scratch on
+# EVERY call — including services/mobile_api_service.py's hot
+# GET /v1/players/{player_id}/schedule path, which calls this once per
+# request. Same live-time-bucket idiom those three already use for their
+# own Redis caches (see docker-compose.yml's mobile-api comment for the
+# full "why": one GIL per uvicorn worker means one CPU-heavy request here
+# could otherwise stall every other concurrent request on that worker).
+DEFENSE_STRENGTH_TTL_SECONDS = 30 * 60
+
+
+def _defense_strength_cache_bucket() -> int:
+    return int(time.time() // DEFENSE_STRENGTH_TTL_SECONDS)
+
+
+# Redis-backed single-flight + cache (modules.redis_cache.redis_single_flight_cache)
+# — same pattern, and same reason, as modules.trade_hub_engine's/
+# modules.playoff_simulator's/modules.league_rankings's own caches: without
+# a single-flight guard, N concurrent requests that all miss the same
+# (season, upto_week, max_weeks_back, half_life_weeks, bucket) key before
+# the first one finishes would each independently redo the full
+# season-long aggregation instead of sharing one.
+#
+# ``weekly_stats``/``players`` are deliberately NOT part of the cache key
+# (and never touch Redis — only the small aggregated result does): both
+# default to, and in practice always resolve to, modules.sleeper's own
+# already-cached season stats/players snapshot, so every real caller for
+# the same (season, upto_week) within this TTL window is aggregating the
+# same underlying data regardless of which one happened to fetch it (see
+# ``team_defense_points_allowed_by_position``'s docstring). A caller that
+# injects deliberately different data (this module's own tests) still gets
+# a correct, freshly-computed result keyed off the same tuple, because
+# each test run starts with its own empty fakeredis instance (see
+# tests/conftest.py) — there is never a same-process collision between two
+# different injected-data calls sharing a cache key within one test.
+_DEFENSE_STRENGTH_LOCK_TIMEOUT_SECONDS = 15.0
+
+
+def team_defense_points_allowed_by_position(
+    season: int,
+    *,
+    upto_week: Optional[int] = None,
+    weekly_stats: Optional[Dict[str, Dict[str, Any]]] = None,
+    players: Optional[Dict[str, Any]] = None,
+    max_weeks_back: int = DEFENSE_MAX_WEEKS_BACK,
+    half_life_weeks: float = DEFENSE_HALF_LIFE_WEEKS,
+) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """Real PPR fantasy points allowed by every team, broken out per offensive
+    skill position, recency-weighted.
+
+    Returns ``{team_code: {position: {"weighted_points_allowed_per_game",
+    "simple_points_allowed_per_game", "games_sampled", "low_sample", "rank",
+    "tier"}}}``. A team/position pair with zero sampled weeks is omitted
+    entirely (never a fabricated 0). ``rank``/``tier`` (1 = toughest / "tough"
+    | "average" | "weak") are computed only among teams with
+    ``games_sampled >= MIN_GAMES_FOR_DEFENSE_TIER`` for that position — a
+    team with a single sampled week gets a value but no rank/tier.
+
+    ``weekly_stats``/``players`` may be injected (tests, or a caller that
+    already has them in hand) to avoid a second fetch; both default to the
+    real cached sources (``modules.sleeper``).
+
+    Cached front door — see ``DEFENSE_STRENGTH_TTL_SECONDS``'s comment
+    above and ``modules.redis_cache.redis_single_flight_cache`` for the
+    shared caching mechanics (also used by modules.trade_hub_engine,
+    modules.playoff_simulator, and modules.league_rankings). Single-flight
+    + cache, shared across every mobile-api worker via Redis.
+    """
+
+    key = (
+        season,
+        upto_week,
+        max_weeks_back,
+        half_life_weeks,
+        _defense_strength_cache_bucket(),
+    )
+    cache_key = redis_cache.build_cache_key("team_defense_points_allowed_by_position", *key)
+    return redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=DEFENSE_STRENGTH_TTL_SECONDS,
+        compute=lambda: _team_defense_points_allowed_by_position_uncached(
+            season,
+            upto_week=upto_week,
+            weekly_stats=weekly_stats,
+            players=players,
+            max_weeks_back=max_weeks_back,
+            half_life_weeks=half_life_weeks,
+        ),
+        lock_timeout_seconds=_DEFENSE_STRENGTH_LOCK_TIMEOUT_SECONDS,
+    )
 
 
 def _league_average_points_allowed(

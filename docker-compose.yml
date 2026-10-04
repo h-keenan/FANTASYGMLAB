@@ -48,16 +48,36 @@
 # moved there). So memory scales roughly linearly with worker count for
 # that piece, even though Redis now means the trade-hub/league-rankings/
 # playoff-odds caches are NOT duplicated per worker the way they used to
-# be. Total mem_limit across all six is ~12.5GB, leaving ~3.5GB headroom
-# for the host OS/Docker itself; total cpus is ~7.75 of the 12 logical
-# threads, leaving ~4.25 threads of headroom. These are ceilings, not
-# reservations, so normal (non-spiking) operation is unaffected — they
-# only bound the worst case. Sign-off note: this is a real production
-# resource-limit change (new, not tightening something that worked
-# before) — flagging for coridian_ to confirm before this ships to the
-# actual box, even though the values themselves are deliberately
-# conservative (safe headroom, not tight enough to cause normal-load
-# throttling) given the stated 6c/12t spec.
+# be.
+#
+# `web` got a smaller, single-process bump instead of the same `--workers`
+# treatment: Streamlit is a single reactive server process per instance —
+# there's no `--workers N` flag the way uvicorn has, because a Streamlit
+# process keeps every open browser session's widget/script-rerun state
+# (`st.session_state`) in its own process memory, not in a shared store.
+# Splitting `web` across N Streamlit processes was evaluated and rejected
+# for this change (see the `web` service's own comment below for the
+# full reasoning) — it would need sticky, session-affine routing at Caddy
+# PLUS moving `st.session_state` out of process memory, which is a real
+# architecture project, not a resource-limit tweak; left as a follow-up for
+# a human to scope separately. So `web` still only ever uses one core's
+# worth of raw Python/GIL-bound execution at a time per request, same as
+# `mobile-api` did pre-migration — its bump below is sized for the real
+# pandas/numpy work (which *can* use extra threads/memory within that one
+# process, e.g. BLAS-backed vector ops and holding bigger Monte
+# Carlo/player-table arrays) and for give multiple concurrent browser
+# sessions more headroom, not for added parallelism the process can't use.
+#
+# Total mem_limit across all six is now ~13.5GB of this box's 16GB,
+# leaving ~2.5GB headroom for the host OS/Docker itself; total cpus is
+# ~8.75 of the 12 logical threads, leaving ~3.25 threads of headroom.
+# These are ceilings, not reservations, so normal (non-spiking) operation
+# is unaffected — they only bound the worst case. Sign-off note: this is a
+# real production resource-limit change (new, not tightening something
+# that worked before) — flagging for coridian_ to confirm before this
+# ships to the actual box, even though the values themselves are
+# deliberately conservative (safe headroom, not tight enough to cause
+# normal-load throttling) given the stated 6c/12t spec.
 
 services:
   web:
@@ -87,8 +107,46 @@ services:
       DYNASTYGM_SELF_HOSTED: "1"
     env_file:
       - .env
-    mem_limit: 4g
-    cpus: 2.0
+    # Bumped from the old single-process 4g/2.0 (see this file's top-of-file
+    # resource-limit comment for the full box budget) — `web` does the same
+    # class of real pandas/Monte Carlo work `mobile-api` does (playoff odds,
+    # league rankings, trade hub ideas, the player table itself), so it was
+    # under-provisioned relative to `mobile-api`'s post-migration 7g/4.0 even
+    # though it never got the `--workers` treatment.
+    #
+    # Streamlit has no documented way to run multiple server processes
+    # behind one shared port the way uvicorn's `--workers` does for
+    # `mobile-api`: a Streamlit process keeps every open browser tab's
+    # `st.session_state` in its own process memory (there is no shared
+    # session store), and Streamlit's own deployment docs only describe
+    # running one process per app instance. Running 2 Streamlit processes
+    # behind Caddy would need (a) Caddy's cookie-based sticky-session load
+    # balancing so a given browser tab's HTTP AND WebSocket (Streamlit's
+    # live-rerun channel) traffic always lands on the same backend process —
+    # without that, a session landing on "the other" process mid-session
+    # would hit a process that has never seen its session_state and would
+    # silently reset the user's whole app state — and (b) auditing every
+    # existing `st.session_state`/module-level cache usage in this app for
+    # anything that implicitly assumes a single shared process (e.g.
+    # anything cached at import time rather than per-session or in Redis).
+    # That is a real session-state/architecture project, not a resource-
+    # limit tweak, so it was deliberately NOT attempted here — this is the
+    # resource-bump-only fix, with a note for a human to decide whether true
+    # horizontal Streamlit scaling is worth a dedicated follow-up.
+    #
+    # Sized against the box's remaining budget after the other five
+    # services (see top-of-file comment): mem 5g (was 4g) keeps the total
+    # at ~13.5GB of 16GB, ~2.5GB headroom for the host; cpus 3.0 (was 2.0)
+    # keeps total cpus at ~8.75 of 12 logical threads, ~3.25 threads of
+    # headroom. Smaller than mobile-api's jump (4g->7g, 2.0->4.0) on
+    # purpose: mobile-api's bump covers 4 separate worker PROCESSES, each
+    # with its own copy of in-memory state, while `web` is still exactly
+    # one process — the extra room here is for bigger in-process data
+    # (Monte Carlo trial arrays, the warmed player table, concurrent
+    # browser sessions' own state), not for added parallelism the process
+    # can't use.
+    mem_limit: 5g
+    cpus: 3.0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/_stcore/health"]
       interval: 30s
