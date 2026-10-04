@@ -40,6 +40,17 @@ interface AnimatedCardProps extends PressableProps {
  * exactly as before — the highlight overlay shares the card's own top
  * corner radius rather than needing a separate clipped wrapper, so it never
  * fights a caller's padding.
+ *
+ * The highlight is a fixed-height gradient fading to transparent, not a
+ * flat `height: '35%'` rectangle: a percentage-of-card-height band is
+ * invisible on a short card but becomes an obvious hard-edged seam on a
+ * tall one — e.g. MyTeamScreen's Bench `groupCard`, which wraps an entire
+ * 10+ row roster in one AnimatedCard, showed a visibly lighter top ~35% of
+ * the list with a sharp cutoff mid-row-list (coridian_, 2026-10-03/04: "two
+ * tone colors" / "the two-tone problem is still there"). A fixed height
+ * keeps the sheen reading the same on every card regardless of how many
+ * rows it holds, and the gradient fade (rather than flat opacity) means
+ * there's no hard edge left to see even where the band ends.
  */
 export default function AnimatedCard({ style, children, glow, glowColor, onPressIn, onPressOut, ...rest }: AnimatedCardProps) {
   const { colors, isDark } = useThemeMode();
@@ -69,7 +80,9 @@ export default function AnimatedCard({ style, children, glow, glowColor, onPress
       }}
       {...rest}
     >
-      <Animated.View pointerEvents="none" style={[styles.highlight, highlightStyle]} />
+      <Animated.View pointerEvents="none" style={[styles.highlight, highlightStyle]}>
+        <LinearGradient colors={['#FFFFFF', 'rgba(255,255,255,0)']} style={StyleSheet.absoluteFillObject} />
+      </Animated.View>
       {children}
     </AnimatedPressable>
   );
@@ -101,10 +114,15 @@ function createStyles(colors: ThemeColors) {
     top: 0,
     left: 0,
     right: 0,
-    height: '35%',
+    // Fixed height, not a percentage of the card — see the component doc
+    // comment above: a height tied to card size reads fine on a short card
+    // but turns into a hard-edged two-tone seam on a tall one (e.g. a full
+    // Bench list in one groupCard). 56 comfortably covers one row's worth
+    // of sheen on every card size in the app without needing to scale.
+    height: 56,
     borderTopLeftRadius: radii.md,
     borderTopRightRadius: radii.md,
-    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
   },
   // Shadow is applied at render time (default `shadows.orbGlow`, or
   // `glowShadow(glowColor)` when a caller overrides the rim color) rather
