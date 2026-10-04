@@ -12,7 +12,6 @@ from modules import league_history
 from modules import league_history_ui
 from modules import league_recaps
 from modules import league_storylines_ui
-from modules import transaction_grades
 from modules import transaction_grades_ui
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
@@ -423,7 +422,9 @@ def render_league_recaps_page(
         movement=movement if selected_week == completed else None,
         power_ranks=power_ranks,
     )
-    later_by_id = list(normalized)
+    all_grades = league_history_ui.cached_transaction_grades(
+        home_league_id, normalized, player_lookup, current_week or completed
+    )
     for story in recap.get("stories") or ():
         if not isinstance(story, dict):
             continue
@@ -431,24 +432,7 @@ def render_league_recaps_page(
         ids = story.get("source_event_ids") or ()
         if ids:
             event_id = _text(ids[0])
-        match = next(
-            (item for item in later_by_id if _text(item.get("transaction_id")) == event_id),
-            None,
-        )
-        if match is None:
-            continue
-        later = [
-            other
-            for other in later_by_id
-            if _text(other.get("transaction_id")) != event_id
-            and int(other.get("timestamp") or 0) > int(match.get("timestamp") or 0)
-        ]
-        report = transaction_grades.grade_transaction(
-            match,
-            player_lookup=player_lookup,
-            current_week=current_week or completed,
-            later_events=later,
-        )
+        report = all_grades.get(event_id) if event_id else None
         if report:
             story["grade"] = report
     render_html_fragment(recap_masthead_html(recap))
