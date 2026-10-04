@@ -518,3 +518,79 @@ def test_opponent_multiplier_neutral_when_no_signal():
 
     assert multiplier == 1.0
     assert has_signal is False
+
+
+def test_project_player_week_floors_negative_real_trend_but_preserves_it_in_basis(extended_schedule):
+    """Regression for the Chimere Dike bug report: a near-zero-usage
+    player's real weekly PPR rows can genuinely be negative (a catch
+    behind the line of scrimmage, a lost fumble is a real, bounded-floor-
+    stat-exception game, not a data error), so the recency-weighted trend
+    feeding the projection can legitimately compute to a negative number.
+    That negative *trend* is honest and must stay visible in
+    ``basis.recent_weighted_avg_ppr`` — but the *displayed* projection
+    (``point_estimate``/``low``/``high``) must never show a misleadingly
+    precise negative number like "-0.7": every mainstream fantasy platform
+    floors a forward-looking projection at 0, since "less than zero points
+    expected" isn't a meaningfully different forecast from "approximately
+    zero points expected."
+    """
+
+    players = {"wr_a1": {"position": "WR", "team": "AAA"}}
+    # Real shape of the bug report: 2 usable games, both genuinely negative
+    # PPR (a negative-yardage catch each week) out of a 3-game season.
+    weekly_rows = [
+        {"week": 1, "fantasy_points_ppr": -0.3, "games_played": 1},
+        {"week": 3, "fantasy_points_ppr": -0.7, "games_played": 1},
+    ]
+
+    result = pp.project_player_week(
+        "wr_a1", week=6, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+    )
+
+    assert result["status"] == "ok"
+    # The real recency-weighted trend is negative — honestly preserved.
+    assert result["basis"]["recent_weighted_avg_ppr"] < 0.0
+    assert result["basis"]["point_estimate_floored"] is True
+    # But nothing shown to a user is ever negative.
+    assert result["point_estimate"] == 0.0
+    assert result["low"] == 0.0
+    assert result["high"] >= 0.0
+
+
+def test_project_player_week_floored_estimate_repeats_across_weeks_for_sidelined_player(extended_schedule):
+    """A near-identical small (floored-to-zero) estimate repeating across
+    several consecutive future weeks for a player who hasn't played a new
+    game is NOT a recurrence of the PR #868 recency-window-anchoring bug —
+    it's the correctly-fixed behavior working as intended. Per
+    ``_most_recent_played_week``'s "as-of" anchoring, the lookback window
+    stays anchored on his real last game for every future week projected
+    (no new games played => no new information => same baseline trend),
+    so weeks far apart must agree on the underlying (pre-floor) trend.
+    """
+
+    players = {"wr_a1": {"position": "WR", "team": "AAA"}}
+    weekly_rows = [
+        {"week": 1, "fantasy_points_ppr": -0.3, "games_played": 1},
+        {"week": 3, "fantasy_points_ppr": -0.7, "games_played": 1},
+    ]
+
+    results = [
+        pp.project_player_week(
+            "wr_a1", week=week, season=2099, players=players,
+            player_weekly_rows=weekly_rows, defense_strength={},
+        )
+        for week in (4, 6, 8, 10)
+    ]
+
+    for result in results:
+        assert result["status"] == "ok"
+        assert result["point_estimate"] == 0.0
+
+    # Same underlying trend every time — no defense signal injected, so the
+    # (pre-floor) weighted average must be identical across every future
+    # week, exactly like the existing trend-invariance regression test
+    # above for a positive-production player.
+    first = results[0]["basis"]["recent_weighted_avg_ppr"]
+    for result in results[1:]:
+        assert result["basis"]["recent_weighted_avg_ppr"] == pytest.approx(first)

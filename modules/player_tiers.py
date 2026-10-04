@@ -40,6 +40,25 @@ TIER_COLUMN_BY_SCORE_FIELD = {
     "rebuild_score": "rebuild_tier",
 }
 
+# A player rankings.py's own opportunity/usage signal has already judged to
+# have no live current role (``workload_trend == "Blocked"`` — the same
+# column modules.waivers_ui.rank_priority_add_candidates gates Priority
+# Adds on, for the identical reason) must never show as "Starter" tier or
+# above. value_score/dynasty_score are long-horizon (draft capital, age
+# curve, market) and can stay high for a young former-high-pick player long
+# after his real-world role has collapsed — e.g. Chimere Dike (2026 WR,
+# TEN): 7% snap share, 2 targets in 3 games, workload_trend "Blocked", yet
+# high enough dynasty/value-score percentile to clear the "Starter"
+# threshold below purely on legacy draft-capital/market value. Cap any
+# blocked-role player's tier at "Depth" regardless of score percentile —
+# same philosophy as the waiver gate, applied at the tier-tag layer instead
+# of the waiver-ranking layer. A player whose opportunity reopens is
+# already relabeled out of "Blocked" upstream in rankings.py, so this does
+# not punish real opportunity swings, only players rankings.py itself
+# judged to have no current role.
+BLOCKED_ROLE_TIER_CAP = "Depth"
+_TIER_RANK = {label: index for index, label in enumerate(PLAYER_TIERS)}
+
 
 def score_field_tier_column(score_field: str) -> str:
     return TIER_COLUMN_BY_SCORE_FIELD.get(str(score_field or "").strip(), "player_tier")
@@ -70,6 +89,25 @@ def _tier_labels_from_strength(
     return labels
 
 
+def _blocked_role_mask(df: pd.DataFrame) -> pd.Series | None:
+    if "workload_trend" not in df.columns:
+        return None
+    normalized = df["workload_trend"].fillna("").astype(str).str.strip().str.casefold()
+    blocked = normalized.eq("blocked")
+    return blocked if bool(blocked.any()) else None
+
+
+def _cap_blocked_role_tier(tier_labels: pd.Series, blocked: pd.Series | None) -> pd.Series:
+    """Never let a role-blocked (no live current usage) player outrank
+    ``BLOCKED_ROLE_TIER_CAP`` — see that constant's docstring for why."""
+
+    if blocked is None:
+        return tier_labels
+    cap_rank = _TIER_RANK[BLOCKED_ROLE_TIER_CAP]
+    ranks = tier_labels.map(_TIER_RANK).fillna(cap_rank)
+    return tier_labels.mask(blocked & (ranks < cap_rank), BLOCKED_ROLE_TIER_CAP)
+
+
 def assign_player_tiers(
     df: pd.DataFrame,
     primary_score_field: str = "dynasty_score",
@@ -91,6 +129,7 @@ def assign_player_tiers(
     out = df.copy()
     market_strength = _normalized_strength(_safe_series(out, "market_score"))
     scarcity_strength = _normalized_strength(_safe_series(out, "scarcity_score"))
+    blocked_role = _blocked_role_mask(out)
 
     computed_columns: list[str] = []
     for score_field, tier_column in TIER_COLUMN_BY_SCORE_FIELD.items():
@@ -104,7 +143,8 @@ def assign_player_tiers(
             + scarcity_strength * float(weights.get("scarcity", 0.08))
         ).clip(lower=0.0, upper=1.0)
         blended_strength = blended_strength.where(primary_scores.gt(0), 0.0)
-        out[tier_column] = _tier_labels_from_strength(blended_strength, thresholds)
+        tier_labels = _tier_labels_from_strength(blended_strength, thresholds)
+        out[tier_column] = _cap_blocked_role_tier(tier_labels, blocked_role)
         computed_columns.append(tier_column)
 
     preferred_column = score_field_tier_column(primary_score_field)

@@ -63,6 +63,26 @@ Known, deliberate simplifications (first pass — do not over-engineer):
   signal) default for every kicker matchup. A kicker's confidence is
   therefore capped at "medium" — never "high" — since ``_confidence_label``
   requires a defense signal for "high".
+- A near-zero-usage player's own recent weekly PPR rows can genuinely be
+  negative (a catch behind the line of scrimmage, a lost fumble), so
+  ``_player_recent_trend``'s weighted average — and therefore the raw,
+  pre-floor point estimate — can legitimately come out negative. That is
+  not a bug; it is an honest read of a real bad stretch. ``project_player_week``
+  still floors the *displayed* ``point_estimate``/``low``/``high`` at 0.0
+  (matching the convention most fantasy platforms use: "less than zero
+  points expected" is not a usefully different, or honestly communicable,
+  forecast from "approximately zero points expected"), while leaving the
+  real unfloored trend visible in ``basis.recent_weighted_avg_ppr`` and
+  flagging the floor via ``basis.point_estimate_floored``. A near-identical
+  small estimate repeating across several consecutive future weeks for a
+  player who hasn't played a new game is *also* not a bug by itself: per
+  ``_most_recent_played_week``'s "as-of" anchoring (the fix in PR #868),
+  the recency window correctly stays anchored on his real last game for
+  every future week projected, so the baseline trend is genuinely stable
+  until he plays again — only the bounded opponent-defense multiplier
+  (``_OPPONENT_MULTIPLIER_BOUNDS``) can move the number week to week, which
+  is why it was observed to vary only slightly (e.g. -0.7/-0.7/-0.6/-0.6/
+  -0.7) rather than being perfectly identical or wildly different.
 
 Nothing in this module is wired into any screen, endpoint, or the existing
 ``value_score``/ranking/lineup-optimization paths — that is deliberately left
@@ -640,7 +660,27 @@ def project_player_week(
     )
     multiplier, defense_has_signal = _opponent_multiplier(defense_strength, str(opponent), position)
 
-    point_estimate = trend["weighted_avg_ppr"] * multiplier
+    # A player's real recent-week PPR rows can be genuinely negative — a
+    # catch behind the line of scrimmage, a lost fumble — so
+    # ``trend["weighted_avg_ppr"]`` (and therefore the raw multiplied
+    # estimate below) is not itself a bug when it lands below zero; it is
+    # an honest reflection of a real bad recent stretch. See Chimere Dike
+    # (2026 WR, TEN): weeks 1 and 3 both carry a real negative
+    # ``fantasy_points_ppr`` row (a negative-yardage catch each time), so
+    # his recency-weighted average is genuinely negative on the real data.
+    #
+    # But a *forward-looking projection* is a different claim than a
+    # historical fact, and every mainstream fantasy platform floors a
+    # projection at 0 — "we expect less than zero points" isn't a
+    # meaningfully different (or honestly communicable) forecast from "we
+    # expect approximately zero points," and a precise-looking negative
+    # decimal (e.g. "-0.7") reads as false confidence about an outcome that
+    # is actually just "basically no usage expected." Floor the *displayed*
+    # estimate/range here, at the output layer — never mutate ``trend``
+    # itself (preserved below in ``basis.recent_weighted_avg_ppr`` so the
+    # real underlying negative data stays visible/auditable).
+    raw_point_estimate = trend["weighted_avg_ppr"] * multiplier
+    point_estimate = max(0.0, raw_point_estimate)
     half_width = _band_half_width(trend, defense_has_signal=defense_has_signal)
     low = max(0.0, point_estimate - half_width)
     high = max(low, point_estimate + half_width)
@@ -668,5 +708,11 @@ def project_player_week(
             "opponent_defense_has_signal": defense_has_signal,
             "opponent_defense_games_sampled": (defense_entry or {}).get("games_sampled", 0),
             "opponent_defense_tier": (defense_entry or {}).get("tier"),
+            # True when the real recency-weighted trend × opponent
+            # multiplier was negative and got floored to 0 for display —
+            # lets a caller distinguish "genuinely projected ~0" from
+            # "recent production was actually negative" without re-deriving
+            # it from recent_weighted_avg_ppr itself.
+            "point_estimate_floored": raw_point_estimate < 0.0,
         },
     }
