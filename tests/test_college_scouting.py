@@ -22,6 +22,99 @@ def test_placeholder_prospects_are_internally_consistent():
         assert isinstance(prospect["draft_year"], int)
 
 
+def test_placeholder_prospects_contain_no_non_fantasy_positions():
+    """This app has no IDP support and offensive tackles have zero fantasy
+    scoring value, so the seed catalog itself must never contain them —
+    not just have them filtered out downstream."""
+
+    positions = {prospect["position"] for prospect in cs.PLACEHOLDER_PROSPECTS}
+    assert positions <= cs.SCOUTING_RELEVANT_POSITIONS
+    assert positions == {"QB", "RB", "WR", "TE"}
+    for non_fantasy in ("OT", "EDGE", "CB", "S", "LB", "DL", "DT"):
+        assert non_fantasy not in positions
+
+
+def test_filter_scouting_relevant_prospects_drops_defensive_and_ot_rows():
+    """The central filter must reject every non-QB/RB/WR/TE position,
+    regardless of casing, and keep well-formed fantasy-relevant rows."""
+
+    rows = [
+        {"id": "p1", "name": "Keeper", "position": "QB", "school": "X", "draft_year": 2026},
+        {"id": "p2", "name": "lowercase wr", "position": "wr", "school": "Y", "draft_year": 2026},
+        {"id": "p3", "name": "Tackle", "position": "OT", "school": "Z", "draft_year": 2026},
+        {"id": "p4", "name": "Edge Rusher", "position": "EDGE", "school": "Z", "draft_year": 2026},
+        {"id": "p5", "name": "Corner", "position": "CB", "school": "Z", "draft_year": 2026},
+        {"id": "p6", "name": "Safety", "position": "S", "school": "Z", "draft_year": 2026},
+        {"id": "p7", "name": "No Position"},
+    ]
+    filtered = cs._filter_scouting_relevant_prospects(rows)
+    assert {row["id"] for row in filtered} == {"p1", "p2"}
+
+
+def test_fetch_all_prospects_filters_fake_supabase_defensive_row(monkeypatch):
+    """Even if Supabase returns a row with a defensive/OT position (bad or
+    future data), fetch_all_prospects must never surface it."""
+
+    fake_rows = [
+        {"id": "real-qb", "name": "Real QB", "position": "QB", "school": "X", "draft_year": 2026},
+        {"id": "fake-cb", "name": "Fake CB", "position": "CB", "school": "Y", "draft_year": 2026},
+        {"id": "fake-edge", "name": "Fake EDGE", "position": "EDGE", "school": "Y", "draft_year": 2026},
+        {"id": "fake-ot", "name": "Fake OT", "position": "OT", "school": "Y", "draft_year": 2026},
+        {"id": "fake-s", "name": "Fake S", "position": "S", "school": "Y", "draft_year": 2026},
+    ]
+
+    class _FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return fake_rows
+
+    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: True)
+    monkeypatch.setattr(cs.requests, "get", lambda *args, **kwargs: _FakeResponse())
+
+    prospects, used_placeholder = cs.fetch_all_prospects({}, "token")
+    assert used_placeholder is False
+    positions = {p["position"] for p in prospects}
+    assert positions == {"QB"}
+    assert positions <= cs.SCOUTING_RELEVANT_POSITIONS
+
+
+def test_fetch_all_prospects_placeholder_fallback_has_no_non_fantasy_positions(monkeypatch):
+    """The placeholder fallback path (Supabase not configured) must also be
+    filtered, as a backstop even though the seed list itself is now clean."""
+
+    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: False)
+    prospects, used_placeholder = cs.fetch_all_prospects({}, "token")
+    assert used_placeholder is True
+    positions = {p["position"] for p in prospects}
+    assert positions <= cs.SCOUTING_RELEVANT_POSITIONS
+
+
+def test_build_prospect_views_never_returns_non_fantasy_position(monkeypatch):
+    """End-to-end through build_prospect_views: inject a fake defensive row
+    via the same mapping path the mobile scouting endpoint uses, and assert
+    no non-QB/RB/WR/TE position ever reaches the rendered rows."""
+
+    fake_rows = [
+        {"id": "real-wr", "name": "Real WR", "position": "WR", "school": "X", "draft_year": 2026},
+        {"id": "fake-s", "name": "Fake Safety", "position": "S", "school": "Y", "draft_year": 2026},
+    ]
+
+    class _FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return fake_rows
+
+    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: True)
+    monkeypatch.setattr(cs.requests, "get", lambda *args, **kwargs: _FakeResponse())
+
+    prospects, _ = cs.fetch_all_prospects({}, "token")
+    rows = cs.build_prospect_views(prospects, [])
+    assert all(row["position"] in cs.SCOUTING_RELEVANT_POSITIONS for row in rows)
+    assert {row["id"] for row in rows} == {"real-wr"}
+
+
 def test_normalize_grade_rejects_out_of_range_and_bad_input():
     assert cs.normalize_grade(3) == 3
     assert cs.normalize_grade("4") == 4

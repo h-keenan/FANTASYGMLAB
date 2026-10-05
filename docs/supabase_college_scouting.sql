@@ -61,7 +61,11 @@ comment on table public.college_prospects is
 
 -- Seed rows — must mirror modules/college_scouting.py's PLACEHOLDER_PROSPECTS
 -- exactly (same ids). `on conflict do nothing` so re-running this file is
--- always safe.
+-- always safe. Only fantasy-relevant positions (QB/RB/WR/TE) belong here —
+-- this app has no IDP support and offensive tackles have no fantasy scoring
+-- value, so defensive positions/OT are deliberately excluded (see
+-- modules/college_scouting.py's SCOUTING_RELEVANT_POSITIONS, which also
+-- filters any such row out at read time as a backstop).
 insert into public.college_prospects (id, name, position, school, draft_year) values
     ('2026-qb-01', 'Marcus Whitfield', 'QB', 'Ohio State', 2026),
     ('2026-qb-02', 'Deion Castellan', 'QB', 'Oregon', 2026),
@@ -73,12 +77,7 @@ insert into public.college_prospects (id, name, position, school, draft_year) va
     ('2026-wr-03', 'Isaiah Ferro', 'WR', 'Florida State', 2026),
     ('2026-wr-04', 'Nate Kowalczyk', 'WR', 'Penn State', 2026),
     ('2026-te-01', 'Grant Salois', 'TE', 'Notre Dame', 2026),
-    ('2026-te-02', 'Dorian Vasquez', 'TE', 'Tennessee', 2026),
-    ('2026-ot-01', 'Colton Weyrich', 'OT', 'Iowa', 2026),
-    ('2026-edge-01', 'Amari Benoit', 'EDGE', 'Clemson', 2026),
-    ('2026-cb-01', 'Devon Marchetti', 'CB', 'USC', 2026),
-    ('2026-cb-02', 'Elijah Trumbauer', 'CB', 'Miami', 2026),
-    ('2026-s-01', 'Weston Ibekwe', 'S', 'Utah', 2026)
+    ('2026-te-02', 'Dorian Vasquez', 'TE', 'Tennessee', 2026)
 on conflict (id) do nothing;
 
 create table if not exists public.scouting_reports (
