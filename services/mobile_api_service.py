@@ -3303,17 +3303,22 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
     report and watchlist status, in one round trip (powers the mobile
     College Prospects list screen).
 
-    Fails soft: if scouting_reports/prospect_watchlist aren't reachable yet
-    (migration not applied), this still returns the prospect catalog with
-    empty aggregates rather than erroring the whole screen — same posture as
-    every other Supabase-backed mobile feature in this file.
+    Fails soft: if the catalog or scouting_reports/prospect_watchlist aren't
+    reachable yet (migration not applied), this still returns 200 with an
+    empty/partial result rather than erroring the whole screen — same
+    posture as every other Supabase-backed mobile feature in this file.
+    There is no fabricated-data fallback: if the real catalog isn't
+    available, ``prospects`` is simply empty (see
+    modules/college_scouting.py's "NO FABRICATED DATA" docstring section),
+    and the mobile screen's existing empty state ("No prospects yet") covers
+    that honestly rather than inventing players.
     """
 
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
 
-    prospects, used_placeholder = college_scouting.fetch_all_prospects(config, access_token)
+    prospects, prospects_error = college_scouting.fetch_all_prospects(config, access_token)
     reports, reports_error = college_scouting.fetch_all_scouting_reports(config, access_token)
     watchlist_ids: list[str] = []
     if user_id:
@@ -3328,7 +3333,7 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
     return {
         "ok": True,
         "prospects": rows,
-        "used_placeholder_catalog": used_placeholder,
+        "catalog_available": not bool(prospects_error),
         "reason": "scouting_reports_not_available" if reports_error else "",
     }
 

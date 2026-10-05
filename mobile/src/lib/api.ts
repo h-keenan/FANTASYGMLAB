@@ -1348,9 +1348,11 @@ export interface CollegeProspect {
 export interface CollegeProspectsResponse {
   ok: true;
   prospects: CollegeProspect[];
-  // True when the real Supabase catalog wasn't reachable/migrated yet and
-  // this list is modules.college_scouting's placeholder fallback.
-  used_placeholder_catalog: boolean;
+  // False when the real Supabase catalog isn't configured/migrated/
+  // reachable yet. There is no fabricated-data fallback — `prospects` is
+  // simply empty in that case, and the screen's existing "No prospects
+  // yet" empty state covers it.
+  catalog_available: boolean;
   reason: string;
 }
 
