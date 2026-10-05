@@ -3525,10 +3525,11 @@ def test_scouting_prospects_requires_auth(monkeypatch):
     assert client.delete("/v1/scouting/watchlist/2026-qb-01").status_code == 401
 
 
-def test_get_scouting_prospects_falls_back_to_placeholder_catalog_when_table_unreachable(monkeypatch):
-    """No migration applied yet -> college_prospects/scouting_reports 404s,
-    but the screen still gets a usable (placeholder) catalog rather than an
-    empty/broken response."""
+def test_get_scouting_prospects_returns_empty_not_fabricated_when_table_unreachable(monkeypatch):
+    """No migration applied yet -> college_prospects/scouting_reports 404s.
+    The screen must get an honest empty list and catalog_available=False —
+    never a fabricated/placeholder catalog presented as real scouting
+    subjects."""
 
     client = _client(monkeypatch)
 
@@ -3543,14 +3544,8 @@ def test_get_scouting_prospects_falls_back_to_placeholder_catalog_when_table_unr
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
-    assert body["used_placeholder_catalog"] is True
-    assert len(body["prospects"]) == 11  # len(college_scouting.PLACEHOLDER_PROSPECTS)
-    for prospect in body["prospects"]:
-        assert prospect["position"] in {"QB", "RB", "WR", "TE"}
-        assert prospect["aggregate"]["scout_count"] == 0
-        assert prospect["aggregate"]["avg_grade"] is None
-        assert prospect["my_report"] is None
-        assert prospect["on_watchlist"] is False
+    assert body["catalog_available"] is False
+    assert body["prospects"] == []
 
 
 def test_get_scouting_prospects_reflects_shared_aggregate_and_my_report(monkeypatch):
@@ -3578,7 +3573,7 @@ def test_get_scouting_prospects_reflects_shared_aggregate_and_my_report(monkeypa
 
     assert response.status_code == 200
     body = response.json()
-    assert body["used_placeholder_catalog"] is False
+    assert body["catalog_available"] is True
     [prospect] = body["prospects"]
     assert prospect["id"] == "p1"
     assert prospect["aggregate"] == {"avg_grade": 3.0, "scout_count": 2, "avg_round_projection": 2.0}
