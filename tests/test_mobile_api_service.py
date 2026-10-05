@@ -3544,8 +3544,9 @@ def test_get_scouting_prospects_falls_back_to_placeholder_catalog_when_table_unr
     body = response.json()
     assert body["ok"] is True
     assert body["used_placeholder_catalog"] is True
-    assert len(body["prospects"]) == 16  # len(college_scouting.PLACEHOLDER_PROSPECTS)
+    assert len(body["prospects"]) == 11  # len(college_scouting.PLACEHOLDER_PROSPECTS)
     for prospect in body["prospects"]:
+        assert prospect["position"] in {"QB", "RB", "WR", "TE"}
         assert prospect["aggregate"]["scout_count"] == 0
         assert prospect["aggregate"]["avg_grade"] is None
         assert prospect["my_report"] is None

@@ -71,10 +71,26 @@ SCOUTING_REPORTS_TABLE = "scouting_reports"
 WATCHLIST_TABLE = "prospect_watchlist"
 
 # ---------------------------------------------------------------------------
+# This app has no IDP (individual defensive player) scoring support, and
+# offensive tackles have zero fantasy scoring value either — so the
+# scouting list only ever surfaces the fantasy-relevant skill positions.
+# Mirrors the precedent in modules/draft_prospects.py's
+# ``draft_watch_positions`` (``["QB", "RB", "WR", "TE"]``), minus K since a
+# kicker is never a college draft-prospect scouting subject. Defined locally
+# rather than importing modules.rankings.FANTASY_POSITIONS (which also
+# pulls in streamlit/pandas) to keep this module's dependency footprint
+# small — services/mobile_api_service.py imports this module directly.
+# ---------------------------------------------------------------------------
+SCOUTING_RELEVANT_POSITIONS = {"QB", "RB", "WR", "TE"}
+
+# ---------------------------------------------------------------------------
 # Placeholder prospect catalog — see module docstring. Ids are stable slugs
 # (not database-generated uuids) so the same id works whether it's read from
 # this Python constant or from the Supabase college_prospects table seeded
 # from it (docs/supabase_college_scouting.sql mirrors this list verbatim).
+# Only SCOUTING_RELEVANT_POSITIONS entries belong here — see
+# _filter_scouting_relevant_prospects below, which also protects against
+# non-fantasy positions arriving from Supabase.
 # ---------------------------------------------------------------------------
 PLACEHOLDER_PROSPECTS: Tuple[Dict[str, Any], ...] = (
     {"id": "2026-qb-01", "name": "Marcus Whitfield", "position": "QB", "school": "Ohio State", "draft_year": 2026},
@@ -88,13 +104,31 @@ PLACEHOLDER_PROSPECTS: Tuple[Dict[str, Any], ...] = (
     {"id": "2026-wr-04", "name": "Nate Kowalczyk", "position": "WR", "school": "Penn State", "draft_year": 2026},
     {"id": "2026-te-01", "name": "Grant Salois", "position": "TE", "school": "Notre Dame", "draft_year": 2026},
     {"id": "2026-te-02", "name": "Dorian Vasquez", "position": "TE", "school": "Tennessee", "draft_year": 2026},
-    {"id": "2026-ot-01", "name": "Colton Weyrich", "position": "OT", "school": "Iowa", "draft_year": 2026},
-    {"id": "2026-edge-01", "name": "Amari Benoit", "position": "EDGE", "school": "Clemson", "draft_year": 2026},
-    {"id": "2026-cb-01", "name": "Devon Marchetti", "position": "CB", "school": "USC", "draft_year": 2026},
-    {"id": "2026-cb-02", "name": "Elijah Trumbauer", "position": "CB", "school": "Miami", "draft_year": 2026},
-    {"id": "2026-s-01", "name": "Weston Ibekwe", "position": "S", "school": "Utah", "draft_year": 2026},
 )
 PLACEHOLDER_PROSPECTS_BY_ID: Dict[str, Dict[str, Any]] = {p["id"]: p for p in PLACEHOLDER_PROSPECTS}
+
+
+def _filter_scouting_relevant_prospects(
+    rows: Iterable[Mapping[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Drop any prospect whose position isn't fantasy-relevant
+    (SCOUTING_RELEVANT_POSITIONS). Applied centrally so defensive
+    positions/offensive tackles never reach the scouting list regardless of
+    whether the row came from Supabase or the placeholder fallback —
+    protects against future bad data from Supabase too, not just the
+    hardcoded placeholder list.
+    """
+
+    filtered: List[Dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        position = _safe_text(row.get("position")).upper()
+        if position not in SCOUTING_RELEVANT_POSITIONS:
+            continue
+        filtered.append(row)
+    return filtered
+
 
 # ---------------------------------------------------------------------------
 # Grading scale
@@ -336,10 +370,15 @@ def fetch_all_prospects(config: dict, access_token: str, *, timeout: float = 15)
     """The shared prospect catalog. Falls back to PLACEHOLDER_PROSPECTS
     (fail-soft) if the table isn't migrated yet or isn't reachable — returns
     ``(rows, used_placeholder_fallback)``.
+
+    Every path is filtered to SCOUTING_RELEVANT_POSITIONS before returning:
+    this app has no IDP support, so defensive positions/offensive tackles
+    must never reach the scouting list, whether they came from Supabase or
+    the placeholder fallback.
     """
 
     if not auth_supabase.is_configured(config):
-        return list(PLACEHOLDER_PROSPECTS), True
+        return _filter_scouting_relevant_prospects(PLACEHOLDER_PROSPECTS), True
     try:
         response = requests.get(
             auth_supabase.rest_api_url(config, PROSPECTS_TABLE, "select=id,name,position,school,draft_year"),
@@ -347,16 +386,16 @@ def fetch_all_prospects(config: dict, access_token: str, *, timeout: float = 15)
             timeout=timeout,
         )
     except Exception:
-        return list(PLACEHOLDER_PROSPECTS), True
+        return _filter_scouting_relevant_prospects(PLACEHOLDER_PROSPECTS), True
     if response.status_code >= 400:
-        return list(PLACEHOLDER_PROSPECTS), True
+        return _filter_scouting_relevant_prospects(PLACEHOLDER_PROSPECTS), True
     try:
         rows = response.json()
     except Exception:
-        return list(PLACEHOLDER_PROSPECTS), True
+        return _filter_scouting_relevant_prospects(PLACEHOLDER_PROSPECTS), True
     if not isinstance(rows, list) or not rows:
-        return list(PLACEHOLDER_PROSPECTS), True
-    return [row for row in rows if isinstance(row, dict)], False
+        return _filter_scouting_relevant_prospects(PLACEHOLDER_PROSPECTS), True
+    return _filter_scouting_relevant_prospects(rows), False
 
 
 def fetch_all_scouting_reports(
