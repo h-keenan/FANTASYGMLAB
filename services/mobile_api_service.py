@@ -4813,12 +4813,18 @@ def get_league_my_team(
 
 
 # The one sentence every matchup surface (API, mobile headline, tests)
-# points at for what this comparison actually measures. This app has NO
-# weekly points-projection data source — nothing in modules/ produces one —
-# so the matchup view ranks lineups by the same season-long value/
-# opportunity signal the rest of the app already computes, and says so.
-# Do not relabel this as "projected points" without a real weekly
-# projection feed behind it.
+# points at for what this comparison actually measures. ``modules.
+# player_projections`` does now provide a real weekly points-projection
+# data source (wired into the REAL current-week lineup below — see
+# `_project_real_starter_row`/`_weekly_projection_for_player` — and into
+# GET /v1/players/{id}/schedule), but this SUGGESTED lineup is deliberately
+# left out of that: it is this app's best-roster recommendation in
+# season-long value/opportunity terms (the same signal the rest of the app
+# already computes), not a single week's matchup-dependent point estimate
+# — mixing a short-term projection into "who should I roster as a starter"
+# would make the recommendation swing on one week's matchup variance,
+# which isn't what this view answers. Do not relabel this as "projected
+# points" without deciding that tradeoff deliberately first.
 SEASON_VALUE_BASIS = "season_value"
 SEASON_VALUE_BASIS_LABEL = "Season-long value & opportunity signal — not a weekly points projection."
 
@@ -4841,8 +4847,12 @@ def _matchup_starter_why(player: dict[str, Any], best_score_by_position: dict[st
     Every clause comes from data that genuinely exists on the lineup row
     (tier, opportunity/workload label, season-value rank on this roster,
     injury tag). Deliberately says nothing about this week's opponent or
-    expected points — no opponent-defense or weekly-projection data source
-    exists in this codebase.
+    expected points: a real weekly-projection/opponent-defense data source
+    does now exist (``modules.player_projections``, surfaced on the REAL
+    lineup's rows below), but this SUGGESTED lineup is scoped to season-
+    long value terms only — see ``SEASON_VALUE_BASIS_LABEL``'s comment for
+    why mixing the two here is deliberately out of scope rather than an
+    oversight.
     """
 
     bits: list[str] = []

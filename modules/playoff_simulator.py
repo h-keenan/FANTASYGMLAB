@@ -39,8 +39,17 @@ power_score team's z-differential vs. whether it actually won) whenever
 there are enough completed games to do that safely (see
 ``MIN_GAMES_TO_FIT``); small-sample MLE for a single logistic parameter is
 numerically stable (one Newton-Raphson update per iteration, clamped to
-avoid runaway separation), so no second regularization mechanism is
-needed. Below that threshold (e.g., the first couple of weeks of a
+avoid runaway separation — see ``MAX_FIT_SLOPE``), so no second
+regularization mechanism is needed, INCLUDING when this season's completed
+games so far are perfectly (or near-perfectly) one-sided — e.g., every
+completed game has gone the way the power-score gap implied. An
+unclamped MLE genuinely diverges toward an infinite slope in that case
+(there is no counterexample to pull it back toward a finite estimate), but
+``MAX_FIT_SLOPE`` already exists specifically to stop that divergence at a
+strong-but-finite, explicitly documented effect size instead of letting it
+run away — so a real fit is still used there rather than discarded for the
+context-free default, as long as ``MIN_GAMES_TO_FIT`` games have been
+played. Below that games threshold (e.g., the first couple of weeks of a
 season) there is not enough same-season signal yet to fit anything
 honestly, so a **documented default slope of 1.0** is used instead — the
 "standard logistic" shape where a one-standard-deviation power_score edge
@@ -149,16 +158,27 @@ def fit_win_probability_slope(
     power_score) for one real, completed game this season; ``outcomes[i]``
     is 1 if team A won that game, 0 if team B won. Returns
     ``(slope, fitted, n_games)`` — ``fitted`` is False (and ``slope`` is
-    ``default_slope``) whenever there are fewer than ``min_games`` usable
-    results, or the results are one-sided in a way that makes a same-
-    season fit meaningless (every game won by the same side — nothing to
-    distinguish a real effect from zero games of the other outcome).
+    ``default_slope``) only when there are fewer than ``min_games`` usable
+    results; that is the one case where a same-season fit genuinely isn't
+    trustworthy yet.
+
+    A completed-games sample that is perfectly (or near-perfectly)
+    one-sided — every game this season has gone the way the power-score
+    gap implied, so ``outcomes`` is all-1 or all-0 — is deliberately NOT
+    special-cased here anymore: an unclamped MLE would diverge toward an
+    infinite slope in that case, but the Newton-Raphson loop below clamps
+    every step to ``max_slope`` (see ``MAX_FIT_SLOPE``'s module-level
+    comment), so it already saturates at a strong-but-finite, explicitly
+    documented effect size instead of running away. That clamped result is
+    real, bounded signal from this league's own games — strictly more
+    informative than silently discarding it for the context-free
+    ``default_slope`` once ``min_games`` really have been played.
     """
 
     x = np.asarray(z_differentials, dtype=float)
     y = np.asarray(outcomes, dtype=float)
     n_games = int(x.shape[0])
-    if n_games < min_games or y.min(initial=1) == y.max(initial=0):
+    if n_games < min_games:
         return default_slope, False, n_games
 
     slope = default_slope
