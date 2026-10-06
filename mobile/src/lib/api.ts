@@ -804,7 +804,23 @@ export interface GmPlanTradeItem {
   source: string;
 }
 
-export type GmPlanFocusItem = GmPlanRankItem | GmPlanRecordItem | GmPlanTradeItem;
+export interface GmPlanInjuryItem {
+  label: 'Injury Exposure';
+  /** modules.rankings.summarize_team_injuries' injury_impact_flag (falls
+   * back to health_flag) — the same vocabulary the Dashboard's Team
+   * Snapshot health_flag already uses. */
+  health_flag: string;
+  injured_starters: number;
+  /** Active/starting positions with a significant injury and no healthy
+   * bench cover (modules.trade_analyzer_fit.roster_injury_context's
+   * injury_need_positions) — the exact gap the connectivity audit flagged
+   * GM Plan as missing. */
+  injury_need_positions: string[];
+  summary: string;
+  source: string;
+}
+
+export type GmPlanFocusItem = GmPlanRankItem | GmPlanRecordItem | GmPlanTradeItem | GmPlanInjuryItem;
 
 export interface GmPlanFocusArea {
   key: 'standing' | 'trade_opportunities' | 'roster_construction';

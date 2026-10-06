@@ -5408,6 +5408,100 @@ def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch
     assert bench_item["relative_weak_spot"] is True
 
 
+def test_gm_plan_flags_an_uncovered_starter_injury(monkeypatch):
+    """Connectivity-audit fix: GM Plan used to build its roadmap with zero
+    awareness of the team's own injuries, even though get_league_dashboard
+    and get_league_waivers already compute this exact same
+    modules.trade_analyzer_fit.roster_injury_context for this same roster.
+    `_fake_roster_frame` rosters exactly one TE (my7) with no other TE
+    anywhere on the roster, so injuring him leaves that starting slot with
+    no healthy same-position cover — the one scenario
+    injury_need_positions is reserved for."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    injured_frame = _fake_roster_frame()
+    injured_frame["news_updated"] = time.time()
+    injured_frame.loc[injured_frame["player_id"] == "my7", "injury_status"] = "Out"
+    injured_frame.loc[injured_frame["player_id"] == "my7", "status"] = "Injured Reserve"
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=[auth_user_response, profile_response]))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(
+            patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {
+                        "roster_id": 1,
+                        "owner_id": "sleeper-user-1",
+                        "players": my_roster_ids,
+                        "settings": {"wins": 7, "losses": 6, "ties": 0},
+                    },
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            )
+        )
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE))
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_team_stance", return_value="rebuilding")
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service._fetch_gm_stance_with_set_flag",
+                return_value=("retool", True),
+            )
+        )
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ()))
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.league_rankings.build_league_rankings_frame_cached",
+                return_value=pd.DataFrame(),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached",
+                return_value=[],
+            )
+        )
+        stack.enter_context(patch("modules.rankings.load_players", return_value=injured_frame))
+        stack.enter_context(
+            patch(
+                "modules.player_eligibility.filter_current_fantasy_players",
+                side_effect=lambda df, **kwargs: df,
+            )
+        )
+
+        response = client.get(
+            "/v1/leagues/abc/gm-plan",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+
+    roster_area = next(fa for fa in body["focus_areas"] if fa["key"] == "roster_construction")
+    injury_item = next(
+        (item for item in roster_area["items"] if item.get("label") == "Injury Exposure"), None
+    )
+    assert injury_item is not None, "an uncovered starter injury should surface as a GM Plan fact"
+    assert injury_item["injury_need_positions"] == ["TE"]
+    assert injury_item["injured_starters"] >= 1
+    assert injury_item["health_flag"]
+    assert injury_item["source"] == "modules.trade_analyzer_fit.roster_injury_context"
+
+
 def test_trade_hub_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/trade-hub")

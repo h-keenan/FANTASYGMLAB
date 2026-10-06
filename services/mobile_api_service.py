@@ -4485,6 +4485,26 @@ def get_gm_plan(
 
     declared_team_stance = _fetch_team_stance(config, user_id, access_token, league_id)
 
+    # Connectivity-audit fix: GM Plan was the only roster-facing screen that
+    # built its roadmap with zero awareness of the team's own injuries, even
+    # though get_league_dashboard and get_league_waivers already compute this
+    # exact same roster_injury_context for this same user's roster — same
+    # settings/valued/roster_df/lineup_df pattern as get_league_dashboard
+    # above (and get_league_waivers below), inlined here rather than shared
+    # since neither of those two already factors it into a helper.
+    injury_context: dict[str, Any] = {}
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if not valued.empty:
+        score_field = league_value_settings.valuation_score_field(lens)
+        roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+        roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+        if not roster_df.empty:
+            lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+            injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+
     rankings_row: dict[str, Any] | None = None
     total_teams: int | None = None
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
@@ -4534,6 +4554,7 @@ def get_gm_plan(
         total_teams=total_teams,
         record=record,
         trade_ideas=trade_idea_records,
+        injury_context=injury_context,
     )
 
     return {"ok": True, "quiet": False, "reason": "", **plan}
