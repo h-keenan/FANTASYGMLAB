@@ -5408,6 +5408,180 @@ def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch
     assert bench_item["relative_weak_spot"] is True
 
 
+def test_gm_plan_surfaces_playoff_odds_for_the_callers_own_roster(monkeypatch):
+    # Connectivity-audit fix: "Where You Stand" now also checks the
+    # already-cached rest-of-season playoff odds simulation
+    # (modules.playoff_simulator.build_league_playoff_odds_cached) for the
+    # caller's own roster, not just Power Rank / Draft Capital Rank /
+    # record.
+    league = dict(_TRADE_ANALYZER_LEAGUE)
+    league["settings"] = {"type": 2, "leg": 10, "playoff_week_start": 15}
+
+    rankings_frame = pd.DataFrame(
+        [
+            {
+                "roster_id": "1",
+                "power_rank": 2,
+                "power_rank_tied": False,
+                "draft_capital_rank": 4,
+                "draft_capital_rank_tied": True,
+                "starter_rank": 1,
+                "starter_rank_tied": False,
+                "bench_rank": 11,
+                "bench_rank_tied": False,
+                "age_rank": 5,
+                "age_rank_tied": False,
+            },
+        ]
+    )
+    playoff_odds_result = {
+        "ok": True,
+        "reason": "",
+        "teams": [
+            {
+                "roster_id": "1",
+                "playoff_probability": 67.3,
+                "median_seed": 4,
+                "clinched": False,
+                "eliminated": False,
+            },
+            {
+                "roster_id": "2",
+                "playoff_probability": 12.0,
+                "median_seed": 10,
+                "clinched": False,
+                "eliminated": True,
+            },
+        ],
+    }
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=[auth_user_response, profile_response]))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(
+            patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["my1"]}],
+            )
+        )
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=league))
+        stack.enter_context(patch("services.mobile_api_service._fetch_team_stance", return_value="balanced"))
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_gm_stance_with_set_flag", return_value=("retool", True))
+        )
+        stack.enter_context(patch("services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ())))
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.league_rankings.build_league_rankings_frame_cached",
+                return_value=rankings_frame,
+            )
+        )
+        stack.enter_context(
+            patch("services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached", return_value=[])
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.playoff_simulator.build_league_playoff_odds_cached",
+                return_value=playoff_odds_result,
+            )
+        )
+
+        response = client.get(
+            "/v1/leagues/abc/gm-plan",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    standing = next(fa for fa in body["focus_areas"] if fa["key"] == "standing")
+    odds_item = next(item for item in standing["items"] if item["label"] == "Playoff Odds")
+    assert odds_item["playoff_probability"] == 67.3
+    assert odds_item["median_seed"] == 4
+    assert odds_item["clinched"] is False
+    assert odds_item["eliminated"] is False
+    # The other roster's row in the same simulation result must never leak
+    # into the caller's own GM Plan.
+    assert all(item["label"] != "Playoff Odds" or item["median_seed"] == 4 for item in standing["items"])
+
+
+def test_gm_plan_omits_playoff_odds_when_simulation_not_ready(monkeypatch):
+    # Early season / no playoff format / etc. — the simulation's own
+    # not-ready contract (empty `teams`) must not fabricate a fact.
+    league = dict(_TRADE_ANALYZER_LEAGUE)
+    league["settings"] = {"type": 2, "leg": 1, "playoff_week_start": 15}
+
+    rankings_frame = pd.DataFrame(
+        [
+            {
+                "roster_id": "1",
+                "power_rank": 2,
+                "power_rank_tied": False,
+                "draft_capital_rank": 4,
+                "draft_capital_rank_tied": True,
+                "starter_rank": 1,
+                "starter_rank_tied": False,
+                "bench_rank": 11,
+                "bench_rank_tied": False,
+                "age_rank": 5,
+                "age_rank_tied": False,
+            },
+        ]
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=[auth_user_response, profile_response]))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(
+            patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["my1"]}],
+            )
+        )
+        stack.enter_context(patch("modules.sleeper.get_league", return_value=league))
+        stack.enter_context(patch("services.mobile_api_service._fetch_team_stance", return_value="balanced"))
+        stack.enter_context(
+            patch("services.mobile_api_service._fetch_gm_stance_with_set_flag", return_value=("retool", True))
+        )
+        stack.enter_context(patch("services.mobile_api_service._fetch_gm_target_player_ids", return_value=((), ())))
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.league_rankings.build_league_rankings_frame_cached",
+                return_value=rankings_frame,
+            )
+        )
+        stack.enter_context(
+            patch("services.mobile_api_service.trade_hub_engine.generate_trade_idea_records_cached", return_value=[])
+        )
+        stack.enter_context(
+            patch(
+                "services.mobile_api_service.playoff_simulator.build_league_playoff_odds_cached",
+                return_value={"ok": True, "reason": "offseason", "teams": []},
+            )
+        )
+
+        response = client.get(
+            "/v1/leagues/abc/gm-plan",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    standing = next(fa for fa in body["focus_areas"] if fa["key"] == "standing")
+    assert all(item["label"] != "Playoff Odds" for item in standing["items"])
+
+
 def test_trade_hub_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/trade-hub")

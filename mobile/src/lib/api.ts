@@ -785,6 +785,19 @@ export interface GmPlanRecordItem {
   source: string;
 }
 
+// Same already-cached rest-of-season Monte Carlo simulation the standalone
+// Playoff Odds screen renders (see PlayoffOddsTeam) — looked up for the
+// caller's own roster and surfaced as a "Where You Stand" fact. Omitted
+// entirely (not sent) when that simulation isn't ready yet for this league.
+export interface GmPlanPlayoffOddsItem {
+  label: 'Playoff Odds';
+  playoff_probability: number;
+  median_seed: number | null;
+  clinched: boolean;
+  eliminated: boolean;
+  source: string;
+}
+
 export interface GmPlanTradeItem {
   partner_team_name: string;
   my_player: string;
@@ -804,7 +817,11 @@ export interface GmPlanTradeItem {
   source: string;
 }
 
-export type GmPlanFocusItem = GmPlanRankItem | GmPlanRecordItem | GmPlanTradeItem;
+export type GmPlanFocusItem =
+  | GmPlanRankItem
+  | GmPlanRecordItem
+  | GmPlanPlayoffOddsItem
+  | GmPlanTradeItem;
 
 export interface GmPlanFocusArea {
   key: 'standing' | 'trade_opportunities' | 'roster_construction';

@@ -4485,6 +4485,8 @@ def get_gm_plan(
 
     declared_team_stance = _fetch_team_stance(config, user_id, access_token, league_id)
 
+    my_roster_id = str(my_roster.get("roster_id") or "")
+
     rankings_row: dict[str, Any] | None = None
     total_teams: int | None = None
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
@@ -4492,12 +4494,29 @@ def get_gm_plan(
     )
     if not rankings_frame.empty:
         total_teams = int(len(rankings_frame))
-        my_roster_id = str(my_roster.get("roster_id") or "")
         match = rankings_frame[rankings_frame["roster_id"].astype(str) == my_roster_id]
         if not match.empty:
             rankings_row = {
                 key: _clean_json_value(value) for key, value in match.iloc[0].to_dict().items()
             }
+
+    # Same already-cached rest-of-season Monte Carlo simulation the
+    # standalone Playoff Odds screen (GET /v1/leagues/{id}/playoff-odds)
+    # calls — "Where You Stand" asked Power Rank/Draft Capital Rank/record
+    # but never this, even though it's the already-computed answer to
+    # exactly the question GM Plan is trying to answer. Not-ready states
+    # (offseason, no_playoff_format, no_rankings_data, unavailable) come
+    # back as `reason` with an empty `teams` list — same honest-degradation
+    # contract the dedicated endpoint uses, so there's simply no match
+    # below and modules.gm_plan omits the fact rather than fabricating one.
+    playoff_odds_result = playoff_simulator.build_league_playoff_odds_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    my_playoff_odds: dict[str, Any] | None = None
+    for team in playoff_odds_result.get("teams") or []:
+        if str(team.get("roster_id") or "") == my_roster_id:
+            my_playoff_odds = team
+            break
 
     trade_idea_records: list[dict[str, Any]] = []
     try:
@@ -4533,6 +4552,7 @@ def get_gm_plan(
         rankings_row=rankings_row,
         total_teams=total_teams,
         record=record,
+        playoff_odds=my_playoff_odds,
         trade_ideas=trade_idea_records,
     )
 
