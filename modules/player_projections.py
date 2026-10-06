@@ -112,9 +112,20 @@ Known, deliberate simplifications (first pass — do not over-engineer):
   is why it was observed to vary only slightly (e.g. -0.7/-0.7/-0.6/-0.6/
   -0.7) rather than being perfectly identical or wildly different.
 
-Nothing in this module is wired into any screen, endpoint, or the existing
-``value_score``/ranking/lineup-optimization paths — that is deliberately left
-for separate follow-up work.
+Update (the "separate follow-up work" below happened): ``project_player_week``
+is wired into the weekly-context consumers this was always meant for —
+``services/mobile_api_service.py``'s ``GET /v1/players/{id}/schedule`` (each
+remaining week) and the Matchup screen's REAL current-week lineup rows (see
+``_weekly_projection_for_player``/``_project_real_starter_row`` there), both
+mobile and web (``modules.web_matchup_ui``). It is still deliberately NOT
+wired into ``value_score``/``dynasty_score``/rankings/trade-value/waiver-
+suggestion, nor into the Matchup/My Team screens' SUGGESTED (season-value)
+lineup recommendation or ``modules.team_eval.suggest_optimal_lineup``'s own
+slot-assignment ranking — a single week's matchup-dependent point estimate
+has no business swinging a long-term dynasty asset value or which player
+this app recommends rostering as a starter, which is a season-long-value
+question, not a this-week's-matchup one. That split stays deliberate, not
+an oversight.
 """
 
 from __future__ import annotations

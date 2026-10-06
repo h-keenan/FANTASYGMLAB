@@ -194,15 +194,58 @@ def test_slope_fit_falls_back_to_default_with_too_few_games():
     assert n_games == 3
 
 
-def test_slope_fit_rejects_one_sided_results_as_uninformative():
-    # Every single game won by the favored side -- nothing to distinguish
-    # a real effect size from an artifact of a tiny sample.
+def test_slope_fit_saturates_at_max_slope_for_perfectly_one_sided_results():
+    # Every single game won by the favored side, with enough games played
+    # (>= MIN_GAMES_TO_FIT) to trust a fit. This is a real, if extreme,
+    # signal -- the Newton-Raphson loop's own clamp (MAX_FIT_SLOPE) is
+    # exactly what keeps an unclamped MLE from diverging to infinity here,
+    # so the fit should saturate at that documented ceiling rather than
+    # being discarded for the context-free default.
     slope, fitted, n_games = sim.fit_win_probability_slope(
         z_differentials=[1.0] * 15,
         outcomes=[1] * 15,
     )
-    assert fitted is False
-    assert slope == sim.DEFAULT_SLOPE
+    assert fitted is True
+    assert n_games == 15
+    assert slope == sim.MAX_FIT_SLOPE
+
+
+def test_slope_fit_one_sided_results_with_varied_margins_stays_well_inside_the_clamp():
+    # Realistic one-sided case: the same side won every completed game, but
+    # the power-score gap varied game to game (sometimes a big favorite,
+    # sometimes a closer one) rather than being identical every time. The
+    # MLE here isn't actually divergent -- it should land at a modest,
+    # finite slope well below MAX_FIT_SLOPE, confirming the fit (not just
+    # the clamp) is doing real work rather than every one-sided sample
+    # bottoming out at the ceiling.
+    rng = np.random.default_rng(1)
+    z = rng.normal(scale=1.0, size=14)
+    slope, fitted, n_games = sim.fit_win_probability_slope(
+        z_differentials=z.tolist(),
+        outcomes=[1] * 14,
+    )
+    assert fitted is True
+    assert n_games == 14
+    assert 0.0 < slope < sim.MAX_FIT_SLOPE
+
+
+def test_slope_fit_true_separation_by_power_score_sign_saturates_at_max_slope():
+    # The scenario the product brief actually cares about: every completed
+    # game this season went to whichever team had the higher power_score
+    # (mixed favorites across different pairings, so z_differentials has
+    # both signs) -- real perfect separation by the predictor, which an
+    # unclamped MLE would send to infinity. The fit should still produce
+    # the documented finite ceiling, not fall back to the default.
+    rng = np.random.default_rng(2)
+    z = rng.normal(scale=1.0, size=14)
+    outcomes = (z > 0).astype(float)
+    slope, fitted, n_games = sim.fit_win_probability_slope(
+        z_differentials=z.tolist(),
+        outcomes=outcomes.tolist(),
+    )
+    assert fitted is True
+    assert n_games == 14
+    assert slope == sim.MAX_FIT_SLOPE
 
 
 def test_slope_fit_recovers_a_real_positive_signal():
