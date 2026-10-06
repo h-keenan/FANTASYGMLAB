@@ -25,6 +25,7 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import CircularProgressRing from '../components/CircularProgressRing';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
@@ -40,6 +41,7 @@ import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { valueDirectionLabel } from '../lib/tradeValue';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
@@ -128,6 +130,10 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [assetType, setAssetType] = useState<AssetType>('players');
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // Quick Compare: an instant, client-side players-only value readout that
+  // folds in what used to be the standalone Trade Calculator screen. Picks
+  // never supported Trade Calculator, so they're force-excluded below.
+  const [quickMode, setQuickMode] = useState(false);
   // Read-only here: stance is changed from the header button only.
   const { strategy } = useGmStance(leagueId);
   const { lens } = useValuationLens(leagueId);
@@ -159,6 +165,18 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   useEffect(() => {
     setVerdict(null);
   }, [strategy, lens]);
+
+  // Entering Quick Compare must never leave an ambiguous state: force
+  // players-only (picks never entered Trade Calculator's pool), drop any
+  // picks already staged from Full Analysis, and clear any stale verdict
+  // from a previous full-analysis run.
+  useEffect(() => {
+    if (!quickMode) return;
+    setAssetType('players');
+    setSendPicks([]);
+    setReceivePicks([]);
+    setVerdict(null);
+  }, [quickMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -307,7 +325,17 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     setVerdict(null);
   };
 
+  // Quick Compare's instant readout — receive-side total minus send-side
+  // total, players only (ports Trade Calculator's own delta calc). Never
+  // server-computed: this is what lets Quick Compare stay instant and never
+  // call api.postTradeAnalyzer.
+  const quickCompareDelta = useMemo(
+    () => receiveIds.reduce((sum, p) => sum + playerScore(p), 0) - sendIds.reduce((sum, p) => sum + playerScore(p), 0),
+    [sendIds, receiveIds],
+  );
+
   const analyze = async () => {
+    if (quickMode) return;
     setAnalyzeError(null);
     setAnalyzing(true);
     try {
@@ -358,8 +386,23 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     <View>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenInfoNote
-        text={`The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`}
+        text={
+          quickMode
+            ? `Raw asset value only — ${leagueName}'s "Dynasty" valuations. Doesn't yet weigh roster fit or strategy, unlike the full Trade Analyzer.`
+            : `The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`
+        }
       />
+
+      <View style={styles.modeRow}>
+        <SegmentedTabBar<'full' | 'quick'>
+          options={[
+            { key: 'full', label: 'Full Analysis' },
+            { key: 'quick', label: 'Quick Compare' },
+          ]}
+          active={quickMode ? 'quick' : 'full'}
+          onChange={(key) => setQuickMode(key === 'quick')}
+        />
+      </View>
 
       <View style={styles.sidesRow}>
         <TradeSide
@@ -386,20 +429,22 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         />
       </View>
 
-      <View style={styles.assetTypeRow}>
-        <TouchableOpacity
-          style={[styles.pill, assetType === 'players' && styles.pillActive]}
-          onPress={() => setAssetType('players')}
-        >
-          <AppText style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.pill, assetType === 'picks' && styles.pillActive]}
-          onPress={() => setAssetType('picks')}
-        >
-          <AppText style={[styles.pillText, assetType === 'picks' && styles.pillTextActive]}>Picks</AppText>
-        </TouchableOpacity>
-      </View>
+      {!quickMode ? (
+        <View style={styles.assetTypeRow}>
+          <TouchableOpacity
+            style={[styles.pill, assetType === 'players' && styles.pillActive]}
+            onPress={() => setAssetType('players')}
+          >
+            <AppText style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.pill, assetType === 'picks' && styles.pillActive]}
+            onPress={() => setAssetType('picks')}
+          >
+            <AppText style={[styles.pillText, assetType === 'picks' && styles.pillTextActive]}>Picks</AppText>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {assetType === 'players' ? (
         <View style={styles.teamRow}>
@@ -439,26 +484,41 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
-      <TouchableOpacity
-        style={[styles.analyzeButton, !hasAnyAssets && styles.analyzeButtonDisabled]}
-        onPress={analyze}
-        disabled={analyzing || !hasAnyAssets}
-      >
-        {analyzing ? <ActivityIndicator color="#fff" /> : <AppText style={styles.analyzeButtonText}>Analyze Trade</AppText>}
-      </TouchableOpacity>
+      {quickMode ? (
+        hasAnyAssets ? (
+          <View style={styles.quickCompareSection}>
+            <AppText style={styles.deltaLabel}>{valueDirectionLabel(quickCompareDelta)}</AppText>
+            <TradeValueBar delta={quickCompareDelta} style={styles.verdictValueBar} />
+          </View>
+        ) : null
+      ) : (
+        <>
+          <TouchableOpacity
+            style={[styles.analyzeButton, !hasAnyAssets && styles.analyzeButtonDisabled]}
+            onPress={analyze}
+            disabled={analyzing || !hasAnyAssets}
+          >
+            {analyzing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <AppText style={styles.analyzeButtonText}>Analyze Trade</AppText>
+            )}
+          </TouchableOpacity>
 
-      {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
-      {verdict ? (
-        <VerdictCard
-          verdict={verdict}
-          sendIds={sendIds}
-          receiveIds={receiveIds}
-          leagueId={leagueId}
-          leagueName={leagueName}
-          partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
-          onBuildCounter={applyCounterAction}
-        />
-      ) : null}
+          {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
+          {verdict ? (
+            <VerdictCard
+              verdict={verdict}
+              sendIds={sendIds}
+              receiveIds={receiveIds}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
+              onBuildCounter={applyCounterAction}
+            />
+          ) : null}
+        </>
+      )}
 
       <TextInput
         style={styles.searchInput}
@@ -765,6 +825,7 @@ function createStyles(colors: ThemeColors) {
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
+  modeRow: { marginBottom: spacing.sm },
   sidesRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   // The side panel is a drop target, so it needs a visible edge even when
   // inactive — a `surface` fill alone is only 1.09 against `background`.
@@ -815,6 +876,16 @@ function createStyles(colors: ThemeColors) {
   },
   analyzeButtonDisabled: { opacity: disabledOpacity },
   analyzeButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  // Quick Compare's instant readout — same label + bar shape as the full
+  // verdict's value strip (below), just driven by a client-computed delta.
+  quickCompareSection: { marginBottom: spacing.md },
+  deltaLabel: {
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
   // AnimatedCard already supplies the surface fill/radius/border/shadow —
   // this just adds the tone-colored left rail and the card's own spacing.
   verdictCard: {
