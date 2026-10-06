@@ -342,7 +342,13 @@ export default function RecapScreen({ route, navigation }: Props) {
         recap={recap}
         rosterMap={rosterMap}
       />
-      <RecapTradeDetailModal visible={tradeStory != null} onClose={() => setTradeStory(null)} story={tradeStory} />
+      <RecapTradeDetailModal
+        visible={tradeStory != null}
+        onClose={() => setTradeStory(null)}
+        story={tradeStory}
+        primaryAvatarId={avatarFor(rosterMap, tradeStory?.primary_roster_id)}
+        secondaryAvatarId={avatarFor(rosterMap, tradeStory?.secondary_roster_id)}
+      />
     </View>
   );
 }

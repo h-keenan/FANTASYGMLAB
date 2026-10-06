@@ -26,6 +26,7 @@ import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import CircularProgressRing from '../components/CircularProgressRing';
+import TeamAvatar from '../components/TeamAvatar';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
@@ -33,6 +34,7 @@ import {
   api,
   type DraftPickAsset,
   type RankedPlayer,
+  type TeamProfile,
   type TradeVerdict,
 } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
@@ -101,6 +103,7 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 interface OtherTeam {
   rosterId: string;
   ownerName: string;
+  avatarId: string | null;
   playerIds: Set<string>;
 }
 
@@ -164,12 +167,18 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult] = await Promise.all([
+        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult, teamProfilesResult] = await Promise.all([
           api.getMyRoster(leagueId),
           api.getLeagueRankings(leagueId, { lens, limit: 300 }),
           api.getLeagueUsers(leagueId),
           api.getLeagueRosters(leagueId),
           api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: 'unavailable' })),
+          // Same team-profiles endpoint TeamsScreen/MyTeamScreen use for
+          // `TeamAvatar` — avatar_id already has the server's real
+          // roster-metadata -> user-metadata fallback chain baked in
+          // (modules.sleeper.get_league_roster_profiles), unlike reading a
+          // raw Sleeper user's `avatar` field directly.
+          api.getLeagueTeamProfiles(leagueId).catch(() => ({ ok: true as const, profiles: {} })),
         ]);
         if (cancelled) return;
 
@@ -189,6 +198,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           const id = String(user.user_id ?? '');
           if (id) usersById.set(id, String(user.display_name ?? user.username ?? 'Unknown owner'));
         }
+        const teamProfiles: Record<string, TeamProfile> = teamProfilesResult.profiles ?? {};
         const teams: OtherTeam[] = rostersResult.rosters
           .map((roster) => {
             const rosterId = String(roster.roster_id ?? '');
@@ -197,6 +207,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             return {
               rosterId,
               ownerName: usersById.get(ownerId) ?? 'Unclaimed team',
+              avatarId: teamProfiles[rosterId]?.avatar_id ?? null,
               playerIds: new Set(players.map(String)),
             };
           })
@@ -425,9 +436,10 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           {otherTeams.map((team) => (
             <TouchableOpacity
               key={team.rosterId}
-              style={[styles.pill, selectedTeamId === team.rosterId && styles.pillActive]}
+              style={[styles.teamPill, selectedTeamId === team.rosterId && styles.pillActive]}
               onPress={() => setSelectedTeamId(team.rosterId)}
             >
+              <TeamAvatar avatarId={team.avatarId} size={16} />
               <AppText
                 style={[styles.pillText, selectedTeamId === team.rosterId && styles.pillTextActive]}
                 numberOfLines={1}
@@ -796,6 +808,20 @@ function createStyles(colors: ThemeColors) {
   assetTypeRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
   teamRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
   pill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  // Same pill as above, plus the leading TeamAvatar other-team filter pills
+  // show next to the owner name — "All Teams" keeps the plain `pill` style
+  // since it has no single team/avatar to show.
+  teamPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: radii.pill,

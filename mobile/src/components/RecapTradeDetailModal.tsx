@@ -8,11 +8,18 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import CompactPlayerModule from './CompactPlayerModule';
 import IconCircle from './IconCircle';
+import TeamAvatar from './TeamAvatar';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   story: RecapStory | null;
+  /** Sleeper avatar ids for the trade's two sides, already resolved by the
+   * caller (RecapScreen's own `rosterMap`/`avatarFor`) — this modal takes
+   * plain ids rather than importing that screen's roster-lookup machinery,
+   * to avoid a screen <-> component circular import. */
+  primaryAvatarId?: string;
+  secondaryAvatarId?: string;
 }
 
 /**
@@ -23,7 +30,7 @@ interface Props {
  * `right_assets` modules/league_recaps.py's `_trade_story` now includes
  * (the card itself, and `players`, stay truncated to 2-per-side).
  */
-export default function RecapTradeDetailModal({ visible, onClose, story }: Props) {
+export default function RecapTradeDetailModal({ visible, onClose, story, primaryAvatarId, secondaryAvatarId }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (!story) return null;
@@ -44,11 +51,11 @@ export default function RecapTradeDetailModal({ visible, onClose, story }: Props
           </View>
           {story.summary ? <AppText style={styles.summary}>{story.summary}</AppText> : null}
           <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-            <TeamAssetColumn teamName={story.primary_team} assets={leftAssets} />
+            <TeamAssetColumn teamName={story.primary_team} avatarId={primaryAvatarId} assets={leftAssets} />
             <View style={styles.divider}>
               <Ionicons name="swap-horizontal" size={16} color={colors.textTertiary} />
             </View>
-            <TeamAssetColumn teamName={story.secondary_team} assets={rightAssets} />
+            <TeamAssetColumn teamName={story.secondary_team} avatarId={secondaryAvatarId} assets={rightAssets} />
             {story.editorial_label ? (
               <AppText style={styles.editorial}>{story.editorial_label}</AppText>
             ) : null}
@@ -65,14 +72,25 @@ export default function RecapTradeDetailModal({ visible, onClose, story }: Props
   );
 }
 
-function TeamAssetColumn({ teamName, assets }: { teamName: string; assets: RecapTradeAsset[] }) {
+function TeamAssetColumn({
+  teamName,
+  avatarId,
+  assets,
+}: {
+  teamName: string;
+  avatarId?: string;
+  assets: RecapTradeAsset[];
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.column}>
-      <AppText style={styles.columnTeam} numberOfLines={1}>
-        {teamName || 'Unknown team'}
-      </AppText>
+      <View style={styles.columnHeaderRow}>
+        <TeamAvatar avatarId={avatarId} size={18} />
+        <AppText style={styles.columnTeam} numberOfLines={1}>
+          {teamName || 'Unknown team'}
+        </AppText>
+      </View>
       {assets.length === 0 ? (
         <AppText style={styles.emptyNote}>No assets recorded</AppText>
       ) : (
@@ -143,12 +161,17 @@ function createStyles(colors: ThemeColors) {
   body: { flexGrow: 0 },
   bodyContent: { paddingBottom: spacing.sm },
   column: { marginBottom: spacing.md },
+  columnHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
   columnTeam: {
     fontSize: 12,
     fontWeight: '700',
     color: colors.accent,
     letterSpacing: 0.4,
-    marginBottom: spacing.sm,
     textTransform: 'uppercase',
   },
   divider: { alignItems: 'center', marginVertical: spacing.xs },
