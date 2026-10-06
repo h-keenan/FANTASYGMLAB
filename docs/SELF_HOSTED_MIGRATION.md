@@ -274,11 +274,14 @@ Notes:
 Render auto-deploys on every push to `main` — that behavior does **not**
 exist on this box. Nothing in this repo (no GitHub Actions workflow, no
 webhook, no cron) rebuilds or restarts this stack when `main` changes;
-`.github/workflows/` only runs CI (`ci.yml`), a keep-alive ping
-(`keep-alive.yml`), and auto-merge (`auto-merge.yml`) — none of them touch
-this server. The stack runs whatever was on disk the last time someone ran
-section 3's `docker compose build && docker compose up -d` here, and it
-will keep serving that exact build indefinitely, through any number of
+`.github/workflows/` only runs CI (`ci.yml`) and auto-merge
+(`auto-merge.yml`) — none of them touch this server. (A Render-specific
+`keep-alive.yml` ping used to live here too; it was retired once the app
+fully cut over to this self-hosted box, since the Render free/sleeping-
+tier cold-start problem it worked around doesn't apply to a `restart:
+unless-stopped` Docker stack.) The stack runs whatever was on disk the
+last time someone ran section 3's `docker compose build && docker compose
+up -d` here, and it will keep serving that exact build indefinitely, through any number of
 later merges to `main`, until a human repeats those steps.
 
 Concretely: if this box was stood up once and left alone, it can silently
