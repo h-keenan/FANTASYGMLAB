@@ -6024,6 +6024,82 @@ def test_waivers_attaches_this_weeks_real_opponent_context_only(monkeypatch):
     assert target["overall_rank"] == 1
 
 
+def test_waivers_attaches_opponent_matchup_difficulty_tier_context_only(monkeypatch):
+    """Waivers already showed a free agent's upcoming opponent, but not
+    whether that matchup is actually good or bad — even though
+    modules.player_projections.team_defense_points_allowed_by_position
+    already computes exactly that signal in this same file for the Matchup
+    endpoint (coridian_'s connectivity-audit finding). This asserts the new
+    `opponent_defense_tier` field is wired from that same function, keyed
+    off the opponent's team code AND this free agent's own position, and
+    stays purely additive context — same "never overweighted" contract as
+    `opponent`/`opponent_is_home` — never touching score/position_rank/
+    overall_rank.
+    """
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+    league_with_week = {**_TRADE_ANALYZER_LEAGUE, "settings": {"type": 2, "leg": 3}}
+
+    # target_rb is RB/SF (see _fake_roster_frame); the opponent mock below
+    # makes BUF its Week 3 opponent, so a BUF/RB "tough" tier here must land
+    # on exactly this free agent's row.
+    fake_defense_strength = {"BUF": {"RB": {"tier": "tough", "games_sampled": 5, "rank": 1}}}
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=league_with_week):
+                    with patch("modules.sleeper.default_player_stats_season", return_value=2026):
+                        with patch("modules.sleeper.get_players", return_value={}):
+                            with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                                with patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()):
+                                    with patch(
+                                        "modules.nfl_schedule.team_matchup_for_week",
+                                        return_value={"week": 3, "opponent": "BUF", "is_home": True},
+                                    ):
+                                        with patch(
+                                            "modules.player_projections.team_defense_points_allowed_by_position",
+                                            return_value=fake_defense_strength,
+                                        ):
+                                            with patch("modules.rankings.load_players", return_value=roster_frame):
+                                                with patch(
+                                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                                    side_effect=lambda df, **kwargs: df,
+                                                ):
+                                                    with patch(
+                                                        "modules.player_state_authority.filter_current_fantasy_players",
+                                                        side_effect=lambda df, **kwargs: df,
+                                                    ):
+                                                        response = client.get(
+                                                            "/v1/leagues/abc/waivers",
+                                                            headers={"Authorization": "Bearer good-token"},
+                                                        )
+
+    assert response.status_code == 200
+    body = response.json()
+    target = body["players"][0]
+    assert target["opponent"] == "BUF"
+    assert target["opponent_defense_tier"] == "tough"
+    # Still additive context only — unchanged from the no-tier-data case.
+    assert target["position_rank"] == 1
+    assert target["overall_rank"] == 1
+
+
 def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
     client = _client(monkeypatch)
 
