@@ -489,11 +489,12 @@ def health() -> dict[str, str]:
     Also piggybacks the same stale-while-revalidate players refresh
     require_user triggers for authenticated requests (see
     _maybe_schedule_players_refresh's docstring) — this endpoint needs no
-    auth and is already pinged every 10 minutes by the keep-alive workflow
-    (.github/workflows/keep-alive.yml), so it doubles as a reliable,
-    traffic-independent freshness check: injury_status/score/rank no longer
-    depend on a real user happening to hit an authenticated endpoint after
-    the hourly Sleeper cache goes stale.
+    auth, so any external health check pinging it (e.g. an uptime monitor,
+    see docs/SELF_HOSTED_MIGRATION.md's "Basic uptime monitoring" section)
+    doubles as a reliable, traffic-independent freshness check:
+    injury_status/score/rank no longer depend on a real user happening to
+    hit an authenticated endpoint after the hourly Sleeper cache goes
+    stale.
     """
 
     _maybe_schedule_players_refresh()

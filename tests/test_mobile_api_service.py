@@ -192,10 +192,10 @@ def test_gzip_middleware_compresses_large_responses(monkeypatch):
 
 def test_health_triggers_players_refresh_check_without_auth(monkeypatch):
     # /health needs no Authorization header, unlike every endpoint behind
-    # require_user — it's the only route the keep-alive cron actually pings
-    # (.github/workflows/keep-alive.yml), so it's also the only reliable,
-    # traffic-independent place to catch a stale players cache when no real
-    # user has hit an authenticated endpoint in the last hour.
+    # require_user — so it's the one route an external uptime check (no
+    # auth required) can hit, making it the only reliable, traffic-
+    # independent place to catch a stale players cache when no real user
+    # has hit an authenticated endpoint in the last hour.
     client = _client(monkeypatch)
     from services import mobile_api_service
 
