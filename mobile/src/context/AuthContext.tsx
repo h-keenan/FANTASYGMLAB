@@ -4,11 +4,20 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { api } from '../lib/api';
+import {
+  didAuthenticatedUserChange,
+  readStoredAuthScopeUserId,
+  setCurrentAuthScopeUserId,
+  writeStoredAuthScopeUserId,
+} from '../lib/authScope';
 import { canConvertGuestToAccount, validateGuestConversionInput } from '../lib/guestConversion';
+import { clearAuthenticatedQueryCache } from '../lib/queryClient';
 import { identifyRevenueCatUser, signOutRevenueCatUser } from '../lib/revenuecat';
 import { syncLastLeagueFromServer } from '../lib/lastLeague';
 import { syncPushToken, unregisterCurrentPushToken } from '../lib/pushNotifications';
@@ -49,6 +58,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { syncDensityFromServer } = useDensity();
   const { syncModeFromServer } = useThemeMode();
+  // Requirement 5 (auth session change hardening): the last authenticated
+  // user id this provider has actually acted on, primed from AsyncStorage
+  // below so a cross-restart user swap (not just a same-session one) is
+  // caught too. Compared via `didAuthenticatedUserChange`, which is a
+  // no-op for an ordinary token refresh of the SAME user — only a genuine
+  // user-id change triggers a cache clear.
+  const lastHandledUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -75,8 +91,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    supabase.auth.getSession().then(({ data }) => {
+    // Requirement 5: if the authenticated user differs from whoever the
+    // persisted query cache was last confirmed to belong to, clear it
+    // *before* letting the rest of this effect proceed to sync/fetch that
+    // user's private data. Also keeps queryKeys.ts's per-user key scoping
+    // (authScope.ts) and the cross-restart marker in sync going forward.
+    const handleAuthenticatedUserId = async (nextUserId: string | null) => {
+      if (didAuthenticatedUserChange(lastHandledUserIdRef.current, nextUserId)) {
+        await clearAuthenticatedQueryCache();
+      }
+      lastHandledUserIdRef.current = nextUserId;
+      setCurrentAuthScopeUserId(nextUserId);
+      await writeStoredAuthScopeUserId(AsyncStorage, nextUserId);
+    };
+
+    void (async () => {
+      lastHandledUserIdRef.current = await readStoredAuthScopeUserId(AsyncStorage);
       if (!isMounted) return;
+
+      const { data } = await supabase.auth.getSession();
+      if (!isMounted) return;
+      const nextUserId = data.session?.user?.id ?? null;
+      await handleAuthenticatedUserId(nextUserId);
+      if (!isMounted) return;
+
       setSession(data.session);
       setLoading(false);
       if (data.session) {
@@ -84,16 +122,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void syncPushToken();
         void syncDevicePreferences();
       }
-    });
+    })();
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
       (_event, nextSession) => {
-        setSession(nextSession);
-        if (nextSession) {
-          void identifyRevenueCatUser(nextSession.user.id);
-          void syncPushToken();
-          void syncDevicePreferences();
-        }
+        const nextUserId = nextSession?.user?.id ?? null;
+        void (async () => {
+          if (!isMounted) return;
+          await handleAuthenticatedUserId(nextUserId);
+          if (!isMounted) return;
+
+          setSession(nextSession);
+          if (nextSession) {
+            void identifyRevenueCatUser(nextSession.user.id);
+            void syncPushToken();
+            void syncDevicePreferences();
+          }
+        })();
       },
     );
 
@@ -145,9 +190,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       signOut: async () => {
+        // Push-token unregistering needs the still-active session/access
+        // token to call the backend, so it must run before anything below
+        // invalidates it.
         await unregisterCurrentPushToken();
-        await supabase.auth.signOut();
-        await signOutRevenueCatUser();
+        try {
+          await supabase.auth.signOut();
+          await signOutRevenueCatUser();
+        } finally {
+          // Requirement 1: always clear authenticated/persisted query
+          // state on sign-out, even if supabase/RevenueCat sign-out above
+          // threw — a cache-clear (or anything else here) failure must
+          // never leave the user stuck unable to sign out, and stale
+          // authenticated data must never survive to the next session
+          // regardless of how sign-out got here. clearAuthenticatedQueryCache
+          // itself never throws (see its own doc comment).
+          await clearAuthenticatedQueryCache();
+          lastHandledUserIdRef.current = null;
+          setCurrentAuthScopeUserId(null);
+          await writeStoredAuthScopeUserId(AsyncStorage, null);
+        }
       },
       deleteAccount: async () => {
         // public.delete_user() (docs/supabase_delete_account.sql) is
@@ -158,9 +220,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // trade_outcomes, etc.) — no separate per-table cleanup needed.
         const { error } = await supabase.rpc('delete_user');
         if (error) return { error: error.message };
+        // Same ordering/guarantee as signOut above: push-token unregister
+        // first (needs the still-live session), then best-effort
+        // sign-out/cache-teardown that always completes via `finally`.
         await unregisterCurrentPushToken();
-        await supabase.auth.signOut();
-        await signOutRevenueCatUser();
+        try {
+          await supabase.auth.signOut();
+          await signOutRevenueCatUser();
+        } finally {
+          await clearAuthenticatedQueryCache();
+          lastHandledUserIdRef.current = null;
+          setCurrentAuthScopeUserId(null);
+          await writeStoredAuthScopeUserId(AsyncStorage, null);
+        }
         return { error: null };
       },
     }),

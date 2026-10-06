@@ -60,3 +60,87 @@ export const asyncStoragePersister = createAsyncStoragePersister({
 });
 
 export const PERSIST_MAX_AGE_MS = GC_TIME_MS;
+
+/**
+ * Persisted React Query cache schema version — passed as
+ * `PersistQueryClientProvider`'s `buster` (see App.tsx). The persister
+ * compares this string against the one baked into whatever was last
+ * written to AsyncStorage and, on a mismatch, discards the old persisted
+ * cache entirely (then refetches normally) instead of trying to read
+ * data shaped for an older version of the app.
+ *
+ * INCREMENT THIS (e.g. '2' -> '3') whenever a change would make an
+ * already-persisted cache entry incompatible with what the app currently
+ * expects, for example:
+ *  - a backend API response shape changes in a way an existing screen
+ *    can't safely parse/render (a renamed/removed/retyped field a screen
+ *    reads without an undefined-check)
+ *  - a query's `queryKey` shape changes (e.g. the `['user', userId, ...]`
+ *    scoping added alongside this constant) such that stale,
+ *    differently-shaped entries would otherwise sit in storage forever
+ *    instead of being swept
+ *  - the persisted-client wrapper shape itself changes (rare — a
+ *    TanStack Query major version bump)
+ *
+ * Must stay a plain, constant, intentionally-chosen string — NEVER a
+ * random value or a timestamp. A random/changing-every-run value would
+ * invalidate the cache on every single app launch, defeating the entire
+ * point of persisting it. Bump it only as an explicit, reviewed change
+ * committed together with the incompatible change that requires it.
+ */
+export const PERSISTED_QUERY_CACHE_VERSION = '2';
+
+/**
+ * Minimal shape `clearAuthenticatedQueryCache` needs from a persister —
+ * deliberately narrower than the full `Persister` interface so a test can
+ * supply a trivial in-memory fake instead of a real AsyncStorage-backed one.
+ */
+interface RemovableClientPersister {
+  removeClient: () => void | PromiseLike<void>;
+}
+
+/**
+ * The one centralized place that tears down authenticated/persisted server
+ * state — every "this app no longer speaks for the previously-authenticated
+ * user" transition (sign-out, delete-account, or discovering the
+ * authenticated Supabase user id changed — see AuthContext.tsx) must funnel
+ * through this, rather than each call site hand-rolling its own subset.
+ *
+ * Order matters:
+ *  1. Cancel active queries first so an in-flight fetch for the outgoing
+ *     user can't resolve *after* the clear below and silently repopulate
+ *     the cache with that user's data.
+ *  2. Clear the in-memory `QueryClient` — every query/mutation observer
+ *     reset, nothing left for a screen to read stale data out of.
+ *  3. Remove the persisted copy from AsyncStorage via the persister's own
+ *     `removeClient()` — this touches only the one storage key the
+ *     persister owns (`fgl:react-query-cache`), never anything else this
+ *     app keeps in AsyncStorage (display density, theme, onboarding
+ *     flags, etc.), so normal, non-authenticated app preferences survive
+ *     a sign-out untouched.
+ *
+ * Each step is independently best-effort: a failure in one (e.g.
+ * AsyncStorage briefly unavailable) must never block the next, and this
+ * function itself never throws — a cache-clear failure must never leave
+ * the user unable to sign out.
+ */
+export async function clearAuthenticatedQueryCache(
+  client: QueryClient = queryClient,
+  persister: RemovableClientPersister = asyncStoragePersister,
+): Promise<void> {
+  try {
+    await client.cancelQueries();
+  } catch (err) {
+    console.warn('[queryClient] cancelQueries failed during auth cache clear', err);
+  }
+  try {
+    client.clear();
+  } catch (err) {
+    console.warn('[queryClient] clear() failed during auth cache clear', err);
+  }
+  try {
+    await persister.removeClient();
+  } catch (err) {
+    console.warn('[queryClient] persister.removeClient() failed during auth cache clear', err);
+  }
+}

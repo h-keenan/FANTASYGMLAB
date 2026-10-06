@@ -25,7 +25,12 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
 import { registerNotificationTapHandler } from './src/lib/pushNotifications';
-import { asyncStoragePersister, PERSIST_MAX_AGE_MS, queryClient } from './src/lib/queryClient';
+import {
+  asyncStoragePersister,
+  PERSIST_MAX_AGE_MS,
+  PERSISTED_QUERY_CACHE_VERSION,
+  queryClient,
+} from './src/lib/queryClient';
 
 // Holds the native splash up past its default auto-hide — AppText (every
 // screen's Text) needs these weight files registered with the native font
@@ -68,7 +73,15 @@ export default function App() {
           just in-memory nav between screens. */}
       <PersistQueryClientProvider
         client={queryClient}
-        persistOptions={{ persister: asyncStoragePersister, maxAge: PERSIST_MAX_AGE_MS }}
+        persistOptions={{
+          persister: asyncStoragePersister,
+          maxAge: PERSIST_MAX_AGE_MS,
+          // Cache/schema version — see queryClient.ts's doc comment for
+          // exactly when this must be bumped. Changing it discards any
+          // previously-persisted cache that doesn't carry the same value
+          // instead of trying to read data shaped for an older app version.
+          buster: PERSISTED_QUERY_CACHE_VERSION,
+        }}
       >
         <SafeAreaProvider>
           <ThemeModeProvider>
