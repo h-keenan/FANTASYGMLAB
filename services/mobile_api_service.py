@@ -1667,16 +1667,14 @@ def get_league_rankings(
 
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_rankings", league=league
+    # Shares the (league_id, lens)-scoped cache every other list/detail
+    # endpoint now pulls this exact pipeline from — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "players": []}
-
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
 
     score_field = league_value_settings.valuation_score_field(lens)
     scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
@@ -1727,16 +1725,15 @@ def get_player_rank_in_league(
 
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_rankings", league=league
+    # Same (league_id, lens)-scoped cache /rankings pulls from — Player
+    # Detail hitting this per-player endpoint no longer re-runs the full
+    # pool valuation pass it was only ever going to filter down to one row.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "player": None}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
     scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
     ranked = canonical_player_ranking.attach_canonical_ranks(
@@ -1937,16 +1934,14 @@ def post_trade_analyzer(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_trade_analyzer", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "verdict": None, "reason": "no_player_data"}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, body.lens, settings)
     score_field = league_value_settings.valuation_score_field(body.lens)
 
     my_roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
@@ -2155,16 +2150,15 @@ def get_league_recap(
 
     profiles = sleeper.get_league_roster_profiles(league_id) or {}
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_recap", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    # Recap's lookup only ever needs the Dynasty lens, matching this
+    # endpoint's prior hardcoded "Dynasty" argument.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens="Dynasty", players_db_path=PLAYERS_DB_PATH
     )
     lookup_rows: list[dict[str, Any]] = []
-    if not players_df.empty:
-        settings = league_value_settings.detect_league_value_settings_from_payload(league)
-        valued = league_value_settings.apply_valuation_lens(players_df, "Dynasty", settings)
+    if not valued.empty:
         cols = [c for c in ("player_id", "name", "position", "team", "value_score") if c in valued.columns]
         if cols:
             lookup_rows = valued[cols].to_dict("records")
@@ -4057,16 +4051,16 @@ def get_league_dashboard(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_dashboard", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    # Dashboard is the app's home screen, opened on every session, so this
+    # was previously the single most frequent re-run of the uncached chain.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": "no_player_data"}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
 
     roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
@@ -4784,16 +4778,14 @@ def get_league_my_team(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_my_team", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "starters": [], "bench": [], "reason": "no_player_data"}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
 
     roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
@@ -5240,16 +5232,14 @@ def get_league_matchup(
     if opponent_entry is None:
         return _empty_matchup("bye_week", week=current_week)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_matchup", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return _empty_matchup("no_player_data", week=current_week)
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
 
     opponent_roster_id = str(opponent_entry.get("roster_id") or "")
