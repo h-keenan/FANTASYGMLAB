@@ -972,12 +972,45 @@ def get_league_team_rankings(
     if rankings_frame.empty:
         return {"ok": True, "teams": [], "reason": "no_rankings_data"}
 
-    # Archetype/strategy classification degrades gracefully without a full
-    # league-intelligence frame (health/balance inputs default to neutral —
-    # see modules.team_eval._rank_strength's fallback), so it's safe to run
-    # directly on the cheap rankings_frame rather than needing the heavier
-    # per-roster injury-summary pass web's cached_league_intelligence_frame
-    # does.
+    # Real per-roster injury/balance pass, now accepted as a real compute
+    # cost on the dedicated box (see modules.league_rankings.
+    # build_roster_health_metrics_frame's docstring — this is the same pass
+    # app.py's cached_league_intelligence_frame runs for web). Previously
+    # this endpoint ran refine_team_directions directly on the cheap
+    # rankings_frame, which has no injury_burden/top_heavy_ratio/
+    # impact_tier_starters/elite_tier_count columns at all, so archetype
+    # classification silently used modules.team_eval._rank_strength's
+    # neutral-default fallback — a real correctness gap against web for a
+    # user-facing label (_classify_team_strategy/_assign_team_archetype
+    # both gate on these fields, e.g. injury_burden < 4 for "Juggernaut").
+    # Cached the same way as the rankings frame itself (30s live-time-bucket
+    # Redis single-flight), so this doesn't add per-request latency beyond
+    # the first caller in each window.
+    health_metrics = league_rankings.build_roster_health_metrics_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if not health_metrics.empty:
+        health_cols = [
+            "roster_id",
+            "injury_burden",
+            "injured_starters",
+            "health_flag",
+            "top_heavy_ratio",
+            "impact_tier_starters",
+            "elite_tier_count",
+        ]
+        health_metrics = health_metrics[[c for c in health_cols if c in health_metrics.columns]].copy()
+        health_metrics["roster_id"] = pd.to_numeric(health_metrics["roster_id"], errors="coerce")
+        rankings_frame = rankings_frame.drop(
+            columns=[c for c in health_cols if c != "roster_id" and c in rankings_frame.columns]
+        )
+        rankings_frame["__roster_id_key__"] = pd.to_numeric(rankings_frame["roster_id"], errors="coerce")
+        rankings_frame = rankings_frame.merge(
+            health_metrics.rename(columns={"roster_id": "__roster_id_key__"}),
+            on="__roster_id_key__",
+            how="left",
+        ).drop(columns=["__roster_id_key__"])
+
     rankings_frame = refine_team_directions(rankings_frame)
 
     rosters = sleeper.get_rosters(league_id)

@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import threading
 import time
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pandas as pd
 
-from modules import league_rankings, league_value_settings, player_eligibility, rankings, sleeper
+from modules import league_rankings, league_value_settings, player_eligibility, rankings, sleeper, team_eval
 
 
 def test_safe_pick_value_uses_score_when_present():
@@ -519,3 +521,161 @@ def test_build_league_summary_and_draft_capital_cached_concurrent_misses_single_
     assert call_count == 1, "concurrent misses for the same key must single-flight to one real computation"
     assert len(results) == 8
     assert all(summary.iloc[0]["league_id"] == league_id for summary, _ in results)
+
+
+# --- Mobile/web archetype parity -------------------------------------------
+#
+# Regression for the gap a prior audit found: services/mobile_api_service.py's
+# get_league_team_rankings used to run modules.team_eval.refine_team_directions
+# directly on the cheap build_league_rankings_frame_cached frame, which has no
+# injury_burden/top_heavy_ratio/impact_tier_starters/elite_tier_count columns
+# at all (health/balance inputs silently defaulted to neutral), while app.py's
+# web dashboard ran the same classifier on cached_league_intelligence_frame,
+# which merges real per-roster injury data via the per-roster loop now
+# extracted into build_roster_health_metrics_frame. The same team could get a
+# different auto-computed archetype label on mobile vs. web. Both callers now
+# merge build_roster_health_metrics_frame's output before classifying -- this
+# proves that merge produces identical results regardless of which caller's
+# base frame it's merged onto, and that it actually changes the outcome
+# relative to the old no-health-data behavior (otherwise this would be a
+# vacuous test).
+
+
+def _injury_parity_players() -> pd.DataFrame:
+    rows = [
+        # Roster 1 ("Powerhouse"): a loaded roster whose top two backs are on
+        # IR -- real injury weight (injury_burden >= 4, 2 injured starters)
+        # that modules.team_eval._assign_team_archetype's Juggernaut gate and
+        # refine_team_directions's health_strength input both react to.
+        {"player_id": "h1", "name": "QB1", "position": "QB", "age": 28, "team": "AAA", "dynasty_score": 90, "value_score": 90, "player_tier": "Elite", "status": "", "injury_status": ""},
+        {"player_id": "h2", "name": "RB1", "position": "RB", "age": 24, "team": "AAA", "dynasty_score": 95, "value_score": 95, "player_tier": "Elite", "status": "IR", "injury_status": "Injured Reserve"},
+        {"player_id": "h3", "name": "RB2", "position": "RB", "age": 25, "team": "AAA", "dynasty_score": 93, "value_score": 93, "player_tier": "Elite", "status": "IR", "injury_status": "Injured Reserve"},
+        {"player_id": "h4", "name": "RB3", "position": "RB", "age": 23, "team": "AAA", "dynasty_score": 60, "value_score": 60, "player_tier": "Star", "status": "", "injury_status": ""},
+        {"player_id": "h5", "name": "RB4", "position": "RB", "age": 26, "team": "AAA", "dynasty_score": 55, "value_score": 55, "player_tier": "Starter", "status": "", "injury_status": ""},
+        {"player_id": "h6", "name": "WR1", "position": "WR", "age": 24, "team": "AAA", "dynasty_score": 80, "value_score": 80, "player_tier": "Elite", "status": "", "injury_status": ""},
+        {"player_id": "h7", "name": "WR2", "position": "WR", "age": 25, "team": "AAA", "dynasty_score": 75, "value_score": 75, "player_tier": "Star", "status": "", "injury_status": ""},
+        {"player_id": "h8", "name": "WR3", "position": "WR", "age": 23, "team": "AAA", "dynasty_score": 70, "value_score": 70, "player_tier": "Core Starter", "status": "", "injury_status": ""},
+        {"player_id": "h9", "name": "WR4", "position": "WR", "age": 26, "team": "AAA", "dynasty_score": 50, "value_score": 50, "player_tier": "Depth", "status": "", "injury_status": ""},
+        {"player_id": "h10", "name": "TE1", "position": "TE", "age": 27, "team": "AAA", "dynasty_score": 40, "value_score": 40, "player_tier": "Depth", "status": "", "injury_status": ""},
+    ]
+    # Roster 2 ("Rebuilder"): healthy, much weaker/younger -- a contrasting
+    # roster so power/franchise/starter/bench ranks aren't degenerate ties.
+    positions = ["QB", "RB", "RB", "RB", "RB", "WR", "WR", "WR", "WR", "TE"]
+    for i in range(1, 11):
+        rows.append(
+            {
+                "player_id": f"r{i}",
+                "name": f"Weak{i}",
+                "position": positions[i - 1],
+                "age": 22,
+                "team": "BBB",
+                "dynasty_score": 10,
+                "value_score": 10,
+                "player_tier": "Depth",
+                "status": "",
+                "injury_status": "",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _injury_parity_rosters() -> list[dict]:
+    return [
+        {"roster_id": 1, "owner_id": "u1", "players": [f"h{i}" for i in range(1, 11)], "settings": {"wins": 0, "losses": 0, "ties": 0}},
+        {"roster_id": 2, "owner_id": "u2", "players": [f"r{i}" for i in range(1, 11)], "settings": {"wins": 0, "losses": 0, "ties": 0}},
+    ]
+
+
+def _injury_parity_adapter(rosters: list[dict]) -> SimpleNamespace:
+    return SimpleNamespace(
+        get_rosters=lambda _league: rosters,
+        get_users=lambda _league: [
+            {"user_id": "u1", "display_name": "Powerhouse"},
+            {"user_id": "u2", "display_name": "Rebuilder"},
+        ],
+        get_league=lambda _league: {"season": 2026, "settings": {"draft_rounds": 4, "leg": 0, "playoff_week_start": 15}},
+        get_traded_picks=lambda _league: [],
+    )
+
+
+def _merge_roster_health(frame: pd.DataFrame, health_metrics: pd.DataFrame) -> pd.DataFrame:
+    """Same shape of merge both services/mobile_api_service.py's
+    get_league_team_rankings and app.py's cached_league_intelligence_frame
+    now do: drop any pre-existing (neutral-default) health columns, then
+    left-merge the real per-roster health frame on roster_id."""
+
+    merge_cols = [column for column in health_metrics.columns if column != "roster_id"]
+    merged = frame.drop(columns=[column for column in merge_cols if column in frame.columns], errors="ignore").copy()
+    merged["__roster_id_key__"] = pd.to_numeric(merged["roster_id"], errors="coerce")
+    health = health_metrics.copy()
+    health["__roster_id_key__"] = pd.to_numeric(health["roster_id"], errors="coerce")
+    merged = merged.merge(
+        health.drop(columns=["roster_id"]), on="__roster_id_key__", how="left"
+    ).drop(columns="__roster_id_key__")
+    return merged
+
+
+def test_mobile_and_web_archetypes_match_on_real_injury_inputs_and_differ_from_the_old_neutral_default():
+    players = _injury_parity_players()
+    rosters = _injury_parity_rosters()
+    adapter = _injury_parity_adapter(rosters)
+
+    # Real per-roster health pass (modules.league_rankings.
+    # build_roster_health_metrics_frame) -- the exact function both
+    # services/mobile_api_service.py and app.py now call.
+    with patch("modules.sleeper.get_rosters", return_value=rosters):
+        health_metrics = league_rankings.build_roster_health_metrics_frame(
+            players, "league-parity", score_field="dynasty_score"
+        )
+    assert not health_metrics.empty
+    powerhouse_health = health_metrics.set_index("roster_id").loc[1]
+    # The two IR starters must register as real injury weight, not a
+    # neutral default -- this is exactly what _assign_team_archetype's
+    # Juggernaut gate (injury_burden < 4) and refine_team_directions's
+    # health_strength input read.
+    assert powerhouse_health["injury_burden"] >= 4
+    assert powerhouse_health["injured_starters"] == 2
+    assert powerhouse_health["impact_tier_starters"] >= 3
+
+    # Mobile's base frame: the cheap, health-free rankings frame
+    # build_league_rankings_frame_cached wraps.
+    mobile_base = league_rankings.build_league_rankings_frame(
+        players, "league-parity", score_field="dynasty_score", adapter=adapter
+    )
+
+    # Web's base frame: build_league_summary_and_draft_capital +
+    # build_league_display_frame(include_picks=True) + add_league_detail_ranks
+    # -- the exact chain app.py's cached_league_core_context runs to produce
+    # the frame it feeds into cached_league_intelligence_frame as df_display.
+    with patch("modules.team_eval.get_league_roster_profiles", return_value={}):
+        df_summary, draft_capital_summary = league_rankings.build_league_summary_and_draft_capital(
+            players, "league-parity", score_field="dynasty_score", adapter=adapter
+        )
+    web_base = league_rankings.add_league_detail_ranks(
+        league_rankings.build_league_display_frame(df_summary, draft_capital_summary, include_picks=True)
+    )
+
+    mobile_frame = team_eval.refine_team_directions(_merge_roster_health(mobile_base, health_metrics))
+    web_frame = team_eval.refine_team_directions(_merge_roster_health(web_base, health_metrics))
+
+    mobile_by_roster = mobile_frame.set_index("roster_id")
+    web_by_roster = web_frame.set_index("roster_id")
+    for roster_id in (1, 2):
+        assert mobile_by_roster.loc[roster_id, "strategy"] == web_by_roster.loc[roster_id, "strategy"]
+        assert mobile_by_roster.loc[roster_id, "archetype_label"] == web_by_roster.loc[roster_id, "archetype_label"]
+        assert (
+            mobile_by_roster.loc[roster_id, "archetype_explanation"]
+            == web_by_roster.loc[roster_id, "archetype_explanation"]
+        )
+
+    # And the fix must actually matter: classifying the same roster WITHOUT
+    # the real health merge (the old mobile behavior, running
+    # refine_team_directions straight on the cheap frame) lands on a
+    # different archetype for the injured powerhouse roster -- otherwise
+    # this would just be confirming two paths agree on a label the injury
+    # data never affected.
+    old_mobile_behavior = team_eval.refine_team_directions(mobile_base.copy())
+    assert (
+        old_mobile_behavior.set_index("roster_id").loc[1, "archetype_label"]
+        != mobile_by_roster.loc[1, "archetype_label"]
+    )
