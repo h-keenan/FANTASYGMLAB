@@ -27,7 +27,6 @@ import PlayersScreen from '../screens/PlayersScreen';
 import PlayerDetailScreen from '../screens/PlayerDetailScreen';
 import PlayerCompareScreen from '../screens/PlayerCompareScreen';
 import WaiversScreen from '../screens/WaiversScreen';
-import TradeAnalyzerScreen from '../screens/TradeAnalyzerScreen';
 import RecapScreen from '../screens/RecapScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import GmPlanScreen from '../screens/GmPlanScreen';
@@ -35,8 +34,7 @@ import GmTargetsScreen from '../screens/GmTargetsScreen';
 import TeamStanceScreen from '../screens/TeamStanceScreen';
 import TradeHistoryScreen from '../screens/TradeHistoryScreen';
 import DashboardScreen from '../screens/DashboardScreen';
-import TradeHubScreen from '../screens/TradeHubScreen';
-import TradeFinderScreen from '../screens/TradeFinderScreen';
+import TradesScreen from '../screens/TradesScreen';
 import TeamsScreen from '../screens/TeamsScreen';
 import PlayoffOddsScreen from '../screens/PlayoffOddsScreen';
 import DraftCenterScreen from '../screens/DraftCenterScreen';
@@ -67,11 +65,12 @@ export type RootStackParamList = {
   GmPlan: { leagueId: string; leagueName: string };
   TradeHistory: undefined;
   Waivers: { leagueId: string; leagueName: string };
-  TradeAnalyzer: { leagueId: string; leagueName: string };
   Recap: { leagueId: string; leagueName: string };
   Dashboard: { leagueId: string; leagueName: string };
-  TradeHub: { leagueId: string; leagueName: string };
-  TradeFinder: { leagueId: string; leagueName: string };
+  // Single consolidated host for Trade Hub ("Trade Block"), Trade Finder
+  // ("Search"), and Trade Analyzer ("Make a Trade") — see TradesScreen.
+  // `initialTab` defaults to 'block' when omitted.
+  Trades: { leagueId: string; leagueName: string; initialTab?: 'block' | 'search' | 'make' };
   // `metric` picks which TeamRanking rank field the leaderboard sorts/labels
   // by (defaults to 'power' when omitted, matching every pre-existing
   // caller) — added so My Team's Age tile (TeamAnalysisPanel) can drill
@@ -222,11 +221,9 @@ export default function RootNavigator() {
           <AppStack.Screen name="PlayerDetail" component={PlayerDetailScreen} />
           <AppStack.Screen name="PlayerCompare" component={PlayerCompareScreen} />
           <AppStack.Screen name="Waivers" component={WaiversScreen} />
-          <AppStack.Screen name="TradeAnalyzer" component={TradeAnalyzerScreen} />
           <AppStack.Screen name="Recap" component={RecapScreen} />
           <AppStack.Screen name="Dashboard" component={DashboardScreen} />
-          <AppStack.Screen name="TradeHub" component={TradeHubScreen} />
-          <AppStack.Screen name="TradeFinder" component={TradeFinderScreen} />
+          <AppStack.Screen name="Trades" component={TradesScreen} />
           <AppStack.Screen name="Teams" component={TeamsScreen} />
           <AppStack.Screen name="PlayoffOdds" component={PlayoffOddsScreen} />
           <AppStack.Screen name="DraftCenter" component={DraftCenterScreen} />

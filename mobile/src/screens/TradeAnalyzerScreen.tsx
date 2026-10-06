@@ -10,18 +10,14 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
-import BrandHeaderBar from '../components/BrandHeaderBar';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
-import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import FilterDropdownButton from '../components/FilterDropdownButton';
-import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
-import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -38,14 +34,24 @@ import {
 import { useGmStance } from '../context/GmStanceContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'TradeAnalyzer'>;
+// Prop-driven now (TradesScreen owns the single `Trades` route and hosts
+// this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
+// plain props instead of via route.params, but `navigation` is still the
+// real root-stack navigation prop, used exactly as before for PlayerDetail/
+// PickDetail/Paywall.
+type TradeAnalyzerNavigation = NativeStackNavigationProp<RootStackParamList>;
+
+interface Props {
+  leagueId: string;
+  leagueName: string;
+  navigation: TradeAnalyzerNavigation;
+}
 type Side = 'send' | 'receive';
 type AssetType = 'players' | 'picks';
 
@@ -106,11 +112,10 @@ interface OtherTeam {
 
 const ALL_TEAMS_ID = '__all__';
 
-export default function TradeAnalyzerScreen({ route, navigation }: Props) {
+export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
@@ -136,20 +141,6 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   const orbClearance = useOrbClearance();
-
-  useScreenHeaderTitle(navigation, 'Trade Analyzer', leagueName);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={styles.headerButtonRow}>
-          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
-          <EvaluationLensHeaderButton leagueId={leagueId} />
-          <GmStanceHeaderButton leagueId={leagueId} />
-        </View>
-      ),
-    });
-  }, [navigation, leagueId, styles]);
 
   // A verdict is analyzed under one stance/lens, so it goes stale the
   // moment either changes. The removed in-page strategy pills cleared it
@@ -356,7 +347,6 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
 
   const header = (
     <View>
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenInfoNote
         text={`The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`}
       />
@@ -753,7 +743,6 @@ function TradeSide({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {
