@@ -14,7 +14,7 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import PlayerCard from '../components/PlayerCard';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -35,6 +35,7 @@ import {
 } from '../lib/api';
 import { api } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { presentationAssetBackStats } from '../lib/playerCardBackStats';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useDensity } from '../context/DensityContext';
 import { useGmStance } from '../context/GmStanceContext';
@@ -533,17 +534,27 @@ function TradeHubGateCard({
 
 /**
  * One side (You Send / You Receive) of a trade package: players render via
- * the shared PlayerIdentityRow (no `slot` — trade assets have no lineup
- * slot), picks via DraftPickAssetRow — never a malformed player row for a
- * pick. Order is preserved exactly as the API returned it; only the
- * per-asset presentation differs by `asset_type`.
+ * the shared, flippable `PlayerCard` (coridian_'s circled reference card,
+ * generalized — see components/PlayerCard.tsx's own doc comment), picks
+ * via DraftPickAssetRow — never a malformed player row for a pick. Order
+ * is preserved exactly as the API returned it; only the per-asset
+ * presentation differs by `asset_type`.
  *
- * Team and age are combined into PlayerIdentityRow's single `team` slot
- * (e.g. "NO · Age 30") rather than passed separately (team) + via
- * `contextLine` (age) — the concept mockups show these on one meta line
- * under the position badge, not a whole extra row. This is a page-local
- * prop composition, not a change to PlayerIdentityRow itself: every other
- * screen using the shared row is unaffected.
+ * `presentationAssetBackStats` (lib/playerCardBackStats.ts) builds each
+ * player's back-face stats from fields `PresentationAsset` already carries
+ * — tier, role, injury (status + severity), the asset's own value score,
+ * team/age, and the role's rationale sentence — several of which
+ * (`score`, `injury_level`, `opportunity_explanation`) had nowhere to
+ * render on the old row at all. Tapping a player card now flips it instead
+ * of navigating straight to Player Detail (PlayerIdentityRow's old
+ * behavior) — `onOpenDetail` wires the card's own small corner affordance
+ * to that navigation instead, matching coridian_'s ask that the primary
+ * tap flip the card and a separate control open the PQV.
+ *
+ * Fixed `size` (not a flex-filled column width) deliberately mirrors
+ * Waivers' `BestAvailableCard` sizing precedent — a trade side can carry
+ * 2-3 assets, and a card stretched to the full exchange column's width
+ * would read as oversized stacked repeatedly.
  */
 function ExchangeAssetList({
   assets,
@@ -554,41 +565,42 @@ function ExchangeAssetList({
   onPressPlayer: (asset: PresentationAsset) => void;
   onPressPick: (asset: PresentationAsset) => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <>
       {assets.map((asset, index) => {
-        const showDivider = index < assets.length - 1;
+        const isLast = index === assets.length - 1;
         if (asset.asset_type === 'pick') {
           return (
-            <DraftPickAssetRow
-              key={`pick-${asset.pick_id ?? index}`}
-              pickId={asset.pick_id}
-              round={asset.round ? Number(asset.round) : null}
-              label={asset.label}
-              projectedRange={asset.projected_range}
-              pickTier={asset.pick_tier}
-              onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
-              showDivider={showDivider}
-            />
+            <View key={`pick-${asset.pick_id ?? index}`} style={!isLast && styles.exchangeItemSpacing}>
+              <DraftPickAssetRow
+                pickId={asset.pick_id}
+                round={asset.round ? Number(asset.round) : null}
+                label={asset.label}
+                projectedRange={asset.projected_range}
+                pickTier={asset.pick_tier}
+                onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
+              />
+            </View>
           );
         }
-        const teamAgeLine = [asset.team, asset.age != null ? `Age ${asset.age}` : null]
-          .filter(Boolean)
-          .join(' · ');
+        const { note, stats } = presentationAssetBackStats(asset);
         return (
-          <PlayerIdentityRow
-            key={`player-${asset.player_id ?? index}`}
-            playerId={asset.player_id}
-            name={asset.name}
-            position={asset.position}
-            team={teamAgeLine || null}
-            tier={asset.tier}
-            overallRating={asset.overall_rating}
-            opportunityLabel={asset.role}
-            injuryLabel={asset.injury_status}
-            onPress={asset.player_id ? () => onPressPlayer(asset) : undefined}
-            showDivider={showDivider}
-          />
+          <View key={`player-${asset.player_id ?? index}`} style={[styles.exchangeCardWrap, !isLast && styles.exchangeItemSpacing]}>
+            <PlayerCard
+              size={120}
+              playerId={asset.player_id}
+              name={asset.name}
+              position={asset.position}
+              tier={asset.tier}
+              overallRating={asset.overall_rating}
+              injuryLabel={asset.injury_status}
+              backStats={stats}
+              backNote={note}
+              onOpenDetail={asset.player_id ? () => onPressPlayer(asset) : undefined}
+            />
+          </View>
         );
       })}
     </>
@@ -1179,6 +1191,12 @@ function createStyles(colors: ThemeColors) {
     paddingTop: spacing.xs,
     paddingBottom: 2,
   },
+  // PlayerCard is square and fixed-size (see ExchangeAssetList's doc
+  // comment) rather than stretched to the column's own flex:1 width, so
+  // each tile needs its own flex-start wrapper inside the stretch-aligned
+  // exchangeSide column.
+  exchangeCardWrap: { alignSelf: 'flex-start' },
+  exchangeItemSpacing: { marginBottom: spacing.sm },
   exchangeGutter: { width: 26, alignItems: 'center', justifyContent: 'center' },
   swapDisc: {
     width: 26,
