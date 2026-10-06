@@ -9,6 +9,7 @@ V1 is session/cache scoped. Generation is lazy on recap open.
 
 from __future__ import annotations
 
+import concurrent.futures
 from collections import Counter
 from hashlib import sha256
 from typing import Any, Mapping, MutableMapping, Sequence
@@ -113,11 +114,29 @@ def build_matchup_history_rows(
     signature: `(league_id, round_num) -> list[dict]`) so this stays testable
     without mocking modules.sleeper directly — same dependency-injection
     pattern as `collect_season_transactions` in modules/league_history.py.
+
+    The per-week calls are fanned out across a small thread pool rather than
+    made one at a time: a full season is up to 18 of these, each its own
+    Sleeper HTTP round-trip, and each is a *distinct*
+    modules.sleeper.get_matchups cache key (league_id, week, time-bucket) —
+    so running them concurrently only ever populates different cache
+    entries, never races on the same one, and leaves get_matchups' own 30s
+    time-bucketed @lru_cache behavior untouched. Results are still combined
+    in week order below, so the returned rows are identical to the old
+    sequential version, just faster to produce. Same
+    concurrent.futures.ThreadPoolExecutor pattern already used for fan-out
+    I/O in services/mobile_api_service.py.
     """
 
+    weeks = list(range(1, max(1, _int(max_week, 1)) + 1))
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(8, len(weeks)), thread_name_prefix="dgm-recap-matchups"
+    ) as executor:
+        fetched = list(executor.map(lambda week: fetch_matchups(league_id, week) or [], weeks))
+
     rows: list[dict[str, Any]] = []
-    for week in range(1, max(1, _int(max_week, 1)) + 1):
-        for matchup in fetch_matchups(league_id, week) or []:
+    for week, matchups in zip(weeks, fetched):
+        for matchup in matchups:
             roster_id = _safe_positive_int(matchup.get("roster_id"), 0)
             if roster_id <= 0:
                 continue
@@ -950,6 +969,41 @@ def _riser_story(movement: Mapping[str, Any] | None, *, week: int) -> dict[str, 
     )
 
 
+def _weekly_recap_identity(
+    *,
+    league_id: str,
+    season: str,
+    week: int,
+    transactions: Sequence[Mapping[str, Any]],
+    matchups: Sequence[Mapping[str, Any]],
+) -> tuple[str, str, list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    """(recap_id, fingerprint, week_txs, paired, event_ids) from recorded facts alone.
+
+    Split out of build_weekly_recap so get_or_build_weekly_recap can compute
+    the exact same cache key `build_weekly_recap` would land on — and check
+    for a hit — *before* paying for the 10 story-generator passes below,
+    instead of building the whole recap first and only then discovering it
+    matched what was already cached.
+    """
+
+    week_txs = _week_transactions(transactions, week=week)
+    paired = pair_matchups(matchups, week=week)
+    event_ids = [_text(item.get("transaction_id")) for item in week_txs]
+    matchup_keys = [
+        f"{row.get('matchup_id')}:{row.get('winner_roster_id')}:{row.get('winner_points')}"
+        for row in paired
+    ]
+    fingerprint = recap_fingerprint(
+        league_id=league_id,
+        season=season,
+        week=week,
+        event_ids=event_ids,
+        matchup_keys=matchup_keys,
+    )
+    recap_id = f"{_text(league_id)}:{_text(season)}:{week}:{fingerprint}"
+    return recap_id, fingerprint, week_txs, paired, event_ids
+
+
 def build_weekly_recap(
     *,
     league_id: str,
@@ -965,21 +1019,14 @@ def build_weekly_recap(
     """Build one weekly recap. Omits categories that lack recorded facts."""
 
     del generated  # Recaps are derived, never persisted as a separate universe.
-    week_txs = _week_transactions(transactions, week=week)
-    identities = _identity_lookup(week_txs or transactions, profiles)
-    paired = pair_matchups(matchups, week=week)
-    event_ids = [_text(item.get("transaction_id")) for item in week_txs]
-    matchup_keys = [
-        f"{row.get('matchup_id')}:{row.get('winner_roster_id')}:{row.get('winner_points')}"
-        for row in paired
-    ]
-    fingerprint = recap_fingerprint(
+    recap_id, fingerprint, week_txs, paired, event_ids = _weekly_recap_identity(
         league_id=league_id,
         season=season,
         week=week,
-        event_ids=event_ids,
-        matchup_keys=matchup_keys,
+        transactions=transactions,
+        matchups=matchups,
     )
+    identities = _identity_lookup(week_txs or transactions, profiles)
     stories: list[dict[str, Any]] = []
     for builder in (
         lambda: _performance_story(paired, identities, week=week, fingerprint=fingerprint),
@@ -1018,7 +1065,7 @@ def build_weekly_recap(
             ),
         )
     return {
-        "recap_id": f"{_text(league_id)}:{_text(season)}:{week}:{fingerprint}",
+        "recap_id": recap_id,
         "league_id": _text(league_id),
         "season": _text(season),
         "period_type": PERIOD_WEEK,
@@ -1075,6 +1122,23 @@ def get_or_build_weekly_recap(
     movement: Mapping[str, Any] | None = None,
     power_ranks: Mapping[int, int] | None = None,
 ) -> dict[str, Any]:
+    # Compute the cache key build_weekly_recap would land on (recap_id,
+    # fingerprint) from recorded facts alone and check the session cache
+    # for a hit *first* — only on an actual miss do we pay for
+    # build_weekly_recap's 10 story-generator passes. Previously this
+    # called build_weekly_recap unconditionally and checked the cache
+    # after, which did the expensive work on every call regardless of
+    # whether anything had actually changed.
+    recap_id, fingerprint, _week_txs, _paired, _event_ids = _weekly_recap_identity(
+        league_id=league_id,
+        season=season,
+        week=week,
+        transactions=transactions,
+        matchups=matchups,
+    )
+    existing = cached_recap(session, recap_id=recap_id)
+    if existing and existing.get("fingerprint") == fingerprint:
+        return existing
     probe = build_weekly_recap(
         league_id=league_id,
         season=season,
@@ -1085,9 +1149,6 @@ def get_or_build_weekly_recap(
         movement=movement,
         power_ranks=power_ranks,
     )
-    existing = cached_recap(session, recap_id=str(probe.get("recap_id")))
-    if existing and existing.get("fingerprint") == probe.get("fingerprint"):
-        return existing
     store_recap(session, probe)
     notice_id = f"league-recap:{probe.get('recap_id')}"
     existing_notice = session.get(NOTICE_KEY)

@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import BrandedSpinner from '../components/BrandedSpinner';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -13,11 +14,13 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -106,6 +109,26 @@ const METRIC_CONFIG: Record<
   },
 };
 
+/**
+ * In-screen metric switcher tabs — short pill labels for the same six
+ * `METRIC_CONFIG` keys above, in the same order. This screen already fully
+ * supported all six (it reads `metric` once from `route.params`), but with
+ * no in-screen control to change it, every user landed on and stayed on
+ * Power unless a caller happened to deep-link with a specific metric (only
+ * the Age tile did). Reuses `SegmentedTabBar` — the same shared
+ * pill-switcher Player Detail's Stats/Trends/Schedule/Career/Model tabs and
+ * My Team's Overview/Bench/Analysis tabs already use — rather than a
+ * page-local control.
+ */
+const METRIC_TABS: Array<{ key: RankingMetric; label: string }> = [
+  { key: 'power', label: 'Power' },
+  { key: 'franchise', label: 'Franchise' },
+  { key: 'draft_capital', label: 'Draft' },
+  { key: 'starter', label: 'Starters' },
+  { key: 'bench', label: 'Bench' },
+  { key: 'age', label: 'Age' },
+];
+
 interface TeamRow {
   rosterId: number | string;
   teamName: string;
@@ -120,16 +143,63 @@ interface TeamRow {
   tradeTendency: string | null;
 }
 
+/** Metric-independent roster data — fetched once per league focus, not
+ * refetched on every in-screen metric switch. The in-screen switcher below
+ * only needs to re-derive rank/detail/sort per `TeamRanking` already held
+ * here (see the `teams` memo), not re-hit the network. */
+interface BaseTeamRow {
+  rosterId: number | string;
+  teamName: string;
+  avatarId: string;
+  playerIds: string[];
+  isMine: boolean;
+  ranking: TeamRanking | undefined;
+}
+
 export default function TeamsScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName, metric = 'power' } = route.params;
+  const { leagueId, leagueName } = route.params;
+  // Local state, seeded once from `route.params.metric` (e.g. the Age tile's
+  // deep link) rather than read directly from route.params on every render —
+  // the in-screen switcher below changes this same state afterward, and a
+  // user can land on any of the six metrics in-screen regardless of how they
+  // navigated in.
+  const [metric, setMetric] = useState<RankingMetric>(route.params.metric ?? 'power');
   const config = METRIC_CONFIG[metric];
-  const [teams, setTeams] = useState<TeamRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  // Gates every query below until the persisted AsyncStorage cache has
+  // finished hydrating back into the in-memory QueryClient — same guard
+  // Dashboard/Matchup use, so a query here never fires before last session's
+  // cached response is restored.
+  const isRestoring = useIsRestoring();
+
+  const teamProfilesQuery = useQuery({
+    queryKey: queryKeys.teamProfiles(leagueId),
+    queryFn: () => api.getLeagueTeamProfiles(leagueId),
+    enabled: !isRestoring,
+  });
+  const rostersQuery = useQuery({
+    queryKey: queryKeys.leagueRosters(leagueId),
+    queryFn: () => api.getLeagueRosters(leagueId),
+    enabled: !isRestoring,
+  });
+  const myRosterQuery = useQuery({
+    queryKey: queryKeys.myRoster(leagueId),
+    queryFn: () => api.getMyRoster(leagueId),
+    enabled: !isRestoring,
+  });
+  // Same endpoint Dashboard's League Pulse section and MyTeamScreen's Team
+  // Snapshot both fetch — shares one cache entry under
+  // queryKeys.teamRankings(leagueId) instead of each screen hitting it
+  // independently.
+  const teamRankingsQuery = useQuery({
+    queryKey: queryKeys.teamRankings(leagueId),
+    queryFn: () => api.getLeagueTeamRankings(leagueId),
+    enabled: !isRestoring,
+  });
 
   useScreenHeaderTitle(navigation, config.title, leagueName);
 
@@ -145,69 +215,92 @@ export default function TeamsScreen({ route, navigation }: Props) {
     });
   }, [navigation, leagueId, styles]);
 
+  // Matches the previous useFocusEffect's cadence (always re-check on
+  // regaining focus) but through React Query: invalidating marks each query
+  // stale and triggers its background refetch if it's currently mounted —
+  // cached data stays on screen throughout, never cleared first.
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-
-      async function load() {
-        try {
-          const [profilesResult, rostersResult, myRosterResult, rankingsResult] = await Promise.all([
-            api.getLeagueTeamProfiles(leagueId),
-            api.getLeagueRosters(leagueId),
-            api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
-            api
-              .getLeagueTeamRankings(leagueId)
-              .catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
-          ]);
-          if (cancelled) return;
-
-          const myRosterId = myRosterResult.roster ? String(myRosterResult.roster.roster_id ?? '') : '';
-          const rankingsByRoster = new Map(rankingsResult.teams.map((team) => [team.roster_id, team]));
-
-          const rows: TeamRow[] = rostersResult.rosters.map((roster) => {
-            const rosterId = String(roster.roster_id ?? '');
-            const players = Array.isArray(roster.players) ? roster.players : [];
-            const profile = profilesResult.profiles[rosterId];
-            const ranking = rankingsByRoster.get(rosterId);
-            return {
-              rosterId,
-              teamName: profile?.team_name || 'Unclaimed team',
-              avatarId: profile?.avatar_id || '',
-              playerIds: players.map(String),
-              isMine: Boolean(myRosterId) && rosterId === myRosterId,
-              metricRank: ranking ? config.rank(ranking) : null,
-              metricRankTied: ranking ? config.tied(ranking) : false,
-              metricDetail: ranking && config.detail ? config.detail(ranking) : null,
-              recordLabel: ranking?.record_label ?? null,
-              archetypeLabel: ranking?.archetype_label ?? null,
-              tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
-            };
-          });
-          // Pure metric-rank order — no longer pins the caller's own team
-          // first, since that made a rank-4 team appear above rank-1 with
-          // no explanation. The "You" badge + left-accent row below is how a
-          // user finds their own row now instead of it always being #1 in
-          // the list regardless of rank.
-          rows.sort((a, b) => {
-            if (a.metricRank == null && b.metricRank == null) return 0;
-            if (a.metricRank == null) return 1;
-            if (b.metricRank == null) return -1;
-            return a.metricRank - b.metricRank;
-          });
-          setTeams(rows);
-        } catch (err) {
-          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load teams.'));
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      }
-
-      void load();
-      return () => {
-        cancelled = true;
-      };
-    }, [leagueId, config]),
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamProfiles(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leagueRosters(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.myRoster(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamRankings(leagueId) });
+    }, [queryClient, leagueId]),
   );
+
+  // Metric-independent roster data, derived from the four queries above —
+  // the in-screen metric switcher re-derives per-metric rank/sort from this
+  // below instead of refetching, so switching metrics stays instant/in-place.
+  // `myRosterQuery`/`teamRankingsQuery` are best-effort enrichment (the "You"
+  // badge and rank pills, not core to rendering a row at all), so a failure
+  // on either just falls back to an empty/undefined read here rather than
+  // blocking the whole screen — same soft-fail the old Promise.all
+  // `.catch()` fallbacks gave them.
+  const baseRows: BaseTeamRow[] = useMemo(() => {
+    const profiles = teamProfilesQuery.data?.profiles;
+    const rosters = rostersQuery.data?.rosters;
+    if (!profiles || !rosters) return [];
+    const myRosterId = myRosterQuery.data?.roster
+      ? String(myRosterQuery.data.roster.roster_id ?? '')
+      : '';
+    const rankingsByRoster = new Map(
+      (teamRankingsQuery.data?.teams ?? []).map((team) => [team.roster_id, team]),
+    );
+    return rosters.map((roster) => {
+      const rosterId = String(roster.roster_id ?? '');
+      const players = Array.isArray(roster.players) ? roster.players : [];
+      const profile = profiles[rosterId];
+      return {
+        rosterId,
+        teamName: profile?.team_name || 'Unclaimed team',
+        avatarId: profile?.avatar_id || '',
+        playerIds: players.map(String),
+        isMine: Boolean(myRosterId) && rosterId === myRosterId,
+        ranking: rankingsByRoster.get(rosterId),
+      };
+    });
+  }, [teamProfilesQuery.data, rostersQuery.data, myRosterQuery.data, teamRankingsQuery.data]);
+
+  // Only teamProfiles/rosters are core to rendering any row at all — myRoster
+  // ("You" badge) and teamRankings (rank pills) are best-effort enrichment
+  // that can paint in slightly afterward without blocking the initial list.
+  const loading = isRestoring || teamProfilesQuery.isPending || rostersQuery.isPending;
+  const error =
+    (teamProfilesQuery.isError && !teamProfilesQuery.data) || (rostersQuery.isError && !rostersQuery.data)
+      ? toUserErrorMessage(teamProfilesQuery.error ?? rostersQuery.error, 'Failed to load teams.')
+      : null;
+
+  // Per-metric rank/detail + sort, derived from the metric-independent fetch
+  // above — switching `metric` here never re-hits the network.
+  const teams: TeamRow[] = useMemo(() => {
+    const rows = baseRows.map((row) => {
+      const { ranking } = row;
+      return {
+        rosterId: row.rosterId,
+        teamName: row.teamName,
+        avatarId: row.avatarId,
+        playerIds: row.playerIds,
+        isMine: row.isMine,
+        metricRank: ranking ? config.rank(ranking) : null,
+        metricRankTied: ranking ? config.tied(ranking) : false,
+        metricDetail: ranking && config.detail ? config.detail(ranking) : null,
+        recordLabel: ranking?.record_label ?? null,
+        archetypeLabel: ranking?.archetype_label ?? null,
+        tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
+      };
+    });
+    // Pure metric-rank order — no longer pins the caller's own team first,
+    // since that made a rank-4 team appear above rank-1 with no explanation.
+    // The "You" badge + left-accent row below is how a user finds their own
+    // row now instead of it always being #1 in the list regardless of rank.
+    rows.sort((a, b) => {
+      if (a.metricRank == null && b.metricRank == null) return 0;
+      if (a.metricRank == null) return 1;
+      if (b.metricRank == null) return -1;
+      return a.metricRank - b.metricRank;
+    });
+    return rows;
+  }, [baseRows, config]);
 
   // Percentile denominator is the count of teams the backend actually ranked
   // for this metric (not every roster — an unclaimed team has no rank and
@@ -230,6 +323,9 @@ export default function TeamsScreen({ route, navigation }: Props) {
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+      <View style={styles.metricTabBarWrap}>
+        <SegmentedTabBar options={METRIC_TABS} active={metric} onChange={setMetric} />
+      </View>
       <FlatList
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
@@ -381,6 +477,7 @@ function createStyles(colors: ThemeColors) {
   root: { flex: 1, backgroundColor: colors.background },
   list: { backgroundColor: 'transparent' },
   listContent: { padding: spacing.lg },
+  metricTabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   infoNoteWrap: { marginBottom: spacing.md },
   center: {
     flex: 1,

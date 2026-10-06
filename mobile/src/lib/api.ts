@@ -547,6 +547,19 @@ export interface WaiverPlayer {
   stale_free_agent: boolean;
   injury_replacement_fit: boolean;
   injury_replacement_note: string;
+  // Sleeper's GLOBAL trending-add signal (modules.sleeper.trending_add_rank_map
+  // / modules.waivers_ui.annotate_sleeper_trending_add on the backend) —
+  // cross-league, last-24h add velocity across every league on Sleeper, NOT
+  // scoped to this league. Deliberately distinct from this app's own
+  // internal "usage trending up/down" role signal (see RankedPlayer's
+  // usage_trend) — never present this as "trending in your league."
+  sleeper_trending_add: boolean;
+  // Sleeper's own 24h global add count when sleeper_trending_add is true;
+  // null when not trending or the count is unavailable.
+  sleeper_trending_add_count: number | null;
+  // 1-indexed rank within Sleeper's global trending-add list (1 = most
+  // added across all of Sleeper in the last 24h); null when not trending.
+  sleeper_trending_add_rank: number | null;
   // This week's real NFL opponent (context only — never factored into
   // score/position_rank/overall_rank above). Null in the offseason/draft
   // or when the team code has no schedule match.
@@ -1135,6 +1148,19 @@ export interface QuickViewModel {
   // decision_fit_narrative) — null when the position pool is too thin to
   // support a meaningful comparison.
   decision_fit_narrative: string | null;
+  // Market/Opportunity/Scarcity/Role, each re-expressed on the same 0-99
+  // "OVR ring" scale via modules.player_quick_view.sub_ratings — a
+  // position-relative percentile run through the exact same
+  // _overall_rating_from_percentile curve the headline overall_rating uses.
+  // Null under the same thin-pool gate as every other percentile here.
+  market_rating: number | null;
+  opportunity_rating: number | null;
+  scarcity_rating: number | null;
+  role_rating: number | null;
+  // Durability: injury_multiplier * non_injury_risk_multiplier scaled
+  // directly onto the 0-99 range — not position-ranked (see sub_ratings'
+  // docstring for why). Null only when neither multiplier is present.
+  durability_rating: number | null;
 }
 
 export interface WeeklyStatPoint {
@@ -1241,6 +1267,11 @@ export interface QuickViewResponse {
 export interface PlayerAward {
   badge_id: string;
   category: string;
+  /** modules/player_awards.py's PlayerBadge.family, e.g. "workhorse",
+   * "bellcow", "targets", "pass-yards" — drives the per-award icon in
+   * AwardsStrip, mirroring the web app's _accolade_kind/_accolade_emblem_svg
+   * special-casing (modules/player_quick_view.py). */
+  family: string;
   title: string;
   short_label: string;
   tier: 'gold' | 'silver' | 'bronze' | null;
@@ -1317,9 +1348,11 @@ export interface CollegeProspect {
 export interface CollegeProspectsResponse {
   ok: true;
   prospects: CollegeProspect[];
-  // True when the real Supabase catalog wasn't reachable/migrated yet and
-  // this list is modules.college_scouting's placeholder fallback.
-  used_placeholder_catalog: boolean;
+  // False when the real Supabase catalog isn't configured/migrated/
+  // reachable yet. There is no fabricated-data fallback — `prospects` is
+  // simply empty in that case, and the screen's existing "No prospects
+  // yet" empty state covers it.
+  catalog_available: boolean;
   reason: string;
 }
 

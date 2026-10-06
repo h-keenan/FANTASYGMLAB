@@ -677,8 +677,11 @@ function VerdictCard({
  * One side (You Send / You Receive) of the trade being built — the same
  * Send/Receive card language Trade Hub/Trade Finder use for a proposed
  * trade's asset lists (§30), just editable here: each row's own tap removes
- * it instead of opening detail, and tapping the header makes this side the
- * active add target for the search list below.
+ * it instead of opening detail, and tapping anywhere on the card (not just
+ * the label row) makes this side the active add target for the search list
+ * below. The card itself is the touchable, so nested per-item rows (each a
+ * TouchableOpacity in their own right) still win their own taps for removal
+ * — RN resolves the responder to the deepest touchable under the finger.
  */
 function TradeSide({
   label,
@@ -698,11 +701,15 @@ function TradeSide({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={[styles.side, active && styles.sideActive]}>
-      <TouchableOpacity style={styles.sideLabelRow} onPress={onPressHeader} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[styles.side, active && styles.sideActive]}
+      onPress={onPressHeader}
+      activeOpacity={0.85}
+    >
+      <View style={styles.sideLabelRow}>
         <View style={[styles.sideDot, { backgroundColor: dotColor }]} />
         <AppText style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</AppText>
-      </TouchableOpacity>
+      </View>
       {items.length > 0 ? (
         <View style={styles.sideAssetSurface}>
           {items.map((item, index) => {
@@ -738,11 +745,9 @@ function TradeSide({
           })}
         </View>
       ) : (
-        <TouchableOpacity onPress={onPressHeader} activeOpacity={0.7}>
-          <AppText style={styles.sideEmpty}>Tap to add</AppText>
-        </TouchableOpacity>
+        <AppText style={styles.sideEmpty}>Tap to add</AppText>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 

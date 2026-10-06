@@ -192,10 +192,10 @@ def test_gzip_middleware_compresses_large_responses(monkeypatch):
 
 def test_health_triggers_players_refresh_check_without_auth(monkeypatch):
     # /health needs no Authorization header, unlike every endpoint behind
-    # require_user — it's the only route the keep-alive cron actually pings
-    # (.github/workflows/keep-alive.yml), so it's also the only reliable,
-    # traffic-independent place to catch a stale players cache when no real
-    # user has hit an authenticated endpoint in the last hour.
+    # require_user — so it's the one route an external uptime check (no
+    # auth required) can hit, making it the only reliable, traffic-
+    # independent place to catch a stale players cache when no real user
+    # has hit an authenticated endpoint in the last hour.
     client = _client(monkeypatch)
     from services import mobile_api_service
 
@@ -1468,6 +1468,60 @@ def test_player_rank_in_league_returns_the_players_real_rank(monkeypatch):
     assert body["player"]["overall_rank"] == 2
 
 
+def test_rankings_and_player_rank_share_one_cached_valued_players_frame(monkeypatch):
+    """/rankings and /players/{id}/rank ask the identical (league_id, lens)
+    question — Player Detail opening right after Rankings (or vice versa)
+    must hit ONE cached valued-players frame
+    (league_value_settings.build_valued_players_frame_cached), not each
+    independently rerun apply_valuation_lens's full pool pass (including its
+    row-wise current_risk_multiplier apply) from scratch. Same cache-sharing
+    contract test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame
+    already pins for league_rankings.build_league_rankings_frame_cached."""
+
+    client = _client(monkeypatch)
+    from modules import league_value_settings
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+
+    call_count = {"n": 0}
+    real_apply = league_value_settings.apply_valuation_lens
+
+    def counting_apply(*args, **kwargs):
+        call_count["n"] += 1
+        return real_apply(*args, **kwargs)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    with patch.object(
+                        league_value_settings, "apply_valuation_lens", side_effect=counting_apply
+                    ):
+                        rankings_response = client.get(
+                            "/v1/leagues/abc/rankings?lens=Dynasty",
+                            headers={"Authorization": "Bearer good-token"},
+                        )
+                        rank_response = client.get(
+                            "/v1/leagues/abc/players/9002/rank?lens=Dynasty",
+                            headers={"Authorization": "Bearer good-token"},
+                        )
+
+    assert rankings_response.status_code == 200
+    assert rank_response.status_code == 200
+    assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
+    assert rank_response.json()["player"]["name"] == "Backup Runner"
+
+
 def test_player_rank_in_league_returns_none_for_unknown_player(monkeypatch):
     client = _client(monkeypatch)
 
@@ -1597,6 +1651,7 @@ def test_friendly_news_source_maps_known_feed_domains(monkeypatch):
     assert _friendly_news_source("https://www.cbssports.com/rss/headlines/nfl/") == "CBS Sports"
     assert _friendly_news_source("https://sports.yahoo.com/nfl/rss/") == "Yahoo Sports"
     assert _friendly_news_source("https://www.nbcsports.com/profootballtalk.rss") == "Pro Football Talk"
+    assert _friendly_news_source("https://www.profootballrumors.com/feed") == "Pro Football Rumors"
     # Unknown source falls back to the bare domain rather than a raw URL.
     assert _friendly_news_source("https://www.example.com/some/feed.xml") == "example.com"
     assert _friendly_news_source("") == ""
@@ -2334,6 +2389,114 @@ def test_quick_view_omits_the_overall_rating_when_the_pool_is_too_thin(monkeypat
     # The field is always present in the payload; null means "no honest
     # answer", never "zero".
     assert response.json()["stats"]["overall_rating"] is None
+
+
+def _sub_rated_quick_view_frame(pool_size=20):
+    """Same shape as _rated_quick_view_frame, plus the composite-score inputs
+    and injury/risk multipliers the Model tab's sub-rating chip row
+    (market_rating/opportunity_rating/scarcity_rating/role_rating/
+    durability_rating) ranks against. Subject (9001) tops every composite
+    column and carries a reduced durability pair, so its expected ratings
+    land unambiguously at the scale's top (factors) and a predictable
+    mid-pack value (durability, a direct scale not a position rank)."""
+
+    rows = []
+    for index in range(pool_size):
+        rows.append(
+            {
+                "player_id": f"pool-{index}",
+                "name": f"Pool Player {index}",
+                "position": "WR",
+                "team": "NYJ",
+                "status": "Active",
+                "active": True,
+                "years_exp": 3,
+                "market_score": float(index),
+                "opportunity_score": float(index),
+                "scarcity_score": float(index),
+                "role_score": float(index),
+                "injury_multiplier": 1.0,
+                "non_injury_risk_multiplier": 1.0,
+                "is_current_fantasy_eligible": True,
+                "player_eligibility_reason": "active_fantasy_player",
+                "trust_enforcement": "pass",
+                "trust_evidence_confidence": 1.0,
+                "trust_block_reason": "",
+                "trust_validation_fingerprint": f"fp-{index}",
+            }
+        )
+    subject = dict(rows[0])
+    subject.update(
+        {
+            "player_id": "9001",
+            "name": "Star Wideout",
+            "market_score": 1000.0,
+            "opportunity_score": 1000.0,
+            "scarcity_score": 1000.0,
+            "role_score": 1000.0,
+            "injury_multiplier": 0.8,
+            "non_injury_risk_multiplier": 0.5,
+            "trust_validation_fingerprint": "fp-subject",
+        }
+    )
+    return pd.DataFrame([*rows, subject])
+
+
+def test_quick_view_sends_sub_ratings_for_a_real_pool(monkeypatch):
+    from modules import player_quick_view
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=_sub_rated_quick_view_frame()):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    model = response.json()["model"]
+    # Best in the pool on every composite input -> top of the shared 0-99
+    # OVR-ring scale, via the real player_quick_view.sub_ratings engine.
+    assert model["market_rating"] == player_quick_view.OVERALL_RATING_MAX
+    assert model["opportunity_rating"] == player_quick_view.OVERALL_RATING_MAX
+    assert model["scarcity_rating"] == player_quick_view.OVERALL_RATING_MAX
+    assert model["role_rating"] == player_quick_view.OVERALL_RATING_MAX
+    # Durability is a direct 0-99 scaling of injury_multiplier *
+    # non_injury_risk_multiplier (0.8 * 0.5 = 0.4), not a position rank.
+    assert model["durability_rating"] == round(0.8 * 0.5 * player_quick_view.OVERALL_RATING_MAX)
+    # The pre-existing raw composite fields are untouched by the new ratings.
+    assert model["market_score"] == 1000.0
+
+
+def test_quick_view_omits_sub_ratings_when_the_pool_is_too_thin(monkeypatch):
+    from modules import player_quick_view
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    thin = _sub_rated_quick_view_frame(player_quick_view.PERCENTILE_MIN_POOL - 2)
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.rankings.load_players", return_value=thin):
+            response = client.get(
+                "/v1/players/9001/quick-view",
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    model = response.json()["model"]
+    assert model["market_rating"] is None
+    assert model["opportunity_rating"] is None
+    assert model["scarcity_rating"] is None
+    assert model["role_rating"] is None
+    # Durability is unaffected by the position-pool gate — it never ranked
+    # against peers in the first place.
+    assert model["durability_rating"] == round(0.8 * 0.5 * player_quick_view.OVERALL_RATING_MAX)
 
 
 def test_quick_view_sends_a_real_prime_window_for_the_players_position_and_age(monkeypatch):
@@ -3416,10 +3579,11 @@ def test_scouting_prospects_requires_auth(monkeypatch):
     assert client.delete("/v1/scouting/watchlist/2026-qb-01").status_code == 401
 
 
-def test_get_scouting_prospects_falls_back_to_placeholder_catalog_when_table_unreachable(monkeypatch):
-    """No migration applied yet -> college_prospects/scouting_reports 404s,
-    but the screen still gets a usable (placeholder) catalog rather than an
-    empty/broken response."""
+def test_get_scouting_prospects_returns_empty_not_fabricated_when_table_unreachable(monkeypatch):
+    """No migration applied yet -> college_prospects/scouting_reports 404s.
+    The screen must get an honest empty list and catalog_available=False —
+    never a fabricated/placeholder catalog presented as real scouting
+    subjects."""
 
     client = _client(monkeypatch)
 
@@ -3434,13 +3598,8 @@ def test_get_scouting_prospects_falls_back_to_placeholder_catalog_when_table_unr
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
-    assert body["used_placeholder_catalog"] is True
-    assert len(body["prospects"]) == 16  # len(college_scouting.PLACEHOLDER_PROSPECTS)
-    for prospect in body["prospects"]:
-        assert prospect["aggregate"]["scout_count"] == 0
-        assert prospect["aggregate"]["avg_grade"] is None
-        assert prospect["my_report"] is None
-        assert prospect["on_watchlist"] is False
+    assert body["catalog_available"] is False
+    assert body["prospects"] == []
 
 
 def test_get_scouting_prospects_reflects_shared_aggregate_and_my_report(monkeypatch):
@@ -3468,7 +3627,7 @@ def test_get_scouting_prospects_reflects_shared_aggregate_and_my_report(monkeypa
 
     assert response.status_code == 200
     body = response.json()
-    assert body["used_placeholder_catalog"] is False
+    assert body["catalog_available"] is True
     [prospect] = body["prospects"]
     assert prospect["id"] == "p1"
     assert prospect["aggregate"] == {"avg_grade": 3.0, "scout_count": 2, "avg_round_projection": 2.0}
@@ -3613,6 +3772,10 @@ def test_player_awards_returns_real_badges_for_a_qualifying_season(monkeypatch):
     assert any(award["short_label"] == "1,500+ Rec Yds" for award in body["awards"])
     for award in body["awards"]:
         assert award["tier"] in {"gold", "silver", "bronze", None}
+        # `family` drives AwardsStrip's per-award icon on mobile, the same
+        # way modules.player_quick_view._accolade_kind drives the web app's
+        # SVG emblem — must round-trip to the client.
+        assert award["family"]
 
 
 def test_register_push_token_requires_auth(monkeypatch):
@@ -4954,6 +5117,159 @@ def test_project_portfolio_top_asset_degrades_without_a_player_id():
     }
 
 
+def test_portfolio_fanout_preserves_saved_league_order_despite_uneven_completion(monkeypatch):
+    """GET /v1/portfolio parallelizes the per-league fan-out (team_stance +
+    GM Targets + build_league_summary) across a thread pool instead of the
+    old one-league-at-a-time loop. `leagues`/`failed_leagues` must still
+    come back in the SAME order account_store.fetch_saved_leagues returned
+    them — even when a LATER saved league's (mocked) engine call finishes
+    before an EARLIER one — proving the ordering comes from zipping worker
+    results back against `saved_rows`, never from whichever worker happens
+    to finish first.
+    """
+    from services import mobile_api_service
+
+    saved_rows = [
+        {"league_id": "league-slow", "league_name": "Slow League"},
+        {"league_id": "league-fast", "league_name": "Fast League"},
+        {"league_id": "league-skip", "league_name": "Skip League"},
+        {"league_id": "league-boom", "league_name": "Boom League"},
+    ]
+    monkeypatch.setattr(
+        mobile_api_service.account_store, "fetch_saved_leagues", lambda *a, **k: (saved_rows, "")
+    )
+    monkeypatch.setattr(mobile_api_service, "_fetch_team_stance", lambda *a, **k: "")
+    monkeypatch.setattr(mobile_api_service, "_fetch_gm_target_player_ids", lambda *a, **k: ((), ()))
+
+    # Only the FIRST saved league sleeps — everything else resolves near-
+    # instantly, so if result order leaked from completion order instead of
+    # input order, "league-slow" would land last instead of first.
+    SLOW_LEAGUE_DELAY_S = 0.12
+
+    def _fake_build_league_summary(*, league_id, **_kwargs):
+        if league_id == "league-slow":
+            time.sleep(SLOW_LEAGUE_DELAY_S)
+        if league_id == "league-skip":
+            return {"ok": False, "reason": "not_a_member_of_league"}
+        if league_id == "league-boom":
+            raise RuntimeError("Sleeper is unreachable")
+        return {
+            "ok": True,
+            "reason": "",
+            "team_name": f"Team for {league_id}",
+            "wins": 1,
+            "losses": 2,
+            "ties": 0,
+            "health_flag": "Stable",
+            "power_rank": 3,
+            "power_rank_tied": False,
+            "top_item": None,
+        }
+
+    monkeypatch.setattr(
+        mobile_api_service.dashboard_engine, "build_league_summary", _fake_build_league_summary
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [row["league_id"] for row in body["leagues"]] == ["league-slow", "league-fast"]
+    assert [row["league_id"] for row in body["failed_leagues"]] == ["league-skip", "league-boom"]
+
+
+def test_portfolio_fanout_runs_concurrently_and_is_faster_than_sequential(monkeypatch):
+    """The whole point of parallelizing the per-league fan-out: N saved
+    leagues should cost roughly the slowest ONE league's latency, not the
+    sum of all N. Each of the three per-league calls the old sequential
+    loop made one at a time (team_stance, GM Targets,
+    build_league_summary) sleeps DELAY_S here, so a sequential loop over
+    NUM_LEAGUES leagues would cost roughly NUM_LEAGUES * 3 * DELAY_S;
+    parallelized across the fan-out's thread pool (well under its worker
+    cap), every league's slowest call overlaps and the whole request
+    should finish in close to 3 * DELAY_S regardless of NUM_LEAGUES.
+    """
+    from services import mobile_api_service
+
+    DELAY_S = 0.1
+    NUM_LEAGUES = 6
+    saved_rows = [
+        {"league_id": f"league-{i}", "league_name": f"League {i}"} for i in range(NUM_LEAGUES)
+    ]
+    monkeypatch.setattr(
+        mobile_api_service.account_store, "fetch_saved_leagues", lambda *a, **k: (saved_rows, "")
+    )
+
+    def _slow_fetch_team_stance(*_args, **_kwargs):
+        time.sleep(DELAY_S)
+        return ""
+
+    def _slow_fetch_gm_target_player_ids(*_args, **_kwargs):
+        time.sleep(DELAY_S)
+        return (), ()
+
+    def _slow_build_league_summary(*, league_id, **_kwargs):
+        time.sleep(DELAY_S)
+        return {
+            "ok": True,
+            "reason": "",
+            "team_name": f"Team {league_id}",
+            "wins": 1,
+            "losses": 0,
+            "ties": 0,
+            "health_flag": "Stable",
+            "power_rank": 1,
+            "power_rank_tied": False,
+            "top_item": None,
+        }
+
+    monkeypatch.setattr(mobile_api_service, "_fetch_team_stance", _slow_fetch_team_stance)
+    monkeypatch.setattr(
+        mobile_api_service, "_fetch_gm_target_player_ids", _slow_fetch_gm_target_player_ids
+    )
+    monkeypatch.setattr(
+        mobile_api_service.dashboard_engine, "build_league_summary", _slow_build_league_summary
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    # What the OLD one-league-at-a-time loop would have cost — the
+    # regression this test guards against.
+    sequential_baseline_s = NUM_LEAGUES * 3 * DELAY_S
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        started = time.perf_counter()
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        elapsed_s = time.perf_counter() - started
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["leagues"]) == NUM_LEAGUES
+
+    # Comfortably under the sequential baseline — a true parallel run lands
+    # near 3 * DELAY_S regardless of NUM_LEAGUES; this generous margin
+    # (well over half the sequential sum) absorbs CI scheduling jitter
+    # without being able to pass a loop that secretly stayed sequential.
+    assert elapsed_s < sequential_baseline_s * 0.6
+
+
 # --- GM Plan (season-phase-aware roadmap, additive on top of existing engines) ---
 #
 # GM Plan is a NEW aggregation layer, distinct from both the Dashboard's
@@ -5822,6 +6138,185 @@ def test_waivers_excludes_rostered_players_and_ranks_free_agents(monkeypatch):
     # league-global canonical rank.
     assert target["position_rank"] == 1
     assert target["overall_rank"] == 1
+
+
+def test_waiver_free_agent_pool_cached_concurrent_misses_single_flight(monkeypatch):
+    """Two concurrent cache misses for the same (league_id, lens, ...) key
+    must run the expensive free-agent-pool build
+    (modules.player_state_authority.waiver_actionable_player_pool, the real
+    computation behind modules.waivers_ui.build_waiver_free_agent_pool_cached)
+    exactly once, not once per caller.
+
+    Same Redis-backed single-flight guarantee
+    (modules.redis_cache.redis_single_flight_cache) modules.league_rankings
+    and modules.trade_hub_engine already enforce for their own caches — see
+    tests/test_league_rankings.py's equivalent test. tests/conftest.py's
+    autouse fakeredis fixture backs this cache with a real (fake) Redis
+    here, so this exercises the actual code path, not a mock of it.
+    """
+
+    import threading
+
+    from modules import player_state_authority, waivers_ui
+
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+
+    monkeypatch.setattr("modules.sleeper.get_league", lambda _league_id: _TRADE_ANALYZER_LEAGUE)
+    monkeypatch.setattr(
+        "modules.sleeper.get_rosters",
+        lambda _league_id: [
+            {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+            {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+        ],
+    )
+    monkeypatch.setattr("modules.sleeper.trending_add_rank_map", lambda: {})
+    monkeypatch.setattr("modules.rankings.load_players", lambda _db_path: roster_frame)
+    monkeypatch.setattr(
+        "modules.player_eligibility.filter_current_fantasy_players",
+        lambda df, **_kwargs: df,
+    )
+    monkeypatch.setattr(
+        "modules.player_state_authority.filter_current_fantasy_players",
+        lambda df, **_kwargs: df,
+    )
+
+    call_count = 0
+    call_count_lock = threading.Lock()
+    real_pool = player_state_authority.waiver_actionable_player_pool
+
+    def _slow_wrapped_pool(valued, roster_player_map, **kwargs):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        time.sleep(0.2)
+        return real_pool(valued, roster_player_map, **kwargs)
+
+    monkeypatch.setattr(
+        "modules.player_state_authority.waiver_actionable_player_pool",
+        _slow_wrapped_pool,
+    )
+
+    league_id = "test-waiver-pool-single-flight"
+    results: list[tuple[pd.DataFrame, pd.DataFrame]] = []
+    results_lock = threading.Lock()
+
+    def _call():
+        result = waivers_ui.build_waiver_free_agent_pool_cached(
+            league_id=league_id, lens="Dynasty", players_db_path="unused.db"
+        )
+        with results_lock:
+            results.append(result)
+
+    threads = [threading.Thread(target=_call) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert call_count == 1, "concurrent misses for the same key must single-flight to one real computation"
+    assert len(results) == 8
+    for valued, free_agents in results:
+        # target_rb is the only unowned player in the fixture -- every
+        # caller must see this exact, real result, not a stale/wrong or
+        # cross-caller-contaminated one.
+        assert list(free_agents["player_id"]) == ["target_rb"]
+        assert bool(free_agents.iloc[0]["stale_free_agent"]) is False
+        assert valued.shape[0] == len(roster_frame)
+
+
+def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypatch):
+    """A second request for the same (league_id, lens) within the cache's
+    30s window must be a genuine cache hit — the expensive free-agent-pool
+    build (modules.player_state_authority.waiver_actionable_player_pool)
+    runs exactly once across both requests — while both responses still
+    carry the real, correctly-computed free-agent data (not a stale or
+    wrong cached shape)."""
+
+    import threading
+
+    from modules import player_state_authority
+
+    client = _client(monkeypatch)
+
+    auth_user_response_1 = Mock(status_code=200)
+    auth_user_response_1.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response_1 = Mock(status_code=200)
+    profile_response_1.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    auth_user_response_2 = Mock(status_code=200)
+    auth_user_response_2.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response_2 = Mock(status_code=200)
+    profile_response_2.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    roster_frame = _fake_roster_frame()
+    roster_frame.loc[roster_frame["player_id"] == "target_rb", "stats_season"] = 2025
+
+    call_count = 0
+    call_count_lock = threading.Lock()
+    real_pool = player_state_authority.waiver_actionable_player_pool
+
+    def _counted_pool(valued, roster_player_map, **kwargs):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+        return real_pool(valued, roster_player_map, **kwargs)
+
+    with patch(
+        "requests.get",
+        side_effect=[
+            auth_user_response_1,
+            profile_response_1,
+            auth_user_response_2,
+            profile_response_2,
+        ],
+    ):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[
+                    {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                    {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+                ],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch("modules.rankings.load_players", return_value=roster_frame):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            with patch(
+                                "modules.player_state_authority.filter_current_fantasy_players",
+                                side_effect=lambda df, **kwargs: df,
+                            ):
+                                with patch(
+                                    "modules.player_state_authority.waiver_actionable_player_pool",
+                                    side_effect=_counted_pool,
+                                ):
+                                    response_1 = client.get(
+                                        "/v1/leagues/abc/waivers",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+                                    response_2 = client.get(
+                                        "/v1/leagues/abc/waivers",
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response_1.status_code == 200
+    assert response_2.status_code == 200
+    assert call_count == 1, "second request within the cache window must be a cache hit, not a recomputation"
+
+    for body in (response_1.json(), response_2.json()):
+        assert body["ok"] is True
+        player_ids = [p["player_id"] for p in body["players"]]
+        assert player_ids == ["target_rb"]
+        assert body["available_count"] == 1
+        target = body["players"][0]
+        assert target["stale_free_agent"] is False
+        assert target["position_rank"] == 1
+        assert target["overall_rank"] == 1
+        assert body["avg_wire_score"] == round(target["score"])
 
 
 def test_project_priority_add_carries_the_real_waiver_confidence_label(monkeypatch):

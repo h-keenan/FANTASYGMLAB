@@ -1,3 +1,9 @@
+// NOTE: the `.ts` extension here is required, not stylistic — this file is
+// also imported by backgroundRetry.test.ts, which runs directly under
+// plain Node's own module loader (no bundler to resolve an extensionless
+// specifier). See tsconfig.json's `allowImportingTsExtensions` comment.
+import { isTransportErrorMessage } from './transportError.ts';
+
 /**
  * Absorbs a very specific, very common failure: iOS (and, more loosely,
  * Android) suspends a backgrounded app's in-flight network connections and
@@ -31,9 +37,17 @@
  * never a background-transition artifact and must never be retried here.
  * Only a bare transport failure (RN's fetch rejects with a plain
  * `TypeError`, no `.status`) is a candidate.
+ *
+ * Deliberately narrower than "any `TypeError`": an ordinary JS programming
+ * bug (e.g. `Cannot read properties of undefined (reading 'is_premium')`)
+ * throws a `TypeError` too, and blindly retrying *that* would just run the
+ * same buggy code path twice instead of surfacing it. Only a `TypeError`
+ * whose message actually matches a known RN/iOS/Android fetch-failure
+ * signature (see transportError.ts, shared with errorMessages.ts so the
+ * two classifications can't drift apart) is treated as transient.
  */
 export function isTransientNetworkError(err: unknown): boolean {
-  return err instanceof TypeError;
+  return err instanceof TypeError && isTransportErrorMessage(err.message);
 }
 
 /**

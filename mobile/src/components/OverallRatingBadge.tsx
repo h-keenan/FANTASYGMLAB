@@ -33,15 +33,23 @@ import { radii, spacing } from '../theme';
  * already use) so the module itself signals "this number reflects a global
  * rank," not just an ordinary high rating. Every rank outside the top 5 (or
  * omitted entirely) renders exactly as before.
+ *
+ * `label`: the trailing tag after the number — defaults to "OVR" (the
+ * headline rating) but any other 0-99-scale rating sharing the same curve
+ * and percentileColor tint can reuse this exact pill with its own short tag
+ * (e.g. "MKT", "DUR") — see SubRatingRow, the Model tab's sub-rating chip
+ * row, which is the first other caller.
  */
 export default function OverallRatingBadge({
   rating,
   size = 'sm',
   positionRank,
+  label = 'OVR',
 }: {
   rating: number | null | undefined;
   size?: 'sm' | 'md';
   positionRank?: number | null;
+  label?: string;
 }) {
   const { colors, isDark } = useThemeMode();
   if (rating === null || rating === undefined || !Number.isFinite(rating)) return null;
@@ -70,7 +78,7 @@ export default function OverallRatingBadge({
         numberOfLines={1}
         accessibilityLabel={prestige.tier ? `League-wide number ${positionRank} at position, ${Math.round(rating)} overall rating` : undefined}
       >
-        {Math.round(rating)} OVR
+        {Math.round(rating)} {label}
       </AppText>
     </View>
   );

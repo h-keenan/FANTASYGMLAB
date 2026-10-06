@@ -14,6 +14,26 @@ import { awardTierColor, radii, spacing, type ThemeColors } from '../theme';
 // dark-only constant, which put gold/silver text at ~1.4:1/~1.3:1 contrast
 // on a light-mode card (color-system audit, 2026-09-25).
 
+// Award-family -> icon mapping, the mobile analogue of the web app's
+// _accolade_kind/_accolade_emblem_svg special-casing (modules/player_quick
+// _view.py). Every award used to render with the same flat "medal" glyph
+// regardless of what it actually recognized (a 280-carry workhorse season
+// looked identical to a top-10 PPR finish); this gives the usage-badge
+// families — and any future one — their own at-a-glance icon, same as the
+// web app's dedicated emblem per family. Falls back to "medal" for every
+// family this map doesn't know about, so an unrecognized/new family never
+// breaks rendering.
+function awardIconName(family: string): keyof typeof Ionicons.glyphMap {
+  const key = (family || '').toLowerCase();
+  if (key === 'workhorse') return 'flash';
+  if (key === 'bellcow') return 'star';
+  if (key === 'targets' || key.includes('target')) return 'locate';
+  if (key === 'positional-finish' || key === 'overall-finish') return 'ribbon';
+  if (key.endsWith('-yards') || key.includes('yard')) return 'trending-up';
+  if (key.endsWith('-td') || key.includes('touch')) return 'american-football';
+  return 'medal';
+}
+
 /** Above this many awards, the horizontal strip gets a "View All" link that
  * opens the full vertical list — otherwise everything already fits in the
  * scroll and a link would be redundant chrome. */
@@ -37,7 +57,7 @@ function AwardDetailSheet({
             <>
               <View style={styles.sheetHeaderRow}>
                 <View style={[styles.medal, { backgroundColor: `${tierColor}26` }]}>
-                  <Ionicons name="medal" size={22} color={tierColor} />
+                  <Ionicons name={awardIconName(award.family)} size={22} color={tierColor} />
                 </View>
                 <View style={styles.chipTextGroup}>
                   <AppText style={[styles.sheetTitle, { color: tierColor }]}>{award.title}</AppText>
@@ -63,7 +83,7 @@ function AwardChip({ award, onPress }: { award: PlayerAward; onPress: () => void
   return (
     <TouchableOpacity style={[styles.chip, { borderLeftColor: tierColor }]} onPress={onPress}>
       <View style={[styles.medal, { backgroundColor: `${tierColor}26` }]}>
-        <Ionicons name="medal" size={16} color={tierColor} />
+        <Ionicons name={awardIconName(award.family)} size={16} color={tierColor} />
       </View>
       <View style={styles.chipTextGroup}>
         <AppText style={[styles.chipLabel, { color: tierColor }]} numberOfLines={1}>
@@ -137,7 +157,7 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
                     }}
                   >
                     <View style={[styles.medal, { backgroundColor: `${tierColor}26` }]}>
-                      <Ionicons name="medal" size={18} color={tierColor} />
+                      <Ionicons name={awardIconName(award.family)} size={18} color={tierColor} />
                     </View>
                     <View style={styles.chipTextGroup}>
                       <AppText style={[styles.chipLabel, { color: tierColor }]}>

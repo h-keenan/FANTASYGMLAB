@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules import league_history as history
+from modules import league_history_ui
 from modules import league_recaps
 from modules import league_recaps_ui
+from modules import transaction_grades
 from modules.app_styles import APP_CSS
 from modules.league_recaps_styles import LEAGUE_RECAPS_CSS
 from modules.notification_center import compose_activity_inbox
@@ -245,6 +248,107 @@ def test_history_deep_links_and_session_cache_do_not_duplicate():
     assert teaser is not None
     assert teaser["title"] == "Week 7 is ready"
     assert league_recaps.dashboard_teaser({}, league_id="L1") is None
+
+
+def test_get_or_build_weekly_recap_cache_hit_skips_expensive_build():
+    """A repeated call with no new data must hit the session cache and never
+    re-run build_weekly_recap's story-generator passes at all — the cache
+    lookup has to gate the expensive call, not just run alongside it."""
+
+    session: dict = {}
+    first = league_recaps.get_or_build_weekly_recap(
+        session,
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_trade(), _waiver()],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    with patch("modules.league_recaps.build_weekly_recap") as mock_build:
+        second = league_recaps.get_or_build_weekly_recap(
+            session,
+            league_id="L1",
+            season="2025",
+            week=7,
+            transactions=[_trade(), _waiver()],
+            matchups=_matchups(),
+            profiles=PROFILES,
+        )
+    mock_build.assert_not_called()
+    assert second == first
+    assert len(session[league_recaps.SESSION_CACHE_KEY]) == 1
+
+
+def test_get_or_build_weekly_recap_cache_miss_still_builds_and_updates():
+    """Sanity check for the reordering: a genuine change (a new transaction)
+    must still take the build path and refresh the cached entry."""
+
+    session: dict = {}
+    first = league_recaps.get_or_build_weekly_recap(
+        session,
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_trade()],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    with patch(
+        "modules.league_recaps.build_weekly_recap", wraps=league_recaps.build_weekly_recap
+    ) as spy_build:
+        second = league_recaps.get_or_build_weekly_recap(
+            session,
+            league_id="L1",
+            season="2025",
+            week=7,
+            transactions=[_trade(), _waiver()],
+            matchups=_matchups(),
+            profiles=PROFILES,
+        )
+    spy_build.assert_called_once()
+    assert second["fingerprint"] != first["fingerprint"]
+    assert len(session[league_recaps.SESSION_CACHE_KEY]) == 2
+
+
+def test_build_matchup_history_rows_matches_sequential_calls():
+    """Parallelizing the per-week fetches must not change the combined
+    result vs. the old one-week-at-a-time loop: same rows, same order,
+    every week fetched exactly once."""
+
+    calls: list[tuple[str, int]] = []
+
+    def fetch(league_id, week):
+        calls.append((league_id, week))
+        return [
+            {"roster_id": 1, "matchup_id": week, "points": float(week)},
+            {"roster_id": 2, "matchup_id": week, "points": float(week) + 10},
+            {"roster_id": 0, "matchup_id": week, "points": 5.0},  # dropped: no roster_id
+        ]
+
+    rows = league_recaps.build_matchup_history_rows("L1", 4, fetch_matchups=fetch)
+
+    expected_rows: list[dict] = []
+    for week in range(1, 5):
+        expected_rows.append({"week": week, "roster_id": 1, "matchup_id": week, "points": float(week)})
+        expected_rows.append({"week": week, "roster_id": 2, "matchup_id": week, "points": float(week) + 10})
+    assert rows == expected_rows
+    assert sorted(calls) == [("L1", week) for week in range(1, 5)]
+    assert len(calls) == 4
+
+
+def test_build_matchup_history_rows_preserves_week_order_despite_timing():
+    """Weeks that finish fetching out of order (slower calls for earlier
+    weeks) must still be assembled in week order, not completion order."""
+
+    def slow_fetch(league_id, week):
+        # Earlier weeks sleep longer, so if row order followed completion
+        # order instead of week number this would come back shuffled.
+        time.sleep(0.02 * (6 - week))
+        return [{"roster_id": 1, "matchup_id": week, "points": float(week)}]
+
+    rows = league_recaps.build_matchup_history_rows("L1", 5, fetch_matchups=slow_fetch)
+    assert [row["week"] for row in rows] == [1, 2, 3, 4, 5]
 
 
 def test_current_value_lens_is_labeled_and_never_called_historical():
@@ -628,3 +732,78 @@ def test_gm_orb_lists_league_recaps_under_core_via_category_not_group():
     assert '"League Overview"' in core
     assert core.index("League Overview") < core.index("League Recaps / History")
     assert '"League Recaps / History"' not in support
+
+
+def test_recaps_story_grading_reuses_cached_transaction_grades():
+    """render_league_recaps_page's post-recap story-grading loop used to be
+    its own private O(visible x total) later_events rescan calling
+    transaction_grades.grade_transaction with no caching at all (the same bug
+    as league_history_ui, lines ~426-449 pre-fix). It now routes through
+    league_history_ui.cached_transaction_grades, so a bare Streamlit rerun
+    (e.g. re-selecting the same archive week) with unchanged
+    transactions/player_lookup/current_week must not re-invoke
+    grade_transaction a second time."""
+    league_history_ui.cached_transaction_grades.clear()
+
+    trade = _trade()
+
+    class _Session(dict):
+        pass
+
+    def _container(*_args, **_kwargs):
+        ctx = MagicMock()
+        ctx.__enter__ = MagicMock(return_value=ctx)
+        ctx.__exit__ = MagicMock(return_value=False)
+        return ctx
+
+    session = _Session()
+    html_chunks: list[str] = []
+    call_counts_after_each_render: list[int] = []
+
+    with (
+        patch.object(league_recaps_ui.st, "session_state", session),
+        patch.object(league_recaps_ui, "inject_global_styles"),
+        patch.object(league_recaps_ui, "render_html_fragment", side_effect=lambda html: html_chunks.append(html)),
+        patch.object(league_recaps_ui.st, "caption"),
+        patch.object(
+            league_recaps_ui.st,
+            "pills",
+            side_effect=["Recaps", "This week · 7", "Recaps", "This week · 7"],
+        ),
+        patch.object(league_recaps_ui.st, "container", side_effect=_container),
+        patch.object(league_recaps_ui.st, "button", return_value=False),
+        patch.object(league_recaps_ui.deferred_rendering, "mark_deferred_section_ready"),
+        patch.object(
+            league_recaps_ui.league_history_ui,
+            "cached_season_history_payload",
+            return_value={"profiles": PROFILES, "transactions": []},
+        ),
+        patch.object(
+            league_recaps_ui.league_history,
+            "normalize_season_payload",
+            return_value=[trade],
+        ),
+        patch.object(
+            transaction_grades, "grade_transaction", wraps=transaction_grades.grade_transaction
+        ) as spy,
+    ):
+        for _ in range(2):
+            league_recaps_ui.render_league_recaps_page(
+                home_league_id="L1",
+                season="2025",
+                league={"settings": {"last_scored_leg": 7}},
+                player_lookup=PLAYERS,
+                current_profiles=PROFILES,
+                matchups=_matchups(),
+                movement=None,
+                render_section_header=lambda *a, **k: None,
+            )
+            call_counts_after_each_render.append(spy.call_count)
+
+    assert call_counts_after_each_render[0] > 0, "the trade story must be graded at least once"
+    assert call_counts_after_each_render[1] == call_counts_after_each_render[0], (
+        "a rerun with unchanged transactions/player_lookup/current_week must "
+        "not re-invoke grade_transaction"
+    )
+    joined = "\n".join(html_chunks)
+    assert "dg-recap-grade" in joined, "the trade story's grade must actually render"
