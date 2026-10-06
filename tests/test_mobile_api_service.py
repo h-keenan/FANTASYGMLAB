@@ -1468,6 +1468,60 @@ def test_player_rank_in_league_returns_the_players_real_rank(monkeypatch):
     assert body["player"]["overall_rank"] == 2
 
 
+def test_rankings_and_player_rank_share_one_cached_valued_players_frame(monkeypatch):
+    """/rankings and /players/{id}/rank ask the identical (league_id, lens)
+    question — Player Detail opening right after Rankings (or vice versa)
+    must hit ONE cached valued-players frame
+    (league_value_settings.build_valued_players_frame_cached), not each
+    independently rerun apply_valuation_lens's full pool pass (including its
+    row-wise current_risk_multiplier apply) from scratch. Same cache-sharing
+    contract test_dashboard_and_team_rankings_share_one_cached_league_rankings_frame
+    already pins for league_rankings.build_league_rankings_frame_cached."""
+
+    client = _client(monkeypatch)
+    from modules import league_value_settings
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+
+    call_count = {"n": 0}
+    real_apply = league_value_settings.apply_valuation_lens
+
+    def counting_apply(*args, **kwargs):
+        call_count["n"] += 1
+        return real_apply(*args, **kwargs)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                with patch(
+                    "modules.player_eligibility.filter_current_fantasy_players",
+                    side_effect=lambda df, **kwargs: df,
+                ):
+                    with patch.object(
+                        league_value_settings, "apply_valuation_lens", side_effect=counting_apply
+                    ):
+                        rankings_response = client.get(
+                            "/v1/leagues/abc/rankings?lens=Dynasty",
+                            headers={"Authorization": "Bearer good-token"},
+                        )
+                        rank_response = client.get(
+                            "/v1/leagues/abc/players/9002/rank?lens=Dynasty",
+                            headers={"Authorization": "Bearer good-token"},
+                        )
+
+    assert rankings_response.status_code == 200
+    assert rank_response.status_code == 200
+    assert call_count["n"] == 1, "expected the second request to hit the shared cache, not recompute"
+    assert rank_response.json()["player"]["name"] == "Backup Runner"
+
+
 def test_player_rank_in_league_returns_none_for_unknown_player(monkeypatch):
     client = _client(monkeypatch)
 
