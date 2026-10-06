@@ -33,8 +33,10 @@ import WaiverRecommendationCard, {
   waiverTrendingAddLabel,
 } from '../components/WaiverRecommendationCard';
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
+import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
+import { positionRankPrestige } from '../lib/positionRankPrestige';
 import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -379,6 +381,33 @@ function SecondaryWaiverBoard({
   );
 }
 
+/**
+ * coridian_ (Discord, this pass): "we can have the border be the prestige
+ * color with a glowing effect, have the name of the prestige along the top,
+ * have the overall top right and name bottom center middle. And whatever
+ * else." The prestige tier is the same league-wide top-5-at-position
+ * gold/silver/bronze banding `OverallRatingBadge`'s crown already uses (see
+ * lib/positionRankPrestige.ts) — not a new color system — and the glow
+ * treatment is `AnimatedCard`'s own existing `glow`/`glowColor` props (the
+ * same mechanism Dashboard's Top Priority card uses), not a bespoke shadow.
+ * Only a tiered player gets the colored glow border + label; an untiered
+ * player (outside the top 5 at their position) keeps AnimatedCard's normal
+ * plain hairline border and shows no label row at all — per
+ * UI_MAGNA_CARTA.md §14/§15, the glow/colored-border treatment stays
+ * meaningful by not applying to every card uniformly.
+ *
+ * Per UI_HIERARCHY_DIRECTIVE.md §11 (player identity must outrank badges),
+ * the player's name — even though it now sits bottom-center rather than
+ * up top — stays the single largest/boldest text on the card
+ * (`bestAvailableName`, 15/800) specifically to outweigh the smaller
+ * prestige label (10/800, uppercase kicker) and the OVR badge's own tiny
+ * text, rather than letting top-of-card placement read as "most important."
+ *
+ * Feature parity vs. the previous layout: PositionBadge, headshot, numeric
+ * score, and the "{count} active" context all still render — only their
+ * position within the card changed to make room for the prestige label row
+ * and the bottom-center name.
+ */
 function BestAvailableCard({
   position,
   player,
@@ -390,10 +419,28 @@ function BestAvailableCard({
   count: number;
   onPress: () => void;
 }) {
-  const { colors } = useThemeMode();
+  const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const prestige = positionRankPrestige(player.position_rank, isDark);
+  const visual = bestAvailableCardVisual(prestige.tier);
   return (
-    <AnimatedCard style={styles.bestAvailableCard} onPress={onPress}>
+    <AnimatedCard
+      style={styles.bestAvailableCard}
+      onPress={onPress}
+      glow={visual.glow}
+      glowColor={prestige.color ?? undefined}
+    >
+      <View style={styles.bestAvailableTopRow}>
+        {visual.prestigeLabel ? (
+          <AppText style={[styles.bestAvailablePrestigeLabel, { color: prestige.color ?? colors.textTertiary }]}>
+            {visual.prestigeLabel}
+          </AppText>
+        ) : (
+          <View />
+        )}
+        <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+      </View>
+      <PlayerAvatar playerId={player.player_id} size={36} tier={player.tier} style={styles.avatarWrap} />
       {/* Shared PositionBadge (per-position semantic color, e.g. RB green /
           WR blue / TE orange) instead of a flat neutral pill — the concept
           gives each mini-card's position tag a distinct color, and
@@ -402,15 +449,15 @@ function BestAvailableCard({
           on this same screen via PlayerIdentityRow. Wrapped so its own
           alignSelf:'flex-start' doesn't fight this card's centered layout. */}
       <View style={styles.bestAvailablePosBadgeWrap}>
-        <PositionBadge position={position} size="md" />
+        <PositionBadge position={position} size="sm" />
       </View>
-      <PlayerAvatar playerId={player.player_id} size={36} tier={player.tier} style={styles.avatarWrap} />
       <AppText style={styles.bestAvailableName} numberOfLines={1}>
         {player.name ?? 'Unknown'}
       </AppText>
-      <AppText style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
-      <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
-      <AppText style={styles.bestAvailableCount}>{count} active</AppText>
+      <View style={styles.bestAvailableFooterRow}>
+        <AppText style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <AppText style={styles.bestAvailableCount}>{count} active</AppText>
+      </View>
     </AnimatedCard>
   );
 }
@@ -541,15 +588,35 @@ function createStyles(colors: ThemeColors) {
   compactGroupCard: { marginTop: spacing.sm, padding: spacing.sm },
   bestAvailableRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.lg },
   bestAvailableCard: {
-    width: 112,
+    width: 124,
     padding: spacing.sm,
     alignItems: 'center',
     gap: 2,
   },
+  // Prestige label (left) <-> OVR badge (right). An untiered player renders
+  // an empty spacer View in the label's place (rather than omitting the
+  // whole row) so `justifyContent: 'space-between'` still pins the OVR
+  // badge to the right instead of letting it drift to center/left, and
+  // `minHeight` keeps the row from collapsing to 0 for an untiered player
+  // with no rating either, so every card in the strip lines up the same.
+  bestAvailableTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    minHeight: 14,
+    marginBottom: spacing.xs,
+  },
+  bestAvailablePrestigeLabel: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   avatarWrap: { marginRight: spacing.md },
-  bestAvailablePosBadgeWrap: { alignSelf: 'center', marginBottom: spacing.xs },
-  bestAvailableName: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.xs },
-  bestAvailableScore: { fontSize: 14, fontWeight: '700', color: colors.accent },
+  bestAvailablePosBadgeWrap: { alignSelf: 'center', marginTop: spacing.xs },
+  // The most visually dominant text on the card (UI_HIERARCHY_DIRECTIVE.md
+  // §11: player identity must outrank badges/chips) — larger and bolder
+  // than the prestige label above it and the OVR badge's own text, even
+  // though both of those sit higher in the layout.
+  bestAvailableName: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },
+  bestAvailableFooterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
+  bestAvailableScore: { fontSize: 13, fontWeight: '700', color: colors.accent },
   bestAvailableCount: { fontSize: 10, color: colors.textTertiary },
   // No marginTop here (unlike when this board rendered as the list's own
   // ListFooterComponent, trailing the whole page): it now sits directly
