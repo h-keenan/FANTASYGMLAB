@@ -91,3 +91,25 @@ test('withBackgroundRetry: gives up after a single retry (no infinite loop / bac
   );
   assert.equal(calls, 2);
 });
+
+test('isTransientNetworkError: false for an ordinary programming TypeError (not just any TypeError)', () => {
+  assert.equal(
+    isTransientNetworkError(new TypeError("Cannot read properties of undefined (reading 'is_premium')")),
+    false,
+  );
+});
+
+test('withBackgroundRetry: does NOT retry an arbitrary programming TypeError even if backgrounded', async () => {
+  let calls = 0;
+  await assert.rejects(
+    withBackgroundRetry(
+      async () => {
+        calls += 1;
+        throw new TypeError("Cannot read properties of undefined (reading 'is_premium')");
+      },
+      () => true, // backgrounded — but this still isn't a transport failure
+    ),
+    TypeError,
+  );
+  assert.equal(calls, 1);
+});

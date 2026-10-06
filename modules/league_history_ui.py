@@ -247,6 +247,54 @@ def cached_season_chain(home_league_id: str) -> list[dict[str, Any]]:
     return history.walk_season_chain(home_league_id, get_league)
 
 
+@st.cache_data(ttl=15 * 60, show_spinner=False)
+def cached_transaction_grades(
+    league_id: str,
+    normalized: Sequence[Mapping[str, Any]],
+    player_lookup: Mapping[str, Mapping[str, Any]] | None,
+    current_week: int,
+) -> dict[str, dict[str, Any]]:
+    """Grade every transaction in ``normalized`` once per distinct input set.
+
+    ``transaction_grades.grade_transaction`` has no caching of its own, and
+    each call's ``later_events`` is itself an O(total) rescan of every event
+    in the season — so grading used to re-run from scratch on every Streamlit
+    rerun, including a bare filter-pill click (``selected_filter`` below),
+    even when ``league_id``/``normalized``/``player_lookup``/``current_week``
+    were unchanged.
+
+    Keyed on the *full* ``normalized`` list rather than the filtered
+    ``visible`` subset: ``later_events`` must be computed against every
+    event in the season regardless of which filter pill is selected, so
+    grading the full season once and letting callers index by
+    ``transaction_id`` makes a filter change a pure dict lookup instead of a
+    re-grade. A genuine change to the underlying transaction/history data
+    changes ``normalized`` (or ``player_lookup``/``current_week``), which
+    changes the cache key, so stale grades are never served.
+    """
+
+    grades: dict[str, dict[str, Any]] = {}
+    for item in normalized:
+        event_id = _text(item.get("transaction_id"))
+        if not event_id:
+            continue
+        later = [
+            other
+            for other in normalized
+            if _text(other.get("transaction_id")) != event_id
+            and int(other.get("timestamp") or 0) > int(item.get("timestamp") or 0)
+        ]
+        report = transaction_grades.grade_transaction(
+            item,
+            player_lookup=player_lookup,
+            current_week=current_week,
+            later_events=later,
+        )
+        if report:
+            grades[event_id] = report
+    return grades
+
+
 def render_league_history_section(
     *,
     home_league_id: str,
@@ -334,25 +382,14 @@ def render_league_history_section(
         key=filter_widget_key(home_league_id),
     ) or history.FILTER_ALL
     visible = history.filter_history(normalized, selected_filter)
+    all_grades = cached_transaction_grades(
+        selected_league_id, normalized, player_lookup, current_week
+    )
     grades: dict[str, Mapping[str, Any]] = {}
-    for index, item in enumerate(visible):
+    for item in visible:
         event_id = _text(item.get("transaction_id"))
-        if not event_id:
-            continue
-        later = [
-            other
-            for other in normalized
-            if _text(other.get("transaction_id")) != event_id
-            and int(other.get("timestamp") or 0) > int(item.get("timestamp") or 0)
-        ]
-        report = transaction_grades.grade_transaction(
-            item,
-            player_lookup=player_lookup,
-            current_week=current_week,
-            later_events=later,
-        )
-        if report:
-            grades[event_id] = report
+        if event_id and event_id in all_grades:
+            grades[event_id] = all_grades[event_id]
     render_html_fragment(
         history_feed_html(
             visible,

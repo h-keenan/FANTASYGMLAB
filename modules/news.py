@@ -25,6 +25,7 @@ NEWS_FEEDS = [
     "https://www.cbssports.com/rss/headlines/nfl/",
     "https://sports.yahoo.com/nfl/rss/",
     "https://www.nbcsports.com/profootballtalk.rss",
+    "https://www.profootballrumors.com/feed",
 ]
 
 NEWS_CACHE_PATH = "data/news_cache.json"

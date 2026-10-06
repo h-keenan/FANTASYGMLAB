@@ -10,12 +10,16 @@
 --   - Personal watchlist layered on top (prospect_watchlist): plain
 --     follow/unfollow, no scouting fields duplicated there.
 --
--- PLACEHOLDER DATA WARNING: there is no licensed college recruiting/draft
--- feed wired into this app yet. The seed rows below are a small, explicitly
--- fictional prospect list (see modules/college_scouting.py's
--- PLACEHOLDER_PROSPECTS docstring for why) — replace both the moment a real
--- data source is integrated. Keep this file's seed rows and that Python
--- constant in sync by hand until then.
+-- NO FABRICATED DATA: there is no licensed college recruiting/draft feed
+-- wired into this app yet. This migration deliberately seeds zero rows into
+-- college_prospects — inventing fictional prospect names/schools would be
+-- indistinguishable from real scouting subjects to the people using this
+-- screen (see modules/college_scouting.py's "NO FABRICATED DATA" docstring
+-- section). The table is real and migration-managed; it starts empty and
+-- stays empty until a real prospect data source is loaded into it. Until
+-- then, services/mobile_api_service.py's /v1/scouting/prospects returns an
+-- empty prospect list and the mobile screen shows its existing "No
+-- prospects yet" empty state — never invented rows.
 --
 -- RLS:
 --   - college_prospects: read-only reference data. SELECT for any
@@ -57,29 +61,14 @@ using (true);
 -- No insert/update/delete policy — this table is migration-managed only.
 
 comment on table public.college_prospects is
-    'Shared college prospect catalog. PLACEHOLDER seed data (see modules/college_scouting.py) pending a real recruiting/draft data feed. Read-only to the app; RLS select-all, no app-writable policy.';
+    'Shared college prospect catalog. No seed data — real recruiting/draft data only; see modules/college_scouting.py "NO FABRICATED DATA". Read-only to the app; RLS select-all, no app-writable policy.';
 
--- Seed rows — must mirror modules/college_scouting.py's PLACEHOLDER_PROSPECTS
--- exactly (same ids). `on conflict do nothing` so re-running this file is
--- always safe.
-insert into public.college_prospects (id, name, position, school, draft_year) values
-    ('2026-qb-01', 'Marcus Whitfield', 'QB', 'Ohio State', 2026),
-    ('2026-qb-02', 'Deion Castellan', 'QB', 'Oregon', 2026),
-    ('2026-rb-01', 'Trevor Lindqvist', 'RB', 'Georgia', 2026),
-    ('2026-rb-02', 'Jalen Ashford', 'RB', 'Texas', 2026),
-    ('2026-rb-03', 'Corey Mabanta', 'RB', 'LSU', 2026),
-    ('2026-wr-01', 'Xavier Donnell', 'WR', 'Alabama', 2026),
-    ('2026-wr-02', 'Bryson Okafor', 'WR', 'Michigan', 2026),
-    ('2026-wr-03', 'Isaiah Ferro', 'WR', 'Florida State', 2026),
-    ('2026-wr-04', 'Nate Kowalczyk', 'WR', 'Penn State', 2026),
-    ('2026-te-01', 'Grant Salois', 'TE', 'Notre Dame', 2026),
-    ('2026-te-02', 'Dorian Vasquez', 'TE', 'Tennessee', 2026),
-    ('2026-ot-01', 'Colton Weyrich', 'OT', 'Iowa', 2026),
-    ('2026-edge-01', 'Amari Benoit', 'EDGE', 'Clemson', 2026),
-    ('2026-cb-01', 'Devon Marchetti', 'CB', 'USC', 2026),
-    ('2026-cb-02', 'Elijah Trumbauer', 'CB', 'Miami', 2026),
-    ('2026-s-01', 'Weston Ibekwe', 'S', 'Utah', 2026)
-on conflict (id) do nothing;
+-- Intentionally no seed INSERT here. When a real prospect data source is
+-- integrated, load real rows here (or via an admin tool) — only
+-- fantasy-relevant positions (QB/RB/WR/TE) matter to this app, since it has
+-- no IDP support and offensive tackles have no fantasy scoring value;
+-- modules/college_scouting.py's SCOUTING_RELEVANT_POSITIONS filter also
+-- drops any other position at read time as a backstop.
 
 create table if not exists public.scouting_reports (
     user_id uuid not null references auth.users(id) on delete cascade,

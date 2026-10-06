@@ -76,6 +76,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import dataclasses
+import functools
 import hashlib
 import logging
 import os
@@ -490,11 +491,12 @@ def health() -> dict[str, str]:
     Also piggybacks the same stale-while-revalidate players refresh
     require_user triggers for authenticated requests (see
     _maybe_schedule_players_refresh's docstring) — this endpoint needs no
-    auth and is already pinged every 10 minutes by the keep-alive workflow
-    (.github/workflows/keep-alive.yml), so it doubles as a reliable,
-    traffic-independent freshness check: injury_status/score/rank no longer
-    depend on a real user happening to hit an authenticated endpoint after
-    the hourly Sleeper cache goes stale.
+    auth, so any external health check pinging it (e.g. an uptime monitor,
+    see docs/SELF_HOSTED_MIGRATION.md's "Basic uptime monitoring" section)
+    doubles as a reliable, traffic-independent freshness check:
+    injury_status/score/rank no longer depend on a real user happening to
+    hit an authenticated endpoint after the hourly Sleeper cache goes
+    stale.
     """
 
     _maybe_schedule_players_refresh()
@@ -1775,16 +1777,14 @@ def get_league_rankings(
 
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_rankings", league=league
+    # Shares the (league_id, lens)-scoped cache every other list/detail
+    # endpoint now pulls this exact pipeline from — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "players": []}
-
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
 
     score_field = league_value_settings.valuation_score_field(lens)
     scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
@@ -1835,16 +1835,15 @@ def get_player_rank_in_league(
 
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_rankings", league=league
+    # Same (league_id, lens)-scoped cache /rankings pulls from — Player
+    # Detail hitting this per-player endpoint no longer re-runs the full
+    # pool valuation pass it was only ever going to filter down to one row.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "player": None}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
     scoring_context = canonical_player_ranking.resolve_scoring_rank_context(settings)
     ranked = canonical_player_ranking.attach_canonical_ranks(
@@ -1866,6 +1865,7 @@ _NEWS_SOURCE_DISPLAY_NAMES = {
     "cbssports.com": "CBS Sports",
     "sports.yahoo.com": "Yahoo Sports",
     "nbcsports.com": "Pro Football Talk",
+    "profootballrumors.com": "Pro Football Rumors",
 }
 
 
@@ -2044,16 +2044,14 @@ def post_trade_analyzer(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_trade_analyzer", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "verdict": None, "reason": "no_player_data"}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, body.lens, settings)
     score_field = league_value_settings.valuation_score_field(body.lens)
 
     my_roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
@@ -2262,16 +2260,15 @@ def get_league_recap(
 
     profiles = sleeper.get_league_roster_profiles(league_id) or {}
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_recap", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    # Recap's lookup only ever needs the Dynasty lens, matching this
+    # endpoint's prior hardcoded "Dynasty" argument.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens="Dynasty", players_db_path=PLAYERS_DB_PATH
     )
     lookup_rows: list[dict[str, Any]] = []
-    if not players_df.empty:
-        settings = league_value_settings.detect_league_value_settings_from_payload(league)
-        valued = league_value_settings.apply_valuation_lens(players_df, "Dynasty", settings)
+    if not valued.empty:
         cols = [c for c in ("player_id", "name", "position", "team", "value_score") if c in valued.columns]
         if cols:
             lookup_rows = valued[cols].to_dict("records")
@@ -2867,6 +2864,14 @@ def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None
     "why" sentence naming this player's real strongest/weakest composite
     inputs (modules.player_quick_view.decision_fit_narrative), not a new
     computation over the numbers already in this same dict.
+
+    market_rating/opportunity_rating/scarcity_rating/role_rating/
+    durability_rating are the Model tab's sub-rating chip row — the same
+    four composite-score inputs above (plus a durability read), re-expressed
+    on the 0-99 OVR-ring scale instead of their raw composite units, via
+    modules.player_quick_view.sub_ratings. Kept alongside the raw
+    *_score fields rather than replacing them: those stay the source of
+    truth for decision_fit_narrative and any other raw-unit consumer.
     """
 
     age_score_raw = row.get("age_score") if "age_score" in row.index else None
@@ -2888,6 +2893,10 @@ def _project_player_model(row: pd.Series, players_df: pd.DataFrame | None = None
         "workload_trend": _clean_json_value(row.get("workload_trend")),
         "usage_trend": _project_usage_trend(row),
         "decision_fit_narrative": player_quick_view.decision_fit_narrative(players_df, row),
+        **{
+            key: _clean_json_value(value)
+            for key, value in player_quick_view.sub_ratings(players_df, row).items()
+        },
     }
 
 
@@ -3398,17 +3407,22 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
     report and watchlist status, in one round trip (powers the mobile
     College Prospects list screen).
 
-    Fails soft: if scouting_reports/prospect_watchlist aren't reachable yet
-    (migration not applied), this still returns the prospect catalog with
-    empty aggregates rather than erroring the whole screen — same posture as
-    every other Supabase-backed mobile feature in this file.
+    Fails soft: if the catalog or scouting_reports/prospect_watchlist aren't
+    reachable yet (migration not applied), this still returns 200 with an
+    empty/partial result rather than erroring the whole screen — same
+    posture as every other Supabase-backed mobile feature in this file.
+    There is no fabricated-data fallback: if the real catalog isn't
+    available, ``prospects`` is simply empty (see
+    modules/college_scouting.py's "NO FABRICATED DATA" docstring section),
+    and the mobile screen's existing empty state ("No prospects yet") covers
+    that honestly rather than inventing players.
     """
 
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
 
-    prospects, used_placeholder = college_scouting.fetch_all_prospects(config, access_token)
+    prospects, prospects_error = college_scouting.fetch_all_prospects(config, access_token)
     reports, reports_error = college_scouting.fetch_all_scouting_reports(config, access_token)
     watchlist_ids: list[str] = []
     if user_id:
@@ -3423,7 +3437,7 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
     return {
         "ok": True,
         "prospects": rows,
-        "used_placeholder_catalog": used_placeholder,
+        "catalog_available": not bool(prospects_error),
         "reason": "scouting_reports_not_available" if reports_error else "",
     }
 
@@ -3568,6 +3582,7 @@ def _project_award(badge: player_awards.PlayerBadge) -> dict[str, Any]:
     return {
         "badge_id": badge.badge_id,
         "category": badge.category,
+        "family": badge.family,
         "title": badge.title,
         "short_label": badge.short_label,
         "tier": badge.tier,
@@ -4146,16 +4161,16 @@ def get_league_dashboard(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_dashboard", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    # Dashboard is the app's home screen, opened on every session, so this
+    # was previously the single most frequent re-run of the uncached chain.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": "no_player_data"}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
 
     roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
@@ -4308,6 +4323,12 @@ def get_league_dashboard(
     }
 
 
+# Bounds the per-request fan-out in get_portfolio below — plenty for
+# modules.saved_leagues' real-world Premium usage (a handful of leagues)
+# without one request opening unboundedly many threads if an account has
+# saved dozens.
+_PORTFOLIO_FANOUT_MAX_WORKERS = 8
+
 _PORTFOLIO_UPSELL = {
     "title": "See every league at a glance",
     "body": (
@@ -4317,6 +4338,77 @@ _PORTFOLIO_UPSELL = {
         "opportunity across all of them in one place."
     ),
 }
+
+
+def _build_portfolio_row(
+    config: dict,
+    user_id: str,
+    access_token: str,
+    lens: str,
+    sleeper_username: str,
+    entitlement: str,
+    row: dict[str, Any],
+) -> dict[str, Any]:
+    """One saved league's Portfolio row — runs on a worker thread.
+
+    Fans out the exact same three per-league calls the old sequential loop
+    made (team_stance, GM Targets, dashboard_engine.build_league_summary) so
+    a caller with several saved leagues pays the slowest ONE of them
+    instead of the sum of all of them. Safe to run concurrently: `config`/
+    `user_id`/`access_token` are read-only here, `_fetch_team_stance` /
+    `_fetch_gm_target_player_ids` each make their own `requests.get` call
+    (no shared Session object to race), and dashboard_engine.build_league_summary's
+    own Sleeper/rankings caches are already keyed per league_id and guarded
+    with their own locks (modules.sleeper's `_players_memo_lock`,
+    modules.rankings' `_PROCESS_BUILD_LOCKS`) for exactly this kind of
+    concurrent multi-league access.
+    """
+
+    league_id = saved_leagues.normalize_league_id(row.get("league_id"))
+    if not league_id:
+        return {"status": "skip"}
+    league_name = str(row.get("league_name") or "").strip() or league_id
+
+    try:
+        team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
+        gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+            config, user_id, access_token, league_id
+        )
+        summary = dashboard_engine.build_league_summary(
+            league_id=league_id,
+            lens=lens,
+            sleeper_username=sleeper_username,
+            players_db_path=PLAYERS_DB_PATH,
+            team_stance_value=team_stance_value,
+            gm_target_player_ids=gm_target_ids,
+            gm_untouchable_player_ids=gm_untouchable_ids,
+            entitlement=entitlement,
+        )
+    except Exception:
+        return {
+            "status": "failed",
+            "league_id": league_id,
+            "league_name": league_name,
+            "reason": "unavailable",
+        }
+
+    if not summary.get("ok"):
+        reason = summary.get("reason") or "unavailable"
+        if reason not in dashboard_engine.LEAGUE_SUMMARY_SKIP_REASONS:
+            reason = "unavailable"
+        return {
+            "status": "failed",
+            "league_id": league_id,
+            "league_name": league_name,
+            "reason": reason,
+        }
+
+    return {
+        "status": "ok",
+        "league_id": league_id,
+        "league_name": league_name,
+        "summary": summary,
+    }
 
 
 @app.get("/v1/portfolio")
@@ -4393,43 +4485,43 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
     leagues: list[dict[str, Any]] = []
     failed_leagues: list[dict[str, Any]] = []
 
-    for row in saved_rows:
-        league_id = saved_leagues.normalize_league_id(row.get("league_id"))
-        if not league_id:
-            continue
-        league_name = str(row.get("league_name") or "").strip() or league_id
+    # Fan the per-league work out across a thread pool instead of paying
+    # each saved league's Supabase + Sleeper round trips back to back.
+    # executor.map yields results in `saved_rows` order regardless of which
+    # worker finishes first, so the loop below reproduces exactly the old
+    # sequential loop's ordering and output. See _build_portfolio_row's
+    # docstring for the thread-safety case.
+    results: list[dict[str, Any]] = []
+    if saved_rows:
+        worker = functools.partial(
+            _build_portfolio_row, config, user_id, access_token, lens, sleeper_username, entitlement
+        )
+        max_workers = min(len(saved_rows), _PORTFOLIO_FANOUT_MAX_WORKERS)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="dgm-portfolio-fanout"
+        ) as executor:
+            results = list(executor.map(worker, saved_rows))
 
-        try:
-            team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
-            gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
-                config, user_id, access_token, league_id
+    for result in results:
+        status = result["status"]
+        if status == "skip":
+            continue
+        if status == "failed":
+            failed_leagues.append(
+                {
+                    "league_id": result["league_id"],
+                    "league_name": result["league_name"],
+                    "reason": result["reason"],
+                }
             )
-            summary = dashboard_engine.build_league_summary(
-                league_id=league_id,
-                lens=lens,
-                sleeper_username=sleeper_username,
-                players_db_path=PLAYERS_DB_PATH,
-                team_stance_value=team_stance_value,
-                gm_target_player_ids=gm_target_ids,
-                gm_untouchable_player_ids=gm_untouchable_ids,
-                entitlement=entitlement,
-            )
-        except Exception:
-            failed_leagues.append({"league_id": league_id, "league_name": league_name, "reason": "unavailable"})
             continue
 
-        if not summary.get("ok"):
-            reason = summary.get("reason") or "unavailable"
-            if reason not in dashboard_engine.LEAGUE_SUMMARY_SKIP_REASONS:
-                reason = "unavailable"
-            failed_leagues.append({"league_id": league_id, "league_name": league_name, "reason": reason})
-            continue
-
+        summary = result["summary"]
         top_item = summary.get("top_item")
         leagues.append(
             {
-                "league_id": league_id,
-                "league_name": league_name,
+                "league_id": result["league_id"],
+                "league_name": result["league_name"],
                 "team_name": summary.get("team_name") or "",
                 "wins": _clean_json_value(summary.get("wins")),
                 "losses": _clean_json_value(summary.get("losses")),
@@ -4796,16 +4888,14 @@ def get_league_my_team(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_my_team", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": True, "starters": [], "bench": [], "reason": "no_player_data"}
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
 
     roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
@@ -4833,12 +4923,18 @@ def get_league_my_team(
 
 
 # The one sentence every matchup surface (API, mobile headline, tests)
-# points at for what this comparison actually measures. This app has NO
-# weekly points-projection data source — nothing in modules/ produces one —
-# so the matchup view ranks lineups by the same season-long value/
-# opportunity signal the rest of the app already computes, and says so.
-# Do not relabel this as "projected points" without a real weekly
-# projection feed behind it.
+# points at for what this comparison actually measures. ``modules.
+# player_projections`` does now provide a real weekly points-projection
+# data source (wired into the REAL current-week lineup below — see
+# `_project_real_starter_row`/`_weekly_projection_for_player` — and into
+# GET /v1/players/{id}/schedule), but this SUGGESTED lineup is deliberately
+# left out of that: it is this app's best-roster recommendation in
+# season-long value/opportunity terms (the same signal the rest of the app
+# already computes), not a single week's matchup-dependent point estimate
+# — mixing a short-term projection into "who should I roster as a starter"
+# would make the recommendation swing on one week's matchup variance,
+# which isn't what this view answers. Do not relabel this as "projected
+# points" without deciding that tradeoff deliberately first.
 SEASON_VALUE_BASIS = "season_value"
 SEASON_VALUE_BASIS_LABEL = "Season-long value & opportunity signal — not a weekly points projection."
 
@@ -4861,8 +4957,12 @@ def _matchup_starter_why(player: dict[str, Any], best_score_by_position: dict[st
     Every clause comes from data that genuinely exists on the lineup row
     (tier, opportunity/workload label, season-value rank on this roster,
     injury tag). Deliberately says nothing about this week's opponent or
-    expected points — no opponent-defense or weekly-projection data source
-    exists in this codebase.
+    expected points: a real weekly-projection/opponent-defense data source
+    does now exist (``modules.player_projections``, surfaced on the REAL
+    lineup's rows below), but this SUGGESTED lineup is scoped to season-
+    long value terms only — see ``SEASON_VALUE_BASIS_LABEL``'s comment for
+    why mixing the two here is deliberately out of scope rather than an
+    oversight.
     """
 
     bits: list[str] = []
@@ -5252,16 +5352,14 @@ def get_league_matchup(
     if opponent_entry is None:
         return _empty_matchup("bye_week", week=current_week)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_matchup", league=league
+    # Same (league_id, lens)-scoped cache /rankings and friends share — see
+    # league_value_settings.build_valued_players_frame_cached's docstring.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-    if players_df.empty:
+    if valued.empty:
         return _empty_matchup("no_player_data", week=current_week)
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
 
     opponent_roster_id = str(opponent_entry.get("roster_id") or "")
@@ -5385,6 +5483,13 @@ def _project_waiver_row(
         "stale_free_agent": bool(row.get("stale_free_agent") or False),
         "injury_replacement_fit": bool(row.get("injury_replacement_fit") or False),
         "injury_replacement_note": _clean_json_value(row.get("injury_replacement_note")) or "",
+        # Sleeper's GLOBAL trending-add signal — cross-league, last-24h add
+        # velocity across all of Sleeper, NOT scoped to this league (see
+        # waivers_ui.annotate_sleeper_trending_add). sleeper_trending_add_rank
+        # is 1-indexed within that global list (1 = most added platform-wide).
+        "sleeper_trending_add": bool(row.get("sleeper_trending_add") or False),
+        "sleeper_trending_add_count": _clean_json_value(row.get("sleeper_trending_add_count")),
+        "sleeper_trending_add_rank": _clean_json_value(row.get("sleeper_trending_add_rank")),
         # 0-99 "OVR" badge — see player_quick_view.overall_ratings_for_pool.
         # Percentiled against the full league-eligible pool (attached to
         # `valued` in get_league_waivers before the free-agent-only filter
@@ -5464,37 +5569,20 @@ def get_league_waivers(
         raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(PLAYERS_DB_PATH)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(PLAYERS_DB_PATH)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="mobile_api_waivers", league=league
-    )
-    if players_df.empty:
-        return {"ok": True, "players": [], "priority_adds": [], "needed_positions": [], "reason": "no_player_data"}
-
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
-    # Percentiled against the full league-eligible pool (rostered players
-    # included) BEFORE the free-agent-only filter below narrows it — see
-    # _project_waiver_row's overall_rating comment for why the wire-relative
-    # free-agent pool would be the wrong denominator for this number.
-    valued["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(
-        valued, score_column=score_field
+    # The league-wide, asker-independent part of this pipeline (valuation
+    # lens, overall-rating percentiles, the stale-free-agent row-wise check,
+    # Sleeper trending-add, position/overall ranking) is identical for every
+    # caller asking about this (league_id, lens) combo within the same live
+    # window, so it's single-flighted + Redis-cached — see
+    # modules.waivers_ui.build_waiver_free_agent_pool_cached and the big
+    # comment above its private compute function for why only this part
+    # (not the per-roster work below) is in the cache boundary.
+    valued, free_agents = waivers_ui.build_waiver_free_agent_pool_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
-
-    rosters = sleeper.get_rosters(league_id)
-    roster_player_map = {
-        str(roster.get("roster_id")): tuple(
-            str(pid) for pid in (roster.get("players") or []) if pid is not None
-        )
-        for roster in rosters
-        if roster.get("roster_id") is not None
-    }
-
-    free_agents = player_state_authority.waiver_actionable_player_pool(
-        valued, roster_player_map, surface="mobile_api_waivers"
-    )
+    if valued.empty:
+        return {"ok": True, "players": [], "priority_adds": [], "needed_positions": [], "reason": "no_player_data"}
     if free_agents.empty:
         return {
             "ok": True,
@@ -5506,19 +5594,16 @@ def get_league_waivers(
             "reason": "",
         }
 
-    free_agents = free_agents.copy()
-    free_agents["stale_free_agent"] = free_agents.apply(rankings.is_probably_stale_free_agent, axis=1)
-    free_agents.loc[free_agents["stale_free_agent"], ["dynasty_score", "value_score"]] = 0
-    free_agents = free_agents.sort_values(["stale_free_agent", score_field], ascending=[True, False])
+    rosters = sleeper.get_rosters(league_id)
+    roster_player_map = {
+        str(roster.get("roster_id")): tuple(
+            str(pid) for pid in (roster.get("players") or []) if pid is not None
+        )
+        for roster in rosters
+        if roster.get("roster_id") is not None
+    }
 
     score_series = pd.to_numeric(free_agents.get(score_field, 0), errors="coerce").fillna(0)
-    free_agents["position_rank"] = (
-        free_agents.groupby("position")[score_field]
-        .rank(method="first", ascending=False)
-        .fillna(0)
-        .astype(int)
-    )
-    free_agents["overall_rank"] = score_series.rank(method="first", ascending=False).fillna(0).astype(int)
     avg_wire_score = int(score_series.mean()) if len(score_series) else 0
 
     roster_id = str(my_roster.get("roster_id") or "")

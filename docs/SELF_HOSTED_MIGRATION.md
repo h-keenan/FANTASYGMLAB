@@ -274,11 +274,14 @@ Notes:
 Render auto-deploys on every push to `main` — that behavior does **not**
 exist on this box. Nothing in this repo (no GitHub Actions workflow, no
 webhook, no cron) rebuilds or restarts this stack when `main` changes;
-`.github/workflows/` only runs CI (`ci.yml`), a keep-alive ping
-(`keep-alive.yml`), and auto-merge (`auto-merge.yml`) — none of them touch
-this server. The stack runs whatever was on disk the last time someone ran
-section 3's `docker compose build && docker compose up -d` here, and it
-will keep serving that exact build indefinitely, through any number of
+`.github/workflows/` only runs CI (`ci.yml`) and auto-merge
+(`auto-merge.yml`) — none of them touch this server. (A Render-specific
+`keep-alive.yml` ping used to live here too; it was retired once the app
+fully cut over to this self-hosted box, since the Render free/sleeping-
+tier cold-start problem it worked around doesn't apply to a `restart:
+unless-stopped` Docker stack.) The stack runs whatever was on disk the
+last time someone ran section 3's `docker compose build && docker compose
+up -d` here, and it will keep serving that exact build indefinitely, through any number of
 later merges to `main`, until a human repeats those steps.
 
 Concretely: if this box was stood up once and left alone, it can silently
@@ -462,7 +465,7 @@ migration prep itself.
 | `Dockerfile` | Multi-stage build (builder installs deps into a venv; runtime stage is a slim Python image + app code). One shared image for all four real services — see the Dockerfile's own header comment for the reasoning. |
 | `.dockerignore` | Keeps the build context to only what the Python services need (excludes `mobile/`, `tests/`, `docs/`, dev/editor state, secrets). |
 | `docker-compose.yml` | Orchestrates `web`, `mobile-api`, `redis`, `stripe-webhook`, `revenuecat-webhook`, and `caddy`; healthchecks on each app service's existing `/health`/`/_stcore/health` endpoint (and `redis-cli ping` for `redis`); `mobile-api` depends on `redis` reporting healthy before it starts, and `caddy` waits on all four app services' healthchecks (`depends_on: condition: service_healthy`) before proxying; `restart: unless-stopped` everywhere; secrets only via `.env`; sets `DYNASTYGM_SELF_HOSTED=1` on every app service (see section 3). |
-| `Caddyfile` | Reverse proxy + automatic HTTPS routing per placeholder subdomain, plus static `file_server` for the marketing site. |
+| `Caddyfile` | Reverse proxy + automatic HTTPS routing per placeholder subdomain, plus static `file_server` for the marketing site. Also handles response compression (`encode zstd gzip` on `web`/`mobile-api`/the marketing site, skipped on the two webhook endpoints) and `Cache-Control` headers on the marketing site's static assets (images/fonts get `max-age=86400`, CSS/JS get `max-age=3600`, both `must-revalidate` since those files aren't content-hashed; HTML/`robots.txt`/`sitemap.xml` get no explicit cache header). |
 | `.env.example` | Every required secret/variable name, matching `render.yaml`'s names exactly, with a comment on which Render service/dashboard it comes from. Copy to `.env` (gitignored) and fill in real values. |
 | `deploy/systemd/fantasygmlab.service` | systemd unit so the stack starts on boot and stops cleanly on `systemctl stop`. |
 | `docs/SELF_HOSTED_MIGRATION.md` | This runbook. |

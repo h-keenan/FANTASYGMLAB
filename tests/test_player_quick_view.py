@@ -190,6 +190,10 @@ def test_news_source_normalization_and_card_contract():
         )
         == "RotoWire"
     )
+    assert (
+        player_quick_view.normalize_news_source("https://www.profootballrumors.com/feed")
+        == "Pro Football Rumors"
+    )
     assert player_quick_view.normalize_news_source("Unknown Desk") == "Unknown Desk"
     card = player_quick_view.news_card_html(
         player_quick_view.NewsItem(
@@ -614,3 +618,72 @@ def test_decision_fit_narrative_none_below_the_percentile_pool_minimum():
 
 def test_decision_fit_narrative_none_without_a_position_pool():
     assert player_quick_view.decision_fit_narrative(None, _row()) is None
+
+
+def test_sub_ratings_run_the_same_percentiles_through_the_ovr_curve():
+    # Reuses _decision_fit_pool's exact ascending setup, already proven by
+    # the narrative tests above to land the subject at the 100th percentile
+    # (market_score) and the 5th (scarcity_score).
+    players = _decision_fit_pool(
+        20,
+        market_score=1000.0,
+        scarcity_score=-1.0,
+        opportunity_score=10.0,
+        role_score=10.0,
+    )
+
+    ratings = player_quick_view.sub_ratings(players, _subject_row(players))
+
+    # Same curve the headline OVR badge uses (_overall_rating_from_percentile):
+    # 100th percentile -> the scale's ceiling.
+    assert ratings["market_rating"] == player_quick_view.OVERALL_RATING_MAX
+    assert ratings["market_rating"] == player_quick_view._overall_rating_from_percentile(1.0)
+    # 5th percentile -> the same curve's compressed low end, not a raw 5.
+    assert ratings["scarcity_rating"] == player_quick_view._overall_rating_from_percentile(0.05)
+    assert ratings["scarcity_rating"] != 5
+
+
+def test_sub_ratings_none_below_the_percentile_pool_minimum():
+    players = _decision_fit_pool(
+        player_quick_view.PERCENTILE_MIN_POOL - 2,
+        market_score=1000.0,
+        scarcity_score=1.0,
+    )
+
+    ratings = player_quick_view.sub_ratings(players, _subject_row(players))
+
+    assert ratings["market_rating"] is None
+    assert ratings["opportunity_rating"] is None
+    assert ratings["scarcity_rating"] is None
+    assert ratings["role_rating"] is None
+
+
+def test_sub_ratings_durability_scales_the_two_multipliers_directly_not_by_rank():
+    players = _decision_fit_pool(20, market_score=1000.0)
+    row = _subject_row(players).copy()
+    row["injury_multiplier"] = 0.8
+    row["non_injury_risk_multiplier"] = 0.5
+
+    ratings = player_quick_view.sub_ratings(players, row)
+
+    assert ratings["durability_rating"] == round(0.8 * 0.5 * player_quick_view.OVERALL_RATING_MAX)
+
+
+def test_sub_ratings_durability_defaults_a_missing_multiplier_to_fully_available():
+    players = _decision_fit_pool(20, market_score=1000.0)
+    row = _subject_row(players).copy()
+    row["injury_multiplier"] = 0.5
+    # non_injury_risk_multiplier absent entirely -> treated as 1.0 (no
+    # roster-presence/status discount known), not as a missing durability.
+
+    ratings = player_quick_view.sub_ratings(players, row)
+
+    assert ratings["durability_rating"] == round(0.5 * 1.0 * player_quick_view.OVERALL_RATING_MAX)
+
+
+def test_sub_ratings_durability_none_when_neither_multiplier_is_present():
+    ratings = player_quick_view.sub_ratings(None, _row())
+
+    assert ratings["durability_rating"] is None
+    # No position pool either -> every factor rating is also None.
+    assert ratings["market_rating"] is None

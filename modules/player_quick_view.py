@@ -589,6 +589,28 @@ def _ordinal(value: int) -> str:
     return f"{value}{suffix}"
 
 
+def _column_percentile(group: pd.DataFrame, offset: int, column: str) -> int | None:
+    """Percentile rank (1-100) of one composite-score input column, for the
+    player at `offset` inside `group` (already this player's position-
+    filtered pool from ``_position_pool``). Same ``PERCENTILE_MIN_POOL`` gate
+    and ``rank(pct=True)`` machinery as ``_stat_percentiles``, just applied to
+    a composite-score input instead of a raw stat. Shared by
+    ``decision_fit_narrative`` (the "why" sentence) and ``sub_ratings`` (the
+    Model tab's chip row) so the two surfaces can never disagree about the
+    exact same number.
+    """
+
+    if column not in group.columns:
+        return None
+    series = pd.to_numeric(group[column], errors="coerce")
+    if int(series.notna().sum()) < PERCENTILE_MIN_POOL:
+        return None
+    value = series.rank(pct=True).to_numpy()[offset]
+    if pd.isna(value):
+        return None
+    return int(min(100, max(1, round(float(value) * 100))))
+
+
 def decision_fit_narrative(
     players_df: pd.DataFrame | None,
     row: Mapping[str, object],
@@ -610,15 +632,10 @@ def decision_fit_narrative(
 
     resolved: list[tuple[str, int]] = []
     for label, column in _DECISION_FIT_FACTORS:
-        if column not in group.columns:
+        pctile = _column_percentile(group, offset, column)
+        if pctile is None:
             continue
-        series = pd.to_numeric(group[column], errors="coerce")
-        if int(series.notna().sum()) < PERCENTILE_MIN_POOL:
-            continue
-        value = series.rank(pct=True).to_numpy()[offset]
-        if pd.isna(value):
-            continue
-        resolved.append((label, int(min(100, max(1, round(float(value) * 100))))))
+        resolved.append((label, pctile))
 
     if len(resolved) < _DECISION_FIT_MIN_FACTORS:
         return None
@@ -633,6 +650,78 @@ def decision_fit_narrative(
     if weakest_label != strongest_label and weakest_pctile <= _DECISION_FIT_WEAKNESS_CEILING:
         sentence += f" {weakest_label.capitalize()} ({_ordinal(weakest_pctile)}) is the softest input."
     return sentence
+
+
+#: Composite-score inputs that get the OVR ring's percentile-and-rating
+#: treatment on the Model tab's sub-rating chip row. Same four factors
+#: decision_fit_narrative names (_DECISION_FIT_FACTORS) — kept as a
+#: separate tuple keyed to the short field-name prefix the API/mobile chip
+#: row uses ("market_rating", "opportunity_rating", ...) rather than
+#: overloading that tuple's own long-form-label shape.
+_SUB_RATING_FACTORS: tuple[tuple[str, str], ...] = (
+    ("market", "market_score"),
+    ("opportunity", "opportunity_score"),
+    ("scarcity", "scarcity_score"),
+    ("role", "role_score"),
+)
+
+
+def sub_ratings(
+    players_df: pd.DataFrame | None,
+    row: Mapping[str, object],
+) -> dict[str, int | None]:
+    """Market/Opportunity/Scarcity/Role/Durability, each re-expressed on the
+    same 0-99 "how good, out of 99" scale as the headline OVR ring badge —
+    the Model tab's sub-rating chip row (e.g. "MKT 91 - OPP 84 - SCR 62 -
+    ROLE 73 - DUR 58").
+
+    Market/Opportunity/Scarcity/Role: each composite-score input is first
+    turned into a percentile within the player's position pool — identical
+    math and PERCENTILE_MIN_POOL gate to decision_fit_narrative's own
+    per-factor percentiles (``_column_percentile``), so the chip row and the
+    narrative sentence can never disagree about the same number — then run
+    through the EXACT SAME ``_overall_rating_from_percentile`` curve the OVR
+    badge itself uses, so "MKT 91" sits on the identical scale as "91 OVR".
+    ``None`` for any factor whose column is missing or whose position pool
+    is too thin to rank against (same gate, same reason, as every other
+    percentile on this screen) — never a fabricated rating.
+
+    Durability is a different kind of input, not a peer-ranked one:
+    ``injury_multiplier`` and ``non_injury_risk_multiplier`` (modules.
+    rankings) are already an intrinsic 0-1 "how available is this player
+    right now" rate — a healthy backup and a healthy star are both fully
+    available, so ranking durability against the position pool would just
+    bucket almost everyone at the ceiling and bury the one signal that
+    actually matters (an injury). It is scaled directly onto the 0-99
+    display range instead of being position-ranked. ``None`` only when
+    neither multiplier is present on the row at all.
+    """
+
+    located = _position_pool(players_df, row)
+    ratings: dict[str, int | None] = {}
+    if located is not None:
+        group, offset = located
+        for label, column in _SUB_RATING_FACTORS:
+            pctile = _column_percentile(group, offset, column)
+            ratings[f"{label}_rating"] = (
+                _overall_rating_from_percentile(pctile / 100.0) if pctile is not None else None
+            )
+    else:
+        for label, _column in _SUB_RATING_FACTORS:
+            ratings[f"{label}_rating"] = None
+
+    injury_mult = _percentile_value(row.get("injury_multiplier"))
+    non_injury_mult = _percentile_value(row.get("non_injury_risk_multiplier"))
+    if injury_mult is None and non_injury_mult is None:
+        ratings["durability_rating"] = None
+    else:
+        durability = (1.0 if injury_mult is None else injury_mult) * (
+            1.0 if non_injury_mult is None else non_injury_mult
+        )
+        ratings["durability_rating"] = int(
+            min(OVERALL_RATING_MAX, max(1, round(durability * OVERALL_RATING_MAX)))
+        )
+    return ratings
 
 
 def _with_percentile(item: Mapping[str, object], percentile: float | None) -> dict:
@@ -1358,6 +1447,10 @@ def _accolade_emblem_svg(kind: str) -> str:
             "<circle cx='16' cy='16' r='6' fill='none' stroke='currentColor' stroke-width='1.6'/>"
             "<circle cx='16' cy='16' r='2.2' fill='currentColor'/>"
         ),
+        "bellcow": (
+            "<path d='M16 21.27L22.18 25l-1.64-7.03L26 13.24l-7.19-.61L16 6 13.19 12.63 6 13.24"
+            "l5.46 4.73L9.82 25z' fill='currentColor'/>"
+        ),
     }.get(kind, "")
     if not mark:
         mark = (
@@ -1381,6 +1474,8 @@ def _accolade_kind(badge: PlayerBadge) -> str:
         return "scores"
     if family == "workhorse":
         return "workhorse"
+    if family == "bellcow":
+        return "bellcow"
     if family == "targets" or "target" in family:
         return "targets"
     return "finish"
@@ -2326,6 +2421,7 @@ _KNOWN_NEWS_HOSTS = {
     "pff.com": "PFF",
     "si.com": "Sports Illustrated",
     "bleacherreport.com": "Bleacher Report",
+    "profootballrumors.com": "Pro Football Rumors",
 }
 
 _KNOWN_NEWS_NAMES = {
@@ -2345,6 +2441,8 @@ _KNOWN_NEWS_NAMES = {
     "profootballtalk": "PFT",
     "pft": "PFT",
     "pff": "PFF",
+    "profootballrumors": "Pro Football Rumors",
+    "pro football rumors": "Pro Football Rumors",
 }
 
 

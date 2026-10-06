@@ -168,6 +168,88 @@ def test_position_specific_thresholds_do_not_cross_apply():
     assert wr_targets == ()
 
 
+def test_wr_bellcow_badge_requires_true_featured_volume():
+    # Below both floors: no usage badge at all.
+    low = player_awards.build_player_awards([_row(2025, targets=100)], position="WR")
+    assert {item.family for item in low} == set()
+
+    # Clears the existing "Elite Target Volume" floor (140) but not bellcow
+    # (160) — the ordinary elite-volume badge fires alone.
+    mid = player_awards.build_player_awards([_row(2025, targets=145)], position="WR")
+    mid_families = {item.family for item in mid}
+    assert mid_families == {"targets"}
+
+    # Clears the bellcow floor too — both usage badges coexist (same pattern
+    # as RB rush-yards + workhorse already coexisting independently).
+    high = player_awards.build_player_awards([_row(2025, targets=165)], position="WR")
+    high_families = {item.family for item in high}
+    assert "targets" in high_families
+    assert "bellcow" in high_families
+    bellcow = next(item for item in high if item.family == "bellcow")
+    assert bellcow.title == "Elite Bellcow Season"
+    assert bellcow.short_label == "Bellcow"
+    assert bellcow.tier is None
+    assert bellcow.metric_value == 165.0
+
+    # Boundary: exactly 160 qualifies, 159 does not.
+    boundary = player_awards.build_player_awards([_row(2025, targets=160)], position="WR")
+    assert "bellcow" in {item.family for item in boundary}
+    below_boundary = player_awards.build_player_awards([_row(2025, targets=159)], position="WR")
+    assert "bellcow" not in {item.family for item in below_boundary}
+
+
+def test_te_bellcow_badge_uses_its_own_lower_floor():
+    # TE's existing elite-volume floor (110) still fires alone below 120.
+    mid = player_awards.build_player_awards([_row(2025, targets=115, position="TE")], position="TE")
+    mid_families = {item.family for item in mid}
+    assert mid_families == {"targets"}
+
+    # Clears the TE bellcow floor (120).
+    high = player_awards.build_player_awards([_row(2025, targets=125, position="TE")], position="TE")
+    high_families = {item.family for item in high}
+    assert "targets" in high_families
+    assert "bellcow" in high_families
+
+    # Boundary: exactly 120 qualifies, 119 does not.
+    boundary = player_awards.build_player_awards([_row(2025, targets=120, position="TE")], position="TE")
+    assert "bellcow" in {item.family for item in boundary}
+    below_boundary = player_awards.build_player_awards([_row(2025, targets=119, position="TE")], position="TE")
+    assert "bellcow" not in {item.family for item in below_boundary}
+
+
+def test_rb_workhorse_badge_is_unaffected_by_bellcow_addition():
+    """Regression guard: the WR/TE bellcow addition must not touch RB logic."""
+
+    # Exactly at the rush-attempts floor (280).
+    at_floor = player_awards.build_player_awards(
+        [_row(2025, position="RB", rush_attempts=280)],
+        position="RB",
+    )
+    assert "workhorse" in {item.family for item in at_floor}
+
+    # Just under both floors (279 attempts, 0 targets => 279 touches): no badge.
+    under_floor = player_awards.build_player_awards(
+        [_row(2025, position="RB", rush_attempts=279)],
+        position="RB",
+    )
+    assert "workhorse" not in {item.family for item in under_floor}
+
+    # Under the rush-attempts floor but over the combined-touches floor (320).
+    touches_floor = player_awards.build_player_awards(
+        [_row(2025, position="RB", rush_attempts=250, targets=70)],
+        position="RB",
+    )
+    workhorse = next(item for item in touches_floor if item.family == "workhorse")
+    assert workhorse.title == "Elite Workhorse Season"
+    assert workhorse.short_label == "Workhorse"
+    assert workhorse.tier is None
+
+    # RB never qualifies for the WR/TE-only bellcow family, regardless of
+    # how many targets it racks up alongside its carries.
+    assert "bellcow" not in {item.family for item in touches_floor}
+    assert "bellcow" not in {item.family for item in at_floor}
+
+
 def test_no_duplicate_tier_badges_for_the_same_season():
     badges = player_awards.build_player_awards(
         [_row(2025, position_finish=1, overall_finish=3, receiving_yards=1800)],
@@ -329,6 +411,14 @@ def test_mobile_accolade_cluster_stays_readable():
     )
     assert "pqv-accolade--workhorse" in workhorse or "pqv-accolade--yards" in workhorse
     assert "pqv-accolade--scores" in workhorse or "Rush TD" in workhorse
+    bellcow = player_quick_view.accolades_html(
+        player_awards.build_player_awards(
+            [_row(2025, position="WR", targets=165)],
+            position="WR",
+        )
+    )
+    assert "pqv-accolade--bellcow" in bellcow
+    assert "Bellcow" in bellcow
     qb = player_quick_view.accolades_html(
         player_awards.build_player_awards(
             [_row(2025, position="QB", passing_yards=4200, passing_tds=32, position_finish=4)],

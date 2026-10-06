@@ -10,6 +10,9 @@
     "@react-navigation/native-stack": "^7.18.10",
     "@react-navigation/routers": "^7.6.4",
     "@supabase/supabase-js": "^2.116.0",
+    "@tanstack/query-async-storage-persister": "^5.104.1",
+    "@tanstack/react-query": "^5.104.1",
+    "@tanstack/react-query-persist-client": "^5.104.1",
     "babel-preset-expo": "~54.0.10",
     "expo": "^54.0.0",
     "expo-apple-authentication": "~8.0.8",
@@ -49,7 +52,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts"
   },
   "private": true
 }

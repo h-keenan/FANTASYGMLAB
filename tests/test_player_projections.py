@@ -72,6 +72,27 @@ def tier_schedule(monkeypatch):
     return games
 
 
+def _extended_two_team_games(weeks: int = 10) -> pd.DataFrame:
+    """AAA vs BBB, every week from 1 through ``weeks`` with no bye — long
+    enough to project several weeks past a player's last real game (see
+    the "far out" trend-invariance regression test below)."""
+
+    rows = []
+    for week in range(1, weeks + 1):
+        if week % 2 == 1:
+            rows.append({"season": 2099, "game_type": "REG", "week": week, "home_team": "AAA", "away_team": "BBB", "home_score": 20.0, "away_score": 17.0})
+        else:
+            rows.append({"season": 2099, "game_type": "REG", "week": week, "home_team": "BBB", "away_team": "AAA", "home_score": 17.0, "away_score": 20.0})
+    return pd.DataFrame(rows)
+
+
+@pytest.fixture
+def extended_schedule(monkeypatch):
+    games = _extended_two_team_games()
+    monkeypatch.setattr(nfl_schedule, "load_games", lambda **_: games)
+    return games
+
+
 # ---------------------------------------------------------------------------
 # Defense strength by position
 # ---------------------------------------------------------------------------
@@ -396,6 +417,89 @@ def test_project_player_week_unknown_player(round_robin_schedule):
     assert result["status"] == "unknown_player"
 
 
+def test_project_player_week_trend_is_invariant_to_target_week_distance(extended_schedule):
+    """Regression for the Juwan-Johnson-style bug: a player's recency-
+    weighted trend must be identical whether he's being projected for next
+    week or several weeks further out, as long as no new games have been
+    played in between. Before the fix, the lookback window was anchored on
+    ``week - 1`` (the TARGET week), not the real as-of week — so a player
+    whose last real game was week 3 got his full 3-game trend when
+    projected for week 4, but only his single best game (week 3) when
+    projected for week 9 (weeks 1-2 aged out of the window purely because
+    a later target week was being projected, not because any real time
+    passed), and lost the trend entirely (``insufficient_player_data``) for
+    weeks far enough out that even week 3 aged out.
+    """
+
+    players = {"wr_a1": {"position": "WR", "team": "AAA"}}
+    weekly_rows = [
+        {"week": 1, "fantasy_points_ppr": 14.4},
+        {"week": 2, "fantasy_points_ppr": 10.6},
+        {"week": 3, "fantasy_points_ppr": 23.3},
+    ]
+
+    near = pp.project_player_week(
+        "wr_a1", week=4, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
+    )
+    far = pp.project_player_week(
+        "wr_a1", week=9, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
+    )
+    way_far = pp.project_player_week(
+        "wr_a1", week=10, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
+    )
+
+    for result in (near, far, way_far):
+        assert result["status"] == "ok"
+        assert result["basis"]["recent_weeks_used"] == [1, 2, 3]
+        assert result["basis"]["recent_games_played"] == 3
+
+    assert near["basis"]["recent_weighted_avg_ppr"] == pytest.approx(far["basis"]["recent_weighted_avg_ppr"])
+    assert near["basis"]["recent_weighted_avg_ppr"] == pytest.approx(way_far["basis"]["recent_weighted_avg_ppr"])
+    # No defense signal was injected (neutral 1.0 multiplier throughout),
+    # so the point estimates themselves must match too.
+    assert near["point_estimate"] == pytest.approx(far["point_estimate"])
+    assert near["point_estimate"] == pytest.approx(way_far["point_estimate"])
+
+
+def test_project_player_week_recent_trend_still_drops_old_games_for_actively_playing_player(extended_schedule):
+    """Guards against overcorrecting the fix above into "every game ever
+    counts forever": a player who HAS played recently must still get a
+    trend built from his actual recent games — weeks far enough before his
+    real last-played week must still fall out of the ``PLAYER_MAX_WEEKS_BACK``
+    lookback window, exactly as before the fix.
+    """
+
+    players = {"wr_a1": {"position": "WR", "team": "AAA"}}
+    weekly_rows = [
+        {"week": 1, "fantasy_points_ppr": 1.0},
+        {"week": 2, "fantasy_points_ppr": 2.0},
+        {"week": 3, "fantasy_points_ppr": 9.0},
+        {"week": 4, "fantasy_points_ppr": 10.0},
+        {"week": 5, "fantasy_points_ppr": 11.0},
+        {"week": 6, "fantasy_points_ppr": 12.0},
+        {"week": 7, "fantasy_points_ppr": 13.0},
+        {"week": 8, "fantasy_points_ppr": 14.0},
+    ]
+
+    result = pp.project_player_week(
+        "wr_a1", week=9, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
+    )
+
+    assert result["status"] == "ok"
+    # Real as-of week is 8 (his last played week). With a 6-week lookback,
+    # weeks 1 and 2 (7 and 6 weeks before week 8) must still be excluded.
+    assert result["basis"]["recent_weeks_used"] == [3, 4, 5, 6, 7, 8]
+    assert result["basis"]["recent_games_played"] == 6
+
+
 def test_opponent_multiplier_is_bounded():
     # A wildly weak defense relative to league average should still only
     # nudge the projection within the documented bounds, not blow it up.
@@ -418,3 +522,244 @@ def test_opponent_multiplier_neutral_when_no_signal():
 
     assert multiplier == 1.0
     assert has_signal is False
+
+
+# ---------------------------------------------------------------------------
+# Team starting-QB-quality signal (WR/TE only)
+# ---------------------------------------------------------------------------
+
+
+def _team_qb_quality_entry(quality: float, *, player_id: str = "qb") -> dict:
+    return {
+        "quality": quality,
+        "qb_count": 1,
+        "selected_player_id": player_id,
+        "selection_method": "depth_chart",
+        "pass_att_pg": 30.0,
+        "quality_detail": "QB pass_att/g=30.0",
+    }
+
+
+def test_team_qb_quality_multiplier_is_bounded_above():
+    team_qb_quality = {
+        "ELITE": _team_qb_quality_entry(0.95),
+        "AVG1": _team_qb_quality_entry(0.5),
+        "AVG2": _team_qb_quality_entry(0.5),
+    }
+
+    multiplier, has_signal = pp._team_qb_quality_multiplier(team_qb_quality, "ELITE")
+
+    assert has_signal is True
+    low, high = pp._TEAM_QB_QUALITY_MULTIPLIER_BOUNDS
+    assert low <= multiplier <= high
+    assert multiplier == pytest.approx(high)
+
+
+def test_team_qb_quality_multiplier_is_bounded_below():
+    team_qb_quality = {
+        "WEAK": _team_qb_quality_entry(0.05),
+        "AVG1": _team_qb_quality_entry(0.5),
+        "AVG2": _team_qb_quality_entry(0.5),
+    }
+
+    multiplier, has_signal = pp._team_qb_quality_multiplier(team_qb_quality, "WEAK")
+
+    assert has_signal is True
+    low, high = pp._TEAM_QB_QUALITY_MULTIPLIER_BOUNDS
+    assert low <= multiplier <= high
+    assert multiplier == pytest.approx(low)
+
+
+def test_team_qb_quality_multiplier_neutral_when_no_signal():
+    multiplier, has_signal = pp._team_qb_quality_multiplier({}, "GHOST")
+
+    assert multiplier == 1.0
+    assert has_signal is False
+
+
+def test_team_qb_quality_multiplier_neutral_with_single_team_sample():
+    # A single team's quality score can't be compared to a "league
+    # average" of just itself — that would always normalize to a false 1.0
+    # ratio, so this must stay neutral/no-signal instead.
+    team_qb_quality = {"LONE": _team_qb_quality_entry(0.9)}
+
+    multiplier, has_signal = pp._team_qb_quality_multiplier(team_qb_quality, "LONE")
+
+    assert multiplier == 1.0
+    assert has_signal is False
+
+
+def test_project_player_week_wr_projection_moves_both_directions_with_team_qb_quality(round_robin_schedule):
+    players = _players_fixture()
+    weekly_stats = _weekly_stats_fixture()
+    defense_strength = pp.team_defense_points_allowed_by_position(
+        2099, upto_week=5, weekly_stats=weekly_stats, players=players
+    )
+
+    neutral_quality = {
+        "CCC": _team_qb_quality_entry(0.5, player_id="qb_c1"),
+        "ZZZ": _team_qb_quality_entry(0.5, player_id="qb_z1"),
+    }
+    better_quality = {
+        "CCC": _team_qb_quality_entry(0.9, player_id="qb_c1"),
+        "ZZZ": _team_qb_quality_entry(0.5, player_id="qb_z1"),
+    }
+    worse_quality = {
+        "CCC": _team_qb_quality_entry(0.2, player_id="qb_c1"),
+        "ZZZ": _team_qb_quality_entry(0.5, player_id="qb_z1"),
+    }
+
+    def _project(team_qb_quality):
+        return pp.project_player_week(
+            "wr_c1",
+            week=6,
+            season=2099,
+            players=players,
+            player_weekly_rows=weekly_stats["wr_c1"]["weekly"],
+            defense_strength=defense_strength,
+            team_qb_quality=team_qb_quality,
+            weekly_stats={},
+        )
+
+    neutral = _project(neutral_quality)
+    better = _project(better_quality)
+    worse = _project(worse_quality)
+
+    assert neutral["status"] == "ok"
+    assert neutral["basis"]["team_qb_quality_multiplier"] == pytest.approx(1.0)
+    assert neutral["basis"]["team_qb_quality_has_signal"] is True
+
+    low, high = pp._TEAM_QB_QUALITY_MULTIPLIER_BOUNDS
+    assert better["basis"]["team_qb_quality_multiplier"] == pytest.approx(high)
+    assert worse["basis"]["team_qb_quality_multiplier"] == pytest.approx(low)
+    assert low <= better["basis"]["team_qb_quality_multiplier"] <= high
+    assert low <= worse["basis"]["team_qb_quality_multiplier"] <= high
+
+    # Both directions of the audit's ask: a better team QB situation must
+    # raise the point estimate above neutral, a worse one must lower it.
+    assert better["point_estimate"] > neutral["point_estimate"] > worse["point_estimate"]
+    assert better["basis"]["team_starting_qb_player_id"] == "qb_c1"
+
+
+def test_project_player_week_qb_and_rb_unaffected_by_team_qb_quality_signal(round_robin_schedule):
+    """QB/RB projections must be completely untouched by this new signal —
+    even when a deliberately extreme team_qb_quality map is injected (one
+    that would swing a WR/TE projection to the bound), the QB/RB point
+    estimate and basis must be identical to the no-signal-at-all case."""
+
+    players = _players_fixture()
+    weekly_stats = _weekly_stats_fixture()
+    defense_strength = pp.team_defense_points_allowed_by_position(
+        2099, upto_week=4, weekly_stats=weekly_stats, players=players
+    )
+    extreme_team_qb_quality = {
+        "AAA": _team_qb_quality_entry(1.0, player_id="qb_a1"),
+        "BBB": _team_qb_quality_entry(0.01, player_id="qb_b1"),
+    }
+
+    # AAA (qb_a1) plays in week 5; BBB (rb_b1) has a bye in week 5 (see
+    # round_robin_schedule's docstring), so each player is projected for a
+    # week its own team actually plays.
+    for player_id, week in (("qb_a1", 5), ("rb_b1", 4)):
+        with_signal = pp.project_player_week(
+            player_id,
+            week=week,
+            season=2099,
+            players=players,
+            player_weekly_rows=weekly_stats[player_id]["weekly"],
+            defense_strength=defense_strength,
+            team_qb_quality=extreme_team_qb_quality,
+            weekly_stats=weekly_stats,
+        )
+        without_signal = pp.project_player_week(
+            player_id,
+            week=week,
+            season=2099,
+            players=players,
+            player_weekly_rows=weekly_stats[player_id]["weekly"],
+            defense_strength=defense_strength,
+        )
+
+        assert with_signal["point_estimate"] == pytest.approx(without_signal["point_estimate"])
+        assert with_signal["basis"]["team_qb_quality_multiplier"] == 1.0
+        assert with_signal["basis"]["team_qb_quality_has_signal"] is False
+        assert with_signal["basis"]["team_qb_quality_score"] is None
+        assert with_signal["basis"] == without_signal["basis"]
+
+
+def test_project_player_week_floors_negative_real_trend_but_preserves_it_in_basis(extended_schedule):
+    """Regression for the Chimere Dike bug report: a near-zero-usage
+    player's real weekly PPR rows can genuinely be negative (a catch
+    behind the line of scrimmage, a lost fumble is a real, bounded-floor-
+    stat-exception game, not a data error), so the recency-weighted trend
+    feeding the projection can legitimately compute to a negative number.
+    That negative *trend* is honest and must stay visible in
+    ``basis.recent_weighted_avg_ppr`` — but the *displayed* projection
+    (``point_estimate``/``low``/``high``) must never show a misleadingly
+    precise negative number like "-0.7": every mainstream fantasy platform
+    floors a forward-looking projection at 0, since "less than zero points
+    expected" isn't a meaningfully different forecast from "approximately
+    zero points expected."
+    """
+
+    players = {"wr_a1": {"position": "WR", "team": "AAA"}}
+    # Real shape of the bug report: 2 usable games, both genuinely negative
+    # PPR (a negative-yardage catch each week) out of a 3-game season.
+    weekly_rows = [
+        {"week": 1, "fantasy_points_ppr": -0.3, "games_played": 1},
+        {"week": 3, "fantasy_points_ppr": -0.7, "games_played": 1},
+    ]
+
+    result = pp.project_player_week(
+        "wr_a1", week=6, season=2099, players=players,
+        player_weekly_rows=weekly_rows, defense_strength={},
+        team_qb_quality={}, weekly_stats={},
+    )
+
+    assert result["status"] == "ok"
+    # The real recency-weighted trend is negative — honestly preserved.
+    assert result["basis"]["recent_weighted_avg_ppr"] < 0.0
+    assert result["basis"]["point_estimate_floored"] is True
+    # But nothing shown to a user is ever negative.
+    assert result["point_estimate"] == 0.0
+    assert result["low"] == 0.0
+    assert result["high"] >= 0.0
+
+
+def test_project_player_week_floored_estimate_repeats_across_weeks_for_sidelined_player(extended_schedule):
+    """A near-identical small (floored-to-zero) estimate repeating across
+    several consecutive future weeks for a player who hasn't played a new
+    game is NOT a recurrence of the PR #868 recency-window-anchoring bug —
+    it's the correctly-fixed behavior working as intended. Per
+    ``_most_recent_played_week``'s "as-of" anchoring, the lookback window
+    stays anchored on his real last game for every future week projected
+    (no new games played => no new information => same baseline trend),
+    so weeks far apart must agree on the underlying (pre-floor) trend.
+    """
+
+    players = {"wr_a1": {"position": "WR", "team": "AAA"}}
+    weekly_rows = [
+        {"week": 1, "fantasy_points_ppr": -0.3, "games_played": 1},
+        {"week": 3, "fantasy_points_ppr": -0.7, "games_played": 1},
+    ]
+
+    results = [
+        pp.project_player_week(
+            "wr_a1", week=week, season=2099, players=players,
+            player_weekly_rows=weekly_rows, defense_strength={},
+            team_qb_quality={}, weekly_stats={},
+        )
+        for week in (4, 6, 8, 10)
+    ]
+
+    for result in results:
+        assert result["status"] == "ok"
+        assert result["point_estimate"] == 0.0
+
+    # Same underlying trend every time — no defense signal injected, so the
+    # (pre-floor) weighted average must be identical across every future
+    # week, exactly like the existing trend-invariance regression test
+    # above for a positive-production player.
+    first = results[0]["basis"]["recent_weighted_avg_ppr"]
+    for result in results[1:]:
+        assert result["basis"]["recent_weighted_avg_ppr"] == pytest.approx(first)

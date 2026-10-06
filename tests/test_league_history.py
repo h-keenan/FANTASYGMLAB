@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from modules import league_history as history
 from modules import league_history_ui
+from modules import transaction_grades
 from modules.app_styles import APP_CSS
 from modules.league_history_styles import LEAGUE_HISTORY_CSS
 from modules.ui_architecture import PLATFORM_DESTINATIONS
@@ -372,4 +374,165 @@ def test_first_load_fetch_count_vs_payload_reuse():
         history.FILTER_TRADES,
     )
     assert calls["n"] == first_n
+
+
+_GRADE_LOOKUP = {
+    "star": {"current_value": 5200, "name": "Star"},
+    "ok": {"current_value": 4800, "name": "Solid"},
+}
+
+
+def _graded_trade(transaction_id, timestamp, *, receive_id="star", send_id="ok"):
+    return {
+        "type": "trade",
+        "transaction_id": transaction_id,
+        "week": 4,
+        "timestamp": timestamp,
+        "sides": [
+            {
+                "team_name": "War Room",
+                "receives": [
+                    {"player_id": receive_id, "name": receive_id, "kind": "player"}
+                ],
+            },
+            {
+                "team_name": "Lakefront",
+                "receives": [
+                    {"player_id": send_id, "name": send_id, "kind": "player"}
+                ],
+            },
+        ],
+    }
+
+
+def test_cached_transaction_grades_skips_recompute_on_identical_inputs():
+    """A bare Streamlit rerun (e.g. clicking the filter pill) with the same
+    underlying transaction/history data must not re-invoke grade_transaction."""
+    league_history_ui.cached_transaction_grades.clear()
+    normalized = [_graded_trade("t1", 100), _graded_trade("t2", 200)]
+    with patch.object(
+        transaction_grades, "grade_transaction", wraps=transaction_grades.grade_transaction
+    ) as spy:
+        first = league_history_ui.cached_transaction_grades("L1", normalized, _GRADE_LOOKUP, 10)
+        assert spy.call_count == 2
+
+        # Fresh-but-identical objects, exactly what a new Streamlit rerun
+        # rebuilds every time (new list/dict instances, same content).
+        rerun_normalized = [_graded_trade("t1", 100), _graded_trade("t2", 200)]
+        rerun_lookup = dict(_GRADE_LOOKUP)
+        second = league_history_ui.cached_transaction_grades(
+            "L1", rerun_normalized, rerun_lookup, 10
+        )
+        assert spy.call_count == 2, "identical underlying data must hit the cache"
+    assert first == second
+    assert set(first) == {"t1", "t2"}
+
+
+def test_cached_transaction_grades_recomputes_on_real_data_change():
+    """A genuine change to the underlying transaction set must invalidate the
+    cache and never serve a stale grade."""
+    league_history_ui.cached_transaction_grades.clear()
+    normalized = [_graded_trade("t1", 100)]
+    with patch.object(
+        transaction_grades, "grade_transaction", wraps=transaction_grades.grade_transaction
+    ) as spy:
+        first = league_history_ui.cached_transaction_grades("L1", normalized, _GRADE_LOOKUP, 10)
+        assert spy.call_count == 1
+
+        # Same transaction id, but the trade itself changed (sides swapped) —
+        # a real change to the underlying data, not just a rerun.
+        changed = [_graded_trade("t1", 100, receive_id="ok", send_id="star")]
+        second = league_history_ui.cached_transaction_grades("L1", changed, _GRADE_LOOKUP, 10)
+        assert spy.call_count == 2, "a genuine data change must bust the cache"
+    assert first["t1"] != second["t1"], "stale grade must not be served after a real change"
+
+    # current_week is also a real grading input and must vary the cache key.
+    league_history_ui.cached_transaction_grades.clear()
+    with patch.object(
+        transaction_grades, "grade_transaction", wraps=transaction_grades.grade_transaction
+    ) as spy:
+        league_history_ui.cached_transaction_grades("L1", normalized, _GRADE_LOOKUP, 10)
+        assert spy.call_count == 1
+        league_history_ui.cached_transaction_grades("L1", normalized, _GRADE_LOOKUP, 15)
+        assert spy.call_count == 2, "a changed current_week must bust the cache"
+
+
+def test_render_league_history_uses_cached_grades_for_visible_filter_subset(monkeypatch):
+    """Switching the filter pill (a pure Streamlit widget rerun) must not
+    re-invoke grade_transaction when the underlying transactions/profiles/
+    player_lookup haven't changed — this is the exact repro from the audit."""
+    league_history_ui.cached_transaction_grades.clear()
+    league_history_ui.cached_season_chain.clear()
+    league_history_ui.cached_season_history_payload.clear()
+
+    monkeypatch.setattr(
+        league_history_ui,
+        "cached_season_chain",
+        lambda home_league_id: [{"league_id": home_league_id, "season": "2026", "name": "League"}],
+    )
+    monkeypatch.setattr(
+        league_history_ui,
+        "cached_season_history_payload",
+        lambda league_id: {
+            "league_id": league_id,
+            "season": "2026",
+            "transactions": [
+                {
+                    "type": "trade",
+                    "transaction_id": "t1",
+                    "status": "complete",
+                    "status_updated": 100,
+                    "_history_week": 4,
+                    "roster_ids": [1, 2],
+                    "adds": {"p1": 2, "p2": 1},
+                    "drops": {"p2": 2, "p1": 1},
+                    "draft_picks": [],
+                },
+            ],
+        },
+    )
+
+    import streamlit as st
+
+    class _FakeSessionState(dict):
+        pass
+
+    monkeypatch.setattr(st, "session_state", _FakeSessionState())
+
+    def _fake_pills(label, options, default=None, key=None):
+        if label == "Show":
+            return st.session_state.get(key, history.FILTER_ALL)
+        return default
+
+    monkeypatch.setattr(st, "pills", _fake_pills)
+    monkeypatch.setattr(league_history_ui.deferred_rendering, "mark_deferred_section_ready", lambda *a, **k: None)
+    monkeypatch.setattr(league_history_ui, "render_html_fragment", lambda *a, **k: None)
+    monkeypatch.setattr(league_history_ui, "inject_global_styles", lambda *a, **k: None)
+
+    with patch.object(
+        transaction_grades, "grade_transaction", wraps=transaction_grades.grade_transaction
+    ) as spy:
+        league_history_ui.render_league_history_section(
+            home_league_id="L1",
+            player_lookup=PLAYERS,
+            team_logo_html=lambda *a, **k: "",
+            render_section_header=lambda *a, **k: None,
+            load_immediately=True,
+        )
+        calls_after_first_render = spy.call_count
+        assert calls_after_first_render > 0
+
+        # Switch the filter pill — same underlying history data.
+        st.session_state[league_history_ui.filter_widget_key("L1")] = history.FILTER_TRADES
+        league_history_ui.render_league_history_section(
+            home_league_id="L1",
+            player_lookup=PLAYERS,
+            team_logo_html=lambda *a, **k: "",
+            render_section_header=lambda *a, **k: None,
+            load_immediately=True,
+        )
+        assert spy.call_count == calls_after_first_render, (
+            "filter pill rerun with unchanged transaction data must not "
+            "re-invoke grade_transaction"
+        )
 

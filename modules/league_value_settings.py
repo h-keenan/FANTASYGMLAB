@@ -22,10 +22,12 @@ same rule as `modules/canonical_player_ranking.py`.
 
 from __future__ import annotations
 
+import time
 from typing import Any, Mapping
 
 import pandas as pd
 
+from modules import player_eligibility, rankings, redis_cache, sleeper
 from modules.player_tiers import assign_player_tiers
 from modules.rankings import current_availability_multiplier
 
@@ -725,3 +727,86 @@ def apply_valuation_lens(
         primary_score_field=valuation_score_field(valuation_lens),
     )
     return format_score_columns(df)
+
+
+# apply_valuation_lens's `current_risk_multiplier` row-wise `.apply(axis=1)`
+# call above makes it the dominant cost of the load_players ->
+# filter_current_fantasy_players -> apply_valuation_lens chain every one of
+# these mobile-api endpoints repeats on every single request: Rankings,
+# Player Rank, Trade Analyzer, Recap, Dashboard, My Team, and Matchup each
+# independently re-ran this exact (league_id, lens)-scoped pipeline over the
+# WHOLE eligible player pool (~1,700+ rows) from scratch, even though none
+# of it depends on who's asking — only on which league/lens combo, and how
+# recently the underlying Sleeper league settings or player data actually
+# changed. That's the same "asker-independent, redone from scratch on every
+# call" shape modules.league_rankings/modules.trade_hub_engine/
+# modules.playoff_simulator/modules.waivers_ui already fixed for their own
+# downstream computations — this is that same fix one layer further
+# upstream, for the shared input every one of them (and these seven
+# endpoints) builds on top of.
+VALUED_PLAYERS_FRAME_TTL_SECONDS = 30
+
+
+def _valued_players_frame_cache_bucket() -> int:
+    return int(time.time() // VALUED_PLAYERS_FRAME_TTL_SECONDS)
+
+
+_VALUED_PLAYERS_FRAME_LOCK_TIMEOUT_SECONDS = 15.0
+
+
+def _build_valued_players_frame_cached(
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+    _bucket: int,
+) -> pd.DataFrame:
+    league = sleeper.get_league(league_id)
+    if not league:
+        return pd.DataFrame()
+    settings = detect_league_value_settings_from_payload(league)
+
+    players_df = rankings.load_players(players_db_path)
+    if players_df is None or players_df.empty:
+        players_df = rankings.build_players_table(players_db_path)
+    players_df = player_eligibility.filter_current_fantasy_players(
+        players_df, surface="valued_players_frame_cache", league=league
+    )
+    if players_df.empty:
+        return pd.DataFrame()
+
+    return apply_valuation_lens(players_df, lens, settings)
+
+
+def build_valued_players_frame_cached(
+    *,
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+) -> pd.DataFrame:
+    """Cached front door for the load -> filter -> `apply_valuation_lens`
+    chain shared by every mobile-api endpoint that needs "the whole
+    league-eligible player pool, valued under this lens" rather than a
+    single caller's roster slice of it. Resolves its own league/settings
+    from just (league_id, lens, players_db_path), same as
+    modules.league_rankings.build_league_rankings_frame_cached, so every
+    caller asking about the same (league_id, lens) within the same 30s
+    window hits one cache entry instead of each independently re-running
+    the full pipeline — including `apply_valuation_lens`'s row-wise
+    `current_risk_multiplier` pass over every eligible player.
+
+    Returns a copy so a caller mutating it (adding `_overall_rating_col`,
+    slicing to one roster, etc.) never corrupts the cached entry.
+
+    Single-flight + cache, shared across every mobile-api worker via Redis:
+    see modules.redis_cache.redis_single_flight_cache and this module's own
+    comment above `_build_valued_players_frame_cached`."""
+
+    key = (league_id, lens, players_db_path, _valued_players_frame_cache_bucket())
+    cache_key = redis_cache.build_cache_key("valued_players_frame", *key)
+    valued = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=VALUED_PLAYERS_FRAME_TTL_SECONDS,
+        compute=lambda: _build_valued_players_frame_cached(*key),
+        lock_timeout_seconds=_VALUED_PLAYERS_FRAME_LOCK_TIMEOUT_SECONDS,
+    )
+    return valued.copy()
