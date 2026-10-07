@@ -5027,6 +5027,20 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monk
                 "health_flag": "Stable",
                 "power_rank": 2,
                 "power_rank_tied": False,
+                "franchise_rank": 3,
+                "franchise_rank_tied": False,
+                "roster_value_rank": 1,
+                "roster_value_rank_tied": True,
+                "archetype": "juggernaut",
+                "archetype_label": "Juggernaut",
+                "top_asset": {
+                    "player_id": "p-1",
+                    "name": "Star Back",
+                    "position": "RB",
+                    "team": "SF",
+                    "tier": "Elite",
+                    "score": 95.5,
+                },
                 "top_item": {
                     "category": "need",
                     "headline": "Add RB2 depth",
@@ -5066,6 +5080,14 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monk
     assert league["team_name"] == "Ok Team"
     assert league["wins"] == 7
     assert league["power_rank"] == 2
+    assert league["franchise_rank"] == 3
+    assert league["roster_value_rank"] == 1
+    assert league["roster_value_rank_tied"] is True
+    assert league["archetype"] == "juggernaut"
+    assert league["archetype_label"] == "Juggernaut"
+    assert league["top_asset"]["player_id"] == "p-1"
+    assert league["top_asset"]["name"] == "Star Back"
+    assert league["top_asset"]["score"] == 95.5
     assert league["top_item"]["headline"] == "Add RB2 depth"
     assert league["top_item"]["category"] == "need"
 
@@ -5075,6 +5097,24 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monk
     # An unexpected raise never leaks internals — it's reported as a plain
     # "unavailable", same bucket any other genuine failure falls into.
     assert failed_by_id["league-boom"]["reason"] == "unavailable"
+
+
+def test_project_portfolio_top_asset_degrades_without_a_player_id():
+    from services import mobile_api_service
+
+    assert mobile_api_service._project_portfolio_top_asset(None) is None
+    assert mobile_api_service._project_portfolio_top_asset({}) is None
+    assert mobile_api_service._project_portfolio_top_asset({"player_id": ""}) is None
+    assert mobile_api_service._project_portfolio_top_asset(
+        {"player_id": "p-9", "name": "Depth Guy", "score": 10.0}
+    ) == {
+        "player_id": "p-9",
+        "name": "Depth Guy",
+        "position": None,
+        "team": None,
+        "tier": None,
+        "score": 10.0,
+    }
 
 
 def test_portfolio_fanout_preserves_saved_league_order_despite_uneven_completion(monkeypatch):

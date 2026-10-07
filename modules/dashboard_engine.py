@@ -60,7 +60,7 @@ from modules.player_cards import recommendation_reason_text
 from modules.rankings import injury_display_label, injury_level
 from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES
 from modules.roster_needs import NEED_TIER_LABELS, TeamNeedsAssessment, select_need_headline
-from modules.team_eval import suggest_optimal_lineup
+from modules.team_eval import refine_team_directions, suggest_optimal_lineup
 from modules.trade_analyzer_fit import (
     build_team_needs_assessment,
     get_needed_positions,
@@ -588,17 +588,59 @@ def build_league_summary(
 
     power_rank = None
     power_rank_tied = False
+    franchise_rank = None
+    franchise_rank_tied = False
+    roster_value_rank = None
+    roster_value_rank_tied = False
+    archetype = None
+    archetype_label = None
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
         league_id=league_id, lens=lens, players_db_path=players_db_path
     )
     if not rankings_frame.empty:
+        # Archetype/strategy classification degrades gracefully without the
+        # heavier per-roster injury-summary pass web's cached_league_intelligence_frame
+        # builds (health/balance inputs just default to neutral — see
+        # modules.team_eval._rank_strength's fallback), so it's safe to run
+        # directly on the cheap, already-cached rankings_frame — same choice
+        # services/mobile_api_service.py's get_league_team_rankings makes.
+        # roster_value_rank is already present too: build_league_rankings_frame
+        # (which build_league_rankings_frame_cached wraps) runs
+        # add_league_detail_ranks before returning.
+        rankings_frame = refine_team_directions(rankings_frame)
         match = rankings_frame[rankings_frame["roster_id"].astype(str) == str(roster_id or "")]
         if not match.empty:
-            power_rank = match.iloc[0].get("power_rank")
-            power_rank_tied = bool(match.iloc[0].get("power_rank_tied"))
+            row = match.iloc[0]
+            power_rank = row.get("power_rank")
+            power_rank_tied = bool(row.get("power_rank_tied"))
+            franchise_rank = row.get("franchise_rank")
+            franchise_rank_tied = bool(row.get("franchise_rank_tied"))
+            roster_value_rank = row.get("roster_value_rank")
+            roster_value_rank_tied = bool(row.get("roster_value_rank_tied"))
+            archetype = row.get("archetype")
+            archetype_label = row.get("archetype_label")
 
     team_profile = sleeper.get_league_roster_profiles(league_id).get(str(roster_id or ""), {})
     roster_settings = my_roster.get("settings") or {}
+
+    # The single highest-value-score asset on this roster — just the top row
+    # of the already-computed roster_df (the exact same valuation `valued`/
+    # score_field every other tile on this summary reads), no new valuation
+    # logic. None only for the (empty_roster already short-circuits above,
+    # so this is just defensive) case where score_field itself is missing.
+    top_asset = None
+    if not roster_df.empty and score_field in roster_df.columns:
+        top_row = roster_df.sort_values(score_field, ascending=False).iloc[0]
+        top_player_id = _text(top_row.get("player_id"))
+        if top_player_id:
+            top_asset = {
+                "player_id": top_player_id,
+                "name": _text(top_row.get("name")) or None,
+                "position": _text(top_row.get("position")) or None,
+                "team": _text(top_row.get("team")) or None,
+                "tier": _text(top_row.get("player_tier")) or None,
+                "score": top_row.get(score_field),
+            }
 
     return {
         "ok": True,
@@ -611,6 +653,13 @@ def build_league_summary(
         "health_flag": health_flag,
         "power_rank": power_rank,
         "power_rank_tied": power_rank_tied,
+        "franchise_rank": franchise_rank,
+        "franchise_rank_tied": franchise_rank_tied,
+        "roster_value_rank": roster_value_rank,
+        "roster_value_rank_tied": roster_value_rank_tied,
+        "archetype": archetype,
+        "archetype_label": archetype_label,
+        "top_asset": top_asset,
         # Priority-ordered by organize_dashboard_items/compose_daily_gm_briefing
         # above — items[0] is already "the one thing to do in this league",
         # the same headline the single-league Dashboard leads with.
