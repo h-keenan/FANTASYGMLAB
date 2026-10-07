@@ -1659,6 +1659,26 @@ def _clean_json_value(value: Any) -> Any:
     return value
 
 
+def _project_portfolio_top_asset(item: Any) -> dict[str, Any] | None:
+    """modules.dashboard_engine.build_league_summary's `top_asset` — the
+    single highest-value-score player on a saved league's roster — trimmed
+    to what the Portfolio share card's standout line needs (name + avatar +
+    score). `None` when that league's roster summary had nothing to pick
+    a top asset from (e.g. an empty roster, already an unreachable state
+    upstream)."""
+
+    if not isinstance(item, dict) or not item.get("player_id"):
+        return None
+    return {
+        "player_id": _clean_json_value(item.get("player_id")),
+        "name": _clean_json_value(item.get("name")),
+        "position": _clean_json_value(item.get("position")),
+        "team": _clean_json_value(item.get("team")),
+        "tier": _clean_json_value(item.get("tier")),
+        "score": _clean_json_value(item.get("score")),
+    }
+
+
 def _as_string_list(value: Any) -> list[str]:
     """A DataFrame cell holding a list-of-strings column, defensively —
     modules.team_eval._assign_team_archetype always builds these as real
@@ -4562,6 +4582,13 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
                 "health_flag": summary.get("health_flag"),
                 "power_rank": _clean_json_value(summary.get("power_rank")),
                 "power_rank_tied": bool(summary.get("power_rank_tied")),
+                "franchise_rank": _clean_json_value(summary.get("franchise_rank")),
+                "franchise_rank_tied": bool(summary.get("franchise_rank_tied")),
+                "roster_value_rank": _clean_json_value(summary.get("roster_value_rank")),
+                "roster_value_rank_tied": bool(summary.get("roster_value_rank_tied")),
+                "archetype": _clean_json_value(summary.get("archetype")),
+                "archetype_label": _clean_json_value(summary.get("archetype_label")),
+                "top_asset": _project_portfolio_top_asset(summary.get("top_asset")),
                 "top_item": _project_briefing_item_payload(top_item) if top_item else None,
             }
         )
@@ -4630,6 +4657,26 @@ def get_gm_plan(
 
     my_roster_id = str(my_roster.get("roster_id") or "")
 
+    # Connectivity-audit fix: GM Plan was the only roster-facing screen that
+    # built its roadmap with zero awareness of the team's own injuries, even
+    # though get_league_dashboard and get_league_waivers already compute this
+    # exact same roster_injury_context for this same user's roster — same
+    # settings/valued/roster_df/lineup_df pattern as get_league_dashboard
+    # above (and get_league_waivers below), inlined here rather than shared
+    # since neither of those two already factors it into a helper.
+    injury_context: dict[str, Any] = {}
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if not valued.empty:
+        score_field = league_value_settings.valuation_score_field(lens)
+        roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+        roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+        if not roster_df.empty:
+            lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+            injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+
     rankings_row: dict[str, Any] | None = None
     total_teams: int | None = None
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
@@ -4697,6 +4744,7 @@ def get_gm_plan(
         record=record,
         playoff_odds=my_playoff_odds,
         trade_ideas=trade_idea_records,
+        injury_context=injury_context,
     )
 
     return {"ok": True, "quiet": False, "reason": "", **plan}

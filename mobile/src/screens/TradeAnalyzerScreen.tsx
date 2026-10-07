@@ -23,6 +23,7 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import CircularProgressRing from '../components/CircularProgressRing';
+import TeamAvatar from '../components/TeamAvatar';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
@@ -30,6 +31,7 @@ import {
   api,
   type DraftPickAsset,
   type RankedPlayer,
+  type TeamProfile,
   type TradeVerdict,
 } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
@@ -109,6 +111,7 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 interface OtherTeam {
   rosterId: string;
   ownerName: string;
+  avatarId: string | null;
   playerIds: Set<string>;
 }
 
@@ -173,12 +176,18 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
     let cancelled = false;
     (async () => {
       try {
-        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult] = await Promise.all([
+        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult, teamProfilesResult] = await Promise.all([
           api.getMyRoster(leagueId),
           api.getLeagueRankings(leagueId, { lens, limit: 300 }),
           api.getLeagueUsers(leagueId),
           api.getLeagueRosters(leagueId),
           api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: 'unavailable' })),
+          // Same team-profiles endpoint TeamsScreen/MyTeamScreen use for
+          // `TeamAvatar` — avatar_id already has the server's real
+          // roster-metadata -> user-metadata fallback chain baked in
+          // (modules.sleeper.get_league_roster_profiles), unlike reading a
+          // raw Sleeper user's `avatar` field directly.
+          api.getLeagueTeamProfiles(leagueId).catch(() => ({ ok: true as const, profiles: {} })),
         ]);
         if (cancelled) return;
 
@@ -198,6 +207,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
           const id = String(user.user_id ?? '');
           if (id) usersById.set(id, String(user.display_name ?? user.username ?? 'Unknown owner'));
         }
+        const teamProfiles: Record<string, TeamProfile> = teamProfilesResult.profiles ?? {};
         const teams: OtherTeam[] = rostersResult.rosters
           .map((roster) => {
             const rosterId = String(roster.roster_id ?? '');
@@ -206,6 +216,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
             return {
               rosterId,
               ownerName: usersById.get(ownerId) ?? 'Unclaimed team',
+              avatarId: teamProfiles[rosterId]?.avatar_id ?? null,
               playerIds: new Set(players.map(String)),
             };
           })
@@ -273,6 +284,21 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
       .slice(0, MAX_SEARCH_RESULTS)
       .map((player) => ({ kind: 'player' as const, player }));
   }, [assetType, searchPool, pickSearchPool, selectedIds, selectedPickIds, search, positionFilter]);
+
+  // Switching which side new taps go to must also drop whatever text/position
+  // filter was scoped to the *other* side's roster — otherwise the search
+  // input's placeholder flips to "Search players to receive" while the field
+  // still holds e.g. "Washington" (typed to find a player already added to
+  // Send), silently zeroing the Receive results list against the opposing
+  // roster and making "Tap to add" look completely broken (coridian_,
+  // Discord: could add 2 players to Send but "cannot tap you receive side to
+  // add players to that side" — the tap worked, the leftover filter just
+  // hid every candidate).
+  const selectSide = (side: Side) => {
+    setActiveSide(side);
+    setSearch('');
+    setPositionFilter(null);
+  };
 
   const addPlayerToSide = (player: RankedPlayer) => {
     if (activeSide === 'send') {
@@ -403,7 +429,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
             ...sendPicks.map((pick): SideAssetItem => ({ kind: 'pick', pick })),
           ]}
           active={activeSide === 'send'}
-          onPressHeader={() => setActiveSide('send')}
+          onPressHeader={() => selectSide('send')}
           onRemove={(id) => removeFromSide('send', id)}
         />
         <TradeSide
@@ -414,7 +440,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
             ...receivePicks.map((pick): SideAssetItem => ({ kind: 'pick', pick })),
           ]}
           active={activeSide === 'receive'}
-          onPressHeader={() => setActiveSide('receive')}
+          onPressHeader={() => selectSide('receive')}
           onRemove={(id) => removeFromSide('receive', id)}
         />
       </View>
@@ -460,9 +486,10 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
           {otherTeams.map((team) => (
             <TouchableOpacity
               key={team.rosterId}
-              style={[styles.pill, selectedTeamId === team.rosterId && styles.pillActive]}
+              style={[styles.teamPill, selectedTeamId === team.rosterId && styles.pillActive]}
               onPress={() => setSelectedTeamId(team.rosterId)}
             >
+              <TeamAvatar avatarId={team.avatarId} size={16} />
               <AppText
                 style={[styles.pillText, selectedTeamId === team.rosterId && styles.pillTextActive]}
                 numberOfLines={1}
@@ -647,14 +674,48 @@ function VerdictCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
   const toneColor = toneColors(colors)[verdict.tone];
+  // trade_offer_analyzer.py's decide_offer_verdict already separates a
+  // routine ACCEPT/DECLINE from a genuinely lopsided one into its own named
+  // band (VERDICT_SMASH_ACCEPT / VERDICT_HARD_DECLINE) — that split only
+  // fires at the value/fit extremes _VALUE_SMASH / _VALUE_HARD, well beyond
+  // a normal accept/decline gap. Reusing that existing band string here
+  // (rather than re-deriving a client-side value-delta threshold) is what
+  // coridian_ asked for after a 2-for-nothing trade came back as a plain
+  // "HARD DECLINE, 90% confidence" card indistinguishable from a mild
+  // decline: "we need a custom screens for things like this ... when it's
+  // absolutely lopsided."
+  const isExtreme = verdict.band === 'HARD DECLINE' || verdict.band === 'SMASH ACCEPT';
   // Recorded alongside the share so the quiet Trade Outcomes result sweep
   // can re-value these same players under the same lens later.
   const { lens } = useValuationLens(leagueId);
 
   return (
-    <AnimatedCard style={StyleSheet.flatten([styles.verdictCard, { borderLeftColor: toneColor }])}>
+    <AnimatedCard
+      style={StyleSheet.flatten([
+        styles.verdictCard,
+        { borderLeftColor: toneColor },
+        isExtreme && styles.verdictCardExtreme,
+      ])}
+      // `glow` is this app's existing "the one card on screen that matters"
+      // treatment (Dashboard's Top Priority card) — reused as-is instead of
+      // inventing a second emphasis language, tinted to the verdict's own
+      // tone so an extreme accept glows success-green and an extreme decline
+      // glows danger-red.
+      glow={isExtreme}
+      glowColor={toneColor}
+    >
+      {isExtreme ? (
+        <View style={[styles.extremeEyebrowRow, { backgroundColor: toneColor }]}>
+          <Ionicons name="alert-circle" size={13} color="#fff" />
+          <AppText style={styles.extremeEyebrowText}>
+            {verdict.tone === 'accept' ? 'Extremely Lopsided In Your Favor' : 'Extremely Lopsided Against You'}
+          </AppText>
+        </View>
+      ) : null}
       <View style={styles.verdictHeaderRow}>
-        <AppText style={[styles.verdictBand, { color: toneColor }]}>{verdict.band}</AppText>
+        <AppText style={[styles.verdictBand, isExtreme && styles.verdictBandExtreme, { color: toneColor }]}>
+          {verdict.band}
+        </AppText>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           <AppText style={styles.shareButtonText}>Share</AppText>
@@ -853,6 +914,20 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
+  // Same pill as above, plus the leading TeamAvatar other-team filter pills
+  // show next to the owner name — "All Teams" keeps the plain `pill` style
+  // since it has no single team/avatar to show.
+  teamPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
   pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   pillTextActive: { color: '#fff' },
@@ -881,8 +956,27 @@ function createStyles(colors: ThemeColors) {
     borderLeftWidth: 4,
     marginBottom: spacing.md,
   },
+  // Extra left-rail weight for the SMASH ACCEPT / HARD DECLINE bands, on top
+  // of AnimatedCard's own `glow` rim+shadow — the rail alone reads too close
+  // to a normal verdict's 4pt rail once the glow is also present.
+  verdictCardExtreme: { borderLeftWidth: 6 },
+  // A solid, full-width tone-colored strip above the band — the one
+  // "unmissable even at a glance" cue, distinct from every other card on
+  // this screen which only ever gets a thin colored rail.
+  extremeEyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    marginBottom: spacing.sm,
+  },
+  extremeEyebrowText: { fontSize: 11, fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3 },
   verdictHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   verdictBand: { fontSize: 18, fontWeight: '800', marginBottom: spacing.xs },
+  verdictBandExtreme: { fontSize: 22 },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',

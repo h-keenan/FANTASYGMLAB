@@ -280,12 +280,21 @@ export default function HomeScreen({ navigation }: Props) {
     }, [load]),
   );
 
-  // Skip the "pick a league" step on repeat visits: jump straight into the
-  // last league opened (or the marked default) once, on first load. Home
+  // Skip the "pick a league" step on repeat visits, once on first load. Home
   // stays reachable afterward via the GM Orb, so this never traps anyone.
+  // Exactly one saved league: jump straight into that league's Dashboard
+  // (unchanged). Two or more: land on the cross-league Portfolio view
+  // instead of guessing which single league to jump into (coridian_-
+  // approved) — Portfolio's own row-tap (PortfolioScreen's openLeague)
+  // still reaches any one league's Dashboard directly, just one tap
+  // further than the old single-league auto-jump below.
   useEffect(() => {
     if (autoNavigated.current || !leagues || leagues.length === 0) return;
     autoNavigated.current = true;
+    if (leagues.length > 1) {
+      navigation.navigate('Portfolio');
+      return;
+    }
     (async () => {
       const last = await getLastLeague();
       const target =
