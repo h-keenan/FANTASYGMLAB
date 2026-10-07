@@ -21,6 +21,7 @@ import NewBadge from '../components/NewBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
 import RecapReadyCard from '../components/RecapReadyCard';
+import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
 import {
@@ -76,6 +77,10 @@ interface LeaguePulseTile {
   note: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   color: string;
+  /** The tile's team's Sleeper avatar (`TeamRanking.avatar_url`) — null
+   * when no team currently qualifies for the tile (e.g. "No clear leader"),
+   * in which case TeamAvatar's own fallback circle renders instead. */
+  avatarUrl: string | null;
 }
 
 function bestByRank(teams: TeamRanking[], rankKey: 'power_rank' | 'draft_capital_rank'): TeamRanking | null {
@@ -128,6 +133,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
       note: contender ? `Power ${formatRank(contender.power_rank, contender.power_rank_tied)}` : 'No contender read available yet.',
       icon: 'flame',
       color: colors.accent,
+      avatarUrl: contender?.avatar_url ?? null,
     },
     {
       label: 'Biggest Rebuilder',
@@ -137,6 +143,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
         : 'No rebuild read available yet.',
       icon: 'construct',
       color: colors.premium,
+      avatarUrl: rebuilder?.avatar_url ?? null,
     },
     {
       label: 'Draft Capital Leader',
@@ -144,6 +151,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
       note: draftLeader ? `Draft Capital ${formatRank(draftLeader.draft_capital_rank, draftLeader.draft_capital_rank_tied)}` : 'No draft-capital read available yet.',
       icon: 'layers',
       color: colors.success,
+      avatarUrl: draftLeader?.avatar_url ?? null,
     },
     {
       label: 'Most Active Manager',
@@ -154,6 +162,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
           : 'No transaction activity tracked yet.',
       icon: 'repeat',
       color: colors.violet,
+      avatarUrl: mostActive?.avatar_url ?? null,
     },
   ];
   return tiles;
@@ -515,9 +524,12 @@ function LeaguePulseSection({ teams }: { teams: TeamRanking[] }) {
               <Ionicons name={tile.icon} size={12} color={tile.color} />
               <AppText style={[styles.pulseLabel, { color: tile.color }]}>{tile.label.toUpperCase()}</AppText>
             </View>
-            <AppText style={styles.pulseValue} numberOfLines={1}>
-              {tile.value}
-            </AppText>
+            <View style={styles.pulseValueRow}>
+              <TeamAvatar avatarId={tile.avatarUrl} size={20} />
+              <AppText style={styles.pulseValue} numberOfLines={1}>
+                {tile.value}
+              </AppText>
+            </View>
             <AppText style={styles.pulseNote} numberOfLines={1}>
               {tile.note}
             </AppText>
@@ -1163,7 +1175,8 @@ function createStyles(colors: ThemeColors) {
   },
   pulseLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pulseLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-  pulseValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: 4 },
+  pulseValueRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  pulseValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   pulseNote: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   checkInBanner: {
     flexDirection: 'row',
