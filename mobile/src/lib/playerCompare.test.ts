@@ -10,6 +10,7 @@ import {
   buildStatusRows,
   buildTrendRows,
   buildValueRows,
+  compareRowWinner,
   LOWER_IS_BETTER,
   type CompareSide,
 } from './playerCompare.ts';
@@ -144,4 +145,21 @@ test('buildNarrativePair pairs both real sentences and is null (not two empty bl
 
   const neither = buildNarrativePair(side({}, { decision_fit_narrative: null }), side({}, { decision_fit_narrative: null }));
   assert.equal(neither, null);
+});
+
+test('compareRowWinner picks the higher-is-better side for a normal row', () => {
+  assert.equal(compareRowWinner({ label: 'Value Score', a: 80, b: 60 }), 'a');
+  assert.equal(compareRowWinner({ label: 'Value Score', a: 60, b: 80 }), 'b');
+});
+
+test('compareRowWinner flips the comparison for lower-is-better rows (ranks)', () => {
+  assert.equal(compareRowWinner({ label: 'Overall Rank', a: 5, b: 20 }), 'a');
+  assert.equal(compareRowWinner({ label: 'Position Rank', a: 20, b: 5 }), 'b');
+});
+
+test('compareRowWinner returns null on a tie or when either side is missing', () => {
+  assert.equal(compareRowWinner({ label: 'Age', a: 25, b: 25 }), null);
+  assert.equal(compareRowWinner({ label: 'Age', a: null, b: 25 }), null);
+  assert.equal(compareRowWinner({ label: 'Age', a: 25, b: null }), null);
+  assert.equal(compareRowWinner({ label: 'Age', a: null, b: null }), null);
 });

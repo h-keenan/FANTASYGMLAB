@@ -47,6 +47,14 @@ Sync (or, run by a human, rotate) signing certs/profiles via match. Read-only in
 
 Build and upload a TestFlight build
 
+### ios build_only
+
+```sh
+[bundle exec] fastlane ios build_only
+```
+
+Build and archive only — no upload anywhere. Verifies the build compiles/signs before a real `beta` run.
+
 ----
 
 

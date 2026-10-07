@@ -565,6 +565,17 @@ export interface WaiverPlayer {
   // or when the team code has no schedule match.
   opponent: string | null;
   opponent_is_home: boolean | null;
+  /** Matchup-difficulty tier for this free agent's upcoming opponent AT
+   * THEIR POSITION (modules.player_projections.
+   * team_defense_points_allowed_by_position — the same signal/shape the
+   * Matchup tab's weekly per-game projections already use, and the same
+   * tier values Player Detail's Schedule tab shows as
+   * ScheduleWeek.opponent_defense_tier). Context only, same "never
+   * overweighted" contract as opponent/opponent_is_home above — never
+   * factored into score/position_rank/overall_rank. Null whenever there's
+   * no opponent, no sampled data for that opponent/position, or too few
+   * sampled games for a reliable tier. */
+  opponent_defense_tier: 'tough' | 'average' | 'weak' | null;
   /** 0-99 "OVR" badge — percentiled against the full league-eligible pool
    * at this position (rostered players included), NOT the wire-relative
    * free-agent-only pool position_rank/overall_rank above use. Same
@@ -785,6 +796,19 @@ export interface GmPlanRecordItem {
   source: string;
 }
 
+// Same already-cached rest-of-season Monte Carlo simulation the standalone
+// Playoff Odds screen renders (see PlayoffOddsTeam) — looked up for the
+// caller's own roster and surfaced as a "Where You Stand" fact. Omitted
+// entirely (not sent) when that simulation isn't ready yet for this league.
+export interface GmPlanPlayoffOddsItem {
+  label: 'Playoff Odds';
+  playoff_probability: number;
+  median_seed: number | null;
+  clinched: boolean;
+  eliminated: boolean;
+  source: string;
+}
+
 export interface GmPlanTradeItem {
   partner_team_name: string;
   my_player: string;
@@ -820,7 +844,12 @@ export interface GmPlanInjuryItem {
   source: string;
 }
 
-export type GmPlanFocusItem = GmPlanRankItem | GmPlanRecordItem | GmPlanTradeItem | GmPlanInjuryItem;
+export type GmPlanFocusItem =
+  | GmPlanRankItem
+  | GmPlanRecordItem
+  | GmPlanPlayoffOddsItem
+  | GmPlanTradeItem
+  | GmPlanInjuryItem;
 
 export interface GmPlanFocusArea {
   key: 'standing' | 'trade_opportunities' | 'roster_construction';

@@ -30,6 +30,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import WaiverRecommendationCard, {
   waiverInjuryDisplay,
   waiverOpponentContext,
+  waiverOpponentContextColor,
   waiverTrendingAddLabel,
 } from '../components/WaiverRecommendationCard';
 import { api, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
@@ -489,6 +490,7 @@ function FreeAgentRow({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const injury = waiverInjuryDisplay(player.injury_status);
   const contextLine = player.injury_replacement_fit ? player.injury_replacement_note : waiverOpponentContext(player);
+  const contextLineColor = player.injury_replacement_fit ? undefined : waiverOpponentContextColor(player, colors);
   return (
     <View
       style={[
@@ -511,6 +513,7 @@ function FreeAgentRow({
           injuryTone={injury.tone}
           ruledOut={injury.ruledOut}
           contextLine={contextLine}
+          contextLineColor={contextLineColor}
           trendingAddLabel={waiverTrendingAddLabel(player)}
           onPress={onPress}
           showDivider={false}

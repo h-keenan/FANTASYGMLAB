@@ -51,7 +51,7 @@ if _SENTRY_DSN:
         )
 
 from modules import rankings as rankings_module
-from modules.league_rankings import add_rank_tie_metadata
+from modules.league_rankings import add_rank_tie_metadata, build_roster_health_metrics_frame
 from modules import player_asset_explorer_ui
 from modules import account_store
 from modules import account_ui
@@ -15357,184 +15357,18 @@ def cached_league_intelligence_frame(
         enriched["injury_role_context"] = [{} for _ in range(len(enriched))]
         return enriched
 
-    player_lookup = players.set_index("player_id", drop=False)
-    roster_rows: list[dict] = []
-    for roster in rosters:
-        try:
-            roster_id = int(roster.get("roster_id"))
-        except Exception:
-            continue
-
-        player_ids = [str(pid) for pid in roster.get("players", []) or [] if pid is not None]
-        if not player_ids:
-            roster_rows.append(
-                {
-                    "roster_id": roster_id,
-                    "current_score_total": 0.0,
-                    "market_total": 0.0,
-                    "starter_current_score": 0.0,
-                    "bench_current_score": 0.0,
-                    "starter_share": 0.0,
-                    "top_heavy_ratio": 0.0,
-                    "impact_tier_starters": 0,
-                    "elite_tier_count": 0,
-                    "injured_count": 0,
-                    "major_absences": 0,
-                    "injured_starters": 0,
-                    "injured_bench_players": 0,
-                    "major_injury_count": 0,
-                    "major_injured_starters": 0,
-                    "injury_risk_total": 0.0,
-                    "injury_burden": 0.0,
-                    "injury_impact_score": 0.0,
-                    "injury_value_impact": 0.0,
-                    "injury_impact_flag": "Injury Data Unavailable",
-                    "injury_data_quality": "missing",
-                    "injury_data_note": "No roster players are available for injury assessment.",
-                    "health_flag": "Stable",
-                    "key_injuries_summary": "",
-                    "top_injury_impact_summary": "",
-                    "top_injury_impact_players": [],
-                    "actionable_injury_summary": "",
-                    "actionable_injury_players": [],
-                    "injury_role_context": {},
-                }
-            )
-            continue
-
-        team_df = player_lookup.loc[player_lookup.index.isin(player_ids)].copy()
-        if team_df.empty:
-            roster_rows.append(
-                {
-                    "roster_id": roster_id,
-                    "current_score_total": 0.0,
-                    "market_total": 0.0,
-                    "starter_current_score": 0.0,
-                    "bench_current_score": 0.0,
-                    "starter_share": 0.0,
-                    "top_heavy_ratio": 0.0,
-                    "impact_tier_starters": 0,
-                    "elite_tier_count": 0,
-                    "injured_count": 0,
-                    "major_absences": 0,
-                    "injured_starters": 0,
-                    "injured_bench_players": 0,
-                    "major_injury_count": 0,
-                    "major_injured_starters": 0,
-                    "injury_risk_total": 0.0,
-                    "injury_burden": 0.0,
-                    "injury_impact_score": 0.0,
-                    "injury_value_impact": 0.0,
-                    "injury_impact_flag": "Injury Data Unavailable",
-                    "injury_data_quality": "missing",
-                    "injury_data_note": "Roster players could not be matched to injury metadata.",
-                    "health_flag": "Stable",
-                    "key_injuries_summary": "",
-                    "top_injury_impact_summary": "",
-                    "top_injury_impact_players": [],
-                    "actionable_injury_summary": "",
-                    "actionable_injury_players": [],
-                    "injury_role_context": {},
-                }
-            )
-            continue
-
-        if "value_score" in team_df.columns:
-            team_df["value_score"] = pd.to_numeric(team_df["value_score"], errors="coerce").fillna(0)
-        else:
-            team_df["value_score"] = pd.to_numeric(
-                team_df[score_field] if score_field in team_df.columns else team_df.get("dynasty_score", 0),
-                errors="coerce",
-            ).fillna(0)
-        lineup_df = suggest_optimal_lineup(team_df, lineup_settings, score_field=score_field)
-        starter_mask = lineup_df["suggested_starter"].fillna(False) if "suggested_starter" in lineup_df.columns else pd.Series(False, index=lineup_df.index)
-        injury_flags = lineup_df.apply(is_injury_status, axis=1) if not lineup_df.empty else pd.Series(dtype=bool)
-
-        status_series = lineup_df.get("status", pd.Series("", index=lineup_df.index)).fillna("").astype(str).str.strip().str.lower()
-        injury_series = lineup_df.get("injury_status", pd.Series("", index=lineup_df.index)).fillna("").astype(str).str.strip().str.lower()
-        major_flags = (
-            status_series.isin({"out", "doubtful", "injured reserve", "ir", "pup", "nfi"})
-            | injury_series.isin({"out", "doubtful", "injured reserve", "ir", "pup", "nfi"})
-        )
-
-        current_score_total = float(pd.to_numeric(lineup_df["value_score"], errors="coerce").fillna(0).sum())
-        starter_current_score = float(pd.to_numeric(lineup_df.loc[starter_mask, "value_score"], errors="coerce").fillna(0).sum())
-        bench_current_score = float(pd.to_numeric(lineup_df.loc[~starter_mask, "value_score"], errors="coerce").fillna(0).sum())
-        injury_context = summarize_team_injuries(team_df, lineup_df)
-        injured_count = int(injury_context.get("injured_roster") or 0)
-        major_absences = int(injury_context.get("major_absences") or 0)
-        injured_starters = int(injury_context.get("injured_starters") or 0)
-        starter_share = starter_current_score / current_score_total if current_score_total else 0.0
-        top_heavy_ratio = starter_current_score / max(bench_current_score, 1.0)
-        starter_tiers = (
-            lineup_df.loc[starter_mask, "player_tier"].fillna("").astype(str)
-            if "player_tier" in lineup_df.columns
-            else pd.Series("", index=lineup_df.index)
-        )
-        roster_tiers = (
-            team_df.get("player_tier", pd.Series("", index=team_df.index)).fillna("").astype(str)
-            if not team_df.empty
-            else pd.Series(dtype="object")
-        )
-        impact_tier_starters = int(starter_tiers.isin({"Elite", "Star", "Core Starter"}).sum())
-        elite_tier_count = int(roster_tiers.isin({"Elite", "Star"}).sum())
-        injury_risk_total = float(injury_context.get("injury_risk_total") or 0.0)
-        injury_burden = float(injury_context.get("injury_burden") or 0.0)
-        injured_bench_players = int(injury_context.get("injured_bench_players") or 0)
-        major_injury_count = int(injury_context.get("major_injury_count") or 0)
-        major_injured_starters = int(injury_context.get("major_injured_starters") or 0)
-        injury_impact_score = float(injury_context.get("injury_impact_score") or 0.0)
-        injury_value_impact = float(injury_context.get("injury_value_impact") or injury_impact_score)
-        injury_impact_flag = _safe_text(injury_context.get("injury_impact_flag"), "Stable")
-        injury_data_quality = _safe_text(injury_context.get("injury_data_quality"), "uncertain")
-        injury_data_note = _safe_text(injury_context.get("injury_data_note"))
-        health_flag = _safe_text(injury_context.get("health_flag"), "Stable")
-        actionable_players = list(injury_context.get("actionable_injury_players") or [])
-        key_injuries_summary = ", ".join(
-            _safe_text(item.get("name"))
-            for item in actionable_players
-            if _safe_text(item.get("name"))
-        )
-        top_injury_impact_summary = _safe_text(injury_context.get("top_injury_impact_summary"))
-        top_injury_impact_players = list(injury_context.get("top_injury_impact_players") or [])
-        actionable_injury_summary = _safe_text(injury_context.get("actionable_injury_summary"))
-        actionable_injury_players = actionable_players
-
-        roster_rows.append(
-            {
-                "roster_id": roster_id,
-                "current_score_total": current_score_total,
-                "market_total": float(pd.to_numeric(team_df.get("market_score", 0), errors="coerce").fillna(0).sum()),
-                "starter_current_score": starter_current_score,
-                "bench_current_score": bench_current_score,
-                "starter_share": starter_share,
-                "top_heavy_ratio": top_heavy_ratio,
-                "impact_tier_starters": impact_tier_starters,
-                "elite_tier_count": elite_tier_count,
-                "injured_count": injured_count,
-                "major_absences": major_absences,
-                "injured_starters": injured_starters,
-                "injured_bench_players": injured_bench_players,
-                "major_injury_count": major_injury_count,
-                "major_injured_starters": major_injured_starters,
-                "injury_risk_total": injury_risk_total,
-                "injury_burden": injury_burden,
-                "injury_impact_score": injury_impact_score,
-                "injury_value_impact": injury_value_impact,
-                "injury_impact_flag": injury_impact_flag,
-                "injury_data_quality": injury_data_quality,
-                "injury_data_note": injury_data_note,
-                "health_flag": health_flag,
-                "key_injuries_summary": key_injuries_summary,
-                "top_injury_impact_summary": top_injury_impact_summary,
-                "top_injury_impact_players": top_injury_impact_players,
-                "actionable_injury_summary": actionable_injury_summary,
-                "actionable_injury_players": actionable_injury_players,
-                "injury_role_context": injury_context,
-            }
-        )
-
-    roster_metrics = pd.DataFrame(roster_rows)
+    # Real per-roster injury/balance pass — shared with
+    # services/mobile_api_service.py's get_league_team_rankings via
+    # modules.league_rankings.build_roster_health_metrics_frame so mobile's
+    # archetype classification matches this page's instead of running on
+    # neutral health/balance defaults. See that function's docstring.
+    roster_metrics = build_roster_health_metrics_frame(
+        players,
+        league_id,
+        score_field=score_field,
+        lineup_settings=lineup_settings,
+        rosters=rosters,
+    )
     trade_activity = cached_trade_activity_summary(league_id)
     manager_behavior = cached_manager_behavior_summary(league_id)
 
