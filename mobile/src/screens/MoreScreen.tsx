@@ -13,6 +13,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -145,10 +147,32 @@ export default function MoreScreen({ navigation }: Props) {
     setExporting(true);
     try {
       const result = await api.exportMyData();
-      await Share.share({
-        title: 'My FantasyGM Lab data',
-        message: JSON.stringify(result, null, 2),
-      });
+      const json = JSON.stringify(result, null, 2);
+      // Share the export as an actual .json file, not a raw-text message.
+      // A real account's export (13 tables, potentially years of Decision
+      // Memory/scouting rows) can run well past what Share.share's text
+      // `message` reliably delivers — Android's Binder IPC caps an Intent's
+      // extras around 1MB, so a large export silently failed to hand off
+      // to Messages/Mail/etc. with no distinguishable error. Writing to a
+      // file and sharing *that* (same expo-sharing pattern the Player/Trade/
+      // Recap share cards already use for their screenshot PNGs) has no
+      // such size ceiling and gives the user a real file they can save,
+      // which is also just a better shape for "my data" than a text blob.
+      const canShareFile = await Sharing.isAvailableAsync();
+      if (canShareFile) {
+        const file = new File(Paths.cache, `fantasygmlab-my-data-${Date.now()}.json`);
+        file.create();
+        file.write(json);
+        await Sharing.shareAsync(file.uri, {
+          mimeType: 'application/json',
+          UTI: 'public.json',
+          dialogTitle: 'My FantasyGM Lab data',
+        });
+      } else {
+        // Rare fallback (file sharing unavailable on this device) — same
+        // text-message share this screen used before.
+        await Share.share({ title: 'My FantasyGM Lab data', message: json });
+      }
     } catch {
       Alert.alert('Could not export your data', 'Please try again in a moment.');
     } finally {

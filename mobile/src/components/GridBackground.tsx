@@ -9,11 +9,15 @@ import { useThemeMode } from '../context/ThemeModeContext';
  * The app's shared screen backdrop: two layers, back to front.
  *
  * 1. A navy-to-black wash in dark mode (the same `gradients.hero` pair
- *    Login/Home use) or a white-to-glacier wash in light mode — before the
- *    dark version, only the pre-login screens had any depth to their
- *    background and every in-league screen behind it read as flat
- *    near-black, the single biggest gap against the concept sheet's
- *    atmospheric navy-glow look.
+ *    Login/Home use) or a pale-blue-to-glacier wash in light mode (its own
+ *    `lightGradients.headerWash` — see that token's comment for why this
+ *    isn't just the light half of `hero`: that pairing used to run the
+ *    light wash backwards, whiter at the header than at the base
+ *    background, which is why coridian_ saw the header go flat/invisible
+ *    in light mode) — before the dark version, only the pre-login screens
+ *    had any depth to their background and every in-league screen behind
+ *    it read as flat near-black, the single biggest gap against the
+ *    concept sheet's atmospheric navy-glow look.
  * 2. A soft accent glow bloom anchored top-center, echoing the concept
  *    sheet's corner-glow treatment — kept faint on purpose (this app's
  *    established rule is distinct accents, not overdone ones).
@@ -30,7 +34,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
  */
 export default function GridBackground() {
   const { colors, isDark } = useThemeMode();
-  const wash = isDark ? gradients.hero : lightGradients.hero;
+  const wash = isDark ? gradients.hero : lightGradients.headerWash;
   return (
     <Svg pointerEvents="none" style={StyleSheet.absoluteFillObject}>
       <Defs>

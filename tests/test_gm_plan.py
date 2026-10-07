@@ -245,6 +245,51 @@ def test_standing_focus_area_with_no_rankings_row_is_honest_no_signal():
     assert standing["watch_for"] == gm_plan.STANDING_NO_SIGNAL_WATCH_FOR
 
 
+def test_standing_focus_area_surfaces_playoff_odds_when_available():
+    # modules.playoff_simulator.build_league_playoff_odds_cached's own
+    # `teams` row shape for the caller's roster — already-cached, so GM
+    # Plan just reads it, never recomputes it.
+    plan = gm_plan.build_gm_plan(
+        team_stance="balanced",
+        season_phase=gm_plan.PHASE_PLAYOFF_PUSH,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+        record={"wins": 8, "losses": 4, "ties": 0},
+        playoff_odds={
+            "roster_id": "1",
+            "playoff_probability": 67.3,
+            "median_seed": 4,
+            "clinched": False,
+            "eliminated": False,
+        },
+    )
+    standing = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_STANDING)
+    odds_item = next(item for item in standing["items"] if item["label"] == "Playoff Odds")
+    assert odds_item["playoff_probability"] == 67.3
+    assert odds_item["median_seed"] == 4
+    assert odds_item["clinched"] is False
+    assert odds_item["eliminated"] is False
+    assert odds_item["source"] == "modules.playoff_simulator.build_league_playoff_odds_cached"
+
+
+def test_standing_focus_area_omits_playoff_odds_when_not_ready_or_missing():
+    # No fabricated fact when the simulation isn't ready yet for this
+    # league (offseason / no playoff format / no rankings data) or the
+    # caller's roster didn't resolve in it — same honest-degradation
+    # contract as every other fact here.
+    for not_ready in (None, {}, {"roster_id": "1", "playoff_probability": None}):
+        plan = gm_plan.build_gm_plan(
+            team_stance="",
+            season_phase=gm_plan.PHASE_EARLY_SEASON,
+            rankings_row=_rankings_row(),
+            total_teams=12,
+            playoff_odds=not_ready,
+        )
+        standing = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_STANDING)
+        labels = {item["label"] for item in standing["items"]}
+        assert "Playoff Odds" not in labels
+
+
 def test_roster_focus_area_flags_bottom_third_ranks_as_relative_weak_spots():
     plan = gm_plan.build_gm_plan(
         team_stance="",

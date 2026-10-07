@@ -85,3 +85,4 @@ data/nfl_games.csv
 data/*measurement*.json
 data/*_measurement.json
 data/*benchmark*.json
+settings.local.json

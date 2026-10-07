@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AnalyticsSection from '../components/AnalyticsSection';
 import BrandedSpinner from '../components/BrandedSpinner';
 import CircularProgressRing from '../components/CircularProgressRing';
+import CompareSharePreviewModal from '../components/CompareSharePreviewModal';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -26,7 +27,7 @@ import {
   buildStatusRows,
   buildTrendRows,
   buildValueRows,
-  LOWER_IS_BETTER,
+  compareRowWinner,
   type CompareRow,
   type CompareSide,
   type CompareTextRow,
@@ -42,10 +43,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PlayerCompare'>;
 function CompareRowView({ row, isLast }: { row: CompareRow; isLast: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const lowerIsBetter = LOWER_IS_BETTER.has(row.label);
-  const hasBoth = row.a !== null && row.b !== null;
-  const aWins = hasBoth && row.a !== row.b && (lowerIsBetter ? row.a! < row.b! : row.a! > row.b!);
-  const bWins = hasBoth && row.a !== row.b && (lowerIsBetter ? row.b! < row.a! : row.b! > row.a!);
+  const winner = compareRowWinner(row);
+  const aWins = winner === 'a';
+  const bWins = winner === 'b';
   const display = (value: number | null) => (value === null ? '—' : row.format ? row.format(value) : String(value));
   return (
     <View style={[styles.row, !isLast && styles.rowDivider]}>
@@ -197,6 +197,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
   const [playerB, setPlayerB] = useState<RankedPlayer | null>(null);
   const [sides, setSides] = useState<[CompareSide, CompareSide] | null>(null);
   const [loadingCompare, setLoadingCompare] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useScreenHeaderTitle(navigation, 'Compare', leagueName);
 
@@ -357,10 +358,27 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
   return (
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
-      <TouchableOpacity style={styles.changeButton} onPress={() => setPlayerB(null)}>
-        <Ionicons name="swap-horizontal-outline" size={14} color={colors.accent} />
-        <AppText style={styles.changeButtonText}>Compare someone else</AppText>
-      </TouchableOpacity>
+      <View style={styles.topActionsRow}>
+        <TouchableOpacity style={styles.changeButton} onPress={() => setPlayerB(null)}>
+          <Ionicons name="swap-horizontal-outline" size={14} color={colors.accent} />
+          <AppText style={styles.changeButtonText}>Compare someone else</AppText>
+        </TouchableOpacity>
+        {sides ? (
+          // Same icon-only "share-outline" treatment PlayerDetail/TradeHub/
+          // Recap's share triggers use, placed beside this screen's one
+          // existing top-of-result action rather than inventing a second
+          // action row.
+          <TouchableOpacity
+            style={styles.compareShareButton}
+            onPress={() => setShareOpen(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Share this comparison"
+          >
+            <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
       {loadingCompare || !sides ? (
         <BrandedSpinner style={styles.center} />
       ) : (
@@ -405,6 +423,29 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
           ) : null}
         </ScrollView>
       )}
+      {sides ? (
+        <CompareSharePreviewModal
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          sideA={{
+            playerId: sides[0].player.player_id,
+            name: sides[0].player.name ?? 'Unknown',
+            position: sides[0].player.position,
+            team: sides[0].player.team,
+            tier: sides[0].player.tier,
+            overallRating: sides[0].overallRating,
+          }}
+          sideB={{
+            playerId: sides[1].player.player_id,
+            name: sides[1].player.name ?? 'Unknown',
+            position: sides[1].player.position,
+            team: sides[1].player.team,
+            tier: sides[1].player.tier,
+            overallRating: sides[1].overallRating,
+          }}
+          rows={valueRows}
+        />
+      ) : null}
     </View>
   );
 }
@@ -444,13 +485,21 @@ function createStyles(colors: ThemeColors) {
     overflow: 'hidden',
   },
   candidateRow: { paddingHorizontal: spacing.md },
+  // Wraps the existing "Compare someone else" pill plus the new share
+  // trigger — centered as a pair so the pill's own former alignSelf:
+  // 'center' positioning is unchanged, just now shared with a sibling.
+  topActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
   changeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    alignSelf: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radii.pill,
@@ -458,6 +507,7 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.accentMuted,
   },
   changeButtonText: { fontSize: 12, fontWeight: '600', color: colors.accent },
+  compareShareButton: { alignItems: 'center', justifyContent: 'center', padding: spacing.xs },
   scrollContent: { paddingHorizontal: spacing.lg },
   identityRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: spacing.sm },
   identity: { flex: 1, alignItems: 'center', gap: spacing.xs },
