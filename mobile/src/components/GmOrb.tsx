@@ -168,14 +168,6 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       subtitle: 'Trade ideas, search, and build a trade',
     },
     {
-      label: 'Trade Calculator',
-      route: 'TradeCalculator',
-      icon: 'calculator-outline',
-      needsLeague: true,
-      color: colors.premium,
-      subtitle: 'Quick value comparisons',
-    },
-    {
       label: 'GM Targets',
       route: 'GmTargets',
       icon: 'bookmark-outline',
