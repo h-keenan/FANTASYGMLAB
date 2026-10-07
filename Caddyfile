@@ -47,6 +47,21 @@
 	reverse_proxy web:8080
 }
 
+# --- fantasygm-lab-marketing-www --------------------------------------------
+# `www` used to be served the same static marketing page as the apex domain
+# (see docs/production-domain-cutover.md's original "canonicalize to apex"
+# plan — never implemented as an actual redirect). In practice, users treat
+# `www.<domain>` as the product itself, not a marketing mirror: a static
+# page with no auth/session awareness looked indistinguishable from "you're
+# logged out" even to an already-signed-in user, since session state lives
+# only on APP_DOMAIN's origin (localStorage is origin-scoped — see that doc).
+# Redirecting straight into the app, preserving path/query, removes that
+# confusion entirely: `www` now always reflects the visitor's real auth
+# state instead of a static page that can never know it.
+{$MARKETING_DOMAIN_WWW} {
+	redir https://{$APP_DOMAIN}{uri} permanent
+}
+
 # --- fantasygm-lab-marketing (static landing site) --------------------------
 # Static files only (no Python process) — same content Render's
 # fantasygm-lab-marketing static service publishes from staticPublishPath
@@ -55,7 +70,7 @@
 # repo's checked-in static/landing/ is served as-is; re-run the script
 # after pulling marketing asset changes to refresh it before the next
 # `docker compose up -d`.
-{$MARKETING_DOMAIN}, {$MARKETING_DOMAIN_WWW} {
+{$MARKETING_DOMAIN} {
 	import encode_responses
 	root * /srv/static/landing
 

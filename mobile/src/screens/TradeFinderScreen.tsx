@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import { useFocusEffect } from '@react-navigation/native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,9 +10,6 @@ import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EmptyState from '../components/EmptyState';
-import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
-import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
-import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -32,12 +28,22 @@ import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { radii, shadows, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'TradeFinder'>;
+// Prop-driven now (TradesScreen owns the single `Trades` route and hosts
+// this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
+// plain props instead of via route.params, but `navigation` is still the
+// real root-stack navigation prop, used exactly as before for PlayerDetail/
+// PickDetail.
+type TradeFinderNavigation = NativeStackNavigationProp<RootStackParamList>;
+
+interface Props {
+  leagueId: string;
+  leagueName: string;
+  navigation: TradeFinderNavigation;
+}
 
 // Button height (paddingVertical * 2 + line height) plus its own gap above
 // the orb clearance zone (see the `bottom` override on the button below) —
@@ -351,12 +357,11 @@ function ResultCard({
  * modules.trade_hub_engine.generate_trade_finder_records), just restricted
  * to whatever the caller picks here instead of the unrestricted pool.
  */
-export default function TradeFinderScreen({ route, navigation }: Props) {
+export default function TradeFinderScreen({ leagueId, leagueName, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
   const { strategy } = useGmStance(leagueId);
   const { lens } = useValuationLens(leagueId);
 
@@ -367,20 +372,6 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
-
-  useScreenHeaderTitle(navigation, 'Trade Finder', leagueName);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={styles.headerButtonRow}>
-          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
-          <EvaluationLensHeaderButton leagueId={leagueId} />
-          <GmStanceHeaderButton leagueId={leagueId} />
-        </View>
-      ),
-    });
-  }, [navigation, leagueId, leagueName, styles]);
 
   useFocusEffect(
     useCallback(() => {
@@ -465,7 +456,6 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
         ]}
         ListHeaderComponent={
           <View>
-            <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
             <ScreenInfoNote
               text={`Pick the players you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
             />
@@ -542,7 +532,6 @@ export default function TradeFinderScreen({ route, navigation }: Props) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     container: { flex: 1, backgroundColor: colors.background },
     center: {
       flex: 1,

@@ -973,12 +973,45 @@ def get_league_team_rankings(
     if rankings_frame.empty:
         return {"ok": True, "teams": [], "reason": "no_rankings_data"}
 
-    # Archetype/strategy classification degrades gracefully without a full
-    # league-intelligence frame (health/balance inputs default to neutral —
-    # see modules.team_eval._rank_strength's fallback), so it's safe to run
-    # directly on the cheap rankings_frame rather than needing the heavier
-    # per-roster injury-summary pass web's cached_league_intelligence_frame
-    # does.
+    # Real per-roster injury/balance pass, now accepted as a real compute
+    # cost on the dedicated box (see modules.league_rankings.
+    # build_roster_health_metrics_frame's docstring — this is the same pass
+    # app.py's cached_league_intelligence_frame runs for web). Previously
+    # this endpoint ran refine_team_directions directly on the cheap
+    # rankings_frame, which has no injury_burden/top_heavy_ratio/
+    # impact_tier_starters/elite_tier_count columns at all, so archetype
+    # classification silently used modules.team_eval._rank_strength's
+    # neutral-default fallback — a real correctness gap against web for a
+    # user-facing label (_classify_team_strategy/_assign_team_archetype
+    # both gate on these fields, e.g. injury_burden < 4 for "Juggernaut").
+    # Cached the same way as the rankings frame itself (30s live-time-bucket
+    # Redis single-flight), so this doesn't add per-request latency beyond
+    # the first caller in each window.
+    health_metrics = league_rankings.build_roster_health_metrics_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if not health_metrics.empty:
+        health_cols = [
+            "roster_id",
+            "injury_burden",
+            "injured_starters",
+            "health_flag",
+            "top_heavy_ratio",
+            "impact_tier_starters",
+            "elite_tier_count",
+        ]
+        health_metrics = health_metrics[[c for c in health_cols if c in health_metrics.columns]].copy()
+        health_metrics["roster_id"] = pd.to_numeric(health_metrics["roster_id"], errors="coerce")
+        rankings_frame = rankings_frame.drop(
+            columns=[c for c in health_cols if c != "roster_id" and c in rankings_frame.columns]
+        )
+        rankings_frame["__roster_id_key__"] = pd.to_numeric(rankings_frame["roster_id"], errors="coerce")
+        rankings_frame = rankings_frame.merge(
+            health_metrics.rename(columns={"roster_id": "__roster_id_key__"}),
+            on="__roster_id_key__",
+            how="left",
+        ).drop(columns=["__roster_id_key__"])
+
     rankings_frame = refine_team_directions(rankings_frame)
 
     rosters = sleeper.get_rosters(league_id)
@@ -4513,6 +4546,8 @@ def get_gm_plan(
 
     declared_team_stance = _fetch_team_stance(config, user_id, access_token, league_id)
 
+    my_roster_id = str(my_roster.get("roster_id") or "")
+
     rankings_row: dict[str, Any] | None = None
     total_teams: int | None = None
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
@@ -4520,12 +4555,29 @@ def get_gm_plan(
     )
     if not rankings_frame.empty:
         total_teams = int(len(rankings_frame))
-        my_roster_id = str(my_roster.get("roster_id") or "")
         match = rankings_frame[rankings_frame["roster_id"].astype(str) == my_roster_id]
         if not match.empty:
             rankings_row = {
                 key: _clean_json_value(value) for key, value in match.iloc[0].to_dict().items()
             }
+
+    # Same already-cached rest-of-season Monte Carlo simulation the
+    # standalone Playoff Odds screen (GET /v1/leagues/{id}/playoff-odds)
+    # calls — "Where You Stand" asked Power Rank/Draft Capital Rank/record
+    # but never this, even though it's the already-computed answer to
+    # exactly the question GM Plan is trying to answer. Not-ready states
+    # (offseason, no_playoff_format, no_rankings_data, unavailable) come
+    # back as `reason` with an empty `teams` list — same honest-degradation
+    # contract the dedicated endpoint uses, so there's simply no match
+    # below and modules.gm_plan omits the fact rather than fabricating one.
+    playoff_odds_result = playoff_simulator.build_league_playoff_odds_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    my_playoff_odds: dict[str, Any] | None = None
+    for team in playoff_odds_result.get("teams") or []:
+        if str(team.get("roster_id") or "") == my_roster_id:
+            my_playoff_odds = team
+            break
 
     trade_idea_records: list[dict[str, Any]] = []
     try:
@@ -4561,6 +4613,7 @@ def get_gm_plan(
         rankings_row=rankings_row,
         total_teams=total_teams,
         record=record,
+        playoff_odds=my_playoff_odds,
         trade_ideas=trade_idea_records,
     )
 
@@ -5372,9 +5425,16 @@ def get_league_matchup(
 
 
 def _project_waiver_row(
-    row: pd.Series, score_field: str, opponent_by_team: dict[str, dict[str, Any]] | None = None
+    row: pd.Series,
+    score_field: str,
+    opponent_by_team: dict[str, dict[str, Any]] | None = None,
+    defense_strength_by_position: dict[str, dict[str, dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     matchup = (opponent_by_team or {}).get(str(row.get("team") or ""))
+    opponent_team = matchup.get("opponent") if matchup else None
+    defense_entry = ((defense_strength_by_position or {}).get(str(opponent_team or "")) or {}).get(
+        str(row.get("position") or "")
+    )
     return {
         "player_id": _clean_json_value(row.get("player_id")),
         "name": _clean_json_value(row.get("name")),
@@ -5389,8 +5449,22 @@ def _project_waiver_row(
         # This week's real opponent (modules.nfl_schedule) — context only,
         # same "never overweighted" contract as Player Detail's Schedule
         # tab: doesn't touch score/position_rank/overall_rank above.
-        "opponent": matchup.get("opponent") if matchup else None,
+        "opponent": opponent_team,
         "opponent_is_home": matchup.get("is_home") if matchup else None,
+        # Matchup-difficulty tier for this free agent's upcoming opponent AT
+        # THEIR POSITION — modules.player_projections.
+        # team_defense_points_allowed_by_position, reused exactly as the
+        # Matchup endpoint (get_league_matchup, above) already calls it,
+        # same (season, upto_week) shape. Per coridian_'s connectivity-audit
+        # finding: this screen already showed the opponent but not whether
+        # it's actually a good/bad matchup, even though this exact signal
+        # was already computed in this file for a different endpoint.
+        # Same "never overweighted" contract as opponent/opponent_is_home
+        # above — context only, never touches score/position_rank/
+        # overall_rank. Null whenever there's no opponent, no sampled data
+        # for that opponent/position, or too few sampled games for a
+        # reliable tier (see that function's own docstring).
+        "opponent_defense_tier": (defense_entry or {}).get("tier"),
         # Wire-relative ranks (rank among available free agents only), not the
         # league-global canonical_* ranks /rankings returns — deliberately
         # separate, matching the web app's waivers page (app.py comment:
@@ -5424,8 +5498,9 @@ def _project_priority_add(
     score_field: str,
     guidance: "faab.FaabGuidance",
     opponent_by_team: dict[str, dict[str, Any]] | None = None,
+    defense_strength_by_position: dict[str, dict[str, dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
-    projected = _project_waiver_row(row, score_field, opponent_by_team)
+    projected = _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
     position_rank = int(row.get("position_rank") or 99) or 99
     label, tone = waivers_ui.waiver_recommendation_label(row, position_rank)
     projected["recommendation_label"] = label
@@ -5564,6 +5639,17 @@ def get_league_waivers(
     # with no current week (offseason/draft) or an unmapped team just
     # leaves "opponent" null rather than failing the whole request.
     opponent_by_team: dict[str, dict[str, Any]] = {}
+    # Matchup-difficulty tier for each free agent's upcoming opponent AT
+    # THEIR POSITION — modules.player_projections.
+    # team_defense_points_allowed_by_position, reused exactly as the
+    # Matchup endpoint (get_league_matchup, above) already calls it, same
+    # (season, upto_week) shape. Per coridian_'s connectivity-audit finding:
+    # this endpoint already surfaced the opponent but never whether it's
+    # actually a good/bad matchup, even though this exact signal was
+    # already computed in this file for a different endpoint. Context
+    # only, same "never overweighted" contract as opponent_by_team below —
+    # never touches score_field, position_rank, or overall_rank anywhere.
+    defense_strength_by_position: dict[str, dict[str, dict[str, Any]]] = {}
     try:
         current_week = int((league.get("settings") or {}).get("leg") or 0)
     except (TypeError, ValueError):
@@ -5575,9 +5661,29 @@ def get_league_waivers(
             matchup = nfl_schedule.team_matchup_for_week(team_code, current_week, season, games=games_df)
             if matchup:
                 opponent_by_team[team_code] = matchup
+        # Best-effort, same "fails soft" contract as every other enrichment
+        # fetch in this file (e.g. the matchup loop just above, and
+        # _ProjectionContext's own try/except for the Matchup endpoint): a
+        # hiccup fetching Sleeper's season stats must never break the real
+        # waiver-pool response, it only means opponent_defense_tier stays
+        # null for this request.
+        try:
+            defense_players_lookup = sleeper.get_players()
+            defense_weekly_stats = sleeper.get_season_player_stats(season=season, retain_weekly=True)
+            defense_strength_by_position = player_projections.team_defense_points_allowed_by_position(
+                season,
+                upto_week=current_week - 1,
+                weekly_stats=defense_weekly_stats,
+                players=defense_players_lookup,
+            )
+        except Exception:
+            defense_strength_by_position = {}
 
     limited = free_agents.head(max(1, min(limit, 300)))
-    players = [_project_waiver_row(row, score_field, opponent_by_team) for _, row in limited.iterrows()]
+    players = [
+        _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
+        for _, row in limited.iterrows()
+    ]
 
     priority_df = waivers_ui.rank_priority_add_candidates(
         free_agents,
@@ -5606,7 +5712,9 @@ def get_league_waivers(
             remaining_budget=faab_budget.remaining,
             roster_need=str(row.get("position") or "").upper() in needed_upper,
         )
-        priority_adds.append(_project_priority_add(row, score_field, guidance, opponent_by_team))
+        priority_adds.append(
+            _project_priority_add(row, score_field, guidance, opponent_by_team, defense_strength_by_position)
+        )
 
     # Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
     # Shortlist) — matches web's Premium-only gate (modules/waivers_ui.py:
@@ -5640,9 +5748,18 @@ def get_league_waivers(
         ]
         faab_df = faab_pool.sort_values(score_field, ascending=False).head(4)
 
-        stash_candidates = [_project_waiver_row(row, score_field, opponent_by_team) for _, row in stash_df.iterrows()]
-        watchlist_candidates = [_project_waiver_row(row, score_field, opponent_by_team) for _, row in watchlist_df.iterrows()]
-        faab_targets = [_project_waiver_row(row, score_field, opponent_by_team) for _, row in faab_df.iterrows()]
+        stash_candidates = [
+            _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
+            for _, row in stash_df.iterrows()
+        ]
+        watchlist_candidates = [
+            _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
+            for _, row in watchlist_df.iterrows()
+        ]
+        faab_targets = [
+            _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
+            for _, row in faab_df.iterrows()
+        ]
 
     return {
         "ok": True,

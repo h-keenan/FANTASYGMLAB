@@ -12,8 +12,8 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import IconCircle from '../components/IconCircle';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import RecapReadyCard from '../components/RecapReadyCard';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -237,16 +237,10 @@ export default function AlertsScreen({ route, navigation }: Props) {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListHeaderComponent={
           recapReadyWeek != null ? (
-            <TouchableOpacity onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}>
-              <AnimatedCard glow style={styles.recapCard}>
-                <IconCircle name="newspaper-outline" color={colors.accent} size={36} style={styles.recapIconDisc} />
-                <View style={styles.recapTextGroup}>
-                  <AppText style={styles.recapTitle}>Week {recapReadyWeek} League Recap is ready</AppText>
-                  <AppText style={styles.recapSubtitle}>Tap to see this week's storylines</AppText>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-              </AnimatedCard>
-            </TouchableOpacity>
+            <RecapReadyCard
+              week={recapReadyWeek}
+              onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
+            />
           ) : null
         }
         ListEmptyComponent={
@@ -406,16 +400,6 @@ function createStyles(colors: ThemeColors) {
     },
     notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
     listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3 },
-    recapCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: spacing.md,
-      marginBottom: spacing.md,
-    },
-    recapIconDisc: { marginRight: spacing.sm },
-    recapTextGroup: { flex: 1 },
-    recapTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    recapSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
     group: { marginBottom: spacing.md },
     groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
     groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },

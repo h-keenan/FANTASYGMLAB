@@ -39,6 +39,24 @@ export function waiverOpponentContext(player: {
   return player.opportunity_label ?? null;
 }
 
+/** Color override for `waiverOpponentContext`'s string when it's actually
+ * showing the opponent (never for the opportunity_label fallback) — tough
+ * defense (bad matchup for this free agent's position) reads danger/red,
+ * weak defense (good matchup) reads success/green, average/unranked stays
+ * the row's normal muted context color. Exact same tier→color mapping
+ * Player Detail's Schedule tab already uses for this identical signal
+ * (PlayerDetailScreen's `defenseTierColor`) — this is a restrained color
+ * change to the existing text, not a new badge. */
+export function waiverOpponentContextColor(
+  player: { opponent: string | null; opponent_defense_tier?: 'tough' | 'average' | 'weak' | null },
+  colors: ThemeColors,
+): string | undefined {
+  if (!player.opponent) return undefined;
+  if (player.opponent_defense_tier === 'tough') return colors.danger;
+  if (player.opponent_defense_tier === 'weak') return colors.success;
+  return undefined;
+}
+
 /** Sleeper's GLOBAL (cross-league, last-24h) trending-add label for a free
  * agent, or null when the player isn't on Sleeper's trending-add list right
  * now. Deliberately says "Sleeper"/"across Sleeper," never "in your league"
@@ -128,6 +146,7 @@ export default function WaiverRecommendationCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const injury = waiverInjuryDisplay(player.injury_status);
   const contextLine = player.injury_replacement_fit ? player.injury_replacement_note : waiverOpponentContext(player);
+  const contextLineColor = player.injury_replacement_fit ? undefined : waiverOpponentContextColor(player, colors);
   const isPrimary = variant === 'primary';
 
   const identity = (
@@ -141,6 +160,7 @@ export default function WaiverRecommendationCard({
       injuryTone={injury.tone}
       ruledOut={injury.ruledOut}
       contextLine={contextLine}
+      contextLineColor={contextLineColor}
       trendingAddLabel={waiverTrendingAddLabel(player)}
       showDivider={false}
     />

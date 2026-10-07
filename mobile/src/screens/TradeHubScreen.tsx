@@ -1,20 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import MeterRow, { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
-import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
-import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
-import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import PlayerCard from '../components/PlayerCard';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -35,6 +31,7 @@ import {
 } from '../lib/api';
 import { api } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { presentationAssetBackStats } from '../lib/playerCardBackStats';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useDensity } from '../context/DensityContext';
 import { useGmStance } from '../context/GmStanceContext';
@@ -42,7 +39,6 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { setSeenTradeIdeaCount } from '../lib/tradeHubSeen';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -179,7 +175,18 @@ function TradeIdeaSkeletonCard() {
   );
 }
 
-type Props = NativeStackScreenProps<RootStackParamList, 'TradeHub'>;
+// Prop-driven now (TradesScreen owns the single `Trades` route and hosts
+// this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
+// plain props instead of via route.params, but `navigation` is still the
+// real root-stack navigation prop, used exactly as before for PlayerDetail/
+// PickDetail/Paywall/TradeHistory.
+type TradeHubNavigation = NativeStackNavigationProp<RootStackParamList>;
+
+interface Props {
+  leagueId: string;
+  leagueName: string;
+  navigation: TradeHubNavigation;
+}
 
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
 
@@ -192,12 +199,11 @@ const NOT_READY_MESSAGES: Record<string, string> = {
   no_player_data: "Player data isn't available right now.",
 };
 
-export default function TradeHubScreen({ route, navigation }: Props) {
+export default function TradeHubScreen({ leagueId, leagueName, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
   // Read-only here: the header's GmStanceHeaderButton is the only place
   // stance is changed, and a change there re-runs `load` through this.
   const { strategy, loaded: stanceLoaded } = useGmStance(leagueId);
@@ -224,33 +230,6 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const [allTradesLoadingMore, setAllTradesLoadingMore] = useState(false);
   const [allTradesError, setAllTradesError] = useState<string | null>(null);
   const [allTradesStarted, setAllTradesStarted] = useState(false);
-
-  useScreenHeaderTitle(navigation, 'Trade Hub', leagueName);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={styles.headerButtonRow}>
-          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
-          <EvaluationLensHeaderButton leagueId={leagueId} />
-          <GmStanceHeaderButton leagueId={leagueId} />
-          {/* Discoverability audit (2026-09-26): Trade History had exactly one
-              path in (More -> Your Team), even though "did my trade work out"
-              is a Trade Hub question first. Same icon-button pattern as the
-              three buttons to its left — no new header affordance invented. */}
-          <TouchableOpacity
-            onPress={() => navigation.navigate('TradeHistory')}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Trade History"
-            accessibilityHint="Trades you've confirmed and how they've worked out"
-          >
-            <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      ),
-    });
-  }, [navigation, leagueId, lens, colors.textSecondary]);
 
   const load = useCallback(
     async (nextStrategy: TeamStrategy, nextAdUnlocks: number, nextLens: ValuationLens) => {
@@ -362,7 +341,6 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
       ListHeaderComponent={
         <View>
-          <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
           <View style={styles.viewModeRow}>
             <SegmentedTabBar<'for_you' | 'all_trades'>
               options={[
@@ -533,17 +511,27 @@ function TradeHubGateCard({
 
 /**
  * One side (You Send / You Receive) of a trade package: players render via
- * the shared PlayerIdentityRow (no `slot` — trade assets have no lineup
- * slot), picks via DraftPickAssetRow — never a malformed player row for a
- * pick. Order is preserved exactly as the API returned it; only the
- * per-asset presentation differs by `asset_type`.
+ * the shared, flippable `PlayerCard` (coridian_'s circled reference card,
+ * generalized — see components/PlayerCard.tsx's own doc comment), picks
+ * via DraftPickAssetRow — never a malformed player row for a pick. Order
+ * is preserved exactly as the API returned it; only the per-asset
+ * presentation differs by `asset_type`.
  *
- * Team and age are combined into PlayerIdentityRow's single `team` slot
- * (e.g. "NO · Age 30") rather than passed separately (team) + via
- * `contextLine` (age) — the concept mockups show these on one meta line
- * under the position badge, not a whole extra row. This is a page-local
- * prop composition, not a change to PlayerIdentityRow itself: every other
- * screen using the shared row is unaffected.
+ * `presentationAssetBackStats` (lib/playerCardBackStats.ts) builds each
+ * player's back-face stats from fields `PresentationAsset` already carries
+ * — tier, role, injury (status + severity), the asset's own value score,
+ * team/age, and the role's rationale sentence — several of which
+ * (`score`, `injury_level`, `opportunity_explanation`) had nowhere to
+ * render on the old row at all. Tapping a player card now flips it instead
+ * of navigating straight to Player Detail (PlayerIdentityRow's old
+ * behavior) — `onOpenDetail` wires the card's own small corner affordance
+ * to that navigation instead, matching coridian_'s ask that the primary
+ * tap flip the card and a separate control open the PQV.
+ *
+ * Fixed `size` (not a flex-filled column width) deliberately mirrors
+ * Waivers' `BestAvailableCard` sizing precedent — a trade side can carry
+ * 2-3 assets, and a card stretched to the full exchange column's width
+ * would read as oversized stacked repeatedly.
  */
 function ExchangeAssetList({
   assets,
@@ -554,41 +542,42 @@ function ExchangeAssetList({
   onPressPlayer: (asset: PresentationAsset) => void;
   onPressPick: (asset: PresentationAsset) => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <>
       {assets.map((asset, index) => {
-        const showDivider = index < assets.length - 1;
+        const isLast = index === assets.length - 1;
         if (asset.asset_type === 'pick') {
           return (
-            <DraftPickAssetRow
-              key={`pick-${asset.pick_id ?? index}`}
-              pickId={asset.pick_id}
-              round={asset.round ? Number(asset.round) : null}
-              label={asset.label}
-              projectedRange={asset.projected_range}
-              pickTier={asset.pick_tier}
-              onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
-              showDivider={showDivider}
-            />
+            <View key={`pick-${asset.pick_id ?? index}`} style={!isLast && styles.exchangeItemSpacing}>
+              <DraftPickAssetRow
+                pickId={asset.pick_id}
+                round={asset.round ? Number(asset.round) : null}
+                label={asset.label}
+                projectedRange={asset.projected_range}
+                pickTier={asset.pick_tier}
+                onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
+              />
+            </View>
           );
         }
-        const teamAgeLine = [asset.team, asset.age != null ? `Age ${asset.age}` : null]
-          .filter(Boolean)
-          .join(' · ');
+        const { note, stats } = presentationAssetBackStats(asset);
         return (
-          <PlayerIdentityRow
-            key={`player-${asset.player_id ?? index}`}
-            playerId={asset.player_id}
-            name={asset.name}
-            position={asset.position}
-            team={teamAgeLine || null}
-            tier={asset.tier}
-            overallRating={asset.overall_rating}
-            opportunityLabel={asset.role}
-            injuryLabel={asset.injury_status}
-            onPress={asset.player_id ? () => onPressPlayer(asset) : undefined}
-            showDivider={showDivider}
-          />
+          <View key={`player-${asset.player_id ?? index}`} style={[styles.exchangeCardWrap, !isLast && styles.exchangeItemSpacing]}>
+            <PlayerCard
+              size={120}
+              playerId={asset.player_id}
+              name={asset.name}
+              position={asset.position}
+              tier={asset.tier}
+              overallRating={asset.overall_rating}
+              injuryLabel={asset.injury_status}
+              backStats={stats}
+              backNote={note}
+              onOpenDetail={asset.player_id ? () => onPressPlayer(asset) : undefined}
+            />
+          </View>
         );
       })}
     </>
@@ -1003,7 +992,6 @@ function TradeIdeaCard({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   gateCard: { alignItems: 'center', padding: spacing.lg, marginTop: spacing.xs },
   gateIconDisc: {
     width: 44,
@@ -1179,6 +1167,12 @@ function createStyles(colors: ThemeColors) {
     paddingTop: spacing.xs,
     paddingBottom: 2,
   },
+  // PlayerCard is square and fixed-size (see ExchangeAssetList's doc
+  // comment) rather than stretched to the column's own flex:1 width, so
+  // each tile needs its own flex-start wrapper inside the stretch-aligned
+  // exchangeSide column.
+  exchangeCardWrap: { alignSelf: 'flex-start' },
+  exchangeItemSpacing: { marginBottom: spacing.sm },
   exchangeGutter: { width: 26, alignItems: 'center', justifyContent: 'center' },
   swapDisc: {
     width: 26,

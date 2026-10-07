@@ -161,6 +161,29 @@ platform :ios do
     )
     upload_to_testflight(api_key: api_key, skip_waiting_for_build_processing: true)
   end
+
+  desc "Build and archive only — no upload anywhere. Verifies the build compiles/signs before a real `beta` run."
+  lane :build_only do
+    api_key = asc_api_key
+    bump_ios_build_number
+    ensure_native_project(:ios, force: true)
+    match(type: "appstore", api_key: api_key, readonly: true)
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "ios/FantasyGMLab.xcodeproj",
+      team_id: ENV.fetch("APPLE_TEAM_ID"),
+      code_sign_identity: "Apple Distribution",
+      bundle_identifier: ENV.fetch("FGL_BUNDLE_ID"),
+      profile_name: ENV.fetch("sigh_#{ENV.fetch('FGL_BUNDLE_ID')}_appstore_profile-name"),
+    )
+    build_app(
+      workspace: ENV["FGL_IOS_WORKSPACE"] || "ios/FantasyGMLab.xcworkspace",
+      scheme: ENV["FGL_IOS_SCHEME"] || "FantasyGMLab",
+      export_method: "app-store",
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('APPLE_TEAM_ID')}",
+    )
+    UI.success("Archived and exported an .ipa locally — nothing was uploaded to App Store Connect. Run `fastlane ios beta` (yourself, via `!`) to actually ship it.")
+  end
 end
 
 # app.json has no versionCode (expo prebuild defaults to 1 every time,

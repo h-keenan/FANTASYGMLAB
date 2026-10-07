@@ -14,7 +14,10 @@
         "ITSAppUsesNonExemptEncryption": false,
         "UIDesignRequiresCompatibility": true
       },
-      "buildNumber": "35"
+      "entitlements": {
+        "aps-environment": "production"
+      },
+      "buildNumber": "50"
     },
     "android": {
       "package": "com.fantasygmlab.app",
