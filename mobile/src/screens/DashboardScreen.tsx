@@ -685,10 +685,11 @@ function TeamSnapshotRow({
          * prop (same override mechanism PR #743 used for PlayerDetail),
          * not a change to MetricCard's own shared default sizing, so no
          * other MetricCard consumer is affected. */}
-        <MetricCard label="Record" value={record} style={styles.snapshotTileThird} />
+        <MetricCard label="Record" icon="ribbon-outline" value={record} style={styles.snapshotTileThird} />
         {snapshot.power_rank != null ? (
           <MetricCard
             label="Power"
+            icon="flash"
             value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)}
             onPress={goToTeams}
             style={styles.snapshotTileThird}
@@ -697,6 +698,7 @@ function TeamSnapshotRow({
         {snapshot.franchise_rank != null ? (
           <MetricCard
             label="Franchise"
+            icon="star"
             value={formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied)}
             onPress={goToTeams}
             style={styles.snapshotTileThird}
@@ -704,11 +706,13 @@ function TeamSnapshotRow({
         ) : null}
         <MetricCard
           label="Avg Age"
+          icon="hourglass-outline"
           value={snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—'}
           style={styles.snapshotTileHalf}
         />
         <MetricCard
           label="Injuries"
+          icon="medkit-outline"
           value={injuredCount != null ? String(injuredCount) : '—'}
           valueColor={injuredCount != null && injuredCount > 0 ? colors.danger : undefined}
           style={styles.snapshotTileHalf}
