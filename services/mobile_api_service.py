@@ -100,6 +100,7 @@ import requests
 from modules import (
     account_store,
     auth_supabase,
+    build_identity,
     canonical_player_ranking,
     college_scouting,
     dashboard_engine,
@@ -497,10 +498,15 @@ def health() -> dict[str, str]:
     injury_status/score/rank no longer depend on a real user happening to
     hit an authenticated endpoint after the hourly Sleeper cache goes
     stale.
+
+    `build` answers "is this actually running what I think it's running" —
+    see modules/build_identity.py's docstring for why Render's own
+    RENDER_GIT_COMMIT doesn't exist here and DYNASTYGM_BUILD (set by
+    deploy/release_deploy.sh) stands in for it on the self-hosted box.
     """
 
     _maybe_schedule_players_refresh()
-    return {"status": "ok"}
+    return {"status": "ok", "build": build_identity.resolve_build_identity().revision}
 
 
 @app.get("/ready")

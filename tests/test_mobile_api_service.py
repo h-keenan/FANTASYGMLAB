@@ -163,7 +163,8 @@ def test_health_root_and_ready(monkeypatch):
 
     health = client.get("/health")
     assert health.status_code == 200
-    assert health.json() == {"status": "ok"}
+    assert health.json()["status"] == "ok"
+    assert health.json()["build"] == "local"  # no RENDER_GIT_COMMIT/DYNASTYGM_BUILD set in this test env
 
     root = client.get("/")
     assert root.status_code == 200

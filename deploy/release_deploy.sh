@@ -21,6 +21,13 @@ echo "== rebuilding containers =="
 docker compose build
 
 echo "== restarting stack =="
+# Exported (not written to .env) so it reflects exactly what this run just
+# deployed, every time — a leftover value in .env would silently go stale
+# the next time someone deploys by hand instead of through this script.
+# See services/mobile_api_service.py's /health docstring and
+# modules/build_identity.py for why this exists (Render set
+# RENDER_GIT_COMMIT automatically; this box has to do it itself).
+export DYNASTYGM_BUILD="$(git rev-parse --short HEAD)"
 docker compose up -d
 
 echo "== status =="
