@@ -274,11 +274,14 @@ Notes:
 Render auto-deploys on every push to `main` — that behavior does **not**
 exist on this box. Nothing in this repo (no GitHub Actions workflow, no
 webhook, no cron) rebuilds or restarts this stack when `main` changes;
-`.github/workflows/` only runs CI (`ci.yml`), a keep-alive ping
-(`keep-alive.yml`), and auto-merge (`auto-merge.yml`) — none of them touch
-this server. The stack runs whatever was on disk the last time someone ran
-section 3's `docker compose build && docker compose up -d` here, and it
-will keep serving that exact build indefinitely, through any number of
+`.github/workflows/` only runs CI (`ci.yml`) and auto-merge
+(`auto-merge.yml`) — none of them touch this server. (A Render-specific
+`keep-alive.yml` ping used to live here too; it was retired once the app
+fully cut over to this self-hosted box, since the Render free/sleeping-
+tier cold-start problem it worked around doesn't apply to a `restart:
+unless-stopped` Docker stack.) The stack runs whatever was on disk the
+last time someone ran section 3's `docker compose build && docker compose
+up -d` here, and it will keep serving that exact build indefinitely, through any number of
 later merges to `main`, until a human repeats those steps.
 
 Concretely: if this box was stood up once and left alone, it can silently
@@ -303,6 +306,63 @@ webhook-triggered GitHub Actions job that SSHes in and runs the block
 above) is a reasonable follow-up, but is intentionally out of scope here —
 it needs a deploy credential/secret decision this runbook isn't positioned
 to make unilaterally.
+
+## 5.6. Scoped deploy access for a second operator
+
+The `deploy` user from section 1.1 is a full sudo-capable admin account —
+don't hand its key to anyone you wouldn't trust with root on this box. To
+let a second person (e.g. a co-founder or product owner who isn't an infra
+admin) run section 5.5's redeploy themselves without that level of access,
+create a separate, narrowly-scoped account whose SSH key can only ever
+trigger `deploy/release_deploy.sh` — never an interactive shell, never an
+arbitrary command.
+
+```bash
+# Run as the existing `deploy` admin user (or root).
+
+# 1. A plain, non-sudo account. It needs `docker` group membership to run
+#    `docker compose` (note: docker-group membership is root-equivalent in
+#    general — a user in that group can trivially escalate by mounting the
+#    host filesystem into a container. That's acceptable *only* because
+#    this account will never get a shell — see step 3).
+sudo adduser --disabled-password --gecos "" fgl-releaser
+sudo usermod -aG docker fgl-releaser
+
+# 2. Read access to the repo so the script can git fetch/merge and docker
+#    compose can read the Dockerfile/compose file. Repo stays owned by
+#    `deploy`; fgl-releaser gets read+traverse only, via ACL (install the
+#    `acl` package first if `setfacl` isn't already present).
+sudo apt-get install -y acl
+sudo setfacl -R -m u:fgl-releaser:rX /opt/fantasygmlab
+sudo setfacl -R -d -m u:fgl-releaser:rX /opt/fantasygmlab
+
+# 3. Lock the account to one forced command over SSH: no shell, no port
+#    forwarding (so this key can't be used to tunnel to anything else on
+#    the box or network), no pty. Paste the real public key from whoever
+#    will use this in place of <PASTE_PUBLIC_KEY_HERE>.
+sudo -u fgl-releaser mkdir -p /home/fgl-releaser/.ssh
+sudo -u fgl-releaser chmod 700 /home/fgl-releaser/.ssh
+echo 'command="/opt/fantasygmlab/deploy/release_deploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty <PASTE_PUBLIC_KEY_HERE>' \
+  | sudo -u fgl-releaser tee /home/fgl-releaser/.ssh/authorized_keys
+sudo -u fgl-releaser chmod 600 /home/fgl-releaser/.ssh/authorized_keys
+```
+
+From then on, that person runs the equivalent of section 5.5's redeploy
+with:
+
+```bash
+ssh fgl-releaser@<server-ip>
+```
+
+No arguments are accepted or needed — whatever command they type (or none
+at all) is ignored; the `command=` entry always runs
+`deploy/release_deploy.sh` instead. They cannot get a shell, cannot read
+or write anything outside what that script does, and cannot use the
+connection to reach any other service on the box.
+
+To revoke access later, delete or comment out their line in
+`/home/fgl-releaser/.ssh/authorized_keys` (as `deploy` or root) — no
+restart needed, it takes effect on the next connection attempt.
 
 ## 6. Rollback plan
 
@@ -465,4 +525,5 @@ migration prep itself.
 | `Caddyfile` | Reverse proxy + automatic HTTPS routing per placeholder subdomain, plus static `file_server` for the marketing site. Also handles response compression (`encode zstd gzip` on `web`/`mobile-api`/the marketing site, skipped on the two webhook endpoints) and `Cache-Control` headers on the marketing site's static assets (images/fonts get `max-age=86400`, CSS/JS get `max-age=3600`, both `must-revalidate` since those files aren't content-hashed; HTML/`robots.txt`/`sitemap.xml` get no explicit cache header). |
 | `.env.example` | Every required secret/variable name, matching `render.yaml`'s names exactly, with a comment on which Render service/dashboard it comes from. Copy to `.env` (gitignored) and fill in real values. |
 | `deploy/systemd/fantasygmlab.service` | systemd unit so the stack starts on boot and stops cleanly on `systemctl stop`. |
+| `deploy/release_deploy.sh` | Forced-command redeploy script for the scoped second-operator SSH key — see section 5.6. |
 | `docs/SELF_HOSTED_MIGRATION.md` | This runbook. |

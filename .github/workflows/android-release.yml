@@ -1,0 +1,64 @@
+name: Android release (Play internal track)
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
+jobs:
+  beta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install JS deps
+        run: npm ci
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: mobile
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Recreate mobile/.env from secrets
+        run: |
+          cat > .env <<EOF
+          EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_API_BASE_URL=${{ secrets.EXPO_PUBLIC_API_BASE_URL }}
+          EXPO_PUBLIC_REVENUECAT_IOS_SDK_KEY=${{ secrets.EXPO_PUBLIC_REVENUECAT_IOS_SDK_KEY }}
+          EXPO_PUBLIC_REVENUECAT_ANDROID_SDK_KEY=${{ secrets.EXPO_PUBLIC_REVENUECAT_ANDROID_SDK_KEY }}
+          EOF
+
+      - name: Write Android keystore + Play service account key
+        run: |
+          mkdir -p "$RUNNER_TEMP/android"
+          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/android/upload-keystore.jks"
+          printf '%s' "${{ secrets.GOOGLE_PLAY_JSON_KEY }}" > "$RUNNER_TEMP/android/play-publisher-key.json"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/android/upload-keystore.jks" >> "$GITHUB_ENV"
+          echo "GOOGLE_PLAY_JSON_KEY_PATH=$RUNNER_TEMP/android/play-publisher-key.json" >> "$GITHUB_ENV"
+
+      - name: Run fastlane android beta
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          FGL_BUNDLE_ID: com.fantasygmlab.app
+        run: bundle exec fastlane android beta

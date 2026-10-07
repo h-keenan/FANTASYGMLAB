@@ -20,6 +20,7 @@ import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { markRecapOpened } from '../lib/recapSeen';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -156,6 +157,14 @@ export default function RecapScreen({ route, navigation }: Props) {
         if (result.recap) {
           setRecap(result.recap);
           setNotReady(false);
+          // Marks this exact recap (by fingerprint-based recap_id, not week
+          // number) as opened on this device — see lib/recapSeen.ts. Firing
+          // this from RecapScreen itself, regardless of which entry point
+          // got the user here, is what keeps Dashboard's "new recap" module
+          // from reappearing once the recap has actually been viewed.
+          if (!result.recap.incomplete) {
+            void markRecapOpened(leagueId, result.recap.recap_id);
+          }
         } else {
           setNotReady(true);
         }

@@ -377,6 +377,7 @@ function TeamAnalyticsSection({
       <View style={styles.analyticsMetricsRow}>
         <MetricCard
           label="Starter Strength"
+          icon="american-football-outline"
           value={formatRank(team.starter_rank, team.starter_rank_tied)}
           percentile={starterPercentile}
           valueColor={starterPercentile != null ? percentileColor(starterPercentile, colors) : undefined}
@@ -384,6 +385,7 @@ function TeamAnalyticsSection({
         />
         <MetricCard
           label="Draft Capital"
+          icon="file-tray-stacked-outline"
           value={formatRank(team.draft_capital_rank, team.draft_capital_rank_tied)}
           percentile={draftCapitalPercentile}
           valueColor={draftCapitalPercentile != null ? percentileColor(draftCapitalPercentile, colors) : undefined}
@@ -391,6 +393,7 @@ function TeamAnalyticsSection({
         />
         <MetricCard
           label="Roster Age"
+          icon="hourglass-outline"
           value={team.average_age != null ? team.average_age.toFixed(1) : '—'}
           note={ageLabel(team.average_age)}
           valueColor={ageColor(team.average_age, colors)}

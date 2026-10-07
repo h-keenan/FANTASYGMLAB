@@ -288,6 +288,36 @@ export const gradients = {
 export const lightGradients = {
   hero: ['#FFFFFF', '#EAF3F8'] as const,
   accent: ['#00A6CC', '#0077A3'] as const,
+  /**
+   * GridBackground's full-screen wash, light mode only — deliberately NOT
+   * `hero` above (coridian_, verbal, 2026-10-06: "the header becomes
+   * invisible because light mode does not have that blue gradient across
+   * the top").
+   *
+   * Root cause: in dark mode, `gradients.hero` puts the *more colorful*
+   * stop (`#16202C`, a navy) at the top of the screen (offset 0, where the
+   * header sits) and fades DOWN to the plain `darkColors.background`
+   * (`#000000`) — so the header area is the most distinctly-colored part of
+   * the wash. `lightGradients.hero` did the opposite: `#FFFFFF` (whiter,
+   * i.e. LESS colorful than the base background) at the top, fading down
+   * to `lightColors.background` (`#EAF3F8`) — so in light mode the header
+   * was the plainest, most washed-out part of the screen, and happened to
+   * exactly match `surface`'s white card color, with zero visual
+   * separation. Not a text-contrast bug (BrandHeaderBar's own colors were
+   * already theme-correct) — the wash itself had its color placement
+   * inverted relative to dark mode's.
+   *
+   * This value puts a distinctly blue top stop back at the header, fading
+   * to the same `lightColors.background` dark mode fades to for symmetry.
+   * It can't be as saturated as dark mode's navy: `BrandHeaderBar` paints
+   * its wordmark accent and star icon directly in `colors.accent`
+   * (`#0077A3`) over this wash, and WCAG AA (4.5:1) for that small bold
+   * text caps how dark/saturated this can go — `#D2FAFF` clears it at
+   * ~4.53:1 (`lightColors.background` itself only clears it at ~4.49:1, so
+   * this is already near the practical ceiling). `textPrimary` clears
+   * ~15.5:1 against it, no concern there.
+   */
+  headerWash: ['#D2FAFF', '#EAF3F8'] as const,
 };
 
 /**
