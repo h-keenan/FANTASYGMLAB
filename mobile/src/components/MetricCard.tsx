@@ -33,7 +33,7 @@ export default function MetricCard({
   style,
 }: {
   label: string;
-  /** Small glyph in front of the label (e.g. a trophy for Power, a star for
+  /** Small glyph in front of the label (e.g. a trophy for Roster Power, a star for
    * Franchise) — coridian_'s ask for the Roster Analysis tiles to "pop"
    * instead of reading as plain text. Same leading-icon-before-title
    * pattern AnalyticsSection's header already uses, just scoped to one
@@ -61,7 +61,7 @@ export default function MetricCard({
    * rather than being replaced by it, since the whole point is it must
    * stay visible even when a percentile is present. */
   periodLabel?: string | null;
-  /** Makes the whole tile tappable (e.g. Dashboard's Power/Franchise rank
+  /** Makes the whole tile tappable (e.g. Dashboard's Roster Power/Franchise rank
    * tiles, which drill into the Teams screen) while leaving every other
    * caller — anything that omits this — a plain, non-interactive View. */
   onPress?: () => void;
@@ -89,7 +89,7 @@ export default function MetricCard({
          * AwardsStrip/WaiverRecommendationCard already use to mark a row as
          * tappable — reused here rather than inventing a card-specific
          * tappability indicator, so every MetricCard with an `onPress`
-         * (Dashboard's Power/Franchise tiles included) now signals it the
+         * (Dashboard's Roster Power/Franchise tiles included) now signals it the
          * same way the rest of the app does. */}
         {periodLabel ? (
           <View style={styles.periodTag}>

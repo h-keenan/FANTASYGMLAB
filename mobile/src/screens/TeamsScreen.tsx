@@ -32,7 +32,7 @@ type RankingMetric = NonNullable<Props['route']['params']['metric']>;
 
 /**
  * Per-metric leaderboard config — the one thing that changes between "Teams"
- * (Power Rank, the long-standing default) and a metric-specific drill-down
+ * (Roster Power, the long-standing default) and a metric-specific drill-down
  * (e.g. Age, opened from My Team's Analysis tab tiles via TeamAnalysisPanel).
  * Every metric here already exists on `TeamRanking` for every team in the
  * league (modules/team_eval.py + modules/league_rankings.py via
@@ -54,10 +54,10 @@ const METRIC_CONFIG: Record<
 > = {
   power: {
     title: 'Teams',
-    pillLabel: 'POWER',
-    infoLabel: 'How Power Rank works',
+    pillLabel: 'ROSTER POWER',
+    infoLabel: 'How Roster Power works',
     infoText:
-      'Teams are ordered by Power Rank — roster strength (starters + bench), not record — so you can see exactly where every team in the league stacks up. Your team is marked You and highlighted below.',
+      'Teams are ordered by Roster Power — roster strength (starters + bench), not record — so you can see exactly where every team in the league stacks up. Your team is marked You and highlighted below.',
     rank: (team) => team.power_rank,
     tied: (team) => team.power_rank_tied,
   },
@@ -141,6 +141,38 @@ interface TeamRow {
   recordLabel: string | null;
   archetypeLabel: string | null;
   tradeTendency: string | null;
+  /** Zero, one, or several real, data-backed team signals (see
+   * TEAM_BADGE_VISUALS) — a team can plausibly earn more than one at once
+   * (e.g. both "Highly Active" and "Pick Hoarder"), so this always renders
+   * as a wrapping row rather than a single slot. */
+  signalBadges: string[];
+}
+
+/** Visual treatment for every real, data-backed team signal shown on a
+ * Teams row — same icon-plus-colored-text pattern the "Real history of
+ * buying/selling" trade-tendency badge already uses (TeamRowCard below),
+ * reused rather than inventing a new chip/box treatment. Tone picks the
+ * semantic color token that actually matches each signal's meaning
+ * (mobile/UI_COLOR_SYSTEM_AUDIT.md: one consistent meaning per color
+ * family) — most of these are neutral play-style descriptors (textSecondary),
+ * while the two with a real positive/negative read (an active streak, a
+ * roster-concentration risk) get success/danger. */
+const TEAM_BADGE_VISUALS: Record<string, { icon: keyof typeof Ionicons.glyphMap; tone: 'neutral' | 'positive' | 'negative' }> = {
+  'Highly Active': { icon: 'flash', tone: 'neutral' },
+  'Quiet Manager': { icon: 'pause', tone: 'neutral' },
+  'Pick Hoarder': { icon: 'layers', tone: 'neutral' },
+  'Pick Seller': { icon: 'swap-horizontal', tone: 'neutral' },
+  'Veteran Collector': { icon: 'time', tone: 'neutral' },
+  'Youth Builder': { icon: 'leaf', tone: 'neutral' },
+  'Hot Streak': { icon: 'flame', tone: 'positive' },
+  'Cold Streak': { icon: 'snow', tone: 'negative' },
+  'Top-Heavy Roster': { icon: 'alert-circle', tone: 'negative' },
+};
+
+function toneColor(tone: 'neutral' | 'positive' | 'negative', colors: ThemeColors): string {
+  if (tone === 'positive') return colors.success;
+  if (tone === 'negative') return colors.danger;
+  return colors.textSecondary;
 }
 
 /** Metric-independent roster data — fetched once per league focus, not
@@ -287,6 +319,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
         recordLabel: ranking?.record_label ?? null,
         archetypeLabel: ranking?.archetype_label ?? null,
         tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
+        signalBadges: ranking?.team_badges ?? [],
       };
     });
     // Pure metric-rank order — no longer pins the caller's own team first,
@@ -378,8 +411,8 @@ function TeamRowCard({
   isLast: boolean;
   rankedTeamCount: number;
   pillLabel: string;
-  /** Trophy-for-rank-1 styling only applies to Power Rank — "league
-   * champion" is a Power Rank concept, so other metrics (e.g. youngest
+  /** Trophy-for-rank-1 styling only applies to Roster Power — "league
+   * champion" is a Roster Power concept, so other metrics (e.g. youngest
    * roster for Age) just get the plain rank pill instead of a misleading
    * trophy. */
   showTrophy: boolean;
@@ -429,22 +462,39 @@ function TeamRowCard({
             </AppText>
           </View>
         ) : null}
-        {item.tradeTendency ? (
-          <View style={styles.tendencyRow}>
-            <Ionicons
-              name={item.tradeTendency === 'Seller' ? 'trending-down' : 'trending-up'}
-              size={11}
-              color={item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium}
-            />
-            <AppText
-              style={[
-                styles.tendencyText,
-                { color: item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium },
-              ]}
-              numberOfLines={1}
-            >
-              Real history of {item.tradeTendency === 'Seller' ? 'selling' : 'buying'}
-            </AppText>
+        {item.tradeTendency || item.signalBadges.length > 0 ? (
+          <View style={styles.signalBadgeWrap}>
+            {item.tradeTendency ? (
+              <View style={styles.tendencyRow}>
+                <Ionicons
+                  name={item.tradeTendency === 'Seller' ? 'trending-down' : 'trending-up'}
+                  size={11}
+                  color={item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium}
+                />
+                <AppText
+                  style={[
+                    styles.tendencyText,
+                    { color: item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium },
+                  ]}
+                  numberOfLines={1}
+                >
+                  Real history of {item.tradeTendency === 'Seller' ? 'selling' : 'buying'}
+                </AppText>
+              </View>
+            ) : null}
+            {item.signalBadges.map((label) => {
+              const visual = TEAM_BADGE_VISUALS[label];
+              if (!visual) return null;
+              const color = toneColor(visual.tone, colors);
+              return (
+                <View key={label} style={styles.tendencyRow}>
+                  <Ionicons name={visual.icon} size={11} color={color} />
+                  <AppText style={[styles.tendencyText, { color }]} numberOfLines={1}>
+                    {label}
+                  </AppText>
+                </View>
+              );
+            })}
           </View>
         ) : null}
       </View>
@@ -524,7 +574,11 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.xs,
   },
   archetypeBadgeText: { fontSize: 10, fontWeight: '700', color: colors.badgeText },
-  tendencyRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  // Wraps every real-signal row (trade tendency + team_badges) so a team
+  // with several badges at once (e.g. "Highly Active" + "Pick Hoarder")
+  // flows them onto a second line instead of clipping or overlapping.
+  signalBadgeWrap: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: 2, marginTop: 3 },
+  tendencyRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   tendencyText: { fontSize: 11, fontWeight: '600' },
   rankPill: {
     backgroundColor: colors.background,

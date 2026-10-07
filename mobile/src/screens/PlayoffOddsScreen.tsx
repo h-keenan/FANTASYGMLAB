@@ -27,7 +27,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PlayoffOdds'>;
 const REASON_MESSAGES: Record<string, string> = {
   offseason: 'Playoff odds will be available once the regular season begins.',
   no_playoff_format: "This league's playoff format isn't set yet — odds need a real playoff-team count from league settings.",
-  no_rankings_data: "We don't have enough roster data to compute Power Rank for this league yet.",
+  no_rankings_data: "We don't have enough roster data to compute Roster Power for this league yet.",
   unavailable: "Playoff odds aren't available for this league right now.",
 };
 
@@ -106,7 +106,7 @@ export default function PlayoffOddsScreen({ route, navigation }: Props) {
   const methodologyNote =
     weeksRemaining === 0
       ? 'The regular season is over (or your league has no games left to simulate), so these are today’s final results, not a projection.'
-      : `Ranked by simulated playoff odds across thousands of simulated completions of the ${weeksRemaining ?? ''} remaining week${weeksRemaining === 1 ? '' : 's'}, using your league’s real schedule and Power Rank. ${
+      : `Ranked by simulated playoff odds across thousands of simulated completions of the ${weeksRemaining ?? ''} remaining week${weeksRemaining === 1 ? '' : 's'}, using your league’s real schedule and Roster Power. ${
           slopeFitted
             ? 'Win probabilities are calibrated against this league’s own real results so far.'
             : 'Early in the season, so win probabilities use a standard default model until more real results come in.'

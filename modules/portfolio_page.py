@@ -85,7 +85,7 @@ def _rank_label(summary: Mapping[str, Any]) -> str:
     if power_rank is None:
         return ""
     prefix = "T-" if summary.get("power_rank_tied") else "#"
-    return f"Power Rank {prefix}{int(power_rank)}"
+    return f"Roster Power {prefix}{int(power_rank)}"
 
 
 def _build_portfolio_row(

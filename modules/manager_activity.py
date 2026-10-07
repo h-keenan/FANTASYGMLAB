@@ -26,7 +26,9 @@ mobile's League Pulse tile only needs the single count.
 from __future__ import annotations
 
 import time
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
+
+import pandas as pd
 
 from modules import league_history, redis_cache, sleeper
 
@@ -63,6 +65,58 @@ def manager_activity_counts(
                 continue
             counts[rid] = counts.get(rid, 0) + 1
     return counts
+
+
+def activity_quartiles(counts: Iterable[int]) -> tuple[float, float]:
+    """(tx_low, tx_high) = the league's 25th/75th percentile transaction
+    count. Same quantile computation app.py's `_classify_manager_tendencies`
+    uses for its own tx_low/tx_high (pandas `.quantile(0.25)`/`.quantile(0.75)`,
+    falling back to min/max for a league of one), pulled out here so a
+    caller with just a plain list of counts (mobile's
+    transaction_activity_count across the league) doesn't need to re-derive
+    the same quantile math."""
+
+    series = pd.to_numeric(pd.Series(list(counts)), errors="coerce").fillna(0)
+    if series.empty:
+        return 0.0, 0.0
+    if len(series) > 1:
+        return float(series.quantile(0.25)), float(series.quantile(0.75))
+    return float(series.min() or 0), float(series.max() or 0)
+
+
+def classify_activity_level(
+    *,
+    transaction_count: int,
+    tx_high: float,
+    tx_low: float,
+    waiver_moves: int = 0,
+    trade_count: int = 0,
+    roster_churn: int | None = None,
+    churn_high: float | None = None,
+) -> str | None:
+    """"Highly Active" / "Quiet Manager" team badge off real transaction
+    volume.
+
+    Exact threshold logic app.py's `_classify_manager_tendencies` already
+    used inline (~app.py 14420-14425: `transaction_count >= max(6,
+    round(tx_high))` or `roster_churn >= max(12, round(churn_high))` ->
+    Highly Active; `transaction_count <= max(1, round(tx_low)) and
+    waiver_moves <= 1 and trade_count <= 1` -> Quiet Manager), pulled into
+    this shared module so mobile can apply the same thresholds too.
+    `roster_churn`/`churn_high` are optional — mobile doesn't have a
+    roster-churn read piped through yet, so when they're omitted this is
+    judged on transaction_count alone (web's app.py call site keeps passing
+    both, so its own behavior is unchanged).
+    """
+
+    highly_active = transaction_count >= max(6, int(round(tx_high)))
+    if roster_churn is not None and churn_high is not None:
+        highly_active = highly_active or roster_churn >= max(12, int(round(churn_high)))
+    if highly_active:
+        return "Highly Active"
+    if transaction_count <= max(1, int(round(tx_low))) and waiver_moves <= 1 and trade_count <= 1:
+        return "Quiet Manager"
+    return None
 
 
 # Same 30-minute cache idiom modules.team_trade_history uses for its own

@@ -369,7 +369,7 @@ function TeamAnalyticsSection({
           ) : null}
           {team.power_rank != null ? (
             <AppText style={styles.analyticsRankLine}>
-              Power Rank {formatRank(team.power_rank, team.power_rank_tied)} of {leagueSize}
+              Roster Power {formatRank(team.power_rank, team.power_rank_tied)} of {leagueSize}
             </AppText>
           ) : null}
         </View>

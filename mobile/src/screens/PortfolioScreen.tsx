@@ -258,7 +258,7 @@ function PortfolioLeagueCard({
             {isChampion ? (
               <Ionicons name="trophy" size={13} color={rankColor} style={styles.rankTrophy} />
             ) : (
-              <AppText style={styles.rankLabel}>POWER</AppText>
+              <AppText style={styles.rankLabel}>ROSTER POWER</AppText>
             )}
             <AppText style={[styles.rankValue, { color: rankColor }]}>
               {league.power_rank_tied ? `T-${league.power_rank}` : `#${league.power_rank}`}

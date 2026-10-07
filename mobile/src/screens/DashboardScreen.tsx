@@ -130,7 +130,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
     {
       label: 'Biggest Contender',
       value: contender?.team_name ?? 'No clear leader',
-      note: contender ? `Power ${formatRank(contender.power_rank, contender.power_rank_tied)}` : 'No contender read available yet.',
+      note: contender ? `Roster Power ${formatRank(contender.power_rank, contender.power_rank_tied)}` : 'No contender read available yet.',
       icon: 'flame',
       color: colors.accent,
       avatarUrl: contender?.avatar_url ?? null,
@@ -661,7 +661,7 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
  * PR #682 introduced for Player Detail's Stats tab) instead of a
  * Dashboard-only tile style — these five metrics are ranks/counts, not
  * percentiles, so MetricCard's percentile prop is simply omitted (it
- * already renders fine as plain label+value in that case). Power/Franchise
+ * already renders fine as plain label+value in that case). Roster Power/Franchise
  * stay tappable through to Teams; Injuries stays deliberately non-tappable
  * (the Needs Attention section below already carries "the why" when there
  * is one), and gets `valueColor` emphasis when non-zero instead of a
@@ -691,16 +691,16 @@ function TeamSnapshotRow({
     <View style={styles.snapshotSection}>
       <SectionHeading title="League Snapshot" icon="stats-chart" />
       <View style={styles.snapshotRow}>
-        {/* Concept sheet groups these as a 3-up row (Record/Power/Franchise)
-         * over a 2-up row (Avg Age/Injuries) rather than an even wrap — a
-         * per-instance flexBasis override on MetricCard's existing `style`
-         * prop (same override mechanism PR #743 used for PlayerDetail),
-         * not a change to MetricCard's own shared default sizing, so no
-         * other MetricCard consumer is affected. */}
+        {/* Concept sheet groups these as a 3-up row (Record/Roster Power/
+         * Franchise) over a 2-up row (Avg Age/Injuries) rather than an even
+         * wrap — a per-instance flexBasis override on MetricCard's existing
+         * `style` prop (same override mechanism PR #743 used for
+         * PlayerDetail), not a change to MetricCard's own shared default
+         * sizing, so no other MetricCard consumer is affected. */}
         <MetricCard label="Record" icon="ribbon-outline" value={record} style={styles.snapshotTileThird} />
         {snapshot.power_rank != null ? (
           <MetricCard
-            label="Power"
+            label="Roster Power"
             icon="flash"
             value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)}
             onPress={goToTeams}

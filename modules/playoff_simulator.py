@@ -9,7 +9,7 @@ app — never an invented schedule or strength metric:
   weeks still to come (the actual remaining matchup pairings to simulate).
   A future week Sleeper hasn't published pairings for yet is simply left
   out of the simulated schedule rather than invented.
-- **Team strength**: ``modules.league_rankings``'s real Power Rank
+- **Team strength**: ``modules.league_rankings``'s real Roster Power
   ``power_score`` (same number the Teams screen/Team Rankings board show)
   is the only team-strength signal — never a new valuation metric.
 - **Current record/tiebreakers**: ``modules.league_standings``'s real
@@ -23,7 +23,7 @@ app — never an invented schedule or strength metric:
 ## Win-probability model
 
 Each remaining matchup's win probability is a **single-parameter logistic
-function of the two teams' real Power Rank ``power_score`` differential**,
+function of the two teams' real Roster Power ``power_score`` differential**,
 z-scored against this league's own power_score spread so the model is
 scale-free:
 
@@ -454,7 +454,7 @@ def build_league_playoff_odds(
     contract as the other `/v1/leagues/{id}/...` endpoints) when the real
     data needed isn't available yet: ``"offseason"`` (no real results yet),
     ``"no_playoff_format"`` (league has no configured playoff_teams
-    setting), ``"no_rankings_data"`` (Power Rank can't be computed — same
+    setting), ``"no_rankings_data"`` (Roster Power can't be computed — same
     gate /team-rankings uses).
     """
 

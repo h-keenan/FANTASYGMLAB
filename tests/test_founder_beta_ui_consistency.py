@@ -99,7 +99,7 @@ def test_league_overview_prioritizes_boards_then_insights():
         < how_to_index
         < insights_index
     )
-    for label in ("Standings", "Power Rank", "Franchise Rank", "Draft Capital", "Strategy"):
+    for label in ("Standings", "Roster Power", "Franchise Rank", "Draft Capital", "Strategy"):
         assert f'"label": "{label}"' in concept_block
     assert "Best Starter Core" not in rankings[:12000]
     assert "League Decision Signals" not in rankings[:12000]

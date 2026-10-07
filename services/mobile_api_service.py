@@ -121,6 +121,7 @@ from modules import (
     nfl_schedule,
     player_awards,
     player_eligibility,
+    pick_flow,
     player_history,
     player_projections,
     player_quick_view,
@@ -137,6 +138,7 @@ from modules import (
     sleeper_leagues,
     startup_cold_path,
     team_stance,
+    team_streaks,
     team_trade_history,
     trade_analyzer_fit,
     trade_hub_engine,
@@ -930,7 +932,7 @@ def get_league_team_rankings(
     lens: str = "Dynasty",
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    """Power Rank / Franchise Rank / Draft Capital Rank / standings for every
+    """Roster Power / Franchise Rank / Draft Capital Rank / standings for every
     roster in the league.
 
     Shares the web app's real "Rankings" page computation
@@ -1048,10 +1050,74 @@ def get_league_team_rankings(
     except Exception:
         activity_counts = {}
 
+    # Real per-roster future-pick flow (modules.pick_flow) — acquired vs.
+    # sent, 1st-rounders tracked separately — the data half of the
+    # "Pick Hoarder"/"Pick Seller" team badge. Same best-effort contract as
+    # trade_tendencies/activity_counts above.
+    try:
+        pick_flow_counts = pick_flow.league_pick_flow_counts_cached(league_id)
+    except Exception:
+        pick_flow_counts = {}
+
+    # Real per-roster current win/loss streak (modules.team_streaks) — the
+    # data half of the "Hot Streak"/"Cold Streak" team badge. Same
+    # best-effort contract: a scan failure just leaves every team at a
+    # neutral (0) streak rather than failing team-rankings entirely.
+    try:
+        current_streaks = team_streaks.league_current_streaks_cached(league_id)
+    except Exception:
+        current_streaks = {}
+
+    # League-wide inputs the per-team badge thresholds below are judged
+    # against — each badge is relative to this league's own distribution,
+    # not a fixed absolute cutoff (same quartile-by-league-size idiom
+    # app.py's `_classify_manager_tendencies`/`_archetype_cutoffs` already
+    # use for the equivalent web-side classifications).
+    league_size = max(len(rankings_frame), 1)
+    top_rank_cut = max(2, int(round(league_size * 0.33)))
+    bottom_rank_cut = max(top_rank_cut + 1, int(round(league_size * 0.67)))
+
+    def _activity_count_for(raw_roster_id: Any) -> int:
+        try:
+            return int(activity_counts.get(int(raw_roster_id), 0))
+        except (TypeError, ValueError):
+            return 0
+
+    tx_low, tx_high = manager_activity.activity_quartiles(
+        _activity_count_for(raw_roster_id) for raw_roster_id in rankings_frame["roster_id"]
+    )
+
+    # "Top-Heavy Roster" (stretch badge): starter_score/bench_score are
+    # already computed per roster (modules.team_eval's current-value
+    # starter/bench split feeding power_rank/starter_rank/bench_rank above)
+    # — no new pipeline needed. There's no pre-existing badge threshold for
+    # this exact ratio (app.py's own top_heavy_ratio is a *different*, raw
+    # unweighted starter/bench split used only as an archetype risk
+    # footnote, not comparable 1:1 to this weighted/limited bench_score), so
+    # this is judged against this league's own top quartile — a team only
+    # earns the badge if its current-value concentration in the starting
+    # lineup is more extreme than 75% of the league, a deliberate,
+    # documented judgment call per the audit's instructions.
+    _zero_series = pd.Series(0, index=rankings_frame.index)
+    top_heavy_ratios = (
+        pd.to_numeric(rankings_frame.get("starter_score", _zero_series), errors="coerce").fillna(0)
+        / pd.to_numeric(rankings_frame.get("bench_score", _zero_series), errors="coerce").fillna(0).clip(lower=1.0)
+    )
+    if len(top_heavy_ratios) > 1:
+        top_heavy_cutoff = float(top_heavy_ratios.quantile(0.75))
+    elif len(top_heavy_ratios) == 1:
+        top_heavy_cutoff = float(top_heavy_ratios.iloc[0]) + 1.0
+    else:
+        top_heavy_cutoff = None
+
     teams: list[dict[str, Any]] = []
-    for _, row in rankings_frame.iterrows():
+    for idx, row in rankings_frame.iterrows():
         roster_id = str(row.get("roster_id"))
         standing = standings_by_roster.get(roster_id, {})
+        try:
+            roster_id_int: int | None = int(roster_id)
+        except (TypeError, ValueError):
+            roster_id_int = None
         try:
             tendency = trade_tendencies.get(int(roster_id), {})
         except (TypeError, ValueError):
@@ -1060,6 +1126,45 @@ def get_league_team_rankings(
             activity_count = int(activity_counts.get(int(roster_id), 0))
         except (TypeError, ValueError):
             activity_count = 0
+
+        pick_flow_entry = pick_flow_counts.get(roster_id_int, {}) if roster_id_int is not None else {}
+        firsts_acquired = int(pick_flow_entry.get("firsts_acquired") or 0)
+        firsts_sent = int(pick_flow_entry.get("firsts_sent") or 0)
+
+        streak_entry = current_streaks.get(roster_id_int, {}) if roster_id_int is not None else {}
+        current_streak = int(streak_entry.get("current_streak") or 0)
+
+        age_rank = row.get("age_rank")
+        draft_rank = row.get("draft_capital_rank")
+        try:
+            age_rank_int: int | None = int(age_rank) if age_rank is not None and not pd.isna(age_rank) else None
+        except (TypeError, ValueError):
+            age_rank_int = None
+        try:
+            draft_rank_int: int | None = int(draft_rank) if draft_rank is not None and not pd.isna(draft_rank) else None
+        except (TypeError, ValueError):
+            draft_rank_int = None
+
+        team_badges: list[str] = []
+        activity_badge = manager_activity.classify_activity_level(
+            transaction_count=activity_count, tx_high=tx_high, tx_low=tx_low
+        )
+        if activity_badge:
+            team_badges.append(activity_badge)
+        pick_flow_badge = pick_flow.classify_pick_flow(firsts_acquired, firsts_sent)
+        if pick_flow_badge:
+            team_badges.append(pick_flow_badge)
+        if age_rank_int is not None and draft_rank_int is not None:
+            if age_rank_int >= bottom_rank_cut and draft_rank_int >= bottom_rank_cut:
+                team_badges.append("Veteran Collector")
+            elif age_rank_int <= top_rank_cut and draft_rank_int <= top_rank_cut:
+                team_badges.append("Youth Builder")
+        streak_badge = team_streaks.classify_streak_badge(current_streak)
+        if streak_badge:
+            team_badges.append(streak_badge)
+        if top_heavy_cutoff is not None and top_heavy_ratios.loc[idx] >= top_heavy_cutoff:
+            team_badges.append("Top-Heavy Roster")
+
         teams.append(
             {
                 "roster_id": roster_id,
@@ -1067,6 +1172,10 @@ def get_league_team_rankings(
                 "trade_tendency_sell_count": int(tendency.get("sell_count") or 0),
                 "trade_tendency_buy_count": int(tendency.get("buy_count") or 0),
                 "transaction_activity_count": activity_count,
+                "firsts_acquired": firsts_acquired,
+                "firsts_sent": firsts_sent,
+                "current_streak": current_streak,
+                "team_badges": team_badges,
                 "team_name": _clean_json_value(row.get("team_name")),
                 "owner_name": _clean_json_value(standing.get("owner_name") or row.get("owner_name")),
                 "owner_username": _clean_json_value(standing.get("owner_username")),
@@ -1114,10 +1223,10 @@ def get_league_playoff_odds(
 
     Real inputs only — see modules.playoff_simulator's module docstring for
     the full methodology: real remaining matchup schedule (Sleeper), real
-    Power Rank team strength, real season-to-date record/points for
+    Roster Power team strength, real season-to-date record/points for
     tiebreaking, real playoff_teams/playoff_week_start league settings. The
     win-probability model is a single-parameter logistic function of
-    Power-Rank differential, calibrated against this league's own real
+    Roster-Power differential, calibrated against this league's own real
     results so far once enough of the season has been played, and a
     documented default shape before that.
 
@@ -1125,7 +1234,7 @@ def get_league_playoff_odds(
     states return 200 with a `reason` (same contract as the other league
     endpoints) rather than an HTTP error: "offseason" (no real results
     yet), "no_playoff_format" (league has no playoff_teams setting
-    configured), "no_rankings_data"/"unavailable" (Power Rank/league data
+    configured), "no_rankings_data"/"unavailable" (Roster Power/league data
     isn't computable right now).
 
     Cached for modules.playoff_simulator.PLAYOFF_ODDS_TTL_SECONDS (3 hours)

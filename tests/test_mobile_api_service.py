@@ -5430,7 +5430,7 @@ def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch
 
     standing = focus_by_key["standing"]
     assert standing["status"] == "signal_found"
-    power_item = next(item for item in standing["items"] if item["label"] == "Power Rank")
+    power_item = next(item for item in standing["items"] if item["label"] == "Roster Power")
     assert power_item["rank"] == 2
     assert power_item["total_teams"] == 2
     capital_item = next(item for item in standing["items"] if item["label"] == "Draft Capital Rank")
