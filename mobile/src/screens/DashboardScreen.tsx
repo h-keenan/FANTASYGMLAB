@@ -20,6 +20,7 @@ import PlayerInsightRow from '../components/PlayerInsightRow';
 import NewBadge from '../components/NewBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import RecapReadyCard from '../components/RecapReadyCard';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
 import {
@@ -44,6 +45,7 @@ import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
 import { formatRank } from '../lib/percentile';
+import { getLastOpenedRecapId } from '../lib/recapSeen';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -241,6 +243,13 @@ export default function DashboardScreen({ route, navigation }: Props) {
     queryFn: () => api.getLeagueMatchup(leagueId),
     enabled: !isRestoring,
   });
+  // Backs the "new recap ready" module below — same ready/incomplete gate
+  // AlertsScreen's own recap-ready card already uses.
+  const recapQuery = useQuery({
+    queryKey: queryKeys.recap(leagueId),
+    queryFn: () => api.getLeagueRecap(leagueId),
+    enabled: !isRestoring,
+  });
 
   const dashboardData = dashboardQuery.data;
   const items: DashboardItem[] | null = dashboardData?.items ?? null;
@@ -251,6 +260,28 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const notReadyReason: string | null = dashboardData?.reason || null;
   const teamRankings: TeamRanking[] | null = teamRankingsQuery.data?.teams ?? null;
   const matchup: MatchupResponse | null = matchupQuery.data ?? null;
+  // Ready AND not yet opened on this device (lib/recapSeen.ts, by recap_id —
+  // see that module's docstring for why id rather than week number) is what
+  // makes this a "new, unopened" alert rather than a permanent button —
+  // coridian_'s brief. Starts opened=true so a slower AsyncStorage read
+  // never flashes the card for a recap this device already saw.
+  const readyRecap = recapQuery.data?.recap && !recapQuery.data.recap.incomplete ? recapQuery.data.recap : null;
+  const [recapOpened, setRecapOpened] = useState(true);
+  useEffect(() => {
+    if (!readyRecap) {
+      setRecapOpened(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const lastOpenedId = await getLastOpenedRecapId(leagueId);
+      if (!cancelled) setRecapOpened(lastOpenedId === readyRecap.recap_id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId, readyRecap?.recap_id]);
+  const showRecapModule = readyRecap != null && !recapOpened;
 
   // No data at all yet (neither a persisted cache hit nor a prior in-memory
   // fetch) — the one case that still needs a blank-slate spinner. Once any
@@ -312,6 +343,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(leagueId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.teamRankings(leagueId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.matchup(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.recap(leagueId) });
     }, [queryClient, leagueId]),
   );
 
@@ -420,7 +452,20 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {/* Secondary context — useful, but not the answer to "what should I
           do next," so it sits below the actionable feed rather than
-          pushing it under the fold. */}
+          pushing it under the fold. A new, unopened League Recap is a
+          one-off alert (coridian_: "should not be a button there... should
+          be a module... whenever it's new and has been unopened"), so it
+          renders here as the same proven ready-card AlertsScreen already
+          uses, not as a permanent nav tile — it disappears the moment this
+          device actually opens that recap (see recapOpened above) and
+          never dominates the Hero/Needs Attention/Opportunities tiers
+          above it (Magna Carta §33). */}
+      {showRecapModule && readyRecap ? (
+        <RecapReadyCard
+          week={readyRecap.week}
+          onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
+        />
+      ) : null}
       {matchup ? (
         <WeeklyMatchupCard
           matchup={matchup}

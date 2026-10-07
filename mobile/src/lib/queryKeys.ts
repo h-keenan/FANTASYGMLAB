@@ -28,6 +28,12 @@ export const queryKeys = {
   teamRankings: (leagueId: string) =>
     [...userScopeKey(), 'league', leagueId, 'team-rankings'] as const,
   matchup: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'matchup'] as const,
+  // Dashboard's "new recap ready" module — Alerts/LeagueDetail/RecapScreen/
+  // GmOrb each still do their own plain fetch-on-mount for this same
+  // endpoint (out of scope here), so this key only backs Dashboard's own
+  // useQuery for now, same cache-first/background-refetch treatment as its
+  // other three fetches above.
+  recap: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'recap'] as const,
   // TeamsScreen's own metric-independent roster data (re-derived per-metric
   // client-side rather than refetched — see that screen's `baseRows` memo).
   teamProfiles: (leagueId: string) =>
