@@ -297,9 +297,12 @@ git fetch origin
 git log --oneline HEAD..origin/main   # anything listed here is NOT live yet
 git pull
 docker compose build
+export DYNASTYGM_BUILD="$(git rev-parse --short HEAD)"  # see below — skip this and /health just reports "local" again
 docker compose up -d
 docker compose ps --format 'table {{.Name}}\t{{.Status}}'
 ```
+
+**Checking what's actually live, without guessing**: `curl https://api.fantasygmlab.com/health` returns `{"status": "ok", "build": "<short sha>"}`. Compare that sha to `git log origin/main -1 --format=%h` — if they match, production is current; if not, something above didn't run (or didn't run with `DYNASTYGM_BUILD` set). Render used to answer this automatically via its own `RENDER_GIT_COMMIT`; this box has no equivalent unless whatever runs `docker compose up -d` exports `DYNASTYGM_BUILD` first — `deploy/release_deploy.sh` (section 5.6) already does this for you; a manual deploy only reflects the real commit if you also export it as shown above.
 
 Standing up real continuous deployment for this box (e.g. a scheduled or
 webhook-triggered GitHub Actions job that SSHes in and runs the block

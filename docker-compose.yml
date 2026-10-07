@@ -105,6 +105,14 @@ services:
       # st.error()) and unlocks customer-unsafe debug/premium-override
       # switches by default. See docs/SELF_HOSTED_MIGRATION.md.
       DYNASTYGM_SELF_HOSTED: "1"
+      # Render set RENDER_GIT_COMMIT automatically; nothing does that here,
+      # so modules/build_identity.py's resolve_build_identity() always fell
+      # back to "local" on this box — meaning the app's own "Build …"
+      # footer silently lied about every self-hosted deploy being an
+      # uncommitted local run. deploy/release_deploy.sh exports this from
+      # the actual commit it just deployed right before `docker compose up
+      # -d`; `:-local` only applies if that script wasn't used to deploy.
+      DYNASTYGM_BUILD: ${DYNASTYGM_BUILD:-local}
     env_file:
       - .env
     # Bumped from the old single-process 4g/2.0 (see this file's top-of-file
@@ -212,6 +220,8 @@ services:
       MOBILE_API_WORKERS: "${MOBILE_API_WORKERS:-4}"
       # See the "web" service's DYNASTYGM_SELF_HOSTED comment above.
       DYNASTYGM_SELF_HOSTED: "1"
+      # See the "web" service's DYNASTYGM_BUILD comment above.
+      DYNASTYGM_BUILD: ${DYNASTYGM_BUILD:-local}
     env_file:
       - .env
     # See this file's top-of-file resource-limit comment for the full
