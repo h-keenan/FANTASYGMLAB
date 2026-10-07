@@ -199,6 +199,24 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
                 />
               );
             }
+            if ('playoff_probability' in item) {
+              // Same real Monte Carlo simulation the standalone Playoff
+              // Odds screen renders (modules.playoff_simulator) — "Where
+              // You Stand" previously showed Power Rank/Draft Capital
+              // Rank/record but never checked this already-cached answer
+              // to exactly the question this section asks.
+              const statusNote = item.clinched ? ' · Clinched' : item.eliminated ? ' · Eliminated' : '';
+              const seedNote = item.median_seed ? `, projected ${item.median_seed}-seed` : '';
+              return (
+                <InsightRow
+                  key={`${focusArea.key}-${index}`}
+                  icon="trophy-outline"
+                  color={colors.accent}
+                  headline={`${Math.round(item.playoff_probability)}% to make the playoffs${seedNote}${statusNote}`}
+                  last={last}
+                />
+              );
+            }
             return null;
           })}
         </AnimatedCard>
