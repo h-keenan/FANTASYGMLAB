@@ -56,6 +56,14 @@ export interface PlayerIdentityRowProps {
    * value" — kept to a single line by the caller; this component never
    * wraps it into a paragraph. */
   contextLine?: string | null;
+  /** Optional color override for `contextLine` only — e.g. Waivers tints
+   * its opponent context line (danger/success) when that opponent is a
+   * tough/weak matchup at this player's position, the same restrained
+   * "color the existing text, no new badge" treatment Player Detail's
+   * Schedule tab already uses for the identical signal. Omit (or pass
+   * undefined) to keep the normal muted `styles.context` color — every
+   * existing caller is unaffected. */
+  contextLineColor?: string;
   /** Injury tag to render — '' / null / undefined means healthy, so no pill
    * renders at all. */
   injuryLabel?: string | null;
@@ -137,6 +145,7 @@ export default function PlayerIdentityRow({
   slot,
   opportunityLabel,
   contextLine,
+  contextLineColor,
   injuryLabel,
   ruledOut,
   injuryTone = 'risk',
@@ -229,7 +238,10 @@ export default function PlayerIdentityRow({
           </AppText>
         ) : null}
         {contextLine ? (
-          <AppText style={styles.context} numberOfLines={1}>
+          <AppText
+            style={[styles.context, contextLineColor ? { color: contextLineColor } : null]}
+            numberOfLines={1}
+          >
             {contextLine}
           </AppText>
         ) : null}
