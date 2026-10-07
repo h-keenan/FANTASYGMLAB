@@ -313,6 +313,65 @@ def test_roster_focus_area_without_rankings_row_is_honest_no_signal():
     assert roster["watch_for"] == gm_plan.ROSTER_NO_SIGNAL_WATCH_FOR
 
 
+def test_roster_focus_area_flags_an_uncovered_starter_injury():
+    # Connectivity-audit fix: shaped like a real
+    # modules.trade_analyzer_fit.roster_injury_context (summarize_team_injuries)
+    # return value — injury_need_positions is already restricted to
+    # active/starting positions with no healthy bench cover, so its mere
+    # presence is the signal.
+    injury_context = {
+        "injury_impact_flag": "Major Starter Absence",
+        "injured_starters": 1,
+        "injury_need_positions": {"te"},
+        "top_injury_impact_summary": "My Player 7 (TE, KC) - Out, value 2000, impact 50",
+        "key_injuries": ["My Player 7 (TE)"],
+    }
+    plan = gm_plan.build_gm_plan(
+        team_stance="",
+        season_phase=gm_plan.PHASE_EARLY_SEASON,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+        injury_context=injury_context,
+    )
+    roster = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_ROSTER)
+    injury_item = next(item for item in roster["items"] if item["label"] == gm_plan.INJURY_EXPOSURE_LABEL)
+    assert injury_item["health_flag"] == "Major Starter Absence"
+    assert injury_item["injured_starters"] == 1
+    assert injury_item["injury_need_positions"] == ["TE"]
+    assert "My Player 7" in injury_item["summary"]
+    assert injury_item["source"] == "modules.trade_analyzer_fit.roster_injury_context"
+
+
+def test_roster_focus_area_with_no_injury_need_positions_adds_no_injury_item():
+    # A healthy roster (or one where every injury has healthy cover) must
+    # never fabricate a risk flag.
+    injury_context = {
+        "injury_impact_flag": "Stable",
+        "injured_starters": 0,
+        "injury_need_positions": set(),
+    }
+    plan = gm_plan.build_gm_plan(
+        team_stance="",
+        season_phase=gm_plan.PHASE_EARLY_SEASON,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+        injury_context=injury_context,
+    )
+    roster = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_ROSTER)
+    assert all(item["label"] != gm_plan.INJURY_EXPOSURE_LABEL for item in roster["items"])
+
+
+def test_roster_focus_area_without_injury_context_adds_no_injury_item():
+    plan = gm_plan.build_gm_plan(
+        team_stance="",
+        season_phase=gm_plan.PHASE_EARLY_SEASON,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+    )
+    roster = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_ROSTER)
+    assert all(item["label"] != gm_plan.INJURY_EXPOSURE_LABEL for item in roster["items"])
+
+
 def test_build_gm_plan_never_touches_value_score_or_similar_valuation_fields():
     # Guard against scope creep: GM Plan's output must never carry a
     # value_score/dynasty_score/rebuild_score-shaped key anywhere.
