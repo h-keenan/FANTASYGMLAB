@@ -155,29 +155,17 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
 
 function gmToolsDestinations(colors: ThemeColors): Destination[] {
   return [
+    // Trade Hub / Trade Finder / Trade Analyzer consolidated into one
+    // Madden-style Trades entry point (coridian_-approved) — see
+    // TradesScreen. Trade Calculator stays separate for now (PR 2 folds it
+    // into Trade Analyzer as a quick-mode toggle).
     {
-      label: 'Trade Hub',
-      route: 'TradeHub',
+      label: 'Trades',
+      route: 'Trades',
       icon: 'shuffle-outline',
       needsLeague: true,
       color: colors.premium,
-      subtitle: 'Trade ideas and negotiation tools',
-    },
-    {
-      label: 'Trade Finder',
-      route: 'TradeFinder',
-      icon: 'search-outline',
-      needsLeague: true,
-      color: colors.premium,
-      subtitle: 'Pick players to trade, find who wants them',
-    },
-    {
-      label: 'Trade Analyzer',
-      route: 'TradeAnalyzer',
-      icon: 'git-compare-outline',
-      needsLeague: true,
-      color: colors.premium,
-      subtitle: 'Analyze and compare any trade',
+      subtitle: 'Trade ideas, search, and build a trade',
     },
     {
       label: 'Trade Calculator',
@@ -844,7 +832,7 @@ export default function GmOrb() {
                     isCurrent={destination.route === currentRouteName}
                     unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
                     hasNew={
-                      destination.route === 'TradeHub'
+                      destination.route === 'Trades'
                         ? tradeHubHasNew
                         : destination.route === 'Recap'
                           ? recapReady
@@ -890,7 +878,7 @@ export default function GmOrb() {
                           destination={destination}
                           isCurrent={destination.route === currentRouteName}
                           hasNew={
-                            destination.route === 'TradeHub'
+                            destination.route === 'Trades'
                               ? tradeHubHasNew
                               : destination.route === 'Recap'
                                 ? recapReady

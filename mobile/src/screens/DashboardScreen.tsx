@@ -66,7 +66,7 @@ const DESTINATION_BUTTON_LABEL: Record<string, string> = {
   waivers: 'Open Waivers',
 };
 const DESTINATION_ROUTE: Record<string, string> = {
-  trade_hub: 'TradeHub',
+  trade_hub: 'Trades',
   waivers: 'Waivers',
 };
 
@@ -544,12 +544,12 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 // the same color everywhere, not a fresh one invented per screen.
 function quickActions(colors: ThemeColors): Array<{
   label: string;
-  route: 'TradeHub' | 'Players' | 'Waivers' | 'DraftCenter';
+  route: 'Trades' | 'Players' | 'Waivers' | 'DraftCenter';
   icon: React.ComponentProps<typeof IconCircle>['name'];
   color: string;
 }> {
   return [
-    { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', color: colors.premium },
+    { label: 'Trades', route: 'Trades', icon: 'shuffle-outline', color: colors.premium },
     { label: 'Rankings', route: 'Players', icon: 'people-outline', color: colors.violet },
     { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
     { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
