@@ -113,6 +113,13 @@ services:
       # the actual commit it just deployed right before `docker compose up
       # -d`; `:-local` only applies if that script wasn't used to deploy.
       DYNASTYGM_BUILD: ${DYNASTYGM_BUILD:-local}
+      # Same deal, for the companion "how long ago was this deployed"
+      # staleness question — see services/mobile_api_service.py's /health
+      # docstring and modules/build_identity.py. Empty default (not
+      # "local") because modules/build_identity.py treats anything that
+      # isn't a strict UTC ISO-8601 timestamp as unknown, not a literal
+      # label to display.
+      DYNASTYGM_DEPLOYED_AT: ${DYNASTYGM_DEPLOYED_AT:-}
     env_file:
       - .env
     # Bumped from the old single-process 4g/2.0 (see this file's top-of-file
@@ -222,6 +229,8 @@ services:
       DYNASTYGM_SELF_HOSTED: "1"
       # See the "web" service's DYNASTYGM_BUILD comment above.
       DYNASTYGM_BUILD: ${DYNASTYGM_BUILD:-local}
+      # See the "web" service's DYNASTYGM_DEPLOYED_AT comment above.
+      DYNASTYGM_DEPLOYED_AT: ${DYNASTYGM_DEPLOYED_AT:-}
     env_file:
       - .env
     # See this file's top-of-file resource-limit comment for the full

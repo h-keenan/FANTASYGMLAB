@@ -503,10 +503,27 @@ def health() -> dict[str, str]:
     see modules/build_identity.py's docstring for why Render's own
     RENDER_GIT_COMMIT doesn't exist here and DYNASTYGM_BUILD (set by
     deploy/release_deploy.sh) stands in for it on the self-hosted box.
+
+    `deployed_at` answers the related-but-different question "how stale is
+    production relative to `origin/main`" — deploy/release_deploy.sh (run
+    either manually or by the `Auto Deploy` GitHub Actions workflow on
+    every push to `main`, see docs/SELF_HOSTED_MIGRATION.md section 5.7)
+    exports DYNASTYGM_DEPLOYED_AT right before `docker compose up -d`, the
+    same way it exports DYNASTYGM_BUILD. This is deliberately a timestamp
+    stored at deploy time, not a live GitHub API call from this endpoint —
+    an operator compares it against `git log origin/main -1
+    --format=%cI` by hand (or scripts that comparison) to see how far
+    behind `main` this box is. Empty string means unknown: local dev, or a
+    deploy that didn't go through release_deploy.sh.
     """
 
     _maybe_schedule_players_refresh()
-    return {"status": "ok", "build": build_identity.resolve_build_identity().revision}
+    identity = build_identity.resolve_build_identity()
+    return {
+        "status": "ok",
+        "build": identity.revision,
+        "deployed_at": identity.deployed_at,
+    }
 
 
 @app.get("/ready")

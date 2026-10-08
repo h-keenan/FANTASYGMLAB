@@ -269,27 +269,34 @@ Notes:
   webhook URL in their respective dashboards if you repointed those
   subdomains, and re-verify a real signed webhook reaches the new host.
 
-## 5.5. Keeping the box in sync with `main` (no auto-deploy here)
+## 5.5. Keeping the box in sync with `main`
 
-Render auto-deploys on every push to `main` — that behavior does **not**
-exist on this box. Nothing in this repo (no GitHub Actions workflow, no
-webhook, no cron) rebuilds or restarts this stack when `main` changes;
-`.github/workflows/` only runs CI (`ci.yml`) and auto-merge
-(`auto-merge.yml`) — none of them touch this server. (A Render-specific
-`keep-alive.yml` ping used to live here too; it was retired once the app
-fully cut over to this self-hosted box, since the Render free/sleeping-
-tier cold-start problem it worked around doesn't apply to a `restart:
-unless-stopped` Docker stack.) The stack runs whatever was on disk the
-last time someone ran section 3's `docker compose build && docker compose
-up -d` here, and it will keep serving that exact build indefinitely, through any number of
-later merges to `main`, until a human repeats those steps.
+As of `.github/workflows/auto-deploy.yml` (section 5.7), this box
+auto-deploys on every push to `main`, the same way Render used to — but
+only once the required secrets listed in 5.7 are actually provisioned; a
+box set up before that secret handoff still behaves exactly as described
+below, and manual redeploys remain the fallback whenever the automated
+path is down or a secret rotates.
 
-Concretely: if this box was stood up once and left alone, it can silently
-drift arbitrarily far behind `main` — including missing later brand-asset,
-styling, or welcome-screen changes that look completely normal in the repo
-and in CI, but were never actually deployed here. If the live site ever
-looks wrong in a way the current `main` branch's code doesn't explain,
-check this first, before assuming it's a code bug:
+Before that workflow existed, nothing in this repo touched this server
+automatically — `.github/workflows/` only ran CI (`ci.yml`) and auto-merge
+(`auto-merge.yml`). (A Render-specific `keep-alive.yml` ping used to live
+here too; it was retired once the app fully cut over to this self-hosted
+box, since the Render free/sleeping-tier cold-start problem it worked
+around doesn't apply to a `restart: unless-stopped` Docker stack.) Absent
+the auto-deploy workflow (or while its secrets are missing), the stack
+runs whatever was on disk the last time someone ran section 3's `docker
+compose build && docker compose up -d` here, and it will keep serving
+that exact build indefinitely, through any number of later merges to
+`main`, until a human repeats those steps.
+
+Concretely: if this box was stood up once and left alone with no working
+auto-deploy, it can silently drift arbitrarily far behind `main` —
+including missing later brand-asset, styling, or welcome-screen changes
+that look completely normal in the repo and in CI, but were never
+actually deployed here. If the live site ever looks wrong in a way the
+current `main` branch's code doesn't explain, check this first, before
+assuming it's a code bug:
 
 ```bash
 cd /opt/fantasygmlab
@@ -298,17 +305,30 @@ git log --oneline HEAD..origin/main   # anything listed here is NOT live yet
 git pull
 docker compose build
 export DYNASTYGM_BUILD="$(git rev-parse --short HEAD)"  # see below — skip this and /health just reports "local" again
+export DYNASTYGM_DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"  # see below — skip this and /health's deployed_at is just empty
 docker compose up -d
 docker compose ps --format 'table {{.Name}}\t{{.Status}}'
 ```
 
-**Checking what's actually live, without guessing**: `curl https://api.fantasygmlab.com/health` returns `{"status": "ok", "build": "<short sha>"}`. Compare that sha to `git log origin/main -1 --format=%h` — if they match, production is current; if not, something above didn't run (or didn't run with `DYNASTYGM_BUILD` set). Render used to answer this automatically via its own `RENDER_GIT_COMMIT`; this box has no equivalent unless whatever runs `docker compose up -d` exports `DYNASTYGM_BUILD` first — `deploy/release_deploy.sh` (section 5.6) already does this for you; a manual deploy only reflects the real commit if you also export it as shown above.
-
-Standing up real continuous deployment for this box (e.g. a scheduled or
-webhook-triggered GitHub Actions job that SSHes in and runs the block
-above) is a reasonable follow-up, but is intentionally out of scope here —
-it needs a deploy credential/secret decision this runbook isn't positioned
-to make unilaterally.
+**Checking what's actually live, without guessing**: `curl
+https://api.fantasygmlab.com/health` returns `{"status": "ok", "build":
+"<short sha>", "deployed_at": "<UTC ISO-8601 timestamp>"}`. Compare
+`build` to `git log origin/main -1 --format=%h` — if they match,
+production is current; if not, something above didn't run (or didn't run
+with `DYNASTYGM_BUILD` set). Compare `deployed_at` to `git log origin/main
+-1 --format=%cI` to see how long production has been behind whatever is
+newest on `main` — a non-trivial gap between the two, even when `build`
+still matches, is the signal that auto-deploy (section 5.7) has stopped
+firing (expired/rotated SSH key, box unreachable, etc.) and is worth
+alerting on. Render used to answer the first question automatically via
+its own `RENDER_GIT_COMMIT`; this box has no equivalent unless whatever
+runs `docker compose up -d` exports `DYNASTYGM_BUILD` (and now
+`DYNASTYGM_DEPLOYED_AT`) first — `deploy/release_deploy.sh` (section 5.6)
+already does both for you; a manual deploy only reflects the real
+commit/timestamp if you also export them as shown above. Both are stored
+at deploy time (not fetched live from GitHub by the server), per
+services/mobile_api_service.py's `/health` docstring and
+modules/build_identity.py.
 
 ## 5.6. Scoped deploy access for a second operator
 
@@ -366,6 +386,47 @@ connection to reach any other service on the box.
 To revoke access later, delete or comment out their line in
 `/home/fgl-releaser/.ssh/authorized_keys` (as `deploy` or root) — no
 restart needed, it takes effect on the next connection attempt.
+
+## 5.7. Auto-deploy via GitHub Actions
+
+`.github/workflows/auto-deploy.yml` ("Auto Deploy") is the real
+continuous-deployment job section 5.5 used to describe as a reasonable
+but out-of-scope follow-up. It triggers on `workflow_run` of "Delivery
+Validation" (`ci.yml`) completing, filtered down to exactly the case
+that matters: `github.event.workflow_run.event == 'push'`, `head_branch
+== 'main'`, `conclusion == 'success'`. That covers both a PR merged by
+"Trusted Delivery" (`auto-merge.yml`) and a plain commit pushed straight
+to `main` by `players-db-refresh.yml` / `injury-status-sync.yml` — either
+way, CI has already run against that exact commit and passed before any
+deploy is attempted.
+
+The job SSHes in as the `fgl-releaser` scoped account from section 5.6
+and runs `ssh fgl-releaser@<host>` with no command — exactly like a human
+running section 5.6's manual redeploy, just automatic. fgl-releaser's
+forced command always runs `deploy/release_deploy.sh` regardless of what
+the connecting side asks for, so the workflow has no path to run
+anything else on the box even if it were compromised.
+
+**Required repository secrets** (none of these exist yet — this workflow
+file was added before they were provisioned; it will fail its own "Require
+deploy secrets" step until they are, by design, rather than silently
+skipping the deploy):
+
+| Secret | Value |
+| --- | --- |
+| `FGL_RELEASER_SSH_KEY` | The private key matching the public key already installed in `fgl-releaser`'s `authorized_keys` (section 5.6). Never the `deploy` admin account's key. |
+| `FGL_RELEASER_HOST` | The production box's hostname or IP. |
+| `FGL_RELEASER_KNOWN_HOSTS` | That host's SSH host key(s), exactly as `ssh-keyscan <host>` prints them. Captured once, out-of-band, by someone who can already independently verify the box's identity (e.g. while SSH'd in as `deploy`, run `ssh-keyscan <host>` from a trusted network path). Pins the host key so the workflow can use `StrictHostKeyChecking=yes` — this repo does not disable host-key checking to work around a missing secret. |
+
+To add them: repo Settings → Secrets and variables → Actions → New
+repository secret, for each of the three names above. Once all three
+exist, the next push to `main` (or the next merge) deploys automatically;
+no further workflow change is needed.
+
+If this workflow is failing and a deploy is needed urgently, section 5.5's
+manual `ssh fgl-releaser@<server-ip>` (or the full manual block above it)
+remains available as a fallback — the automation is additive, not a
+replacement for operator access.
 
 ## 6. Rollback plan
 

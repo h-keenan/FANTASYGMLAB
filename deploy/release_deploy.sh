@@ -28,6 +28,12 @@ echo "== restarting stack =="
 # modules/build_identity.py for why this exists (Render set
 # RENDER_GIT_COMMIT automatically; this box has to do it itself).
 export DYNASTYGM_BUILD="$(git rev-parse --short HEAD)"
+# Same reasoning, for the companion staleness question "how long ago was
+# this deployed" rather than "what commit is this" — see
+# modules/build_identity.py and /health's docstring. UTC, strict
+# ISO-8601, matching modules/build_identity.py's _DEPLOYED_AT regex
+# exactly (it rejects anything else rather than mangling it).
+export DYNASTYGM_DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 docker compose up -d
 
 echo "== status =="
