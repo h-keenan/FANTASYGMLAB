@@ -190,19 +190,17 @@ function deriveContextLine(player: MatchupStarter): string | null {
 }
 
 /**
- * The REAL lineup's secondary (never-competing) trailing figure: this
- * week's per-game projection (modules.player_projections), rendered next to
- * — never instead of — the row's real `actual_points`. Honors every honest
- * edge-case status from `project_player_week`: an "ok" projection renders
- * as a small "Proj X.X" + confidence caption; a handful of statuses that
- * are meaningful to a user watching their own lineup (bye, no market/
- * schedule data yet, not enough recent games) render a short plain-English
- * note instead; anything else (e.g. `unsupported_position` for a K/DEF,
- * or a missing projection object entirely) renders nothing at all rather
- * than a confusing "no projection" note on a row that was never going to
- * have one.
+ * This week's per-game projection (modules.player_projections) rendered as
+ * text. Honors every honest edge-case status from `project_player_week`: an
+ * "ok" projection renders as "Proj X.X" + confidence caption; a handful of
+ * statuses that are meaningful to a user watching their own lineup (bye, no
+ * market/schedule data yet, not enough recent games) render a short
+ * plain-English note instead; anything else (e.g. `unsupported_position`
+ * for a K/DEF, or a missing projection object entirely) renders nothing at
+ * all rather than a confusing "no projection" note on a row that was never
+ * going to have one.
  */
-function projectionSecondary(
+function projectionDisplay(
   projection: PlayerWeekProjection | null | undefined,
 ): { value: string | null; caption: string | null } {
   if (!projection) return { value: null, caption: null };
@@ -218,6 +216,55 @@ function projectionSecondary(
     return { value: 'No matchup data', caption: null };
   }
   return { value: null, caption: null };
+}
+
+/**
+ * Which number is this REAL starter row's PRIMARY/prominent figure.
+ *
+ * Before this player's own NFL game has kicked off, Sleeper's
+ * `actual_points` is a real-looking `0.0` that isn't an actual result yet —
+ * nobody has played a snap — so leading with it reads as "this player
+ * scored zero," which is misleading (coridian_'s bug report). This swaps
+ * the hierarchy pre-kickoff: the projection becomes the prominent number
+ * (with its confidence level), and the real score only takes over once
+ * `game_started` says this player's specific game has actually begun —
+ * never just "the week is live" (`MatchupSide.has_live_data`), since games
+ * across a week kick off at different times.
+ *
+ * `game_started` can be null (unknown — no resolvable team, bye, or a
+ * schedule-fetch hiccup). In that case a nonzero `actual_points` is still
+ * trusted as "started" (a real score can't exist before kickoff), but a
+ * null/zero `actual_points` with an unknown `game_started` falls back to
+ * showing the projection rather than risking the exact misleading zero
+ * this fix exists to remove.
+ */
+function realStarterPointsDisplay(player: MatchupRealStarter): {
+  value: string;
+  caption: string | null;
+  secondaryValue: string | null;
+  secondaryCaption: string | null;
+} {
+  const projection = projectionDisplay(player.projection);
+  const hasActual = player.actual_points != null;
+  const started = player.game_started === true || (hasActual && player.actual_points! > 0);
+
+  if (started) {
+    return {
+      value: hasActual ? player.actual_points!.toFixed(1) : '0.0',
+      caption: 'PTS',
+      secondaryValue: projection.value,
+      secondaryCaption: projection.caption,
+    };
+  }
+
+  // Not started yet (or unconfirmed with nothing real to show) — lead with
+  // the projection instead of a 0 that isn't a real result.
+  return {
+    value: projection.value ?? 'Not started',
+    caption: projection.value ? projection.caption : null,
+    secondaryValue: null,
+    secondaryCaption: null,
+  };
 }
 
 export default function MatchupScreen({ route, navigation }: Props) {
@@ -544,7 +591,7 @@ function RealLineupSection({
       </View>
       <AnimatedCard style={styles.sectionCard}>
         {side.real_starters.map((player, index) => {
-          const projection = projectionSecondary(player.projection);
+          const display = realStarterPointsDisplay(player);
           return (
             <PlayerIdentityRow
               key={`${side.roster_id}-real-${player.player_id}`}
@@ -558,13 +605,14 @@ function RealLineupSection({
               // IR/PUP/season-ending arrives on `status`, not `injury_status`.
               injuryLabel={player.injury_label}
               injuryTone={waiverInjuryDisplay(player.injury_status).tone}
-              trailingValue={player.actual_points != null ? player.actual_points.toFixed(1) : '—'}
-              trailingCaption="PTS"
-              // Per-game projection — a small secondary figure under the
-              // real live score, never a competing primary number (Magna
-              // Carta's one-dominant-metric rule). See projectionSecondary.
-              secondaryTrailingValue={projection.value}
-              secondaryTrailingCaption={projection.caption}
+              // Primary number swaps between the real score and the
+              // projection based on whether THIS player's game has started
+              // — see realStarterPointsDisplay. Pre-kickoff, the real "0.0"
+              // Sleeper reports isn't a real result yet, so it never leads.
+              trailingValue={display.value}
+              trailingCaption={display.caption}
+              secondaryTrailingValue={display.secondaryValue}
+              secondaryTrailingCaption={display.secondaryCaption}
               onPress={() => onPressPlayer(player)}
               showDivider={index < side.real_starters.length - 1}
             />

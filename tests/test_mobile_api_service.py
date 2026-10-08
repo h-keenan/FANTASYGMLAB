@@ -8214,6 +8214,75 @@ def test_matchup_real_lineup_projection_fails_soft_on_error(monkeypatch):
     assert mine_starter["actual_points"] == 20.5
 
 
+def test_matchup_real_starter_reports_game_started_from_kickoff_time(monkeypatch):
+    """`game_started` is sourced from modules.nfl_schedule's real per-game
+    kickoff time for THIS starter's own team/week — a different signal
+    from the roster-level `has_live_data` gate, which only means Sleeper
+    has locked the week's starters, not that any individual player's game
+    has begun. A starter whose own game hasn't kicked off yet still
+    reports `actual_points == 0` from Sleeper (the bug this field exists to
+    let a client distinguish from a genuine zero).
+    """
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [0.0], "points": 0.0},
+        {"roster_id": 2, "matchup_id": 3, "starters": ["opp1"], "starters_points": [0.0], "points": 0.0},
+    ]
+
+    # Two separate requests (each needs its own `_matchup_world` — the
+    # auth/profile mocks it installs are only good for one request).
+    with _matchup_world(matchups):
+        with patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()):
+            with patch(
+                "modules.nfl_schedule.team_matchup_for_week",
+                return_value={"week": 5, "opponent": "BUF", "kickoff_at": "2026-01-01T00:00:00+00:00", "played": False},
+            ):
+                with patch("modules.nfl_schedule.game_has_started", return_value=False):
+                    not_started_response = client.get(
+                        "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
+                    )
+
+    with _matchup_world(matchups):
+        with patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()):
+            with patch(
+                "modules.nfl_schedule.team_matchup_for_week",
+                return_value={"week": 5, "opponent": "BUF", "kickoff_at": "2026-01-01T00:00:00+00:00", "played": True},
+            ):
+                with patch("modules.nfl_schedule.game_has_started", return_value=True):
+                    started_response = client.get(
+                        "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
+                    )
+
+    not_started_starter = not_started_response.json()["my_team"]["real_starters"][0]
+    assert not_started_starter["game_started"] is False
+    assert not_started_starter["actual_points"] == 0.0
+
+    started_starter = started_response.json()["my_team"]["real_starters"][0]
+    assert started_starter["game_started"] is True
+
+
+def test_matchup_real_starter_game_started_is_null_when_no_schedule_row(monkeypatch):
+    """No resolvable schedule row for this starter's team/week (bye, unknown
+    team, or a schedule-fetch hiccup) reports `game_started: null` — unknown,
+    never guessed as either true or false.
+    """
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [0.0], "points": 0.0},
+        {"roster_id": 2, "matchup_id": 3, "starters": ["opp1"], "starters_points": [0.0], "points": 0.0},
+    ]
+
+    with _matchup_world(matchups):
+        with patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()):
+            with patch("modules.nfl_schedule.team_matchup_for_week", return_value=None):
+                response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    mine_starter = response.json()["my_team"]["real_starters"][0]
+    assert mine_starter["game_started"] is None
+
+
 def test_trade_outcomes_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     assert client.post("/v1/leagues/abc/trade-outcomes", json={}).status_code == 401
