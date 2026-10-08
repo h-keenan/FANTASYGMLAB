@@ -5158,6 +5158,38 @@ def _matchup_side(
     }
 
 
+def _player_game_started(team: Any, projection_context: "_ProjectionContext | None") -> bool | None:
+    """Whether THIS starter's own NFL game has actually kicked off this
+    week — a different question from the roster-level `has_live_data` gate
+    on `MatchupSide`, which only means Sleeper has locked the week's
+    starters, not that any one player's game has begun. A real starter
+    whose game hasn't started yet still reports `actual_points == 0` from
+    Sleeper (nobody has played a snap), and a client needs this signal to
+    know that a 0 isn't a real score yet — the product bug this exists to
+    fix (coridian_: "the points... should not be zero... before any
+    games").
+
+    Sourced from modules.nfl_schedule's real kickoff time (nflverse's
+    gameday/gametime, Eastern Time) for this player's team/week — the same
+    real schedule data Player Detail's Schedule tab already reads, never a
+    new invented concept. Returns None (unknown) when the signal isn't
+    available (no team, bye week, schedule fetch hiccup, or an older
+    season missing gameday/gametime) rather than guessing; callers fall
+    back to "has this player actually scored a nonzero amount" in that
+    case, which can only be true for a game that has started.
+    """
+
+    if projection_context is None or projection_context.games is None or not team:
+        return None
+    try:
+        matchup = nfl_schedule.team_matchup_for_week(
+            str(team), projection_context.week, projection_context.season, games=projection_context.games
+        )
+    except Exception:
+        return None
+    return nfl_schedule.game_has_started(matchup)
+
+
 def _project_real_starter_row(
     row: pd.Series,
     score_field: str,
@@ -5187,6 +5219,7 @@ def _project_real_starter_row(
         if projection_context is not None
         else None
     )
+    fields["game_started"] = _player_game_started(fields.get("team"), projection_context)
     return fields
 
 
@@ -5195,6 +5228,14 @@ class _ProjectionContext:
     """Everything `_weekly_projection_for_player` needs, fetched/computed
     ONCE per matchup request rather than once per starter — see that
     function's own docstring for why a per-player refetch would be wasteful.
+
+    `games` (modules.nfl_schedule's real games table) is additionally used
+    by `_player_game_started` to tell whether a REAL starter's own game has
+    actually kicked off yet — a separate question from the projection
+    itself, but fetched here too so it's still only loaded once per
+    request. None when the caller couldn't fetch it (best-effort, same
+    fails-soft contract as every other field here); `_player_game_started`
+    reports "unknown" rather than guessing in that case.
     """
 
     week: int
@@ -5202,6 +5243,7 @@ class _ProjectionContext:
     players_lookup: dict[str, Any]
     weekly_stats: dict[str, Any]
     defense_strength: dict[str, Any]
+    games: pd.DataFrame | None = None
 
 
 def _real_current_lineup(
@@ -5284,6 +5326,10 @@ def _real_current_lineup(
                         if projection_context is not None
                         else None
                     ),
+                    # No resolvable team for this id, so there's no schedule
+                    # row to check — unknown, same as `_player_game_started`
+                    # returns for any other missing-team case.
+                    "game_started": None,
                 }
             )
 
@@ -5510,13 +5556,15 @@ def get_league_matchup(
     # own matchup entry, alongside the (unchanged) suggested season-value
     # lineup already built into my_side/opponent_side above. Each real
     # starter also carries this week's per-game `projection` (point
-    # estimate/low/high/confidence/honest status) — computed from data
-    # fetched ONCE for the whole request (both rosters), not once per
-    # player, via `_ProjectionContext`/`_weekly_projection_for_player`. Only
-    # attempted at all when at least one side actually has a live lineup to
-    # enrich, and treated as best-effort (same "fails soft" contract as
-    # every other enrichment fetch in this file) — a projection-data hiccup
-    # must never break the real Sleeper lineup/points response.
+    # estimate/low/high/confidence/honest status) and a `game_started` flag
+    # (modules.nfl_schedule's real kickoff time for his team/week) —
+    # computed from data fetched ONCE for the whole request (both rosters),
+    # not once per player, via `_ProjectionContext`/`_weekly_projection_for_
+    # player`/`_player_game_started`. Only attempted at all when at least
+    # one side actually has a live lineup to enrich, and treated as
+    # best-effort (same "fails soft" contract as every other enrichment
+    # fetch in this file) — a projection-data hiccup must never break the
+    # real Sleeper lineup/points response.
     projection_context = None
     has_any_real_starters = bool(my_entry.get("starters")) or bool(opponent_entry.get("starters"))
     if has_any_real_starters:
@@ -5537,6 +5585,7 @@ def get_league_matchup(
                     weekly_stats=projection_weekly_stats,
                     players=projection_players_lookup,
                 ),
+                games=nfl_schedule.load_games(),
             )
         except Exception:
             projection_context = None

@@ -423,6 +423,19 @@ export interface MatchupRealStarter {
    * (best-effort; see services/mobile_api_service.py's fails-soft
    * contract) — render nothing rather than a guess. */
   projection: PlayerWeekProjection | null;
+  /**
+   * Whether THIS player's own NFL game has actually kicked off this week —
+   * distinct from `MatchupSide.has_live_data`, which only means Sleeper has
+   * locked the week's starters, not that any individual player's game has
+   * begun (games across a week start at different times). A starter whose
+   * game hasn't started yet still reports `actual_points === 0` from
+   * Sleeper, which is NOT a real score — a client must gate on this (not on
+   * `actual_points`) before treating 0 as a genuine result. Sourced from
+   * modules.nfl_schedule's real kickoff time for this player's team/week.
+   * Null when the signal isn't available (no resolvable team, bye week,
+   * schedule fetch hiccup) — treat as unknown, never as "started".
+   */
+  game_started: boolean | null;
 }
 
 export interface MatchupSide {

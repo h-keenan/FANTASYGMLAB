@@ -17,12 +17,21 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
 
 from modules import performance
+
+# nflverse's `gametime` column is published in US Eastern local time
+# (the stadium clock, not whatever timezone the server/user happens to be
+# in) — see nflverse's games.csv data dictionary. Used only to derive each
+# game's real kickoff instant for `game_has_started`; never surfaced as a
+# "matchup difficulty" adjustment or scoring input (see module docstring).
+_GAME_TIMEZONE = ZoneInfo("America/New_York")
 
 GAMES_CSV_URL = "https://github.com/nflverse/nfldata/raw/master/data/games.csv"
 GAMES_CACHE_PATH = "data/nfl_games.csv"
@@ -93,6 +102,27 @@ def _normalize_team_code(games: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _kickoff_at_utc(game: pd.Series) -> str | None:
+    """This game's real kickoff instant, in UTC ISO-8601 — combines
+    nflverse's `gameday` (date) and `gametime` (Eastern-time local kickoff)
+    columns. None when either is missing/unparseable rather than a guessed
+    time; `game_has_started` falls back to the `played` flag (or lets the
+    caller fall back further) when this is unavailable.
+    """
+    gameday = game.get("gameday")
+    gametime = game.get("gametime")
+    if gameday is None or pd.isna(gameday) or gametime is None or pd.isna(gametime):
+        return None
+    try:
+        naive = pd.Timestamp(f"{gameday} {gametime}")
+        if pd.isna(naive):
+            return None
+        localized = naive.tz_localize(_GAME_TIMEZONE)
+        return localized.tz_convert(timezone.utc).isoformat()
+    except Exception:
+        return None
+
+
 def _row_from_game(game: pd.Series, *, team_is_home: bool) -> dict[str, Any]:
     opponent = game["away_team"] if team_is_home else game["home_team"]
     team_score = game["home_score"] if team_is_home else game["away_score"]
@@ -117,6 +147,10 @@ def _row_from_game(game: pd.Series, *, team_is_home: bool) -> dict[str, Any]:
         "team_score": float(team_score) if played else None,
         "opponent_score": float(opponent_score) if played and opponent_score is not None and not pd.isna(opponent_score) else None,
         "bye": False,
+        # Real kickoff instant (UTC) for this one game — see
+        # `_kickoff_at_utc`/`game_has_started`. None for older seasons or
+        # any row missing gameday/gametime.
+        "kickoff_at": _kickoff_at_utc(game),
     }
 
 
@@ -165,6 +199,7 @@ def team_schedule(
                         "team_score": None,
                         "opponent_score": None,
                         "bye": True,
+                        "kickoff_at": None,
                     }
                 )
     rows.sort(key=lambda row: row["week"])
@@ -254,3 +289,34 @@ def team_matchup_for_week(
         if row["week"] == week:
             return row
     return None
+
+
+def game_has_started(game_row: dict[str, Any] | None, *, now: datetime | None = None) -> bool | None:
+    """Whether a specific game (one `team_matchup_for_week` row) has
+    actually kicked off — not whether the WEEK has started, since games
+    across a week start at different times (Thursday/Sunday-early/Sunday-
+    late/Sunday-night/Monday). Used by the Matchup screen to decide whether
+    a starter's `0.0` real points is a genuine not-yet-played zero or just
+    "his game hasn't begun yet" (see services.mobile_api_service's
+    `_player_game_started`).
+
+    True once the real kickoff instant (`kickoff_at`) has passed, or
+    unconditionally once nflverse reports a final score (`played`) even if
+    the kickoff math is somehow off. None when there's no row at all (bye)
+    or `kickoff_at` couldn't be computed (older data, missing columns) —
+    callers fall back to another signal rather than guessing.
+    """
+
+    if game_row is None:
+        return None
+    if game_row.get("played"):
+        return True
+    kickoff_at = game_row.get("kickoff_at")
+    if not kickoff_at:
+        return None
+    try:
+        kickoff = datetime.fromisoformat(kickoff_at)
+    except ValueError:
+        return None
+    reference = now if now is not None else datetime.now(timezone.utc)
+    return reference >= kickoff
