@@ -338,6 +338,15 @@ function TeamAnalyticsSection({
   const valuePercentile = percentileFromRank(team.power_rank, leagueSize);
   const draftCapitalPercentile = percentileFromRank(team.draft_capital_rank, leagueSize);
   const starterPercentile = percentileFromRank(team.starter_rank, leagueSize);
+  // Color-system/percentile-bar follow-up (this pass): `age_rank` is the
+  // same dense, league_rankings.py-computed rank (1 = best) as
+  // starter_rank/draft_capital_rank above — ascending by avg_age, so rank 1
+  // is the youngest roster — just never wired into a percentile here before.
+  // Reusing it (rather than inventing a new computation) keeps Roster Age on
+  // the exact same rank->percentile transform as its two siblings on this
+  // card. `ageLabel`/`note` below stays as the fallback caption for the rare
+  // case percentileFromRank can't produce a value (single-team league).
+  const agePercentile = percentileFromRank(team.age_rank, leagueSize);
   const outlook = team.archetype_label || team.strategy_label;
   const ringColor = valuePercentile != null ? percentileColor(valuePercentile, colors) : colors.accent;
 
@@ -395,6 +404,7 @@ function TeamAnalyticsSection({
           label="Roster Age"
           icon="hourglass-outline"
           value={team.average_age != null ? team.average_age.toFixed(1) : '—'}
+          percentile={agePercentile}
           note={ageLabel(team.average_age)}
           valueColor={ageColor(team.average_age, colors)}
           style={styles.analyticsMetricTile}

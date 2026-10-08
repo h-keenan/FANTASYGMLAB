@@ -8,6 +8,7 @@ import { colors, radii, spacing } from '../theme';
 import PlayerAvatar from './PlayerAvatar';
 import PlayerNameText from './PlayerNameText';
 import PositionBadge from './PositionBadge';
+import TeamAvatar from './TeamAvatar';
 import TradeValueBar from './TradeValueBar';
 
 const CARD_WIDTH = 360;
@@ -73,14 +74,24 @@ function AssetLine({
  * synchronously false→true→false as props change, so a caller (the share
  * modal) should treat the latest value as the source of truth, not a
  * one-shot event.
+ *
+ * `partnerTeamName`/`partnerTeamAvatarUrl` (this pass): UI_MAGNA_CARTA.md's
+ * Trade UI priority order is "partner/team → assets sent → assets received →
+ * value change → rationale → confidence" — this card had no partner
+ * identity at all despite TradeHubScreen already fetching both fields and
+ * already rendering them in its own on-screen partner row. Reuses
+ * `TeamAvatar`, the same shared component that on-screen row uses, rather
+ * than a one-off avatar here.
  */
 const TradeShareCard = forwardRef<View, {
   leagueName: string;
   verdict: TradeVerdict;
   sendPlayers: RankedPlayer[];
   receivePlayers: RankedPlayer[];
+  partnerTeamName?: string;
+  partnerTeamAvatarUrl?: string | null;
   onReadyChange?: (ready: boolean) => void;
-}>(({ leagueName, verdict, sendPlayers, receivePlayers, onReadyChange }, ref) => {
+}>(({ leagueName, verdict, sendPlayers, receivePlayers, partnerTeamName, partnerTeamAvatarUrl, onReadyChange }, ref) => {
   const meta = HEADLINE_META[verdict.tone];
   const gain = verdict.value_delta;
   const gainColor = gain > 0 ? colors.successBright : gain < 0 ? colors.danger : colors.textSecondary;
@@ -135,6 +146,15 @@ const TradeShareCard = forwardRef<View, {
       </View>
 
       <View style={styles.hairline} />
+
+      {partnerTeamName ? (
+        <View style={styles.partnerRow}>
+          <TeamAvatar avatarId={partnerTeamAvatarUrl} size={28} style={styles.partnerAvatar} />
+          <AppText style={styles.partnerName} numberOfLines={1}>
+            {partnerTeamName}
+          </AppText>
+        </View>
+      ) : null}
 
       <AppText style={[styles.headline, { color: meta.color }]}>{meta.headline}</AppText>
       <View style={styles.bandRow}>
@@ -244,6 +264,9 @@ const styles = StyleSheet.create({
   brandWordAccent: { color: colors.accent },
   leagueName: { fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.6, maxWidth: 120 },
   hairline: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.sm },
+  partnerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  partnerAvatar: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  partnerName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   headline: { fontSize: 20, fontWeight: '800', letterSpacing: 0.5, marginTop: spacing.xs },
   bandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 6 },
   bandChip: { borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
