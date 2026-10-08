@@ -31,7 +31,7 @@ from modules.team_eval import (
     team_strategy_label,
     team_strategy_mode,
 )
-from modules.roster_needs import true_roster_needs
+from modules.roster_needs import SHALLOW_POSITIONS, true_roster_needs, true_shallow_position_needs
 from modules.rankings import (
     build_player_injury_index,
     injury_display_label,
@@ -2227,6 +2227,14 @@ def _build_team_shape(
         league_settings,
         metrics.get("weaknesses", []),
     )
+    # K/DEF run through their own shallow-room model (see roster_needs) --
+    # they're never part of CORE_POSITIONS' depth-gradient need machinery --
+    # but a real gap there (no startable K/DEF) belongs in the same "needs"
+    # set everything else in this shape dict already reads from.
+    shallow_needs, shallow_room_coverage = true_shallow_position_needs(
+        work_team,
+        league_settings,
+    )
     _TEAM_SHAPE_STATS["needs_ms"] = float(_TEAM_SHAPE_STATS["needs_ms"]) + (
         (time.perf_counter() - needs_started) * 1000.0
     )
@@ -2240,8 +2248,10 @@ def _build_team_shape(
         "mode": team_strategy_mode(strategy),
         "strategy": strategy,
         "strategy_label": team_strategy_label(strategy),
-        "needs": _normalize_pos_list(smart_needs),
-        "room_coverage": room_coverage,
+        "needs": _normalize_pos_list(
+            list(dict.fromkeys(list(smart_needs) + list(shallow_needs)))
+        ),
+        "room_coverage": {**room_coverage, **shallow_room_coverage},
         "surplus": _normalize_pos_list(metrics.get("strengths", [])),
         "counts": counts,
         "minimums": _team_position_minimums(league_settings),
@@ -2486,6 +2496,41 @@ def _target_trade_fit(
     elif archetype == "Aging Contender" and 26 <= age <= 30:
         score += 7
     return score
+
+
+def _acquire_candidate_allowed(
+    position: str,
+    my_shape: Dict[str, Any],
+    partner_shape: Dict[str, Any],
+) -> bool:
+    """Position-needs gate for the acquire-side candidate pool.
+
+    Patterns that draw straight from a sorted-by-value asset list (the
+    one-for-one swap and the player-plus-pick-return patterns) previously had
+    no position filter at all, so a position the acquiring team already has
+    adequately covered -- and isn't missing -- could still win a slot purely
+    because its raw value score was decent. That's harmless for CORE
+    POSITIONS, where pattern 1b's whole premise is a plain value-for-value
+    swap regardless of need (a surplus RB for a surplus WR is a perfectly
+    normal trade), so this intentionally stays a no-op for them.
+
+    It isn't harmless for shallow, single-starter rooms (K/DEF): a league
+    only starts one of each, so a second rostered one has no real
+    roster-construction value no matter its raw score. This gate blocks a
+    shallow position from the pool unless it's a true need for the acquiring
+    team (no startable K/DEF) or the partner has flagged it as a surplus
+    they're trying to move. Written generically off SHALLOW_POSITIONS rather
+    than a hardcoded K/DEF check so any future shallow, binary-coverage
+    position gets the same treatment automatically.
+    """
+    pos = str(position or "").upper()
+    if pos not in SHALLOW_POSITIONS:
+        return True
+    if pos in set(my_shape.get("needs") or []):
+        return True
+    if pos in set(partner_shape.get("surplus") or []):
+        return True
+    return False
 
 
 def _fit_priority(
@@ -3810,12 +3855,26 @@ def _build_trade_ideas_impl(
                     or asset["position"] in my_shape.get("needs", [])
                     or asset["score"] >= 6500
                 )
-            ] or partner_player_assets[:target_cap]
+            ] or [
+                asset
+                for asset in partner_player_assets[:target_cap]
+                if _acquire_candidate_allowed(asset["position"], my_shape, partner_shape)
+            ]
             partner_pick_assets = [
                 _pick_asset(pick, score_multiplier=pick_score_multiplier)
                 for pick in roster_pick_assets.get(partner_roster_id, [])
             ]
             partner_pick_assets = [pick for pick in partner_pick_assets if int(pick.get("round") or 99) <= 3]
+            # Patterns 1b and 3 draw straight from a value-sorted partner
+            # pool with no position-needs filter at all (unlike
+            # partner_target_players above, which patterns 1/2 use). Gate out
+            # positions the acquiring team already has covered and isn't
+            # missing -- see _acquire_candidate_allowed.
+            gated_partner_players = [
+                asset
+                for asset in partner_player_assets[:14]
+                if _acquire_candidate_allowed(asset["position"], my_shape, partner_shape)
+            ]
 
         # 1. Consolidate two movable pieces into a real need-position starter.
         for target in partner_target_players[:target_cap]:
@@ -3870,7 +3929,7 @@ def _build_trade_ideas_impl(
             player_pos = str(player.get("position") or "").upper()
             if player_pos in my_needs and player_pos not in my_strengths:
                 continue
-            for target in partner_player_assets[:14]:
+            for target in gated_partner_players:
                 if target["score"] < 1500:
                     continue
                 send_assets = make_package(player)
@@ -3949,7 +4008,7 @@ def _build_trade_ideas_impl(
                     player_age = 0
                 if active_strategy in {"rebuild", "tank"} and player_age < 26 and player["score"] > 3500:
                     continue
-                for young_target in partner_player_assets[:14]:
+                for young_target in gated_partner_players:
                     try:
                         target_age = float(young_target.get("age"))
                     except Exception:
