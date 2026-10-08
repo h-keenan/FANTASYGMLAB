@@ -101,6 +101,51 @@ def frozen_trust_inputs():
         http.assert_not_called()
 
 
+VALUATION_AUTHORITY_FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "valuation_authority"
+
+
+def frozen_valuation_authority_persisted_frame():
+    """Frozen two-row snapshot of data/players.db (Keenan Allen + Davante
+    Adams), captured 2026-10-08.
+
+    data/players.db is overwritten every ~6h by the players-db-refresh
+    cron ("chore(data): scheduled players.db refresh"), so a test that
+    pins an exact value_score/fantasycalc_value read live from it goes
+    stale for reasons unrelated to the valuation logic under test — the
+    same fixture-drift failure mode tests/test_trust_fixture_isolation.py
+    guards against for the public player cache.
+
+    Both players are already provider-backed/modeled rows (fantasycalc_value
+    > 0, role_score and opportunity_label populated), so
+    modules.rankings.apply_local_structured_valuation only runs the
+    per-row-independent legs of the pipeline for them (role/opportunity,
+    injury risk, composite score) — it never recomputes market_score,
+    age_curve_score, or scarcity_score, which are the only values in this
+    path that depend on the full position pool via VORP/replacement-level
+    (modules.rankings._apply_market_valuation_context). A two-row snapshot
+    therefore reproduces byte-identical output to the full table for these
+    two players, confirmed empirically against the live table before this
+    fixture was captured.
+    """
+    import sqlite3
+
+    import pandas as pd
+
+    with sqlite3.connect(VALUATION_AUTHORITY_FIXTURE_DIR / "players_snapshot.db") as connection:
+        return pd.read_sql_query("SELECT * FROM players", connection)
+
+
+def frozen_valuation_authority_sleeper_records() -> dict:
+    """Frozen data/sleeper_players.json entries for the same two players,
+    captured at the same snapshot moment as
+    ``frozen_valuation_authority_persisted_frame``. See that function's
+    docstring for why freezing just these two players' data is safe."""
+
+    return json.loads(
+        (VALUATION_AUTHORITY_FIXTURE_DIR / "sleeper_records_snapshot.json").read_text(encoding="utf-8")
+    )
+
+
 @pytest.fixture
 def committed_fantasycalc(monkeypatch):
     """Opt-in model tests consume cached values without refreshing shared files."""
