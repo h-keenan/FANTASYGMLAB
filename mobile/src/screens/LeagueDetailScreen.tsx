@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
@@ -116,6 +116,13 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [myPlayoffOdds, setMyPlayoffOdds] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Which league the state above currently belongs to (or is in flight for)
+  // — lets `load()` tell "the league actually changed" apart from "this
+  // screen was just refocused" (e.g. backing out of Matchup/Waivers/Teams),
+  // which also re-runs the effect below but should keep showing the
+  // already-loaded content while it quietly refreshes, not flash a blank
+  // spinner over it.
+  const loadedLeagueIdRef = useRef<string | null>(null);
 
   useScreenHeaderTitle(navigation, 'League Overview', leagueName);
 
@@ -140,6 +147,28 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
       let cancelled = false;
 
       async function load() {
+        // This effect re-runs both when `leagueId` actually changes (the
+        // swap button pops back to this same screen instance with new
+        // params instead of remounting it — see LeagueSwitcherHeaderButton)
+        // and on an ordinary refocus of the *same* league (e.g. backing out
+        // of Matchup/Waivers/Teams). Only the former should reset
+        // loading/error: without this guard, a league swap either kept
+        // showing the previous league's stale body while the new fetch was
+        // in flight, or — if the previous league's load had ended in an
+        // error — kept showing that stale error screen on top of the new
+        // league entirely. A same-league refocus should keep refreshing
+        // quietly in the background, as it already did.
+        if (loadedLeagueIdRef.current !== leagueId) {
+          loadedLeagueIdRef.current = leagueId;
+          setLoading(true);
+          setError(null);
+          // getLeagueMatchup below is independent of this Promise.all and
+          // can resolve after `loading` already flips back to false —
+          // without clearing it here, the matchup card would briefly show
+          // the *previous* league's matchup (wrong two teams) until the new
+          // league's own matchup call resolves.
+          setMatchup(null);
+        }
         try {
           const [
             leagueResult,

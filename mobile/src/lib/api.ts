@@ -33,19 +33,54 @@ AppState.addEventListener('change', (nextState) => {
   if (nextState !== 'active') backgroundTransitions += 1;
 });
 
+// A screen like League Overview fires several of these in parallel
+// (Promise.all) and each individual call is usually wrapped in its own
+// `.catch(() => null)` by the caller, so a single endpoint that never
+// settles doesn't just degrade that one tile — it leaves the *whole*
+// screen's loading state stuck forever, since `finally { setLoading(false) }`
+// never runs. That's the actual failure mode behind "I swapped leagues and
+// it's just loading": a newly-opened (cold-cache) league's heavier
+// endpoints — e.g. playoff_simulator.build_league_playoff_odds_cached,
+// waivers_ui's pool lock — run a real Redis single-flight lock with its own
+// ~15s ceiling server-side (modules/redis_cache.py's
+// redis_single_flight_cache), and a request can legitimately take tens of
+// seconds for a league this device hasn't warmed up yet. Nothing on the
+// client ever gave up, so a slow backend round-trip (or, if the server
+// truly wedges, one that never returns at all) had no way to surface as a
+// recoverable error instead of an infinite spinner.
+//
+// REQUEST_TIMEOUT_MS is comfortably above every known server-side lock
+// ceiling (15s) so a legitimately slow cold computation still gets to
+// finish, but still finite — once it fires, `fetch` rejects with an
+// AbortError, which transportError.ts's `isAbortOrTimeoutError` (and, via
+// it, `isTransportError`/`toUserErrorMessage`) already know how to turn
+// into a friendly message. That classification existed before this fetch
+// ever set a `signal` — this wires up the wrapper the comment there was
+// already written for.
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function performRequest<T>(
   path: string,
   init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown } | undefined,
   accessToken: string,
 ): Promise<T> {
-  const response = await fetch(`${env.apiBaseUrl}${path}`, {
-    method: init?.method ?? 'GET',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      ...(init?.jsonBody !== undefined ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${env.apiBaseUrl}${path}`, {
+      method: init?.method ?? 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(init?.jsonBody !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   let body: unknown = null;
   try {
