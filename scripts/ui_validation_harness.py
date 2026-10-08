@@ -2489,7 +2489,11 @@ def _guest_landing() -> None:
                 "Sleeper Username",
                 key="guest_landing_fixture_username",
                 placeholder="Enter your Sleeper username",
-                autocomplete="username",
+                # Mirrors app.py's home_launch_username_input: not a site
+                # login credential, so it must not collide with the real
+                # sign-in form's own autocomplete pair rendered on the
+                # same fixture page.
+                autocomplete="off",
             )
             st.form_submit_button("Load my leagues", use_container_width=True, type="primary")
 

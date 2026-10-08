@@ -156,6 +156,13 @@ export default function LoginScreen() {
           placeholderTextColor={colors.textTertiary}
           autoCapitalize="none"
           keyboardType="email-address"
+          // Without these, iOS/Android can't tell this is the username half
+          // of a credential pair, so saved-password autofill can misfire
+          // (e.g. dropping the saved password into this field instead of
+          // Password). textContentType="username" is Apple's documented
+          // token for the identifier field even when it's an email address.
+          textContentType="username"
+          autoComplete="email"
           value={email}
           onChangeText={setEmail}
         />
@@ -164,6 +171,8 @@ export default function LoginScreen() {
           placeholder="Password"
           placeholderTextColor={colors.textTertiary}
           secureTextEntry
+          textContentType={mode === 'signUp' ? 'newPassword' : 'password'}
+          autoComplete={mode === 'signUp' ? 'new-password' : 'password'}
           value={password}
           onChangeText={setPassword}
         />

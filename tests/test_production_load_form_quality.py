@@ -111,7 +111,16 @@ def test_auth_and_search_autocomplete_tokens():
     assert 'autocomplete="current-password"' in guest
     assert 'autocomplete="new-password"' in guest
     ui = (ROOT / "modules" / "trade_analyzer_ui.py").read_text(encoding="utf-8")
-    assert 'autocomplete="username"' in APP
+    # Sleeper-username lookup fields are not this site's login credential
+    # and can render on the same page as the real email+password sign-in
+    # form, so they must use autocomplete="off" rather than "username" to
+    # avoid colliding with the real credential pair's autofill matching
+    # (an explicit autocomplete="username" token elsewhere on the page can
+    # outrank proximity-based matching and get bound to the password field
+    # instead of the real email field — this was the mobile autofill bug
+    # where the saved password landed in the username field).
+    assert 'autocomplete="username"' not in APP
+    assert 'autocomplete="off"' in APP
     assert 'autocomplete="off"' in ui
     assert 'autocomplete=""' not in account
     assert 'autocomplete=""' not in guest

@@ -490,6 +490,8 @@ export default function MoreScreen({ navigation }: Props) {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              textContentType="username"
+              autoComplete="email"
               value={guestUpgradeEmail}
               onChangeText={setGuestUpgradeEmail}
               editable={!guestUpgradeSubmitting}
@@ -499,6 +501,8 @@ export default function MoreScreen({ navigation }: Props) {
               placeholder="Password"
               placeholderTextColor={colors.textTertiary}
               secureTextEntry
+              textContentType="newPassword"
+              autoComplete="new-password"
               value={guestUpgradePassword}
               onChangeText={setGuestUpgradePassword}
               editable={!guestUpgradeSubmitting}
