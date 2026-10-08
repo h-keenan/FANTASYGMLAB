@@ -5,7 +5,9 @@ import pandas as pd
 from modules.roster_needs import (
     assess_team_needs,
     classify_roster_rooms,
+    classify_shallow_position_rooms,
     true_roster_needs,
+    true_shallow_position_needs,
 )
 
 
@@ -364,6 +366,76 @@ class TestRosterNeeds(unittest.TestCase):
         self.assertTrue(qb.true_need)
         self.assertEqual(qb.required_starters, 2)
         self.assertEqual(qb.classification, "short_term_need")
+
+
+class TestShallowPositionRooms(unittest.TestCase):
+    """K/DEF get their own, simpler binary-ish coverage model (see
+    roster_needs.classify_shallow_position_rooms) instead of being folded
+    into the CORE_POSITIONS depth-gradient machinery above, which is the
+    model `TestRosterNeeds` exercises.
+    """
+
+    def test_one_startable_kicker_is_covered_not_a_need(self):
+        roster = pd.DataFrame([player("k1", "K", age=28, years_exp=5, value=10)])
+
+        rooms = classify_shallow_position_rooms(roster, {})
+        needs, _ = true_shallow_position_needs(roster, {})
+
+        self.assertFalse(rooms["K"]["true_need"])
+        self.assertNotIn("K", needs)
+
+    def test_one_startable_defense_is_covered_not_a_need(self):
+        roster = pd.DataFrame([player("def1", "DEF", age=0, years_exp=0, value=8)])
+
+        rooms = classify_shallow_position_rooms(roster, {})
+        needs, _ = true_shallow_position_needs(roster, {})
+
+        self.assertFalse(rooms["DEF"]["true_need"])
+        self.assertNotIn("DEF", needs)
+
+    def test_no_rostered_kicker_is_a_true_need(self):
+        roster = pd.DataFrame([player("rb1", "RB", age=24, years_exp=2, value=50)])
+
+        rooms = classify_shallow_position_rooms(roster, {})
+        needs, _ = true_shallow_position_needs(roster, {})
+
+        self.assertTrue(rooms["K"]["true_need"])
+        self.assertTrue(rooms["DEF"]["true_need"])
+        self.assertIn("K", needs)
+        self.assertIn("DEF", needs)
+
+    def test_rostered_kicker_on_ir_does_not_count_as_covered(self):
+        roster = pd.DataFrame(
+            [
+                player(
+                    "k1",
+                    "K",
+                    age=28,
+                    years_exp=5,
+                    value=10,
+                    status="IR",
+                    injury_status="out",
+                ),
+                player("def1", "DEF", age=0, years_exp=0, value=8),
+            ]
+        )
+
+        rooms = classify_shallow_position_rooms(roster, {})
+        needs, _ = true_shallow_position_needs(roster, {})
+
+        self.assertTrue(rooms["K"]["true_need"])
+        self.assertIn("K", needs)
+        self.assertFalse(rooms["DEF"]["true_need"])
+        self.assertNotIn("DEF", needs)
+
+    def test_empty_roster_needs_both_shallow_positions(self):
+        roster = pd.DataFrame(columns=["player_id", "position", "status", "injury_status"])
+
+        needs, rooms = true_shallow_position_needs(roster, {})
+
+        self.assertEqual(sorted(needs), ["DEF", "K"])
+        self.assertTrue(rooms["K"]["true_need"])
+        self.assertTrue(rooms["DEF"]["true_need"])
 
 
 if __name__ == "__main__":
