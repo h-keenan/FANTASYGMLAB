@@ -40,6 +40,7 @@ Deployment topology (Render):
   - POST /v1/push/test        — send a test push to all of the caller's tokens
   - GET  /v1/leagues/{id}/dashboard — the caller's "Next Move" briefing
   - GET  /v1/portfolio              — cross-league standing/needs/opportunities, one row per saved league (Premium)
+  - GET  /v1/leagues-glance        — compact per-league cards (record, top add, top trade, news count, top need), 3-min cache (Premium)
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
   - GET  /v1/leagues/{id}/waivers   — roster-need-aware free-agent pool + FAAB guidance
   - POST /v1/leagues/{id}/trade-outcomes        — record a shared trade for later "did this happen?" follow-up
@@ -82,6 +83,7 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -111,6 +113,7 @@ from modules import (
     gm_targets,
     injury_ui,
     league_history,
+    league_glance,
     league_rankings,
     league_recaps,
     league_standings,
@@ -4607,6 +4610,196 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
         "failed_leagues": failed_leagues,
         "upsell": None,
     }
+
+
+# --- All leagues at a glance ---------------------------------------------
+#
+# Short TTL on purpose: these cards summarize live-ish state (waiver pool,
+# record, news), so a few minutes of staleness is fine for a glance view but
+# anything longer would start showing a player who was already claimed.
+# Pull-to-refresh on the client re-reads within the same window; the full
+# single-league screens each card links into are always live.
+LEAGUE_GLANCE_TTL_SECONDS = 180
+
+_LEAGUE_GLANCE_UPSELL = {
+    "title": "All your leagues at a glance",
+    "body": (
+        "Premium keeps every league you're in and shows each one's record, top "
+        "waiver add, top trade idea, news, and biggest need side by side."
+    ),
+}
+
+
+def _league_glance_cache_key(user_id: str, league_id: str, lens: str) -> str:
+    return redis_cache.build_cache_key("league_glance", user_id, league_id, lens, PLAYERS_DB_PATH)
+
+
+def _build_league_glance_row(
+    config: dict,
+    user_id: str,
+    access_token: str,
+    lens: str,
+    sleeper_username: str,
+    news_pool_loader: Any,
+    row: dict[str, Any],
+) -> dict[str, Any]:
+    """One saved league's glance card, through a short-TTL Redis cache.
+
+    The whole per-league compute (including the Team Situation / GM Targets
+    reads) sits inside the cache, so a repeat visit inside the TTL costs one
+    Redis GET per league. redis_single_flight_cache fails open (computes
+    directly) if Redis is down, and never caches an exception, so a league
+    that blew up is retried on the next visit instead of pinned as broken.
+    """
+
+    league_id = saved_leagues.normalize_league_id(row.get("league_id"))
+    if not league_id:
+        return {"status": "skip"}
+    league_name = str(row.get("league_name") or "").strip() or league_id
+
+    def _compute() -> dict[str, Any]:
+        team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
+        gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+            config, user_id, access_token, league_id
+        )
+        return league_glance.build_league_glance(
+            league_id=league_id,
+            lens=lens,
+            sleeper_username=sleeper_username,
+            players_db_path=PLAYERS_DB_PATH,
+            news_pool=news_pool_loader(),
+            team_stance_value=team_stance_value,
+            gm_target_player_ids=gm_target_ids,
+            gm_untouchable_player_ids=gm_untouchable_ids,
+        )
+
+    try:
+        glance = redis_cache.redis_single_flight_cache(
+            cache_key=_league_glance_cache_key(user_id, league_id, lens),
+            ttl_seconds=LEAGUE_GLANCE_TTL_SECONDS,
+            compute=_compute,
+        )
+    except Exception:
+        return {"status": "failed", "league_id": league_id, "league_name": league_name, "reason": "unavailable"}
+
+    if not glance.get("ok"):
+        reason = glance.get("reason") or "unavailable"
+        if reason not in dashboard_engine.LEAGUE_SUMMARY_SKIP_REASONS:
+            reason = "unavailable"
+        return {"status": "failed", "league_id": league_id, "league_name": league_name, "reason": reason}
+
+    return {"status": "ok", "league_id": league_id, "league_name": league_name, "glance": glance}
+
+
+def _project_league_glance(league_id: str, league_name: str, glance: dict[str, Any]) -> dict[str, Any]:
+    def _clean_mapping(value: Any) -> dict[str, Any] | None:
+        if not isinstance(value, dict):
+            return None
+        return {key: _clean_json_value(item) for key, item in value.items()}
+
+    news = _clean_mapping(glance.get("news")) or {"news_count": 0, "injury_count": 0}
+    return {
+        "league_id": league_id,
+        "league_name": league_name,
+        "team_name": glance.get("team_name") or "",
+        "record": _clean_mapping(glance.get("record")),
+        "waiver": _clean_mapping(glance.get("waiver")),
+        "trade": _clean_mapping(glance.get("trade")),
+        "news": news,
+        "need": _clean_mapping(glance.get("need")),
+    }
+
+
+@app.get("/v1/leagues-glance")
+def get_leagues_glance(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """"All leagues at a glance": one compact card per saved league.
+
+    Each card carries only five trimmed data points (record, top waiver add,
+    top trade idea headline, roster news/injury count, top team need), built
+    by modules.league_glance from the same engines the single-league
+    Dashboard / Waivers / Trade Hub / Alerts / My Team endpoints use. It is
+    a separate, lighter endpoint from GET /v1/portfolio (which runs the full
+    Next Move briefing per league) and does not touch the Dashboard
+    endpoint's behavior.
+
+    Premium-only by construction: modules.saved_leagues caps Free accounts
+    at one saved league, so there is nothing to compare. Free callers get an
+    upsell payload (the client renders a locked teaser) and no per-league
+    work runs. Entitlement resolves exactly like every other gate in this
+    file (profile.entitlement via _fetch_profile_fields).
+
+    Per-league results are cached in Redis for LEAGUE_GLANCE_TTL_SECONDS
+    and fanned out over a bounded thread pool; one failing league is
+    reported in `failed_leagues` instead of blanking the response.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
+    is_premium = str(profile.get("entitlement") or "free") == "premium"
+
+    base = {
+        "ok": True,
+        "is_premium": is_premium,
+        "lens": lens,
+        "leagues": [],
+        "failed_leagues": [],
+        "upsell": None,
+        "cache_ttl_seconds": LEAGUE_GLANCE_TTL_SECONDS,
+    }
+    if not is_premium:
+        return {**base, "upsell": _LEAGUE_GLANCE_UPSELL}
+    if not user_id:
+        return base
+
+    saved_rows, error = account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+    if error:
+        return {**base, "reason": "saved_leagues_unavailable"}
+
+    # The news pool is a disk read shared by every league: load it at most
+    # once per request, and only if some league actually misses the cache.
+    news_lock = threading.Lock()
+    news_holder: dict[str, Any] = {}
+
+    def _news_pool_loader() -> Any:
+        with news_lock:
+            if "pool" not in news_holder:
+                news_cache.schedule_news_cache_refresh()
+                news_holder["pool"] = news_cache.load_cached_news_pool()
+            return news_holder["pool"]
+
+    sleeper_username = str(profile.get("sleeper_username") or "")
+    results: list[dict[str, Any]] = []
+    if saved_rows:
+        worker = functools.partial(
+            _build_league_glance_row, config, user_id, access_token, lens, sleeper_username, _news_pool_loader
+        )
+        max_workers = min(len(saved_rows), _PORTFOLIO_FANOUT_MAX_WORKERS)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="dgm-glance-fanout"
+        ) as executor:
+            results = list(executor.map(worker, saved_rows))
+
+    leagues: list[dict[str, Any]] = []
+    failed_leagues: list[dict[str, Any]] = []
+    for result in results:
+        if result["status"] == "skip":
+            continue
+        if result["status"] == "failed":
+            failed_leagues.append(
+                {"league_id": result["league_id"], "league_name": result["league_name"], "reason": result["reason"]}
+            )
+            continue
+        leagues.append(_project_league_glance(result["league_id"], result["league_name"], result["glance"]))
+
+    return {**base, "leagues": leagues, "failed_leagues": failed_leagues}
 
 
 @app.get("/v1/leagues/{league_id}/gm-plan")

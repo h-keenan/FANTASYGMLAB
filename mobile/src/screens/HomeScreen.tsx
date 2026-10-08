@@ -25,12 +25,14 @@ import EmptyState from '../components/EmptyState';
 import GlassPanel from '../components/GlassPanel';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
+import LeaguesGlanceSection from '../components/LeaguesGlanceSection';
 import PremiumLock from '../components/PremiumLock';
 import { ApiError, api, type MeResponse, type SleeperLeagueOption } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import { getLastLeague } from '../lib/lastLeague';
+import { glanceSectionState } from '../lib/leaguesGlance';
 import { useOrbClearance } from '../lib/orbLayout';
 import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
@@ -80,6 +82,9 @@ export default function HomeScreen({ navigation }: Props) {
   // is derived from the cap the server sent, never a hardcoded number.
   const [addCapMessage, setAddCapMessage] = useState<string | null>(null);
   const autoNavigated = useRef(false);
+  // Bumped on every load() (focus + pull-to-refresh) so the "All leagues at
+  // a glance" section re-reads its server-cached cards alongside the rest.
+  const [glanceReloadToken, setGlanceReloadToken] = useState(0);
 
   // The cap is the server's (GET /v1/me -> league_cap, from
   // modules/saved_leagues.py), so mobile never carries its own copy of the
@@ -94,6 +99,15 @@ export default function HomeScreen({ navigation }: Props) {
     me?.profile_status === 'ok' &&
     me?.entitlement !== 'premium' &&
     (leagues?.length ?? 0) >= leagueCap;
+
+  // Cross-league glance cards: Premium with 2+ saved leagues gets the real
+  // section above the league list; Free gets a locked teaser below it
+  // (Free keeps one league, so there's nothing to compare yet).
+  const glanceState = glanceSectionState({
+    entitlement: me?.entitlement,
+    profileStatus: me?.profile_status,
+    savedLeagueCount: leagues?.length ?? 0,
+  });
 
   const closeAddLeague = () => {
     setAddOpen(false);
@@ -143,6 +157,7 @@ export default function HomeScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     setMeError(null);
     setLeaguesError(null);
+    setGlanceReloadToken((token) => token + 1);
 
     const [meResult, leaguesResult] = await Promise.allSettled([
       api.getMe(),
@@ -402,6 +417,10 @@ export default function HomeScreen({ navigation }: Props) {
               </AnimatedCard>
             </View>
 
+            {glanceState === 'active' ? (
+              <LeaguesGlanceSection state="active" reloadToken={glanceReloadToken} />
+            ) : null}
+
             <View style={styles.sectionHeader}>
               <AppText style={styles.sectionTitle}>Your leagues</AppText>
               {atLeagueCap ? null : (
@@ -431,6 +450,13 @@ export default function HomeScreen({ navigation }: Props) {
               </View>
             ) : null}
           </>
+        }
+        ListFooterComponent={
+          glanceState === 'locked' ? (
+            <View style={styles.glanceTeaser}>
+              <LeaguesGlanceSection state="locked" reloadToken={glanceReloadToken} />
+            </View>
+          ) : null
         }
         ListEmptyComponent={
           <EmptyState
@@ -765,6 +791,7 @@ function createStyles(colors: ThemeColors) {
   },
   addLeagueLabel: { fontSize: 12, fontWeight: '700', color: colors.accent },
   capLock: { marginBottom: spacing.sm },
+  glanceTeaser: { marginTop: spacing.xl },
   capLockInModal: { marginTop: spacing.md },
   addError: { fontSize: 12, color: colors.danger, marginTop: spacing.sm, lineHeight: 16 },
   noLeagueToggle: {
