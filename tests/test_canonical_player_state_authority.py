@@ -9,6 +9,10 @@ from unittest.mock import patch
 import pandas as pd
 
 import app
+from conftest import (
+    frozen_valuation_authority_persisted_frame,
+    frozen_valuation_authority_sleeper_records,
+)
 from modules import league_history
 from modules import player_state_authority
 from modules import rankings
@@ -106,8 +110,14 @@ def test_query_keenan_returns_actual_player_with_default_explorer_filters():
 
 
 def test_active_unsigned_cached_market_value_remains_globally_searchable(cached_2025_stats_season):
-    keenan = _actual_record("Keenan Allen")
-    persisted = _persisted_frame()
+    # Uses a frozen tests/fixtures/valuation_authority/ snapshot rather than
+    # the live, cron-refreshed data/players.db / data/sleeper_players.json
+    # (overwritten every ~6h), so this hardcoded golden value doesn't go
+    # stale for reasons unrelated to the valuation logic under test. See
+    # frozen_valuation_authority_persisted_frame's docstring in conftest.py.
+    sleeper_records = frozen_valuation_authority_sleeper_records()
+    keenan = sleeper_records["1479"]
+    persisted = frozen_valuation_authority_persisted_frame()
     inventory = {str(keenan["player_id"]): keenan}
     frame = structured_player_refresh.refresh_structured_player_state(
         persisted,
@@ -117,7 +127,7 @@ def test_active_unsigned_cached_market_value_remains_globally_searchable(cached_
 
     assert len(row) == 1
     assert float(row.iloc[0]["fantasycalc_value"]) == 222.0
-    assert float(row.iloc[0]["value_score"]) == 1060.0
+    assert float(row.iloc[0]["value_score"]) == 2109.0
     assert row.iloc[0]["valuation_authority_status"] == "canonical_provider_backed"
     assert bool(row.iloc[0]["valuation_is_authoritative"]) is True
 
