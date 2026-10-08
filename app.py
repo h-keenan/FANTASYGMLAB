@@ -6145,7 +6145,20 @@ def render_home_launch_screen(
                     "Sleeper username",
                     key="home_launch_username_input",
                     placeholder="Enter your Sleeper username",
-                    autocomplete="username",
+                    # Not a site login credential (Sleeper is a third-party
+                    # platform lookup, not this app's account identity) and
+                    # this field can render on the same page/DOM as the real
+                    # sign-in form's own fields below. Using the username
+                    # autofill token here would collide with that pair:
+                    # browsers/OS credential managers give an explicit
+                    # username-token field priority over proximity-based
+                    # matching, so this distant field could get bound as
+                    # "the" identity field for the nearby secret-entry
+                    # field, leaving the real sign-in fields mis-filled.
+                    # Use "off", same as the other non-credential
+                    # identifier fields (ESPN cookie fields, search
+                    # inputs) in this codebase.
+                    autocomplete="off",
                 )
                 submitted = st.form_submit_button(
                     product_copy.LOAD_LEAGUES_CTA,
@@ -16570,13 +16583,16 @@ def main():
             username_input = st.text_input(
                 "Sleeper username",
                 key="username_input",
-                autocomplete="username",
+                # Not a site login credential; see home_launch_username_input
+                # above for why this must not use the username autofill
+                # token alongside the real sign-in form's own fields.
+                autocomplete="off",
             )
         else:
             username_input = st.text_input(
                 "Sleeper username",
                 key="username_input",
-                autocomplete="username",
+                autocomplete="off",
                 on_change=lambda: load_leagues_for_username(
                     st.session_state.get("username_input", ""), source="sidebar"
                 ),
