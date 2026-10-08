@@ -742,7 +742,7 @@ export default function GmOrb() {
         colors={[`${colors.background}00`, `${colors.background}EB`]}
         style={[styles.scrim, { height: ORB_SCRIM_BASE_HEIGHT + insets.bottom }]}
       />
-      <View style={[styles.orbWrap, { bottom: insets.bottom + spacing.xs }]}>
+      <View style={[styles.orbWrap, { bottom: insets.bottom }]}>
         <GestureDetector gesture={dragGesture}>
           <Animated.View style={orbAnimatedStyle}>
             <TouchableOpacity
