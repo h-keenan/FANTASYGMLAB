@@ -485,9 +485,28 @@ def classify_shallow_position_rooms(
     """
     roster = roster_df.copy() if roster_df is not None else pd.DataFrame()
     settings = league_settings or {}
+    # Unlike the CORE_POSITIONS required-starter counts above, a shallow
+    # position's settings key can be a meaningful, explicit 0 (e.g.
+    # modules.league_value_settings computes "k_count" straight from the
+    # league's roster_positions, and plenty of real formats start no
+    # kicker at all) -- `settings.get("k_count") or 1` would wrongly
+    # collapse that explicit 0 back to 1 and flag every team in a
+    # no-kicker league as missing one. Only fall back to the default when
+    # the key is genuinely absent (unknown format), never when it's
+    # present and zero.
+    def _required_shallow_starters(*keys: str, default: int = 1) -> int:
+        for key in keys:
+            value = settings.get(key)
+            if value is not None:
+                try:
+                    return max(0, int(value))
+                except (TypeError, ValueError):
+                    continue
+        return default
+
     required = {
-        "K": max(1, int(settings.get("k_count") or 1)),
-        "DEF": max(1, int(settings.get("def_count") or settings.get("dst_count") or 1)),
+        "K": _required_shallow_starters("k_count"),
+        "DEF": _required_shallow_starters("def_count", "dst_count"),
     }
 
     rooms: dict[str, dict[str, Any]] = {}

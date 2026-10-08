@@ -181,6 +181,15 @@ def build_fixture(spec: FixtureSpec) -> dict[str, Any]:
         "rb_count": 2,
         "wr_count": 3,
         "te_count": 1,
+        # This synthetic fixture only models CORE_POSITIONS players (see
+        # POSITIONS above) -- no K/DEF rows exist on any roster. Declaring
+        # that explicitly (rather than leaving these keys absent) keeps
+        # modules.roster_needs.classify_shallow_position_rooms from reading
+        # "no K/DEF settings data" as "assume one of each is required" and
+        # flagging every team here as missing a kicker/defense it was never
+        # modeled to have.
+        "k_count": 0,
+        "def_count": 0,
         "flex_count": 2,
         "superflex_count": 1 if spec.qb_format == "Superflex" else 0,
         "bench_count": max(0, spec.roster_size - (10 if spec.qb_format == "Superflex" else 9)),
