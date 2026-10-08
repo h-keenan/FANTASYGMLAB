@@ -329,8 +329,24 @@ def test_patterns_1b_and_3_do_not_acquire_a_redundant_kicker_or_defense(monkeypa
     assert "DEF" not in received_positions
 
 
+class KickerOnlyAdapter(FakeAdapter):
+    """Partner roster 2 offers only a kicker — no competing WR of comparable
+    or higher raw value to out-rank it — so a successful acquisition here
+    can only mean the gate actually let the kicker through, not that some
+    unrelated higher-value WR simply won the single-candidate pattern-1b/3
+    slot first.
+    """
+
+    def get_rosters(self, _league_id):
+        return [
+            {"roster_id": 1, "players": ["mine-a", "mine-b", "core"]},
+            {"roster_id": 2, "players": ["target-k"]},
+            {"roster_id": 3, "players": []},
+        ]
+
+
 def test_pattern_1b_can_still_acquire_a_kicker_that_is_a_genuine_true_need(monkeypatch):
-    """Same fixture as above, except my shape now flags K as a true need
+    """Same gated pool as above, except my shape now flags K as a true need
     (no startable kicker rostered) — the gate must let that acquisition
     through rather than suppressing every K/DEF suggestion unconditionally.
     """
@@ -366,7 +382,7 @@ def test_pattern_1b_can_still_acquire_a_kicker_that_is_a_genuine_true_need(monke
         {},
         max_ideas=20,
         team_strategy="contender",
-        adapter=ShallowTargetAdapter(),
+        adapter=KickerOnlyAdapter(),
         allow_protected_focus=True,
     )
 
