@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
+import type { LeaguesGlanceResponse } from './leaguesGlance';
 
 /**
  * Client for services/mobile_api_service.py. Every call attaches the current
@@ -1911,6 +1912,9 @@ export const api = {
     authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
   /** Cross-league Portfolio — one row per saved league (Premium). */
   getPortfolio: () => authorizedFetch<PortfolioResponse>('/v1/portfolio'),
+  /** "All leagues at a glance" cards for the My Leagues screen (Premium).
+   * Server-cached per league for a few minutes (cache_ttl_seconds). */
+  getLeaguesGlance: () => authorizedFetch<LeaguesGlanceResponse>('/v1/leagues-glance'),
   getTradeHubIdeas: (
     leagueId: string,
     strategy: TeamStrategy = 'retool',
