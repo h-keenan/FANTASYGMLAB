@@ -157,6 +157,37 @@ a {
   max-width: 40rem;
 }
 
+.fgl-landing__mobile-badge {
+  align-items: center;
+  background: rgba(5, 6, 7, 0.72);
+  border: 1px solid var(--fgl-border);
+  border-inline-start: 2px solid rgba(34, 211, 238, 0.72);
+  border-radius: 999px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.1rem;
+  padding: 0.22rem 0.65rem 0.22rem 0.55rem;
+  position: relative;
+  width: fit-content;
+  z-index: 1;
+}
+
+.fgl-landing__mobile-badge em {
+  color: var(--fgl-note);
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fgl-landing__mobile-badge span {
+  color: var(--fgl-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
 .fgl-landing__focus-note {
   border: 1px solid rgba(34, 211, 238, 0.28);
   color: #e2e8f0;

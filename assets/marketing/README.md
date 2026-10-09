@@ -14,6 +14,13 @@ Real FantasyGM Lab product assets used by the public Founder Beta landing.
 python scripts/capture_marketing_screenshots.py
 ```
 
+`dashboard.jpg`, `dashboard-desktop.jpg`, and `decision-memory.jpg` were
+regenerated 2026-10-09 against current `main` — the previous captures were
+from PR #174 (2026-08-07), predating several app redesigns, and had visibly
+broken renders (overlapping header text, a stuck-open notification drawer).
+Re-run the capture script above whenever the dashboard/My Team UI changes
+enough to make these look stale again.
+
 ## External launch kit
 
 Production-ready distribution pack (not mounted by Streamlit):
