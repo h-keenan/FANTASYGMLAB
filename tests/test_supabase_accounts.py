@@ -141,6 +141,34 @@ class TestSupabaseAccounts(unittest.TestCase):
         self.assertIn("Invalid refresh token", error)
         self.assertTrue(session_state[auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY])
 
+    def test_transient_network_failure_during_refresh_does_not_clear_durable_auth(self):
+        # A DNS blip/connection reset/timeout while refreshing the access
+        # token is not evidence the refresh token itself is invalid. Prior
+        # behavior wiped the durable session on ANY refresh error, which
+        # signed users out on ordinary network flakiness during the
+        # ~hourly token-refresh window. Only a definitive 4xx response from
+        # Supabase (test_failed_refresh_clears_durable_auth, above) should
+        # clear it; this transient case should fail the attempt but leave
+        # the stored refresh token intact for the next rerun to retry.
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {}
+        with patch.object(auth_supabase.requests, "post", side_effect=OSError("network unreachable")):
+            restored, error, refreshed = auth_supabase.restore_auth_payload(
+                config,
+                session_state,
+                {
+                    "access_token": "old-access",
+                    "refresh_token": "old-refresh",
+                    "expires_at": 1,
+                    "user": {"id": "user-1", "email": "user@example.com"},
+                },
+            )
+
+        self.assertFalse(restored)
+        self.assertFalse(refreshed)
+        self.assertEqual(error, auth_supabase.TRANSIENT_AUTH_NETWORK_ERROR)
+        self.assertNotIn(auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY, session_state)
+
     def test_logout_clear_marks_durable_auth_for_removal(self):
         session_state = {
             auth_supabase.AUTH_SESSION_KEY: {"access_token": "access"},
@@ -228,6 +256,36 @@ class TestSupabaseAccounts(unittest.TestCase):
         self.assertEqual(session_state["auth_restore_last_status"]["action"], "read")
         self.assertNotIn("access", str(session_state["auth_restore_last_status"]))
         self.assertNotIn("refresh", str(session_state["auth_restore_last_status"]))
+
+    def test_durable_auth_bridge_keeps_session_through_transient_refresh_network_error(self):
+        # End-to-end version of
+        # test_transient_network_failure_during_refresh_does_not_clear_durable_auth
+        # through the real render_durable_auth_bridge entry point — this is
+        # the actual call site a signed-in user hits on an hourly token
+        # refresh, so it must not re-clear durable auth independently of
+        # restore_auth_payload's own (already-tested) guard.
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        result = Mock()
+        result.status = {"action": "read", "ok": True, "reason": "visibilitychange", "durableAuthPresent": True}
+        result.stored = {
+            "access_token": "old-access",
+            "refresh_token": "old-refresh",
+            "expires_at": 1,
+            "user": {"id": "user-1", "email": "user@example.com"},
+            "_resume_reason": "visibilitychange",
+        }
+        session_state = {}
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui,
+            "AUTH_STORAGE_COMPONENT",
+            return_value=result,
+        ), patch.object(auth_supabase.requests, "post", side_effect=OSError("network unreachable")):
+            actions = account_ui.render_durable_auth_bridge(config=config)
+
+        self.assertFalse(actions["restored"])
+        self.assertEqual(actions["error"], auth_supabase.TRANSIENT_AUTH_NETWORK_ERROR)
+        self.assertNotIn(auth_supabase.DURABLE_AUTH_PENDING_CLEAR_KEY, session_state)
 
     def test_visible_default_saved_league_triggers_launch_auto_resume(self):
         config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
