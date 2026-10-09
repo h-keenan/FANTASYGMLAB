@@ -18,13 +18,16 @@ echo "== fast-forwarding local main =="
 git merge --ff-only origin/main
 
 echo "== rebuilding containers =="
-docker compose build
-
-echo "== restarting stack =="
-# Exported (not written to .env) so it reflects exactly what this run just
-# deployed, every time — a leftover value in .env would silently go stale
-# the next time someone deploys by hand instead of through this script.
-# See services/mobile_api_service.py's /health docstring and
+# Exported (not written to .env) so each build bakes in exactly what this
+# run is deploying — a leftover value in .env would silently go stale the
+# next time someone builds by hand outside this script. Must be exported
+# before `docker compose build`, not after: docker-compose.yml passes both
+# through as Dockerfile `build.args`, baked into the image's ENV, so the
+# build identity survives any later container restart that doesn't go
+# through this script (e.g. the systemd unit's `docker compose up -d` on
+# every host boot) instead of resetting to "local" the moment anything
+# restarts the stack without re-exporting these. See
+# services/mobile_api_service.py's /health docstring and
 # modules/build_identity.py for why this exists (Render set
 # RENDER_GIT_COMMIT automatically; this box has to do it itself).
 export DYNASTYGM_BUILD="$(git rev-parse --short HEAD)"
@@ -34,6 +37,9 @@ export DYNASTYGM_BUILD="$(git rev-parse --short HEAD)"
 # ISO-8601, matching modules/build_identity.py's _DEPLOYED_AT regex
 # exactly (it rejects anything else rather than mangling it).
 export DYNASTYGM_DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+docker compose build
+
+echo "== restarting stack =="
 docker compose up -d
 
 echo "== status =="
