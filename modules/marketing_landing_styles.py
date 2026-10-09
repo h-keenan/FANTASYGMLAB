@@ -49,6 +49,12 @@ body:has(.fgl-landing) .dg-build-identity{
 .fgl-landing__plan{border:1px solid var(--color-border,rgba(148,163,184,.14));padding:.65rem .7rem}
 .fgl-landing__note,.fgl-landing__billing{color:var(--color-text-muted,rgba(168,173,183,.95));font-size:.78rem;margin:.25rem 0 0}
 .fgl-landing--deferred{margin-top:.35rem}
+.fgl-landing__slide-active{padding-bottom:.15rem}
+.fgl-landing__slide-position{color:var(--color-text-muted,rgba(148,163,184,.95));font-size:.78rem;font-weight:650;margin:0;text-align:center}
+body:has(.fgl-landing) [class*="st-key-landing_slide_prev"] button,
+body:has(.fgl-landing) [class*="st-key-landing_slide_next"] button{
+  font-weight:650!important;padding-inline:.5rem!important
+}
 body:has(.fgl-landing) .account-confirm-card{margin:.4rem 0 .5rem;padding:.75rem .8rem}
 body:has(.fgl-landing) .launch-section-intro,
 body:has(.fgl-landing) .launch-account-intro{margin:.15rem 0 .25rem;padding:0;box-shadow:none;border:none;background:transparent}

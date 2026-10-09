@@ -291,7 +291,10 @@ def test_dashboard_game_plan_remains_trust_enforced():
 
 
 def test_no_new_explicit_rerun():
-    assert count_explicit_reruns() <= 63
+    # 63 -> 64: one new shared rerun call site for the welcome page's
+    # feature-explanation slideshow Prev/Next buttons
+    # (modules/marketing_landing.py render_landing_detail_slideshow).
+    assert count_explicit_reruns() <= 64
 
 
 def test_viewport_preservation_helper_still_mounted():

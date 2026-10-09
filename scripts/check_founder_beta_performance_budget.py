@@ -19,20 +19,19 @@ MAX_WARM_SERVER_MS = 750.0
 MAX_FIXTURE_RENDER_MS = 3_000.0
 MAX_PROTOBUF_BYTES = 520_000
 SURFACES = ("dashboard", "my-team", "trade", "waivers", "league")
-# Canonical explicit-rerun inventory is 63 (same on main and every pytest-
+# Canonical explicit-rerun inventory is 64 (same on main and every pytest-
 # level launch-gate test — test_ui_constitution_v1.py, test_founder_beta_
-# ship_pass.py, etc. all already assert <= 63). History: budget was last
+# ship_pass.py, etc. all already assert <= 64). History: budget was last
 # raised to 58 for Trade Analyzer chip remounts (89fb2fb), then to 62 for
 # welcome/entry state-machine work (3036a53: marketing_landing +3,
-# account_ui +1, premium_page +1, trade_hub_ui -1). The live-draft trade
-# evaluator (PR #828) added one more real, reviewed site (Trade Hub
-# navigation from Live Draft's rankings list) and every pytest-level gate
-# was updated to <= 63 accordingly — this standalone script was left stale
-# at 62 and started failing CI on unrelated PRs that merely branched after
-# that count became the real, accepted baseline. Raise only to match the
-# already-authoritative launch inventory; do not raise further without also
-# updating every <= 63 assertion above in lockstep.
-MAX_EXPLICIT_RERUNS = 63
+# account_ui +1, premium_page +1, trade_hub_ui -1), then to 63 for the
+# live-draft trade evaluator's Trade Hub navigation site (PR #828), and now
+# to 64 for one new shared rerun call site behind the welcome page's
+# feature-explanation slideshow Prev/Next buttons (marketing_landing.py
+# render_landing_detail_slideshow). Raise only to match the already-
+# authoritative launch inventory; do not raise further without also
+# updating every <= 64 assertion above in lockstep.
+MAX_EXPLICIT_RERUNS = 64
 
 from scripts.apptest_support import server_only_summary_tiles, server_only_player_quick_view
 
