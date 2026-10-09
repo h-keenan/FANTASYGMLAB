@@ -17,7 +17,26 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * style={styles.disclaimer}>...</AppText>` — same call site, same text,
  * just hidden behind a tap instead of always on screen.
  */
-export default function ScreenInfoNote({ text, label = 'About this screen' }: { text: string; label?: string }) {
+/** One legend entry — a colored dot, a short bold label, and a one-line
+ * definition. Used by screens whose "About this screen" note needs to
+ * explain a small fixed set of terms/tags (e.g. Trade Hub's impact tags)
+ * rather than just one paragraph of prose. Purely additive: screens that
+ * don't pass `legend` render exactly as before. */
+export interface ScreenInfoLegendItem {
+  label: string;
+  color: string;
+  description: string;
+}
+
+export default function ScreenInfoNote({
+  text,
+  label = 'About this screen',
+  legend,
+}: {
+  text: string;
+  label?: string;
+  legend?: ScreenInfoLegendItem[];
+}) {
   const { colors } = useThemeMode();
   const styles = createStyles(colors);
   const [open, setOpen] = useState(false);
@@ -35,6 +54,20 @@ export default function ScreenInfoNote({ text, label = 'About this screen' }: { 
               <AppText style={styles.sheetTitle}>{label}</AppText>
             </View>
             <AppText style={styles.sheetBody}>{text}</AppText>
+            {legend && legend.length > 0 ? (
+              <View style={styles.legendList}>
+                {legend.map((item) => (
+                  <View key={item.label} style={styles.legendRow}>
+                    <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+                    <AppText style={styles.legendText}>
+                      <AppText style={[styles.legendLabel, { color: item.color }]}>{item.label}</AppText>
+                      {'  '}
+                      {item.description}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -62,5 +95,10 @@ function createStyles(colors: ThemeColors) {
     sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
     sheetTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
     sheetBody: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
+    legendList: { marginTop: spacing.md, gap: spacing.sm },
+    legendRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    legendDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
+    legendLabel: { fontSize: 13, fontWeight: '700' },
+    legendText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   });
 }
