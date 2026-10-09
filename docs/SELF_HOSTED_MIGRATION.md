@@ -271,24 +271,25 @@ Notes:
 
 ## 5.5. Keeping the box in sync with `main`
 
-As of `.github/workflows/auto-deploy.yml` (section 5.7), this box
-auto-deploys on every push to `main`, the same way Render used to — but
-only once the required secrets listed in 5.7 are actually provisioned; a
-box set up before that secret handoff still behaves exactly as described
-below, and manual redeploys remain the fallback whenever the automated
-path is down or a secret rotates.
+As of `fantasygmlab-autopull.timer` (section 5.7), this box auto-deploys
+on a ~2-minute poll of `main`, the same way Render used to auto-deploy on
+push — but that's a server-side systemd timer, not anything in this
+repo's `.github/workflows/`, so there's nothing here to verify it's
+installed/enabled short of checking the box directly (`systemctl status
+fantasygmlab-autopull.timer`). Manual redeploy (below) remains the
+fallback whenever autopull is down.
 
-Before that workflow existed, nothing in this repo touched this server
-automatically — `.github/workflows/` only ran CI (`ci.yml`) and auto-merge
+Before that timer existed, nothing touched this server automatically —
+`.github/workflows/` only ran CI (`ci.yml`) and auto-merge
 (`auto-merge.yml`). (A Render-specific `keep-alive.yml` ping used to live
 here too; it was retired once the app fully cut over to this self-hosted
 box, since the Render free/sleeping-tier cold-start problem it worked
 around doesn't apply to a `restart: unless-stopped` Docker stack.) Absent
-the auto-deploy workflow (or while its secrets are missing), the stack
-runs whatever was on disk the last time someone ran section 3's `docker
-compose build && docker compose up -d` here, and it will keep serving
-that exact build indefinitely, through any number of later merges to
-`main`, until a human repeats those steps.
+a working autopull timer, the stack runs whatever was on disk the last
+time someone ran section 3's `docker compose build && docker compose up
+-d` here, and it will keep serving that exact build indefinitely,
+through any number of later merges to `main`, until a human repeats
+those steps (or autopull starts working again).
 
 Concretely: if this box was stood up once and left alone with no working
 auto-deploy, it can silently drift arbitrarily far behind `main` —
@@ -315,12 +316,16 @@ https://api.fantasygmlab.com/health` returns `{"status": "ok", "build":
 "<short sha>", "deployed_at": "<UTC ISO-8601 timestamp>"}`. Compare
 `build` to `git log origin/main -1 --format=%h` — if they match,
 production is current; if not, something above didn't run (or didn't run
-with `DYNASTYGM_BUILD` set before the `build` step). Compare `deployed_at`
+with `DYNASTYGM_BUILD` set before the `build` step — and if autopull is
+the thing that's supposed to have run, confirm it actually exports
+`DYNASTYGM_BUILD`/`DYNASTYGM_DEPLOYED_AT` the same way
+`deploy/release_deploy.sh` does, per section 5.7's note, before
+concluding it isn't deploying at all). Compare `deployed_at`
 to `git log origin/main -1 --format=%cI` to see how long production has
 been behind whatever is newest on `main` — a non-trivial gap between the
-two, even when `build` still matches, is the signal that auto-deploy
-(section 5.7) has stopped firing (expired/rotated SSH key, box
-unreachable, etc.) and is worth alerting on. Render used to answer the
+two, even when `build` still matches, is the signal that the autopull
+timer (section 5.7) has stopped firing or stalled and is worth checking
+on the box directly. Render used to answer the
 first question automatically via its own `RENDER_GIT_COMMIT`; this box
 has no equivalent unless these two are exported before whatever runs
 `docker compose build` — `deploy/release_deploy.sh` (section 5.6) already
@@ -396,46 +401,83 @@ To revoke access later, delete or comment out their line in
 `/home/fgl-releaser/.ssh/authorized_keys` (as `deploy` or root) — no
 restart needed, it takes effect on the next connection attempt.
 
-## 5.7. Auto-deploy via GitHub Actions
+## 5.7. Auto-deploy: `fantasygmlab-autopull.timer` (server-side)
 
-`.github/workflows/auto-deploy.yml` ("Auto Deploy") is the real
-continuous-deployment job section 5.5 used to describe as a reasonable
-but out-of-scope follow-up. It triggers on `workflow_run` of "Delivery
-Validation" (`ci.yml`) completing, filtered down to exactly the case
-that matters: `github.event.workflow_run.event == 'push'`, `head_branch
-== 'main'`, `conclusion == 'success'`. That covers both a PR merged by
-"Trusted Delivery" (`auto-merge.yml`) and a plain commit pushed straight
-to `main` by `players-db-refresh.yml` / `injury-status-sync.yml` — either
-way, CI has already run against that exact commit and passed before any
-deploy is attempted.
+Production's real, authoritative auto-deploy mechanism runs **on the
+box itself**, not in GitHub Actions: a systemd timer,
+`fantasygmlab-autopull.timer`, polls `origin/main` roughly every 2
+minutes and, when it finds the checkout behind, runs
+`deploy/autopull.sh`. That script:
 
-The job SSHes in as the `fgl-releaser` scoped account from section 5.6
-and runs `ssh fgl-releaser@<host>` with no command — exactly like a human
-running section 5.6's manual redeploy, just automatic. fgl-releaser's
-forced command always runs `deploy/release_deploy.sh` regardless of what
-the connecting side asks for, so the workflow has no path to run
-anything else on the box even if it were compromised.
+- fetches `origin/main` and fast-forwards the local checkout to it
+  (never discards local commits — fails loudly on divergence, same
+  contract as `deploy/release_deploy.sh`);
+- regenerates the Cloudflare-Tunnel-adapted runtime Caddy config via
+  `/usr/local/bin/fantasygmlab-sync-caddy` (production's real
+  `Caddyfile` is generated, not a direct copy of this repo's — see the
+  compose-override note below);
+- rebuilds and recreates the stack using **both** `docker-compose.yml`
+  and a server-local `docker-compose.override.yml`;
+- health-checks every service (`redis`, `web`, `mobile-api`,
+  `stripe-webhook`, `revenuecat-webhook`, `caddy`) plus the local
+  web/API health endpoints;
+- on success, records the deployed SHA as last-known-good; on failure,
+  **automatically rolls back** to that SHA and blocks the bad one from
+  being retried every cycle (manual override: `sudo
+  fantasygmlab-rollback`).
 
-**Required repository secrets** (none of these exist yet — this workflow
-file was added before they were provisioned; it will fail its own "Require
-deploy secrets" step until they are, by design, rather than silently
-skipping the deploy):
+The following are production-local implementation details that live on
+the box, not in this repo, and should stay that way — do not try to
+replace them with something GitHub-Actions-hosted:
 
-| Secret | Value |
-| --- | --- |
-| `FGL_RELEASER_SSH_KEY` | The private key matching the public key already installed in `fgl-releaser`'s `authorized_keys` (section 5.6). Never the `deploy` admin account's key. |
-| `FGL_RELEASER_HOST` | The production box's hostname or IP. |
-| `FGL_RELEASER_KNOWN_HOSTS` | That host's SSH host key(s), exactly as `ssh-keyscan <host>` prints them. Captured once, out-of-band, by someone who can already independently verify the box's identity (e.g. while SSH'd in as `deploy`, run `ssh-keyscan <host>` from a trusted network path). Pins the host key so the workflow can use `StrictHostKeyChecking=yes` — this repo does not disable host-key checking to work around a missing secret. |
+- `/opt/fantasygmlab/docker-compose.override.yml`
+- `/opt/fantasygmlab/.runtime/Caddyfile` (generated — the real,
+  Cloudflare-Tunnel-adapted Caddy config Caddy actually loads; binds
+  Caddy to `127.0.0.1:80` only, with its healthcheck pointed at
+  `127.0.0.1:2019`)
+- `/usr/local/bin/fantasygmlab-sync-caddy`
+- `/usr/local/sbin/fantasygmlab-rollback`
+- `/var/lib/fantasygmlab/*` (last-known-good SHA / blocked-bad-SHA
+  state)
 
-To add them: repo Settings → Secrets and variables → Actions → New
-repository secret, for each of the three names above. Once all three
-exist, the next push to `main` (or the next merge) deploys automatically;
-no further workflow change is needed.
+**Note on `/health`'s `build`/`deployed_at` fields** (see
+`services/mobile_api_service.py`'s `/health` docstring and
+`modules/build_identity.py`): those are populated by
+`DYNASTYGM_BUILD`/`DYNASTYGM_DEPLOYED_AT`, which `deploy/release_deploy.sh`
+exports before building. Whether `deploy/autopull.sh` does the same is a
+property of that script, which lives on the box and isn't tracked in
+this repo — don't assume `/health` reflects autopull's deploy state
+until that's confirmed; it may need the same two `export` lines added if
+it doesn't already have them, or `/health` will keep showing "local"
+even on a box autopull is correctly keeping current.
 
-If this workflow is failing and a deploy is needed urgently, section 5.5's
-manual `ssh fgl-releaser@<server-ip>` (or the full manual block above it)
-remains available as a fallback — the automation is additive, not a
-replacement for operator access.
+### GitHub Actions is a manual emergency fallback only, not the deploy path
+
+`.github/workflows/auto-deploy.yml` ("Manual Emergency Deploy") used to
+be the real continuous-deployment mechanism, triggered automatically on
+every green CI run against `main`. It's been downgraded to
+`workflow_dispatch` (manual trigger only) now that the server-side
+autopull timer above is authoritative — two automatic deployers racing
+the same box's one checkout is exactly the failure mode autopull exists
+to be the single answer to.
+
+It still SSHes in as the `fgl-releaser` scoped account from section 5.6
+and runs `ssh fgl-releaser@<host>` with no command, same as a human
+running section 5.6's manual redeploy. **Its required secrets
+(`FGL_RELEASER_SSH_KEY`, `FGL_RELEASER_HOST`, `FGL_RELEASER_KNOWN_HOSTS`)
+are intentionally not provisioned** — they're only needed if someone
+deliberately decides to use this fallback path (e.g. autopull itself is
+down and a deploy is needed urgently without direct SSH access). Running
+it goes through `deploy/release_deploy.sh`, which is legacy/manual-only
+now too (see its own header comment) and does **not** include autopull's
+Caddy sync, compose-override layering, or automatic rollback — treat a
+run through this workflow as a stopgap, not equivalent to a real
+autopull cycle.
+
+If a deploy is needed urgently and autopull is down, section 5.5's
+manual `ssh fgl-releaser@<server-ip>` (or the full manual block above
+it) remains the most direct fallback — the GitHub Actions path above is
+one more layer behind that, not a replacement for operator access.
 
 ## 6. Rollback plan
 
@@ -598,5 +640,5 @@ migration prep itself.
 | `Caddyfile` | Reverse proxy + automatic HTTPS routing per placeholder subdomain, plus static `file_server` for the marketing site. Also handles response compression (`encode zstd gzip` on `web`/`mobile-api`/the marketing site, skipped on the two webhook endpoints) and `Cache-Control` headers on the marketing site's static assets (images/fonts get `max-age=86400`, CSS/JS get `max-age=3600`, both `must-revalidate` since those files aren't content-hashed; HTML/`robots.txt`/`sitemap.xml` get no explicit cache header). |
 | `.env.example` | Every required secret/variable name, matching `render.yaml`'s names exactly, with a comment on which Render service/dashboard it comes from. Copy to `.env` (gitignored) and fill in real values. |
 | `deploy/systemd/fantasygmlab.service` | systemd unit so the stack starts on boot and stops cleanly on `systemctl stop`. |
-| `deploy/release_deploy.sh` | Forced-command redeploy script for the scoped second-operator SSH key — see section 5.6. |
+| `deploy/release_deploy.sh` | Forced-command redeploy script for the scoped second-operator SSH key — see section 5.6. Legacy/manual-only: `fantasygmlab-autopull.timer` (section 5.7) is the real auto-deploy path now. |
 | `docs/SELF_HOSTED_MIGRATION.md` | This runbook. |
