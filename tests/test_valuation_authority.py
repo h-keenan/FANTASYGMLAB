@@ -7,6 +7,10 @@ from unittest.mock import patch
 
 import pandas as pd
 
+from conftest import (
+    frozen_valuation_authority_persisted_frame,
+    frozen_valuation_authority_sleeper_records,
+)
 from modules import rankings, structured_player_refresh, trade_analyzer_assembly, trade_analyzer_builder
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.valuation_authority import (
@@ -60,6 +64,13 @@ def test_canonical_model_result_without_provider_row_remains_authoritative():
 
 
 def test_actual_keenan_cached_provider_value_runs_canonical_local_model(cached_2025_stats_season):
+    # Uses a frozen tests/fixtures/valuation_authority/ snapshot rather than
+    # the live, cron-refreshed data/players.db / data/sleeper_players.json:
+    # those are overwritten every ~6h, so a hardcoded golden value read from
+    # them goes stale for reasons unrelated to the valuation logic under
+    # test. See frozen_valuation_authority_persisted_frame's docstring in
+    # conftest.py for why a two-row snapshot is a safe, full-fidelity
+    # substitute for these two already-modeled players.
     with patch(
         "modules.fantasycalc.requests.get",
         side_effect=AssertionError("cached reconciliation must not call FantasyCalc"),
@@ -67,17 +78,20 @@ def test_actual_keenan_cached_provider_value_runs_canonical_local_model(cached_2
         "modules.sleeper.requests.get",
         side_effect=AssertionError("cached reconciliation must not call Sleeper"),
     ):
-        frame = structured_player_refresh.refresh_structured_player_state(_persisted(), _inventory())
+        frame = structured_player_refresh.refresh_structured_player_state(
+            frozen_valuation_authority_persisted_frame(),
+            frozen_valuation_authority_sleeper_records(),
+        )
     current = filter_current_fantasy_players(frame, surface="valuation_authority_test")
     row = current.loc[current["name"].eq("Keenan Allen")].iloc[0]
-    persisted = _persisted()
+    persisted = frozen_valuation_authority_persisted_frame()
     normal_before = persisted.loc[persisted["name"].eq("Davante Adams")].iloc[0]
     normal_after = frame.loc[frame["name"].eq("Davante Adams")].iloc[0]
 
     assert float(row["fantasycalc_value"]) == 222.0
     assert row["valuation_authority_status"] == PROVIDER_BACKED
     assert row["valuation_authority_source"] == "fantasycalc_plus_canonical_model"
-    assert int(row["value_score"]) == 1060
+    assert int(row["value_score"]) == 2109
     assert int(row["value_score"]) != 6417
     assert bool(row["valuation_trade_eligible"]) is True
     assert int(normal_after["value_score"]) == int(normal_before["value_score"])

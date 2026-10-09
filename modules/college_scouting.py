@@ -13,16 +13,17 @@ Product shape (coridian_, #college-scouting):
     the shape; the actual watchlist rows live in Supabase table
     ``prospect_watchlist`` — see docs/supabase_college_scouting.sql).
 
-PLACEHOLDER DATA WARNING
-------------------------
-There is no licensed college recruiting/draft data feed wired into this app.
-``PLACEHOLDER_PROSPECTS`` below is a small, explicitly fictional seed list —
-invented names/positions/schools for development and to give the shared
-pool something to scout. They are NOT real 2026 draft-eligible players and
-must never be presented to a user as real scouting subjects. Replace this
-list (and the matching seed rows in docs/supabase_college_scouting.sql) the
-day a real prospect data source is integrated. Until then, this module is
-honest about the gap rather than pretending the list is complete or real.
+NO FABRICATED DATA
+------------------
+There is no licensed college recruiting/draft data feed wired into this app
+yet. This module must never invent prospect names/positions/schools to fill
+that gap — a fabricated name presented alongside real players is
+indistinguishable from a real scouting subject to the people using this
+screen. ``fetch_all_prospects`` therefore reads only from the real Supabase
+``college_prospects`` table (see docs/supabase_college_scouting.sql) and
+returns an empty list — never invented rows — when that table isn't
+configured, migrated, or reachable. An empty catalog is the honest state
+until a real prospect data source is integrated.
 
 Confidence discipline
 ----------------------
@@ -71,30 +72,38 @@ SCOUTING_REPORTS_TABLE = "scouting_reports"
 WATCHLIST_TABLE = "prospect_watchlist"
 
 # ---------------------------------------------------------------------------
-# Placeholder prospect catalog — see module docstring. Ids are stable slugs
-# (not database-generated uuids) so the same id works whether it's read from
-# this Python constant or from the Supabase college_prospects table seeded
-# from it (docs/supabase_college_scouting.sql mirrors this list verbatim).
+# This app has no IDP (individual defensive player) scoring support, and
+# offensive tackles have zero fantasy scoring value either — so the
+# scouting list only ever surfaces the fantasy-relevant skill positions.
+# Mirrors the precedent in modules/draft_prospects.py's
+# ``draft_watch_positions`` (``["QB", "RB", "WR", "TE"]``), minus K since a
+# kicker is never a college draft-prospect scouting subject. Defined locally
+# rather than importing modules.rankings.FANTASY_POSITIONS (which also
+# pulls in streamlit/pandas) to keep this module's dependency footprint
+# small — services/mobile_api_service.py imports this module directly.
 # ---------------------------------------------------------------------------
-PLACEHOLDER_PROSPECTS: Tuple[Dict[str, Any], ...] = (
-    {"id": "2026-qb-01", "name": "Marcus Whitfield", "position": "QB", "school": "Ohio State", "draft_year": 2026},
-    {"id": "2026-qb-02", "name": "Deion Castellan", "position": "QB", "school": "Oregon", "draft_year": 2026},
-    {"id": "2026-rb-01", "name": "Trevor Lindqvist", "position": "RB", "school": "Georgia", "draft_year": 2026},
-    {"id": "2026-rb-02", "name": "Jalen Ashford", "position": "RB", "school": "Texas", "draft_year": 2026},
-    {"id": "2026-rb-03", "name": "Corey Mabanta", "position": "RB", "school": "LSU", "draft_year": 2026},
-    {"id": "2026-wr-01", "name": "Xavier Donnell", "position": "WR", "school": "Alabama", "draft_year": 2026},
-    {"id": "2026-wr-02", "name": "Bryson Okafor", "position": "WR", "school": "Michigan", "draft_year": 2026},
-    {"id": "2026-wr-03", "name": "Isaiah Ferro", "position": "WR", "school": "Florida State", "draft_year": 2026},
-    {"id": "2026-wr-04", "name": "Nate Kowalczyk", "position": "WR", "school": "Penn State", "draft_year": 2026},
-    {"id": "2026-te-01", "name": "Grant Salois", "position": "TE", "school": "Notre Dame", "draft_year": 2026},
-    {"id": "2026-te-02", "name": "Dorian Vasquez", "position": "TE", "school": "Tennessee", "draft_year": 2026},
-    {"id": "2026-ot-01", "name": "Colton Weyrich", "position": "OT", "school": "Iowa", "draft_year": 2026},
-    {"id": "2026-edge-01", "name": "Amari Benoit", "position": "EDGE", "school": "Clemson", "draft_year": 2026},
-    {"id": "2026-cb-01", "name": "Devon Marchetti", "position": "CB", "school": "USC", "draft_year": 2026},
-    {"id": "2026-cb-02", "name": "Elijah Trumbauer", "position": "CB", "school": "Miami", "draft_year": 2026},
-    {"id": "2026-s-01", "name": "Weston Ibekwe", "position": "S", "school": "Utah", "draft_year": 2026},
-)
-PLACEHOLDER_PROSPECTS_BY_ID: Dict[str, Dict[str, Any]] = {p["id"]: p for p in PLACEHOLDER_PROSPECTS}
+SCOUTING_RELEVANT_POSITIONS = {"QB", "RB", "WR", "TE"}
+
+
+def _filter_scouting_relevant_prospects(
+    rows: Iterable[Mapping[str, Any]]
+) -> List[Dict[str, Any]]:
+    """Drop any prospect whose position isn't fantasy-relevant
+    (SCOUTING_RELEVANT_POSITIONS). Applied centrally so defensive
+    positions/offensive tackles never reach the scouting list even if a bad
+    row ends up in the real Supabase college_prospects table.
+    """
+
+    filtered: List[Dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        position = _safe_text(row.get("position")).upper()
+        if position not in SCOUTING_RELEVANT_POSITIONS:
+            continue
+        filtered.append(row)
+    return filtered
+
 
 # ---------------------------------------------------------------------------
 # Grading scale
@@ -332,14 +341,25 @@ def build_prospect_views(
 # ---------------------------------------------------------------------------
 
 
-def fetch_all_prospects(config: dict, access_token: str, *, timeout: float = 15) -> Tuple[List[Dict[str, Any]], bool]:
-    """The shared prospect catalog. Falls back to PLACEHOLDER_PROSPECTS
-    (fail-soft) if the table isn't migrated yet or isn't reachable — returns
-    ``(rows, used_placeholder_fallback)``.
+def fetch_all_prospects(
+    config: dict, access_token: str, *, timeout: float = 15
+) -> Tuple[List[Dict[str, Any]], str]:
+    """The shared prospect catalog, read from the real Supabase
+    ``college_prospects`` table only — see the module docstring's "NO
+    FABRICATED DATA" section. Returns ``(rows, error)``: ``error`` is ``""``
+    on success (including a legitimately empty, real, migrated table) or a
+    reason string ("not_configured"/"not_available") when the real catalog
+    isn't configured, migrated, or reachable. There is no invented-data
+    fallback — an unreachable catalog simply returns an empty list, the same
+    fail-soft shape as fetch_all_scouting_reports below.
+
+    Rows are filtered to SCOUTING_RELEVANT_POSITIONS before returning: this
+    app has no IDP support, so defensive positions/offensive tackles must
+    never reach the scouting list even if they exist in Supabase.
     """
 
     if not auth_supabase.is_configured(config):
-        return list(PLACEHOLDER_PROSPECTS), True
+        return [], "not_configured"
     try:
         response = requests.get(
             auth_supabase.rest_api_url(config, PROSPECTS_TABLE, "select=id,name,position,school,draft_year"),
@@ -347,16 +367,16 @@ def fetch_all_prospects(config: dict, access_token: str, *, timeout: float = 15)
             timeout=timeout,
         )
     except Exception:
-        return list(PLACEHOLDER_PROSPECTS), True
+        return [], "not_available"
     if response.status_code >= 400:
-        return list(PLACEHOLDER_PROSPECTS), True
+        return [], "not_available"
     try:
         rows = response.json()
     except Exception:
-        return list(PLACEHOLDER_PROSPECTS), True
-    if not isinstance(rows, list) or not rows:
-        return list(PLACEHOLDER_PROSPECTS), True
-    return [row for row in rows if isinstance(row, dict)], False
+        return [], "not_available"
+    if not isinstance(rows, list):
+        return [], "not_available"
+    return _filter_scouting_relevant_prospects(rows), ""
 
 
 def fetch_all_scouting_reports(

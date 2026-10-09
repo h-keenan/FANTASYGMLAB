@@ -51,7 +51,7 @@ if _SENTRY_DSN:
         )
 
 from modules import rankings as rankings_module
-from modules.league_rankings import add_rank_tie_metadata
+from modules.league_rankings import add_rank_tie_metadata, build_roster_health_metrics_frame
 from modules import player_asset_explorer_ui
 from modules import account_store
 from modules import account_ui
@@ -83,6 +83,7 @@ from modules import daily_gm_briefing_ui
 from modules import decision_change_history
 from modules import decision_change_history_ui
 from modules import decision_memory
+from modules import manager_activity
 from modules import gm_targets
 from modules import gm_targets_ui
 from modules import guest_conversion
@@ -5901,7 +5902,7 @@ def build_home_league_pulse_items(df_intel: pd.DataFrame) -> list[dict]:
             "label": "Biggest Contender",
             "value": _safe_text(strongest_contender.get("team_name"), "No clear leader") if strongest_contender is not None else "No clear leader",
             "note": (
-                f"Power {_format_rank(strongest_contender.get('power_rank'), tied=bool(strongest_contender.get('power_rank_tied')))} | "
+                f"Roster Power {_format_rank(strongest_contender.get('power_rank'), tied=bool(strongest_contender.get('power_rank_tied')))} | "
                 f"Starter {_format_rank(strongest_contender.get('starter_rank'), tied=bool(strongest_contender.get('starter_rank_tied')))}"
                 if strongest_contender is not None
                 else "No contender read available yet."
@@ -6144,7 +6145,20 @@ def render_home_launch_screen(
                     "Sleeper username",
                     key="home_launch_username_input",
                     placeholder="Enter your Sleeper username",
-                    autocomplete="username",
+                    # Not a site login credential (Sleeper is a third-party
+                    # platform lookup, not this app's account identity) and
+                    # this field can render on the same page/DOM as the real
+                    # sign-in form's own fields below. Using the username
+                    # autofill token here would collide with that pair:
+                    # browsers/OS credential managers give an explicit
+                    # username-token field priority over proximity-based
+                    # matching, so this distant field could get bound as
+                    # "the" identity field for the nearby secret-entry
+                    # field, leaving the real sign-in fields mis-filled.
+                    # Use "off", same as the other non-credential
+                    # identifier fields (ESPN cookie fields, search
+                    # inputs) in this codebase.
+                    autocomplete="off",
                 )
                 submitted = st.form_submit_button(
                     product_copy.LOAD_LEAGUES_CTA,
@@ -7756,7 +7770,7 @@ def render_home_dashboard(
             action_center_items = [
                 {
                     "label": "Roster Quality",
-                    "value": f"Power {_format_rank(team_row.get('power_rank'), tied=bool(team_row.get('power_rank_tied')))}",
+                    "value": f"Roster Power {_format_rank(team_row.get('power_rank'), tied=bool(team_row.get('power_rank_tied')))}",
                     "note": f"Franchise {_format_rank(team_row.get('franchise_rank'), tied=bool(team_row.get('franchise_rank_tied')))} after the completed startup.",
                     "tone": "power",
                 },
@@ -14433,18 +14447,21 @@ def _classify_manager_tendencies(enriched: pd.DataFrame) -> pd.DataFrame:
         else:
             asset_behavior = "Balanced Asset Manager"
 
-        if transaction_count >= max(6, int(round(tx_high))) or roster_churn >= max(12, int(round(churn_high))):
-            activity_level = "Highly Active"
-        elif transaction_count <= max(1, int(round(tx_low))) and waiver_moves <= 1 and trade_count <= 1:
-            activity_level = "Quiet Manager"
-        else:
-            activity_level = "Average Activity"
+        activity_level = manager_activity.classify_activity_level(
+            transaction_count=transaction_count,
+            tx_high=tx_high,
+            tx_low=tx_low,
+            waiver_moves=waiver_moves,
+            trade_count=trade_count,
+            roster_churn=roster_churn,
+            churn_high=churn_high,
+        ) or "Average Activity"
 
         evidence = [
             f"{trade_count} completed trades | {trade_asset_total} tracked trade assets",
             f"{transaction_count} total moves | {waiver_moves} waivers | {roster_churn} churn",
             (
-                f"Power {_format_rank(power_rank, tied=bool(row.get('power_rank_tied')))} | "
+                f"Roster Power {_format_rank(power_rank, tied=bool(row.get('power_rank_tied')))} | "
                 f"Franchise {_format_rank(franchise_rank, tied=bool(row.get('franchise_rank_tied')))} | "
                 f"Draft {_format_rank(draft_rank, tied=bool(row.get('draft_capital_rank_tied')))} | "
                 f"Age {_format_rank(age_rank, tied=bool(row.get('age_rank_tied')))}"
@@ -14584,7 +14601,7 @@ def build_weekly_rank_movement(
     if not snapshot_rows or not league_id or report_week <= 0:
         return {
             "available": False,
-            "note": "Power and Franchise rank movement will appear once the report has at least one saved prior-week snapshot.",
+            "note": "Roster Power and Franchise rank movement will appear once the report has at least one saved prior-week snapshot.",
             "previous_week": None,
             "rows": [],
         }
@@ -14645,7 +14662,7 @@ def build_weekly_rank_movement(
     if not rows:
         return {
             "available": False,
-            "note": "Power and Franchise rank movement will appear once the report has at least one saved prior-week snapshot.",
+            "note": "Roster Power and Franchise rank movement will appear once the report has at least one saved prior-week snapshot.",
             "previous_week": previous_week,
             "rows": [],
         }
@@ -14905,7 +14922,7 @@ def cached_weekly_league_report(
                     {
                         "label": "Biggest Upset",
                         "value": f"{biggest_upset['winner_team']} over {biggest_upset['loser_team']}",
-                        "note": f"Beat a team ranked {biggest_upset['gap']} spots higher in Power Rank",
+                        "note": f"Beat a team ranked {biggest_upset['gap']} spots higher in Roster Power",
                         "tone": "power",
                     }
                 )
@@ -14928,13 +14945,13 @@ def cached_weekly_league_report(
                 {
                     "label": "Team of the Week",
                     "value": _safe_text(team_of_week_row.get("team_name"), "Team"),
-                    "note": f"{_format_score(team_of_week.get('points'))} points | Power {_format_rank(team_of_week_row.get('power_rank'), tied=bool(team_of_week_row.get('power_rank_tied')))}",
+                    "note": f"{_format_score(team_of_week.get('points'))} points | Roster Power {_format_rank(team_of_week_row.get('power_rank'), tied=bool(team_of_week_row.get('power_rank_tied')))}",
                     "tone": "strength",
                 },
                 {
                     "label": "Disappointment",
                     "value": _safe_text(disappointment_row.get("team_name"), "Team"),
-                    "note": f"{_format_score(disappointment.get('points'))} points after entering at Power {_format_rank(disappointment_row.get('power_rank'), tied=bool(disappointment_row.get('power_rank_tied')))}",
+                    "note": f"{_format_score(disappointment.get('points'))} points after entering at Roster Power {_format_rank(disappointment_row.get('power_rank'), tied=bool(disappointment_row.get('power_rank_tied')))}",
                     "tone": "risk",
                 },
             ]
@@ -14965,7 +14982,7 @@ def cached_weekly_league_report(
             "tone": "strength",
             "items": [
                 f"{int(hottest.get('current_streak') or 0)}-game win streak",
-                f"Power Rank {_format_rank(hottest.get('power_rank'), tied=bool(hottest.get('power_rank_tied')))}",
+                f"Roster Power {_format_rank(hottest.get('power_rank'), tied=bool(hottest.get('power_rank_tied')))}",
                 f"Strategy: {_safe_text(hottest.get('strategy_display'))}",
             ] if hottest is not None else ["Need completed matchup history first."],
         },
@@ -14975,7 +14992,7 @@ def cached_weekly_league_report(
             "tone": "risk",
             "items": [
                 f"{abs(int(coldest.get('current_streak') or 0))}-game losing streak",
-                f"Power Rank {_format_rank(coldest.get('power_rank'), tied=bool(coldest.get('power_rank_tied')))}",
+                f"Roster Power {_format_rank(coldest.get('power_rank'), tied=bool(coldest.get('power_rank_tied')))}",
                 f"Strategy: {_safe_text(coldest.get('strategy_display'))}",
             ] if coldest is not None else ["Need completed matchup history first."],
         },
@@ -15357,184 +15374,18 @@ def cached_league_intelligence_frame(
         enriched["injury_role_context"] = [{} for _ in range(len(enriched))]
         return enriched
 
-    player_lookup = players.set_index("player_id", drop=False)
-    roster_rows: list[dict] = []
-    for roster in rosters:
-        try:
-            roster_id = int(roster.get("roster_id"))
-        except Exception:
-            continue
-
-        player_ids = [str(pid) for pid in roster.get("players", []) or [] if pid is not None]
-        if not player_ids:
-            roster_rows.append(
-                {
-                    "roster_id": roster_id,
-                    "current_score_total": 0.0,
-                    "market_total": 0.0,
-                    "starter_current_score": 0.0,
-                    "bench_current_score": 0.0,
-                    "starter_share": 0.0,
-                    "top_heavy_ratio": 0.0,
-                    "impact_tier_starters": 0,
-                    "elite_tier_count": 0,
-                    "injured_count": 0,
-                    "major_absences": 0,
-                    "injured_starters": 0,
-                    "injured_bench_players": 0,
-                    "major_injury_count": 0,
-                    "major_injured_starters": 0,
-                    "injury_risk_total": 0.0,
-                    "injury_burden": 0.0,
-                    "injury_impact_score": 0.0,
-                    "injury_value_impact": 0.0,
-                    "injury_impact_flag": "Injury Data Unavailable",
-                    "injury_data_quality": "missing",
-                    "injury_data_note": "No roster players are available for injury assessment.",
-                    "health_flag": "Stable",
-                    "key_injuries_summary": "",
-                    "top_injury_impact_summary": "",
-                    "top_injury_impact_players": [],
-                    "actionable_injury_summary": "",
-                    "actionable_injury_players": [],
-                    "injury_role_context": {},
-                }
-            )
-            continue
-
-        team_df = player_lookup.loc[player_lookup.index.isin(player_ids)].copy()
-        if team_df.empty:
-            roster_rows.append(
-                {
-                    "roster_id": roster_id,
-                    "current_score_total": 0.0,
-                    "market_total": 0.0,
-                    "starter_current_score": 0.0,
-                    "bench_current_score": 0.0,
-                    "starter_share": 0.0,
-                    "top_heavy_ratio": 0.0,
-                    "impact_tier_starters": 0,
-                    "elite_tier_count": 0,
-                    "injured_count": 0,
-                    "major_absences": 0,
-                    "injured_starters": 0,
-                    "injured_bench_players": 0,
-                    "major_injury_count": 0,
-                    "major_injured_starters": 0,
-                    "injury_risk_total": 0.0,
-                    "injury_burden": 0.0,
-                    "injury_impact_score": 0.0,
-                    "injury_value_impact": 0.0,
-                    "injury_impact_flag": "Injury Data Unavailable",
-                    "injury_data_quality": "missing",
-                    "injury_data_note": "Roster players could not be matched to injury metadata.",
-                    "health_flag": "Stable",
-                    "key_injuries_summary": "",
-                    "top_injury_impact_summary": "",
-                    "top_injury_impact_players": [],
-                    "actionable_injury_summary": "",
-                    "actionable_injury_players": [],
-                    "injury_role_context": {},
-                }
-            )
-            continue
-
-        if "value_score" in team_df.columns:
-            team_df["value_score"] = pd.to_numeric(team_df["value_score"], errors="coerce").fillna(0)
-        else:
-            team_df["value_score"] = pd.to_numeric(
-                team_df[score_field] if score_field in team_df.columns else team_df.get("dynasty_score", 0),
-                errors="coerce",
-            ).fillna(0)
-        lineup_df = suggest_optimal_lineup(team_df, lineup_settings, score_field=score_field)
-        starter_mask = lineup_df["suggested_starter"].fillna(False) if "suggested_starter" in lineup_df.columns else pd.Series(False, index=lineup_df.index)
-        injury_flags = lineup_df.apply(is_injury_status, axis=1) if not lineup_df.empty else pd.Series(dtype=bool)
-
-        status_series = lineup_df.get("status", pd.Series("", index=lineup_df.index)).fillna("").astype(str).str.strip().str.lower()
-        injury_series = lineup_df.get("injury_status", pd.Series("", index=lineup_df.index)).fillna("").astype(str).str.strip().str.lower()
-        major_flags = (
-            status_series.isin({"out", "doubtful", "injured reserve", "ir", "pup", "nfi"})
-            | injury_series.isin({"out", "doubtful", "injured reserve", "ir", "pup", "nfi"})
-        )
-
-        current_score_total = float(pd.to_numeric(lineup_df["value_score"], errors="coerce").fillna(0).sum())
-        starter_current_score = float(pd.to_numeric(lineup_df.loc[starter_mask, "value_score"], errors="coerce").fillna(0).sum())
-        bench_current_score = float(pd.to_numeric(lineup_df.loc[~starter_mask, "value_score"], errors="coerce").fillna(0).sum())
-        injury_context = summarize_team_injuries(team_df, lineup_df)
-        injured_count = int(injury_context.get("injured_roster") or 0)
-        major_absences = int(injury_context.get("major_absences") or 0)
-        injured_starters = int(injury_context.get("injured_starters") or 0)
-        starter_share = starter_current_score / current_score_total if current_score_total else 0.0
-        top_heavy_ratio = starter_current_score / max(bench_current_score, 1.0)
-        starter_tiers = (
-            lineup_df.loc[starter_mask, "player_tier"].fillna("").astype(str)
-            if "player_tier" in lineup_df.columns
-            else pd.Series("", index=lineup_df.index)
-        )
-        roster_tiers = (
-            team_df.get("player_tier", pd.Series("", index=team_df.index)).fillna("").astype(str)
-            if not team_df.empty
-            else pd.Series(dtype="object")
-        )
-        impact_tier_starters = int(starter_tiers.isin({"Elite", "Star", "Core Starter"}).sum())
-        elite_tier_count = int(roster_tiers.isin({"Elite", "Star"}).sum())
-        injury_risk_total = float(injury_context.get("injury_risk_total") or 0.0)
-        injury_burden = float(injury_context.get("injury_burden") or 0.0)
-        injured_bench_players = int(injury_context.get("injured_bench_players") or 0)
-        major_injury_count = int(injury_context.get("major_injury_count") or 0)
-        major_injured_starters = int(injury_context.get("major_injured_starters") or 0)
-        injury_impact_score = float(injury_context.get("injury_impact_score") or 0.0)
-        injury_value_impact = float(injury_context.get("injury_value_impact") or injury_impact_score)
-        injury_impact_flag = _safe_text(injury_context.get("injury_impact_flag"), "Stable")
-        injury_data_quality = _safe_text(injury_context.get("injury_data_quality"), "uncertain")
-        injury_data_note = _safe_text(injury_context.get("injury_data_note"))
-        health_flag = _safe_text(injury_context.get("health_flag"), "Stable")
-        actionable_players = list(injury_context.get("actionable_injury_players") or [])
-        key_injuries_summary = ", ".join(
-            _safe_text(item.get("name"))
-            for item in actionable_players
-            if _safe_text(item.get("name"))
-        )
-        top_injury_impact_summary = _safe_text(injury_context.get("top_injury_impact_summary"))
-        top_injury_impact_players = list(injury_context.get("top_injury_impact_players") or [])
-        actionable_injury_summary = _safe_text(injury_context.get("actionable_injury_summary"))
-        actionable_injury_players = actionable_players
-
-        roster_rows.append(
-            {
-                "roster_id": roster_id,
-                "current_score_total": current_score_total,
-                "market_total": float(pd.to_numeric(team_df.get("market_score", 0), errors="coerce").fillna(0).sum()),
-                "starter_current_score": starter_current_score,
-                "bench_current_score": bench_current_score,
-                "starter_share": starter_share,
-                "top_heavy_ratio": top_heavy_ratio,
-                "impact_tier_starters": impact_tier_starters,
-                "elite_tier_count": elite_tier_count,
-                "injured_count": injured_count,
-                "major_absences": major_absences,
-                "injured_starters": injured_starters,
-                "injured_bench_players": injured_bench_players,
-                "major_injury_count": major_injury_count,
-                "major_injured_starters": major_injured_starters,
-                "injury_risk_total": injury_risk_total,
-                "injury_burden": injury_burden,
-                "injury_impact_score": injury_impact_score,
-                "injury_value_impact": injury_value_impact,
-                "injury_impact_flag": injury_impact_flag,
-                "injury_data_quality": injury_data_quality,
-                "injury_data_note": injury_data_note,
-                "health_flag": health_flag,
-                "key_injuries_summary": key_injuries_summary,
-                "top_injury_impact_summary": top_injury_impact_summary,
-                "top_injury_impact_players": top_injury_impact_players,
-                "actionable_injury_summary": actionable_injury_summary,
-                "actionable_injury_players": actionable_injury_players,
-                "injury_role_context": injury_context,
-            }
-        )
-
-    roster_metrics = pd.DataFrame(roster_rows)
+    # Real per-roster injury/balance pass — shared with
+    # services/mobile_api_service.py's get_league_team_rankings via
+    # modules.league_rankings.build_roster_health_metrics_frame so mobile's
+    # archetype classification matches this page's instead of running on
+    # neutral health/balance defaults. See that function's docstring.
+    roster_metrics = build_roster_health_metrics_frame(
+        players,
+        league_id,
+        score_field=score_field,
+        lineup_settings=lineup_settings,
+        rosters=rosters,
+    )
     trade_activity = cached_trade_activity_summary(league_id)
     manager_behavior = cached_manager_behavior_summary(league_id)
 
@@ -16732,13 +16583,16 @@ def main():
             username_input = st.text_input(
                 "Sleeper username",
                 key="username_input",
-                autocomplete="username",
+                # Not a site login credential; see home_launch_username_input
+                # above for why this must not use the username autofill
+                # token alongside the real sign-in form's own fields.
+                autocomplete="off",
             )
         else:
             username_input = st.text_input(
                 "Sleeper username",
                 key="username_input",
-                autocomplete="username",
+                autocomplete="off",
                 on_change=lambda: load_leagues_for_username(
                     st.session_state.get("username_input", ""), source="sidebar"
                 ),
@@ -20934,7 +20788,7 @@ def main():
                     season_label = _safe_text(standings_bundle.get("season"))
                     week_label = _safe_text(standings_bundle.get("week_label"))
                     standings_note_bits = [
-                        "Actual results from league matchups — separate from Power Rankings strength.",
+                        "Actual results from league matchups — separate from Roster Power strength.",
                     ]
                     if week_label:
                         standings_note_bits.insert(0, week_label)
@@ -20953,7 +20807,7 @@ def main():
                     render_section_header(
                         "Playoff Odds",
                         kicker="What might happen next",
-                        note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Power Rank, thousands of simulated outcomes.",
+                        note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Roster Power, thousands of simulated outcomes.",
                     )
                     with _wrr_league.block(
                         st.session_state,
@@ -20963,7 +20817,7 @@ def main():
                     ):
                         render_league_playoff_odds_board(selected_league_id)
                     render_section_header(
-                        "Power Rankings",
+                        "Roster Power Rankings",
                         kicker="Who is strongest",
                         note="Who is best equipped to win games right now — not who has the best record.",
                     )
@@ -21003,7 +20857,7 @@ def main():
                                     "tone": "strategy",
                                 },
                                 {
-                                    "label": "Power Rank",
+                                    "label": "Roster Power",
                                     "title": "Current strength",
                                     "body": "Starter quality and usable depth — who can win now.",
                                     "tone": "power",
@@ -21203,7 +21057,7 @@ def main():
                         else:
                             archetype_table = archetype_table.rename(
                                 columns={
-                                    "power_rank": "Power Rank",
+                                    "power_rank": "Roster Power",
                                     "franchise_rank": "Franchise Rank",
                                     "team_name": "Team",
                                     "owner_name": "Owner",
@@ -21218,7 +21072,7 @@ def main():
                                 primary_column="Team",
                                 secondary_columns=("Archetype", "Strategy"),
                                 meta_column="Explanation",
-                                badge_column="Power Rank",
+                                badge_column="Roster Power",
                                 max_summary_rows=12,
                                 expander_label="Full archetype table",
                                 key_suffix=f"archetypes_{selected_league_id}",
@@ -21755,7 +21609,7 @@ def main():
                                         ),
                                         metric_html=dense_list_primitives.dense_metric_html(
                                             _format_score(row.get("power_score")),
-                                            "Power",
+                                            "Roster Power",
                                         ),
                                         trail_html=dense_list_primitives.dense_trail_html(
                                             meta_html=dense_list_primitives.dense_meta_html(
@@ -21937,7 +21791,7 @@ def main():
         render_section_header(
             "Weekly League Report",
             kicker="Weekly Desk",
-            note="Automatic league highlights built from Sleeper matchups, transactions, standings context, Power Rank, Franchise Rank, strategy, injuries, and draft capital.",
+            note="Automatic league highlights built from Sleeper matchups, transactions, standings context, Roster Power, Franchise Rank, strategy, injuries, and draft capital.",
         )
 
         if startup_mode and selected_league_id:
@@ -22838,7 +22692,7 @@ def main():
                                 {
                                     "label": "Team Context",
                                     "value": (
-                                        f"Power {_format_rank(my_rank_row.get('power_rank'), tied=bool(my_rank_row.get('power_rank_tied')))} | "
+                                        f"Roster Power {_format_rank(my_rank_row.get('power_rank'), tied=bool(my_rank_row.get('power_rank_tied')))} | "
                                         f"Franchise {_format_rank(my_rank_row.get('franchise_rank'), tied=bool(my_rank_row.get('franchise_rank_tied')))}"
                                     ),
                                     "note": f"Trade lens: {trade_hub_lens_label}.",
@@ -22939,7 +22793,7 @@ def main():
                             "label": "Current Team",
                             "value": target_team_name,
                             "note": (
-                                f"{target_owner_name} | Power {_format_rank(target_rank_row.get('power_rank'), tied=bool(target_rank_row.get('power_rank_tied')))} | "
+                                f"{target_owner_name} | Roster Power {_format_rank(target_rank_row.get('power_rank'), tied=bool(target_rank_row.get('power_rank_tied')))} | "
                                 f"Franchise {_format_rank(target_rank_row.get('franchise_rank'), tied=bool(target_rank_row.get('franchise_rank_tied')))}"
                                 + (
                                     f" | {_safe_text(target_rank_row.get('manager_tendencies_summary'))}"

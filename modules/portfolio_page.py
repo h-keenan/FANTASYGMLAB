@@ -26,6 +26,8 @@ and rerun on.
 
 from __future__ import annotations
 
+import concurrent.futures
+import functools
 from typing import Any, Mapping
 
 import streamlit as st
@@ -46,6 +48,11 @@ PAGE_KEY = "portfolio"
 NAV_LABEL = "Portfolio"
 DEFAULT_LENS = "Dynasty"
 PLAYERS_DB_PATH = "data/players.db"
+
+# Bounds the per-request fan-out below — plenty for modules.saved_leagues'
+# real-world Premium usage (a handful of leagues) without one request
+# opening unboundedly many threads if an account has saved dozens.
+PORTFOLIO_FANOUT_MAX_WORKERS = 8
 
 PORTFOLIO_UPSELL_TITLE = "See every league at a glance"
 PORTFOLIO_UPSELL_BODY = (
@@ -78,7 +85,85 @@ def _rank_label(summary: Mapping[str, Any]) -> str:
     if power_rank is None:
         return ""
     prefix = "T-" if summary.get("power_rank_tied") else "#"
-    return f"Power Rank {prefix}{int(power_rank)}"
+    return f"Roster Power {prefix}{int(power_rank)}"
+
+
+def _build_portfolio_row(
+    session_snapshot: Mapping[str, Any],
+    sleeper_username: str,
+    entitlement: str,
+    row: Mapping[str, Any],
+) -> dict[str, Any]:
+    """One saved league's Portfolio row — runs on a worker thread.
+
+    Fans out the exact same three per-league calls the old sequential loop
+    made (team_stance, GM Targets, dashboard_engine.build_league_summary) so
+    a user with several saved leagues pays the slowest ONE of them instead
+    of the sum of all of them.
+
+    Takes a plain-dict `session_snapshot` rather than the live
+    `st.session_state`, for two reasons: (1) Streamlit's session state is
+    bound to the main script thread — touching it from a worker thread logs
+    "missing ScriptRunContext" and isn't supported; (2)
+    `team_stance.fetch_stance_for_league` / `gm_targets.fetch_targets_for_league`
+    cache onto a SINGLE slot in the session keyed to "whichever league was
+    last fetched" (they're built for the single-league Dashboard, not a
+    multi-league fan-out) — sharing one live mapping across concurrent
+    leagues would let them race and clobber each other's cache slot. Each
+    call below gets its OWN fresh copy of the snapshot, so every league's
+    cache writes are thread-local and thrown away with it; only the
+    returned value (computed from this call's own fresh fetch, never read
+    back from that cache slot) is used.
+    """
+
+    league_id = saved_leagues.normalize_league_id(row.get("league_id"))
+    if not league_id:
+        return {"status": "skip"}
+    league_name = _safe_text(row.get("league_name"), league_id)
+    isolated_session = dict(session_snapshot)
+
+    try:
+        team_stance_value = team_stance.fetch_stance_for_league(
+            isolated_session, league_id=league_id
+        )
+        targets = gm_targets.fetch_targets_for_league(isolated_session, league_id=league_id)
+        gm_target_ids = tuple(sorted({t.player_id for t in targets}))
+        gm_untouchable_ids = tuple(sorted({t.player_id for t in targets if t.untouchable}))
+        summary = dashboard_engine.build_league_summary(
+            league_id=league_id,
+            lens=DEFAULT_LENS,
+            sleeper_username=sleeper_username,
+            players_db_path=PLAYERS_DB_PATH,
+            team_stance_value=team_stance_value,
+            gm_target_player_ids=gm_target_ids,
+            gm_untouchable_player_ids=gm_untouchable_ids,
+            entitlement=entitlement,
+        )
+    except Exception:
+        return {
+            "status": "failed",
+            "league_id": league_id,
+            "league_name": league_name,
+            "reason": "unavailable",
+        }
+
+    if not summary.get("ok"):
+        reason = summary.get("reason") or "unavailable"
+        if reason not in dashboard_engine.LEAGUE_SUMMARY_SKIP_REASONS:
+            reason = "unavailable"
+        return {
+            "status": "failed",
+            "league_id": league_id,
+            "league_name": league_name,
+            "reason": reason,
+        }
+
+    return {
+        "status": "ok",
+        "league_id": league_id,
+        "league_name": league_name,
+        "summary": summary,
+    }
 
 
 def render_portfolio_page() -> dict[str, Any]:
@@ -137,39 +222,43 @@ def render_portfolio_page() -> dict[str, Any]:
     leagues: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
 
-    for row in saved_rows:
-        league_id = saved_leagues.normalize_league_id(row.get("league_id"))
-        if not league_id:
-            continue
-        league_name = _safe_text(row.get("league_name"), league_id)
+    # Fan the per-league work (stance + GM targets + build_league_summary,
+    # each its own Supabase/Sleeper round trip) out across a thread pool
+    # instead of paying each saved league's latency back to back — see
+    # _build_portfolio_row's docstring for why a plain-dict session
+    # snapshot (never the live st.session_state) is what each worker gets.
+    # executor.map yields results in `saved_rows` order regardless of which
+    # worker finishes first, so zipping it back against saved_rows below
+    # reproduces exactly the old sequential loop's ordering and output.
+    session_snapshot = dict(st.session_state)
+    worker = functools.partial(_build_portfolio_row, session_snapshot, sleeper_username, entitlement)
+    max_workers = min(len(saved_rows), PORTFOLIO_FANOUT_MAX_WORKERS)
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=max_workers, thread_name_prefix="dgm-portfolio-fanout"
+    ) as executor:
+        results = list(executor.map(worker, saved_rows))
 
-        try:
-            team_stance_value = team_stance.fetch_stance_for_league(st.session_state, league_id=league_id)
-            targets = gm_targets.fetch_targets_for_league(st.session_state, league_id=league_id)
-            gm_target_ids = tuple(sorted({t.player_id for t in targets}))
-            gm_untouchable_ids = tuple(sorted({t.player_id for t in targets if t.untouchable}))
-            summary = dashboard_engine.build_league_summary(
-                league_id=league_id,
-                lens=DEFAULT_LENS,
-                sleeper_username=sleeper_username,
-                players_db_path=PLAYERS_DB_PATH,
-                team_stance_value=team_stance_value,
-                gm_target_player_ids=gm_target_ids,
-                gm_untouchable_player_ids=gm_untouchable_ids,
-                entitlement=entitlement,
+    for row, result in zip(saved_rows, results):
+        status = result["status"]
+        if status == "skip":
+            continue
+        if status == "failed":
+            failed.append(
+                {
+                    "league_id": result["league_id"],
+                    "league_name": result["league_name"],
+                    "reason": result["reason"],
+                }
             )
-        except Exception:
-            failed.append({"league_id": league_id, "league_name": league_name, "reason": "unavailable"})
             continue
-
-        if not summary.get("ok"):
-            reason = summary.get("reason") or "unavailable"
-            if reason not in dashboard_engine.LEAGUE_SUMMARY_SKIP_REASONS:
-                reason = "unavailable"
-            failed.append({"league_id": league_id, "league_name": league_name, "reason": reason})
-            continue
-
-        leagues.append({**row, "league_id": league_id, "league_name": league_name, "summary": summary})
+        leagues.append(
+            {
+                **row,
+                "league_id": result["league_id"],
+                "league_name": result["league_name"],
+                "summary": result["summary"],
+            }
+        )
 
     if failed:
         names = ", ".join(entry["league_name"] for entry in failed)

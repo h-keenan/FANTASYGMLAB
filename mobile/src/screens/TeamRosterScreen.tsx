@@ -71,7 +71,7 @@ interface RankMetric {
    * (see modules.league_rankings.add_rank_tie_metadata on the backend). */
   tied: boolean;
   /**
-   * Power/Franchise link out to the full league rankings (Teams screen) —
+   * Roster Power/Franchise link out to the full league rankings (Teams screen) —
    * the other metrics here have no equivalent standalone screen to open.
    *
    * TeamAnalysisPanel's own copy of this same rank matrix (My Team's
@@ -86,7 +86,7 @@ interface RankMetric {
    * wiring it here would show the viewer's own draft capital while
    * captioned with someone else's team. Age still has no destination
    * anywhere (see TeamAnalysisPanel's identical note). So this duplicate
-   * intentionally keeps only Power/Franchise tappable rather than forcing
+   * intentionally keeps only Roster Power/Franchise tappable rather than forcing
    * the other three into destinations that don't apply to a read-only
    * league-mate view.
    */
@@ -95,7 +95,7 @@ interface RankMetric {
 
 function buildRankMetrics(ranking: TeamRanking): RankMetric[] {
   const metrics: RankMetric[] = [
-    { key: 'power', label: 'Power', icon: 'flash', rank: ranking.power_rank, tied: ranking.power_rank_tied, tappable: true },
+    { key: 'power', label: 'Roster Power', icon: 'flash', rank: ranking.power_rank, tied: ranking.power_rank_tied, tappable: true },
     { key: 'franchise', label: 'Franchise', icon: 'star', rank: ranking.franchise_rank, tied: ranking.franchise_rank_tied, tappable: true },
     { key: 'draft', label: 'Draft Capital', icon: 'file-tray-stacked-outline', rank: ranking.draft_capital_rank, tied: ranking.draft_capital_rank_tied },
     { key: 'starters', label: 'Starters', icon: 'american-football-outline', rank: ranking.starter_rank, tied: ranking.starter_rank_tied },

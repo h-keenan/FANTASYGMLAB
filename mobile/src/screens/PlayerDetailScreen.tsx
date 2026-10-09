@@ -12,6 +12,7 @@ import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import AwardsStrip from '../components/AwardsStrip';
@@ -50,6 +51,7 @@ import {
 } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
 import { contrastTextColor, resolvePlayerTier } from '../lib/playerTier';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -269,10 +271,16 @@ function StatCell({
   label,
   value,
   percentile,
+  icon,
 }: {
   label: string;
   value: string | number | null;
   percentile?: number | null;
+  /** Small glyph before the label — same per-stat glyph treatment MetricCard
+   * tiles use (coridian_'s "glyph icons for receptions, targets, ... stuff
+   * like that" ask), kept optional so Bio/Career/Model's plain StatGrid
+   * rows (no icon mapping) render exactly as before. */
+  icon?: IoniconName;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -280,9 +288,12 @@ function StatCell({
   const pctl = percentileLabel(percentile);
   return (
     <View style={styles.statCell}>
-      <AppText style={styles.statCellLabel} numberOfLines={1}>
-        {label}
-      </AppText>
+      <View style={styles.statCellLabelRow}>
+        {icon ? <Ionicons name={icon} size={11} color={colors.accent} style={styles.statCellLabelIcon} /> : null}
+        <AppText style={styles.statCellLabel} numberOfLines={1}>
+          {label}
+        </AppText>
+      </View>
       <View style={styles.statCellValueRow}>
         <AppText style={styles.statCellValue} numberOfLines={1}>
           {display}
@@ -303,7 +314,7 @@ function StatCell({
 function StatGrid({
   items,
 }: {
-  items: Array<{ label: string; value: string | number | null; percentile?: number | null }>;
+  items: Array<{ label: string; value: string | number | null; percentile?: number | null; icon?: IoniconName }>;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -315,6 +326,7 @@ function StatGrid({
           label={item.label}
           value={item.value}
           percentile={item.percentile}
+          icon={item.icon}
         />
       ))}
     </View>
@@ -367,44 +379,6 @@ function PercentBar({
   );
 }
 
-/** Snap % specifically, per coridian_'s Discord ask (screenshots of Michael
- * Mayer's page): "like the overall" — i.e. the same CircularProgressRing
- * PlayerHero uses for OVR, not the linear bar every other Usage row gets.
- * Only this one row renders this way; Route %/Target Share/Carry Share etc.
- * stay on PercentBar below. Percentile/trend-icon treatment is preserved so
- * this row carries the same context the bar rows do, just laid out beside
- * the ring instead of under the label. */
-function PercentRing({
-  label,
-  percent,
-  display,
-  percentile,
-}: {
-  label: string;
-  percent: number;
-  display: string;
-  percentile?: number | null;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const pctl = percentileLabel(percentile);
-  return (
-    <View style={styles.percentRingRow}>
-      <View style={styles.percentRingLabelCol}>
-        <AppText style={styles.percentLabel} numberOfLines={1}>
-          {label}
-        </AppText>
-        {pctl ? (
-          <View style={styles.statCellPercentileRow}>
-            <Ionicons name={percentileTrendIcon(percentile)!} size={11} color={percentileColor(percentile, colors)} />
-            <AppText style={[styles.statCellPercentile, { color: percentileColor(percentile, colors) }]}>{pctl}</AppText>
-          </View>
-        ) : null}
-      </View>
-      <CircularProgressRing percent={percent} size={52} strokeWidth={5} valueLabel={display} valueFontScale={0.28} color={colors.accent} />
-    </View>
-  );
-}
 
 /** Usage stats (Snap %, Route %, Target Share, Carry Share, Opportunity)
  * are all shares — a plain number is harder to size up at a glance than a
@@ -412,32 +386,58 @@ function PercentRing({
  * generic StatGrid the other sections use. Renders bare rows only — the
  * caller (AnalyticsSection) supplies the card chrome and "Usage" heading.
  *
- * Snap % is the one exception: coridian_ asked for it specifically to read
- * "like the overall" OVR ring (Discord, Michael Mayer screenshots) rather
- * than the linear bar every other usage share still uses here. */
-function UsageRows({ items }: { items: QuickViewStatItem[] }) {
+ * coridian_'s follow-up (Discord): "the usage section could literally just
+ * be a small square module somewhere that says usage above it, and then it
+ * has the percentage gage underneath it." The old layout put Snap %'s label
+ * on the left and the ring on the right in a full-width row; this drops the
+ * label (the AnalyticsSection header above already says "Usage") and
+ * centers the ring directly underneath it instead, so the whole module
+ * reads as one small square block rather than a wide row. Any other usage
+ * shares (Route %, Target Share, Carry Share, Opportunity) still render as
+ * compact bar rows below the ring — the square treatment is for the
+ * headline Snap % ring, not a claim every position's Usage group is always
+ * exactly one number. */
+function UsageSquare({ items }: { items: QuickViewStatItem[] }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const ringItem =
+    items.find((item) => item.label === 'Snap %' && Boolean(item.value) && parsePercent(item.value) !== null) ?? null;
+  const ringPercent = ringItem ? parsePercent(ringItem.value) : null;
+  const ringPctl = ringItem ? percentileLabel(ringItem.percentile) : null;
+  const restItems = items.filter((item) => item !== ringItem);
   return (
     <>
-      {items.map((item, index) => {
+      {ringItem && ringPercent !== null ? (
+        <View style={styles.usageRingWrap}>
+          <CircularProgressRing
+            percent={ringPercent}
+            size={64}
+            strokeWidth={6}
+            valueLabel={ringItem.value}
+            valueFontScale={0.28}
+            color={colors.accent}
+          />
+          {ringPctl ? (
+            <View style={[styles.statCellPercentileRow, styles.usageRingPctlRow]}>
+              <Ionicons
+                name={percentileTrendIcon(ringItem.percentile)!}
+                size={11}
+                color={percentileColor(ringItem.percentile, colors)}
+              />
+              <AppText style={[styles.statCellPercentile, { color: percentileColor(ringItem.percentile, colors) }]}>
+                {ringPctl}
+              </AppText>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+      {restItems.map((item, index) => {
         const percent = item.value ? parsePercent(item.value) : null;
         if (percent === null) {
           return (
             <View key={`${item.label}-${index}`} style={styles.percentFallbackRow}>
               <StatCell label={item.label} value={item.value || null} percentile={item.percentile} />
             </View>
-          );
-        }
-        if (item.label === 'Snap %') {
-          return (
-            <PercentRing
-              key={`${item.label}-${index}`}
-              label={item.label}
-              percent={percent}
-              display={item.value}
-              percentile={item.percentile}
-            />
           );
         }
         return (
@@ -452,6 +452,61 @@ function UsageRows({ items }: { items: QuickViewStatItem[] }) {
       })}
     </>
   );
+}
+
+// Per-stat glyph icons (coridian_'s Discord ask: "we need glyph icons for
+// things like receptions, targets, receiving touchdowns, yards, and stuff
+// like that") — the section headers (Fantasy Output/Production/Receiving/
+// Usage/Efficiency) already carry an icon via AnalyticsSection; this is the
+// same treatment one level down, on each individual stat tile's label.
+// Keyed by the exact label text the backend already renders (see
+// modules/player_quick_view.py's `_key_stats`/`_efficiency_stats`/
+// `_fantasy_stats` and modules/player_profile_ui.py's
+// PLAYER_PROFILE_STAT_GROUPS), so it applies uniformly across every
+// position's tiles (QB passing, RB rushing, WR/TE receiving, shared
+// per-game/per-touch rates, fantasy scoring, college) rather than being
+// re-derived per position. A label missing here just renders with no icon —
+// never a guessed glyph.
+const STAT_LABEL_ICONS: Record<string, IoniconName> = {
+  Games: 'calendar-outline',
+  Season: 'calendar-outline',
+  College: 'school-outline',
+  'Pass Att': 'send-outline',
+  'Pass Yards': 'trending-up-outline',
+  'Pass TDs': 'trophy-outline',
+  'Rush Att': 'walk-outline',
+  'Carries/Gm': 'walk-outline',
+  'Rush Yards': 'trending-up-outline',
+  'Yards/Carry': 'trending-up-outline',
+  'Rush TDs': 'trophy-outline',
+  Targets: 'locate-outline',
+  'Targets/Gm': 'locate-outline',
+  Receptions: 'hand-left-outline',
+  'Rec/Gm': 'hand-left-outline',
+  'Rec Yards': 'trending-up-outline',
+  'Yards/Catch': 'trending-up-outline',
+  'Yards/Route': 'trending-up-outline',
+  'Rec TDs': 'trophy-outline',
+  Dominator: 'flash-outline',
+  PPR: 'stats-chart-outline',
+  'Half PPR': 'stats-chart-outline',
+  Standard: 'stats-chart-outline',
+  'Fantasy Points': 'stats-chart-outline',
+  'PPR PPG': 'speedometer-outline',
+};
+
+function statLabelIcon(label: string): IoniconName | undefined {
+  return STAT_LABEL_ICONS[label];
+}
+
+// Fantasy Output tiles sit right next to each other on the same card — "PPR
+// 48.3" (a season total) next to "PPR PPG 16.1" (a per-game rate) reads as
+// two numbers of the same kind unless each tile says which it is (coridian_:
+// "it doesn't imply that it's yearly stats on some of those stats"). The
+// backend's _fantasy_stats labels every per-game row "... PPG"; everything
+// else in that group is a season cumulative total.
+function fantasyPeriodLabel(label: string): string {
+  return label.includes('PPG') ? 'Per Game' : 'Season Total';
 }
 
 // Receiving-specific labels split out of `season.key_stats` — the backend's
@@ -1114,12 +1169,33 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player, leagueId, leagueName } = route.params;
-  const [stats, setStats] = useState<QuickViewStats | null>(null);
-  const [model, setModel] = useState<QuickViewModel | null>(null);
+  // Gates this query until the persisted AsyncStorage cache has finished
+  // hydrating back into the in-memory QueryClient — same guard
+  // Dashboard/Matchup/Teams/MyTeam use, so it never fires before last
+  // session's cached response for this exact player is restored.
+  const isRestoring = useIsRestoring();
+  // Stats tab's main payload — the only one of this screen's many fetches
+  // ported to `useQuery` so far (see queryKeys.ts's doc comment). Keyed by
+  // player id only: getPlayerQuickView takes no other params that affect the
+  // response, so revisiting the same player (even from a different league)
+  // paints instantly from cache while a background refetch updates in place.
+  // Every other per-tab/enrichment fetch below (news, rank, awards, roster
+  // rec, GM targets) stays on its existing plain fetch-on-mount pattern.
+  const quickViewQuery = useQuery({
+    queryKey: queryKeys.playerQuickView(player.player_id),
+    queryFn: () => api.getPlayerQuickView(player.player_id),
+    enabled: !isRestoring,
+  });
+  const stats: QuickViewStats | null = quickViewQuery.data?.stats ?? null;
+  const model: QuickViewModel | null = quickViewQuery.data?.model ?? null;
+  const bio: QuickViewBio | null = quickViewQuery.data?.bio ?? null;
+  // No data at all yet (neither a persisted cache hit nor a prior in-memory
+  // fetch) — the one case that still needs the skeleton below. A failed
+  // background refetch after data already painted never reverts this to
+  // true, same as Dashboard/Matchup/Teams/MyTeam.
+  const loading = isRestoring || quickViewQuery.isPending;
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
-  const [bio, setBio] = useState<QuickViewBio | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
-  const [loading, setLoading] = useState(true);
   const [watching, setWatching] = useState<boolean | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
   const [untouchable, setUntouchable] = useState(false);
@@ -1207,29 +1283,6 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       cancelled = true;
     };
   }, [leagueId, player.player_id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    api
-      .getPlayerQuickView(player.player_id)
-      .then((result) => {
-        if (cancelled) return;
-        setStats(result.stats);
-        setBio(result.bio);
-        setModel(result.model);
-      })
-      .catch(() => {
-        // Quick View is a nice-to-have enrichment — the core rank card above
-        // already rendered, so a failed fetch just leaves those sections out.
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [player.player_id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1591,7 +1644,15 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           <AnalyticsSection key="fantasy" title="Fantasy Output" icon="american-football-outline">
             <View style={styles.metricGrid}>
               {season.fantasy.map((item, index) => (
-                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
+                <MetricCard
+                  key={`${item.label}-${index}`}
+                  label={item.label}
+                  icon={statLabelIcon(item.label)}
+                  value={item.value || null}
+                  percentile={item.percentile}
+                  periodLabel={fantasyPeriodLabel(item.label)}
+                  style={cardStyle}
+                />
               ))}
             </View>
           </AnalyticsSection>
@@ -1604,7 +1665,14 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           <AnalyticsSection key="production" title={isQB ? 'Passing Production' : 'Production'} icon="bar-chart-outline">
             <View style={styles.metricGrid}>
               {productionItems.map((item, index) => (
-                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
+                <MetricCard
+                  key={`${item.label}-${index}`}
+                  label={item.label}
+                  icon={statLabelIcon(item.label)}
+                  value={item.value || null}
+                  percentile={item.percentile}
+                  style={cardStyle}
+                />
               ))}
             </View>
           </AnalyticsSection>
@@ -1619,7 +1687,12 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           groupNodes.qbRushing = (
             <AnalyticsSection key="qb-rushing" title="QB Rushing" icon="walk-outline">
               <StatGrid
-                items={secondaryItems.map((item) => ({ label: item.label, value: item.value || null, percentile: item.percentile }))}
+                items={secondaryItems.map((item) => ({
+                  label: item.label,
+                  value: item.value || null,
+                  percentile: item.percentile,
+                  icon: statLabelIcon(item.label),
+                }))}
               />
             </AnalyticsSection>
           );
@@ -1629,7 +1702,14 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             <AnalyticsSection key="receiving" title="Receiving" icon="locate-outline">
               <View style={styles.metricGrid}>
                 {secondaryItems.map((item, index) => (
-                  <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
+                  <MetricCard
+                    key={`${item.label}-${index}`}
+                    label={item.label}
+                    icon={statLabelIcon(item.label)}
+                    value={item.value || null}
+                    percentile={item.percentile}
+                    style={cardStyle}
+                  />
                 ))}
               </View>
             </AnalyticsSection>
@@ -1638,10 +1718,23 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       }
 
       if (season.usage.length > 0) {
-        groupNodes.usage = (
+        const usageSection = (
           <AnalyticsSection key="usage" title="Usage" icon="speedometer-outline">
-            <UsageRows items={season.usage} />
+            <UsageSquare items={season.usage} />
           </AnalyticsSection>
+        );
+        // When Usage is about to pair with Efficiency below (see
+        // canPairUsageEfficiency), it already renders inside a compact
+        // half-width `pairedCol` — no extra wrapper needed. Otherwise it
+        // would render as its own full-width row, which is exactly the
+        // "small square module" ask: constrain it to a narrow, left-aligned
+        // card instead.
+        groupNodes.usage = canPairUsageEfficiency ? (
+          usageSection
+        ) : (
+          <View key="usage-square" style={styles.usageSquareWrap}>
+            {usageSection}
+          </View>
         );
       }
 
@@ -1658,7 +1751,14 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           <AnalyticsSection key="efficiency" title="Efficiency" icon="calculator-outline">
             <View style={styles.metricGrid}>
               {season.efficiency.map((item, index) => (
-                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
+                <MetricCard
+                  key={`${item.label}-${index}`}
+                  label={item.label}
+                  icon={statLabelIcon(item.label)}
+                  value={item.value || null}
+                  percentile={item.percentile}
+                  style={cardStyle}
+                />
               ))}
             </View>
           </AnalyticsSection>
@@ -1671,7 +1771,14 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           <AnalyticsSection key="college" title="College" icon="school-outline">
             <View style={styles.metricGrid}>
               {stats.college.map((item, index) => (
-                <MetricCard key={`${item.label}-${index}`} label={item.label} value={item.value || null} percentile={item.percentile} style={cardStyle} />
+                <MetricCard
+                  key={`${item.label}-${index}`}
+                  label={item.label}
+                  icon={statLabelIcon(item.label)}
+                  value={item.value || null}
+                  percentile={item.percentile}
+                  style={cardStyle}
+                />
               ))}
             </View>
           </AnalyticsSection>
@@ -1715,6 +1822,19 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       content.push(
         <View key="stats-tab">
           <AppText style={styles.seasonLabel}>{season.label}</AppText>
+          {/* coridian_'s percentile concern: "there's probably 900+ players
+           * in the NFL ... that can drastically sway percentiles." Verified
+           * against the backend (modules/player_quick_view.py's
+           * _position_pool) — every percentile on this tab is already
+           * ranked only within this player's own position group (e.g. a WR
+           * against other eligible WRs), never the full league pool. The
+           * math was already right; this just says so, since nothing on
+           * the tile itself named the comparison pool. */}
+          {position ? (
+            <AppText style={styles.percentileContextNote}>
+              Percentiles compare this player only to other {position}s, not the full league.
+            </AppText>
+          ) : null}
           {orderedGroups}
           {model ? <InsightChipsRow model={model} /> : null}
         </View>,
@@ -2000,6 +2120,15 @@ function createStyles(colors: ThemeColors) {
     marginBottom: -spacing.sm,
     textTransform: 'uppercase',
   },
+  // Sits once under the season label rather than repeating "vs WR" on every
+  // tile — states the percentile comparison pool a single time per
+  // coridian_'s "that can drastically sway percentiles" Discord concern.
+  percentileContextNote: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   statCell: {
     minWidth: '46%',
@@ -2012,12 +2141,14 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
+  statCellLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  statCellLabelIcon: { marginRight: 4 },
   statCellLabel: {
+    flexShrink: 1,
     fontSize: 11,
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
-    marginBottom: 2,
   },
   statCellValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
   // Suffix, not a second stat: it sits on the value's baseline and shrinks
@@ -2053,13 +2184,17 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     backgroundColor: colors.accent,
   },
-  percentRingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  percentRingLabelCol: { flex: 1, gap: 4, paddingRight: spacing.sm },
+  // Usage's square module (coridian_: "a small square module ... usage
+  // above it, and then the percentage gage underneath it") — the ring
+  // centers directly below the AnalyticsSection "Usage" header instead of
+  // sitting in a label-left/ring-right row.
+  usageRingWrap: { alignItems: 'center', paddingVertical: spacing.sm },
+  usageRingPctlRow: { marginTop: spacing.xs },
+  // Keeps the whole Usage card from stretching full-width when it isn't
+  // paired with Efficiency (see canPairUsageEfficiency) — without this it's
+  // a tall card with one small ring floating in a wide row, exactly the
+  // "could literally just be a small square module" complaint.
+  usageSquareWrap: { alignSelf: 'flex-start', minWidth: 150, maxWidth: 190 },
   seasonCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',

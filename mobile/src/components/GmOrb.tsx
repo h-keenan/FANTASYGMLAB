@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StackActions } from '@react-navigation/routers';
+import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnimatedCard from './AnimatedCard';
 import IconCircle from './IconCircle';
@@ -31,6 +32,7 @@ import BrandMark from './BrandMark';
 import { currentLeagueContext, navigationRef } from '../navigation/navigationRef';
 import { api } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
+import { queryKeys } from '../lib/queryKeys';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
@@ -130,7 +132,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       subtitle: 'View and compare league teams',
     },
     // Real Monte Carlo rest-of-season simulation (modules.playoff_simulator)
-    // keyed off the same real schedule/Power Rank/standings this app
+    // keyed off the same real schedule/Roster Power/standings this app
     // already computes — an analytical, compare-the-league view like
     // Teams/Players, not a roster-management action, hence violet rather
     // than the League group's cyan.
@@ -155,37 +157,17 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
 
 function gmToolsDestinations(colors: ThemeColors): Destination[] {
   return [
+    // Trade Hub / Trade Finder / Trade Analyzer consolidated into one
+    // Madden-style Trades entry point (coridian_-approved) — see
+    // TradesScreen. Trade Calculator stays separate for now (PR 2 folds it
+    // into Trade Analyzer as a quick-mode toggle).
     {
-      label: 'Trade Hub',
-      route: 'TradeHub',
+      label: 'Trades',
+      route: 'Trades',
       icon: 'shuffle-outline',
       needsLeague: true,
       color: colors.premium,
-      subtitle: 'Trade ideas and negotiation tools',
-    },
-    {
-      label: 'Trade Finder',
-      route: 'TradeFinder',
-      icon: 'search-outline',
-      needsLeague: true,
-      color: colors.premium,
-      subtitle: 'Pick players to trade, find who wants them',
-    },
-    {
-      label: 'Trade Analyzer',
-      route: 'TradeAnalyzer',
-      icon: 'git-compare-outline',
-      needsLeague: true,
-      color: colors.premium,
-      subtitle: 'Analyze and compare any trade',
-    },
-    {
-      label: 'Trade Calculator',
-      route: 'TradeCalculator',
-      icon: 'calculator-outline',
-      needsLeague: true,
-      color: colors.premium,
-      subtitle: 'Quick value comparisons',
+      subtitle: 'Trade ideas, search, and build a trade',
     },
     {
       label: 'GM Targets',
@@ -520,7 +502,6 @@ export default function GmOrb() {
   const [searchQuery, setSearchQuery] = useState('');
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
   const [unreadAlertCount, setUnreadAlertCount] = useState(0);
-  const [recapReady, setRecapReady] = useState(false);
   const [tradeHubHasNew, setTradeHubHasNew] = useState(false);
   // This used to clamp bottom to a 100pt ceiling, on the theory that a
   // reported "orb sits mid-screen" bug meant some device was inflating the
@@ -537,6 +518,17 @@ export default function GmOrb() {
   const league = open ? currentLeagueContext() : null;
   const currentRouteName = open && navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRestoring = useIsRestoring();
+  // Shares its cache entry with Dashboard/Alerts/LeagueDetail/RecapScreen's
+  // own recap fetches (queryKeys.recap) — opening the sheet for a league
+  // those screens already visited this session reads the warm cache
+  // instead of hitting the recap endpoint again.
+  const recapQuery = useQuery({
+    queryKey: queryKeys.recap(league?.leagueId ?? ''),
+    queryFn: () => api.getLeagueRecap(league!.leagueId),
+    enabled: !isRestoring && open && Boolean(league?.leagueId),
+  });
+  const recapReady = Boolean(recapQuery.data?.recap && !recapQuery.data.recap.incomplete);
 
   // Lightweight destination search — substring match against label +
   // subtitle across the same three static destination lists the
@@ -641,32 +633,6 @@ export default function GmOrb() {
     // fresh object literal from currentLeagueContext() every render (not
     // memoized); depending on it directly would refetch every render while
     // the sheet is open. leagueId is the only part that actually matters.
-  }, [open, league?.leagueId]);
-
-  // Same "ready and worth a glance" signal Alerts already surfaces as its
-  // own recap-ready banner — mirrored here as a plain glyph on the Recap
-  // row itself, so the destination list doesn't need opening Alerts first
-  // to notice a new recap exists.
-  useEffect(() => {
-    if (!open || !league) {
-      setRecapReady(false);
-      return;
-    }
-    let cancelled = false;
-    api
-      .getLeagueRecap(league.leagueId)
-      .then((result) => {
-        if (!cancelled) setRecapReady(Boolean(result.recap && !result.recap.incomplete));
-      })
-      .catch(() => {
-        if (!cancelled) setRecapReady(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning
-    // as the alert-count effect above: `league` is a fresh object literal
-    // every render, only leagueId actually matters.
   }, [open, league?.leagueId]);
 
   // Same glyph idea as Recap's, for Trade Hub: no server-side "new idea"
@@ -844,7 +810,7 @@ export default function GmOrb() {
                     isCurrent={destination.route === currentRouteName}
                     unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
                     hasNew={
-                      destination.route === 'TradeHub'
+                      destination.route === 'Trades'
                         ? tradeHubHasNew
                         : destination.route === 'Recap'
                           ? recapReady
@@ -890,7 +856,7 @@ export default function GmOrb() {
                           destination={destination}
                           isCurrent={destination.route === currentRouteName}
                           hasNew={
-                            destination.route === 'TradeHub'
+                            destination.route === 'Trades'
                               ? tradeHubHasNew
                               : destination.route === 'Recap'
                                 ? recapReady

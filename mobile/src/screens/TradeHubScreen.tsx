@@ -1,23 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
-import BrandHeaderBar from '../components/BrandHeaderBar';
 import MeterRow, { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
-import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
-import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
-import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import PlayerCard from '../components/PlayerCard';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import ScreenInfoNote, { type ScreenInfoLegendItem } from '../components/ScreenInfoNote';
 import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
@@ -35,6 +31,7 @@ import {
 } from '../lib/api';
 import { api } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { presentationAssetBackStats } from '../lib/playerCardBackStats';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
 import { useDensity } from '../context/DensityContext';
 import { useGmStance } from '../context/GmStanceContext';
@@ -42,7 +39,6 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
 import { setSeenTradeIdeaCount } from '../lib/tradeHubSeen';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -179,7 +175,18 @@ function TradeIdeaSkeletonCard() {
   );
 }
 
-type Props = NativeStackScreenProps<RootStackParamList, 'TradeHub'>;
+// Prop-driven now (TradesScreen owns the single `Trades` route and hosts
+// this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
+// plain props instead of via route.params, but `navigation` is still the
+// real root-stack navigation prop, used exactly as before for PlayerDetail/
+// PickDetail/Paywall/TradeHistory.
+type TradeHubNavigation = NativeStackNavigationProp<RootStackParamList>;
+
+interface Props {
+  leagueId: string;
+  leagueName: string;
+  navigation: TradeHubNavigation;
+}
 
 const REALISM_LEVELS: Record<string, number> = { realistic: 3, plausible: 2, thin: 1 };
 
@@ -192,12 +199,11 @@ const NOT_READY_MESSAGES: Record<string, string> = {
   no_player_data: "Player data isn't available right now.",
 };
 
-export default function TradeHubScreen({ route, navigation }: Props) {
+export default function TradeHubScreen({ leagueId, leagueName, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
   // Read-only here: the header's GmStanceHeaderButton is the only place
   // stance is changed, and a change there re-runs `load` through this.
   const { strategy, loaded: stanceLoaded } = useGmStance(leagueId);
@@ -208,6 +214,10 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [adUnlocks, setAdUnlocks] = useState(0);
   const [watchingAd, setWatchingAd] = useState(false);
+  // Filter chips in IdeaSummaryRow (null = "All" / the Trade Ideas total
+  // tile). Client-side only — filters the same `ideas` the summary row
+  // already counted, never re-requests or re-ranks anything.
+  const [impactFilter, setImpactFilter] = useState<ImpactTagKey | null>(null);
   const { lens } = useValuationLens(leagueId);
 
   // "All Trades" — the concept sheet's second Trade Hub tab: browse ideas
@@ -224,33 +234,6 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const [allTradesLoadingMore, setAllTradesLoadingMore] = useState(false);
   const [allTradesError, setAllTradesError] = useState<string | null>(null);
   const [allTradesStarted, setAllTradesStarted] = useState(false);
-
-  useScreenHeaderTitle(navigation, 'Trade Hub', leagueName);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={styles.headerButtonRow}>
-          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
-          <EvaluationLensHeaderButton leagueId={leagueId} />
-          <GmStanceHeaderButton leagueId={leagueId} />
-          {/* Discoverability audit (2026-09-26): Trade History had exactly one
-              path in (More -> Your Team), even though "did my trade work out"
-              is a Trade Hub question first. Same icon-button pattern as the
-              three buttons to its left — no new header affordance invented. */}
-          <TouchableOpacity
-            onPress={() => navigation.navigate('TradeHistory')}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Trade History"
-            accessibilityHint="Trades you've confirmed and how they've worked out"
-          >
-            <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      ),
-    });
-  }, [navigation, leagueId, lens, colors.textSecondary]);
 
   const load = useCallback(
     async (nextStrategy: TeamStrategy, nextAdUnlocks: number, nextLens: ValuationLens) => {
@@ -280,6 +263,7 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   useEffect(() => {
     if (!stanceLoaded) return;
     setAdUnlocks(0);
+    setImpactFilter(null);
     void load(strategy, 0, lens);
   }, [load, strategy, stanceLoaded, lens]);
 
@@ -350,7 +334,20 @@ export default function TradeHubScreen({ route, navigation }: Props) {
   const isForYou = viewMode === 'for_you';
   const activeLoading = isForYou ? loading : allTradesLoading;
   const activeError = isForYou ? error : allTradesError;
-  const activeData = isForYou ? (activeLoading || activeError || notReadyReason ? [] : ideas ?? []) : allTradesIdeas;
+  // IdeaSummaryRow's chips filter this same `ideas` list by impact_tag —
+  // client-side only, same data, same ranking, just a narrower view of it.
+  const filteredIdeas = useMemo(() => {
+    if (!ideas || !impactFilter) return ideas;
+    return ideas.filter((idea) => idea.impact_tag === impactFilter);
+  }, [ideas, impactFilter]);
+  const activeData = isForYou
+    ? activeLoading || activeError || notReadyReason
+      ? []
+      : filteredIdeas ?? []
+    : allTradesIdeas;
+  const impactFilterActiveWithNoResults = Boolean(
+    isForYou && impactFilter && ideas && ideas.length > 0 && filteredIdeas && filteredIdeas.length === 0,
+  );
 
   return (
     <View style={styles.root}>
@@ -362,7 +359,6 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
       ListHeaderComponent={
         <View>
-          <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
           <View style={styles.viewModeRow}>
             <SegmentedTabBar<'for_you' | 'all_trades'>
               options={[
@@ -376,12 +372,13 @@ export default function TradeHubScreen({ route, navigation }: Props) {
           <ScreenInfoNote
             text={
               isForYou
-                ? "Real ideas from the same engine and Trust checks as the web app's Trade Hub."
+                ? 'Trust check: every idea is re-verified against your league’s live rosters right before it’s shown, so it can never suggest a player who’s since been traded, dropped, or picked up elsewhere.'
                 : 'Real ideas across every roster in the league, not just yours.'
             }
+            legend={isForYou ? impactLegend(colors) : undefined}
           />
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
-            <IdeaSummaryRow ideas={ideas} />
+            <IdeaSummaryRow ideas={ideas} activeFilter={impactFilter} onToggleFilter={setImpactFilter} />
           ) : null}
           {activeLoading ? (
             <View style={styles.skeletonWrap}>
@@ -403,15 +400,23 @@ export default function TradeHubScreen({ route, navigation }: Props) {
       )}
       ListEmptyComponent={
         !activeLoading && !activeError && !(isForYou && notReadyReason) ? (
-          <EmptyState
-            icon="shuffle-outline"
-            title="No trades yet"
-            subtitle={
-              isForYou
-                ? 'No trade idea clears the bar for this strategy right now — check back after rosters move.'
-                : 'No trade idea cleared the bar for any team yet — check back after rosters move.'
-            }
-          />
+          impactFilterActiveWithNoResults ? (
+            <EmptyState
+              icon="filter-outline"
+              title={`No ${impactTagConfig(colors)[impactFilter as string]?.label ?? 'matching'} ideas`}
+              subtitle="Clear the filter above to see every trade idea for this strategy."
+            />
+          ) : (
+            <EmptyState
+              icon="shuffle-outline"
+              title="No trades yet"
+              subtitle={
+                isForYou
+                  ? 'No trade idea clears the bar for this strategy right now — check back after rosters move.'
+                  : 'No trade idea cleared the bar for any team yet — check back after rosters move.'
+              }
+            />
+          )
         ) : null
       }
       ListFooterComponent={
@@ -533,17 +538,27 @@ function TradeHubGateCard({
 
 /**
  * One side (You Send / You Receive) of a trade package: players render via
- * the shared PlayerIdentityRow (no `slot` — trade assets have no lineup
- * slot), picks via DraftPickAssetRow — never a malformed player row for a
- * pick. Order is preserved exactly as the API returned it; only the
- * per-asset presentation differs by `asset_type`.
+ * the shared, flippable `PlayerCard` (coridian_'s circled reference card,
+ * generalized — see components/PlayerCard.tsx's own doc comment), picks
+ * via DraftPickAssetRow — never a malformed player row for a pick. Order
+ * is preserved exactly as the API returned it; only the per-asset
+ * presentation differs by `asset_type`.
  *
- * Team and age are combined into PlayerIdentityRow's single `team` slot
- * (e.g. "NO · Age 30") rather than passed separately (team) + via
- * `contextLine` (age) — the concept mockups show these on one meta line
- * under the position badge, not a whole extra row. This is a page-local
- * prop composition, not a change to PlayerIdentityRow itself: every other
- * screen using the shared row is unaffected.
+ * `presentationAssetBackStats` (lib/playerCardBackStats.ts) builds each
+ * player's back-face stats from fields `PresentationAsset` already carries
+ * — tier, role, injury (status + severity), the asset's own value score,
+ * team/age, and the role's rationale sentence — several of which
+ * (`score`, `injury_level`, `opportunity_explanation`) had nowhere to
+ * render on the old row at all. Tapping a player card now flips it instead
+ * of navigating straight to Player Detail (PlayerIdentityRow's old
+ * behavior) — `onOpenDetail` wires the card's own small corner affordance
+ * to that navigation instead, matching coridian_'s ask that the primary
+ * tap flip the card and a separate control open the PQV.
+ *
+ * Fixed `size` (not a flex-filled column width) deliberately mirrors
+ * Waivers' `BestAvailableCard` sizing precedent — a trade side can carry
+ * 2-3 assets, and a card stretched to the full exchange column's width
+ * would read as oversized stacked repeatedly.
  */
 function ExchangeAssetList({
   assets,
@@ -554,41 +569,42 @@ function ExchangeAssetList({
   onPressPlayer: (asset: PresentationAsset) => void;
   onPressPick: (asset: PresentationAsset) => void;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <>
       {assets.map((asset, index) => {
-        const showDivider = index < assets.length - 1;
+        const isLast = index === assets.length - 1;
         if (asset.asset_type === 'pick') {
           return (
-            <DraftPickAssetRow
-              key={`pick-${asset.pick_id ?? index}`}
-              pickId={asset.pick_id}
-              round={asset.round ? Number(asset.round) : null}
-              label={asset.label}
-              projectedRange={asset.projected_range}
-              pickTier={asset.pick_tier}
-              onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
-              showDivider={showDivider}
-            />
+            <View key={`pick-${asset.pick_id ?? index}`} style={!isLast && styles.exchangeItemSpacing}>
+              <DraftPickAssetRow
+                pickId={asset.pick_id}
+                round={asset.round ? Number(asset.round) : null}
+                label={asset.label}
+                projectedRange={asset.projected_range}
+                pickTier={asset.pick_tier}
+                onPress={asset.pick_id ? () => onPressPick(asset) : undefined}
+              />
+            </View>
           );
         }
-        const teamAgeLine = [asset.team, asset.age != null ? `Age ${asset.age}` : null]
-          .filter(Boolean)
-          .join(' · ');
+        const { note, stats } = presentationAssetBackStats(asset);
         return (
-          <PlayerIdentityRow
-            key={`player-${asset.player_id ?? index}`}
-            playerId={asset.player_id}
-            name={asset.name}
-            position={asset.position}
-            team={teamAgeLine || null}
-            tier={asset.tier}
-            overallRating={asset.overall_rating}
-            opportunityLabel={asset.role}
-            injuryLabel={asset.injury_status}
-            onPress={asset.player_id ? () => onPressPlayer(asset) : undefined}
-            showDivider={showDivider}
-          />
+          <View key={`player-${asset.player_id ?? index}`} style={[styles.exchangeCardWrap, !isLast && styles.exchangeItemSpacing]}>
+            <PlayerCard
+              size={120}
+              playerId={asset.player_id}
+              name={asset.name}
+              position={asset.position}
+              tier={asset.tier}
+              overallRating={asset.overall_rating}
+              injuryLabel={asset.injury_status}
+              backStats={stats}
+              backNote={note}
+              onOpenDetail={asset.player_id ? () => onPressPlayer(asset) : undefined}
+            />
+          </View>
         );
       })}
     </>
@@ -655,6 +671,8 @@ function CategoryBadge({ category }: { category: string }) {
 // uses for a timing-sensitive move). Buy Low is unchanged — green already
 // matched the spec. No underlying impact_tag/category values changed, only
 // their display colors.
+export type ImpactTagKey = 'high_impact' | 'buy_low' | 'sell_high';
+
 function impactTagConfig(
   colors: ThemeColors,
 ): Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> {
@@ -663,6 +681,38 @@ function impactTagConfig(
     buy_low: { label: 'Buy Low', icon: 'trending-down', color: colors.success },
     sell_high: { label: 'Sell High', icon: 'trending-up', color: colors.premium },
   };
+}
+
+// Legend shown inside Trade Hub's "About this screen" sheet. Definitions
+// are sourced from the authoritative server logic, not invented copy:
+// high_impact = confidence_label === "High" (trade_hub_engine.py's
+// _classify_impact_tag); buy_low = the received asset carries a
+// "Backup With Upside"/"Committee Back" opportunity_label
+// (_BUY_LOW_OPPORTUNITY_LABELS — "role trending up, price probably hasn't
+// caught up yet"); sell_high = the sent asset carries "Starter At Risk"
+// (_SELL_HIGH_OPPORTUNITY_LABELS — established trade value from a starter
+// reputation, but the opportunity signal underneath is already softening).
+// Reuses impactTagConfig's exact labels/colors so the legend, the filter
+// chips below, and each card's ImpactBadge never drift from one another.
+function impactLegend(colors: ThemeColors): ScreenInfoLegendItem[] {
+  const config = impactTagConfig(colors);
+  return [
+    {
+      label: config.high_impact.label,
+      color: config.high_impact.color,
+      description: "The model’s highest-confidence recommendation.",
+    },
+    {
+      label: config.buy_low.label,
+      color: config.buy_low.color,
+      description: "You’d receive a player whose role is trending up before the market price catches up.",
+    },
+    {
+      label: config.sell_high.label,
+      color: config.sell_high.color,
+      description: "You’d send a player whose trade value is still strong, but whose role has started to soften.",
+    },
+  ];
 }
 
 function ImpactBadge({ impactTag }: { impactTag: string }) {
@@ -688,8 +738,24 @@ function ImpactBadge({ impactTag }: { impactTag: string }) {
  * the three impact buckets — the total is still every idea's real total.
  *
  * Colors here intentionally match `impactTagConfig` below (see that
- * function's comment for the semantic-color fix applied in this pass). */
-function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
+ * function's comment for the semantic-color fix applied in this pass).
+ *
+ * Each tile also doubles as a filter chip (this pass): tapping one filters
+ * the idea list below to that impact_tag; tapping it again (or tapping
+ * "Trade Ideas") clears back to "all." Active/inactive follows the same
+ * cyan-emphasis-vs-quiet language as SegmentedTabBar's `segmentActive`
+ * (accentMuted fill + accent border) rather than inventing a new chip
+ * style — this never changes which ideas exist or how they're ranked,
+ * only which of the already-loaded ideas render below. */
+function IdeaSummaryRow({
+  ideas,
+  activeFilter,
+  onToggleFilter,
+}: {
+  ideas: TradeIdea[];
+  activeFilter: ImpactTagKey | null;
+  onToggleFilter: (filter: ImpactTagKey | null) => void;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const counts = useMemo(() => {
@@ -706,7 +772,13 @@ function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
 
   if (counts.total === 0) return null;
 
-  const tiles: Array<{ key: string; value: number; label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = [
+  const tiles: Array<{
+    key: 'total' | ImpactTagKey;
+    value: number;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    color: string;
+  }> = [
     { key: 'total', value: counts.total, label: 'Trade Ideas', icon: 'bulb-outline', color: colors.accent },
     { key: 'high_impact', value: counts.highImpact, label: 'High Impact', icon: 'flash', color: colors.accent },
     { key: 'buy_low', value: counts.buyLow, label: 'Buy Low', icon: 'trending-down', color: colors.success },
@@ -716,13 +788,28 @@ function IdeaSummaryRow({ ideas }: { ideas: TradeIdea[] }) {
   return (
     <View style={styles.summaryBlock}>
       <View style={styles.summaryRow}>
-        {tiles.map((tile) => (
-          <View key={tile.key} style={styles.summaryTile}>
-            <Ionicons name={tile.icon} size={16} color={tile.color} />
-            <AppText style={styles.summaryValue}>{tile.value}</AppText>
-            <AppText style={styles.summaryLabel} numberOfLines={1}>{tile.label}</AppText>
-          </View>
-        ))}
+        {tiles.map((tile) => {
+          const isActive = tile.key === 'total' ? activeFilter === null : activeFilter === tile.key;
+          return (
+            <TouchableOpacity
+              key={tile.key}
+              style={[styles.summaryTile, isActive && styles.summaryTileActive]}
+              activeOpacity={0.75}
+              onPress={() =>
+                onToggleFilter(
+                  tile.key === 'total' ? null : activeFilter === tile.key ? null : (tile.key as ImpactTagKey),
+                )
+              }
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`Filter trade ideas by ${tile.label}`}
+            >
+              <Ionicons name={tile.icon} size={16} color={tile.color} />
+              <AppText style={styles.summaryValue}>{tile.value}</AppText>
+              <AppText style={styles.summaryLabel} numberOfLines={1}>{tile.label}</AppText>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -922,6 +1009,7 @@ function TradeIdeaCard({
         leagueId={leagueId}
         leagueName={leagueName}
         partnerTeamName={idea.partner_team_name}
+        partnerTeamAvatarUrl={idea.partner_team_avatar_url}
         verdict={ideaToShareVerdict(idea)}
         sendPlayers={shareAssetsToPlayers(idea.package.send)}
         receivePlayers={shareAssetsToPlayers(idea.package.receive)}
@@ -1003,7 +1091,6 @@ function TradeIdeaCard({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   gateCard: { alignItems: 'center', padding: spacing.lg, marginTop: spacing.xs },
   gateIconDisc: {
     width: 44,
@@ -1095,7 +1182,24 @@ function createStyles(colors: ThemeColors) {
     borderColor: colors.hairline,
   },
   summaryRow: { flexDirection: 'row' },
-  summaryTile: { flex: 1, alignItems: 'center', gap: 2 },
+  summaryTile: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: spacing.xs,
+    marginHorizontal: 2,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  // Filter-chip active state (this pass): same cyan-emphasis language as
+  // SegmentedTabBar's `segmentActive` (accentMuted fill + accent border) —
+  // reused rather than invented so "this chip is selected" reads
+  // identically everywhere in the app.
+  summaryTileActive: {
+    backgroundColor: colors.accentMuted,
+    borderColor: colors.accent,
+  },
   summaryValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
   summaryLabel: { fontSize: 10, fontWeight: '600', color: colors.textSecondary, textAlign: 'center' },
   contextBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, gap: 2 },
@@ -1171,14 +1275,38 @@ function createStyles(colors: ThemeColors) {
   // strongest visual element in the card") so PlayerIdentityRow/
   // DraftPickAssetRow's dividers have a clear boundary to sit inside of,
   // rather than floating on the card's bare background.
+  //
+  // Color-system audit follow-up (2026-10-08): this was `backgroundElevated`,
+  // the same neutral-elevation token used for sheets/skeletons/input chrome.
+  // In light mode that token (#D9E8F0) sits only ~1.1:1 contrast from
+  // `background` (#EAF3F8) — both are desaturated pale blues — so the one
+  // module the card most wants to pop (what you're actually trading) read as
+  // flatter than plain neutral chrome. Switched to `accentMuted` (the token
+  // already dedicated to "cyan tint over a surface," proven on
+  // SegmentedTabBar's active pill) composited over the card's white
+  // `surface`, plus the same `cardBorder` edge AnimatedCard already uses for
+  // "this is a branded module" — a flat accentMuted fill alone measured
+  // *less* distinct from white than the old backgroundElevated fill did, so
+  // the border is what actually carries the separation. Only this role
+  // changed; `backgroundElevated` itself is untouched and still backs every
+  // genuine neutral-chrome use (gateSecondaryButton, partnerAvatar, swapDisc,
+  // rationaleSheet, etc).
   exchangeSide: {
     flex: 1,
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.accentMuted,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     borderRadius: radii.md,
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.xs,
     paddingBottom: 2,
   },
+  // PlayerCard is square and fixed-size (see ExchangeAssetList's doc
+  // comment) rather than stretched to the column's own flex:1 width, so
+  // each tile needs its own flex-start wrapper inside the stretch-aligned
+  // exchangeSide column.
+  exchangeCardWrap: { alignSelf: 'flex-start' },
+  exchangeItemSpacing: { marginBottom: spacing.sm },
   exchangeGutter: { width: 26, alignItems: 'center', justifyContent: 'center' },
   swapDisc: {
     width: 26,

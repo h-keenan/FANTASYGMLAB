@@ -334,6 +334,8 @@ def test_antonia_brown_sleeper_fixture_is_not_waiver_eligible():
     sleeper = json.loads(Path("data/sleeper_players.json").read_text(encoding="utf-8"))
     ab = sleeper.get("536")
     assert ab is not None
+    # Freeze the retired-player scenario instead of depending on a mutable feed.
+    ab = {**ab, "status": "Retired", "active": False, "team": None, "news_updated": 0}
     result = player_eligibility(ab, now=NOW)
     assert result["eligible"] is False
     filtered = filter_current_fantasy_players(

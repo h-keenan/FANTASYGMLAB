@@ -18,6 +18,7 @@ interface Props {
   leagueId: string;
   leagueName: string;
   partnerTeamName?: string;
+  partnerTeamAvatarUrl?: string | null;
   verdict: TradeVerdict;
   sendPlayers: RankedPlayer[];
   receivePlayers: RankedPlayer[];
@@ -37,6 +38,7 @@ export default function TradeSharePreviewModal({
   leagueId,
   leagueName,
   partnerTeamName,
+  partnerTeamAvatarUrl,
   verdict,
   sendPlayers,
   receivePlayers,
@@ -163,6 +165,8 @@ export default function TradeSharePreviewModal({
                 verdict={verdict}
                 sendPlayers={sendPlayers}
                 receivePlayers={receivePlayers}
+                partnerTeamName={partnerTeamName}
+                partnerTeamAvatarUrl={partnerTeamAvatarUrl}
                 onReadyChange={(ready) => {
                   imagesReadyRef.current = ready;
                 }}

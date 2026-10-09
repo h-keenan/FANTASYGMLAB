@@ -54,7 +54,7 @@ def test_see_how_it_works_reveals_proof_before_import():
     assert "overflow-wrap:anywhere" in LANDING_CSS
 
 
-def test_hero_sign_in_sets_account_mode_without_gallery():
+def test_hero_sign_in_sets_account_mode():
     state = _Session()
     markdown: list[str] = []
 
@@ -81,9 +81,13 @@ def test_hero_sign_in_sets_account_mode_without_gallery():
     assert state.get("landing_focus") == "sign_in"
     assert state.get("launch_auth_mode") == "account"
     assert state.get("launch_account_form") == "signin"
-    assert state.get("landing_show_screenshots") is not True
     joined = "\n".join(markdown)
-    assert "Real FantasyGM Lab screens" not in joined
+    # The welcome screen's deferred mount now wires up the real product
+    # screenshot gallery (render_screenshot_gallery) and detail copy
+    # (landing_body_html(detail=True)) — see modules/marketing_landing.py.
+    # This same render pass still shows them even mid-click because the
+    # click's flow transition only takes effect on the next rerun.
+    assert "Real FantasyGM Lab screens" in joined
     assert "load_leagues_for_username" not in cold_render_source()
 
 

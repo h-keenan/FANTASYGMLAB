@@ -28,11 +28,12 @@ export default function MetricCard({
   percentile,
   valueColor,
   note,
+  periodLabel,
   onPress,
   style,
 }: {
   label: string;
-  /** Small glyph in front of the label (e.g. a trophy for Power, a star for
+  /** Small glyph in front of the label (e.g. a trophy for Roster Power, a star for
    * Franchise) — coridian_'s ask for the Roster Analysis tiles to "pop"
    * instead of reading as plain text. Same leading-icon-before-title
    * pattern AnalyticsSection's header already uses, just scoped to one
@@ -52,7 +53,15 @@ export default function MetricCard({
    * competing caption lines. Added for My Team's Roster Age tile, which
    * has a semantic age bucket but no rank-derived percentile. */
   note?: string | null;
-  /** Makes the whole tile tappable (e.g. Dashboard's Power/Franchise rank
+  /** Tiny always-visible tag (e.g. "SEASON TOTAL", "PER GAME") next to the
+   * label, for metrics that could otherwise be misread as the wrong kind of
+   * number sitting right next to a sibling tile — coridian_'s Fantasy
+   * Output ask: "PPR 48.3" next to "PPR PPG 16.1" doesn't say which one is
+   * cumulative. Unlike `note`, this renders alongside the percentile row
+   * rather than being replaced by it, since the whole point is it must
+   * stay visible even when a percentile is present. */
+  periodLabel?: string | null;
+  /** Makes the whole tile tappable (e.g. Dashboard's Roster Power/Franchise rank
    * tiles, which drill into the Teams screen) while leaving every other
    * caller — anything that omits this — a plain, non-interactive View. */
   onPress?: () => void;
@@ -80,9 +89,17 @@ export default function MetricCard({
          * AwardsStrip/WaiverRecommendationCard already use to mark a row as
          * tappable — reused here rather than inventing a card-specific
          * tappability indicator, so every MetricCard with an `onPress`
-         * (Dashboard's Power/Franchise tiles included) now signals it the
+         * (Dashboard's Roster Power/Franchise tiles included) now signals it the
          * same way the rest of the app does. */}
-        {onPress ? <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} /> : null}
+        {periodLabel ? (
+          <View style={styles.periodTag}>
+            <AppText style={styles.periodTagText} numberOfLines={1}>
+              {periodLabel}
+            </AppText>
+          </View>
+        ) : onPress ? (
+          <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} />
+        ) : null}
       </View>
       <AppText style={[styles.value, valueColor ? { color: valueColor } : null]} numberOfLines={1}>
         {display}
@@ -142,5 +159,22 @@ function createStyles(colors: ThemeColors) {
     pctlRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 3 },
     pctlText: { fontSize: 10, fontWeight: '600', letterSpacing: 0.2 },
     noteText: { fontSize: 10, fontWeight: '600', letterSpacing: 0.2, marginTop: 3 },
+    // Neutral pill, deliberately quieter than the percentile/position
+    // badges — it's disambiguating metadata ("is this a season total or a
+    // per-game rate"), not a judgment on the number, so it borrows
+    // `textTertiary` rather than any semantic color.
+    periodTag: {
+      borderRadius: radii.pill,
+      backgroundColor: `${colors.textTertiary}26`,
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+    },
+    periodTagText: {
+      fontSize: 8,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+      color: colors.textTertiary,
+      textTransform: 'uppercase',
+    },
   });
 }

@@ -67,6 +67,20 @@ ENV PATH="$VENV_PATH/bin:$PATH" \
     PYTHONUNBUFFERED=1
 COPY --from=builder /opt/venv /opt/venv
 
+# Baked into the image at build time (not passed as a runtime `environment:`
+# var) so modules/build_identity.py's resolve_build_identity() keeps reporting
+# the right commit/timestamp across a container restart that doesn't go
+# through deploy/release_deploy.sh — e.g. the systemd unit's `docker compose
+# up -d` on every host boot, which runs with no shell env set at all. A
+# runtime-only var would silently reset to its `:-local`/empty default on any
+# such restart; baking it into the image means it only changes on the next
+# real `docker compose build`, i.e. the next real deploy. See
+# docker-compose.yml's `build.args` for where these get their real values.
+ARG DYNASTYGM_BUILD=local
+ARG DYNASTYGM_DEPLOYED_AT=
+ENV DYNASTYGM_BUILD=${DYNASTYGM_BUILD} \
+    DYNASTYGM_DEPLOYED_AT=${DYNASTYGM_DEPLOYED_AT}
+
 WORKDIR /app
 
 # Application source. See .dockerignore for what's intentionally excluded

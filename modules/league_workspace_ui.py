@@ -611,7 +611,7 @@ def _league_overview_team_lines(
         details: list[str] = []
         if include_power:
             details.append(
-                f"Power {_format_rank(row.get('power_rank'), tied=bool(row.get('power_rank_tied')))}"
+                f"Roster Power {_format_rank(row.get('power_rank'), tied=bool(row.get('power_rank_tied')))}"
             )
         if include_franchise:
             details.append(
@@ -1035,19 +1035,19 @@ def _board_secondary_parts(
         ]
     if rank_column == "franchise_rank":
         return [
-            f"Power {power_rank}",
+            f"Roster Power {power_rank}",
             f"Draft {draft_rank}",
             f"Starter {starter_rank}",
         ]
     if rank_column == "draft_capital_rank":
         firsts = _safe_positive_int(row.get("first_rounders"), 0)
         return [
-            f"Power {power_rank}",
+            f"Roster Power {power_rank}",
             f"Franchise {franchise_rank}",
             f"{firsts} firsts" if firsts else f"Picks {_safe_positive_int(row.get('pick_count'), 0)}",
         ]
     return [
-        f"Power {power_rank}",
+        f"Roster Power {power_rank}",
         f"Franchise {franchise_rank}",
         f"Starter {starter_rank}",
         f"Bench {bench_rank}",
@@ -1408,7 +1408,7 @@ def render_standings_board(
 _PLAYOFF_ODDS_REASON_MESSAGES = {
     "offseason": "Playoff odds will be available once the regular season begins.",
     "no_playoff_format": "This league's playoff format isn't set yet — odds need a real playoff-team count from league settings.",
-    "no_rankings_data": "We don't have enough roster data to compute Power Rank for this league yet.",
+    "no_rankings_data": "We don't have enough roster data to compute Roster Power for this league yet.",
     "unavailable": "Playoff odds aren't available for this league right now.",
 }
 
@@ -1424,7 +1424,7 @@ def render_playoff_odds_board(
 ):
     """Real Monte Carlo rest-of-season simulation — see
     modules.playoff_simulator's module docstring for the full methodology
-    (real schedule, real Power Rank, real standings/tiebreakers). Teams
+    (real schedule, real Roster Power, real standings/tiebreakers). Teams
     arrive from the backend already sorted by playoff_probability desc."""
 
     if not isinstance(odds_result, dict) or not odds_result.get("ok"):
@@ -1518,7 +1518,7 @@ def render_team_rank_cards(team_row: dict):
     """Team comparative ranks via canonical summary tiles."""
 
     card_specs = [
-        ("Power Rank", "power_rank", "Strongest lineup and depth right now", "power"),
+        ("Roster Power", "power_rank", "Strongest lineup and depth right now", "power"),
         ("Franchise Rank", "franchise_rank", "Full roster value plus future assets", "franchise"),
         ("Roster Value Rank", "roster_value_rank", "All-player roster value", "metric"),
         ("Starter Rank", "starter_rank", "Best weekly lineup", "metric"),

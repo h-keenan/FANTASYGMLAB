@@ -94,12 +94,13 @@ WHAT_IT_DOES = (
     ),
     (
         "What Changed / Decision Memory",
-        "Session What Changed on Free; Decision Memory adds experimental cross-session continuity when enabled.",
+        "Session What Changed on Free; Decision Memory adds durable cross-session history on Premium.",
         "decision-memory.jpg",
     ),
     (
         "GM Targets",
-        "Experimental saved players to monitor — rank, ownership, and advice without changing recommendations.",
+        "Saved players to monitor — rank, ownership, and advice without changing recommendations. "
+        "Free keeps up to three; Premium expands to the full board.",
         "dashboard-desktop.jpg",
     ),
 )
@@ -110,7 +111,7 @@ WHY_DIFFERENT = (
     ("Recommendation context", "See why a move is suggested, not only a ranked name."),
     ("Current rankings", "Player context stays tied to the current ranking set."),
     ("Canonical consistency", "Trade Hub, Waivers, and PQV share one recommendation source of truth."),
-    ("Decision history", "What Changed (and Decision Memory when enabled) keep priorities visible."),
+    ("Decision history", "What Changed (Free) and Decision Memory (Premium) keep priorities visible."),
 )
 
 FOUNDER_INCLUDED = (
@@ -119,10 +120,13 @@ FOUNDER_INCLUDED = (
     "Labeled experimental lanes when enabled.",
 )
 
+# Decision Memory, GM Targets, and Share Recommendation graduated to shipped
+# Free/Premium features (#232 — see modules/experimental_graduation.py's
+# FEATURE_MATRIX and modules/premium_page.py's explicit "graduated features
+# must not appear here" guard on PREMIUM_EXPERIMENTAL_WHEN_ENABLED). ESPN
+# import is the one surface still genuinely labeled experimental today.
 FOUNDER_EXPERIMENTAL = (
-    "Decision Memory — cross-session GM priority history.",
-    "GM Targets — saved players to monitor.",
-    "Share Recommendation — branded share images for advice you can already see.",
+    "ESPN import — labeled limited; Sleeper has full parity, ESPN support is still catching up.",
 )
 
 TRUST_POINTS = (
@@ -749,9 +753,11 @@ def render_marketing_landing_deferred(*, include_proof: bool = True) -> dict[str
         _track("pricing_viewed", source_surface="landing_pricing", once_key="session")
         include_pricing = True
 
+    render_screenshot_gallery()
+
     deferred = landing_body_html(
         billing_configured=billing_configured,
-        detail=False,
+        detail=True,
         include_pricing=include_pricing,
     )
     if deferred:

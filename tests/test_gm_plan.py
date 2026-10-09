@@ -226,10 +226,10 @@ def test_standing_focus_area_surfaces_power_and_draft_capital_rank_with_ties():
     standing = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_STANDING)
     assert standing["status"] == gm_plan.STATUS_SIGNAL_FOUND
     labels = {item["label"] for item in standing["items"]}
-    assert "Power Rank" in labels
+    assert "Roster Power" in labels
     assert "Draft Capital Rank" in labels
     assert "Record" in labels
-    power_item = next(item for item in standing["items"] if item["label"] == "Power Rank")
+    power_item = next(item for item in standing["items"] if item["label"] == "Roster Power")
     assert power_item["rank"] == 3
     assert power_item["total_teams"] == 12
     assert power_item["tied"] is False
@@ -243,6 +243,51 @@ def test_standing_focus_area_with_no_rankings_row_is_honest_no_signal():
     assert standing["status"] == gm_plan.STATUS_NO_SIGNAL
     assert standing["items"] == []
     assert standing["watch_for"] == gm_plan.STANDING_NO_SIGNAL_WATCH_FOR
+
+
+def test_standing_focus_area_surfaces_playoff_odds_when_available():
+    # modules.playoff_simulator.build_league_playoff_odds_cached's own
+    # `teams` row shape for the caller's roster — already-cached, so GM
+    # Plan just reads it, never recomputes it.
+    plan = gm_plan.build_gm_plan(
+        team_stance="balanced",
+        season_phase=gm_plan.PHASE_PLAYOFF_PUSH,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+        record={"wins": 8, "losses": 4, "ties": 0},
+        playoff_odds={
+            "roster_id": "1",
+            "playoff_probability": 67.3,
+            "median_seed": 4,
+            "clinched": False,
+            "eliminated": False,
+        },
+    )
+    standing = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_STANDING)
+    odds_item = next(item for item in standing["items"] if item["label"] == "Playoff Odds")
+    assert odds_item["playoff_probability"] == 67.3
+    assert odds_item["median_seed"] == 4
+    assert odds_item["clinched"] is False
+    assert odds_item["eliminated"] is False
+    assert odds_item["source"] == "modules.playoff_simulator.build_league_playoff_odds_cached"
+
+
+def test_standing_focus_area_omits_playoff_odds_when_not_ready_or_missing():
+    # No fabricated fact when the simulation isn't ready yet for this
+    # league (offseason / no playoff format / no rankings data) or the
+    # caller's roster didn't resolve in it — same honest-degradation
+    # contract as every other fact here.
+    for not_ready in (None, {}, {"roster_id": "1", "playoff_probability": None}):
+        plan = gm_plan.build_gm_plan(
+            team_stance="",
+            season_phase=gm_plan.PHASE_EARLY_SEASON,
+            rankings_row=_rankings_row(),
+            total_teams=12,
+            playoff_odds=not_ready,
+        )
+        standing = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_STANDING)
+        labels = {item["label"] for item in standing["items"]}
+        assert "Playoff Odds" not in labels
 
 
 def test_roster_focus_area_flags_bottom_third_ranks_as_relative_weak_spots():
@@ -266,6 +311,65 @@ def test_roster_focus_area_without_rankings_row_is_honest_no_signal():
     assert roster["status"] == gm_plan.STATUS_NO_SIGNAL
     assert roster["items"] == []
     assert roster["watch_for"] == gm_plan.ROSTER_NO_SIGNAL_WATCH_FOR
+
+
+def test_roster_focus_area_flags_an_uncovered_starter_injury():
+    # Connectivity-audit fix: shaped like a real
+    # modules.trade_analyzer_fit.roster_injury_context (summarize_team_injuries)
+    # return value — injury_need_positions is already restricted to
+    # active/starting positions with no healthy bench cover, so its mere
+    # presence is the signal.
+    injury_context = {
+        "injury_impact_flag": "Major Starter Absence",
+        "injured_starters": 1,
+        "injury_need_positions": {"te"},
+        "top_injury_impact_summary": "My Player 7 (TE, KC) - Out, value 2000, impact 50",
+        "key_injuries": ["My Player 7 (TE)"],
+    }
+    plan = gm_plan.build_gm_plan(
+        team_stance="",
+        season_phase=gm_plan.PHASE_EARLY_SEASON,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+        injury_context=injury_context,
+    )
+    roster = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_ROSTER)
+    injury_item = next(item for item in roster["items"] if item["label"] == gm_plan.INJURY_EXPOSURE_LABEL)
+    assert injury_item["health_flag"] == "Major Starter Absence"
+    assert injury_item["injured_starters"] == 1
+    assert injury_item["injury_need_positions"] == ["TE"]
+    assert "My Player 7" in injury_item["summary"]
+    assert injury_item["source"] == "modules.trade_analyzer_fit.roster_injury_context"
+
+
+def test_roster_focus_area_with_no_injury_need_positions_adds_no_injury_item():
+    # A healthy roster (or one where every injury has healthy cover) must
+    # never fabricate a risk flag.
+    injury_context = {
+        "injury_impact_flag": "Stable",
+        "injured_starters": 0,
+        "injury_need_positions": set(),
+    }
+    plan = gm_plan.build_gm_plan(
+        team_stance="",
+        season_phase=gm_plan.PHASE_EARLY_SEASON,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+        injury_context=injury_context,
+    )
+    roster = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_ROSTER)
+    assert all(item["label"] != gm_plan.INJURY_EXPOSURE_LABEL for item in roster["items"])
+
+
+def test_roster_focus_area_without_injury_context_adds_no_injury_item():
+    plan = gm_plan.build_gm_plan(
+        team_stance="",
+        season_phase=gm_plan.PHASE_EARLY_SEASON,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+    )
+    roster = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_ROSTER)
+    assert all(item["label"] != gm_plan.INJURY_EXPOSURE_LABEL for item in roster["items"])
 
 
 def test_build_gm_plan_never_touches_value_score_or_similar_valuation_fields():

@@ -10,22 +10,20 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
-import BrandHeaderBar from '../components/BrandHeaderBar';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
-import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import FilterDropdownButton from '../components/FilterDropdownButton';
-import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
-import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import CircularProgressRing from '../components/CircularProgressRing';
+import TeamAvatar from '../components/TeamAvatar';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
@@ -33,19 +31,31 @@ import {
   api,
   type DraftPickAsset,
   type RankedPlayer,
+  type TeamProfile,
   type TradeVerdict,
 } from '../lib/api';
 import { useGmStance } from '../context/GmStanceContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { useOrbClearance } from '../lib/orbLayout';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { valueDirectionLabel } from '../lib/tradeValue';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'TradeAnalyzer'>;
+// Prop-driven now (TradesScreen owns the single `Trades` route and hosts
+// this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
+// plain props instead of via route.params, but `navigation` is still the
+// real root-stack navigation prop, used exactly as before for PlayerDetail/
+// PickDetail/Paywall.
+type TradeAnalyzerNavigation = NativeStackNavigationProp<RootStackParamList>;
+
+interface Props {
+  leagueId: string;
+  leagueName: string;
+  navigation: TradeAnalyzerNavigation;
+}
 type Side = 'send' | 'receive';
 type AssetType = 'players' | 'picks';
 
@@ -101,16 +111,16 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 interface OtherTeam {
   rosterId: string;
   ownerName: string;
+  avatarId: string | null;
   playerIds: Set<string>;
 }
 
 const ALL_TEAMS_ID = '__all__';
 
-export default function TradeAnalyzerScreen({ route, navigation }: Props) {
+export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
@@ -128,6 +138,10 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [assetType, setAssetType] = useState<AssetType>('players');
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // Quick Compare: an instant, client-side players-only value readout that
+  // folds in what used to be the standalone Trade Calculator screen. Picks
+  // never supported Trade Calculator, so they're force-excluded below.
+  const [quickMode, setQuickMode] = useState(false);
   // Read-only here: stance is changed from the header button only.
   const { strategy } = useGmStance(leagueId);
   const { lens } = useValuationLens(leagueId);
@@ -136,20 +150,6 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   const orbClearance = useOrbClearance();
-
-  useScreenHeaderTitle(navigation, 'Trade Analyzer', leagueName);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={styles.headerButtonRow}>
-          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
-          <EvaluationLensHeaderButton leagueId={leagueId} />
-          <GmStanceHeaderButton leagueId={leagueId} />
-        </View>
-      ),
-    });
-  }, [navigation, leagueId, styles]);
 
   // A verdict is analyzed under one stance/lens, so it goes stale the
   // moment either changes. The removed in-page strategy pills cleared it
@@ -160,16 +160,34 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     setVerdict(null);
   }, [strategy, lens]);
 
+  // Entering Quick Compare must never leave an ambiguous state: force
+  // players-only (picks never entered Trade Calculator's pool), drop any
+  // picks already staged from Full Analysis, and clear any stale verdict
+  // from a previous full-analysis run.
+  useEffect(() => {
+    if (!quickMode) return;
+    setAssetType('players');
+    setSendPicks([]);
+    setReceivePicks([]);
+    setVerdict(null);
+  }, [quickMode]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult] = await Promise.all([
+        const [myRoster, rankingsResult, usersResult, rostersResult, picksResult, teamProfilesResult] = await Promise.all([
           api.getMyRoster(leagueId),
           api.getLeagueRankings(leagueId, { lens, limit: 300 }),
           api.getLeagueUsers(leagueId),
           api.getLeagueRosters(leagueId),
           api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: 'unavailable' })),
+          // Same team-profiles endpoint TeamsScreen/MyTeamScreen use for
+          // `TeamAvatar` — avatar_id already has the server's real
+          // roster-metadata -> user-metadata fallback chain baked in
+          // (modules.sleeper.get_league_roster_profiles), unlike reading a
+          // raw Sleeper user's `avatar` field directly.
+          api.getLeagueTeamProfiles(leagueId).catch(() => ({ ok: true as const, profiles: {} })),
         ]);
         if (cancelled) return;
 
@@ -189,6 +207,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           const id = String(user.user_id ?? '');
           if (id) usersById.set(id, String(user.display_name ?? user.username ?? 'Unknown owner'));
         }
+        const teamProfiles: Record<string, TeamProfile> = teamProfilesResult.profiles ?? {};
         const teams: OtherTeam[] = rostersResult.rosters
           .map((roster) => {
             const rosterId = String(roster.roster_id ?? '');
@@ -197,6 +216,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             return {
               rosterId,
               ownerName: usersById.get(ownerId) ?? 'Unclaimed team',
+              avatarId: teamProfiles[rosterId]?.avatar_id ?? null,
               playerIds: new Set(players.map(String)),
             };
           })
@@ -265,6 +285,21 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
       .map((player) => ({ kind: 'player' as const, player }));
   }, [assetType, searchPool, pickSearchPool, selectedIds, selectedPickIds, search, positionFilter]);
 
+  // Switching which side new taps go to must also drop whatever text/position
+  // filter was scoped to the *other* side's roster — otherwise the search
+  // input's placeholder flips to "Search players to receive" while the field
+  // still holds e.g. "Washington" (typed to find a player already added to
+  // Send), silently zeroing the Receive results list against the opposing
+  // roster and making "Tap to add" look completely broken (coridian_,
+  // Discord: could add 2 players to Send but "cannot tap you receive side to
+  // add players to that side" — the tap worked, the leftover filter just
+  // hid every candidate).
+  const selectSide = (side: Side) => {
+    setActiveSide(side);
+    setSearch('');
+    setPositionFilter(null);
+  };
+
   const addPlayerToSide = (player: RankedPlayer) => {
     if (activeSide === 'send') {
       setSendIds((prev) => [...prev, player]);
@@ -307,7 +342,17 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
     setVerdict(null);
   };
 
+  // Quick Compare's instant readout — receive-side total minus send-side
+  // total, players only (ports Trade Calculator's own delta calc). Never
+  // server-computed: this is what lets Quick Compare stay instant and never
+  // call api.postTradeAnalyzer.
+  const quickCompareDelta = useMemo(
+    () => receiveIds.reduce((sum, p) => sum + playerScore(p), 0) - sendIds.reduce((sum, p) => sum + playerScore(p), 0),
+    [sendIds, receiveIds],
+  );
+
   const analyze = async () => {
+    if (quickMode) return;
     setAnalyzeError(null);
     setAnalyzing(true);
     try {
@@ -356,10 +401,24 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
 
   const header = (
     <View>
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenInfoNote
-        text={`The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`}
+        text={
+          quickMode
+            ? `Raw asset value only — ${leagueName}'s "Dynasty" valuations. Doesn't yet weigh roster fit or strategy, unlike the full Trade Analyzer.`
+            : `The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`
+        }
       />
+
+      <View style={styles.modeRow}>
+        <SegmentedTabBar<'full' | 'quick'>
+          options={[
+            { key: 'full', label: 'Full Analysis' },
+            { key: 'quick', label: 'Quick Compare' },
+          ]}
+          active={quickMode ? 'quick' : 'full'}
+          onChange={(key) => setQuickMode(key === 'quick')}
+        />
+      </View>
 
       <View style={styles.sidesRow}>
         <TradeSide
@@ -370,7 +429,7 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             ...sendPicks.map((pick): SideAssetItem => ({ kind: 'pick', pick })),
           ]}
           active={activeSide === 'send'}
-          onPressHeader={() => setActiveSide('send')}
+          onPressHeader={() => selectSide('send')}
           onRemove={(id) => removeFromSide('send', id)}
         />
         <TradeSide
@@ -381,25 +440,27 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
             ...receivePicks.map((pick): SideAssetItem => ({ kind: 'pick', pick })),
           ]}
           active={activeSide === 'receive'}
-          onPressHeader={() => setActiveSide('receive')}
+          onPressHeader={() => selectSide('receive')}
           onRemove={(id) => removeFromSide('receive', id)}
         />
       </View>
 
-      <View style={styles.assetTypeRow}>
-        <TouchableOpacity
-          style={[styles.pill, assetType === 'players' && styles.pillActive]}
-          onPress={() => setAssetType('players')}
-        >
-          <AppText style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.pill, assetType === 'picks' && styles.pillActive]}
-          onPress={() => setAssetType('picks')}
-        >
-          <AppText style={[styles.pillText, assetType === 'picks' && styles.pillTextActive]}>Picks</AppText>
-        </TouchableOpacity>
-      </View>
+      {!quickMode ? (
+        <View style={styles.assetTypeRow}>
+          <TouchableOpacity
+            style={[styles.pill, assetType === 'players' && styles.pillActive]}
+            onPress={() => setAssetType('players')}
+          >
+            <AppText style={[styles.pillText, assetType === 'players' && styles.pillTextActive]}>Players</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.pill, assetType === 'picks' && styles.pillActive]}
+            onPress={() => setAssetType('picks')}
+          >
+            <AppText style={[styles.pillText, assetType === 'picks' && styles.pillTextActive]}>Picks</AppText>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {assetType === 'players' ? (
         <View style={styles.teamRow}>
@@ -425,9 +486,10 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
           {otherTeams.map((team) => (
             <TouchableOpacity
               key={team.rosterId}
-              style={[styles.pill, selectedTeamId === team.rosterId && styles.pillActive]}
+              style={[styles.teamPill, selectedTeamId === team.rosterId && styles.pillActive]}
               onPress={() => setSelectedTeamId(team.rosterId)}
             >
+              <TeamAvatar avatarId={team.avatarId} size={16} />
               <AppText
                 style={[styles.pillText, selectedTeamId === team.rosterId && styles.pillTextActive]}
                 numberOfLines={1}
@@ -439,26 +501,41 @@ export default function TradeAnalyzerScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
-      <TouchableOpacity
-        style={[styles.analyzeButton, !hasAnyAssets && styles.analyzeButtonDisabled]}
-        onPress={analyze}
-        disabled={analyzing || !hasAnyAssets}
-      >
-        {analyzing ? <ActivityIndicator color="#fff" /> : <AppText style={styles.analyzeButtonText}>Analyze Trade</AppText>}
-      </TouchableOpacity>
+      {quickMode ? (
+        hasAnyAssets ? (
+          <View style={styles.quickCompareSection}>
+            <AppText style={styles.deltaLabel}>{valueDirectionLabel(quickCompareDelta)}</AppText>
+            <TradeValueBar delta={quickCompareDelta} style={styles.verdictValueBar} />
+          </View>
+        ) : null
+      ) : (
+        <>
+          <TouchableOpacity
+            style={[styles.analyzeButton, !hasAnyAssets && styles.analyzeButtonDisabled]}
+            onPress={analyze}
+            disabled={analyzing || !hasAnyAssets}
+          >
+            {analyzing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <AppText style={styles.analyzeButtonText}>Analyze Trade</AppText>
+            )}
+          </TouchableOpacity>
 
-      {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
-      {verdict ? (
-        <VerdictCard
-          verdict={verdict}
-          sendIds={sendIds}
-          receiveIds={receiveIds}
-          leagueId={leagueId}
-          leagueName={leagueName}
-          partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
-          onBuildCounter={applyCounterAction}
-        />
-      ) : null}
+          {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
+          {verdict ? (
+            <VerdictCard
+              verdict={verdict}
+              sendIds={sendIds}
+              receiveIds={receiveIds}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              partnerTeamName={otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? ''}
+              onBuildCounter={applyCounterAction}
+            />
+          ) : null}
+        </>
+      )}
 
       <TextInput
         style={styles.searchInput}
@@ -597,14 +674,48 @@ function VerdictCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
   const toneColor = toneColors(colors)[verdict.tone];
+  // trade_offer_analyzer.py's decide_offer_verdict already separates a
+  // routine ACCEPT/DECLINE from a genuinely lopsided one into its own named
+  // band (VERDICT_SMASH_ACCEPT / VERDICT_HARD_DECLINE) — that split only
+  // fires at the value/fit extremes _VALUE_SMASH / _VALUE_HARD, well beyond
+  // a normal accept/decline gap. Reusing that existing band string here
+  // (rather than re-deriving a client-side value-delta threshold) is what
+  // coridian_ asked for after a 2-for-nothing trade came back as a plain
+  // "HARD DECLINE, 90% confidence" card indistinguishable from a mild
+  // decline: "we need a custom screens for things like this ... when it's
+  // absolutely lopsided."
+  const isExtreme = verdict.band === 'HARD DECLINE' || verdict.band === 'SMASH ACCEPT';
   // Recorded alongside the share so the quiet Trade Outcomes result sweep
   // can re-value these same players under the same lens later.
   const { lens } = useValuationLens(leagueId);
 
   return (
-    <AnimatedCard style={StyleSheet.flatten([styles.verdictCard, { borderLeftColor: toneColor }])}>
+    <AnimatedCard
+      style={StyleSheet.flatten([
+        styles.verdictCard,
+        { borderLeftColor: toneColor },
+        isExtreme && styles.verdictCardExtreme,
+      ])}
+      // `glow` is this app's existing "the one card on screen that matters"
+      // treatment (Dashboard's Top Priority card) — reused as-is instead of
+      // inventing a second emphasis language, tinted to the verdict's own
+      // tone so an extreme accept glows success-green and an extreme decline
+      // glows danger-red.
+      glow={isExtreme}
+      glowColor={toneColor}
+    >
+      {isExtreme ? (
+        <View style={[styles.extremeEyebrowRow, { backgroundColor: toneColor }]}>
+          <Ionicons name="alert-circle" size={13} color="#fff" />
+          <AppText style={styles.extremeEyebrowText}>
+            {verdict.tone === 'accept' ? 'Extremely Lopsided In Your Favor' : 'Extremely Lopsided Against You'}
+          </AppText>
+        </View>
+      ) : null}
       <View style={styles.verdictHeaderRow}>
-        <AppText style={[styles.verdictBand, { color: toneColor }]}>{verdict.band}</AppText>
+        <AppText style={[styles.verdictBand, isExtreme && styles.verdictBandExtreme, { color: toneColor }]}>
+          {verdict.band}
+        </AppText>
         <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           <AppText style={styles.shareButtonText}>Share</AppText>
@@ -677,8 +788,11 @@ function VerdictCard({
  * One side (You Send / You Receive) of the trade being built — the same
  * Send/Receive card language Trade Hub/Trade Finder use for a proposed
  * trade's asset lists (§30), just editable here: each row's own tap removes
- * it instead of opening detail, and tapping the header makes this side the
- * active add target for the search list below.
+ * it instead of opening detail, and tapping anywhere on the card (not just
+ * the label row) makes this side the active add target for the search list
+ * below. The card itself is the touchable, so nested per-item rows (each a
+ * TouchableOpacity in their own right) still win their own taps for removal
+ * — RN resolves the responder to the deepest touchable under the finger.
  */
 function TradeSide({
   label,
@@ -698,11 +812,15 @@ function TradeSide({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={[styles.side, active && styles.sideActive]}>
-      <TouchableOpacity style={styles.sideLabelRow} onPress={onPressHeader} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[styles.side, active && styles.sideActive]}
+      onPress={onPressHeader}
+      activeOpacity={0.85}
+    >
+      <View style={styles.sideLabelRow}>
         <View style={[styles.sideDot, { backgroundColor: dotColor }]} />
         <AppText style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</AppText>
-      </TouchableOpacity>
+      </View>
       {items.length > 0 ? (
         <View style={styles.sideAssetSurface}>
           {items.map((item, index) => {
@@ -738,17 +856,14 @@ function TradeSide({
           })}
         </View>
       ) : (
-        <TouchableOpacity onPress={onPressHeader} activeOpacity={0.7}>
-          <AppText style={styles.sideEmpty}>Tap to add</AppText>
-        </TouchableOpacity>
+        <AppText style={styles.sideEmpty}>Tap to add</AppText>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {
@@ -760,6 +875,7 @@ function createStyles(colors: ThemeColors) {
   },
   disclaimer: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 16 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
+  modeRow: { marginBottom: spacing.sm },
   sidesRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   // The side panel is a drop target, so it needs a visible edge even when
   // inactive — a `surface` fill alone is only 1.09 against `background`.
@@ -798,6 +914,20 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
+  // Same pill as above, plus the leading TeamAvatar other-team filter pills
+  // show next to the owner name — "All Teams" keeps the plain `pill` style
+  // since it has no single team/avatar to show.
+  teamPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
   pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   pillTextActive: { color: '#fff' },
@@ -810,14 +940,43 @@ function createStyles(colors: ThemeColors) {
   },
   analyzeButtonDisabled: { opacity: disabledOpacity },
   analyzeButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  // Quick Compare's instant readout — same label + bar shape as the full
+  // verdict's value strip (below), just driven by a client-computed delta.
+  quickCompareSection: { marginBottom: spacing.md },
+  deltaLabel: {
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
   // AnimatedCard already supplies the surface fill/radius/border/shadow —
   // this just adds the tone-colored left rail and the card's own spacing.
   verdictCard: {
     borderLeftWidth: 4,
     marginBottom: spacing.md,
   },
+  // Extra left-rail weight for the SMASH ACCEPT / HARD DECLINE bands, on top
+  // of AnimatedCard's own `glow` rim+shadow — the rail alone reads too close
+  // to a normal verdict's 4pt rail once the glow is also present.
+  verdictCardExtreme: { borderLeftWidth: 6 },
+  // A solid, full-width tone-colored strip above the band — the one
+  // "unmissable even at a glance" cue, distinct from every other card on
+  // this screen which only ever gets a thin colored rail.
+  extremeEyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    marginBottom: spacing.sm,
+  },
+  extremeEyebrowText: { fontSize: 11, fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3 },
   verdictHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   verdictBand: { fontSize: 18, fontWeight: '800', marginBottom: spacing.xs },
+  verdictBandExtreme: { fontSize: 22 },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',

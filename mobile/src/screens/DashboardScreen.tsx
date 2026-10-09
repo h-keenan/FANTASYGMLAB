@@ -20,6 +20,8 @@ import PlayerInsightRow from '../components/PlayerInsightRow';
 import NewBadge from '../components/NewBadge';
 import PlayerAvatar from '../components/PlayerAvatar';
 import PositionBadge from '../components/PositionBadge';
+import RecapReadyCard from '../components/RecapReadyCard';
+import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
 import {
@@ -44,6 +46,7 @@ import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
 import { formatRank } from '../lib/percentile';
+import { getLastOpenedRecapId } from '../lib/recapSeen';
 import { diffAndRecordSeen } from '../lib/sinceLastCheckIn';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -64,7 +67,7 @@ const DESTINATION_BUTTON_LABEL: Record<string, string> = {
   waivers: 'Open Waivers',
 };
 const DESTINATION_ROUTE: Record<string, string> = {
-  trade_hub: 'TradeHub',
+  trade_hub: 'Trades',
   waivers: 'Waivers',
 };
 
@@ -74,6 +77,10 @@ interface LeaguePulseTile {
   note: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   color: string;
+  /** The tile's team's Sleeper avatar (`TeamRanking.avatar_url`) — null
+   * when no team currently qualifies for the tile (e.g. "No clear leader"),
+   * in which case TeamAvatar's own fallback circle renders instead. */
+  avatarUrl: string | null;
 }
 
 function bestByRank(teams: TeamRanking[], rankKey: 'power_rank' | 'draft_capital_rank'): TeamRanking | null {
@@ -123,9 +130,10 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
     {
       label: 'Biggest Contender',
       value: contender?.team_name ?? 'No clear leader',
-      note: contender ? `Power ${formatRank(contender.power_rank, contender.power_rank_tied)}` : 'No contender read available yet.',
+      note: contender ? `Roster Power ${formatRank(contender.power_rank, contender.power_rank_tied)}` : 'No contender read available yet.',
       icon: 'flame',
       color: colors.accent,
+      avatarUrl: contender?.avatar_url ?? null,
     },
     {
       label: 'Biggest Rebuilder',
@@ -135,6 +143,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
         : 'No rebuild read available yet.',
       icon: 'construct',
       color: colors.premium,
+      avatarUrl: rebuilder?.avatar_url ?? null,
     },
     {
       label: 'Draft Capital Leader',
@@ -142,6 +151,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
       note: draftLeader ? `Draft Capital ${formatRank(draftLeader.draft_capital_rank, draftLeader.draft_capital_rank_tied)}` : 'No draft-capital read available yet.',
       icon: 'layers',
       color: colors.success,
+      avatarUrl: draftLeader?.avatar_url ?? null,
     },
     {
       label: 'Most Active Manager',
@@ -152,6 +162,7 @@ function buildLeaguePulseTiles(teams: TeamRanking[], colors: ThemeColors): Leagu
           : 'No transaction activity tracked yet.',
       icon: 'repeat',
       color: colors.violet,
+      avatarUrl: mostActive?.avatar_url ?? null,
     },
   ];
   return tiles;
@@ -241,6 +252,13 @@ export default function DashboardScreen({ route, navigation }: Props) {
     queryFn: () => api.getLeagueMatchup(leagueId),
     enabled: !isRestoring,
   });
+  // Backs the "new recap ready" module below — same ready/incomplete gate
+  // AlertsScreen's own recap-ready card already uses.
+  const recapQuery = useQuery({
+    queryKey: queryKeys.recap(leagueId),
+    queryFn: () => api.getLeagueRecap(leagueId),
+    enabled: !isRestoring,
+  });
 
   const dashboardData = dashboardQuery.data;
   const items: DashboardItem[] | null = dashboardData?.items ?? null;
@@ -251,6 +269,28 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const notReadyReason: string | null = dashboardData?.reason || null;
   const teamRankings: TeamRanking[] | null = teamRankingsQuery.data?.teams ?? null;
   const matchup: MatchupResponse | null = matchupQuery.data ?? null;
+  // Ready AND not yet opened on this device (lib/recapSeen.ts, by recap_id —
+  // see that module's docstring for why id rather than week number) is what
+  // makes this a "new, unopened" alert rather than a permanent button —
+  // coridian_'s brief. Starts opened=true so a slower AsyncStorage read
+  // never flashes the card for a recap this device already saw.
+  const readyRecap = recapQuery.data?.recap && !recapQuery.data.recap.incomplete ? recapQuery.data.recap : null;
+  const [recapOpened, setRecapOpened] = useState(true);
+  useEffect(() => {
+    if (!readyRecap) {
+      setRecapOpened(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const lastOpenedId = await getLastOpenedRecapId(leagueId);
+      if (!cancelled) setRecapOpened(lastOpenedId === readyRecap.recap_id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId, readyRecap?.recap_id]);
+  const showRecapModule = readyRecap != null && !recapOpened;
 
   // No data at all yet (neither a persisted cache hit nor a prior in-memory
   // fetch) — the one case that still needs a blank-slate spinner. Once any
@@ -312,6 +352,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(leagueId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.teamRankings(leagueId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.matchup(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.recap(leagueId) });
     }, [queryClient, leagueId]),
   );
 
@@ -420,7 +461,20 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {/* Secondary context — useful, but not the answer to "what should I
           do next," so it sits below the actionable feed rather than
-          pushing it under the fold. */}
+          pushing it under the fold. A new, unopened League Recap is a
+          one-off alert (coridian_: "should not be a button there... should
+          be a module... whenever it's new and has been unopened"), so it
+          renders here as the same proven ready-card AlertsScreen already
+          uses, not as a permanent nav tile — it disappears the moment this
+          device actually opens that recap (see recapOpened above) and
+          never dominates the Hero/Needs Attention/Opportunities tiers
+          above it (Magna Carta §33). */}
+      {showRecapModule && readyRecap ? (
+        <RecapReadyCard
+          week={readyRecap.week}
+          onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
+        />
+      ) : null}
       {matchup ? (
         <WeeklyMatchupCard
           matchup={matchup}
@@ -470,9 +524,12 @@ function LeaguePulseSection({ teams }: { teams: TeamRanking[] }) {
               <Ionicons name={tile.icon} size={12} color={tile.color} />
               <AppText style={[styles.pulseLabel, { color: tile.color }]}>{tile.label.toUpperCase()}</AppText>
             </View>
-            <AppText style={styles.pulseValue} numberOfLines={1}>
-              {tile.value}
-            </AppText>
+            <View style={styles.pulseValueRow}>
+              <TeamAvatar avatarId={tile.avatarUrl} size={20} />
+              <AppText style={styles.pulseValue} numberOfLines={1}>
+                {tile.value}
+              </AppText>
+            </View>
             <AppText style={styles.pulseNote} numberOfLines={1}>
               {tile.note}
             </AppText>
@@ -499,12 +556,12 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 // the same color everywhere, not a fresh one invented per screen.
 function quickActions(colors: ThemeColors): Array<{
   label: string;
-  route: 'TradeHub' | 'Players' | 'Waivers' | 'DraftCenter';
+  route: 'Trades' | 'Players' | 'Waivers' | 'DraftCenter';
   icon: React.ComponentProps<typeof IconCircle>['name'];
   color: string;
 }> {
   return [
-    { label: 'Trade Hub', route: 'TradeHub', icon: 'shuffle-outline', color: colors.premium },
+    { label: 'Trades', route: 'Trades', icon: 'shuffle-outline', color: colors.premium },
     { label: 'Rankings', route: 'Players', icon: 'people-outline', color: colors.violet },
     { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
     { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
@@ -604,7 +661,7 @@ function TradeAssetRow({ asset }: { asset: PresentationAsset }) {
  * PR #682 introduced for Player Detail's Stats tab) instead of a
  * Dashboard-only tile style — these five metrics are ranks/counts, not
  * percentiles, so MetricCard's percentile prop is simply omitted (it
- * already renders fine as plain label+value in that case). Power/Franchise
+ * already renders fine as plain label+value in that case). Roster Power/Franchise
  * stay tappable through to Teams; Injuries stays deliberately non-tappable
  * (the Needs Attention section below already carries "the why" when there
  * is one), and gets `valueColor` emphasis when non-zero instead of a
@@ -634,16 +691,17 @@ function TeamSnapshotRow({
     <View style={styles.snapshotSection}>
       <SectionHeading title="League Snapshot" icon="stats-chart" />
       <View style={styles.snapshotRow}>
-        {/* Concept sheet groups these as a 3-up row (Record/Power/Franchise)
-         * over a 2-up row (Avg Age/Injuries) rather than an even wrap — a
-         * per-instance flexBasis override on MetricCard's existing `style`
-         * prop (same override mechanism PR #743 used for PlayerDetail),
-         * not a change to MetricCard's own shared default sizing, so no
-         * other MetricCard consumer is affected. */}
-        <MetricCard label="Record" value={record} style={styles.snapshotTileThird} />
+        {/* Concept sheet groups these as a 3-up row (Record/Roster Power/
+         * Franchise) over a 2-up row (Avg Age/Injuries) rather than an even
+         * wrap — a per-instance flexBasis override on MetricCard's existing
+         * `style` prop (same override mechanism PR #743 used for
+         * PlayerDetail), not a change to MetricCard's own shared default
+         * sizing, so no other MetricCard consumer is affected. */}
+        <MetricCard label="Record" icon="ribbon-outline" value={record} style={styles.snapshotTileThird} />
         {snapshot.power_rank != null ? (
           <MetricCard
-            label="Power"
+            label="Roster Power"
+            icon="flash"
             value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)}
             onPress={goToTeams}
             style={styles.snapshotTileThird}
@@ -652,6 +710,7 @@ function TeamSnapshotRow({
         {snapshot.franchise_rank != null ? (
           <MetricCard
             label="Franchise"
+            icon="star"
             value={formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied)}
             onPress={goToTeams}
             style={styles.snapshotTileThird}
@@ -659,11 +718,13 @@ function TeamSnapshotRow({
         ) : null}
         <MetricCard
           label="Avg Age"
+          icon="hourglass-outline"
           value={snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—'}
           style={styles.snapshotTileHalf}
         />
         <MetricCard
           label="Injuries"
+          icon="medkit-outline"
           value={injuredCount != null ? String(injuredCount) : '—'}
           valueColor={injuredCount != null && injuredCount > 0 ? colors.danger : undefined}
           style={styles.snapshotTileHalf}
@@ -1114,7 +1175,8 @@ function createStyles(colors: ThemeColors) {
   },
   pulseLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pulseLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
-  pulseValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: 4 },
+  pulseValueRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  pulseValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
   pulseNote: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   checkInBanner: {
     flexDirection: 'row',

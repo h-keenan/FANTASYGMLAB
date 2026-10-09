@@ -5,6 +5,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { keepPreviousData, useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -20,7 +21,9 @@ import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { markRecapOpened } from '../lib/recapSeen';
 import { useOrbClearance } from '../lib/orbLayout';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -121,15 +124,38 @@ export default function RecapScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
-  const [recap, setRecap] = useState<WeeklyRecap | null>(null);
-  const [maxCompletedWeek, setMaxCompletedWeek] = useState(0);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
-  const [notReady, setNotReady] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [tradeStory, setTradeStory] = useState<RecapStory | null>(null);
   const [rosterMap, setRosterMap] = useState<RosterMap>({});
+  const isRestoring = useIsRestoring();
+  // When `selectedWeek` is null (the initial, "current recap" load), this
+  // query key matches queryKeys.recap(leagueId) exactly, so it shares its
+  // cache entry with Dashboard/Alerts/LeagueDetail/GmOrb's own recap
+  // fetches. Picking a specific past week below gets its own cache entry —
+  // those screens never request a specific past week, so there's nothing
+  // to share for that case.
+  const recapQueryKey =
+    selectedWeek != null ? ([...queryKeys.recap(leagueId), 'week', selectedWeek] as const) : queryKeys.recap(leagueId);
+  const recapQuery = useQuery({
+    queryKey: recapQueryKey,
+    queryFn: () => api.getLeagueRecap(leagueId, selectedWeek != null ? { week: selectedWeek } : undefined),
+    enabled: !isRestoring,
+    // A week switch intentionally clears the prior week's recap rather than
+    // leaving it on screen as if still current (see the loading skeleton
+    // below) — but the early "not ready"/`!recap` guards below still need
+    // *some* data to read while the new week is in flight, so the previous
+    // week's response stays available as a placeholder until the new one
+    // resolves.
+    placeholderData: keepPreviousData,
+  });
+  const recapData = recapQuery.data;
+  const recap: WeeklyRecap | null = recapData?.recap ?? null;
+  const maxCompletedWeek = recapData?.max_completed_week ?? 0;
+  const notReady = recapData != null && !recapData.recap;
+  const loading = isRestoring || recapQuery.isFetching;
+  const error =
+    recapQuery.isError && !recapData ? toUserErrorMessage(recapQuery.error, 'Failed to load recap.') : null;
 
   useScreenHeaderTitle(navigation, 'Recap', leagueName);
 
@@ -145,30 +171,16 @@ export default function RecapScreen({ route, navigation }: Props) {
     });
   }, [navigation, leagueId, styles]);
 
+  // Marks this exact recap (by fingerprint-based recap_id, not week number)
+  // as opened on this device — see lib/recapSeen.ts. Firing this from
+  // RecapScreen itself, regardless of which entry point got the user here,
+  // is what keeps Dashboard's "new recap" module from reappearing once the
+  // recap has actually been viewed.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const result = await api.getLeagueRecap(leagueId, selectedWeek != null ? { week: selectedWeek } : undefined);
-        if (cancelled) return;
-        setMaxCompletedWeek(result.max_completed_week);
-        if (result.recap) {
-          setRecap(result.recap);
-          setNotReady(false);
-        } else {
-          setNotReady(true);
-        }
-      } catch (err) {
-        if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load recap.'));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId, selectedWeek]);
+    if (recap && !recap.incomplete) {
+      void markRecapOpened(leagueId, recap.recap_id);
+    }
+  }, [leagueId, recap]);
 
   // Story cards navigate to TeamRoster, which (like TeamsScreen/LeagueDetailScreen)
   // needs a pre-fetched playerIds list per roster_id — best-effort: a story
@@ -342,7 +354,13 @@ export default function RecapScreen({ route, navigation }: Props) {
         recap={recap}
         rosterMap={rosterMap}
       />
-      <RecapTradeDetailModal visible={tradeStory != null} onClose={() => setTradeStory(null)} story={tradeStory} />
+      <RecapTradeDetailModal
+        visible={tradeStory != null}
+        onClose={() => setTradeStory(null)}
+        story={tradeStory}
+        primaryAvatarId={avatarFor(rosterMap, tradeStory?.primary_roster_id)}
+        secondaryAvatarId={avatarFor(rosterMap, tradeStory?.secondary_roster_id)}
+      />
     </View>
   );
 }

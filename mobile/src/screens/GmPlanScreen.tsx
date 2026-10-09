@@ -174,6 +174,24 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
                 />
               );
             }
+            if ('injury_need_positions' in item) {
+              // GM Plan's injury-awareness fix: this fact only ever appears
+              // when modules.gm_plan found a significant injury at an
+              // active/starting position with no healthy bench cover, so it
+              // always reads as a risk flag, same danger-accent convention
+              // Roster Construction's weak-spot rows use above.
+              const positions = item.injury_need_positions.join(', ');
+              return (
+                <InsightRow
+                  key={`${focusArea.key}-${index}`}
+                  icon="alert-circle-outline"
+                  color={colors.danger}
+                  headline={`${item.health_flag || item.label}: ${positions}`}
+                  detail={item.summary || `No healthy bench cover at ${positions}.`}
+                  last={last}
+                />
+              );
+            }
             if ('rank' in item) {
               const tieNote = item.tied ? ' (tied)' : '';
               const weakSpot = 'relative_weak_spot' in item && item.relative_weak_spot;
@@ -195,6 +213,24 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
                   icon="ribbon-outline"
                   color={colors.accent}
                   headline={`Record: ${item.wins ?? 0}-${item.losses ?? 0}${item.ties ? `-${item.ties}` : ''}`}
+                  last={last}
+                />
+              );
+            }
+            if ('playoff_probability' in item) {
+              // Same real Monte Carlo simulation the standalone Playoff
+              // Odds screen renders (modules.playoff_simulator) — "Where
+              // You Stand" previously showed Power Rank/Draft Capital
+              // Rank/record but never checked this already-cached answer
+              // to exactly the question this section asks.
+              const statusNote = item.clinched ? ' · Clinched' : item.eliminated ? ' · Eliminated' : '';
+              const seedNote = item.median_seed ? `, projected ${item.median_seed}-seed` : '';
+              return (
+                <InsightRow
+                  key={`${focusArea.key}-${index}`}
+                  icon="trophy-outline"
+                  color={colors.accent}
+                  headline={`${Math.round(item.playoff_probability)}% to make the playoffs${seedNote}${statusNote}`}
                   last={last}
                 />
               );

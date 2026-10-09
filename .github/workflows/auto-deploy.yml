@@ -1,0 +1,121 @@
+name: Auto Deploy
+
+# Closes the gap left by the self-hosted cutover (see
+# docs/SELF_HOSTED_MIGRATION.md section 5.7 and commit 095af09, which
+# retired the Render-specific keep-alive workflow): Render auto-deployed
+# on every push to `main`; this self-hosted box does not, by default.
+# `players-db-refresh.yml` (every 6h) and `injury-status-sync.yml` (every
+# 30min) both commit straight to `main` on a schedule, so without this
+# workflow production can silently drift behind `main` by an unbounded
+# amount — confirmed in the production audit that prompted this change.
+#
+# Triggered by workflow_run on "Delivery Validation" (ci.yml, which also
+# runs its `test` job on every push to `main` — see
+# players-db-refresh.yml's own push-loop-safety comment for why that
+# doesn't chain into anything else) rather than directly on `push`, so a
+# real deploy only ever follows a green CI run against the exact commit
+# being deployed — never a race against tests still running.
+#
+# Deliberately does NOT reuse "Trusted Delivery" (auto-merge.yml): that
+# workflow only acts when the completed run's event is `pull_request` (it
+# marks PRs ready and merges them); this one only acts when the completed
+# run's event is `push` to `main` (it deploys what Trusted Delivery just
+# merged, or what a cron data-refresh workflow just committed). Same
+# workflow_run trigger, disjoint `if:` conditions, no overlap.
+#
+# SSHes in as the `fgl-releaser` scoped account (see
+# docs/SELF_HOSTED_MIGRATION.md section 5.6) and runs its forced command —
+# this workflow never sends `deploy/release_deploy.sh` as a literal
+# command string; the account's `authorized_keys` forced-command entry
+# runs that exact script regardless of what's requested, so there's
+# nothing here for a compromised workflow to redirect. No shell, no pty,
+# no port-forwarding are possible over this key by design (section 5.6).
+#
+# Required repository secrets (none of these exist yet as of this
+# workflow's introduction — see the PR description for exactly what to
+# add before this can fire for real):
+#   FGL_RELEASER_SSH_KEY     - private key matching the public key already
+#                              installed in fgl-releaser's authorized_keys
+#                              (section 5.6). Never the `deploy` admin
+#                              account's key.
+#   FGL_RELEASER_HOST        - production box's hostname or IP.
+#   FGL_RELEASER_KNOWN_HOSTS - that host's SSH host key(s), exactly as
+#                              `ssh-keyscan <host>` prints them, captured
+#                              once out-of-band by someone who can already
+#                              verify the box's identity. Used to pin the
+#                              host key via StrictHostKeyChecking=yes +
+#                              UserKnownHostsFile, NOT to disable host-key
+#                              checking — see the step below for why that
+#                              line is never weakened to work around a
+#                              missing secret.
+on:
+  workflow_run:
+    workflows: ["Delivery Validation"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Serialize deploys: release_deploy.sh does a fast-forward-only merge
+  # plus `docker compose build`/`up -d` on the box's one checkout — two
+  # overlapping runs (e.g. a cron data-refresh commit landing seconds
+  # after a PR merge) could otherwise race each other on the same
+  # worktree. Never cancel-in-progress: a deploy that's already rebuilding
+  # containers should finish, not get killed mid-restart.
+  group: fgl-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require deploy secrets
+        run: |
+          missing=()
+          [ -z "${{ secrets.FGL_RELEASER_SSH_KEY }}" ] && missing+=("FGL_RELEASER_SSH_KEY")
+          [ -z "${{ secrets.FGL_RELEASER_HOST }}" ] && missing+=("FGL_RELEASER_HOST")
+          [ -z "${{ secrets.FGL_RELEASER_KNOWN_HOSTS }}" ] && missing+=("FGL_RELEASER_KNOWN_HOSTS")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required repository secret(s): ${missing[*]}. See docs/SELF_HOSTED_MIGRATION.md section 5.7 for how to provision each one. This workflow intentionally fails closed rather than skipping the deploy silently or weakening host-key verification to work around a missing secret."
+            exit 1
+          fi
+
+      - name: Deploy to production via fgl-releaser
+        env:
+          FGL_RELEASER_HOST: ${{ secrets.FGL_RELEASER_HOST }}
+          FGL_RELEASER_SSH_KEY: ${{ secrets.FGL_RELEASER_SSH_KEY }}
+          FGL_RELEASER_KNOWN_HOSTS: ${{ secrets.FGL_RELEASER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          work_dir="$(mktemp -d)"
+          trap 'rm -rf "$work_dir"' EXIT
+
+          key_file="$work_dir/fgl-releaser.key"
+          known_hosts_file="$work_dir/known_hosts"
+          printf '%s\n' "$FGL_RELEASER_SSH_KEY" > "$key_file"
+          printf '%s\n' "$FGL_RELEASER_KNOWN_HOSTS" > "$known_hosts_file"
+          chmod 600 "$key_file"
+
+          # StrictHostKeyChecking=yes + a pinned UserKnownHostsFile, never
+          # `-o StrictHostKeyChecking=no`: this key can trigger a
+          # production deploy, so this workflow verifies it's actually
+          # talking to the production box, not something impersonating it
+          # (e.g. DNS/ARP spoofing of a misconfigured runner route).
+          #
+          # No command is passed to `ssh` on purpose — fgl-releaser's
+          # forced command (section 5.6) runs deploy/release_deploy.sh
+          # regardless of what's requested, so requesting anything else
+          # here would be misleading dead code, not a real choice.
+          ssh \
+            -i "$key_file" \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$known_hosts_file" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=15 \
+            "fgl-releaser@${FGL_RELEASER_HOST}"

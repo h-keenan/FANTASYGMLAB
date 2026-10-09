@@ -114,7 +114,7 @@ def test_concept_tiles_preserve_comparison_for_posture():
 def test_roster_posture_uses_league_comparisons_when_available():
     source = (ROOT / "modules" / "my_team_ui.py").read_text(encoding="utf-8")
     assert "dashboard_comparison_payloads" in source
-    assert 'posture_comparisons.get("Power Rank")' in source
+    assert 'posture_comparisons.get("Roster Power")' in source
     assert 'posture_comparisons.get("Franchise Rank")' in source
 
 

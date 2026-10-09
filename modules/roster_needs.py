@@ -6,6 +6,19 @@ import pandas as pd
 from modules import runtime_trace
 
 CORE_POSITIONS = ("QB", "RB", "WR", "TE")
+
+# Shallow, single-starter rooms. Unlike CORE_POSITIONS -- where "how many
+# playable bodies do you have" sits on a real depth gradient (a second RB or
+# third WR has genuine bench/trade value) -- a league only ever starts one K
+# and one DEF. A second rostered kicker has ~zero roster-construction value
+# no matter how strong its raw score looks, so these positions get their own
+# binary-ish coverage model (classify_shallow_position_rooms /
+# true_shallow_position_needs below) instead of being folded into the
+# depth-gradient machinery that classify_roster_rooms/true_roster_needs use
+# for CORE_POSITIONS, or omitted from the needs model entirely (the latter is
+# the root cause of kicker/defense "acquire" trade suggestions being pushed
+# at teams that already have one of each and don't want another).
+SHALLOW_POSITIONS = ("K", "DEF")
 STRONG_TIERS = {"elite", "star", "core starter", "starter"}
 PLAYABLE_OPPORTUNITIES = {
     "elite opportunity",
@@ -436,6 +449,126 @@ def true_roster_needs(
     for position in CORE_POSITIONS:
         if rooms[position]["true_need"] and position not in needs:
             needs.append(position)
+    return needs, rooms
+
+
+def _is_shallow_position_disqualified(row) -> bool:
+    """Disqualifying status for a shallow-position (K/DEF) starter.
+
+    Reuses the shared ``_is_unavailable`` IR/out/suspended check and adds
+    "retired", which never matters for depth positions (a retired RB simply
+    isn't rostered) but does show up on long-tenured kickers/defenses whose
+    row lingers on a roster.
+    """
+    if _is_unavailable(row):
+        return True
+    status = _text(row, "status", "injury_status")
+    return "retired" in status
+
+
+@runtime_trace.traced("classify_shallow_position_rooms", phase="team_needs")
+def classify_shallow_position_rooms(
+    roster_df: pd.DataFrame,
+    league_settings: dict | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Binary-ish coverage model for shallow, single-starter rooms (K/DEF).
+
+    CORE_POSITIONS' coverage model is tuned for a real depth gradient --
+    required starter counts greater than one, backups with standalone trade
+    value, developmental/future-asset tracking, etc. None of that fits K/DEF:
+    a league starts exactly one of each, a second rostered one has no
+    standalone value, and "developmental kicker" isn't a real roster
+    construction concept. So this is deliberately a much simpler, analogous
+    room record: a position is "covered" if the team has at least one
+    rostered, non-disqualified (not IR/out/suspended/retired/etc.) player
+    there; otherwise it's a true, surfaceable need.
+    """
+    roster = roster_df.copy() if roster_df is not None else pd.DataFrame()
+    settings = league_settings or {}
+    # Unlike the CORE_POSITIONS required-starter counts above, a shallow
+    # position's settings key can be a meaningful, explicit 0 (e.g.
+    # modules.league_value_settings computes "k_count" straight from the
+    # league's roster_positions, and plenty of real formats start no
+    # kicker at all) -- `settings.get("k_count") or 1` would wrongly
+    # collapse that explicit 0 back to 1 and flag every team in a
+    # no-kicker league as missing one. Only fall back to the default when
+    # the key is genuinely absent (unknown format), never when it's
+    # present and zero.
+    def _required_shallow_starters(*keys: str, default: int = 1) -> int:
+        for key in keys:
+            value = settings.get(key)
+            if value is not None:
+                try:
+                    return max(0, int(value))
+                except (TypeError, ValueError):
+                    continue
+        return default
+
+    required = {
+        "K": _required_shallow_starters("k_count"),
+        "DEF": _required_shallow_starters("def_count", "dst_count"),
+    }
+
+    rooms: dict[str, dict[str, Any]] = {}
+    for position in SHALLOW_POSITIONS:
+        position_df = (
+            roster[
+                roster.get("position", pd.Series("", index=roster.index))
+                .fillna("")
+                .astype(str)
+                .str.upper()
+                .eq(position)
+            ].copy()
+            if not roster.empty
+            else pd.DataFrame()
+        )
+        rostered_ids: list[str] = []
+        startable_ids: list[str] = []
+        disqualified_ids: list[str] = []
+        for _, row in position_df.iterrows():
+            player_id = str(row.get("player_id") or "").strip()
+            rostered_ids.append(player_id)
+            if _is_shallow_position_disqualified(row):
+                disqualified_ids.append(player_id)
+            else:
+                startable_ids.append(player_id)
+
+        startable_count = len(startable_ids)
+        true_need = startable_count < required[position]
+        if true_need and not rostered_ids:
+            need_type = f"no rostered {position.lower()}"
+        elif true_need:
+            need_type = f"rostered {position.lower()} unavailable (IR/retired/etc.)"
+        else:
+            need_type = "covered"
+
+        rooms[position] = {
+            "position": position,
+            "required_starters": required[position],
+            "rostered_ids": rostered_ids,
+            "startable_ids": startable_ids,
+            "disqualified_ids": disqualified_ids,
+            "startable_count": startable_count,
+            "true_need": true_need,
+            "need_type": need_type,
+        }
+    return rooms
+
+
+@runtime_trace.traced("true_shallow_position_needs", phase="team_needs")
+def true_shallow_position_needs(
+    roster_df: pd.DataFrame,
+    league_settings: dict | None = None,
+) -> tuple[list[str], dict[str, dict[str, Any]]]:
+    """``true_roster_needs``'s analog for shallow, single-starter rooms.
+
+    Returns the K/DEF positions that are real gaps (no startable rostered
+    player) alongside their room records, kept separate from
+    ``true_roster_needs`` so CORE_POSITIONS' depth-gradient need policy stays
+    untouched.
+    """
+    rooms = classify_shallow_position_rooms(roster_df, league_settings)
+    needs = [position for position in SHALLOW_POSITIONS if rooms[position]["true_need"]]
     return needs, rooms
 
 

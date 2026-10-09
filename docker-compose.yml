@@ -84,6 +84,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Baked into the image (see Dockerfile) rather than passed as a
+      # runtime `environment:` var, so modules/build_identity.py keeps
+      # reporting the right commit/timestamp across a container restart
+      # that doesn't go through deploy/release_deploy.sh — e.g. the
+      # systemd unit's `docker compose up -d` on every host boot, which
+      # has no shell env set at all. A runtime-only var would silently
+      # reset to "local"/empty on any such restart. deploy/release_deploy.sh
+      # exports both from the commit it's about to build right before
+      # `docker compose build`; `:-local`/empty only applies to a manual
+      # `docker compose build` run outside that script.
+      args:
+        DYNASTYGM_BUILD: ${DYNASTYGM_BUILD:-local}
+        DYNASTYGM_DEPLOYED_AT: ${DYNASTYGM_DEPLOYED_AT:-}
     image: fantasygmlab-app:latest
     # NOTE: command must go through a shell ("sh -c") for $PORT to expand —
     # Compose's bare string/list command form is argv-exec'd directly (no
@@ -171,6 +184,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # See the "web" service's build.args comment above.
+      args:
+        DYNASTYGM_BUILD: ${DYNASTYGM_BUILD:-local}
+        DYNASTYGM_DEPLOYED_AT: ${DYNASTYGM_DEPLOYED_AT:-}
     image: fantasygmlab-app:latest
     # See the "web" service's command comment above for why this is
     # wrapped in sh -c and uses the doubled "$$PORT"/"$$MOBILE_API_WORKERS".

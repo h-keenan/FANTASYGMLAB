@@ -885,12 +885,12 @@ def render_my_team_workspace(
             "hide_icon": True,
         },
         {
-            "label": "Power",
+            "label": "Roster Power",
             "title": format_rank(team_row.get("power_rank"), tied=bool(team_row.get("power_rank_tied"))),
             "body": f"Starter unit {format_rank(team_row.get('starter_rank'), tied=bool(team_row.get('starter_rank_tied')))}",
             "tone": "power",
-            "comparison": posture_comparisons.get("Power Rank"),
-            "tappable": bool(posture_comparisons.get("Power Rank")),
+            "comparison": posture_comparisons.get("Roster Power"),
+            "tappable": bool(posture_comparisons.get("Roster Power")),
             "hide_icon": False,
         },
     ]
@@ -909,7 +909,7 @@ def render_my_team_workspace(
                 "hide_icon": False,
             },
         )
-    # Keep league_rank_rows live — used above for clickable Power/Franchise comparisons.
+    # Keep league_rank_rows live — used above for clickable Roster Power/Franchise comparisons.
     _ = (truncate_text, injured_starters, key_injuries_summary, format_score)
     with st.container(key="my_team_roster_signals"):
         render_summary_tiles(

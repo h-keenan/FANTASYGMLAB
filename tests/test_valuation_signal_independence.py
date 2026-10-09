@@ -280,3 +280,92 @@ def test_weights_sum_and_independent_block_material():
         + rankings.COMPOSITE_WEIGHT_OPPORTUNITY
     )
     assert independent >= 0.28
+
+
+def test_role_score_consults_depth_chart_order_for_unrecognized_depth_string():
+    """Regression for the Chimere Dike "STARTER" tag bug report: Sleeper's
+    ``depth_chart_position`` can hold a slot/specialist label (e.g. "SWR"
+    for slot WR) that matches none of role_score's recognized text
+    patterns (digit-suffixed "WR1"/"WR2"/"WR3", "START"/"FIRST",
+    "BACKUP"). Before the fix, that unrecognized-but-present string fell
+    straight through to a flat 4200 default *regardless of*
+    ``depth_chart_order`` — the real, independently supplied "what number
+    string is this player" signal — handing a real 5th-string player (Dike:
+    depth_chart_position "SWR", depth_chart_order 5) a HIGHER role_score
+    than an explicitly recognized BACKUP (3600) or numeric WR3 (3300).
+    """
+
+    unrecognized_but_buried = rankings.role_score("WR", "SWR", 0.0, depth_chart_order=5)
+    explicit_backup = rankings.role_score("WR", "BACKUP", 0.0)
+    explicit_wr3 = rankings.role_score("WR", "WR3", 0.0)
+
+    assert unrecognized_but_buried < explicit_backup
+    assert unrecognized_but_buried < explicit_wr3
+
+    # Depth-chart order 1/2/3 behind an unrecognized string must score the
+    # same as the equivalent explicit numeric slot.
+    assert rankings.role_score("WR", "SWR", 0.0, depth_chart_order=1) == rankings.role_score("WR", "WR1", 0.0)
+    assert rankings.role_score("WR", "SWR", 0.0, depth_chart_order=2) == rankings.role_score("WR", "WR2", 0.0)
+    assert rankings.role_score("WR", "SWR", 0.0, depth_chart_order=3) == rankings.role_score("WR", "WR3", 0.0)
+
+    # No depth_chart_order at all (and no recognized string) still falls
+    # back to the old neutral default — behavior preserved for truly
+    # unknown players.
+    assert rankings.role_score("WR", "SWR", 0.0, depth_chart_order=None) == 4200
+    assert rankings.role_score("WR", "", 0.0, depth_chart_order=5) == 3800  # no depth string at all
+
+
+def test_backup_with_upside_workload_trend_requires_an_actual_rising_signal():
+    """Regression for the same bug report: ``opportunity_label ==
+    "Backup With Upside"`` is assigned purely from age/experience
+    (``young_upside``), independent of any real recent-usage trend. Before
+    the fix, ``workload_trend`` hardcoded "Rising" for this label
+    unconditionally — inconsistent with the "Strong Opportunity"/
+    "Committee Back" branch right above it, which correctly only says
+    "Rising" when there's a substantiating trend signal. That silently
+    defeated modules.waivers_ui.rank_priority_add_candidates' own
+    ``workload_trend == "Blocked"`` gate for a young, near-zero-usage
+    player: Dike (7% snap share, 2 targets in 3 games) got told his role
+    was "Rising" instead of reflecting that he has no live current role.
+    """
+
+    buried_young_no_trend = rankings.opportunity_profile(
+        "WR",
+        "SWR",
+        market_score=0.0,
+        depth_chart_order=5,
+        years_exp=1,
+        age=24,
+        status="Active",
+        injury_status="",
+        games_played=3,
+        targets=2,
+        receptions=2,
+        snap_share=0.0736196319018405,
+    )
+    assert buried_young_no_trend["opportunity_label"] == "Backup With Upside"
+    assert buried_young_no_trend["workload_trend"] == "Blocked"
+
+    # A genuinely rising young backup (clear positive weekly-recency trend,
+    # enough sample to trust it) must still be allowed to say "Rising".
+    rising_young_backup = rankings.opportunity_profile(
+        "WR",
+        "SWR",
+        market_score=0.0,
+        depth_chart_order=3,
+        years_exp=1,
+        age=23,
+        status="Active",
+        injury_status="",
+        games_played=5,
+        targets=20,
+        receptions=14,
+        snap_share=0.55,
+        recency_trend=0.30,
+        recency_confidence=0.9,
+        recency_sample_n=4,
+        recency_usage_rate=0.5,
+        recency_baseline_rate=0.3,
+    )
+    assert rising_young_backup["opportunity_label"] in {"Backup With Upside", "Strong Opportunity"}
+    assert rising_young_backup["workload_trend"] == "Rising"

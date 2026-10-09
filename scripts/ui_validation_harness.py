@@ -1080,7 +1080,7 @@ def _league() -> None:
         "league",
         (
             "Standings",
-            "Power Rankings",
+            "Roster Power Rankings",
             "Franchise Value",
             "Draft Capital",
             "How to read these boards",
@@ -1091,7 +1091,7 @@ def _league() -> None:
     ui_primitives.render_section_header(
         "2026 Standings",
         eyebrow="Where you stand",
-        subtitle="Through Week 8. Actual results — separate from Power Rankings strength.",
+        subtitle="Through Week 8. Actual results — separate from Roster Power Rankings strength.",
     )
     from modules import league_standings
 
@@ -1291,7 +1291,7 @@ def _league() -> None:
     )
     st.caption("Standings = actual results. Boards below = roster strength, dynasty value, and draft capital.")
     ui_primitives.render_section_header(
-        "Power Rankings",
+        "Roster Power Rankings",
         eyebrow="Who is strongest",
         subtitle="Current lineup strength appears before supporting education.",
     )
@@ -1400,7 +1400,7 @@ def _league() -> None:
         workspace_ui.concept_band_html(
             [
                 {
-                    "label": "Power Rank",
+                    "label": "Roster Power",
                     "title": "Current strength",
                     "body": "Starter quality and usable depth.",
                     "tone": "power",
@@ -1422,7 +1422,7 @@ def _league() -> None:
                 "label": "Pressure Teams",
                 "title": "Bottom-tier rosters with the most immediate strain",
                 "tone": "weakness",
-                "items": ["War Room Synthetic | Power #4"],
+                "items": ["War Room Synthetic | Roster Power #4"],
             }
         ]
     )
@@ -1906,10 +1906,10 @@ def _my_team() -> None:
         ),
         unsafe_allow_html=True,
     )
-    ui_primitives.render_section_header("Roster Signals", eyebrow="Ranks", subtitle="Power and franchise ranks without repeating strategy.")
+    ui_primitives.render_section_header("Roster Signals", eyebrow="Ranks", subtitle="Roster Power and franchise ranks without repeating strategy.")
     _tiles([
         {"label": "Outlook", "value": "Balanced Contender", "note": "Strong current roster with manageable gaps."},
-        {"label": "Power", "value": "#4", "note": "Starter unit #3."},
+        {"label": "Roster Power", "value": "#4", "note": "Starter unit #3."},
     ])
     ui_primitives.render_section_header("Strength & Pressure", eyebrow="What matters", subtitle="Existing strengths and short-term coverage needs.")
     _tiles([
@@ -2489,7 +2489,11 @@ def _guest_landing() -> None:
                 "Sleeper Username",
                 key="guest_landing_fixture_username",
                 placeholder="Enter your Sleeper username",
-                autocomplete="username",
+                # Mirrors app.py's home_launch_username_input: not a site
+                # login credential, so it must not collide with the real
+                # sign-in form's own autocomplete pair rendered on the
+                # same fixture page.
+                autocomplete="off",
             )
             st.form_submit_button("Load my leagues", use_container_width=True, type="primary")
 

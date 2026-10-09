@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import BrandedSpinner from '../components/BrandedSpinner';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -19,6 +20,7 @@ import { api, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -30,7 +32,7 @@ type RankingMetric = NonNullable<Props['route']['params']['metric']>;
 
 /**
  * Per-metric leaderboard config — the one thing that changes between "Teams"
- * (Power Rank, the long-standing default) and a metric-specific drill-down
+ * (Roster Power, the long-standing default) and a metric-specific drill-down
  * (e.g. Age, opened from My Team's Analysis tab tiles via TeamAnalysisPanel).
  * Every metric here already exists on `TeamRanking` for every team in the
  * league (modules/team_eval.py + modules/league_rankings.py via
@@ -52,10 +54,10 @@ const METRIC_CONFIG: Record<
 > = {
   power: {
     title: 'Teams',
-    pillLabel: 'POWER',
-    infoLabel: 'How Power Rank works',
+    pillLabel: 'ROSTER POWER',
+    infoLabel: 'How Roster Power works',
     infoText:
-      'Teams are ordered by Power Rank — roster strength (starters + bench), not record — so you can see exactly where every team in the league stacks up. Your team is marked You and highlighted below.',
+      'Teams are ordered by Roster Power — roster strength (starters + bench), not record — so you can see exactly where every team in the league stacks up. Your team is marked You and highlighted below.',
     rank: (team) => team.power_rank,
     tied: (team) => team.power_rank_tied,
   },
@@ -139,6 +141,38 @@ interface TeamRow {
   recordLabel: string | null;
   archetypeLabel: string | null;
   tradeTendency: string | null;
+  /** Zero, one, or several real, data-backed team signals (see
+   * TEAM_BADGE_VISUALS) — a team can plausibly earn more than one at once
+   * (e.g. both "Highly Active" and "Pick Hoarder"), so this always renders
+   * as a wrapping row rather than a single slot. */
+  signalBadges: string[];
+}
+
+/** Visual treatment for every real, data-backed team signal shown on a
+ * Teams row — same icon-plus-colored-text pattern the "Real history of
+ * buying/selling" trade-tendency badge already uses (TeamRowCard below),
+ * reused rather than inventing a new chip/box treatment. Tone picks the
+ * semantic color token that actually matches each signal's meaning
+ * (mobile/UI_COLOR_SYSTEM_AUDIT.md: one consistent meaning per color
+ * family) — most of these are neutral play-style descriptors (textSecondary),
+ * while the two with a real positive/negative read (an active streak, a
+ * roster-concentration risk) get success/danger. */
+const TEAM_BADGE_VISUALS: Record<string, { icon: keyof typeof Ionicons.glyphMap; tone: 'neutral' | 'positive' | 'negative' }> = {
+  'Highly Active': { icon: 'flash', tone: 'neutral' },
+  'Quiet Manager': { icon: 'pause', tone: 'neutral' },
+  'Pick Hoarder': { icon: 'layers', tone: 'neutral' },
+  'Pick Seller': { icon: 'swap-horizontal', tone: 'neutral' },
+  'Veteran Collector': { icon: 'time', tone: 'neutral' },
+  'Youth Builder': { icon: 'leaf', tone: 'neutral' },
+  'Hot Streak': { icon: 'flame', tone: 'positive' },
+  'Cold Streak': { icon: 'snow', tone: 'negative' },
+  'Top-Heavy Roster': { icon: 'alert-circle', tone: 'negative' },
+};
+
+function toneColor(tone: 'neutral' | 'positive' | 'negative', colors: ThemeColors): string {
+  if (tone === 'positive') return colors.success;
+  if (tone === 'negative') return colors.danger;
+  return colors.textSecondary;
 }
 
 /** Metric-independent roster data — fetched once per league focus, not
@@ -167,9 +201,37 @@ export default function TeamsScreen({ route, navigation }: Props) {
   // navigated in.
   const [metric, setMetric] = useState<RankingMetric>(route.params.metric ?? 'power');
   const config = METRIC_CONFIG[metric];
-  const [baseRows, setBaseRows] = useState<BaseTeamRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  // Gates every query below until the persisted AsyncStorage cache has
+  // finished hydrating back into the in-memory QueryClient — same guard
+  // Dashboard/Matchup use, so a query here never fires before last session's
+  // cached response is restored.
+  const isRestoring = useIsRestoring();
+
+  const teamProfilesQuery = useQuery({
+    queryKey: queryKeys.teamProfiles(leagueId),
+    queryFn: () => api.getLeagueTeamProfiles(leagueId),
+    enabled: !isRestoring,
+  });
+  const rostersQuery = useQuery({
+    queryKey: queryKeys.leagueRosters(leagueId),
+    queryFn: () => api.getLeagueRosters(leagueId),
+    enabled: !isRestoring,
+  });
+  const myRosterQuery = useQuery({
+    queryKey: queryKeys.myRoster(leagueId),
+    queryFn: () => api.getMyRoster(leagueId),
+    enabled: !isRestoring,
+  });
+  // Same endpoint Dashboard's League Pulse section and MyTeamScreen's Team
+  // Snapshot both fetch — shares one cache entry under
+  // queryKeys.teamRankings(leagueId) instead of each screen hitting it
+  // independently.
+  const teamRankingsQuery = useQuery({
+    queryKey: queryKeys.teamRankings(leagueId),
+    queryFn: () => api.getLeagueTeamRankings(leagueId),
+    enabled: !isRestoring,
+  });
 
   useScreenHeaderTitle(navigation, config.title, leagueName);
 
@@ -185,55 +247,60 @@ export default function TeamsScreen({ route, navigation }: Props) {
     });
   }, [navigation, leagueId, styles]);
 
+  // Matches the previous useFocusEffect's cadence (always re-check on
+  // regaining focus) but through React Query: invalidating marks each query
+  // stale and triggers its background refetch if it's currently mounted —
+  // cached data stays on screen throughout, never cleared first.
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-
-      async function load() {
-        try {
-          const [profilesResult, rostersResult, myRosterResult, rankingsResult] = await Promise.all([
-            api.getLeagueTeamProfiles(leagueId),
-            api.getLeagueRosters(leagueId),
-            api.getMyRoster(leagueId).catch(() => ({ ok: true as const, roster: null, reason: '' as const })),
-            api
-              .getLeagueTeamRankings(leagueId)
-              .catch(() => ({ ok: true as const, teams: [], reason: 'unavailable' })),
-          ]);
-          if (cancelled) return;
-
-          const myRosterId = myRosterResult.roster ? String(myRosterResult.roster.roster_id ?? '') : '';
-          const rankingsByRoster = new Map(rankingsResult.teams.map((team) => [team.roster_id, team]));
-
-          const rows: BaseTeamRow[] = rostersResult.rosters.map((roster) => {
-            const rosterId = String(roster.roster_id ?? '');
-            const players = Array.isArray(roster.players) ? roster.players : [];
-            const profile = profilesResult.profiles[rosterId];
-            return {
-              rosterId,
-              teamName: profile?.team_name || 'Unclaimed team',
-              avatarId: profile?.avatar_id || '',
-              playerIds: players.map(String),
-              isMine: Boolean(myRosterId) && rosterId === myRosterId,
-              ranking: rankingsByRoster.get(rosterId),
-            };
-          });
-          setBaseRows(rows);
-        } catch (err) {
-          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load teams.'));
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      }
-
-      void load();
-      return () => {
-        cancelled = true;
-      };
-      // Metric-independent: fetched once per league focus. The in-screen
-      // switcher re-derives per-metric rank/sort from `baseRows` below
-      // instead of refetching, so switching metrics stays instant/in-place.
-    }, [leagueId]),
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamProfiles(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.leagueRosters(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.myRoster(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamRankings(leagueId) });
+    }, [queryClient, leagueId]),
   );
+
+  // Metric-independent roster data, derived from the four queries above —
+  // the in-screen metric switcher re-derives per-metric rank/sort from this
+  // below instead of refetching, so switching metrics stays instant/in-place.
+  // `myRosterQuery`/`teamRankingsQuery` are best-effort enrichment (the "You"
+  // badge and rank pills, not core to rendering a row at all), so a failure
+  // on either just falls back to an empty/undefined read here rather than
+  // blocking the whole screen — same soft-fail the old Promise.all
+  // `.catch()` fallbacks gave them.
+  const baseRows: BaseTeamRow[] = useMemo(() => {
+    const profiles = teamProfilesQuery.data?.profiles;
+    const rosters = rostersQuery.data?.rosters;
+    if (!profiles || !rosters) return [];
+    const myRosterId = myRosterQuery.data?.roster
+      ? String(myRosterQuery.data.roster.roster_id ?? '')
+      : '';
+    const rankingsByRoster = new Map(
+      (teamRankingsQuery.data?.teams ?? []).map((team) => [team.roster_id, team]),
+    );
+    return rosters.map((roster) => {
+      const rosterId = String(roster.roster_id ?? '');
+      const players = Array.isArray(roster.players) ? roster.players : [];
+      const profile = profiles[rosterId];
+      return {
+        rosterId,
+        teamName: profile?.team_name || 'Unclaimed team',
+        avatarId: profile?.avatar_id || '',
+        playerIds: players.map(String),
+        isMine: Boolean(myRosterId) && rosterId === myRosterId,
+        ranking: rankingsByRoster.get(rosterId),
+      };
+    });
+  }, [teamProfilesQuery.data, rostersQuery.data, myRosterQuery.data, teamRankingsQuery.data]);
+
+  // Only teamProfiles/rosters are core to rendering any row at all — myRoster
+  // ("You" badge) and teamRankings (rank pills) are best-effort enrichment
+  // that can paint in slightly afterward without blocking the initial list.
+  const loading = isRestoring || teamProfilesQuery.isPending || rostersQuery.isPending;
+  const error =
+    (teamProfilesQuery.isError && !teamProfilesQuery.data) || (rostersQuery.isError && !rostersQuery.data)
+      ? toUserErrorMessage(teamProfilesQuery.error ?? rostersQuery.error, 'Failed to load teams.')
+      : null;
 
   // Per-metric rank/detail + sort, derived from the metric-independent fetch
   // above — switching `metric` here never re-hits the network.
@@ -252,6 +319,7 @@ export default function TeamsScreen({ route, navigation }: Props) {
         recordLabel: ranking?.record_label ?? null,
         archetypeLabel: ranking?.archetype_label ?? null,
         tradeTendency: ranking?.trade_tendency && ranking.trade_tendency !== 'Neutral' ? ranking.trade_tendency : null,
+        signalBadges: ranking?.team_badges ?? [],
       };
     });
     // Pure metric-rank order — no longer pins the caller's own team first,
@@ -343,8 +411,8 @@ function TeamRowCard({
   isLast: boolean;
   rankedTeamCount: number;
   pillLabel: string;
-  /** Trophy-for-rank-1 styling only applies to Power Rank — "league
-   * champion" is a Power Rank concept, so other metrics (e.g. youngest
+  /** Trophy-for-rank-1 styling only applies to Roster Power — "league
+   * champion" is a Roster Power concept, so other metrics (e.g. youngest
    * roster for Age) just get the plain rank pill instead of a misleading
    * trophy. */
   showTrophy: boolean;
@@ -394,22 +462,39 @@ function TeamRowCard({
             </AppText>
           </View>
         ) : null}
-        {item.tradeTendency ? (
-          <View style={styles.tendencyRow}>
-            <Ionicons
-              name={item.tradeTendency === 'Seller' ? 'trending-down' : 'trending-up'}
-              size={11}
-              color={item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium}
-            />
-            <AppText
-              style={[
-                styles.tendencyText,
-                { color: item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium },
-              ]}
-              numberOfLines={1}
-            >
-              Real history of {item.tradeTendency === 'Seller' ? 'selling' : 'buying'}
-            </AppText>
+        {item.tradeTendency || item.signalBadges.length > 0 ? (
+          <View style={styles.signalBadgeWrap}>
+            {item.tradeTendency ? (
+              <View style={styles.tendencyRow}>
+                <Ionicons
+                  name={item.tradeTendency === 'Seller' ? 'trending-down' : 'trending-up'}
+                  size={11}
+                  color={item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium}
+                />
+                <AppText
+                  style={[
+                    styles.tendencyText,
+                    { color: item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium },
+                  ]}
+                  numberOfLines={1}
+                >
+                  Real history of {item.tradeTendency === 'Seller' ? 'selling' : 'buying'}
+                </AppText>
+              </View>
+            ) : null}
+            {item.signalBadges.map((label) => {
+              const visual = TEAM_BADGE_VISUALS[label];
+              if (!visual) return null;
+              const color = toneColor(visual.tone, colors);
+              return (
+                <View key={label} style={styles.tendencyRow}>
+                  <Ionicons name={visual.icon} size={11} color={color} />
+                  <AppText style={[styles.tendencyText, { color }]} numberOfLines={1}>
+                    {label}
+                  </AppText>
+                </View>
+              );
+            })}
           </View>
         ) : null}
       </View>
@@ -489,7 +574,11 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.xs,
   },
   archetypeBadgeText: { fontSize: 10, fontWeight: '700', color: colors.badgeText },
-  tendencyRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  // Wraps every real-signal row (trade tendency + team_badges) so a team
+  // with several badges at once (e.g. "Highly Active" + "Pick Hoarder")
+  // flows them onto a second line instead of clipping or overlapping.
+  signalBadgeWrap: { flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: 2, marginTop: 3 },
+  tendencyRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   tendencyText: { fontSize: 11, fontWeight: '600' },
   rankPill: {
     backgroundColor: colors.background,

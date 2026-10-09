@@ -183,11 +183,11 @@ def dashboard_comparison_payloads(
             "decimals": 0,
             "interpretation": "Lower injury impact is better. This is current availability context and should not be treated as a change to long-term player value.",
         },
-        "Power Rank": {
+        "Roster Power": {
             "metric_key": "power_score",
             "ascending": False,
             "decimals": 0,
-            "interpretation": "Power compares current lineup and depth strength using the existing league evaluation.",
+            "interpretation": "Roster Power compares current lineup and depth strength using the existing league evaluation.",
         },
         "Franchise Rank": {
             "metric_key": "franchise_score",

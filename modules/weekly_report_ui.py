@@ -44,8 +44,8 @@ _HIGHLIGHT_TILE_CONTEXT: dict[str, tuple[str, str]] = {
         "",
     ),
     "biggest upset": (
-        "The winning team was ranked lower in Power Rank than the team it beat this week.",
-        "See Power Movement above for how this result may have shifted both teams' rank.",
+        "The winning team was ranked lower in Roster Power than the team it beat this week.",
+        "See Roster Power Movement above for how this result may have shifted both teams' rank.",
     ),
     "team of the week": (
         "This week's single highest scorer — the same team as Highest Score above, using "
@@ -53,7 +53,7 @@ _HIGHLIGHT_TILE_CONTEXT: dict[str, tuple[str, str]] = {
         "",
     ),
     "disappointment": (
-        "A team ranked well in Power Rank that scored well below its usual output this week.",
+        "A team ranked well in Roster Power that scored well below its usual output this week.",
         "Check Team Notes below for what might be driving the dip.",
     ),
     "most active manager": (
@@ -123,12 +123,12 @@ def _with_trend_followup(cards: list[dict]) -> list[dict]:
 
 
 def _movement_tile_context(*, scope: str, rising: bool) -> tuple[str, str]:
-    """"What this means" + "what to check next" text for one Power/Franchise
-    movement tile. ``scope`` is "power" or "franchise"."""
+    """"What this means" + "what to check next" text for one Roster Power/
+    Franchise movement tile. ``scope`` is "power" or "franchise"."""
 
     if scope == "power":
         what = (
-            "Power Rank is the app's read on which teams are currently strongest — "
+            "Roster Power is the app's read on which teams are currently strongest — "
             "who you'd expect to win on the field right now."
         )
     else:
@@ -148,7 +148,7 @@ def _movement_direction_badge_html(delta: object) -> str:
     The tile's own tone identifies *which metric* moved (power/franchise) and
     a fall already resolves to the shared risk/danger tone, but a rise
     resolves to that same category tone rather than a positive one, so
-    "Biggest Power Riser" and "Biggest Power Faller" read with no consistent
+    "Biggest Roster Power Riser" and "Biggest Roster Power Faller" read with no consistent
     up=positive/down=negative signal between them. This adds that signal
     through the tile's existing "graphic" slot (see workspace_ui.summary_tiles_html)
     without touching the shared tile tone classes any other surface relies on.
@@ -204,10 +204,10 @@ def render_weekly_report(
         )
 
     render_section_header(
-        "Power Movement",
+        "Roster Power Movement",
         kicker="Rank Drift",
         note=(
-            "Power Rank tracks current strength. Franchise Rank tracks total asset base. Exact "
+            "Roster Power tracks current strength. Franchise Rank tracks total asset base. Exact "
             "week-over-week movement starts once the app has saved at least one earlier weekly "
             "snapshot. Tap a tile for what moved and why."
         ),
@@ -225,7 +225,7 @@ def render_weekly_report(
         render_summary_tiles(
             [
                 {
-                    "label": "Biggest Power Riser",
+                    "label": "Biggest Roster Power Riser",
                     "value": _safe_text(power_riser.get("team_name"), "No movement"),
                     "note": (
                         f"+{int(power_riser.get('power_delta') or 0)} spots | "
@@ -237,7 +237,7 @@ def render_weekly_report(
                     "supporting_context": power_rise_context,
                 },
                 {
-                    "label": "Biggest Power Faller",
+                    "label": "Biggest Roster Power Faller",
                     "value": _safe_text(power_faller.get("team_name"), "No movement"),
                     "note": (
                         f"{int(power_faller.get('power_delta') or 0)} spots | "
@@ -283,9 +283,9 @@ def render_weekly_report(
                     .rename(
                         columns={
                             "team_name": "Team",
-                            "power_before": "Power Before",
-                            "power_after": "Power After",
-                            "power_delta": "Power Change",
+                            "power_before": "Roster Power Before",
+                            "power_after": "Roster Power After",
+                            "power_delta": "Roster Power Change",
                             "franchise_before": "Franchise Before",
                             "franchise_after": "Franchise After",
                             "franchise_delta": "Franchise Change",

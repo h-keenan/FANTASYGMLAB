@@ -35,6 +35,18 @@ export interface CompareTextRow {
  * higher-is-better. */
 export const LOWER_IS_BETTER = new Set(['Overall Rank', 'Position Rank']);
 
+/** Which side (if either) "wins" a numeric compare row — null/missing values
+ * and exact ties never win. Shared by the on-screen CompareRowView and the
+ * shareable CompareShareCard (mobile/src/components/CompareShareCard.tsx)
+ * so the win-highlight logic is computed once instead of two copies of the
+ * same tie/lower-is-better check living in two files. */
+export function compareRowWinner(row: CompareRow): 'a' | 'b' | null {
+  if (row.a === null || row.b === null || row.a === row.b) return null;
+  const lowerIsBetter = LOWER_IS_BETTER.has(row.label);
+  const aWins = lowerIsBetter ? row.a < row.b : row.a > row.b;
+  return aWins ? 'a' : 'b';
+}
+
 // Value Score / Overall Rank / Position Rank / Age — the same "how do these
 // two rank" context PlayerSnapshotCard leads with on Player Detail, just
 // doubled for a head-to-head read instead of one player's own snapshot.

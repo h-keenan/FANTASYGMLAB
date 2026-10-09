@@ -5,6 +5,7 @@ import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import AnimatedCard from '../components/AnimatedCard';
@@ -28,6 +29,7 @@ import { api, type LineupPlayer, type TeamRanking } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -134,14 +136,28 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   const { showExplanations } = useDensity();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
-  const [starters, setStarters] = useState<LineupPlayer[]>([]);
-  const [bench, setBench] = useState<LineupPlayer[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [myTeam, setMyTeam] = useState<TeamRanking | null>(null);
-  const [leagueSize, setLeagueSize] = useState(0);
   const [activeTab, setActiveTab] = useState<TeamTab>('overview');
+  const queryClient = useQueryClient();
+  // Gates both queries below until the persisted AsyncStorage cache has
+  // finished hydrating back into the in-memory QueryClient — same guard
+  // Dashboard/Matchup/Teams use.
+  const isRestoring = useIsRestoring();
+
+  const myTeamQuery = useQuery({
+    queryKey: queryKeys.myTeam(leagueId),
+    queryFn: () => api.getLeagueMyTeam(leagueId),
+    enabled: !isRestoring,
+  });
+  // Best-effort enrichment (Team Snapshot's rank/archetype), previously
+  // chained only after `result.roster_id` was known — same dependency here
+  // via `enabled`, and the exact same endpoint Dashboard's League Pulse and
+  // TeamsScreen's leaderboard both fetch, so this shares one cache entry
+  // under queryKeys.teamRankings(leagueId) instead of hitting it again.
+  const teamRankingsQuery = useQuery({
+    queryKey: queryKeys.teamRankings(leagueId),
+    queryFn: () => api.getLeagueTeamRankings(leagueId),
+    enabled: !isRestoring && Boolean(myTeamQuery.data?.roster_id),
+  });
 
   useScreenHeaderTitle(navigation, 'My Team', leagueName);
 
@@ -157,40 +173,35 @@ export default function MyTeamScreen({ route, navigation }: Props) {
     });
   }, [navigation, leagueId, styles]);
 
+  // Matches the previous useFocusEffect's cadence (always re-check on
+  // regaining focus) but through React Query: invalidating marks each query
+  // stale and triggers its background refetch if it's currently mounted —
+  // cached data stays on screen throughout, never cleared first.
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const result = await api.getLeagueMyTeam(leagueId);
-          if (cancelled) return;
-          setStarters(result.starters);
-          setBench(result.bench);
-          setNotice(result.reason ? reasonMessage(result.reason) : null);
-          // Best-effort, independent of the lineup fetch above — Team
-          // Analytics is a bonus section, not core to this screen, so a
-          // failure here shouldn't block showing the lineup.
-          if (result.roster_id) {
-            api
-              .getLeagueTeamRankings(leagueId)
-              .then((rankings) => {
-                if (cancelled) return;
-                setLeagueSize(rankings.teams.length);
-                setMyTeam(rankings.teams.find((team) => team.roster_id === result.roster_id) ?? null);
-              })
-              .catch(() => {});
-          }
-        } catch (err) {
-          if (!cancelled) setError(toUserErrorMessage(err, 'Failed to load your lineup.'));
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [leagueId]),
+      void queryClient.invalidateQueries({ queryKey: queryKeys.myTeam(leagueId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teamRankings(leagueId) });
+    }, [queryClient, leagueId]),
   );
+
+  const myTeamData = myTeamQuery.data;
+  const starters: LineupPlayer[] = myTeamData?.starters ?? [];
+  const bench: LineupPlayer[] = myTeamData?.bench ?? [];
+  const notice = myTeamData?.reason ? reasonMessage(myTeamData.reason) : null;
+  const leagueSize = teamRankingsQuery.data?.teams.length ?? 0;
+  const myTeam: TeamRanking | null = myTeamData?.roster_id
+    ? teamRankingsQuery.data?.teams.find((team) => team.roster_id === myTeamData.roster_id) ?? null
+    : null;
+
+  // No data at all yet (neither a persisted cache hit nor a prior in-memory
+  // fetch) — the one case that still needs a blank-slate spinner. Team
+  // Analytics (teamRankingsQuery) is a bonus section, not core to this
+  // screen, so it never blocks the lineup from painting.
+  const loading = isRestoring || myTeamQuery.isPending;
+  const error =
+    myTeamQuery.isError && !myTeamData
+      ? toUserErrorMessage(myTeamQuery.error, 'Failed to load your lineup.')
+      : null;
 
   const totalStartersValue = useMemo(
     () => starters.reduce((sum, player) => sum + (player.score ?? 0), 0),
@@ -327,6 +338,15 @@ function TeamAnalyticsSection({
   const valuePercentile = percentileFromRank(team.power_rank, leagueSize);
   const draftCapitalPercentile = percentileFromRank(team.draft_capital_rank, leagueSize);
   const starterPercentile = percentileFromRank(team.starter_rank, leagueSize);
+  // Color-system/percentile-bar follow-up (this pass): `age_rank` is the
+  // same dense, league_rankings.py-computed rank (1 = best) as
+  // starter_rank/draft_capital_rank above — ascending by avg_age, so rank 1
+  // is the youngest roster — just never wired into a percentile here before.
+  // Reusing it (rather than inventing a new computation) keeps Roster Age on
+  // the exact same rank->percentile transform as its two siblings on this
+  // card. `ageLabel`/`note` below stays as the fallback caption for the rare
+  // case percentileFromRank can't produce a value (single-team league).
+  const agePercentile = percentileFromRank(team.age_rank, leagueSize);
   const outlook = team.archetype_label || team.strategy_label;
   const ringColor = valuePercentile != null ? percentileColor(valuePercentile, colors) : colors.accent;
 
@@ -358,7 +378,7 @@ function TeamAnalyticsSection({
           ) : null}
           {team.power_rank != null ? (
             <AppText style={styles.analyticsRankLine}>
-              Power Rank {formatRank(team.power_rank, team.power_rank_tied)} of {leagueSize}
+              Roster Power {formatRank(team.power_rank, team.power_rank_tied)} of {leagueSize}
             </AppText>
           ) : null}
         </View>
@@ -366,6 +386,7 @@ function TeamAnalyticsSection({
       <View style={styles.analyticsMetricsRow}>
         <MetricCard
           label="Starter Strength"
+          icon="american-football-outline"
           value={formatRank(team.starter_rank, team.starter_rank_tied)}
           percentile={starterPercentile}
           valueColor={starterPercentile != null ? percentileColor(starterPercentile, colors) : undefined}
@@ -373,6 +394,7 @@ function TeamAnalyticsSection({
         />
         <MetricCard
           label="Draft Capital"
+          icon="file-tray-stacked-outline"
           value={formatRank(team.draft_capital_rank, team.draft_capital_rank_tied)}
           percentile={draftCapitalPercentile}
           valueColor={draftCapitalPercentile != null ? percentileColor(draftCapitalPercentile, colors) : undefined}
@@ -380,7 +402,9 @@ function TeamAnalyticsSection({
         />
         <MetricCard
           label="Roster Age"
+          icon="hourglass-outline"
           value={team.average_age != null ? team.average_age.toFixed(1) : '—'}
+          percentile={agePercentile}
           note={ageLabel(team.average_age)}
           valueColor={ageColor(team.average_age, colors)}
           style={styles.analyticsMetricTile}

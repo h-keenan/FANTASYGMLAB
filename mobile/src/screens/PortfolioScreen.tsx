@@ -10,6 +10,7 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import InsightRow from '../components/InsightRow';
+import PortfolioSharePreviewModal from '../components/PortfolioSharePreviewModal';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioResponse } from '../lib/api';
 import { categoryMeta } from '../lib/dashboardItemPresentation';
@@ -53,6 +54,7 @@ export default function PortfolioScreen() {
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -142,10 +144,18 @@ export default function PortfolioScreen() {
         keyExtractor={(item) => item.league_id}
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
-            <ScreenInfoNote
-              label="Portfolio"
-              text="Your standing, record, and top need or opportunity across every saved league — tap a league to open its Dashboard."
-            />
+            <View style={styles.infoNoteRow}>
+              <ScreenInfoNote
+                label="Portfolio"
+                text="Your standing, record, and top need or opportunity across every saved league — tap a league to open its Dashboard."
+              />
+              {data.leagues.length > 0 ? (
+                <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+                  <Ionicons name="share-outline" size={14} color={colors.textSecondary} />
+                  <AppText style={styles.shareButtonText}>Share</AppText>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             {data.failed_leagues.length > 0 ? (
               <FailedLeaguesNote leagues={data.failed_leagues} colors={colors} styles={styles} />
             ) : null}
@@ -161,6 +171,11 @@ export default function PortfolioScreen() {
             onPress={() => openLeague(item)}
           />
         )}
+      />
+      <PortfolioSharePreviewModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        leagues={data.leagues}
       />
     </View>
   );
@@ -243,7 +258,7 @@ function PortfolioLeagueCard({
             {isChampion ? (
               <Ionicons name="trophy" size={13} color={rankColor} style={styles.rankTrophy} />
             ) : (
-              <AppText style={styles.rankLabel}>POWER</AppText>
+              <AppText style={styles.rankLabel}>ROSTER POWER</AppText>
             )}
             <AppText style={[styles.rankValue, { color: rankColor }]}>
               {league.power_rank_tied ? `T-${league.power_rank}` : `#${league.power_rank}`}
@@ -271,6 +286,18 @@ function createStyles(colors: ThemeColors) {
     list: { backgroundColor: 'transparent' },
     listContent: { padding: spacing.lg },
     infoNoteWrap: { marginBottom: spacing.md, gap: spacing.sm },
+    infoNoteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    shareButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    shareButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
     center: {
       flex: 1,
       alignItems: 'center',

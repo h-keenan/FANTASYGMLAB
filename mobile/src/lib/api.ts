@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
+import type { LeaguesGlanceResponse } from './leaguesGlance';
 
 /**
  * Client for services/mobile_api_service.py. Every call attaches the current
@@ -33,19 +34,54 @@ AppState.addEventListener('change', (nextState) => {
   if (nextState !== 'active') backgroundTransitions += 1;
 });
 
+// A screen like League Overview fires several of these in parallel
+// (Promise.all) and each individual call is usually wrapped in its own
+// `.catch(() => null)` by the caller, so a single endpoint that never
+// settles doesn't just degrade that one tile — it leaves the *whole*
+// screen's loading state stuck forever, since `finally { setLoading(false) }`
+// never runs. That's the actual failure mode behind "I swapped leagues and
+// it's just loading": a newly-opened (cold-cache) league's heavier
+// endpoints — e.g. playoff_simulator.build_league_playoff_odds_cached,
+// waivers_ui's pool lock — run a real Redis single-flight lock with its own
+// ~15s ceiling server-side (modules/redis_cache.py's
+// redis_single_flight_cache), and a request can legitimately take tens of
+// seconds for a league this device hasn't warmed up yet. Nothing on the
+// client ever gave up, so a slow backend round-trip (or, if the server
+// truly wedges, one that never returns at all) had no way to surface as a
+// recoverable error instead of an infinite spinner.
+//
+// REQUEST_TIMEOUT_MS is comfortably above every known server-side lock
+// ceiling (15s) so a legitimately slow cold computation still gets to
+// finish, but still finite — once it fires, `fetch` rejects with an
+// AbortError, which transportError.ts's `isAbortOrTimeoutError` (and, via
+// it, `isTransportError`/`toUserErrorMessage`) already know how to turn
+// into a friendly message. That classification existed before this fetch
+// ever set a `signal` — this wires up the wrapper the comment there was
+// already written for.
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function performRequest<T>(
   path: string,
   init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown } | undefined,
   accessToken: string,
 ): Promise<T> {
-  const response = await fetch(`${env.apiBaseUrl}${path}`, {
-    method: init?.method ?? 'GET',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      ...(init?.jsonBody !== undefined ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${env.apiBaseUrl}${path}`, {
+      method: init?.method ?? 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(init?.jsonBody !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(init?.jsonBody !== undefined ? { body: JSON.stringify(init.jsonBody) } : {}),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   let body: unknown = null;
   try {
@@ -239,6 +275,21 @@ export interface TeamRanking {
   // this roster has been party to so far this season. Powers the Dashboard
   // League Pulse "Most Active Manager" tile.
   transaction_activity_count: number;
+  // Real future-1st-round-pick flow off actual Sleeper trade history
+  // (modules.pick_flow) — backs the "Pick Hoarder"/"Pick Seller" entry in
+  // team_badges below.
+  firsts_acquired: number;
+  firsts_sent: number;
+  // Real current win/loss streak off actual weekly matchup results
+  // (modules.team_streaks) — positive = active win streak, negative =
+  // active losing streak. Backs the "Hot Streak"/"Cold Streak" entry in
+  // team_badges below.
+  current_streak: number;
+  // Zero, one, or several real, data-backed team signals (Highly Active /
+  // Quiet Manager, Pick Hoarder / Pick Seller, Veteran Collector / Youth
+  // Builder, Hot Streak / Cold Streak, Top-Heavy Roster) — see
+  // TEAM_BADGE_VISUALS in TeamsScreen.tsx for how each label renders.
+  team_badges: string[];
 }
 
 export interface LeagueTeamRankingsResponse {
@@ -408,6 +459,19 @@ export interface MatchupRealStarter {
    * (best-effort; see services/mobile_api_service.py's fails-soft
    * contract) — render nothing rather than a guess. */
   projection: PlayerWeekProjection | null;
+  /**
+   * Whether THIS player's own NFL game has actually kicked off this week —
+   * distinct from `MatchupSide.has_live_data`, which only means Sleeper has
+   * locked the week's starters, not that any individual player's game has
+   * begun (games across a week start at different times). A starter whose
+   * game hasn't started yet still reports `actual_points === 0` from
+   * Sleeper, which is NOT a real score — a client must gate on this (not on
+   * `actual_points`) before treating 0 as a genuine result. Sourced from
+   * modules.nfl_schedule's real kickoff time for this player's team/week.
+   * Null when the signal isn't available (no resolvable team, bye week,
+   * schedule fetch hiccup) — treat as unknown, never as "started".
+   */
+  game_started: boolean | null;
 }
 
 export interface MatchupSide {
@@ -565,6 +629,17 @@ export interface WaiverPlayer {
   // or when the team code has no schedule match.
   opponent: string | null;
   opponent_is_home: boolean | null;
+  /** Matchup-difficulty tier for this free agent's upcoming opponent AT
+   * THEIR POSITION (modules.player_projections.
+   * team_defense_points_allowed_by_position — the same signal/shape the
+   * Matchup tab's weekly per-game projections already use, and the same
+   * tier values Player Detail's Schedule tab shows as
+   * ScheduleWeek.opponent_defense_tier). Context only, same "never
+   * overweighted" contract as opponent/opponent_is_home above — never
+   * factored into score/position_rank/overall_rank. Null whenever there's
+   * no opponent, no sampled data for that opponent/position, or too few
+   * sampled games for a reliable tier. */
+  opponent_defense_tier: 'tough' | 'average' | 'weak' | null;
   /** 0-99 "OVR" badge — percentiled against the full league-eligible pool
    * at this position (rostered players included), NOT the wire-relative
    * free-agent-only pool position_rank/overall_rank above use. Same
@@ -785,6 +860,19 @@ export interface GmPlanRecordItem {
   source: string;
 }
 
+// Same already-cached rest-of-season Monte Carlo simulation the standalone
+// Playoff Odds screen renders (see PlayoffOddsTeam) — looked up for the
+// caller's own roster and surfaced as a "Where You Stand" fact. Omitted
+// entirely (not sent) when that simulation isn't ready yet for this league.
+export interface GmPlanPlayoffOddsItem {
+  label: 'Playoff Odds';
+  playoff_probability: number;
+  median_seed: number | null;
+  clinched: boolean;
+  eliminated: boolean;
+  source: string;
+}
+
 export interface GmPlanTradeItem {
   partner_team_name: string;
   my_player: string;
@@ -804,7 +892,28 @@ export interface GmPlanTradeItem {
   source: string;
 }
 
-export type GmPlanFocusItem = GmPlanRankItem | GmPlanRecordItem | GmPlanTradeItem;
+export interface GmPlanInjuryItem {
+  label: 'Injury Exposure';
+  /** modules.rankings.summarize_team_injuries' injury_impact_flag (falls
+   * back to health_flag) — the same vocabulary the Dashboard's Team
+   * Snapshot health_flag already uses. */
+  health_flag: string;
+  injured_starters: number;
+  /** Active/starting positions with a significant injury and no healthy
+   * bench cover (modules.trade_analyzer_fit.roster_injury_context's
+   * injury_need_positions) — the exact gap the connectivity audit flagged
+   * GM Plan as missing. */
+  injury_need_positions: string[];
+  summary: string;
+  source: string;
+}
+
+export type GmPlanFocusItem =
+  | GmPlanRankItem
+  | GmPlanRecordItem
+  | GmPlanPlayoffOddsItem
+  | GmPlanTradeItem
+  | GmPlanInjuryItem;
 
 export interface GmPlanFocusArea {
   key: 'standing' | 'trade_opportunities' | 'roster_construction';
@@ -1267,6 +1376,11 @@ export interface QuickViewResponse {
 export interface PlayerAward {
   badge_id: string;
   category: string;
+  /** modules/player_awards.py's PlayerBadge.family, e.g. "workhorse",
+   * "bellcow", "targets", "pass-yards" — drives the per-award icon in
+   * AwardsStrip, mirroring the web app's _accolade_kind/_accolade_emblem_svg
+   * special-casing (modules/player_quick_view.py). */
+  family: string;
   title: string;
   short_label: string;
   tier: 'gold' | 'silver' | 'bronze' | null;
@@ -1343,9 +1457,11 @@ export interface CollegeProspect {
 export interface CollegeProspectsResponse {
   ok: true;
   prospects: CollegeProspect[];
-  // True when the real Supabase catalog wasn't reachable/migrated yet and
-  // this list is modules.college_scouting's placeholder fallback.
-  used_placeholder_catalog: boolean;
+  // False when the real Supabase catalog isn't configured/migrated/
+  // reachable yet. There is no fabricated-data fallback — `prospects` is
+  // simply empty in that case, and the screen's existing "No prospects
+  // yet" empty state covers it.
+  catalog_available: boolean;
   reason: string;
 }
 
@@ -1476,13 +1592,32 @@ export interface DashboardResponse {
   reason: string;
 }
 
+/** The single highest-value-score player on a saved league's roster — the
+ * top row of modules.dashboard_engine.build_league_summary's already-
+ * computed roster_df, no new valuation math. Lean on purpose (not a full
+ * RankedPlayer): just enough for the Portfolio share card's "standout
+ * asset" avatar + name + score line. */
+export interface PortfolioTopAsset {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  tier: string | null;
+  score: number | null;
+}
+
 /**
  * One saved league's row on the cross-league Portfolio screen — the exact
  * same per-league summary GET /v1/leagues/{id}/dashboard already builds
  * (modules.dashboard_engine.build_league_summary), condensed to what a
  * compact row needs. `top_item` is that league's single highest-priority
  * Next Move tile (same shape as DashboardItem) — "the one thing to do in
- * this league right now."
+ * this league right now." `franchise_rank`/`roster_value_rank` and
+ * `archetype`/`archetype_label` come from the same cached
+ * modules.league_rankings rankings frame `power_rank` already reads, run
+ * through modules.team_eval.refine_team_directions — the identical,
+ * already-cached pass GET /v1/leagues/{id}/team-rankings uses for its own
+ * archetype column.
  */
 export interface PortfolioLeague {
   league_id: string;
@@ -1494,6 +1629,13 @@ export interface PortfolioLeague {
   health_flag: string;
   power_rank: number | null;
   power_rank_tied: boolean;
+  franchise_rank: number | null;
+  franchise_rank_tied: boolean;
+  roster_value_rank: number | null;
+  roster_value_rank_tied: boolean;
+  archetype: string | null;
+  archetype_label: string | null;
+  top_asset: PortfolioTopAsset | null;
   top_item: DashboardItem | null;
 }
 
@@ -1770,6 +1912,9 @@ export const api = {
     authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
   /** Cross-league Portfolio — one row per saved league (Premium). */
   getPortfolio: () => authorizedFetch<PortfolioResponse>('/v1/portfolio'),
+  /** "All leagues at a glance" cards for the My Leagues screen (Premium).
+   * Server-cached per league for a few minutes (cache_ttl_seconds). */
+  getLeaguesGlance: () => authorizedFetch<LeaguesGlanceResponse>('/v1/leagues-glance'),
   getTradeHubIdeas: (
     leagueId: string,
     strategy: TeamStrategy = 'retool',

@@ -21,7 +21,7 @@ _METRIC_LABEL_ALIASES = {
     "draft capital": "Draft capital",
     "draft capital score": "Draft capital",
     "roster value + draft capital": "Roster + draft",
-    "power score": "Power",
+    "power score": "Roster Power",
 }
 
 
@@ -143,10 +143,10 @@ def dense_dual_rank_html(
     *,
     power: str,
     franchise: str,
-    power_label: str = "Power",
+    power_label: str = "Roster Power",
     franchise_label: str = "Franchise",
 ) -> str:
-    """Compact Power / Franchise rank pair for league comparison rows."""
+    """Compact Roster Power / Franchise rank pair for league comparison rows."""
 
     power_text = " ".join(str(power or "—").split()) or "—"
     franchise_text = " ".join(str(franchise or "—").split()) or "—"

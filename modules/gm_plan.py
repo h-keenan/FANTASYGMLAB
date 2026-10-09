@@ -164,6 +164,12 @@ STANDING_NO_SIGNAL_WATCH_FOR = "No power rank data is available for this league 
 
 ROSTER_NO_SIGNAL_WATCH_FOR = "No roster construction ranking is available for this league yet."
 
+# Label for the injury-exposure fact in Roster Construction — a dedicated
+# constant (rather than an inline literal) so the mobile item-discrimination
+# contract (see GmPlanInjuryItem on the client) has one canonical string to
+# point back to.
+INJURY_EXPOSURE_LABEL = "Injury Exposure"
+
 
 def _headline(stance: str, phase: str) -> str:
     phase_text = PHASE_HEADLINES.get(phase, PHASE_HEADLINES[PHASE_OFFSEASON_ADJACENT])
@@ -214,14 +220,45 @@ def _rank_fact(
     }
 
 
+def _playoff_odds_fact(playoff_odds: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Turn one team's row from
+    modules.playoff_simulator.build_league_playoff_odds_cached's `teams`
+    list into a "Where You Stand" fact.
+
+    `playoff_odds` is expected to be exactly that already-computed row
+    (same dict the standalone Playoff Odds screen renders) looked up for
+    the caller's own roster_id, or None when the simulation isn't ready
+    yet for this league (offseason / no playoff format configured / no
+    rankings data — see that function's `reason` contract) or the caller's
+    roster didn't resolve in it. Either way this returns None rather than
+    a fabricated fact, same honest-degradation discipline as every other
+    fact in this module.
+    """
+
+    if not playoff_odds:
+        return None
+    probability = playoff_odds.get("playoff_probability")
+    if probability is None:
+        return None
+    return {
+        "label": "Playoff Odds",
+        "playoff_probability": probability,
+        "median_seed": playoff_odds.get("median_seed"),
+        "clinched": bool(playoff_odds.get("clinched")),
+        "eliminated": bool(playoff_odds.get("eliminated")),
+        "source": "modules.playoff_simulator.build_league_playoff_odds_cached",
+    }
+
+
 def _standing_focus_area(
     rankings_row: Mapping[str, Any] | None,
     total_teams: int | None,
     record: Mapping[str, Any] | None,
+    playoff_odds: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     items: list[dict[str, Any]] = []
 
-    power_fact = _rank_fact(rankings_row, "power_rank", "power_rank_tied", total_teams, "Power Rank")
+    power_fact = _rank_fact(rankings_row, "power_rank", "power_rank_tied", total_teams, "Roster Power")
     if power_fact:
         power_fact["source"] = "modules.league_rankings.build_league_rankings_frame"
         items.append(power_fact)
@@ -232,6 +269,10 @@ def _standing_focus_area(
     if capital_fact:
         capital_fact["source"] = "modules.league_rankings.build_draft_capital_summary"
         items.append(capital_fact)
+
+    odds_fact = _playoff_odds_fact(playoff_odds)
+    if odds_fact:
+        items.append(odds_fact)
 
     if record:
         wins = record.get("wins")
@@ -314,9 +355,61 @@ def _trade_focus_area(
     }
 
 
+def _injury_exposure_fact(injury_context: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The injury-awareness-audit fix's one new fact: a significant injury at
+    an active/starting roster spot with no healthy bench cover.
+
+    `injury_context` is expected to be the already-computed output of
+    modules.trade_analyzer_fit.roster_injury_context (a thin wrapper over
+    modules.rankings.summarize_team_injuries) — the SAME call
+    get_league_dashboard and get_league_waivers already make for this same
+    roster. `injury_need_positions` there is already restricted to active
+    weekly players (starters, or bench players with a real weekly role)
+    whose injury leaves that position with no healthy cover, so its mere
+    non-emptiness IS the "roadmap-relevant" bar — no new threshold is
+    invented here. Returns None (no fact, never a fabricated "all clear")
+    when there's nothing uncovered.
+    """
+
+    if not injury_context:
+        return None
+    need_positions = sorted(
+        str(position).strip().upper()
+        for position in (injury_context.get("injury_need_positions") or ())
+        if str(position).strip()
+    )
+    if not need_positions:
+        return None
+
+    try:
+        injured_starters = int(injury_context.get("injured_starters") or 0)
+    except (TypeError, ValueError):
+        injured_starters = 0
+
+    health_flag = str(
+        injury_context.get("injury_impact_flag") or injury_context.get("health_flag") or ""
+    ).strip()
+    summary = str(
+        injury_context.get("top_injury_impact_summary")
+        or ", ".join(
+            str(entry).strip() for entry in (injury_context.get("key_injuries") or []) if str(entry).strip()
+        )
+    ).strip()
+
+    return {
+        "label": INJURY_EXPOSURE_LABEL,
+        "health_flag": health_flag,
+        "injured_starters": injured_starters,
+        "injury_need_positions": need_positions,
+        "summary": summary,
+        "source": "modules.trade_analyzer_fit.roster_injury_context",
+    }
+
+
 def _roster_focus_area(
     rankings_row: Mapping[str, Any] | None,
     total_teams: int | None,
+    injury_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     items: list[dict[str, Any]] = []
     if rankings_row and total_teams:
@@ -330,6 +423,10 @@ def _roster_focus_area(
             # an invented judgment.
             fact["relative_weak_spot"] = fact["rank"] > max(1, (2 * int(total_teams)) // 3)
             items.append(fact)
+
+    injury_fact = _injury_exposure_fact(injury_context)
+    if injury_fact:
+        items.append(injury_fact)
 
     status = STATUS_SIGNAL_FOUND if items else STATUS_NO_SIGNAL
     return {
@@ -350,6 +447,8 @@ def build_gm_plan(
     record: Mapping[str, Any] | None = None,
     trade_ideas: Sequence[Mapping[str, Any]] | None = None,
     max_trade_ideas: int = 3,
+    playoff_odds: Mapping[str, Any] | None = None,
+    injury_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble a GM Plan from already-computed signals.
 
@@ -360,7 +459,15 @@ def build_gm_plan(
     metadata columns); `trade_ideas` is expected to be the (already
     Team-Situation-framed) output of
     modules.trade_hub_engine.generate_trade_idea_records_cached or
-    modules.trade_ideas.build_trade_ideas.
+    modules.trade_ideas.build_trade_ideas. `playoff_odds` is expected to be
+    the caller's own roster_id's row from
+    modules.playoff_simulator.build_league_playoff_odds_cached's `teams`
+    list (or None when that simulation isn't ready yet for this league).
+    `injury_context` is expected to be the already-computed output of
+    modules.trade_analyzer_fit.roster_injury_context for the caller's own
+    roster — the same roster-awareness signal get_league_dashboard and
+    get_league_waivers already surface elsewhere; GM Plan previously built
+    its roadmap with no awareness of it at all (connectivity-audit finding).
     """
 
     stance = team_stance_module.normalize_stance(team_stance)
@@ -373,8 +480,8 @@ def build_gm_plan(
         "team_stance_label": team_stance_module.STANCE_LABELS.get(stance, ""),
         "headline": _headline(stance, phase),
         "focus_areas": [
-            _standing_focus_area(rankings_row, total_teams, record),
+            _standing_focus_area(rankings_row, total_teams, record, playoff_odds),
             _trade_focus_area(stance, trade_ideas or [], max_trade_ideas),
-            _roster_focus_area(rankings_row, total_teams),
+            _roster_focus_area(rankings_row, total_teams, injury_context),
         ],
     }

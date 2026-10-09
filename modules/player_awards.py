@@ -33,8 +33,29 @@ Touchdowns (strongest qualifying tier per family per season):
 Usage (not every season is tiered — only elite volume):
   WR  targets >= 140   "Elite Target Volume"
   TE  targets >= 110   "Elite Target Volume"
+  WR  targets >= 160   "Elite Bellcow Season" (featured/alpha receiver, rarer
+      than Elite Target Volume — see below)
+  TE  targets >= 120   "Elite Bellcow Season"
   RB  rush attempts >= 280 or (rush attempts + targets) >= 320
       "Elite Workhorse Season"
+
+  The WR/TE bellcow cutoffs are the receiving analogue of the RB workhorse
+  cutoff: a real, defensible "featured target" bar, not an arbitrary number.
+  Grounded in two sources already in this codebase:
+    - modules.rankings._position_usage_quality_series treats 10 targets/g
+      (WR) and 7.5 targets/g (TE) as its own ceiling for "maximum" usage
+      quality. Over a 17-game season that is 170 / 127.5 targets — 160 and
+      120 sit just under those ceilings, i.e. at the top of what the
+      rankings model itself already calls maxed-out usage.
+    - Season-total distributions across data/sleeper_player_stats_2024.json
+      and _2025.json (players with >=8 games played): 160+ WR targets and
+      120+ TE targets each clear roughly the 97th-99th percentile and are
+      met by only ~1-4 players per season — the same rarity band the RB
+      workhorse thresholds (280 rush att / 320 touches) sit in (~6-9 RBs
+      per season out of ~90, also roughly the top handful). The existing
+      "Elite Target Volume" badge (140 WR / 110 TE) sits lower, around the
+      93rd-97th percentile, so bellcow is a meaningfully higher, distinct
+      bar rather than a restatement of it.
 
 Repeat seasons of the same family collapse into one badge. A compact "2×"
 label is applied only when the strongest tier repeats in multiple seasons.
@@ -406,6 +427,25 @@ def _season_badges(row: Mapping[str, Any], *, position: str) -> list[PlayerBadge
                     rank=None,
                     metric_value=targets,
                     description=f"{int(targets)} targets in {season}.",
+                    priority=PRIORITY_USAGE,
+                )
+            )
+        bellcow_floor = 160 if position == "WR" else 120
+        if targets is not None and targets >= bellcow_floor:
+            badges.append(
+                _badge(
+                    family="bellcow",
+                    category="usage",
+                    title="Elite Bellcow Season",
+                    short_label="Bellcow",
+                    tier=None,
+                    season=season,
+                    rank=None,
+                    metric_value=targets,
+                    description=(
+                        f"Elite featured-receiver workload in {season} "
+                        f"({int(targets)} targets)."
+                    ),
                     priority=PRIORITY_USAGE,
                 )
             )

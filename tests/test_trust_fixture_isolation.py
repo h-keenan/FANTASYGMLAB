@@ -10,6 +10,7 @@ from conftest import frozen_trust_inputs, public_player_trust_fixture
 
 @pytest.mark.parametrize("drift", ["fewer", "more"])
 def test_trust_fixture_ignores_provider_and_disk_drift(tmp_path_factory, drift):
+    expected, _ = public_player_trust_fixture.__wrapped__(tmp_path_factory)
     root = Path(__file__).resolve().parents[1]
     live_inventory = json.loads((root / "data/sleeper_players.json").read_text())
     if drift == "fewer":
@@ -24,7 +25,8 @@ def test_trust_fixture_ignores_provider_and_disk_drift(tmp_path_factory, drift):
         return_value=(live_inventory, 999),
     ) as disk:
         frame, _ = public_player_trust_fixture.__wrapped__(tmp_path_factory)
-    assert len(frame) == 1880
+    assert frame["player_id"].tolist() == expected["player_id"].tolist()
+    assert len(frame) >= 1000
     assert {"5199", "8058"} <= set(frame.player_id.astype(str))
     assert "extra-live-player" not in set(frame.player_id.astype(str))
     provider.assert_not_called()
