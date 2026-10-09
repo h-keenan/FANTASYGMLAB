@@ -75,6 +75,7 @@ so the web app and mobile app share one engine.
 
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import dataclasses
 import functools
@@ -352,7 +353,19 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         window = RATE_LIMIT_MUTATING_WINDOW_SECONDS if is_mutating else RATE_LIMIT_GENERAL_WINDOW_SECONDS
         scope = "mutating" if is_mutating else "general"
         client_key = _client_rate_limit_key(request)
-        allowed, retry_after = _rate_limiter.hit(f"{scope}|{client_key}", limit, window)
+        # hit() calls the plain synchronous redis-py client (see
+        # modules/redis_cache.py), which can block for up to
+        # _SOCKET_CONNECT_TIMEOUT_SECONDS/_SOCKET_TIMEOUT_SECONDS (0.5s
+        # each) if Redis is slow-but-reachable rather than cleanly down (the
+        # RedisError fail-open path below only helps once an exception
+        # actually surfaces). dispatch() runs directly on this worker's
+        # asyncio event loop, so calling hit() inline here would stall every
+        # other concurrent request on this worker for that long -- not just
+        # the one being rate limited. asyncio.to_thread offloads the call to
+        # a worker thread so a slow Redis only delays this one request.
+        allowed, retry_after = await asyncio.to_thread(
+            _rate_limiter.hit, f"{scope}|{client_key}", limit, window
+        )
         if not allowed:
             logger.warning(
                 "Rate limit exceeded: %s %s scope=%s",
