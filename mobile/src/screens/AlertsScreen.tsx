@@ -5,6 +5,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
@@ -18,6 +19,7 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
+import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -134,10 +136,21 @@ export default function AlertsScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<AlertItem[]>([]);
-  const [recapReadyWeek, setRecapReadyWeek] = useState<number | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isRestoring = useIsRestoring();
+  // Shares its cache entry with Dashboard/LeagueDetail/Recap/GmOrb's own
+  // recap fetches (queryKeys.recap) — whichever screen fetches it first
+  // warms the cache for the rest, instead of each one hitting the recap
+  // endpoint independently on every visit.
+  const recapQuery = useQuery({
+    queryKey: queryKeys.recap(leagueId),
+    queryFn: () => api.getLeagueRecap(leagueId),
+    enabled: !isRestoring,
+  });
+  const recapReadyWeek =
+    recapQuery.data?.recap && !recapQuery.data.recap.incomplete ? recapQuery.data.recap.week : null;
 
   useScreenHeaderTitle(navigation, 'Alerts', leagueName);
 
@@ -157,16 +170,12 @@ export default function AlertsScreen({ route, navigation }: Props) {
     setError(null);
     setNotReadyReason(null);
     try {
-      const [result, recapResult] = await Promise.all([
-        api.getLeagueAlerts(leagueId, 12),
-        api.getLeagueRecap(leagueId).catch(() => null),
-      ]);
+      const result = await api.getLeagueAlerts(leagueId, 12);
       if (result.reason) {
         setNotReadyReason(result.reason);
       } else {
         setItems(result.items);
       }
-      setRecapReadyWeek(recapResult?.recap && !recapResult.recap.incomplete ? recapResult.recap.week : null);
     } catch (err) {
       setError(toUserErrorMessage(err, 'Failed to load alerts.'));
     } finally {
@@ -177,6 +186,14 @@ export default function AlertsScreen({ route, navigation }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Pull-to-refresh below refreshes both the alerts feed and the shared
+  // recap cache entry — previously one Promise.all did both, now the recap
+  // half is react-query's own refetch.
+  const onRefresh = useCallback(() => {
+    void load();
+    void recapQuery.refetch();
+  }, [load, recapQuery]);
 
   const groupedAlerts = useMemo(() => groupAlertsByType(items), [items]);
 
@@ -234,7 +251,9 @@ export default function AlertsScreen({ route, navigation }: Props) {
         data={groupedAlerts}
         keyExtractor={(group, index) => `${group.eventType ?? 'other'}-${group.alerts[0]?.alert_key ?? index}`}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+        refreshControl={
+          <RefreshControl refreshing={loading || recapQuery.isFetching} onRefresh={onRefresh} />
+        }
         ListHeaderComponent={
           recapReadyWeek != null ? (
             <RecapReadyCard

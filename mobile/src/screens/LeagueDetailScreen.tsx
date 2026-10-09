@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
@@ -39,6 +40,7 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { setLastLeague } from '../lib/lastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
+import { queryKeys } from '../lib/queryKeys';
 import { positionRankPrestige } from '../lib/positionRankPrestige';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -110,12 +112,23 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
   const [dashboardQuiet, setDashboardQuiet] = useState(false);
   const [teamSnapshot, setTeamSnapshot] = useState<TeamSnapshot | null>(null);
   const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
-  const [recap, setRecap] = useState<WeeklyRecap | null>(null);
   const [priorityAdds, setPriorityAdds] = useState<WaiverPriorityAdd[]>([]);
   const [myTeam, setMyTeam] = useState<MyTeamInfo | null>(null);
   const [myPlayoffOdds, setMyPlayoffOdds] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const isRestoring = useIsRestoring();
+  // Shares its cache entry with Dashboard/Alerts/Recap/GmOrb's own recap
+  // fetches (queryKeys.recap) instead of this screen hitting the same
+  // endpoint independently on every visit.
+  const recapQuery = useQuery({
+    queryKey: queryKeys.recap(leagueId),
+    queryFn: () => api.getLeagueRecap(leagueId),
+    enabled: !isRestoring,
+  });
+  const recap: WeeklyRecap | null =
+    recapQuery.data?.recap && !recapQuery.data.recap.incomplete ? recapQuery.data.recap : null;
   // Which league the state above currently belongs to (or is in flight for)
   // — lets `load()` tell "the league actually changed" apart from "this
   // screen was just refocused" (e.g. backing out of Matchup/Waivers/Teams),
@@ -175,7 +188,6 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
             dashboardResult,
             myRosterResult,
             profilesResult,
-            recapResult,
             playoffOddsResult,
             waiversResult,
           ] = await Promise.all([
@@ -183,7 +195,6 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
             api.getLeagueDashboard(leagueId).catch(() => null),
             api.getMyRoster(leagueId).catch(() => null),
             api.getLeagueTeamProfiles(leagueId).catch(() => null),
-            api.getLeagueRecap(leagueId).catch(() => null),
             api.getLeaguePlayoffOdds(leagueId).catch(() => null),
             api.getLeagueWaivers(leagueId).catch(() => null),
           ]);
@@ -222,10 +233,6 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
             });
           }
 
-          if (recapResult?.recap && !recapResult.recap.incomplete) {
-            setRecap(recapResult.recap);
-          }
-
           if (waiversResult) {
             setPriorityAdds(waiversResult.priority_adds ?? []);
           }
@@ -255,10 +262,14 @@ export default function LeagueDetailScreen({ route, navigation }: Props) {
           if (!cancelled) setMatchup(result);
         })
         .catch(() => {});
+      // Matches the previous useFocusEffect's cadence (always re-check on
+      // refocus) for the shared recap cache entry — see DashboardScreen's
+      // own identical invalidate for this same key.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.recap(leagueId) });
       return () => {
         cancelled = true;
       };
-    }, [leagueId]),
+    }, [leagueId, queryClient]),
   );
 
   if (loading) {
