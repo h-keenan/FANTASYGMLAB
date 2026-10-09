@@ -13,10 +13,12 @@ import GridBackground from '../components/GridBackground';
 import PositionBadge from '../components/PositionBadge';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
+import ViewModeToggle from '../components/ViewModeToggle';
 import { api, type CollegeProspect } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { usePlayerListViewMode } from '../lib/viewModePreference';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -36,22 +38,72 @@ function aggregateLabel(prospect: CollegeProspect): string {
  * rather than a per-row card. Trailing star toggles the personal watchlist
  * without leaving this screen; tapping the row itself opens
  * ProspectScoutingDetailScreen to submit/edit a grade.
+ *
+ * `grid`: coridian_'s 2-up compact card ask (Discord, 2026-10-09) — the
+ * exact same fields (position, name, school/class, aggregate scout grade,
+ * this user's own grade, watchlist star) reflowed into a vertical card.
+ * This screen has no shared PlayerIdentityRow usage to extend (prospects
+ * aren't rostered NFL players — no team/tier/injury/portrait, and
+ * school/draft-class/scout-grade/watchlist are all genuinely page-specific
+ * fields), so the grid variant lives locally here rather than forcing this
+ * data into a generic player-row component.
  */
 function ProspectRow({
   prospect,
   isFirst,
   isLast,
+  grid = false,
   onPress,
   onToggleWatchlist,
 }: {
   prospect: CollegeProspect;
   isFirst: boolean;
   isLast: boolean;
+  grid?: boolean;
   onPress: () => void;
   onToggleWatchlist: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const starLabel = prospect.on_watchlist ? 'Remove from watchlist' : 'Add to watchlist';
+  const starIcon = prospect.on_watchlist ? 'star' : 'star-outline';
+  const starColor = prospect.on_watchlist ? colors.premium : colors.textSecondary;
+  const classLabel = `${prospect.school}${prospect.draft_year ? ` · ${prospect.draft_year}` : ''}`;
+
+  if (grid) {
+    return (
+      <TouchableOpacity style={styles.gridCell} onPress={onPress} activeOpacity={0.7}>
+        <View style={styles.gridTopRow}>
+          <PositionBadge position={prospect.position} />
+          <TouchableOpacity
+            style={styles.starButton}
+            onPress={onToggleWatchlist}
+            hitSlop={8}
+            accessibilityLabel={starLabel}
+          >
+            <Ionicons name={starIcon} size={17} color={starColor} />
+          </TouchableOpacity>
+        </View>
+        <AppText style={styles.gridName} numberOfLines={1}>
+          {prospect.name}
+        </AppText>
+        <AppText style={styles.meta} numberOfLines={1}>
+          {classLabel}
+        </AppText>
+        <View style={styles.gridTrailingFooter}>
+          <AppText style={styles.aggregate} numberOfLines={1}>
+            {aggregateLabel(prospect)}
+          </AppText>
+          {prospect.my_report ? (
+            <AppText style={styles.myGrade} numberOfLines={1}>
+              Your grade: {prospect.my_report.grade}/5
+            </AppText>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
       style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, !isLast && styles.rowDivider]}
@@ -64,8 +116,7 @@ function ProspectRow({
           {prospect.name}
         </AppText>
         <AppText style={styles.meta} numberOfLines={1}>
-          {prospect.school}
-          {prospect.draft_year ? ` · ${prospect.draft_year}` : ''}
+          {classLabel}
         </AppText>
       </View>
       <View style={styles.trailing}>
@@ -76,17 +127,8 @@ function ProspectRow({
           <AppText style={styles.myGrade}>Your grade: {prospect.my_report.grade}/5</AppText>
         ) : null}
       </View>
-      <TouchableOpacity
-        style={styles.starButton}
-        onPress={onToggleWatchlist}
-        hitSlop={8}
-        accessibilityLabel={prospect.on_watchlist ? 'Remove from watchlist' : 'Add to watchlist'}
-      >
-        <Ionicons
-          name={prospect.on_watchlist ? 'star' : 'star-outline'}
-          size={18}
-          color={prospect.on_watchlist ? colors.premium : colors.textSecondary}
-        />
+      <TouchableOpacity style={styles.starButton} onPress={onToggleWatchlist} hitSlop={8} accessibilityLabel={starLabel}>
+        <Ionicons name={starIcon} size={18} color={starColor} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -101,6 +143,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { viewMode, setViewMode } = usePlayerListViewMode('college-prospects');
 
   useScreenHeaderTitle(navigation, 'College Prospects');
 
@@ -167,7 +210,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
         text="Every signed-in user's grade on a prospect pools into one shared signal — that shared aggregate, not any single grade, can influence rookie draft-class strength. Your own grade and watchlist stay yours to edit any time."
       />
 
-      <View style={styles.tabWrap}>
+      <View style={styles.tabRow}>
         <SegmentedTabBar
           options={[
             { key: 'all', label: 'All Prospects' },
@@ -176,13 +219,17 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
           active={filter}
           onChange={setFilter}
         />
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </View>
 
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
 
       <FlatList
+        key={viewMode}
         data={visible}
         keyExtractor={(item) => item.id}
+        numColumns={viewMode === 'grid' ? 2 : 1}
+        columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
         ListEmptyComponent={
@@ -201,6 +248,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
             prospect={item}
             isFirst={index === 0}
             isLast={index === visible.length - 1}
+            grid={viewMode === 'grid'}
             onPress={() => openDetail(item)}
             onToggleWatchlist={() => void toggleWatchlist(item)}
           />
@@ -214,7 +262,14 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, paddingTop: spacing.md },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-    tabWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+    tabRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+      gap: spacing.sm,
+    },
     listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
     row: {
       flexDirection: 'row',
@@ -245,6 +300,28 @@ function createStyles(colors: ThemeColors) {
     aggregate: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
     myGrade: { fontSize: 10, color: colors.accent, marginTop: 1 },
     starButton: { padding: spacing.xs },
+    // Grid (2-up compact card) mode — see ProspectRow's `grid` branch. Same
+    // width/space-between approach as the other grid-ified list screens
+    // (keeps an unpaired last card from stretching to double width).
+    gridRow: { justifyContent: 'space-between', marginBottom: spacing.sm },
+    gridCell: {
+      width: '48%',
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth * 1.5,
+      borderColor: colors.cardBorder,
+      padding: spacing.sm,
+      gap: 2,
+    },
+    gridTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    gridName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
+    gridTrailingFooter: {
+      marginTop: spacing.xs,
+      paddingTop: spacing.xs,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+      gap: 1,
+    },
     error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }
