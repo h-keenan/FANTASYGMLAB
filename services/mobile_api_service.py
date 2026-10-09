@@ -526,14 +526,15 @@ def health() -> dict[str, str]:
     same way it exports DYNASTYGM_BUILD. The real production auto-deploy
     path, `fantasygmlab-autopull.timer` -> deploy/autopull.sh (see
     docs/SELF_HOSTED_MIGRATION.md section 5.7), lives on the box and isn't
-    tracked in this repo — whether it exports these two the same way is a
-    property of that script, not guaranteed here. This is deliberately a
-    timestamp stored at deploy time, not a live GitHub API call from this
-    endpoint — an operator compares it against `git log origin/main -1
-    --format=%cI` by hand (or scripts that comparison) to see how far
-    behind `main` this box is. Empty string means unknown: local dev, or a
-    deploy that didn't export it (whether that's release_deploy.sh never
-    having run, or autopull.sh not setting it).
+    tracked in this repo. Confirmed (2026-10-09, live systemctl/journalctl
+    check) it does NOT export either var the way release_deploy.sh does —
+    a box fully current with origin/main, all containers healthy, can
+    still show "local"/empty here. Don't use this endpoint to judge
+    autopull's deploy freshness; check the box directly instead (git log
+    under /opt/fantasygmlab, or docker compose ps) — see
+    docs/SELF_HOSTED_MIGRATION.md section 5.5's "Checking what's actually
+    live" for the real procedure. This is deliberately a timestamp stored
+    at deploy time, not a live GitHub API call from this endpoint.
     """
 
     _maybe_schedule_players_refresh()

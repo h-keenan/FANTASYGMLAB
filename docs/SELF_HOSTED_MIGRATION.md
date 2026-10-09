@@ -311,27 +311,33 @@ docker compose up -d
 docker compose ps --format 'table {{.Name}}\t{{.Status}}'
 ```
 
-**Checking what's actually live, without guessing**: `curl
-https://api.fantasygmlab.com/health` returns `{"status": "ok", "build":
-"<short sha>", "deployed_at": "<UTC ISO-8601 timestamp>"}`. Compare
-`build` to `git log origin/main -1 --format=%h` — if they match,
-production is current; if not, something above didn't run (or didn't run
-with `DYNASTYGM_BUILD` set before the `build` step — and if autopull is
-the thing that's supposed to have run, confirm it actually exports
-`DYNASTYGM_BUILD`/`DYNASTYGM_DEPLOYED_AT` the same way
-`deploy/release_deploy.sh` does, per section 5.7's note, before
-concluding it isn't deploying at all). Compare `deployed_at`
-to `git log origin/main -1 --format=%cI` to see how long production has
-been behind whatever is newest on `main` — a non-trivial gap between the
-two, even when `build` still matches, is the signal that the autopull
-timer (section 5.7) has stopped firing or stalled and is worth checking
-on the box directly. Render used to answer the
-first question automatically via its own `RENDER_GIT_COMMIT`; this box
-has no equivalent unless these two are exported before whatever runs
-`docker compose build` — `deploy/release_deploy.sh` (section 5.6) already
-does both for you; a manual deploy only reflects the real
-commit/timestamp if you also export them, **before building**, as shown
-above.
+**Checking what's actually live, without guessing**: on a box running
+`fantasygmlab-autopull.timer`, `curl https://api.fantasygmlab.com/health`
+is **not** a reliable freshness check — confirmed (2026-10-09) that
+`deploy/autopull.sh` doesn't export `DYNASTYGM_BUILD`/`DYNASTYGM_DEPLOYED_AT`
+the way `deploy/release_deploy.sh` does, so `/health` can show `"build":
+"local", "deployed_at": ""` even when production is fully current.
+Ground truth instead, on the box itself:
+
+```bash
+sudo systemctl status fantasygmlab-autopull.timer --no-pager -l
+cd /opt/fantasygmlab && git fetch origin main
+echo "LOCAL:  $(git rev-parse --short HEAD)"
+echo "REMOTE: $(git rev-parse --short origin/main)"
+docker compose -f docker-compose.yml -f docker-compose.override.yml ps
+```
+
+`LOCAL` matching `REMOTE`, plus all containers `healthy` with a recent
+`CREATED`/uptime consistent with the last real merge, is what "actually
+live" looks like. A `curl`-based check of `/health`'s `build` field only
+means something on a box deployed via `deploy/release_deploy.sh`
+manually — that script *does* export both vars correctly — so it's
+still useful for a manual deploy, just not as an autopull freshness
+signal. (Also worth noting for this specific app: it's a Streamlit app
+that renders over a live connection after the page loads, so a plain
+`curl` of the page itself never shows real page content either way,
+live or stale — don't use that to judge freshness, open it in a real
+browser instead.)
 
 Both are baked into the image at *build* time (Dockerfile `ARG`/`ENV`,
 wired through docker-compose.yml's `build.args`), not passed as a runtime
@@ -444,12 +450,16 @@ replace them with something GitHub-Actions-hosted:
 `services/mobile_api_service.py`'s `/health` docstring and
 `modules/build_identity.py`): those are populated by
 `DYNASTYGM_BUILD`/`DYNASTYGM_DEPLOYED_AT`, which `deploy/release_deploy.sh`
-exports before building. Whether `deploy/autopull.sh` does the same is a
-property of that script, which lives on the box and isn't tracked in
-this repo — don't assume `/health` reflects autopull's deploy state
-until that's confirmed; it may need the same two `export` lines added if
-it doesn't already have them, or `/health` will keep showing "local"
-even on a box autopull is correctly keeping current.
+exports before building. Confirmed (2026-10-09, via a live
+`systemctl status`/`journalctl` check) that `deploy/autopull.sh` does
+**not** do the same — a box with `LOCAL == REMOTE` HEAD, all containers
+healthy, and real traffic being served correctly can still show
+`"build": "local", "deployed_at": ""` on `/health`. Treat that as a
+known cosmetic gap, not a staleness signal: confirm actual deploy state
+on the box directly (`git log -1 --oneline` under `/opt/fantasygmlab`,
+or the containers' `CREATED`/`STATUS` via `docker compose ps`), not via
+`/health`, until `autopull.sh` is updated to export those two the same
+way `release_deploy.sh` does.
 
 ### GitHub Actions is a manual emergency fallback only, not the deploy path
 
