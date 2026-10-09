@@ -53,6 +53,9 @@ def test_dashboard_game_plan_trade_shape_accepts_reconciled_players():
             ("Tyreek Hill", "Joe Mixon", "Najee Harris", "Darren Waller")
         )
     ].copy()
+    # Preserve the original injury-crisis regression regardless of today's provider statuses.
+    partner_team["injury_status"] = "Out"
+    partner_team["status"] = "Injured Reserve"
     metrics = {
         "strategy": "competitive",
         "mode": "competitive",

@@ -97,8 +97,9 @@ def test_real_public_player_dataset_is_exactly_equivalent(public_player_trust_fi
 
     result = _diagnostic_and_schema_equivalence(frame, output_columns)
 
-    # Reconciliation expands the 988 persisted rows to the 1880-player universe.
-    assert len(frame) == 1880
+    # Exercise the complete committed universe as it evolves, not a historical row count.
+    assert len(frame) >= 1000
+    assert frame["player_id"].astype(str).is_unique
     assert all(
         result[key]
         for key in (

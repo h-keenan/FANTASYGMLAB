@@ -92,7 +92,11 @@ def _load_real_frame(db_path: str) -> tuple[pd.DataFrame, tuple[str, ...]]:
         source_fingerprint=fingerprint,
     ) is None:
         rankings.clear_public_player_cache()
-        rankings.load_players(db_path)
+        frame = rankings.load_players(db_path)
+        # Metadata-current SQLite legitimately bypasses snapshot construction.
+        # This profiling fixture needs an isolated snapshot to measure its own stage.
+        if public_player_snapshot.load_public_player_snapshot(db_path, source_fingerprint=rankings.public_player_source_fingerprint(db_path)) is None:
+            rankings._save_players_snapshot(db_path, frame, rankings.public_player_source_fingerprint(db_path))
     snapshot, output_columns, _ = _snapshot_input(db_path)
     return _base_with_snapshot_hydration(db_path, snapshot), output_columns
 
