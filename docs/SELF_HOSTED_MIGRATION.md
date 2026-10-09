@@ -303,9 +303,9 @@ cd /opt/fantasygmlab
 git fetch origin
 git log --oneline HEAD..origin/main   # anything listed here is NOT live yet
 git pull
+export DYNASTYGM_BUILD="$(git rev-parse --short HEAD)"  # must come BEFORE `docker compose build` — see below
+export DYNASTYGM_DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"  # must come BEFORE `docker compose build` — see below
 docker compose build
-export DYNASTYGM_BUILD="$(git rev-parse --short HEAD)"  # see below — skip this and /health just reports "local" again
-export DYNASTYGM_DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"  # see below — skip this and /health's deployed_at is just empty
 docker compose up -d
 docker compose ps --format 'table {{.Name}}\t{{.Status}}'
 ```
@@ -315,18 +315,27 @@ https://api.fantasygmlab.com/health` returns `{"status": "ok", "build":
 "<short sha>", "deployed_at": "<UTC ISO-8601 timestamp>"}`. Compare
 `build` to `git log origin/main -1 --format=%h` — if they match,
 production is current; if not, something above didn't run (or didn't run
-with `DYNASTYGM_BUILD` set). Compare `deployed_at` to `git log origin/main
--1 --format=%cI` to see how long production has been behind whatever is
-newest on `main` — a non-trivial gap between the two, even when `build`
-still matches, is the signal that auto-deploy (section 5.7) has stopped
-firing (expired/rotated SSH key, box unreachable, etc.) and is worth
-alerting on. Render used to answer the first question automatically via
-its own `RENDER_GIT_COMMIT`; this box has no equivalent unless whatever
-runs `docker compose up -d` exports `DYNASTYGM_BUILD` (and now
-`DYNASTYGM_DEPLOYED_AT`) first — `deploy/release_deploy.sh` (section 5.6)
-already does both for you; a manual deploy only reflects the real
-commit/timestamp if you also export them as shown above. Both are stored
-at deploy time (not fetched live from GitHub by the server), per
+with `DYNASTYGM_BUILD` set before the `build` step). Compare `deployed_at`
+to `git log origin/main -1 --format=%cI` to see how long production has
+been behind whatever is newest on `main` — a non-trivial gap between the
+two, even when `build` still matches, is the signal that auto-deploy
+(section 5.7) has stopped firing (expired/rotated SSH key, box
+unreachable, etc.) and is worth alerting on. Render used to answer the
+first question automatically via its own `RENDER_GIT_COMMIT`; this box
+has no equivalent unless these two are exported before whatever runs
+`docker compose build` — `deploy/release_deploy.sh` (section 5.6) already
+does both for you; a manual deploy only reflects the real
+commit/timestamp if you also export them, **before building**, as shown
+above.
+
+Both are baked into the image at *build* time (Dockerfile `ARG`/`ENV`,
+wired through docker-compose.yml's `build.args`), not passed as a runtime
+`environment:` var — on purpose: the systemd unit (section 5.3) runs
+`docker compose up -d` on every host boot/crash-restart with no shell env
+set at all, and a runtime-only var would silently reset to
+"local"/empty on every one of those restarts even though nothing was
+actually redeployed. Baking it into the image means it only changes on
+the next real `docker compose build`, i.e. the next real deploy — see
 services/mobile_api_service.py's `/health` docstring and
 modules/build_identity.py.
 
