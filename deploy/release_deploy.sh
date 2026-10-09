@@ -4,6 +4,17 @@
 # arguments or edited by the account that triggers it over SSH — that
 # account only ever gets to invoke this exact script, nothing else.
 #
+# LEGACY / MANUAL-ONLY: the real, authoritative production auto-deploy
+# path is now the server-side `fantasygmlab-autopull.timer` ->
+# `deploy/autopull.sh`, which also syncs the runtime Caddy config,
+# layers `docker-compose.override.yml`, health-checks every service,
+# and automatically rolls back a bad deploy — see
+# docs/SELF_HOSTED_MIGRATION.md section 5.7. This script does none of
+# that; it's kept as a manual fallback (invoked by hand over SSH, or by
+# `.github/workflows/auto-deploy.yml`'s manual `workflow_dispatch`
+# trigger) for when autopull is down and a deploy is needed without
+# direct SSH access to run `autopull.sh` itself.
+#
 # Re-deploys the current `main` branch: fetch, fast-forward (never discards
 # local commits — fails loudly on divergence instead), rebuild containers,
 # restart, print status.

@@ -1,27 +1,23 @@
-name: Auto Deploy
+name: Manual Emergency Deploy
 
-# Closes the gap left by the self-hosted cutover (see
-# docs/SELF_HOSTED_MIGRATION.md section 5.7 and commit 095af09, which
-# retired the Render-specific keep-alive workflow): Render auto-deployed
-# on every push to `main`; this self-hosted box does not, by default.
-# `players-db-refresh.yml` (every 6h) and `injury-status-sync.yml` (every
-# 30min) both commit straight to `main` on a schedule, so without this
-# workflow production can silently drift behind `main` by an unbounded
-# amount — confirmed in the production audit that prompted this change.
+# Production's real, authoritative auto-deploy mechanism is now
+# SERVER-SIDE: `fantasygmlab-autopull.timer` -> `deploy/autopull.sh`,
+# running directly on the box. It polls `origin/main` every ~2 minutes,
+# fast-forwards, regenerates the runtime Caddy config, rebuilds/recreates
+# the stack, health-checks every service, and automatically rolls back a
+# bad deploy (manual override: `sudo fantasygmlab-rollback`) — see
+# docs/SELF_HOSTED_MIGRATION.md section 5.7 for the full topology.
 #
-# Triggered by workflow_run on "Delivery Validation" (ci.yml, which also
-# runs its `test` job on every push to `main` — see
-# players-db-refresh.yml's own push-loop-safety comment for why that
-# doesn't chain into anything else) rather than directly on `push`, so a
-# real deploy only ever follows a green CI run against the exact commit
-# being deployed — never a race against tests still running.
-#
-# Deliberately does NOT reuse "Trusted Delivery" (auto-merge.yml): that
-# workflow only acts when the completed run's event is `pull_request` (it
-# marks PRs ready and merges them); this one only acts when the completed
-# run's event is `push` to `main` (it deploys what Trusted Delivery just
-# merged, or what a cron data-refresh workflow just committed). Same
-# workflow_run trigger, disjoint `if:` conditions, no overlap.
+# This workflow is what that section used to be: a GitHub-Actions-hosted
+# SSH deploy path, triggered automatically on every green CI run against
+# `main`. Two automatic deployers racing the same box's one checkout is
+# exactly the failure mode the server-side autopull system was built to
+# be the single answer to, so this one no longer fires on its own — it's
+# kept only as a manual emergency fallback (`workflow_dispatch`) for the
+# case where autopull itself is down and someone needs to force a deploy
+# from here instead of SSHing in by hand. Do not re-add an automatic
+# trigger (`workflow_run`/`push`) without first retiring the autopull
+# timer — see the PR that made this change for the full reasoning.
 #
 # SSHes in as the `fgl-releaser` scoped account (see
 # docs/SELF_HOSTED_MIGRATION.md section 5.6) and runs its forced command —
@@ -30,10 +26,15 @@ name: Auto Deploy
 # runs that exact script regardless of what's requested, so there's
 # nothing here for a compromised workflow to redirect. No shell, no pty,
 # no port-forwarding are possible over this key by design (section 5.6).
+# `deploy/release_deploy.sh` itself is legacy/manual-only now too — see
+# its own header comment — and does not include the server-side
+# deployer's Caddy sync, compose-override layering, or automatic
+# rollback, so treat a run through this workflow as a stopgap, not
+# equivalent to a real autopull cycle.
 #
-# Required repository secrets (none of these exist yet as of this
-# workflow's introduction — see the PR description for exactly what to
-# add before this can fire for real):
+# Required repository secrets (intentionally not provisioned — this path
+# is a fallback, not the normal deploy mechanism, so these are only
+# needed if someone deliberately decides to use it):
 #   FGL_RELEASER_SSH_KEY     - private key matching the public key already
 #                              installed in fgl-releaser's authorized_keys
 #                              (section 5.6). Never the `deploy` admin
@@ -49,9 +50,7 @@ name: Auto Deploy
 #                              line is never weakened to work around a
 #                              missing secret.
 on:
-  workflow_run:
-    workflows: ["Delivery Validation"]
-    types: [completed]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -68,10 +67,9 @@ concurrency:
 
 jobs:
   deploy:
-    if: >-
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.conclusion == 'success'
+    # workflow_dispatch only runs when a human explicitly triggers it —
+    # no `if:` gate needed (there's no workflow_run payload to check
+    # anymore now that this isn't an automatic trigger).
     runs-on: ubuntu-latest
     steps:
       - name: Require deploy secrets
