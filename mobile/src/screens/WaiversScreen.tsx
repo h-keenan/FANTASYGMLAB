@@ -27,6 +27,7 @@ import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
 import PlayerAvatar from '../components/PlayerAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
+import ViewModeToggle from '../components/ViewModeToggle';
 import WaiverRecommendationCard, {
   waiverInjuryDisplay,
   waiverOpponentContext,
@@ -40,6 +41,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { positionRankPrestige } from '../lib/positionRankPrestige';
 import { rankedPlayerFromWaiverPlayer } from '../lib/playerStubs';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
+import { usePlayerListViewMode } from '../lib/viewModePreference';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -109,6 +111,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [position, setPosition] = useState('ALL');
   const [search, setSearch] = useState('');
+  const { viewMode, setViewMode } = usePlayerListViewMode('waivers');
 
   useScreenHeaderTitle(navigation, 'Waivers', leagueName);
 
@@ -222,6 +225,10 @@ export default function WaiversScreen({ route, navigation }: Props) {
         />
         <View style={styles.filterRow}>
           <FilterDropdownButton label="Position" options={POSITIONS} value={position} onChange={setPosition} />
+          {/* Governs only "All Free Agents" below — Priority Adds, Best
+              Available, and the Stash/Watchlist/FAAB boards keep their own
+              existing card treatments regardless of this toggle. */}
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </View>
       </View>
 
@@ -229,8 +236,11 @@ export default function WaiversScreen({ route, navigation }: Props) {
         <BrandedSpinner style={styles.loading} />
       ) : (
         <FlatList
+          key={viewMode}
           data={filtered}
           keyExtractor={(item) => item.player_id}
+          numColumns={viewMode === 'grid' ? 2 : 1}
+          columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
           ListHeaderComponent={
             <View>
               {topPriority ? (
@@ -298,6 +308,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               rank={index + 1}
               isFirst={index === 0}
               isLast={index === filtered.length - 1}
+              grid={viewMode === 'grid'}
               onPress={() => openPlayer(item)}
             />
           )}
@@ -470,6 +481,13 @@ function BestAvailableCard({
  * value/position-rank column. `bare` drops the rank slot + grouped-table
  * edge borders for the secondary board, whose rows already sit inside their
  * own labeled AnimatedCard group rather than a single continuous table.
+ *
+ * `grid`: coridian_'s 2-up compact card ask (Discord, 2026-10-09) for "All
+ * Free Agents" — same PlayerIdentityRow props (`layout="grid"`) and the
+ * exact same trailing chip set (score, position rank, OVR), reflowed into a
+ * vertical card. Only wired up for the main free-agent list — the small
+ * Stash/Watchlist/FAAB boards (`bare`) stay full-width rows inside their own
+ * grouped card, where a handful of entries doesn't benefit from a grid.
  */
 function FreeAgentRow({
   player,
@@ -477,6 +495,7 @@ function FreeAgentRow({
   isFirst,
   isLast,
   bare = false,
+  grid = false,
   onPress,
 }: {
   player: WaiverPlayer;
@@ -484,6 +503,7 @@ function FreeAgentRow({
   isFirst: boolean;
   isLast: boolean;
   bare?: boolean;
+  grid?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useThemeMode();
@@ -491,6 +511,45 @@ function FreeAgentRow({
   const injury = waiverInjuryDisplay(player.injury_status);
   const contextLine = player.injury_replacement_fit ? player.injury_replacement_note : waiverOpponentContext(player);
   const contextLineColor = player.injury_replacement_fit ? undefined : waiverOpponentContextColor(player, colors);
+  const scoreText = player.score != null ? String(Math.round(player.score)) : '—';
+
+  if (grid) {
+    return (
+      <View style={[styles.gridCell, player.stale_free_agent && styles.freeAgentStale]}>
+        <PlayerIdentityRow
+          layout="grid"
+          playerId={player.player_id}
+          name={player.name}
+          position={player.position}
+          team={player.team}
+          tier={player.tier}
+          slot={String(rank)}
+          injuryLabel={injury.label}
+          injuryTone={injury.tone}
+          ruledOut={injury.ruledOut}
+          contextLine={contextLine}
+          contextLineColor={contextLineColor}
+          trendingAddLabel={waiverTrendingAddLabel(player)}
+          onPress={onPress}
+        />
+        <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.gridTrailingFooter}>
+          <AppText style={styles.freeAgentValue}>{scoreText}</AppText>
+          <View style={styles.freeAgentTrailingChips}>
+            {player.position_rank ? (
+              <View style={styles.positionRankPill}>
+                <AppText style={styles.positionRankText}>
+                  {player.position}
+                  {player.position_rank}
+                </AppText>
+              </View>
+            ) : null}
+            <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
@@ -520,7 +579,7 @@ function FreeAgentRow({
         />
       </View>
       <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.freeAgentTrailing}>
-        <AppText style={styles.freeAgentValue}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+        <AppText style={styles.freeAgentValue}>{scoreText}</AppText>
         <View style={styles.freeAgentTrailingChips}>
           {player.position_rank ? (
             <View style={styles.positionRankPill}>
@@ -666,6 +725,27 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 1,
   },
   positionRankText: { fontSize: 10, fontWeight: '700', color: colors.textSecondary },
+  // Grid (2-up compact card) mode — see FreeAgentRow's `grid` branch. Same
+  // width/space-between approach as PlayersScreen's PlayerRankRow grid cell
+  // (keeps an unpaired last card from stretching to double width).
+  gridRow: { justifyContent: 'space-between', marginBottom: spacing.sm },
+  gridCell: {
+    width: '48%',
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth * 1.5,
+    borderColor: colors.cardBorder,
+    padding: spacing.sm,
+  },
+  gridTrailingFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   error: { color: colors.danger, textAlign: 'center', marginHorizontal: spacing.lg, marginBottom: spacing.sm },
   });
 }

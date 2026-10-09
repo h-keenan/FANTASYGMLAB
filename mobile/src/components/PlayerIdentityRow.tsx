@@ -113,11 +113,34 @@ export interface PlayerIdentityRowProps {
   secondaryTrailingCaption?: string | null;
   onPress?: () => void;
   /** Renders a hairline divider under the row — set false on the last row
-   * of a group so the group's own bottom edge stays clean. */
+   * of a group so the group's own bottom edge stays clean. Ignored when
+   * `layout="grid"` (a grid card has its own full border instead of a
+   * divider between rows in a continuous list). */
   showDivider?: boolean;
   /** Optional style override for the row container — e.g. to give it `flex:
    * 1` when it shares a horizontal row with a sibling action button. */
   style?: StyleProp<ViewStyle>;
+  /**
+   * `'row'` (default): the original full-width horizontal row — identity on
+   * the left, trailing value block pinned to the right. Every existing
+   * caller is unaffected by this prop's addition.
+   *
+   * `'grid'`: compact vertical content for a 2-up/3-up grid cell (Players,
+   * Waivers, College Prospects' "many players in a list" screens — see
+   * mobile/UI_HIERARCHY_DIRECTIVE.md §9's "shared list/row primitives with
+   * variants, not a new row per page"). Carries the exact same props/
+   * information as `'row'` — slot, identity, tier/opportunity, injury,
+   * trending, context line, trailing value — just reflowed top-to-bottom
+   * for a narrow card instead of left-to-right for a full-width row, with
+   * slightly smaller type to match the component family CompactPlayerModule
+   * already established for dense contexts. Nothing is omitted; chips wrap
+   * instead of clipping. Like `'row'`, this owns no outer border/background
+   * — the caller's own cell wrapper provides the card chrome and any
+   * sibling trailing content (e.g. a FlatList's `numColumns` grid-cell
+   * View), the same "identity component inside a caller-owned container"
+   * composition `'row'` callers already use.
+   */
+  layout?: 'row' | 'grid';
 }
 
 /**
@@ -157,6 +180,7 @@ export default function PlayerIdentityRow({
   onPress,
   showDivider = false,
   style,
+  layout = 'row',
 }: PlayerIdentityRowProps) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -180,6 +204,108 @@ export default function PlayerIdentityRow({
   // chip is the one suppressed.
   const slotRedundant =
     !!slot && !!position && slot.trim().toUpperCase() === position.trim().toUpperCase();
+
+  if (layout === 'grid') {
+    const showSlot = !!slot && !slotRedundant;
+    return (
+      <TouchableOpacity
+        style={[styles.gridCard, style]}
+        onPress={onPress}
+        activeOpacity={onPress ? 0.7 : 1}
+        disabled={!onPress}
+      >
+        {showSlot || injuryLabel ? (
+          <View style={styles.gridTopRow}>
+            {showSlot ? (
+              <View style={styles.slotBadge}>
+                <AppText style={styles.slotText} numberOfLines={1}>
+                  {slot}
+                </AppText>
+              </View>
+            ) : (
+              <View />
+            )}
+            {injuryLabel ? (
+              <View style={[styles.injuryPill, { backgroundColor: injuryPillBg }]}>
+                <AppText style={[styles.injuryText, { color: injuryTextColor }]} numberOfLines={1}>
+                  {injuryLabel}
+                </AppText>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        <View style={styles.gridIdentityRow}>
+          <PlayerAvatar playerId={playerId} size={34} tier={tier} style={styles.gridAvatar} />
+          <View style={styles.gridBody}>
+            <PlayerNameText name={name ?? 'Unknown player'} style={styles.gridName} />
+            <View style={styles.metaRow}>
+              <PositionBadge position={position} />
+              {team ? (
+                <AppText style={styles.team} numberOfLines={1}>
+                  {team}
+                </AppText>
+              ) : null}
+            </View>
+          </View>
+        </View>
+        {labelBits.length > 0 || trendingAddLabel || overallRating != null ? (
+          <View style={styles.gridChipWrap}>
+            <TierBadge storedTier={tier} />
+            {labelBits.length > 0 ? (
+              <AppText style={styles.label} numberOfLines={1}>
+                {labelBits.join(' · ')}
+              </AppText>
+            ) : null}
+            {trendingAddLabel ? (
+              <View style={styles.trendingPill}>
+                <AppText style={styles.trendingPillText} numberOfLines={1}>
+                  {trendingAddLabel}
+                </AppText>
+              </View>
+            ) : null}
+            {/* Last in the chip wrap, same as row layout's metaRow — OVR is a
+                supporting metric, never ahead of identity/position/team/tier
+                (UI_HIERARCHY_DIRECTIVE.md §11). */}
+            <OverallRatingBadge rating={overallRating} positionRank={positionRank} />
+          </View>
+        ) : null}
+        {contextLine ? (
+          <AppText
+            style={[styles.context, contextLineColor ? { color: contextLineColor } : null]}
+            numberOfLines={2}
+          >
+            {contextLine}
+          </AppText>
+        ) : null}
+        {trailingValue ? (
+          <View style={styles.gridTrailingRow}>
+            <View>
+              <AppText style={styles.trailingValue} numberOfLines={1}>
+                {trailingValue}
+              </AppText>
+              {trailingCaption ? (
+                <AppText style={styles.trailingCaption} numberOfLines={1}>
+                  {trailingCaption}
+                </AppText>
+              ) : null}
+            </View>
+            {secondaryTrailingValue ? (
+              <View style={styles.gridSecondaryTrailing}>
+                <AppText style={styles.secondaryTrailingValue} numberOfLines={1}>
+                  {secondaryTrailingValue}
+                </AppText>
+                {secondaryTrailingCaption ? (
+                  <AppText style={styles.secondaryTrailingCaption} numberOfLines={1}>
+                    {secondaryTrailingCaption}
+                  </AppText>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -335,5 +461,41 @@ function createStyles(colors: ThemeColors) {
     secondaryTrailingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
     secondaryTrailingValue: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
     secondaryTrailingCaption: { fontSize: 9, color: colors.textTertiary },
+    // `layout="grid"` — unlike `layout="row"`'s `styles.row` (a bare flex
+    // row — the caller's own container owns the grouped-table border/
+    // background), this intentionally owns no border/background/padding
+    // either: a grid-cell caller that needs additional sibling content
+    // (e.g. a trailing value footer built from badge components this
+    // component's own `trailingValue` text-only prop can't carry) wraps
+    // this in its own bordered card alongside that sibling content, the
+    // same "identity component + sibling trailing block, both inside one
+    // container" composition `layout="row"` callers already use (see
+    // PlayersScreen's PlayerRankRow/WaiversScreen's FreeAgentRow). A caller
+    // with nothing extra to add can just use this as its whole card.
+    gridCard: {
+      flex: 1,
+      gap: 4,
+    },
+    gridTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 20,
+    },
+    gridIdentityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    gridAvatar: {},
+    gridBody: { flex: 1, gap: 1, minWidth: 0 },
+    gridName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+    gridChipWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
+    gridTrailingRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      marginTop: 2,
+      paddingTop: spacing.xs,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.hairline,
+    },
+    gridSecondaryTrailing: { alignItems: 'flex-end' },
   });
 }
