@@ -123,7 +123,10 @@ def test_no_new_provider_or_rerun_architecture_regression():
 
     inv = inventory()
     # Trade Analyzer add/remove must rerun so chips paint after mutation.
-    assert inv["explicit_rerun_count"] <= 63
+    # 63 -> 64: one new shared rerun call site for the welcome page's
+    # feature-explanation slideshow Prev/Next buttons
+    # (modules/marketing_landing.py render_landing_detail_slideshow).
+    assert inv["explicit_rerun_count"] <= 64
     assert inv["deferred_gate_count"] >= 4
     assert inv["reduced_context_call_count"] >= 4
 

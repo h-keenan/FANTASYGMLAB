@@ -244,4 +244,7 @@ def test_orb_owner_and_lifecycle_contracts_are_unchanged():
     assert "_sync_platform_query_page(" in app
     from scripts.measure_interaction_rerun_architecture import count_explicit_reruns
 
-    assert count_explicit_reruns() <= 63
+    # 63 -> 64: one new shared rerun call site for the welcome page's
+    # feature-explanation slideshow Prev/Next buttons
+    # (modules/marketing_landing.py render_landing_detail_slideshow).
+    assert count_explicit_reruns() <= 64
