@@ -984,9 +984,14 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
             event="RESTORE",
             rerun_reason="payload_applied",
         )
-    if not restored and error:
+    if not restored and error and error != auth_supabase.TRANSIENT_AUTH_NETWORK_ERROR:
         # Never clear a potentially valid durable session solely because the
         # bridge was late — only clear on explicit restore failure with error.
+        # A transient network failure reaching Supabase (DNS blip, timeout)
+        # is excluded too: it's not evidence the refresh token is actually
+        # invalid, and clearing here would sign the user out on ordinary
+        # network flakiness during the ~hourly token-refresh window — see
+        # restore_auth_payload's matching guard in modules/auth_supabase.py.
         auth_supabase.queue_durable_auth_clear(st.session_state)
         auth_restore_lifecycle.clear_restore_lifecycle(st.session_state)
     return actions

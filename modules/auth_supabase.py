@@ -27,6 +27,12 @@ CONFIRMATION_REQUIRED_KEY = "account_confirmation_required"
 CONFIRMATION_EMAIL_KEY = "account_confirmation_email"
 CONFIRMATION_RESEND_TS_KEY = "account_confirmation_resend_ts"
 CONFIRMATION_RESEND_COOLDOWN_SECONDS = 60
+# Returned by refresh_auth_session on a requests exception (DNS blip,
+# connection reset, timeout) — distinct from a definitive 4xx response body
+# (_safe_error), so a caller can retry a transient failure instead of
+# treating it the same as a genuinely revoked/invalid refresh token. See
+# restore_auth_payload's use of this constant.
+TRANSIENT_AUTH_NETWORK_ERROR = "Could not reach Supabase Auth."
 # Canonical pending-confirmation state (not authenticated).
 PENDING_EMAIL_CONFIRMATION_KEY = "pending_email_confirmation"
 ACCOUNT_SIGNUP_CHECK_EMAIL_KEY = "account_signup_check_email"
@@ -597,7 +603,7 @@ def refresh_auth_session(config: dict, refresh_token: str) -> tuple[dict | None,
                 timeout=15,
             )
     except Exception:
-        return None, "Could not reach Supabase Auth."
+        return None, TRANSIENT_AUTH_NETWORK_ERROR
     if response.status_code >= 400:
         return None, _safe_error(response)
     return response.json(), ""
@@ -1190,8 +1196,18 @@ def restore_auth_payload(
     if access_token_expired(session):
         refreshed_payload, error = refresh_auth_session(config, session.get("refresh_token", ""))
         if error:
-            queue_durable_auth_clear(session_state)
-            auth_restore_lifecycle.clear_restore_lifecycle(session_state)
+            # A transient network failure (DNS blip, connection reset,
+            # timeout) is not evidence the refresh token is actually
+            # invalid — wiping the durable session here would sign the
+            # user out on ordinary network flakiness during the ~hourly
+            # refresh window. Only a definitive response from Supabase
+            # (a real 4xx body) means the token itself was rejected, so
+            # only that case clears durable auth; a transient failure
+            # just fails this attempt and lets the next rerun retry with
+            # the still-intact stored refresh token.
+            if error != TRANSIENT_AUTH_NETWORK_ERROR:
+                queue_durable_auth_clear(session_state)
+                auth_restore_lifecycle.clear_restore_lifecycle(session_state)
             return False, error, False
         session = durable_auth_payload(refreshed_payload)
         refreshed = True
