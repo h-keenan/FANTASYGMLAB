@@ -6552,3 +6552,13 @@ def get_league_all_trades(
             "remaining_free": remaining_free,
         },
     }
+
+
+# Service-to-service editorial export never calls require_user or exposes league/account data.
+from services.fantasy_content import content_reader, require_content_token
+_content_feed = content_reader(PLAYERS_DB_PATH, _maybe_schedule_players_refresh,
+                               lambda: get_news(limit=20, _user={})["items"])
+
+@app.get("/v1/content/feed", dependencies=[Depends(require_content_token)])
+def get_public_content_feed():
+    return _content_feed()

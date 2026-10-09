@@ -93,7 +93,7 @@ def main() -> None:
         "snapshot_build_ms": round(snapshot_build_ms, 1),
         "cold_ms": round(cold_ms, 1),
         "warm_ms": round(warm_ms, 1),
-        "snapshot_size_bytes": int(data_path.stat().st_size + metadata_path.stat().st_size),
+        "snapshot_size_bytes": sum(path.stat().st_size for path in (data_path, metadata_path) if path.exists()),
         "row_count": int(len(warm)),
         "memory_mb": round(
             int(warm.memory_usage(index=True, deep=True).sum()) / (1024 * 1024),

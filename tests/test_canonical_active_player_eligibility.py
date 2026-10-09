@@ -51,7 +51,10 @@ def _keenan_record() -> dict:
         if str(record.get("full_name") or "").casefold() == "keenan allen"
     ]
     assert len(matches) == 1
-    return matches[0]
+    record = matches[0]
+    # Fixed unsigned-veteran scenario: provider updates must not change this regression.
+    record.update(team=None, team_abbr=None, active=True, status="Active", news_updated=CURRENT_NEWS_MS)
+    return record
 
 
 def test_active_veteran_with_valid_team_is_included():

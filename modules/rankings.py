@@ -3875,9 +3875,15 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     return ensure_identity_columns(df)
 
 
+def _public_result(frame):
+    # The persisted engine table can contain internal factor/fallback columns.
+    # They are excluded at the public boundary, matching snapshot output policy.
+    return ensure_identity_columns(frame.drop(columns=list(public_player_snapshot.FORBIDDEN_SNAPSHOT_OUTPUT_COLUMNS), errors="ignore"))
+
+
 def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
     if not os.path.exists(db_path):
-        return ensure_identity_columns(build_players_table(db_path))
+        return _public_result(build_players_table(db_path))
 
     sqlite_started = time.perf_counter()
     with player_hydrate_stages.stage("sqlite_query", kind="disk"):
@@ -3893,7 +3899,7 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
     )
 
     if df.empty:
-        return ensure_identity_columns(build_players_table(db_path, refresh=True))
+        return _public_result(build_players_table(db_path, refresh=True))
 
     required_meta = [
         "status",
@@ -3927,10 +3933,10 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
         "valuation_blend",
     ]
     if any(col not in df.columns for col in required_meta):
-        return ensure_identity_columns(build_players_table(db_path, refresh=True))
+        return _public_result(build_players_table(db_path, refresh=True))
 
     if "position" not in df.columns:
-        return ensure_identity_columns(build_players_table(db_path, refresh=True))
+        return _public_result(build_players_table(db_path, refresh=True))
 
     for col in required_meta:
         if col not in df.columns:
@@ -4010,9 +4016,9 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
         or "K" not in df["position"].astype(str).str.upper().unique()
         or kicker_is_stale
     ):
-        return ensure_identity_columns(build_players_table(db_path, refresh=True))
+        return _public_result(build_players_table(db_path, refresh=True))
 
-    return ensure_identity_columns(df)
+    return _public_result(df)
 
 
 def _refresh_risk_adjusted_scores(df: pd.DataFrame) -> pd.DataFrame:
@@ -4443,7 +4449,7 @@ def _load_players_uncached(db_path: str) -> pd.DataFrame:
         if current is not None and required.issubset(current.columns):
             identity_started = time.perf_counter()
             with player_hydrate_stages.stage("identity_columns", kind="cpu"):
-                current = ensure_identity_columns(current)
+                current = _public_result(current)
             performance.record_timing(
                 "public_player_identity_columns",
                 (time.perf_counter() - identity_started) * 1000,
