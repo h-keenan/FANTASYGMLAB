@@ -66,6 +66,58 @@ def test_late_kick_only_calls_existing_restore_after_two_frames():
     assert "MutationObserver" not in VIEWPORT_RESTORE_KICK_JS
 
 
+def test_intentional_nav_detection_covers_real_navigation_call_sites():
+    """Every plain st.button that commits a real cross-page route must be
+    recognized by isIntentionalNav(), or the in-place scroll-anchor system
+    fights navigation_state.py's scroll-reset-to-top and the page visibly
+    jumps on every real navigation (#937-class bug). Nothing in the app ever
+    sets data-fgl-intentional-nav and none of these are <a href> links, so
+    detection relies on each button's own Streamlit "st-key-<key>" class.
+    This pins the key patterns in VIEWPORT_PRESERVE_JS against the literal
+    `key=` strings at each real call site so a future rename trips here
+    instead of silently reintroducing the jump.
+    """
+    assert "isIntentionalNavKey" in VIEWPORT_PRESERVE_JS
+    assert "INTENTIONAL_NAV_KEY_PREFIXES" in VIEWPORT_PRESERVE_JS
+    assert "INTENTIONAL_NAV_KEY_SUFFIXES" in VIEWPORT_PRESERVE_JS
+    assert "INTENTIONAL_NAV_KEY_EXACT" in VIEWPORT_PRESERVE_JS
+    assert "isIntentionalNavKey(keyFrom(el))" in VIEWPORT_PRESERVE_JS
+
+    workspace_ui_src = (ROOT / "modules" / "workspace_ui.py").read_text(encoding="utf-8")
+    gm_targets_ui_src = (ROOT / "modules" / "gm_targets_ui.py").read_text(encoding="utf-8")
+    live_draft_ui_src = (ROOT / "modules" / "live_draft_ui.py").read_text(encoding="utf-8")
+    dashboard_orientation_src = (
+        ROOT / "modules" / "dashboard_orientation.py"
+    ).read_text(encoding="utf-8")
+
+    # (source holding the real call site, the literal key= there, the
+    # matching prefix pattern that must appear in VIEWPORT_PRESERVE_JS)
+    prefix_cases = [
+        (workspace_ui_src, 'key=f"home_quick_action_{row_idx}_{route_key}"', "home_quick_action_"),
+        (APP, 'key=f"player_quick_view_trade_hub_{player_id}"', "player_quick_view_trade_hub_"),
+        (APP, 'key=f"premium_lock_route_{key_base}"', "premium_lock_route_"),
+        (APP, 'key=f"mobile_sheet_nav_{page.key}"', "mobile_sheet_nav_"),
+        (gm_targets_ui_src, 'key=f"gm_targets_handoff_{dest_key}_{card.player_id}"', "gm_targets_handoff_"),
+        (live_draft_ui_src, 'key=f"live_rank_trade_{player_id}"', "live_rank_trade_"),
+    ]
+    for source, literal_key, pattern in prefix_cases:
+        assert literal_key in source, f"navigation call site moved or renamed: {literal_key!r}"
+        assert f'"{pattern}"' in VIEWPORT_PRESERVE_JS, f"missing intentional-nav key pattern: {pattern!r}"
+
+    suffix_cases = [
+        (APP, 'key=f"{key_prefix}_{route_key}_handoff"', "_handoff"),
+        (APP, 'key=f"{key_prefix}_open_trade_hub"', "_open_trade_hub"),
+        (APP, 'key=f"{key_prefix}_open_trade_analyzer"', "_open_trade_analyzer"),
+        (dashboard_orientation_src, 'key=f"{scope_key}_my_team"', "_my_team"),
+    ]
+    for source, literal_key, pattern in suffix_cases:
+        assert literal_key in source, f"navigation call site moved or renamed: {literal_key!r}"
+        assert f'"{pattern}"' in VIEWPORT_PRESERVE_JS, f"missing intentional-nav key pattern: {pattern!r}"
+
+    assert 'key="gm_targets_empty_open_players"' in gm_targets_ui_src
+    assert '"gm_targets_empty_open_players"' in VIEWPORT_PRESERVE_JS
+
+
 def test_navigation_tracker_reads_stmain_scroller():
     assert "querySelector('[data-testid=\"stMain\"]')" in APP
     assert "main.scrollTop" in APP or "mainScroller" in APP

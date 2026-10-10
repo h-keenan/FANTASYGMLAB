@@ -61,6 +61,48 @@ VIEWPORT_PRESERVE_JS = """
         return ""
       }
 
+      // Real cross-page navigation here is always a plain st.button (never an
+      // <a href>), so neither data-fgl-intentional-nav (nothing sets it) nor
+      // the ?page= link check ever fires for it. Streamlit still gives every
+      // keyed widget a stable "st-key-<key>" class, so every real navigation
+      // call site is recognized by its own widget key instead. Keep this list
+      // in sync with every button that routes through
+      // commit_destination_navigation / _commit_platform_destination (see
+      // tests/test_viewport_preservation.py for the paired call-site check).
+      const INTENTIONAL_NAV_KEY_EXACT = new Set([
+        "gm_targets_empty_open_players",
+      ])
+      const INTENTIONAL_NAV_KEY_PREFIXES = [
+        "home_quick_action_",
+        "player_quick_view_trade_hub_",
+        "premium_lock_route_",
+        "mobile_sheet_nav_",
+        "gm_targets_handoff_",
+        "live_rank_trade_",
+      ]
+      const INTENTIONAL_NAV_KEY_SUFFIXES = [
+        "_handoff",
+        "_open_trade_hub",
+        "_open_trade_analyzer",
+        "_my_team",
+      ]
+
+      const isIntentionalNavKey = (rawKey) => {
+        const key = String(rawKey || "")
+        const stripped = key.indexOf("st-key-") === 0 ? key.slice(7) : key
+        if (!stripped) return false
+        if (INTENTIONAL_NAV_KEY_EXACT.has(stripped)) return true
+        if (INTENTIONAL_NAV_KEY_PREFIXES.some((prefix) => stripped.indexOf(prefix) === 0)) return true
+        if (
+          INTENTIONAL_NAV_KEY_SUFFIXES.some(
+            (suffix) => stripped.length > suffix.length && stripped.slice(-suffix.length) === suffix
+          )
+        ) {
+          return true
+        }
+        return false
+      }
+
       const isIntentionalNav = (el) => {
         if (!el || !el.closest) return false
         if (el.closest("[data-fgl-intentional-nav]")) return true
@@ -69,6 +111,7 @@ VIEWPORT_PRESERVE_JS = """
           const href = String(link.getAttribute("href") || "")
           if (href.indexOf("?page=") >= 0) return true
         }
+        if (isIntentionalNavKey(keyFrom(el))) return true
         return false
       }
 
