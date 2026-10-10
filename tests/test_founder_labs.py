@@ -108,7 +108,6 @@ def test_labs_nav_requires_flag_without_archived_customer_items():
     assert "founder_labs" in shown
     assert "founder_labs" not in hidden
     assert "weekly_report" not in shown
-    assert "news" not in shown
 
 
 def test_labs_review_routes_are_routable_but_not_in_nav():

@@ -30,10 +30,13 @@ def test_trade_hub_reuses_roster_map_instead_of_second_sleeper_fetch():
     assert "get_shared_league_context(" in hub
     assert "get_roster_player_ids(selected_league_id, my_roster_id)" not in hub
 
-def test_news_and_my_team_prefer_shared_league_roster_maps():
+def test_my_team_prefers_shared_league_roster_map():
+    # The "news" route's roster-aware shared-context reuse (news_context =
+    # get_shared_league_context(...)) was retired when News graduated to a
+    # general, non-roster-scoped feed (web counterpart to mobile's
+    # NewsScreen) — it no longer fetches a league/roster map at all, so that
+    # perf guard no longer applies to it. My Team's own reuse still does.
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "news_context = get_shared_league_context(" in source
-    assert "news_roster_player_map = news_context.get(\"roster_player_map\")" in source
     my_team = source[
         source.index("# MY TEAM") : source.index("# LEAGUE OVERVIEW")
         if "# LEAGUE OVERVIEW" in source

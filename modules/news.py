@@ -9,6 +9,7 @@ Presentation: PQV / Alerts / Dashboard tiles
 import json
 import hashlib
 import os
+import re
 import threading
 import time
 from functools import lru_cache
@@ -218,6 +219,81 @@ def clear_enriched_news_pool_cache() -> None:
     """Drop the in-process enriched-pool cache — tests, and any manual refresh hook."""
 
     _enriched_news_pool_cached.cache_clear()
+
+
+# Only actionable signal — a generic/off-topic headline (the RSS cache is a
+# broad NFL feed, not fantasy-specific) classifies as EVENT_HEADLINE and is
+# dropped. Mirrors services/mobile_api_service.py's GET /v1/news so the web
+# "News" page and the mobile NewsScreen curate the exact same feed.
+GENERAL_NEWS_ACTIONABLE_EVENTS = {
+    news_signal.EVENT_INJURY,
+    news_signal.EVENT_ROLE,
+    news_signal.EVENT_TRANSACTION,
+    news_signal.EVENT_OFF_FIELD,
+}
+
+MAX_GENERAL_NEWS_LIMIT = 50
+
+# Display-only transform (never fed back into classification), matching
+# services/mobile_api_service.py's _NEWS_SOURCE_DISPLAY_NAMES so a reader
+# sees "ESPN" rather than the raw feed URL stored on `source`.
+_NEWS_SOURCE_DISPLAY_NAMES = {
+    "rotowire.com": "RotoWire",
+    "espn.com": "ESPN",
+    "cbssports.com": "CBS Sports",
+    "sports.yahoo.com": "Yahoo Sports",
+    "nbcsports.com": "Pro Football Talk",
+    "profootballrumors.com": "Pro Football Rumors",
+}
+
+
+def friendly_news_source(raw_source: str) -> str:
+    lowered = str(raw_source or "").lower()
+    for marker, display_name in _NEWS_SOURCE_DISPLAY_NAMES.items():
+        if marker in lowered:
+            return display_name
+    match = re.search(r"https?://(?:www\.)?([^/]+)", str(raw_source or ""))
+    return match.group(1) if match else str(raw_source or "")
+
+
+def general_news_feed(limit: int = 30) -> list:
+    """Curated general NFL fantasy news (injury/role/transaction/off-field
+    signal only) — not roster-scoped, a league-wide feed for anyone, not
+    "your team's" news. Deduplicated by link, newest first, capped at
+    ``limit``.
+
+    Same disk-cached pool and classification every other news surface uses
+    (``enriched_news_pool``) and the same curation
+    services/mobile_api_service.py's GET /v1/news performs, so this is the
+    web counterpart to mobile's NewsScreen (mobile/src/screens/NewsScreen.tsx)
+    rather than a second, drifting implementation.
+    """
+
+    limit = max(1, min(int(limit or 1), MAX_GENERAL_NEWS_LIMIT))
+    enriched = enriched_news_pool()
+    actionable = [
+        item
+        for item in enriched
+        if isinstance(item, dict) and item.get("signal_primary_event") in GENERAL_NEWS_ACTIONABLE_EVENTS
+    ]
+    actionable.sort(key=_news_item_timestamp, reverse=True)
+
+    seen_links: set = set()
+    items: list = []
+    for item in actionable:
+        link = str(item.get("link") or "").strip().lower()
+        if link and link in seen_links:
+            continue
+        if link:
+            seen_links.add(link)
+        projected = dict(item)
+        projected["event_type"] = item.get("signal_primary_event")
+        projected["speculative"] = bool(item.get("signal_speculative"))
+        projected["source"] = friendly_news_source(str(item.get("source") or ""))
+        items.append(projected)
+        if len(items) >= limit:
+            break
+    return items
 
 
 def _load_roster_cache():

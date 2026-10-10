@@ -39,6 +39,7 @@ DESTINATION_CONCEPT = {
     "team_stance": "roster",
     "rankings": "league",
     "league_recaps": "history",
+    "news": "alerts",
     "trade_hub": "trade",
     "trade_analyzer": "trade",
     "waivers": "waiver",

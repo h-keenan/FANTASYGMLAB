@@ -61,8 +61,16 @@ def audit() -> dict:
         in main,
         "waivers_use_canonical_league": "selected_league_id=selected_league_id"
         in main[main.index('if current_page == "waivers"') :],
-        "news_is_league_scoped": 'roster_news_key = f"roster_news_{selected_league_id}_{my_roster_id}"'
-        in main,
+        # News graduated from a roster-scoped feed to a general,
+        # non-roster-scoped feed (the web counterpart to mobile's
+        # NewsScreen) — it intentionally no longer reads selected_league_id
+        # / my_roster_id at all, so the old roster-scoped-key check is
+        # replaced with its mirror image.
+        "news_is_general_not_league_scoped": (
+            "news_items = general_news_feed(30)" in main
+            and 'roster_news_key = f"roster_news_{selected_league_id}_{my_roster_id}"'
+            not in main
+        ),
         "trade_entitlement_after_trust": main.index("ideas = enforce_cached_trade_ideas(")
         < main.index("trade_hub_ui.trade_hub_entitlement_presentation("),
         "league_switch_invalidates_active_context": 'st.session_state.pop("active_league_context", None)'

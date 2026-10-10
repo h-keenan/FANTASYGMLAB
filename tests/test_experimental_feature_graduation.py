@@ -49,7 +49,6 @@ def test_live_draft_graduated_conditional():
 def test_archived_routes_never_in_nav():
     expected = {
         "player_detail",
-        "news",
         "archetypes",
         "teams",
         "weekly_report",

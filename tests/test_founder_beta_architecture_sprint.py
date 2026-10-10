@@ -153,7 +153,13 @@ def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysi
     # Team Situation (#232 follow-up) is a new lightweight, non-deep-analysis
     # route (modules.team_stance_ui) — same reduced-context shape GM Targets
     # already uses, so the budget grows by exactly one.
-    assert source.count("include_intelligence=False") == 8
+    #
+    # News graduated to a general, non-roster-scoped feed (the web
+    # counterpart to mobile's NewsScreen) and no longer fetches a
+    # league/roster context at all — its one include_intelligence=False
+    # call site (news_context = get_shared_league_context(...)) is gone,
+    # so the budget drops by exactly one from its #232-follow-up value.
+    assert source.count("include_intelligence=False") == 7
     assert "league_context = get_shared_league_context(include_trust=False)" in source
     assert "trade_hub_context = get_shared_league_context(" in source
     assert "include_intelligence=False" in source[
@@ -164,7 +170,7 @@ def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysi
     assert "targets_context = (" in source
     assert 'if current_page == "gm_targets"' in source
     assert "league_context_my_team = get_shared_league_context()" in source
-    assert "news_context = get_shared_league_context(" in source
+    assert "news_context = get_shared_league_context(" not in source
     assert "waiver_context = get_shared_league_context(" in source
 
 

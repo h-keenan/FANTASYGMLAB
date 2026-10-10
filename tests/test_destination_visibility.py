@@ -26,6 +26,7 @@ class TestDestinationVisibility(unittest.TestCase):
             "waivers",
             "alerts",
             "league_recaps",
+            "news",
         ):
             self.assertIn(key, by_key)
             self.assertEqual(by_key[key].category, "CORE")
@@ -42,7 +43,6 @@ class TestDestinationVisibility(unittest.TestCase):
         for key in (
             "teams",
             "weekly_report",
-            "news",
             "archetypes",
             "manager_tendencies",
             "live_draft",
@@ -50,6 +50,10 @@ class TestDestinationVisibility(unittest.TestCase):
             "gm_targets",
         ):
             self.assertNotIn(key, visible_keys)
+        # News (general, non-roster NFL feed) graduated from ARCHIVED to CORE
+        # to restore a third, standalone general-news surface alongside
+        # Dashboard's tiles and the roster-scoped Alerts timeline.
+        self.assertIn("news", visible_keys)
 
     def test_experimental_flag_exposes_conditional_only(self):
         visible = current_platform_destinations(startup_mode=False, show_experimental=True)
@@ -61,10 +65,11 @@ class TestDestinationVisibility(unittest.TestCase):
             "manager_tendencies",
             "teams",
             "player_detail",
-            "news",
             "archetypes",
         ):
             self.assertNotIn(key, visible_by_key)
+        # News is CORE (always visible), not an archived duplicate.
+        self.assertIn("news", visible_by_key)
         self.assertEqual(visible_by_key["trade_analyzer"].category, "CORE")
         # Graduated conditionals are visible for Ops via SHOW_EXPERIMENTAL.
         self.assertEqual(visible_by_key["live_draft"].category, "CONDITIONAL")
