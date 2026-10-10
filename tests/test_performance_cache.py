@@ -46,6 +46,27 @@ class TestPerformanceCache(unittest.TestCase):
         self.assertIn("watchlist_candidates = featured_free_agents.iloc[0:0].copy()", waiver_branch)
         self.assertIn("faab_targets = free_agents_ranked.iloc[0:0].copy()", waiver_branch)
 
+    def test_player_detail_news_section_never_blocks_render_on_live_rss(self):
+        # Player Detail is reachable from League Overview, My Team, Trade Hub,
+        # Trade Analyzer, Waivers, and Draft Center. The News/Alerts surfaces
+        # already use a non-blocking contract for a stale on-disk cache:
+        # render whatever is cached and let a background thread
+        # (schedule_news_cache_refresh) catch it up, instead of calling
+        # fetch_news() inline, which performs synchronous live RSS fetches
+        # whenever the on-disk cache is older than NEWS_CACHE_TTL_SECONDS.
+        # Player Detail's news section must follow the same contract so
+        # opening any player's profile can never block on live network I/O.
+        app_source = Path("app.py").read_text(encoding="utf-8")
+        start = app_source.index("def render_player_detail_content(")
+        end = app_source.index("def render_player_detail_page(")
+        section = app_source[start:end]
+        news_start = section.index('if include_news:')
+        news_section = section[news_start:]
+
+        self.assertIn("load_cached_news_pool()", news_section)
+        self.assertIn("schedule_news_cache_refresh()", news_section)
+        self.assertNotIn("fetch_news()", news_section)
+
 
 if __name__ == "__main__":
     unittest.main()
