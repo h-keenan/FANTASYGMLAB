@@ -336,8 +336,8 @@ def render_college_scouting_workspace(
         "grade and watchlist stay yours to edit any time.</p>"
     )
 
-    prospects, prospects_error = college_scouting.fetch_all_prospects(resolved_config, access_token)
-    reports, _reports_error = college_scouting.fetch_all_scouting_reports(resolved_config, access_token)
+    prospects, prospects_error = college_scouting.get_cached_all_prospects(resolved_config, access_token)
+    reports, _reports_error = college_scouting.get_cached_all_scouting_reports(resolved_config, access_token)
     watchlist_rows, _watchlist_error = account_store.fetch_rows(
         resolved_config, access_token, college_scouting.WATCHLIST_TABLE, user_id=user_id
     )

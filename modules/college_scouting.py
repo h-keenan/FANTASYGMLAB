@@ -410,13 +410,75 @@ def fetch_all_scouting_reports(
     return [row for row in rows if isinstance(row, dict)], ""
 
 
-# In-process TTL cache for the crowd class-strength signal. This is shared,
-# slow-moving, cross-user data (identical for every caller), so refetching
-# it on every single valuation request would be pure waste against a
-# performance-sensitive hot path (modules/trade_ideas.py's pick valuation is
-# explicitly profiled/instrumented elsewhere for exactly this reason).
+# In-process TTL cache for the crowd class-strength signal (and the raw
+# prospects/reports lists it's built from). This is shared, slow-moving,
+# cross-user data (identical for every caller — pooled grades, not anything
+# scoped to the requesting user), so refetching it from Supabase on every
+# single request would be pure waste against a performance-sensitive hot
+# path (modules/trade_ideas.py's pick valuation is explicitly
+# profiled/instrumented elsewhere for exactly this reason). Before this,
+# modules.college_scouting_ui's College Scouting page called
+# fetch_all_prospects/fetch_all_scouting_reports directly on every single
+# page render — two uncached Supabase round-trips per view, the same bug
+# class as the Player Detail News blocking-RSS-fetch fix (#958) and the
+# NFL-schedule CSV re-parse fix (#960).
 CACHE_TTL_SECONDS = 600.0
 _class_strength_cache: Dict[str, Any] = {"data": None, "fetched_at": 0.0}
+_prospects_cache: Dict[str, Any] = {"data": None, "fetched_at": 0.0}
+_reports_cache: Dict[str, Any] = {"data": None, "fetched_at": 0.0}
+
+
+def get_cached_all_prospects(
+    config: dict,
+    access_token: str,
+    *,
+    now: float | None = None,
+) -> Tuple[List[Dict[str, Any]], str]:
+    """Cached wrapper around ``fetch_all_prospects``.
+
+    The prospect catalog is identical for every caller (no per-user
+    filtering), so a successful fetch is reused for
+    ``CACHE_TTL_SECONDS`` instead of re-hitting Supabase on every page
+    render/request. A failed fetch is never cached (so the page recovers
+    on the very next view once the table is reachable again).
+    """
+
+    current_time = time.time() if now is None else now
+    cached = _prospects_cache.get("data")
+    fetched_at = float(_prospects_cache.get("fetched_at") or 0.0)
+    if cached is not None and (current_time - fetched_at) < CACHE_TTL_SECONDS:
+        return cached, ""
+
+    prospects, error = fetch_all_prospects(config, access_token)
+    if error:
+        return prospects, error
+    _prospects_cache["data"] = prospects
+    _prospects_cache["fetched_at"] = current_time
+    return prospects, error
+
+
+def get_cached_all_scouting_reports(
+    config: dict,
+    access_token: str,
+    *,
+    now: float | None = None,
+) -> Tuple[List[Dict[str, Any]], str]:
+    """Cached wrapper around ``fetch_all_scouting_reports`` — see
+    ``get_cached_all_prospects`` for why this is safe to share across
+    callers/users."""
+
+    current_time = time.time() if now is None else now
+    cached = _reports_cache.get("data")
+    fetched_at = float(_reports_cache.get("fetched_at") or 0.0)
+    if cached is not None and (current_time - fetched_at) < CACHE_TTL_SECONDS:
+        return cached, ""
+
+    reports, error = fetch_all_scouting_reports(config, access_token)
+    if error:
+        return reports, error
+    _reports_cache["data"] = reports
+    _reports_cache["fetched_at"] = current_time
+    return reports, error
 
 
 def get_cached_crowd_class_strength_by_year(
@@ -436,8 +498,8 @@ def get_cached_crowd_class_strength_by_year(
     if cached is not None and (current_time - fetched_at) < CACHE_TTL_SECONDS:
         return cached
 
-    prospects, _ = fetch_all_prospects(config, access_token)
-    reports, error = fetch_all_scouting_reports(config, access_token)
+    prospects, _ = get_cached_all_prospects(config, access_token, now=current_time)
+    reports, error = get_cached_all_scouting_reports(config, access_token, now=current_time)
     if error:
         # Don't cache a failure as if it were "no data forever" — just
         # return neutral for this call and try again next time.
@@ -453,3 +515,7 @@ def _reset_cache_for_tests() -> None:
 
     _class_strength_cache["data"] = None
     _class_strength_cache["fetched_at"] = 0.0
+    _prospects_cache["data"] = None
+    _prospects_cache["fetched_at"] = 0.0
+    _reports_cache["data"] = None
+    _reports_cache["fetched_at"] = 0.0

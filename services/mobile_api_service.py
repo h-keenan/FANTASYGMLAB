@@ -3517,8 +3517,8 @@ def get_scouting_prospects(user: dict[str, Any] = Depends(require_user)) -> dict
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
 
-    prospects, prospects_error = college_scouting.fetch_all_prospects(config, access_token)
-    reports, reports_error = college_scouting.fetch_all_scouting_reports(config, access_token)
+    prospects, prospects_error = college_scouting.get_cached_all_prospects(config, access_token)
+    reports, reports_error = college_scouting.get_cached_all_scouting_reports(config, access_token)
     watchlist_ids: list[str] = []
     if user_id:
         watchlist_rows, _watchlist_error = account_store.fetch_rows(
