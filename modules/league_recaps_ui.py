@@ -68,7 +68,13 @@ def _text(value: object, default: str = "") -> str:
     return text if text else default
 
 
-def recap_story_html(story: Mapping[str, Any], *, lead: bool = False) -> str:
+def recap_story_html(
+    story: Mapping[str, Any],
+    *,
+    lead: bool = False,
+    team_logo_html: Callable[..., str] | None = None,
+    team_avatars: Mapping[str, str] | None = None,
+) -> str:
     glyph = _text(story.get("glyph"), "history")
     title = escape(_text(story.get("title"), "Story"))
     summary = escape(_text(story.get("summary")))
@@ -79,6 +85,33 @@ def recap_story_html(story: Mapping[str, Any], *, lead: bool = False) -> str:
     identity = team
     if secondary:
         identity = f"{team} vs {secondary}" if team else secondary
+    # Mirrors mobile RecapScreen, which renders a real Sleeper TeamAvatar next
+    # to every team name in a storyline card — the identity line here was
+    # plain escaped text with no logo, even though History/Storylines (the
+    # other two Memory tabs on this same page) already show one via this
+    # same team_logo_html callable. Degrades to the pre-existing text-only
+    # identity when no logo callable/avatar map is supplied (e.g. the
+    # non-live recap_edition_html QA/test path).
+    identity_logos_html = ""
+    if team_logo_html is not None and team_avatars:
+        logo_parts = []
+        if team:
+            logo_parts.append(
+                team_logo_html(
+                    _text(team_avatars.get(_text(story.get("primary_roster_id")))),
+                    _text(story.get("primary_team")),
+                    css_class="team-logo-wrap dg-recap-team-logo",
+                )
+            )
+        if secondary:
+            logo_parts.append(
+                team_logo_html(
+                    _text(team_avatars.get(_text(story.get("secondary_roster_id")))),
+                    _text(story.get("secondary_team")),
+                    css_class="team-logo-wrap dg-recap-team-logo",
+                )
+            )
+        identity_logos_html = "".join(logo_parts)
     metric = ""
     if metric_value:
         metric = (
@@ -123,7 +156,7 @@ def recap_story_html(story: Mapping[str, Any], *, lead: bool = False) -> str:
         "<div class='dg-recap-story-kicker'>"
         + glyph_html(glyph, size="kicker")
         + f"<h3>{title}</h3></div>"
-        + (f"<p class='dg-recap-identity'>{identity}</p>" if identity else "")
+        + (f"<p class='dg-recap-identity'>{identity_logos_html}<span>{identity}</span></p>" if identity else "")
         + f"<p class='dg-recap-summary'>{summary}</p>"
         + metric
         + (f"<div class='dg-recap-players'>{players}</div>" if players else "")
@@ -163,10 +196,18 @@ def _story_groups(stories: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return groups
 
 
-def _group_html(group: Mapping[str, Any]) -> str:
+def _group_html(
+    group: Mapping[str, Any],
+    *,
+    team_logo_html: Callable[..., str] | None = None,
+    team_avatars: Mapping[str, str] | None = None,
+) -> str:
     category = escape(_text(group.get("category"), "other"))
     label = escape(_text(group.get("label"), "Storylines"))
-    body = "".join(recap_story_html(story) for story in group.get("stories") or ())
+    body = "".join(
+        recap_story_html(story, team_logo_html=team_logo_html, team_avatars=team_avatars)
+        for story in group.get("stories") or ()
+    )
     return (
         f"<div class='dg-recap-group dg-recap-group--{category}'>"
         "<span class='dg-recap-group__bar'></span>"
@@ -377,6 +418,13 @@ def render_league_recaps_page(
     profiles = payload.get("profiles") or {}
     if current_profiles:
         profiles = current_profiles
+    # roster_id -> avatar_url, so recap story cards can show the same team
+    # logo History/Storylines already show (see recap_story_html).
+    team_avatars = {
+        _text(roster_id): _text(profile.get("avatar_url"))
+        for roster_id, profile in profiles.items()
+        if isinstance(profile, Mapping)
+    }
     normalized = league_history.normalize_season_payload(
         payload,
         profiles=profiles,
@@ -504,12 +552,16 @@ def render_league_recaps_page(
     lead = stories[0]
     with st.container(key=f"league_recap_lead_{home_league_id}_{selected_week}"):
         render_html_fragment(
-            f"<div class='dg-recap-section dg-recap-board'>{recap_story_html(lead, lead=True)}</div>"
+            f"<div class='dg-recap-section dg-recap-board'>"
+            f"{recap_story_html(lead, lead=True, team_logo_html=team_logo_html, team_avatars=team_avatars)}"
+            "</div>"
         )
     _render_story_actions([lead])
     for group_index, group in enumerate(_story_groups(stories[1:]), start=1):
         with st.container(key=f"league_recap_group_{home_league_id}_{selected_week}_{group_index}"):
             render_html_fragment(
-                f"<div class='dg-recap-section dg-recap-board'>{_group_html(group)}</div>"
+                f"<div class='dg-recap-section dg-recap-board'>"
+                f"{_group_html(group, team_logo_html=team_logo_html, team_avatars=team_avatars)}"
+                "</div>"
             )
         _render_story_actions(group["stories"])
