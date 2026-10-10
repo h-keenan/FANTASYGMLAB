@@ -940,7 +940,11 @@ def ranked_leaderboard_row_html(
     badge_html = ""
     if status_badge:
         badge_label, badge_tone = status_badge
-        badge_tone = badge_tone if badge_tone in {"success", "danger", "caution", "information"} else "neutral"
+        badge_tone = (
+            badge_tone
+            if badge_tone in {"success", "danger", "caution", "information", "premium", "neutral"}
+            else "neutral"
+        )
         if badge_label:
             badge_html = f"<span class='dg-ui-badge dg-ui-badge--{badge_tone}'>{escape(badge_label)}</span>"
     trail_html = (
@@ -1119,6 +1123,7 @@ def render_power_rankings_board(
     open_league_team_from_tap: Callable,
     team_logo_html: Callable,
     current_roster_id: object = None,
+    league_id: str = "",
 ):
     if df_display.empty:
         return
@@ -1128,6 +1133,13 @@ def render_power_rankings_board(
         ascending=[True, False],
     ).reset_index(drop=True)
     current_key = _safe_text(current_roster_id).strip()
+    # Same real, data-backed team signal badges (Hot Streak/Pick Hoarder/
+    # Highly Active/etc.) the Team Comparison board already surfaces —
+    # Power Rankings is the board mobile's TeamsScreen most directly maps
+    # to, and it previously showed none of these at all.
+    signal_badges_by_roster = (
+        team_badges.compute_team_signal_badges(ordered, league_id) if league_id else {}
+    )
     metric_label = _safe_text(score_label, "Score")
     for _, row in ordered.iterrows():
         owner_text = owner_handle(
@@ -1177,6 +1189,12 @@ def render_power_rankings_board(
         # _metric_tone_band below) — Power Rankings/Teams was the one board
         # still rendering a flat --text-primary value for every rank.
         metric_tone = _metric_tone_band(_percentile_from_rank(rank_value, len(ordered)))
+        team_signal_badges = signal_badges_by_roster.get(roster_key, []) if roster_key else []
+        team_status_badge = (
+            (team_signal_badges[0], team_badges.badge_tone(team_signal_badges[0]))
+            if team_signal_badges
+            else None
+        )
         board_rows.append(
             ranked_leaderboard_row_html(
                 rank_label=_format_rank(rank_value, tied=bool(row.get(f"{rank_column}_tied"))),
@@ -1200,6 +1218,7 @@ def render_power_rankings_board(
                 is_current=bool(current_key and roster_key and roster_key == current_key),
                 density="compact",
                 metric_tone=metric_tone,
+                status_badge=team_status_badge,
             )
         )
     clicked = render_team_card_tap_grid(

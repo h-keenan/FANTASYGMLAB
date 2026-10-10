@@ -275,7 +275,9 @@ def methodology_page_html() -> str:
     faqs = "".join(
         (
             "<details class='methodology-faq-item'>"
-            f"<summary>{escape(question)}</summary>"
+            f"<summary>{escape(question)}"
+            "<span class='dg-disclosure-hint'>Show answer</span>"
+            "</summary>"
             f"<p class='methodology-copy'>{escape(answer)}</p>"
             "</details>"
         )

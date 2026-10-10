@@ -11,7 +11,20 @@ from modules import league_workspace_ui
 from modules import live_draft_ui
 from modules import metric_graphic_primitives as mgp
 from modules import team_eval as team_eval_module
+from modules import ui_primitives
 from modules import workspace_ui
+
+# Draft posture's five tones ("power"/"weakness"/"strategy"/"opportunity"/
+# "risk" — see _draft_posture_profile below) onto the app's existing
+# dg-ui-badge tone vocabulary, so the posture pill below reuses the exact
+# same badge family every other status pill in the app already uses.
+_DRAFT_POSTURE_BADGE_VARIANT = {
+    "power": "success",
+    "weakness": "caution",
+    "strategy": "information",
+    "opportunity": "opportunity",
+    "risk": "danger",
+}
 
 
 DRAFT_CENTER_PANES = (
@@ -931,7 +944,17 @@ def render_your_draft_posture(
         [
             {
                 "label": "Draft Posture",
-                "value": posture["label"],
+                # The posture verdict is this screen's one headline call —
+                # mobile gives it a solid-fill colored pill (same
+                # high-emphasis treatment as Player Detail's hero tier pill)
+                # instead of a plain tile value string, so web matches that
+                # here instead of leaving it as flat text in a tinted-border
+                # tile like every other metric tile on this row.
+                "value": "",
+                "graphic": ui_primitives.status_badge_html(
+                    posture["label"],
+                    variant=_DRAFT_POSTURE_BADGE_VARIANT.get(posture["tone"], "information"),
+                ),
                 "note": posture["note"],
                 "tone": posture["tone"],
             },

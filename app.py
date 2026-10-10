@@ -176,7 +176,7 @@ from modules import player_cards
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_tiers import assign_player_tiers
 from modules.trade_hub_engine import apply_strategy_age_curve, strategy_adjusted_pick_score_multiplier
-from modules.player_tier_identity import resolve_player_tier_identity
+from modules.player_tier_identity import portrait_frame_classes, resolve_player_tier_identity
 from modules.league_value_settings import (
     DEFAULT_LEAGUE_VALUE_SETTINGS,
     VALUATION_LENS_TO_SCORE_FIELD,
@@ -5065,8 +5065,13 @@ def render_player_detail_content(
     row = player_row
     player_id = _safe_text(row.get("player_id")).strip()
     image_url = cached_headshot_data_url(player_id) if player_id else ""
-    avatar = avatar_html(image_url, _asset_initials(_safe_text(row.get("name"), "Player")), css_class="player-detail-avatar")
     tier_label = _safe_text(row.get("player_tier"), "Developmental")
+    # Tier-colored ring, matching PQV's hero portrait (player_quick_view.py's
+    # pqv-hero-portrait) and mobile's PlayerHero glow halo — this header
+    # previously left the avatar in a flat, untinted frame.
+    avatar_identity = resolve_player_tier_identity(row)
+    avatar_class = portrait_frame_classes(avatar_identity, base="player-detail-avatar", frame_mode="ring")
+    avatar = avatar_html(image_url, _asset_initials(_safe_text(row.get("name"), "Player")), css_class=avatar_class)
     opportunity_label = _safe_text(row.get("opportunity_label"), "Opportunity unclear")
     strategy_label = team_strategy_label(active_team_strategy)
     age_text = _format_age(row.get("age")) or "N/A"
@@ -5076,7 +5081,9 @@ def render_player_detail_content(
         + avatar
         + "<div>"
         + f"<div class='player-detail-name'>{escape(player_display_name(row))}</div>"
-        + f"<div class='player-detail-meta'>{escape(_safe_text(row.get('position')))} | {escape(_safe_text(row.get('team'), 'FA'))} | Age {escape(age_text)}</div>"
+        + "<div class='player-detail-meta'>"
+        + player_cards.player_position_badge_html(_safe_text(row.get("position")))
+        + f" | {escape(_safe_text(row.get('team'), 'FA'))} | Age {escape(age_text)}</div>"
         + "<div class='player-detail-chip-row'>"
         + tier_chip_html(tier_label)
         + glyph_chip_html(opportunity_label, "success")
@@ -16136,6 +16143,7 @@ def render_power_rankings_board(
         open_league_team_from_tap=_open_league_team_from_tap,
         team_logo_html=team_logo_html,
         current_roster_id=active_context.get("my_roster_id"),
+        league_id=_safe_text(active_context.get("selected_league_id")).strip(),
     )
 
 
