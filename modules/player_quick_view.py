@@ -1065,8 +1065,13 @@ def rank_strip_html(
     # The headline Overall rating gets its own gauge-ring cell (matching the
     # mobile app's CircularProgressRing around its "N OVR" hero number)
     # instead of sitting in the generic plain-text `cells` list below — same
-    # "N/99" figure, same band color, just rendered inside a conic-gradient
-    # ring (see .pqv-ovr-ring in player_quick_view_styles.py).
+    # rating, same band color, just rendered inside a conic-gradient ring
+    # (see .pqv-ovr-ring in player_quick_view_styles.py). The "/99" scale
+    # moves to a small caption under the ring rather than crowding inside it
+    # alongside the number — mobile's own ring only ever centers the bare
+    # number (PlayerHero.tsx's CircularProgressRing valueLabel), with its
+    # "OVR" caption outside the ring too; "/99" still appears, just there
+    # instead, so no information is dropped versus the old plain "N/99" text.
     ring_html = ""
     if overall_rating is not None:
         rating = int(overall_rating)
@@ -1076,8 +1081,10 @@ def rank_strip_html(
             "<span>Overall rating</span>"
             f"<div class='pqv-ovr-ring pqv-ovr-ring--{band}' style='--pqv-ovr-pct:{rating}' "
             f"role='img' aria-label='Overall rating {rating} of 99'>"
-            f"<span class='pqv-ovr-ring-value'><strong>{rating}</strong><span>/99</span></span>"
-            "</div></div>"
+            f"<span class='pqv-ovr-ring-value'>{rating}</span>"
+            "</div>"
+            "<span class='pqv-ovr-ring-max'>/99</span>"
+            "</div>"
         )
 
     cells: list[tuple[str, str, str]] = []

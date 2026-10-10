@@ -129,11 +129,10 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
    same --color-danger/--color-action/--color-success tokens pqv-ovr--low/
    mid/high above already use, so the ring's color always matches what the
    plain-text band would have shown. */
-.pqv-ovr-ring{--pqv-ovr-tone:var(--color-action);align-items:center;background:conic-gradient(var(--pqv-ovr-tone) calc(var(--pqv-ovr-pct,0) * 1%),var(--color-border) 0);border-radius:50%;display:grid;height:2.75rem;place-items:center;position:relative;width:2.75rem}
-.pqv-ovr-ring::after{background:var(--surface-1);border-radius:50%;content:'';inset:.36rem;position:absolute}
-.pqv-ovr-ring-value{align-items:baseline;color:var(--pqv-ovr-tone);display:flex;font-variant-numeric:tabular-nums;gap:1px;position:relative;z-index:1}
-.pqv-ovr-ring-value strong{font-size:var(--font-size-body);font-weight:var(--font-weight-display)}
-.pqv-ovr-ring-value span{color:var(--color-text-muted);font-size:var(--font-size-badge)}
+.pqv-ovr-ring{--pqv-ovr-tone:var(--color-action);align-items:center;background:conic-gradient(var(--pqv-ovr-tone) calc(var(--pqv-ovr-pct,0) * 1%),var(--color-border) 0);border-radius:50%;display:grid;height:3.25rem;place-items:center;position:relative;width:3.25rem}
+.pqv-ovr-ring::after{background:var(--surface-1);border-radius:50%;content:'';inset:.4rem;position:absolute}
+.pqv-ovr-ring-value{color:var(--pqv-ovr-tone);font-size:var(--font-size-body);font-weight:var(--font-weight-display);font-variant-numeric:tabular-nums;position:relative;z-index:1}
+.pqv-ovr-ring-max{color:var(--color-text-muted);font-size:var(--font-size-badge);margin-top:2px}
 .pqv-ovr-ring--low{--pqv-ovr-tone:var(--color-danger)}
 .pqv-ovr-ring--mid{--pqv-ovr-tone:var(--color-action)}
 .pqv-ovr-ring--high{--pqv-ovr-tone:var(--color-success)}
