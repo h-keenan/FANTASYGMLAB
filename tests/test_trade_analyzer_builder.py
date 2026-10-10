@@ -195,6 +195,59 @@ def test_chip_and_result_rows_are_compact():
     assert "ADD" not in row
 
 
+def test_result_row_uses_injected_compact_player_card_for_players_only():
+    """coridian_: Trade Hub's trade-building modules should reuse the
+    canonical compact player card. Picks have no equivalent card, so they
+    always keep the existing compact-asset rendering regardless of the
+    injected callable."""
+
+    calls: list[dict] = []
+
+    def _fake_compact_player_row_html(row, **kwargs):
+        calls.append({"row": row, **kwargs})
+        return f"<div class='compact-player-row' data-player-id='{row.get('player_id')}'>{row.get('name')}</div>"
+
+    player = _player("p1", "Player A", owner="partner")
+    row = builder.result_row_html(
+        player,
+        selected=True,
+        compact_player_row_html=_fake_compact_player_row_html,
+    )
+    assert "toa-result-row--selected" in row
+    assert "compact-player-row" in row
+    assert "Player A" in row
+    assert "dg-compact-asset" not in row
+    assert len(calls) == 1
+    assert calls[0]["row"] == player
+    assert calls[0]["score_field"] == "score"
+    assert calls[0]["score_label"] == "Score"
+
+    pick = builder.result_row_html(
+        _pick("2027 1st", owner="partner"),
+        compact_player_row_html=_fake_compact_player_row_html,
+    )
+    assert "dg-compact-pick-plate" in pick
+    assert "dg-compact-asset--pick" in pick
+    assert len(calls) == 1
+
+    # No injected callable keeps the pre-existing behavior unchanged.
+    legacy = builder.result_row_html(player)
+    assert "dg-compact-asset" in legacy
+
+
+def test_trade_analyzer_assembly_injects_compact_player_card():
+    ui = UI_SRC
+    assert "compact_player_row_html: Callable[..., str] | None = None" in ui
+    assert "compact_player_row_html=compact_player_row_html" in ui
+    app = Path("app.py").read_text(encoding="utf-8")
+    assert "compact_player_row_html=_compact_player_row_html" in app[
+        app.index("analyzer_ui.render_trade_analyzer_assembly(") : app.index(
+            "analyzer_ui.render_trade_analyzer_assembly("
+        )
+        + 600
+    ]
+
+
 def test_add_remove_latency_is_local():
     send, receive = [], []
     started = time.perf_counter()

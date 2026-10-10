@@ -101,6 +101,7 @@ def _render_side_browser(
     enabled: bool,
     disabled_reason: str,
     format_score: Callable[[Any], str],
+    compact_player_row_html: Callable[..., str] | None = None,
 ) -> None:
     block_mod = "toa-block-receive" if side == "receive" else "toa-block-send"
     render_html_fragment(
@@ -155,7 +156,10 @@ def _render_side_browser(
             with row_cols[0]:
                 st.markdown(
                     analyzer_builder.result_row_html(
-                        asset, selected=selected, format_score=format_score
+                        asset,
+                        selected=selected,
+                        format_score=format_score,
+                        compact_player_row_html=compact_player_row_html,
                     ),
                     unsafe_allow_html=True,
                 )
@@ -185,6 +189,7 @@ def render_trade_analyzer_assembly(
     partner_name: str = "",
     league_ready: bool = True,
     format_score: Callable[[Any], str] | None = None,
+    compact_player_row_html: Callable[..., str] | None = None,
 ) -> None:
     """You send ↔ You receive workspace under the page's canonical state owner."""
 
@@ -228,6 +233,7 @@ def render_trade_analyzer_assembly(
                 enabled=bool(league_ready and my_roster_id),
                 disabled_reason="Select a league and load your roster first.",
                 format_score=score_fn,
+                compact_player_row_html=compact_player_row_html,
             )
         with receive_col:
             _render_side_browser(
@@ -245,6 +251,7 @@ def render_trade_analyzer_assembly(
                     else "Select a league and load your roster first."
                 ),
                 format_score=score_fn,
+                compact_player_row_html=compact_player_row_html,
             )
         if notice:
             st.warning(notice)
