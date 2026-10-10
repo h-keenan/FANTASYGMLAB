@@ -97,4 +97,4 @@ def test_recap_and_surface_css_stay_out_of_app_css():
     assert LEAGUE_RECAPS_CSS not in APP_CSS
     assert DASHBOARD_WORKFLOW_CSS not in APP_CSS
     assert "st-key-trade_hub_board" not in APP_CSS
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000

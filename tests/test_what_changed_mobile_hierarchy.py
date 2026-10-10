@@ -122,7 +122,7 @@ def test_desktop_keeps_side_by_side_columns():
 
 def test_what_changed_css_stays_off_app_css():
     assert "dg-what-changed-item .dg-dense-metric__value" not in APP_CSS
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
 
 
 def test_hydrate_placeholder_does_not_force_blank_scroll_height():

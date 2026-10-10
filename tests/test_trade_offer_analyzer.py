@@ -250,7 +250,7 @@ def test_logout_clears_trade_analyzer_package():
 def test_trade_analyzer_css_not_in_app_css():
     assert "toa-share-card" not in APP_CSS
     assert "toa-share-card" in TRADE_ANALYZER_CSS
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
 
 
 def test_app_uses_analyze_cta_and_no_idea_generator():

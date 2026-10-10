@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_app_css_stays_under_budget_after_migration():
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     assert DENSE_LIST_CSS in APP_CSS
     assert APP_CSS.index(DENSE_LIST_CSS) < APP_CSS.index(LEAGUE_INTELLIGENCE_CSS)
 

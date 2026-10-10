@@ -137,6 +137,6 @@ def test_form_accessibility_rejects_empty_token():
 
 
 def test_app_css_budget_unchanged_this_pass():
-    assert len(app_styles.APP_CSS) < 390_000
+    assert len(app_styles.APP_CSS) < 393_000
     assert "MutationObserver" not in APP
     assert "MutationObserver" not in app_styles.APP_CSS

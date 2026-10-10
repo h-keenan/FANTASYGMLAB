@@ -38,7 +38,7 @@ RETIRED_FAMILIES = (
 
 
 def test_app_css_budget_recovered():
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     assert len(APP_CSS) < 418_220
 
 

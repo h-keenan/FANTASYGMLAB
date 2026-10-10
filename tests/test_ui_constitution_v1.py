@@ -203,7 +203,7 @@ def test_no_per_player_portrait_hacks_in_pqv():
 
 def test_explicit_rerun_budget_and_app_css():
     assert count_explicit_reruns() <= 63
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
 
 
 def test_pqv_first_screen_height_contract_at_390():

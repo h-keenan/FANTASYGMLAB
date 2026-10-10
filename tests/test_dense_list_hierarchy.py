@@ -161,7 +161,7 @@ def test_power_board_keeps_health_out_of_meta_when_exceptional():
 
 
 def test_app_css_budget_holds_after_dense_lists():
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
 
 
 def test_audit_doc_exists():

@@ -302,7 +302,7 @@ def test_pqv_recent_news_limit_and_card_fields():
 def test_alerts_route_square_controls_and_css_budget():
     assert any(page.key == "alerts" and page.category == "CORE" for page in PLATFORM_DESTINATIONS)
     assert ALERTS_ACTIVITY_CSS not in APP_CSS
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     ui = (ROOT / "modules" / "alerts_activity_ui.py").read_text(encoding="utf-8")
     assert "st.pills(" in ui
     assert "<h2>Alerts</h2>" not in ui

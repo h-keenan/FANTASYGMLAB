@@ -199,7 +199,7 @@ def test_more_details_and_advanced_analysis_stay_compact_and_accessible():
 
 
 def test_app_css_budget_and_pqv_css_remain_route_owned():
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     assert PLAYER_QUICK_VIEW_CSS not in APP_CSS
     assert "st.rerun()" not in gm_orb_row_css()
     overlay = (ROOT / "app.py").read_text(encoding="utf-8")

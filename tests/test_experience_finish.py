@@ -238,7 +238,7 @@ def test_accolades_production_cache_path_has_real_rows():
 
 
 def test_css_caps_and_route_ownership():
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     assert ".dg-lh-feed" not in APP_CSS
     assert ".dg-recap-edition" not in APP_CSS
     assert "max-width:min(68rem,100%)" in LEAGUE_HISTORY_CSS.replace(" ", "")

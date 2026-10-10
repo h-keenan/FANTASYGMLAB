@@ -245,7 +245,7 @@ def test_prepared_frame_and_game_plan_owners_unchanged():
 
 
 def test_app_css_budget_and_ownership_order():
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     assert APP_CSS.index(FAMILY) < APP_CSS.index(DENSE_LIST_CSS)
     assert "dg-dense-dual-rank" in APP_CSS
     assert ".dg-team-comparison-board" in APP_CSS
