@@ -36,6 +36,12 @@ TRANSIENT_AUTH_NETWORK_ERROR = "Could not reach Supabase Auth."
 # Canonical pending-confirmation state (not authenticated).
 PENDING_EMAIL_CONFIRMATION_KEY = "pending_email_confirmation"
 ACCOUNT_SIGNUP_CHECK_EMAIL_KEY = "account_signup_check_email"
+# Set once a password-recovery email link has landed and exchanged its
+# token_hash for a live session (see render_durable_auth_bridge's
+# type="recovery" handling). The user IS authenticated at this point via
+# that one-time recovery session, but must set a new password before any
+# other account UI is reachable.
+PASSWORD_RECOVERY_PENDING_KEY = "password_recovery_pending"
 
 # Accidental dashboard copy-paste suffixes. Auth must hit GoTrue at /auth/v1/*,
 # never PostgREST under /rest/v1/* (that returns 404 PGRST125).
@@ -571,6 +577,185 @@ def resend_signup_confirmation(config: dict, email: str) -> tuple[bool, str]:
     return True, ""
 
 
+def request_password_reset(config: dict, email: str) -> tuple[bool, str]:
+    """POST /auth/v1/recover — request a Supabase password-recovery email.
+
+    Supabase's own `/recover` endpoint returns HTTP 200 for both an email
+    that has an account and one that does not (anti user-enumeration). This
+    must preserve that: a 4xx here reflects a genuine request/provider
+    problem (bad email shape, rate limit, provider outage, not configured),
+    never an "account exists" / "account does not exist" signal. Callers
+    must show the same neutral "if an account exists..." copy on success
+    regardless of the True/False return, and should use
+    ``password_reset_request_user_message`` to render the few error cases
+    that are safe to surface as-is.
+    """
+
+    if not is_configured(config):
+        return False, "Accounts are not configured."
+    clean_email = _safe_text(email)
+    if not clean_email or "@" not in clean_email:
+        return False, "Enter a valid email address."
+    started = time.perf_counter()
+    status_code: int | None = None
+    request_url = auth_api_url(config, "recover")
+    request_path = sanitized_request_path(request_url)
+    host = supabase_host_for_diagnostics(config)
+    try:
+        with performance.time_block("supabase_auth_recover", category="supabase"):
+            response = requests.post(
+                request_url,
+                headers=auth_headers(config),
+                json={"email": clean_email},
+                timeout=15,
+            )
+        status_code = int(response.status_code)
+    except Exception as exc:
+        classified = classify_auth_error(
+            "Could not reach Supabase Auth.",
+            exception_type=type(exc).__name__,
+        )
+        log_auth_operation_diagnostic(
+            operation="password_reset_request",
+            category=classified["category"],
+            duration_ms=(time.perf_counter() - started) * 1000,
+            request_path=request_path,
+            exception_class=type(exc).__name__,
+            supabase_host=host,
+        )
+        return False, "Could not reach Supabase Auth."
+    duration_ms = (time.perf_counter() - started) * 1000
+    if response.status_code >= 400:
+        error = _safe_error(response)
+        classified = classify_auth_error(error, status_code=status_code)
+        log_auth_operation_diagnostic(
+            operation="password_reset_request",
+            category=classified["category"],
+            status_code=status_code,
+            error_code=classified.get("error_code", ""),
+            duration_ms=duration_ms,
+            request_path=request_path,
+            supabase_host=host,
+        )
+        return False, error
+    log_auth_operation_diagnostic(
+        operation="password_reset_request",
+        category="success",
+        status_code=status_code,
+        duration_ms=duration_ms,
+        request_path=request_path,
+        supabase_host=host,
+    )
+    return True, ""
+
+
+def password_reset_request_user_message(error: str) -> str:
+    """Neutral copy for a failed ``request_password_reset`` call.
+
+    Only categories that cannot leak whether an email has an account are
+    ever surfaced verbatim (bad request shape, rate limiting, provider
+    outage, missing config). Anything else collapses to the same
+    enumeration-safe "if an account exists..." copy a successful call
+    already implies, so a caller can safely show one message regardless of
+    the True/False result without accidentally confirming or denying that
+    an account exists for that email.
+    """
+
+    if not error:
+        return ""
+    classified = classify_auth_error(error)
+    if classified["category"] in {
+        "not_configured",
+        "provider_unreachable",
+        "provider_unavailable",
+        "rate_limited",
+        "invalid_api_path",
+        "invalid_configuration",
+        "smtp_failure",
+        "captcha",
+        "invalid_email",
+    }:
+        return classified["user_message"]
+    return (
+        "If an account exists for that email, a password reset link has been sent. "
+        "Check your inbox and spam folder."
+    )
+
+
+def update_user_password(
+    config: dict, access_token: str, new_password: str
+) -> tuple[dict | None, str]:
+    """PUT /auth/v1/user — set a new password on the session for `access_token`.
+
+    Used to complete a Supabase password-recovery flow: the recovery email
+    link already exchanged a `type=recovery` token_hash for a live session
+    (see `verify_email_token_hash` and `render_durable_auth_bridge`'s
+    recovery handling in account_ui.py); this call finishes the reset by
+    setting a new password on that same session.
+    """
+
+    if not is_configured(config):
+        return None, "Accounts are not configured."
+    token = _safe_text(access_token)
+    if not token:
+        return None, "Missing access token."
+    clean_password = _safe_text(new_password)
+    if len(clean_password) < 6:
+        return None, "Password must be at least 6 characters."
+    started = time.perf_counter()
+    status_code: int | None = None
+    request_url = auth_api_url(config, "user")
+    request_path = sanitized_request_path(request_url)
+    host = supabase_host_for_diagnostics(config)
+    try:
+        with performance.time_block("supabase_auth_update_password", category="supabase"):
+            response = requests.put(
+                request_url,
+                headers=auth_headers(config, token),
+                json={"password": clean_password},
+                timeout=15,
+            )
+        status_code = int(response.status_code)
+    except Exception as exc:
+        classified = classify_auth_error(
+            "Could not reach Supabase Auth.",
+            exception_type=type(exc).__name__,
+        )
+        log_auth_operation_diagnostic(
+            operation="password_update",
+            category=classified["category"],
+            duration_ms=(time.perf_counter() - started) * 1000,
+            request_path=request_path,
+            exception_class=type(exc).__name__,
+            supabase_host=host,
+        )
+        return None, "Could not reach Supabase Auth."
+    duration_ms = (time.perf_counter() - started) * 1000
+    if response.status_code >= 400:
+        error = _safe_error(response)
+        classified = classify_auth_error(error, status_code=status_code)
+        log_auth_operation_diagnostic(
+            operation="password_update",
+            category=classified["category"],
+            status_code=status_code,
+            error_code=classified.get("error_code", ""),
+            duration_ms=duration_ms,
+            request_path=request_path,
+            supabase_host=host,
+        )
+        return None, error
+    log_auth_operation_diagnostic(
+        operation="password_update",
+        category="success",
+        status_code=status_code,
+        duration_ms=duration_ms,
+        request_path=request_path,
+        supabase_host=host,
+    )
+    payload = response.json()
+    return (payload if isinstance(payload, dict) else None), ""
+
+
 def sign_out(config: dict, access_token: str) -> str:
     if not is_configured(config) or not access_token:
         return ""
@@ -1069,6 +1254,25 @@ def mark_confirmation_required(session_state: dict, email: str = "") -> None:
         }
 
 
+def enter_password_recovery_pending(session_state: dict) -> None:
+    """Mark the current (already-authenticated) session as recovery-only.
+
+    Must be checked ahead of the normal "signed in" account UI so a
+    recovery-link visitor is forced through the new-password form before
+    reaching anything else — see render_password_recovery_card.
+    """
+
+    session_state[PASSWORD_RECOVERY_PENDING_KEY] = True
+
+
+def is_password_recovery_pending(session_state: dict) -> bool:
+    return bool(session_state.get(PASSWORD_RECOVERY_PENDING_KEY))
+
+
+def clear_password_recovery_pending(session_state: dict) -> None:
+    session_state.pop(PASSWORD_RECOVERY_PENDING_KEY, None)
+
+
 def clear_confirmation_required(session_state: dict) -> None:
     for key in (
         CONFIRMATION_REQUIRED_KEY,
@@ -1304,6 +1508,7 @@ def clear_auth_session(session_state: dict) -> None:
         CONFIRMATION_RESEND_TS_KEY,
         PENDING_EMAIL_CONFIRMATION_KEY,
         ACCOUNT_SIGNUP_CHECK_EMAIL_KEY,
+        PASSWORD_RECOVERY_PENDING_KEY,
         # Prevent prior-account league/entitlement chrome from surviving logout.
         "account_saved_leagues_cache",
         "active_league_context",

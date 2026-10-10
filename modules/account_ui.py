@@ -529,6 +529,80 @@ def render_confirmation_required_card(
     return actions
 
 
+def render_password_recovery_card(
+    *,
+    config: dict,
+    key_prefix: str = "account",
+) -> dict:
+    """"Set a new password" card shown after a Supabase recovery email link
+    lands (see render_durable_auth_bridge's `callback_type == "recovery"`
+    handling + auth_supabase.enter_password_recovery_pending). The viewer
+    is already authenticated via the one-time recovery session at this
+    point; this finishes the reset by setting a new password on it before
+    any other account UI is reachable.
+    """
+
+    # No st.rerun() anywhere below — this codebase enforces a hard cap on
+    # explicit rerun() call sites (count_explicit_reruns in
+    # scripts/measure_interaction_rerun_architecture.py). Every outcome is
+    # therefore shown inline via st.warning/st.success within this same
+    # render pass instead of stashing an error into session_state and
+    # forcing a second full script execution to display it. On success the
+    # caller (render_mobile_auth_entry) reads `actions["completed"]` and
+    # falls through to the normal signed-in branch in that SAME pass rather
+    # than returning early — also without needing a rerun.
+    actions = {"completed": False}
+    st.markdown(
+        "<div class='account-confirm-card' data-fgl-confirm='1' data-fgl-password-recovery='1'>"
+        "<div class='account-confirm-title'>Set a new password</div>"
+        "<div class='account-confirm-copy'>Choose a new password to finish resetting your account.</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    new_password = st.text_input(
+        "New password",
+        type="password",
+        key=f"{key_prefix}_password_recovery_new_password",
+        autocomplete="new-password",
+    )
+    confirm_password = st.text_input(
+        "Confirm new password",
+        type="password",
+        key=f"{key_prefix}_password_recovery_confirm_password",
+        autocomplete="new-password",
+    )
+    if st.button(
+        "Set new password",
+        key=f"{key_prefix}_password_recovery_submit",
+        use_container_width=True,
+        type="primary",
+    ):
+        access_token = auth_supabase.current_access_token(st.session_state)
+        if not access_token:
+            auth_supabase.clear_password_recovery_pending(st.session_state)
+            st.warning("Your reset link has expired. Request a new one.")
+        elif new_password != confirm_password:
+            st.warning("Passwords do not match.")
+        else:
+            _, update_error = auth_supabase.update_user_password(
+                config, access_token, new_password
+            )
+            if update_error:
+                st.warning(auth_supabase.signup_user_message(update_error))
+            else:
+                auth_supabase.clear_password_recovery_pending(st.session_state)
+                actions["completed"] = True
+                st.success("Password updated. You're signed in.")
+    if st.button(
+        "Cancel and sign out",
+        key=f"{key_prefix}_password_recovery_cancel",
+        use_container_width=True,
+    ):
+        auth_supabase.clear_password_recovery_pending(st.session_state)
+        complete_sign_out(st.session_state, config=config)
+    return actions
+
+
 def flush_durable_auth_persistence(
     session_state: MutableMapping[str, Any] | None = None,
     *,
@@ -740,11 +814,17 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
         payload = None
         error = ""
         flow = _safe_text(auth_callback.get("flow"))
+        # Supabase's password-recovery link lands here the same way an
+        # email-confirmation link does (same component, same token_hash /
+        # implicit-hash mechanics) — only `type` differs ("recovery" vs
+        # "signup"). See the `callback_type == "recovery"` branch below for
+        # where that diverges from the ordinary confirm-email path.
+        callback_type = _safe_text(auth_callback.get("type"), "signup") or "signup"
         if flow == "token_hash":
             payload, error = auth_supabase.verify_email_token_hash(
                 config,
                 token_hash=_safe_text(auth_callback.get("token_hash")),
-                token_type=_safe_text(auth_callback.get("type"), "signup"),
+                token_type=callback_type,
             )
         else:
             # Implicit hash tokens from Supabase verify redirect.
@@ -785,9 +865,16 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
                 auth_supabase.queue_durable_auth_save(st.session_state, payload)
                 actions["restored"] = True
                 st.session_state["auth_restore_last_result"] = "email_confirm_callback"
-                st.session_state["account_resume_notice"] = (
-                    "Email confirmed. Your account is ready."
-                )
+                if callback_type == "recovery":
+                    # Authenticated via the one-time recovery session, but
+                    # must set a new password before any other account UI
+                    # is reachable — render_mobile_auth_entry checks this
+                    # ahead of the normal "signed in" branch.
+                    auth_supabase.enter_password_recovery_pending(st.session_state)
+                else:
+                    st.session_state["account_resume_notice"] = (
+                        "Email confirmed. Your account is ready."
+                    )
                 try:
                     from modules import guest_conversion
 
@@ -1270,6 +1357,18 @@ def render_mobile_auth_entry(
         actions["continue_guest"] = True
         return actions
 
+    if auth_supabase.is_password_recovery_pending(st.session_state):
+        # Must be checked ahead of the ordinary "signed in" branch below —
+        # a recovery-link visitor is authenticated via a one-time session
+        # but must set a new password before reaching anything else. On a
+        # successful reset, fall through to that "signed in" branch in
+        # this SAME pass (current_user_id is already true) instead of
+        # calling st.rerun() — this codebase caps explicit rerun() call
+        # sites (see render_password_recovery_card).
+        recovery_actions = render_password_recovery_card(config=config, key_prefix="launch")
+        if not recovery_actions.get("completed"):
+            return actions
+
     if auth_supabase.current_user_id(st.session_state):
         st.markdown(
             "<div class='launch-section-intro launch-account-intro'>"
@@ -1504,6 +1603,38 @@ def render_mobile_auth_entry(
                     pass
                 st.success("Signed in.")
                 st.rerun()
+        # Rendered inline (no mode switch / no st.rerun()) — this codebase
+        # enforces a hard cap on explicit rerun() call sites
+        # (count_explicit_reruns in scripts/measure_interaction_rerun_architecture.py),
+        # so a request-password-reset sub-flow has to live and resolve
+        # entirely within this same expander rather than swapping the whole
+        # form to a separate "reset_password" mode.
+        with st.expander("Forgot password?"):
+            reset_email = st.text_input(
+                "Email",
+                key="launch_password_reset_email",
+                autocomplete="email",
+            )
+            if st.button(
+                "Send reset link",
+                key="launch_password_reset_submit",
+                use_container_width=True,
+            ):
+                sent, error = auth_supabase.request_password_reset(config, reset_email)
+                # Enumeration-safe: show the same neutral copy whether or not
+                # an account actually exists for that email. Only a
+                # genuinely actionable, non-leaking error (bad email shape,
+                # rate limit, provider outage, missing config) overrides it
+                # — see password_reset_request_user_message.
+                st.success(
+                    (
+                        "" if sent else auth_supabase.password_reset_request_user_message(error)
+                    )
+                    or (
+                        "If an account exists for that email, a password reset link has been sent. "
+                        "Check your inbox and spam folder."
+                    )
+                )
         if st.button(
             "New here? Create account",
             key="launch_signin_to_create",

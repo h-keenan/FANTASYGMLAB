@@ -31,7 +31,7 @@ import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '.
 const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
 
 export default function LoginScreen() {
-  const { signIn, signUp, signInAsGuest } = useAuth();
+  const { signIn, signUp, signInAsGuest, resetPassword } = useAuth();
   const { colors } = useThemeMode();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -40,6 +40,8 @@ export default function LoginScreen() {
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [submitting, setSubmitting] = useState(false);
   const [guestSubmitting, setGuestSubmitting] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -73,6 +75,23 @@ export default function LoginScreen() {
     if (mode === 'signUp') {
       setNotice('Check your email to confirm your account, then sign in.');
     }
+  };
+
+  const onResetPasswordPress = async () => {
+    setError(null);
+    setNotice(null);
+    setResetSubmitting(true);
+    const result = await resetPassword(email);
+    setResetSubmitting(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    // Enumeration-safe: identical copy whether or not an account exists
+    // for this email (mirrors Supabase's own /recover response).
+    setNotice(
+      'If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.',
+    );
   };
 
   const onApplePress = async () => {
@@ -115,10 +134,14 @@ export default function LoginScreen() {
         <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
         <AppText style={styles.title}>FantasyGM Lab</AppText>
         <AppText style={styles.subtitle}>
-          {mode === 'signIn' ? 'Sign in to your account' : 'Create an account'}
+          {resetMode
+            ? 'Reset your password'
+            : mode === 'signIn'
+              ? 'Sign in to your account'
+              : 'Create an account'}
         </AppText>
 
-        {appleAvailable ? (
+        {!resetMode && appleAvailable ? (
           <AppleAuthentication.AppleAuthenticationButton
             buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
             buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
@@ -128,7 +151,7 @@ export default function LoginScreen() {
           />
         ) : null}
 
-        {google.available ? (
+        {!resetMode && google.available ? (
           <TouchableOpacity
             style={[styles.socialButton, !google.ready && styles.buttonDisabled]}
             onPress={() => void google.signIn()}
@@ -142,7 +165,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         ) : null}
 
-        {appleAvailable || google.available ? (
+        {!resetMode && (appleAvailable || google.available) ? (
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
             <AppText style={styles.dividerText}>or</AppText>
@@ -166,43 +189,85 @@ export default function LoginScreen() {
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={colors.textTertiary}
-          secureTextEntry
-          textContentType={mode === 'signUp' ? 'newPassword' : 'password'}
-          autoComplete={mode === 'signUp' ? 'new-password' : 'password'}
-          value={password}
-          onChangeText={setPassword}
-        />
+        {!resetMode ? (
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor={colors.textTertiary}
+            secureTextEntry
+            textContentType={mode === 'signUp' ? 'newPassword' : 'password'}
+            autoComplete={mode === 'signUp' ? 'new-password' : 'password'}
+            value={password}
+            onChangeText={setPassword}
+          />
+        ) : null}
 
         {error ? <AppText style={styles.error}>{error}</AppText> : null}
         {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}
 
-        <TouchableOpacity
-          style={[styles.button, (submitting || !email || !password) && styles.buttonDisabled]}
-          onPress={submit}
-          disabled={submitting || !email || !password}
-        >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <AppText style={styles.buttonText}>
-              {mode === 'signIn' ? 'Sign in' : 'Sign up'}
-            </AppText>
-          )}
-        </TouchableOpacity>
+        {resetMode ? (
+          <>
+            <TouchableOpacity
+              style={[styles.button, (resetSubmitting || !email) && styles.buttonDisabled]}
+              onPress={onResetPasswordPress}
+              disabled={resetSubmitting || !email}
+            >
+              {resetSubmitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <AppText style={styles.buttonText}>Send reset link</AppText>
+              )}
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
-        >
-          <AppText style={styles.switchMode}>
-            {mode === 'signIn'
-              ? "Don't have an account? Sign up"
-              : 'Already have an account? Sign in'}
-          </AppText>
-        </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setResetMode(false);
+                setError(null);
+                setNotice(null);
+              }}
+            >
+              <AppText style={styles.switchMode}>Back to sign in</AppText>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.button, (submitting || !email || !password) && styles.buttonDisabled]}
+              onPress={submit}
+              disabled={submitting || !email || !password}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <AppText style={styles.buttonText}>
+                  {mode === 'signIn' ? 'Sign in' : 'Sign up'}
+                </AppText>
+              )}
+            </TouchableOpacity>
+
+            {mode === 'signIn' ? (
+              <TouchableOpacity
+                onPress={() => {
+                  setResetMode(true);
+                  setError(null);
+                  setNotice(null);
+                }}
+              >
+                <AppText style={styles.forgotPassword}>Forgot password?</AppText>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
+            >
+              <AppText style={styles.switchMode}>
+                {mode === 'signIn'
+                  ? "Don't have an account? Sign up"
+                  : 'Already have an account? Sign in'}
+              </AppText>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Fix 4 (welcome/signup audit, positioning judgment call — see PR
             description): equal visual weight to the primary account form via
@@ -331,6 +396,12 @@ function createStyles(colors: ThemeColors) {
     textAlign: 'center',
     marginTop: spacing.lg,
     color: colors.accent,
+  },
+  forgotPassword: {
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    color: colors.textSecondary,
+    fontSize: 13,
   },
   // Layers on top of the shared `socialButton` base (border/surface/height)
   // — only the extra top margin separating it from the sign-in form is

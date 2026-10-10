@@ -30,6 +30,20 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  /**
+   * Requests a Supabase password-recovery email. No redirectTo override is
+   * passed, so the recovery link uses the project's default Site URL — the
+   * web app, which has the "set a new password" completion UI (see
+   * modules/account_ui.py's `reset_password` launch form and
+   * render_durable_auth_bridge's recovery handling). This app has no
+   * deep-link handler for recovery tokens, so finishing the reset happens
+   * in the device's browser after tapping the email link, the same place
+   * this app's email-confirmation links already land. Like Supabase's own
+   * endpoint, this resolves without an error regardless of whether the
+   * email has an account (anti user-enumeration) — never surface a
+   * "no account found" message from the result.
+   */
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
   signInAsGuest: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<{ error: string | null }>;
@@ -167,6 +181,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           options: { emailRedirectTo: 'fantasygmlab://' },
         });
+        return { error: error?.message ?? null };
+      },
+      resetPassword: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
         return { error: error?.message ?? null };
       },
       isGuest: canConvertGuestToAccount(session),
