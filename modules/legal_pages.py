@@ -20,12 +20,10 @@ NO_AFFILIATION_TEXT = (
     "marks, and data belong to their respective owners."
 )
 
-# Existing placeholder support contact used elsewhere in this repo
-# (docs/SUPABASE_SETUP.md's suggested confirmation-email body,
-# docs/founder-beta-marketing-readiness.md) — reused here rather than
-# inventing a second address. Replace everywhere at once when a real
-# public support address is published.
-SUPPORT_EMAIL = "support@example.com"
+# Confirmed directly by the terminal operator on 2026-10-10. Corrected one
+# letter-transposition typo in how it was given ("fantasymglab.com") against
+# the domain used everywhere else in this repo ("fantasygmlab.com").
+SUPPORT_EMAIL = "support@fantasygmlab.com"
 
 # --- Part 2 draft legal text -------------------------------------------
 #
@@ -36,10 +34,10 @@ SUPPORT_EMAIL = "support@example.com"
 # let this notice or the "(DRAFT — pending legal review)" section titles be
 # removed until qualified counsel has reviewed and signed off. In
 # particular:
-#   - The governing-law jurisdiction below is a literal placeholder
-#     (`[GOVERNING STATE]`) because no company name, state of incorporation,
-#     or registered business address was found anywhere in this codebase or
-#     its docs — do not fill this in without confirming the real answer.
+#   - The governing-law jurisdiction below is Wyoming, confirmed directly by
+#     the terminal operator on 2026-10-10 (no company name or registered
+#     business address has been found in this codebase otherwise — if that
+#     changes, double-check it's still consistent with the real entity).
 #   - Whether to include a mandatory arbitration / class-action-waiver
 #     clause at all is a separate business-risk decision for coridian_ and
 #     counsel to make explicitly; it is included below only as optional,
@@ -134,15 +132,16 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 ),
             ),
             # DRAFT — pending legal review. See _DRAFT_PENDING_LEGAL_REVIEW_NOTICE
-            # above: not final, not attorney-reviewed. [GOVERNING STATE] is a
-            # literal placeholder (no real jurisdiction was findable in this
-            # codebase), and the arbitration/class-action-waiver paragraph is
-            # explicitly flagged as an unadopted, optional business decision.
+            # above: not final, not attorney-reviewed. The jurisdiction below
+            # (Wyoming) was confirmed directly by the terminal operator on
+            # 2026-10-10 — no longer a placeholder — but the arbitration/
+            # class-action-waiver paragraph is still explicitly flagged as an
+            # unadopted, optional business decision.
             LegalSection(
                 "Governing law and dispute resolution (DRAFT — pending legal review)",
                 (
                     _DRAFT_PENDING_LEGAL_REVIEW_NOTICE,
-                    "These Terms are governed by the laws of [GOVERNING STATE], without "
+                    "These Terms are governed by the laws of the State of Wyoming, without "
                     "regard to its conflict-of-laws principles, except where applicable "
                     "law (including consumer-protection law in your jurisdiction) "
                     "requires otherwise.",
@@ -232,7 +231,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 bullets=(
                     f"Export My Data — request a copy of the account data {brand_identity.PRODUCT_NAME} stores about you.",
                     "Delete Account — permanently delete your account and the data associated with it.",
-                    "Manage Subscription — view or cancel an active subscription through Apple's or Google's own subscription settings.",
+                    "Manage Subscription — if you subscribed through the mobile app, view or cancel it in Apple's or Google's own subscription settings; if you subscribed through the web app (billed via Stripe), manage or cancel it from your account settings there.",
                 ),
             ),
             LegalSection(
@@ -265,20 +264,38 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 "Auto-renewing subscription",
                 (
                     f"{brand_identity.PRODUCT_NAME} Premium is offered as an auto-renewing subscription. "
-                    "Payment is charged to your Apple ID (or Google Play) account at confirmation of purchase.",
-                    "Your subscription automatically renews for the same length of time unless "
-                    "auto-renew is turned off at least 24 hours before the end of the current period. "
-                    "Your account will be charged for renewal within 24 hours before the end of the "
-                    "current period, at the price you agreed to when subscribing.",
+                    "In the mobile app, payment is charged to your Apple ID or Google Play account at "
+                    f"confirmation of purchase. On the web app, payment is processed by Stripe and charged "
+                    "to the card you provide at checkout.",
+                    "Your subscription automatically renews for the same length of time unless you cancel "
+                    "before the end of the current period. In the mobile app, auto-renew must be turned off "
+                    "at least 24 hours before renewal and you may be charged within that 24-hour window at "
+                    "the price you agreed to when subscribing. On the web app, canceling through your "
+                    "Stripe-billed account settings takes effect at the end of the current billing period.",
                 ),
             ),
             LegalSection(
                 "Managing or canceling",
                 (
-                    "You can manage or cancel your subscription anytime in your device's account "
-                    "settings — on iOS, under Settings > [your name] > Subscriptions; on Android, under "
-                    "the Google Play Store's Subscriptions page. Canceling stops future renewals but does "
-                    "not refund the current billing period.",
+                    "How you manage or cancel depends on where you subscribed:",
+                ),
+                bullets=(
+                    "Mobile app (Apple ID or Google Play billing) — manage or cancel in your device's own "
+                    "account settings: on iOS, under Settings > [your name] > Subscriptions; on Android, "
+                    "under the Google Play Store's Subscriptions page.",
+                    f"Web app (Stripe billing) — manage or cancel from your {brand_identity.PRODUCT_NAME} "
+                    "account settings on the web app, or contact "
+                    f"{SUPPORT_EMAIL} for help.",
+                ),
+            ),
+            LegalSection(
+                "Refunds",
+                (
+                    "Canceling stops future renewals but does not refund the current billing period, "
+                    "regardless of whether you subscribed through the mobile app or the web app. A mobile "
+                    "app purchase is also subject to Apple's or Google's own refund policy, since they "
+                    "process that payment, not "
+                    f"{brand_identity.PRODUCT_NAME} directly.",
                     "Current pricing and available plans (monthly, annual, or other terms) are shown on "
                     f"the {brand_identity.PRODUCT_NAME} Premium screen before you subscribe, since pricing "
                     "can vary by plan, region, and promotion.",
