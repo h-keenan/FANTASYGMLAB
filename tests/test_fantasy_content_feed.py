@@ -43,13 +43,15 @@ def test_public_export_uses_entire_position_pool_and_never_account_data(tmp_path
     assert held.value.status_code == 503
 
 
-def _value_history_frame(player_id, dynasty_score, market_score):
-    return pd.DataFrame([{
+def _value_history_frame(player_id, dynasty_score, market_score, **extra):
+    row = {
         "player_id": player_id, "name": "Player One", "position": "RB", "team": "BUF",
         "dynasty_score": dynasty_score, "market_score": market_score, "age_curve_score": 400.0,
         "role_score": 100.0, "scarcity_score": 50.0, "opportunity_score": 300.0,
         "production_score": 200.0, "owner_id": "PRIVATE",
-    }])
+    }
+    row.update(extra)
+    return pd.DataFrame([row])
 
 
 def test_value_changes_field_reports_delta_and_reason_only_after_a_real_refresh(tmp_path, monkeypatch):
@@ -86,10 +88,80 @@ def test_value_changes_field_reports_delta_and_reason_only_after_a_real_refresh(
     assert change["driver_factor"] == "market_score"
     assert "Market value increased" in change["reason"]
     assert change["name"] == "Player One" and change["team"] == "BUF" and change["position"] == "RB"
+    # The feed exposes when the underlying valuation snapshot was actually
+    # taken, distinct from "generated_at" (this request's own timestamp).
+    assert isinstance(change["snapshot_refreshed_at"], str) and change["snapshot_refreshed_at"]
+    assert change["snapshot_refreshed_at"] != third["generated_at"]
 
-    # Re-reading again before the next refresh returns the same cached diff.
+    # Re-reading again before the next refresh returns the same cached diff,
+    # including the same snapshot_refreshed_at -- it must not advance just
+    # because another feed request happened to land.
     fourth = content.build_feed(str(path), lambda: [])
     assert fourth["value_changes"] == third["value_changes"]
+    assert fourth["value_changes"][0]["snapshot_refreshed_at"] == change["snapshot_refreshed_at"]
+
+
+def test_value_changes_field_uses_honest_label_without_injury_corroboration(tmp_path, monkeypatch):
+    # Overall score moves with every tracked additive component unchanged,
+    # and no risk/injury signal available to corroborate an actual
+    # injury/availability change -- the feed must not claim "Injury or
+    # availability risk" for a move it hasn't verified as injury-related.
+    path = tmp_path / "players.db"
+    path.write_bytes(b"v1")
+    monkeypatch.setattr(content, "roster_percentages", lambda *a: {})
+    monkeypatch.setattr(content.player_eligibility, "filter_current_fantasy_players", lambda f, **kw: f)
+    monkeypatch.setattr(content.sleeper, "trending_add_rank_map", lambda **kw: {})
+
+    monkeypatch.setattr(content.rankings, "load_players", lambda *_: _value_history_frame("1", 500, 400.0))
+    first = content.build_feed(str(path), lambda: [])
+    assert first["value_changes"] == []
+
+    path.write_bytes(b"v2-longer-content")
+    os.utime(path, (time.time() + 10, time.time() + 10))
+    # Every additive component is unchanged (market_score stays 400.0) but
+    # dynasty_score itself moves -- an unexplained residual with no
+    # risk_multiplier/injury_risk_score signal present at all.
+    monkeypatch.setattr(content.rankings, "load_players", lambda *_: _value_history_frame("1", 350, 400.0))
+    second = content.build_feed(str(path), lambda: [])
+    assert len(second["value_changes"]) == 1
+    change = second["value_changes"][0]
+    assert change["driver_factor"] == "other"
+    assert change["driver_label"] == "Other factors"
+    assert "injury" not in change["reason"].lower()
+
+
+def test_value_changes_field_keeps_risk_label_when_corroborated(tmp_path, monkeypatch):
+    # Same unexplained-residual shape, but this time rankings.py's real
+    # risk/injury fields are present and risk_multiplier actually moved --
+    # a genuine, corroborated injury/availability signal.
+    path = tmp_path / "players.db"
+    path.write_bytes(b"v1")
+    monkeypatch.setattr(content, "roster_percentages", lambda *a: {})
+    monkeypatch.setattr(content.player_eligibility, "filter_current_fantasy_players", lambda f, **kw: f)
+    monkeypatch.setattr(content.sleeper, "trending_add_rank_map", lambda **kw: {})
+
+    monkeypatch.setattr(
+        content.rankings, "load_players",
+        lambda *_: _value_history_frame(
+            "1", 500, 400.0, risk_multiplier=1.0, non_injury_risk_multiplier=1.0, injury_risk_score=0.0,
+        ),
+    )
+    first = content.build_feed(str(path), lambda: [])
+    assert first["value_changes"] == []
+
+    path.write_bytes(b"v2-longer-content")
+    os.utime(path, (time.time() + 10, time.time() + 10))
+    monkeypatch.setattr(
+        content.rankings, "load_players",
+        lambda *_: _value_history_frame(
+            "1", 350, 400.0, risk_multiplier=0.72, non_injury_risk_multiplier=1.0, injury_risk_score=1.0,
+        ),
+    )
+    second = content.build_feed(str(path), lambda: [])
+    assert len(second["value_changes"]) == 1
+    change = second["value_changes"][0]
+    assert change["driver_factor"] == "risk"
+    assert "Injury or availability risk" in change["reason"]
 
 
 def test_trending_adds_week_field_is_distinct_from_24h_waiver_watch(tmp_path, monkeypatch):

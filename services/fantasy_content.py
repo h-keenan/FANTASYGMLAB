@@ -108,7 +108,11 @@ def build_feed(db_path, news_loader):
     # Overall-score deltas + a structured "why" since the last players.db
     # refresh (see modules.player_value_history). Gated on the same source
     # fingerprint the public hydration pipeline already uses, so repeated
-    # feed reads between refreshes return the same cached diff.
+    # feed reads between refreshes return the same cached diff. Each entry
+    # already carries its own "snapshot_refreshed_at" (set by
+    # player_value_history, reusing its fingerprint-gated captured_at) —
+    # when the underlying valuation snapshot was taken, distinct from
+    # "generated_at"/"now" above, which is just when this request landed.
     try:
         raw_changes = player_value_history.value_changes_since_last_refresh(db_path, frame, limit=40)
     except Exception:
