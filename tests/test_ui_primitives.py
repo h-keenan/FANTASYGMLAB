@@ -270,6 +270,7 @@ def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
 
     assert consumers == [
         "account_ui.py",
+        "college_scouting_ui.py",
         "daily_gm_briefing_ui.py",
         "dashboard_orientation.py",
         "dashboard_workflow.py",

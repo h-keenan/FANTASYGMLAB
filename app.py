@@ -2257,6 +2257,7 @@ TRADES_TAB_RADIO_KEY = "trades_hub_active_tab"
 PAGE_GLYPHS = {
     "dashboard": "GM",
     "gm_plan": "GP",
+    "college_scouting": "CS",
     "my_team": "TM",
     "matchup": "MU",
     "players": "PL",
@@ -16147,6 +16148,7 @@ def render_team_comparison_board(df_display: pd.DataFrame):
         open_league_team_from_tap=_open_league_team_from_tap,
         team_logo_html=team_logo_html,
         current_roster_id=active_context.get("my_roster_id"),
+        league_id=_safe_text(active_context.get("selected_league_id")),
     )
 
 
@@ -18837,6 +18839,22 @@ def main():
                 team_strategy=active_team_strategy,
                 players_db_path=DB_PATH,
             )
+
+    # COLLEGE SCOUTING — crowdsourced prospect grading, matching mobile's
+    # CollegeProspectsScreen.tsx / ProspectScoutingDetailScreen.tsx. Pure
+    # exposure of modules.college_scouting (already live on mobile); no new
+    # valuation math here (see modules.college_scouting_ui). Not
+    # league-scoped — the same shared prospect pool is graded by every
+    # signed-in user regardless of which league is selected.
+    if current_page == "college_scouting":
+        render_page_shell(
+            page_key="college_scouting",
+            title="College Scouting",
+            subtitle="Submit a 1-5 grade on any college prospect — your grade pools into one shared signal with every other scout. Follow prospects you're tracking on your personal watchlist.",
+        )
+        from modules import college_scouting_ui
+
+        college_scouting_ui.render_college_scouting_workspace(session=st.session_state)
 
     # ALL PLAYERS
     if current_page == "players":
@@ -23423,6 +23441,7 @@ def main():
             partner_name=partner_name,
             league_ready=bool(selected_league_id and my_roster_id is not None),
             format_score=_format_score,
+            compact_player_row_html=_compact_player_row_html,
         )
 
         send_assets = st.session_state["trade_send_assets"]

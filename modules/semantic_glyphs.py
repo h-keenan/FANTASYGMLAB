@@ -47,6 +47,7 @@ DESTINATION_CONCEPT = {
     "startup_draft_center": "draft",
     "draft_summary": "draft",
     "live_draft": "draft",
+    "college_scouting": "draft",
     "premium": "more",
     "methodology": "more",
     "about_disclaimer": "more",

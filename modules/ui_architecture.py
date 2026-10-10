@@ -138,6 +138,14 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         category="CONDITIONAL",
     ),
     PageDefinition(
+        "college_scouting",
+        "College Scouting",
+        "DRAFT",
+        "Submit a 1-5 grade on college prospects, pooled into a shared signal, plus a personal watchlist.",
+        category="CORE",
+        beta_visible=True,
+    ),
+    PageDefinition(
         "news",
         "News",
         "INTELLIGENCE",

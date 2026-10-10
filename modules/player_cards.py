@@ -572,6 +572,16 @@ def player_scan_card_html(
     position = _safe_text(row.get("position"), "Player").upper()
     team = _safe_text(row.get("team"), "FA").upper() or "FA"
     age_text = format_age(row.get("age")) or "-"
+    # Mirrors mobile's PlayerIdentityRow slot-redundancy check: a single-position
+    # slot (QB/RB/WR/TE/...) just duplicates the PositionBadge two inches away,
+    # so only a real multi-position lineup slot (FLEX, SUPER_FLEX, ...) earns
+    # its own chip.
+    slot_value = _safe_text(row.get("slot")).upper() if show_slot else ""
+    slot_chip = (
+        football_assets.status_chip_html(slot_value, tone="neutral")
+        if slot_value and slot_value != position
+        else ""
+    )
     score_value = format_score(row.get(score_field, row.get("value_score", row.get("score", 0))))
     market_value = format_score(row.get("market_score", row.get("value", 0)))
     opportunity_value = format_score(row.get("opportunity_score", 0))
@@ -669,7 +679,10 @@ def player_scan_card_html(
         mode="action-enabled" if interactive else "read-only",
         identity=resolve_player_tier_identity(row),
         avatar_html=avatar,
-        tags_html=(f"<span class='scan-card-tags'>{tags}</span>" if tags else ""),
+        tags_html=(
+            slot_chip
+            + (f"<span class='scan-card-tags'>{tags}</span>" if tags else "")
+        ),
         value_html=injury_adjusted_value_html(
             score_label,
             score_value,
@@ -711,6 +724,13 @@ def compact_player_row_html(
     position = _safe_text(row.get("position"), "Player").upper()
     team = _safe_text(row.get("team"), "FA").upper() or "FA"
     age_text = format_age(row.get("age")) or "-"
+    # See player_scan_card_html's identical slot-redundancy comment.
+    slot_value = _safe_text(row.get("slot")).upper() if show_slot else ""
+    slot_chip = (
+        football_assets.status_chip_html(slot_value, tone="neutral")
+        if slot_value and slot_value != position
+        else ""
+    )
     score_value = format_score(row.get(score_field, row.get("value_score", row.get("score", 0))))
     status_style = resolve_player_card_primary_status(
         row,
@@ -770,7 +790,10 @@ def compact_player_row_html(
         mode="action-enabled" if interactive else "read-only",
         identity=resolve_player_tier_identity(row),
         avatar_html=avatar,
-        tags_html=(f"<span class='compact-player-tags'>{tags}</span>" if tags else ""),
+        tags_html=(
+            slot_chip
+            + (f"<span class='compact-player-tags'>{tags}</span>" if tags else "")
+        ),
         value_html=injury_adjusted_value_html(
             score_label,
             score_value,

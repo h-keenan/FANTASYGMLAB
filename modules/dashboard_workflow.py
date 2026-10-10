@@ -299,6 +299,7 @@ def render_dashboard_workflow(
                     ("Draft Center", "draft_summary"),
                     ("GM Plan", "gm_plan"),
                     ("Trade History", "trade_history"),
+                    ("College Scouting", "college_scouting"),
                 ]
             )
             _log_dashboard_milestone("dashboard_deep_analysis_complete")

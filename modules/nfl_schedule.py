@@ -15,6 +15,7 @@ apply any adjustment to existing rankings.
 
 from __future__ import annotations
 
+import functools
 import os
 import time
 from datetime import datetime, timezone
@@ -66,12 +67,7 @@ def _cache_is_fresh(path: str, ttl: int) -> bool:
         return False
 
 
-def load_games(*, refresh: bool = False) -> pd.DataFrame:
-    """Every real NFL game on record, including this week's not-yet-played
-    games with their real Vegas lines. Disk-cached like
-    modules.sleeper.get_players — a fetch failure falls back to whatever is
-    already on disk (or an empty frame) rather than raising."""
-
+def _load_games_uncached(*, refresh: bool = False) -> pd.DataFrame:
     _ensure_data_dir()
     if not refresh and _cache_is_fresh(GAMES_CACHE_PATH, GAMES_CACHE_TTL_SECONDS):
         try:
@@ -92,6 +88,66 @@ def load_games(*, refresh: bool = False) -> pd.DataFrame:
             except Exception:
                 pass
         return pd.DataFrame()
+
+
+# Parsing the whole games CSV from disk (pd.read_csv, then downstream
+# groupby/aggregation) on every single call is wasted work within a short
+# window: team_defense_strength and team_schedule each call load_games()
+# independently, and a single team_defense_points_allowed_by_position
+# aggregation (modules.player_projections) calls team_schedule once per
+# team — 32 redundant re-reads of the same unchanged file for one request.
+# The disk cache above already throttles the network *fetch* to once every
+# GAMES_CACHE_TTL_SECONDS (6h); this additionally throttles the CSV *parse*
+# itself, using the same live-time-bucket + lru_cache idiom as
+# modules.news._enriched_news_pool_cached (an in-process cache, not shared
+# across the mobile-api's worker processes — each worker gets its own copy,
+# matching how that news cache is deliberately per-process rather than
+# Redis-backed).
+#
+# Deliberately much shorter than the 6h disk TTL, and shorter than
+# modules.player_projections.DEFENSE_STRENGTH_TTL_SECONDS (30 min) — this is
+# the *schedule* cache, not the defensive-ratings cache. Nothing that
+# computes a defensive rating (team_defense_strength here, or
+# team_defense_points_allowed_by_position in modules.player_projections) is
+# itself cached by this bucket: both recompute from scratch on every call,
+# they just read a DataFrame out of this short-lived cache instead of
+# re-parsing the CSV from disk each time. So once newly-completed games land
+# in the disk cache, ratings reflect them within minutes, not hours.
+LOAD_GAMES_INPROCESS_TTL_SECONDS = 5 * 60
+
+
+def _load_games_cache_bucket() -> int:
+    return int(time.time() // LOAD_GAMES_INPROCESS_TTL_SECONDS)
+
+
+@functools.lru_cache(maxsize=4)
+def _load_games_cached(_bucket: int) -> pd.DataFrame:
+    return _load_games_uncached()
+
+
+def clear_load_games_cache() -> None:
+    """Drop the in-process games-table cache — tests, and any manual refresh hook."""
+
+    _load_games_cached.cache_clear()
+
+
+def load_games(*, refresh: bool = False) -> pd.DataFrame:
+    """Every real NFL game on record, including this week's not-yet-played
+    games with their real Vegas lines. Disk-cached like
+    modules.sleeper.get_players — a fetch failure falls back to whatever is
+    already on disk (or an empty frame) rather than raising.
+
+    The non-refresh path additionally goes through a short-lived in-process
+    cache (see LOAD_GAMES_INPROCESS_TTL_SECONDS above) so repeated lookups
+    within the same few minutes don't each re-parse the CSV from disk.
+    ``refresh=True`` always bypasses both caches and reads straight from
+    disk/network — this is what a caller reaches for when it deliberately
+    wants the current on-disk state, not a possibly-stale in-process copy.
+    """
+
+    if refresh:
+        return _load_games_uncached(refresh=True)
+    return _load_games_cached(_load_games_cache_bucket())
 
 
 def _normalize_team_code(games: pd.DataFrame) -> pd.DataFrame:
