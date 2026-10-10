@@ -70,7 +70,7 @@
           "title": "Governing law and dispute resolution (DRAFT \u2014 pending legal review)",
           "paragraphs": [
             "DRAFT \u2014 PENDING LEGAL REVIEW. This section is a first-pass draft prepared for an attorney to review and edit. It is not final, has not been reviewed or approved by qualified counsel, and must not be relied upon as binding until that review is complete.",
-            "These Terms are governed by the laws of [GOVERNING STATE], without regard to its conflict-of-laws principles, except where applicable law (including consumer-protection law in your jurisdiction) requires otherwise.",
+            "These Terms are governed by the laws of the State of Wyoming, without regard to its conflict-of-laws principles, except where applicable law (including consumer-protection law in your jurisdiction) requires otherwise.",
             "Before filing a claim against FantasyGM Lab, you agree to first contact us at support@example.com and attempt in good faith to resolve the dispute informally. Most concerns can be resolved this way without a formal proceeding.",
             "OPTIONAL, NOT YET ADOPTED \u2014 whether to include a mandatory arbitration and class-action-waiver clause at all is a separate business-risk decision that coridian_ and counsel should confirm before this paragraph is finalized. If adopted, this paragraph would require you and FantasyGM Lab to resolve any dispute not settled informally through binding individual arbitration rather than a court proceeding, and would require you to waive the right to participate in a class action or jury trial, subject to any rights that cannot be waived under applicable law."
           ],
@@ -143,7 +143,7 @@
           "bullets": [
             "Export My Data \u2014 request a copy of the account data FantasyGM Lab stores about you.",
             "Delete Account \u2014 permanently delete your account and the data associated with it.",
-            "Manage Subscription \u2014 view or cancel an active subscription through Apple's or Google's own subscription settings."
+            "Manage Subscription \u2014 if you subscribed through the mobile app, view or cancel it in Apple's or Google's own subscription settings; if you subscribed through the web app (billed via Stripe), manage or cancel it from your account settings there."
           ]
         },
         {
@@ -179,15 +179,25 @@
         {
           "title": "Auto-renewing subscription",
           "paragraphs": [
-            "FantasyGM Lab Premium is offered as an auto-renewing subscription. Payment is charged to your Apple ID (or Google Play) account at confirmation of purchase.",
-            "Your subscription automatically renews for the same length of time unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours before the end of the current period, at the price you agreed to when subscribing."
+            "FantasyGM Lab Premium is offered as an auto-renewing subscription. In the mobile app, payment is charged to your Apple ID or Google Play account at confirmation of purchase. On the web app, payment is processed by Stripe and charged to the card you provide at checkout.",
+            "Your subscription automatically renews for the same length of time unless you cancel before the end of the current period. In the mobile app, auto-renew must be turned off at least 24 hours before renewal and you may be charged within that 24-hour window at the price you agreed to when subscribing. On the web app, canceling through your Stripe-billed account settings takes effect at the end of the current billing period."
           ],
           "bullets": []
         },
         {
           "title": "Managing or canceling",
           "paragraphs": [
-            "You can manage or cancel your subscription anytime in your device's account settings \u2014 on iOS, under Settings > [your name] > Subscriptions; on Android, under the Google Play Store's Subscriptions page. Canceling stops future renewals but does not refund the current billing period.",
+            "How you manage or cancel depends on where you subscribed:"
+          ],
+          "bullets": [
+            "Mobile app (Apple ID or Google Play billing) \u2014 manage or cancel in your device's own account settings: on iOS, under Settings > [your name] > Subscriptions; on Android, under the Google Play Store's Subscriptions page.",
+            "Web app (Stripe billing) \u2014 manage or cancel from your FantasyGM Lab account settings on the web app, or contact support@example.com for help."
+          ]
+        },
+        {
+          "title": "Refunds",
+          "paragraphs": [
+            "Canceling stops future renewals but does not refund the current billing period, regardless of whether you subscribed through the mobile app or the web app. A mobile app purchase is also subject to Apple's or Google's own refund policy, since they process that payment, not FantasyGM Lab directly.",
             "Current pricing and available plans (monthly, annual, or other terms) are shown on the FantasyGM Lab Premium screen before you subscribe, since pricing can vary by plan, region, and promotion."
           ],
           "bullets": []
