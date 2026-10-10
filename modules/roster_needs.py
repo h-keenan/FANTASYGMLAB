@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -284,10 +285,28 @@ def classify_roster_rooms(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,
     league_settings: dict | None = None,
+    *,
+    taxi_player_ids: Iterable[object] | None = None,
 ) -> dict[str, dict[str, Any]]:
     roster = roster_df.copy() if roster_df is not None else pd.DataFrame()
     settings = league_settings or {}
     lineup = lineup_df if lineup_df is not None else pd.DataFrame()
+    # A taxi-squad player is never a legal weekly-lineup fill-in -- Sleeper
+    # (and every real dynasty ruleset) requires an explicit roster move to
+    # activate them first. Their NFL `status`/`injury_status` fields often
+    # still read "Active" (many are rookies on a real 53-man roster, just
+    # not promoted off taxi), so `_is_unavailable` alone never catches this:
+    # without this explicit set, a high-value taxi rookie gets scored as
+    # `playable_backups` and can fully mask a real short-term depth need
+    # (e.g. a one-deep RB room reads as "covered" because its only backup
+    # is parked on taxi and literally cannot be started). Callers that
+    # don't have taxi membership data simply omit this and get the prior
+    # behavior unchanged.
+    taxi_ids = {
+        str(player_id).strip()
+        for player_id in (taxi_player_ids or ())
+        if str(player_id or "").strip()
+    }
     starter_ids = {
         str(player_id)
         for player_id in lineup.loc[
@@ -335,6 +354,7 @@ def classify_roster_rooms(
         core_young = []
         injured_active = []
         injured_future = []
+        taxi_stashed = []
 
         for _, row in position_df.iterrows():
             player_id = str(row.get("player_id") or "").strip()
@@ -342,19 +362,27 @@ def classify_roster_rooms(
             core_asset = _is_core_young_asset(row, position)
             future_asset = _is_developmental(row, position) or core_asset
             unavailable = _is_unavailable(row)
+            on_taxi = bool(taxi_ids) and player_id in taxi_ids
             playable = _is_playable_cover(row, position)
 
             if core_asset:
                 core_young.append(player_id)
             if future_asset:
                 developmental.append(player_id)
-                if not weekly_starter or unavailable:
+                if not weekly_starter or unavailable or on_taxi:
                     developmental_depth.append(player_id)
             if unavailable:
                 if weekly_starter and not future_asset:
                     injured_active.append(player_id)
                 elif future_asset:
                     injured_future.append(player_id)
+                continue
+            if on_taxi:
+                # Legally unstartable this week no matter how strong the
+                # prospect grade reads -- never credited toward active or
+                # playable weekly coverage, only toward future/developmental
+                # tracking above.
+                taxi_stashed.append(player_id)
                 continue
             if weekly_starter and playable:
                 active_starters.append(player_id)
@@ -420,6 +448,7 @@ def classify_roster_rooms(
             "core_young_assets": list(dict.fromkeys(core_young)),
             "injured_active_contributors": injured_active,
             "injured_future_assets": injured_future,
+            "taxi_stashed_assets": taxi_stashed,
             "active_coverage_count": weekly_coverage,
             "future_coverage_count": future_count,
             "short_term_need": short_term_need,
@@ -436,8 +465,15 @@ def true_roster_needs(
     lineup_df: pd.DataFrame | None,
     league_settings: dict | None,
     baseline_needs: list[str] | None = None,
+    *,
+    taxi_player_ids: Iterable[object] | None = None,
 ) -> tuple[list[str], dict[str, dict[str, Any]]]:
-    rooms = classify_roster_rooms(roster_df, lineup_df, league_settings)
+    rooms = classify_roster_rooms(
+        roster_df,
+        lineup_df,
+        league_settings,
+        taxi_player_ids=taxi_player_ids,
+    )
     needs: list[str] = []
     for position in baseline_needs or []:
         position = str(position).upper()
@@ -603,6 +639,7 @@ def assess_team_needs(
     league_settings: dict | None = None,
     *,
     relative_weaknesses: list[str] | tuple[str, ...] | None = None,
+    taxi_player_ids: Iterable[object] | None = None,
 ) -> TeamNeedsAssessment:
     """Return immutable need assessments without changing existing need policy.
 
@@ -624,6 +661,7 @@ def assess_team_needs(
         lineup_df,
         league_settings,
         None,
+        taxi_player_ids=taxi_player_ids,
     )
     true_need_set = set(true_needs)
     assessments: list[PositionNeedAssessment] = []
