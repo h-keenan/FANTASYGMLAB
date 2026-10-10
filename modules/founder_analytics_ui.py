@@ -74,7 +74,13 @@ def _table(headers: list[str], rows: list[list[str]]) -> str:
     )
 
 
+@st.fragment
 def render_founder_analytics(*, secrets: Any = None) -> None:
+    # Fragment-scoped: the time-window selectbox below only redraws this
+    # read-only report. founder_labs_ui calls this once and renders its own
+    # "Open Founder Ops" / "Return to Dashboard" buttons around it without
+    # reading anything this function produces, so isolating its rerun from
+    # the rest of app.py changes nothing else on the page.
     if not founder_labs.founder_labs_authorized(st.session_state, secrets=secrets):
         return
 

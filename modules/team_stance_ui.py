@@ -18,6 +18,7 @@ from modules import gm_targets
 from modules import team_stance
 
 
+@st.fragment
 def render_team_stance_workspace(
     *,
     session: MutableMapping[str, Any],
@@ -25,6 +26,12 @@ def render_team_stance_workspace(
     my_roster_player_ids: Iterable[str] | None,
     df_players: pd.DataFrame | None,
 ) -> None:
+    # Fragment-scoped: app.py's "team_stance" route calls this once and
+    # nothing else on the page reads its output (no PQV open, no return
+    # value consumed). The stance radio and every protect-player checkbox
+    # already avoid st.rerun() (plain widget rerun / on_change callback), so
+    # scoping the fragment just stops that rerun from re-executing the rest
+    # of app.py's ~24k-line script on every toggle here.
     league_key = str(league_id or "").strip()
     if not league_key:
         st.info("Select a league to set your Team Situation.")
