@@ -577,3 +577,134 @@ def test_core_position_value_swap_not_regressed_by_shallow_position_gate(monkeyp
         for idea in ideas
         for asset in idea["receive_assets"]
     )
+
+
+def _players_with_a_wire_wr(wire_value_score: float):
+    """Same fixture as `_players()`, plus one unrostered WR ("Wire WR") no
+    `FakeAdapter` roster lists as owned by anyone -- the free agent the
+    old `_build_trade_ideas_impl` dropped before scoring even ran (its
+    `df_players.assign(_trade_owner_id=...).dropna(...)` step). Carries
+    `fantasycalc_value` so player_eligibility's current-signal
+    corroboration (modules.player_eligibility.player_eligibility) treats
+    it as a real current player rather than a stale, uncorroborated row --
+    every rostered fixture row above skips that check entirely since only
+    unowned players ever reach it.
+    """
+    wire = pd.DataFrame(
+        [
+            {
+                "player_id": "wire-wr",
+                "name": "Wire WR",
+                "position": "WR",
+                "value_score": wire_value_score,
+                "age": 24,
+                "player_tier": "Starter",
+                "team": "KC",
+                "status": "Active",
+                "active": True,
+                "fantasycalc_value": float(wire_value_score),
+            }
+        ]
+    )
+    return pd.concat([_players(), wire], ignore_index=True)
+
+
+def test_need_filling_trade_flags_a_clearly_better_waiver_alternative(monkeypatch):
+    """Root-cause regression: the trade-candidate universe used to be built
+    entirely from rostered players, so a need-filling acquire suggestion
+    (patterns 1/1b/2, which draw on `my_shape["needs"]`) had zero visibility
+    into a clearly better free agent already sitting unclaimed on waivers.
+    `_waiver_alternative_guardrail` (additive, never a hard suppression)
+    must flag that gap on the idea itself when the receive side lands on a
+    true need position and a free agent at that position clearly outscores
+    the trade target by modules.waivers_ui's own ranked pool
+    (select_top_waiver_opportunity), using the exact score field already in
+    play elsewhere in this pipeline -- not a reinvented comparison.
+    """
+
+    _install_deterministic_context(monkeypatch)
+    # My shape's mocked "needs" is ["WR"] for roster 1 (see
+    # _install_deterministic_context) -- every WR receive asset below is a
+    # true need, not a surplus/value-only acquisition.
+    players = _players_with_a_wire_wr(wire_value_score=6500)
+    players.loc[players["player_id"] == "mine-a", "value_score"] = 4400
+
+    ideas = trade_ideas.build_trade_ideas(
+        players,
+        "league",
+        _summary(),
+        1,
+        ["Mine A"],
+        [],
+        {},
+        max_ideas=20,
+        team_strategy="contender",
+        adapter=FakeAdapter(),
+        allow_protected_focus=True,
+    )
+
+    assert ideas
+    wr_ideas = [
+        idea
+        for idea in ideas
+        if any(asset.get("position") == "WR" for asset in idea["receive_assets"])
+    ]
+    assert wr_ideas
+    for idea in wr_ideas:
+        assert idea["waiver_alternative_available"] is True
+        assert idea["waiver_alternative"]["name"] == "Wire WR"
+        assert idea["waiver_alternative"]["position"] == "WR"
+        assert "waiver" in idea["rationale"].casefold()
+        assert "Wire WR" in idea["waiver_alternative_summary"]
+    # The trade idea itself is not suppressed -- it still surfaces, just
+    # flagged, per this gate's additive design.
+    assert all(idea["their_player"] for idea in wr_ideas)
+
+
+def test_need_filling_trade_unaffected_when_no_better_waiver_option_exists(monkeypatch):
+    """Negative counterpart: the same true-need shape and the same trade
+    target, but the only free agent at the need position is clearly worse
+    than the trade target (and a second run below has no free agent at all)
+    -- the idea must surface exactly as it would without this gate, with
+    the new fields present but inert.
+    """
+
+    _install_deterministic_context(monkeypatch)
+
+    def _build(players):
+        return trade_ideas.build_trade_ideas(
+            players,
+            "league",
+            _summary(),
+            1,
+            ["Mine A"],
+            [],
+            {},
+            max_ideas=20,
+            team_strategy="contender",
+            adapter=FakeAdapter(),
+            allow_protected_focus=True,
+        )
+
+    # Case 1: a worse free agent exists at the need position.
+    worse_players = _players_with_a_wire_wr(wire_value_score=1500)
+    worse_players.loc[worse_players["player_id"] == "mine-a", "value_score"] = 4400
+    worse_ideas = _build(worse_players)
+
+    # Case 2: no free agent at all (every player_id is rostered).
+    empty_players = _players().copy()
+    empty_players.loc[empty_players["player_id"] == "mine-a", "value_score"] = 4400
+    empty_ideas = _build(empty_players)
+
+    for ideas in (worse_ideas, empty_ideas):
+        assert ideas
+        wr_ideas = [
+            idea
+            for idea in ideas
+            if any(asset.get("position") == "WR" for asset in idea["receive_assets"])
+        ]
+        assert wr_ideas
+        for idea in wr_ideas:
+            assert idea["waiver_alternative_available"] is False
+            assert idea["waiver_alternative"] is None
+            assert idea["waiver_alternative_summary"] == ""

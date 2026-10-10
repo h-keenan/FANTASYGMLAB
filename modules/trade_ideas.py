@@ -39,7 +39,11 @@ from modules.rankings import (
     is_injury_status,
     summarize_team_injuries,
 )
-from modules.player_state_authority import NFL_NON_ACTIONABLE_STATUSES
+from modules.player_state_authority import (
+    NFL_NON_ACTIONABLE_STATUSES,
+    waiver_actionable_player_pool,
+)
+from modules.waivers_ui import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
 from modules import runtime_trace
 from modules import team_stance as team_stance_module
@@ -1702,9 +1706,11 @@ def _attach_trade_assessment_fields(
     *,
     fit_context: Dict[str, Any] | None = None,
     market_context: Dict[str, Any] | None = None,
+    waiver_guardrail: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     fit = fit_context or {}
     market = market_context or {}
+    waiver_alt = waiver_guardrail or {}
     confidence = _trade_confidence_context(
         fit_context=fit,
         market_context=market,
@@ -1732,6 +1738,9 @@ def _attach_trade_assessment_fields(
     idea["trade_headline_fit_exception"] = bool(
         confidence.get("headline_fit_exception")
     )
+    idea["waiver_alternative_available"] = bool(waiver_alt.get("applied"))
+    idea["waiver_alternative"] = waiver_alt.get("waiver_alternative")
+    idea["waiver_alternative_summary"] = str(waiver_alt.get("summary") or "")
     return idea
 
 
@@ -2407,6 +2416,132 @@ def _temporary_injury_trade_guardrail(
         "hard_fail": hard_fail,
         "tags": tags,
         "summary": " ".join(reasons),
+    }
+
+
+# "Clearly outscores" margin for the waiver-alternative guardrail below --
+# the same absolute-points convention _temporary_injury_trade_guardrail's
+# own strong_value_win/long_term_upgrade checks already use (incoming_best
+# >= outgoing_best + 900) rather than a percentage, so a flag only fires on
+# a gap big enough that no reasonable valuation noise explains it away.
+WAIVER_ALTERNATIVE_MARGIN = 900
+
+
+def _waiver_alternative_for_need(
+    position: str,
+    waiver_context: Dict[str, Any] | None,
+) -> Dict[str, Any] | None:
+    """The best actionable, need-fit waiver option at `position` for this
+    team, via the exact same ranked pool modules.waivers_ui already builds
+    for the Waivers tab (select_top_waiver_opportunity ->
+    rank_priority_add_candidates) -- never a second, bespoke scoring pass.
+    Returns None when no waiver context was built for this run (e.g. the
+    team has no true needs at all, or the league has no eligible free
+    agents) or nothing at `position` clears that ranker's own bar.
+    """
+    if not waiver_context:
+        return None
+    # This same (position, roster) lookup recurs across every pattern/
+    # package that targets a given need position -- memoize it on the
+    # shared context dict (one per _build_trade_ideas_impl call, reused
+    # across every partner) rather than re-running
+    # select_top_waiver_opportunity's ranking pass each time.
+    memo = waiver_context.setdefault("_memo", {})
+    if position in memo:
+        return memo[position]
+    free_agents = waiver_context.get("free_agents")
+    if free_agents is None or free_agents.empty:
+        memo[position] = None
+        return None
+    score_field = str(waiver_context.get("score_field") or "value_score")
+    selected = select_top_waiver_opportunity(
+        free_agents,
+        waiver_context.get("my_team_df"),
+        waiver_context.get("league_settings"),
+        score_field,
+        needed_positions=[position],
+    )
+    if selected is None or selected.empty:
+        memo[position] = None
+        return None
+    name = str(selected.get("name") or "").strip()
+    result = {
+        "player_id": str(selected.get("player_id") or ""),
+        "name": name or "a waiver free agent",
+        "score": _safe_int(selected.get(score_field)),
+    }
+    memo[position] = result
+    return result
+
+
+def _waiver_alternative_guardrail(
+    my_shape: Dict[str, Any],
+    receive_assets: List[Dict[str, Any]],
+    waiver_context: Dict[str, Any] | None,
+) -> Dict[str, Any]:
+    """Need-filling acquire gate: when a trade idea brings back a player at
+    a position this roster has a TRUE need at (``my_shape["needs"]``), check
+    whether a clearly better option already sits unclaimed on waivers before
+    letting the trade suggestion stand unqualified.
+
+    Deliberately additive, never a hard-fail -- this is the flagging sibling
+    of ``_acquire_candidate_allowed`` (that gate blocks a redundant shallow-
+    position acquisition outright; this one only attaches a reason the UI
+    can show, the same way ``_temporary_injury_trade_guardrail``'s summary
+    text gets folded into the idea's rationale). Only ever looks at true
+    needs, so a pure value-for-value swap or a surplus-driven acquisition at
+    a position this roster does not need is never touched -- when
+    ``my_shape["needs"]`` is empty, or none of the receive side's positions
+    are in it, this is a no-op.
+    """
+    empty_result: Dict[str, Any] = {
+        "applied": False,
+        "waiver_alternative": None,
+        "summary": "",
+        "tags": [],
+    }
+    if not waiver_context:
+        return empty_result
+    my_needs = {str(pos).upper() for pos in (my_shape.get("needs") or [])}
+    if not my_needs:
+        return empty_result
+
+    best: Dict[str, Any] | None = None
+    for asset in _player_assets(receive_assets):
+        position = str(asset.get("position") or "").upper()
+        if position not in my_needs:
+            continue
+        alternative = _waiver_alternative_for_need(position, waiver_context)
+        if not alternative:
+            continue
+        target_score = _safe_int(asset.get("score"))
+        if alternative["score"] < target_score + WAIVER_ALTERNATIVE_MARGIN:
+            continue
+        if best is None or alternative["score"] > best["alternative"]["score"]:
+            best = {
+                "position": position,
+                "target_label": str(asset.get("label") or "this target"),
+                "alternative": alternative,
+            }
+
+    if not best:
+        return empty_result
+
+    alt = best["alternative"]
+    summary = (
+        f"A stronger option is available on waivers: {alt['name']} ({best['position']}) "
+        f"outscores {best['target_label']} without spending any trade capital."
+    )
+    return {
+        "applied": True,
+        "waiver_alternative": {
+            "position": best["position"],
+            "player_id": alt["player_id"],
+            "name": alt["name"],
+            "score": alt["score"],
+        },
+        "summary": summary,
+        "tags": ["Waiver Alternative Available"],
     }
 
 
@@ -3339,6 +3474,7 @@ class _TradePipelineProfile:
         self._market_cache: Dict[str, Dict[str, Any]] = {}
         self._fit_cache: Dict[str, Dict[str, Any]] = {}
         self._priority_cache: Dict[str, int] = {}
+        self._waiver_alternative_cache: Dict[str, Dict[str, Any]] = {}
 
     @contextmanager
     def stage(self, name: str):
@@ -3386,6 +3522,7 @@ class _TradePipelineProfile:
             "market": self._market_cache,
             "fit": self._fit_cache,
             "priority": self._priority_cache,
+            "waiver_alternative": self._waiver_alternative_cache,
         }
         store = stores[category]
         if self.cache_enabled and key in store:
@@ -3611,6 +3748,31 @@ def _build_trade_ideas_impl(
         my_shape["archetype_label"] = str(team_archetype)
     my_needs = _normalize_pos_list(my_shape.get("needs", []))
 
+    # Need-filling acquire suggestions should know about the waiver wire,
+    # not just rostered trade partners -- see _waiver_alternative_guardrail.
+    # `owner_ids` (built above from the same `df_players`/`roster_players_map`
+    # the rest of this function already uses) is NaN for exactly the players
+    # modules.trade_ideas used to silently drop from the whole trade-candidate
+    # universe: unowned free agents. Only built at all when this team has a
+    # true need to check against, and reused across every partner/pattern
+    # below instead of recomputed per idea.
+    waiver_alternative_context: Dict[str, Any] | None = None
+    if my_needs:
+        free_agent_df = df_players.loc[owner_ids.isna()]
+        if not free_agent_df.empty:
+            free_agent_pool = waiver_actionable_player_pool(
+                free_agent_df,
+                roster_players_map,
+                surface="trade_ideas_waiver_alternative",
+            )
+            if not free_agent_pool.empty:
+                waiver_alternative_context = {
+                    "free_agents": free_agent_pool,
+                    "my_team_df": my_team_df,
+                    "league_settings": league_settings,
+                    "score_field": score_field,
+                }
+
     pos_focus = my_needs if my_needs else ["WR", "RB", "QB", "TE"]
     movable_positions = list(dict.fromkeys(my_strengths + ["WR", "RB", "QB", "TE"]))
 
@@ -3762,9 +3924,23 @@ def _build_trade_ideas_impl(
                 return None
             if int(market_context.get("score") or 0) < min_acceptance_score:
                 return None
+            waiver_guardrail = profile.cached(
+                "waiver_alternative",
+                cache_key,
+                lambda: _waiver_alternative_guardrail(
+                    my_shape,
+                    receive_assets,
+                    waiver_alternative_context,
+                ),
+            )
             final_rationale = " ".join(
                 part
-                for part in [reasoning.get("summary", ""), rationale, market_context.get("summary", "")]
+                for part in [
+                    reasoning.get("summary", ""),
+                    rationale,
+                    market_context.get("summary", ""),
+                    waiver_guardrail.get("summary", ""),
+                ]
                 if part
             ).strip()
             with profile.stage("confidence_scoring"):
@@ -3789,6 +3965,7 @@ def _build_trade_ideas_impl(
                     idea,
                     fit_context=fit_context,
                     market_context=market_context,
+                    waiver_guardrail=waiver_guardrail,
                 )
 
         def make_package(*assets: Dict[str, Any]) -> List[Dict[str, Any]]:
