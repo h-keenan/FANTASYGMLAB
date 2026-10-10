@@ -142,6 +142,21 @@ def test_intentional_nav_detection_covers_real_navigation_call_sites():
     assert 'key="gm_targets_empty_open_players"' in gm_targets_ui_src
     assert '"gm_targets_empty_open_players"' in VIEWPORT_PRESERVE_JS
 
+    # Dashboard "module" tiles (render_home_command_tiles) route-navigate
+    # via a plain HTML data-route card sharing ONE Streamlit widget key with
+    # sibling in-place cards in the same tap-delegation root
+    # (interaction_contract.TAP_DELEGATION_JS) — key-based matching alone
+    # can never tell those cards apart, so isIntentionalNav() must check the
+    # data-route attribute directly instead of (or in addition to) the key
+    # allowlist. Pin both the DOM check and the real call site that sets
+    # data-route only on the navigating card.
+    assert 'el.closest("[data-route]")' in VIEWPORT_PRESERVE_JS
+    interaction_contract_src = (
+        ROOT / "modules" / "interaction_contract.py"
+    ).read_text(encoding="utf-8")
+    assert "data-route" in workspace_ui_src
+    assert ".home-command-route-card[data-route]" in interaction_contract_src
+
     # Exact-match call sites added by later PRs (dead "Read recap" button
     # wired live, the player-detail Back button, header League management,
     # and the founder pages) that never got a matching key pattern — the
@@ -377,5 +392,63 @@ def test_real_dom_click_recognizes_fixed_navigation_keys(harness_url):
             # navigation, or this check would be vacuously true for anything.
             anchor = check_intentional_nav_key(page, "viewport_refresh_inplace")
             assert anchor.get("nav") is False, f"control key wrongly recognized as nav: {anchor!r}"
+        finally:
+            browser.close()
+
+
+def test_real_dom_mobile_tap_recognizes_module_route_cards(harness_url):
+    """Real-browser regression check for dashboard "module" tiles on mobile.
+
+    coridian_'s repeated report ("modules need to be tappable ... tapping
+    still jumps me around like I'm scrolling") is a different gap than the
+    #95x key-allowlist regression test_real_dom_click_recognizes_fixed_navigation_keys
+    covers above: render_home_command_tiles (modules/workspace_ui.py) draws
+    route-navigating cards and in-place Player Quick View cards as plain
+    HTML inside ONE shared st.components.v2 tap-delegation root
+    (interaction_contract.TAP_DELEGATION_JS), so every card shares a single
+    Streamlit widget key — isIntentionalNavKey()'s key matching can never
+    tell them apart. isIntentionalNav() instead checks the data-route
+    attribute that Python only puts on the navigating card
+    (_open_home_command_route / commit_destination_navigation). This drives
+    a real mobile-viewport, touch-style pointerdown (not just a desktop
+    mouse pointerdown) at both card shapes from the dg_nav_detection_fixture
+    block in scripts/ui_validation_harness.py's _viewport_preserve(), and
+    reads back the real shipped isIntentionalNav() verdict off
+    window.__dgInPlaceAnchor.nav — not a re-implementation of that logic.
+    """
+    from playwright.sync_api import sync_playwright
+    from scripts.validate_viewport_preservation import check_intentional_nav_selector, wait_app
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(
+            viewport={"width": 390, "height": 844},
+            is_mobile=True,
+            has_touch=True,
+            user_agent=(
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+            ),
+        )
+        try:
+            page.goto(f"{harness_url}/?surface=viewport-preserve")
+            wait_app(page)
+            anchor = check_intentional_nav_selector(
+                page, "[data-route='viewport_fixture_route']", touch=True
+            )
+            assert anchor.get("nav") is True, (
+                f"module route card: expected isIntentionalNav() to recognize "
+                f"data-route on a real mobile touch tap, got {anchor!r}"
+            )
+            # Negative control: the sibling in-place module card (same shared
+            # component key, no data-route) must NOT be treated as
+            # navigation, or this check would be vacuously true for any card
+            # in the tap-delegation root.
+            anchor = check_intentional_nav_selector(
+                page, ".home-command-player-card", touch=True
+            )
+            assert anchor.get("nav") is False, (
+                f"in-place module card wrongly recognized as nav: {anchor!r}"
+            )
         finally:
             browser.close()

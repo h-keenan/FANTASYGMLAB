@@ -255,6 +255,33 @@ def check_intentional_nav_key(page: Page, key: str) -> dict[str, Any]:
     return anchor or {}
 
 
+def check_intentional_nav_selector(page: Page, selector: str, *, touch: bool = False) -> dict[str, Any]:
+    """Like ``check_intentional_nav_key`` but for a DOM-structural match
+    (e.g. ``[data-route]``) instead of a Streamlit widget ``key=``.
+
+    Dashboard "module" tiles (``render_home_command_tiles`` /
+    ``interaction_contract.TAP_DELEGATION_JS``) are plain HTML cards sharing
+    one Streamlit component key with sibling in-place cards, so
+    ``isIntentionalNav()`` cannot tell them apart by key — it checks the
+    ``data-route`` attribute directly instead. ``touch=True`` dispatches a
+    touch-style pointerdown (``pointerType: "touch"``) to match a real
+    mobile tap rather than a desktop mouse pointerdown.
+    """
+
+    locator = page.locator(selector).first
+    locator.wait_for(state="visible", timeout=90_000)
+    page.wait_for_function("window.__dgViewportPreserveBound === true", timeout=90_000)
+    if touch:
+        locator.dispatch_event(
+            "pointerdown",
+            {"pointerType": "touch", "isPrimary": True, "bubbles": True},
+        )
+    else:
+        locator.dispatch_event("pointerdown")
+    anchor = page.evaluate("window.__dgInPlaceAnchor")
+    return anchor or {}
+
+
 def run_viewport_matrix(page: Page, *, base_url: str) -> dict[str, Any]:
     report: dict[str, Any] = {"cases": {}}
     page.goto(
