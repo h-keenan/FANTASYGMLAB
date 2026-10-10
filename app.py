@@ -23439,6 +23439,7 @@ def main():
             partner_name=partner_name,
             league_ready=bool(selected_league_id and my_roster_id is not None),
             format_score=_format_score,
+            compact_player_row_html=_compact_player_row_html,
         )
 
         send_assets = st.session_state["trade_send_assets"]

@@ -6,7 +6,7 @@ Presentation/state only — no valuation, rankings, or provider calls.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, MutableMapping, Sequence
+from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
 from modules.valuation_authority import valuation_is_trade_eligible
 
@@ -198,15 +198,30 @@ def result_row_html(
     *,
     selected: bool = False,
     format_score=None,
+    compact_player_row_html: Callable[..., str] | None = None,
 ) -> str:
     from modules.compact_fantasy_assets import compact_asset_html
 
     # Roster-browse rows show real value context (matching the mobile Trade
     # Analyzer search results, which surface each player/pick's score),
     # instead of forcing the user to add an asset before seeing its value.
-    inner = compact_asset_html(
-        asset, size="standard", show_value=True, format_score=format_score
-    )
+    #
+    # Player rows reuse the same canonical compact player card every other
+    # roster surface renders (coridian_: "Places like the TradeHub trade
+    # modules can use those new compacted player cards") when the caller
+    # injects one. Picks have no equivalent card, so they always keep the
+    # existing compact-asset rendering.
+    asset_type = str(asset.get("asset_type") or "player").strip().lower()
+    if compact_player_row_html is not None and asset_type == "player":
+        inner = compact_player_row_html(
+            asset,
+            score_field="score",
+            score_label="Score",
+        )
+    else:
+        inner = compact_asset_html(
+            asset, size="standard", show_value=True, format_score=format_score
+        )
     state = " toa-result-row--selected" if selected else ""
     flag = "1" if selected else "0"
     return (

@@ -300,6 +300,14 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
   max-width: 100%;
 }
 
+/* Player rows render the full canonical compact player card
+   (.dg-football-asset), which fills its container instead of shrinking to
+   fit like the plain compact-asset chip does — keep it from being clipped
+   by the shrink-to-fit width above. Pick rows are untouched. */
+.toa-result-row:has(.dg-football-asset) {
+  width: 100%;
+}
+
 .toa-result-row--selected {
   background: var(--color-muted-soft, rgba(148, 163, 184, 0.12));
   border-radius: var(--radius-control, 12px);
@@ -394,6 +402,13 @@ div[data-testid="stHorizontalBlock"]:has(.toa-result-row):not(:has(.toa-block)) 
   max-width: 5.25rem !important;
   min-width: 5.25rem !important;
   width: 5.25rem !important;
+}
+
+/* Same compact-player-card exception as .toa-result-row above — the row's
+   own container must fill the roster list instead of shrinking to the
+   un-wrapped max-content width of the fuller card's name/meta/insight text. */
+div[data-testid="stHorizontalBlock"]:has(.toa-result-row):has(.dg-football-asset):not(:has(.toa-block)) {
+  width: 100%;
 }
 
 /* Desktop two-side workspace; stack below 1024 so 320/390/430 never sit 50/50. */
