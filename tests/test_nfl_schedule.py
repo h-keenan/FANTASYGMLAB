@@ -277,3 +277,85 @@ def test_load_games_returns_empty_frame_with_no_cache_and_no_network(tmp_path):
         result = nfl_schedule.load_games(refresh=True)
 
     assert result.empty
+
+
+def test_load_games_does_not_reparse_disk_within_the_in_process_ttl_window(tmp_path):
+    # Two plain (refresh=False) calls within the same in-process cache
+    # bucket must only hit the disk/CSV-parse path once — this is the
+    # "don't look it up every time" fix itself, not just a behavior check.
+    nfl_schedule.clear_load_games_cache()
+    cache_path = tmp_path / "nfl_games.csv"
+    _games_frame().to_csv(cache_path, index=False)
+
+    with patch.object(nfl_schedule, "GAMES_CACHE_PATH", str(cache_path)):
+        with patch.object(nfl_schedule.pd, "read_csv", wraps=pd.read_csv) as mock_read_csv:
+            first = nfl_schedule.load_games()
+            second = nfl_schedule.load_games()
+
+    assert mock_read_csv.call_count == 1
+    assert first is second  # same cached object, not just equal content
+    nfl_schedule.clear_load_games_cache()
+
+
+def test_load_games_refresh_true_always_bypasses_the_in_process_cache(tmp_path):
+    nfl_schedule.clear_load_games_cache()
+    cache_path = tmp_path / "nfl_games.csv"
+    _games_frame().to_csv(cache_path, index=False)
+
+    with (
+        patch.object(nfl_schedule, "GAMES_CACHE_PATH", str(cache_path)),
+        patch.object(nfl_schedule, "requests") as mock_requests,
+    ):
+        mock_requests.get.side_effect = Exception("network down")
+        nfl_schedule.load_games()  # warms the in-process cache
+        with patch.object(nfl_schedule.pd, "read_csv", wraps=pd.read_csv) as mock_read_csv:
+            nfl_schedule.load_games(refresh=True)
+
+    assert mock_read_csv.call_count == 1  # re-read from disk, not served from cache
+    nfl_schedule.clear_load_games_cache()
+
+
+def test_defensive_ratings_see_newly_completed_games_despite_the_schedule_cache(tmp_path):
+    # The in-process schedule cache must never freeze team_defense_strength:
+    # once new game results land on disk and the cache is refreshed, the
+    # very next call must reflect them (ratings have their own cadence —
+    # they are never themselves cached by LOAD_GAMES_INPROCESS_TTL_SECONDS).
+    nfl_schedule.clear_load_games_cache()
+    cache_path = tmp_path / "nfl_games.csv"
+    _defense_strength_frame().to_csv(cache_path, index=False)
+
+    with patch.object(nfl_schedule, "GAMES_CACHE_PATH", str(cache_path)):
+        before = nfl_schedule.team_defense_strength(2026)
+        assert before["KC"]["tier"] == "tough"
+
+        # KC just allowed a blowout in a newly-completed week 4 game —
+        # simulates the disk cache refreshing with new results.
+        updated = pd.concat(
+            [
+                _defense_strength_frame(),
+                pd.DataFrame(
+                    [
+                        {
+                            "season": 2026,
+                            "game_type": "REG",
+                            "week": 4,
+                            "home_team": "KC",
+                            "away_team": "NE",
+                            "home_score": 3,
+                            "away_score": 60,
+                            "spread_line": None,
+                            "total_line": None,
+                        }
+                    ]
+                ),
+            ],
+            ignore_index=True,
+        )
+        updated.to_csv(cache_path, index=False)
+        nfl_schedule.clear_load_games_cache()  # same rotation the live TTL bucket does
+
+        after = nfl_schedule.team_defense_strength(2026)
+
+    assert after["KC"]["games_played"] == 4
+    assert after["KC"]["points_allowed_avg"] > before["KC"]["points_allowed_avg"]
+    nfl_schedule.clear_load_games_cache()
