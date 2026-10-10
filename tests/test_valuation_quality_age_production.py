@@ -100,10 +100,23 @@ def test_continuous_age_curves_reduce_cliffs_vs_legacy_steps():
 
 
 def test_age_curve_no_older_more_valuable_from_bucket_crossing():
+    """After each position's own age-curve peak, the curve must decline
+    smoothly with no bucket-crossing artifact that makes an older age
+    spuriously more valuable than a younger one.
+
+    Before the peak, a rise is expected and correct — every curve now goes
+    rookie-below-peak -> mid-career peak -> decline, so this test (unlike
+    before this curve redesign) only asserts non-increase from each
+    position's own peak onward. See
+    test_valuation_calibration_audit.test_age_multiplier_continuous_and_position_aware
+    for the rise-phase assertions.
+    """
+
     for pos in ("QB", "RB", "WR", "TE"):
         ages = list(range(21, 36))
         vals = [rankings.age_multiplier(pos, age) for age in ages]
-        for i in range(len(vals) - 1):
+        peak_idx = vals.index(max(vals))
+        for i in range(peak_idx, len(vals) - 1):
             assert vals[i + 1] <= vals[i] + 1e-9, (pos, ages[i], vals[i], vals[i + 1])
 
 
