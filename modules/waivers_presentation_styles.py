@@ -261,10 +261,17 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
 }
 
 .waiver-faab-block dt {
+    align-items: center;
     color: var(--color-text-muted);
+    display: flex;
     font-size: var(--font-size-badge);
+    gap: var(--space-xs);
     letter-spacing: var(--letter-spacing-badge);
     text-transform: uppercase;
+}
+
+.waiver-faab-block dt .dg-glyph {
+    margin-right: 0;
 }
 
 .waiver-faab-block dd {

@@ -44,8 +44,9 @@ from modules.trade_visual_language import (
 from modules.trade_detail_styles import TRADE_DETAIL_CSS
 from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
 from modules.portrait_normalization import card_focus_x
+from modules.semantic_glyphs import SEMANTIC_GLYPH_CSS, concept_for, glyph_html
 
-TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + """
+TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + SEMANTIC_GLYPH_CSS + """
 * { box-sizing: border-box; }
 html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); --dg-headshot-focus-x: FOCUS_X; --dg-headshot-focus: 18%; }
 .trade-summary-card {
@@ -76,15 +77,22 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
 .trade-summary-header { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); justify-content: flex-start; max-width: 100%; min-width: 0; order: 1; }
 .trade-summary-heading { display: grid; gap: var(--space-xs); max-width: 100%; min-width: 0; }
 .trade-summary-category {
+    align-items: center;
     color: var(--color-text-muted);
+    display: flex;
     font: var(--type-supporting-metadata);
     font-size: var(--font-size-badge);
     font-weight: var(--font-weight-title);
+    gap: var(--space-xs);
     letter-spacing: var(--letter-spacing-badge);
     line-height: var(--line-height-badge);
     opacity: var(--opacity-secondary);
     text-transform: uppercase;
 }
+/* The category glyph is decorative (the label text already names the
+   category); gap above already supplies spacing, so drop dg-glyph's own
+   default margin-right to avoid doubling it. */
+.trade-summary-category .dg-glyph { margin-right: 0; }
 .trade-summary-visually-hidden {
     clip: rect(0 0 0 0);
     clip-path: inset(50%);
@@ -283,12 +291,31 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     -webkit-line-clamp: 2;
 }
 .trade-summary-affordance {
+    align-items: center;
     color: var(--color-text-primary);
+    display: flex;
     font-size: var(--font-size-body);
     font-weight: var(--font-weight-button);
+    gap: var(--space-xs);
+    justify-content: space-between;
     letter-spacing: var(--letter-spacing-badge);
     text-align: left;
     text-transform: uppercase;
+    width: 100%;
+}
+/* Same "tap this row" chevron already used for GM Sheet navigation rows
+   (modules/mobile_interaction_overlay_styles.py, modules/app_styles.py) —
+   reused here instead of inventing a second affordance convention, and
+   it mirrors the chevron-forward Ionicon mobile puts on nearly every
+   tappable row app-wide (MyTeamScreen, WaiverRecommendationCard,
+   InsightRow, GmOrb's own destination rows, etc.) — this was the one
+   tappable row on web's Trade Hub card without that cue. */
+.trade-summary-affordance::after {
+    color: var(--color-text-muted);
+    content: "›";
+    flex: 0 0 auto;
+    font-size: 1rem;
+    font-weight: 700;
 }
 .trade-summary-footer {
     align-items: center;
@@ -363,6 +390,16 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
     .trade-summary-package { align-items: start; column-gap: var(--space-sm); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); justify-content: stretch; max-width: 100%; width: 100%; }
     .trade-summary-for { align-self: center; display: flex; justify-content: center; }
     .trade-summary-side + .trade-summary-side { border-top: 0; margin-top: 0; padding-top: 0; }
+    /* At this width the card is rendering on a desktop-class column, not a
+       narrow phone-width one — the base rule's var(--space-sm) padding is
+       the same tight value the <430px tier below uses for a phone-width
+       card, so a desktop-wide card ends up reading thin/cramped relative
+       to its own size (mobile's equivalent AnimatedCard uses spacing.lg,
+       noticeably roomier). Step up one token on the existing scale rather
+       than copying mobile's literal px value or touching the shared
+       .dg-ui-card base rule other surfaces (summary-tile, explorer-pick-card,
+       home-command-card) still rely on. */
+    .trade-summary-card { padding: var(--space-md); }
 }
 @container trade-summary (max-width: 430px) {
     .trade-summary-card { gap: 0.22rem; max-width: 100%; min-height: 0; overflow-x: clip; padding: 0.45rem 0.65rem; width: 100%; }
@@ -1935,7 +1972,16 @@ def render_trade_idea_card(
     fit = _safe_text(idea.get("fit_grade"), "Fit Pending")
     partner = escape(_safe_text(idea.get("partner_team_name"), "Trade partner"))
     tag = escape(_safe_text(idea.get("tag"), "Trade idea"))
-    section = escape(trade_summary_card_category(idea))
+    category_raw = trade_summary_card_category(idea)
+    section = escape(category_raw)
+    # Mobile's Trade Hub pairs every category/impact tag with a small icon
+    # (ImpactBadge's flash/trending icons, the summary-row tiles) — web's
+    # category line was text-only. Reuse the existing restrained glyph set
+    # (modules/semantic_glyphs.py) instead of inventing new iconography;
+    # decorative only, the label text still carries the information.
+    category_glyph_html = (
+        glyph_html(concept_for(category_raw), size="kicker") if category_raw else ""
+    )
 
     if trade_gain > 0:
         delta_text = f"+{format_score(trade_gain)}"
@@ -2024,7 +2070,7 @@ def render_trade_idea_card(
             <header class="trade-summary-header">
                 <div class="trade-summary-heading">
                     {focus_kicker}
-                    <div class="trade-summary-category">{section}</div>
+                    <div class="trade-summary-category">{category_glyph_html}{section}</div>
                     <div class="trade-summary-title-row">
                         <div class="trade-summary-title">{partner}</div>
                         {fairness_pill_html}

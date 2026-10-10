@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Mapping, Sequence
 
 from modules.rankings import injury_level
+from modules.semantic_glyphs import glyph_html
 
 
 def _safe_int(value, default: int = 0) -> int:
@@ -105,9 +106,14 @@ def format_faab_block_html(guidance: FaabGuidance, *, compact: bool = False) -> 
         f"<p>{escape(secondary)}</p>"
         f"<p>{escape(guidance.rationale)}</p>"
     )
+    # Mobile's FAABGuidance pairs this exact "bid this much" line with a
+    # cash-outline icon (colors.success — same green as web's "waiver"
+    # glyph below). Reuses the existing restrained glyph set rather than
+    # adding a new concept; decorative only, "FAAB BID" is still the label.
+    faab_glyph_html = glyph_html("waiver", size="kicker", extra_class="waiver-faab-block-glyph")
     return (
         f"<div class='waiver-faab-block{compact_class}'>"
-        "<dt>FAAB BID</dt>"
+        f"<dt>{faab_glyph_html}FAAB BID</dt>"
         f"<dd>{escape(primary)}</dd>"
         f"{extra}"
         "</div>"
