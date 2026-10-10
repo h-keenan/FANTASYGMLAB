@@ -57,6 +57,10 @@ ALERTS_ACTIVITY_CSS = """
     border-left:0.2rem solid var(--color-success);
     padding-left:var(--space-xs);
 }
+.dg-alerts-row--other{
+    border-left:0.2rem solid var(--color-text-secondary);
+    padding-left:var(--space-xs);
+}
 .dg-alerts-row--player{
     grid-template-columns:3.25rem minmax(0,1fr);
 }

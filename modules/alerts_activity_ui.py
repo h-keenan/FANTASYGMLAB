@@ -17,6 +17,25 @@ from modules import player_profile_ui
 from modules.alerts_activity_styles import ALERTS_ACTIVITY_CSS
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.player_tier_identity import portrait_frame_classes, resolve_player_tier_identity
+from modules.semantic_glyphs import glyph_html
+
+# Mobile's AlertsScreen gives every alert-type group header a distinct
+# Ionicons shape (EVENT_BADGE_ICONS); web's non-player rows (no portrait to
+# carry identity) only ever had header_glyph()'s short text label. This maps
+# that same text onto the app's existing per-concept SVG icon set
+# (modules.semantic_glyphs) instead of inventing a new icon vocabulary.
+_GLYPH_TEXT_CONCEPT = {
+    "URGENT": "alerts",
+    "ROSTER": "roster",
+    "NEWS": "alerts",
+    "RECAP": "history",
+    "DECISION": "insights",
+    "DRAFT": "draft",
+    "PRODUCT": "more",
+    "INJURY ALERT": "health",
+    "POTENTIALLY SIGNIFICANT INJURY": "health",
+    "OUT": "health",
+}
 
 
 def widget_safe_key(value: object) -> str:
@@ -194,7 +213,13 @@ def alert_priority_tier(row: Mapping[str, Any]) -> str:
 
 
 def timeline_row_html(row: Mapping[str, Any]) -> str:
-    glyph = escape(str(row.get("glyph") or "NEWS")[:10])
+    glyph_raw = str(row.get("glyph") or "NEWS")[:10]
+    glyph = escape(glyph_raw)
+    glyph_icon_html = glyph_html(
+        _GLYPH_TEXT_CONCEPT.get(glyph_raw.upper(), "more"),
+        size="row",
+        extra_class="dg-alerts-glyph-icon",
+    )
     headline = escape(alerts_activity.humanize_headline(row))
     context = escape(str(row.get("context") or ""))
     freshness = escape(str(row.get("freshness") or ""))
@@ -213,6 +238,11 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
         row_classes.append("dg-alerts-row--transaction")
     elif bucket == "role":
         row_classes.append("dg-alerts-row--role")
+    else:
+        # Mirrors mobile AlertsScreen's 'off-field/drama' bucket (textSecondary)
+        # and the News page's identical mapping (general_news_ui.py) — the
+        # only bucket missing its own accent here before this fix.
+        row_classes.append("dg-alerts-row--other")
     if is_urgent:
         row_classes.extend(("dg-alerts-row--urgent", "dg-alerts-row--my-player"))
     elif is_teammate:
@@ -283,7 +313,7 @@ def timeline_row_html(row: Mapping[str, Any]) -> str:
     )
     player_name = str(row.get("player_name") or headline or "Player").strip()
     initials = "".join(part[:1] for part in player_name.split()[:2]).upper() or "?"
-    visual_html = f"<div class='dg-alerts-glyph'>{glyph}</div>"
+    visual_html = f"<div class='dg-alerts-glyph'>{glyph_icon_html}{glyph}</div>"
     identity_html = ""
     if player_id:
         # Position/team/tier come from alert_presentation.attach_player_identity_fields
