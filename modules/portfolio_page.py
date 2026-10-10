@@ -88,6 +88,45 @@ def _rank_label(summary: Mapping[str, Any]) -> str:
     return f"Roster Power {prefix}{int(power_rank)}"
 
 
+@st.cache_data(ttl=5 * 60, show_spinner=False)
+def _cached_league_summary(
+    *,
+    league_id: str,
+    lens: str,
+    sleeper_username: str,
+    players_db_path: str,
+    team_stance_value: str,
+    gm_target_player_ids: tuple[str, ...],
+    gm_untouchable_player_ids: tuple[str, ...],
+    entitlement: str,
+) -> dict[str, Any]:
+    """Cached per-league valuation summary — mirrors app.py's single-league
+    Dashboard ``cached_league_summary`` (same 5-minute TTL, ``@st.cache_data``
+    with no spinner). Without this, every Portfolio rerun re-ran the full,
+    uncached per-league fan-out (one `dashboard_engine.build_league_summary`
+    call per saved league), compounded by the `st.rerun()` after row actions
+    running the whole fan-out twice per click.
+
+    Every argument that affects the result is part of this call's signature
+    (league_id, sleeper_username, team stance, GM Targets, entitlement), so
+    `@st.cache_data`'s own argument-hash key keeps each user's and each
+    league's cache entry isolated from every other — there is no separate
+    cache key to get wrong, and no way for one user's cached valuation to
+    leak into another user's or another league's lookup.
+    """
+
+    return dashboard_engine.build_league_summary(
+        league_id=league_id,
+        lens=lens,
+        sleeper_username=sleeper_username,
+        players_db_path=players_db_path,
+        team_stance_value=team_stance_value,
+        gm_target_player_ids=gm_target_player_ids,
+        gm_untouchable_player_ids=gm_untouchable_player_ids,
+        entitlement=entitlement,
+    )
+
+
 def _build_portfolio_row(
     session_snapshot: Mapping[str, Any],
     sleeper_username: str,
@@ -129,7 +168,7 @@ def _build_portfolio_row(
         targets = gm_targets.fetch_targets_for_league(isolated_session, league_id=league_id)
         gm_target_ids = tuple(sorted({t.player_id for t in targets}))
         gm_untouchable_ids = tuple(sorted({t.player_id for t in targets if t.untouchable}))
-        summary = dashboard_engine.build_league_summary(
+        summary = _cached_league_summary(
             league_id=league_id,
             lens=DEFAULT_LENS,
             sleeper_username=sleeper_username,

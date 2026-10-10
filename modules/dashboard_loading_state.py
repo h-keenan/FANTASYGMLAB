@@ -73,6 +73,8 @@ ROUTE_LEAGUE_LOADING = "league_loading"
 ROUTE_PLAYER_NEWS = "player_news"
 ROUTE_NFL_HEADLINES_FALLBACK = "nfl_headlines_fallback"
 ROUTE_GENERIC_SURFACE = "generic_surface"
+ROUTE_DRAFT_CENTER = "draft_center"
+ROUTE_LIVE_DRAFT = "live_draft"
 
 # Skeleton "shape" a route's placeholder should roughly match. Perfect shape
 # matching isn't required -- a reasonable reserved-height block beats a bare
@@ -89,6 +91,8 @@ _ROUTE_SHAPES: dict[str, str] = {
     ROUTE_LEAGUE_LOADING: SHAPE_LIST,
     ROUTE_PLAYER_NEWS: SHAPE_LIST,
     ROUTE_NFL_HEADLINES_FALLBACK: SHAPE_LIST,
+    ROUTE_DRAFT_CENTER: SHAPE_LIST,
+    ROUTE_LIVE_DRAFT: SHAPE_LIST,
 }
 
 _SHAPE_ROW_COUNTS: dict[str, int] = {

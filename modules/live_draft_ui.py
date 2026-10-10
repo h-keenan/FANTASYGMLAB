@@ -985,20 +985,26 @@ def render_live_draft_page(
                 invalidation_reason="unchanged_draft_state" if not pick_error else "temporary_sleeper_failure",
             )
         else:
+            from modules import dashboard_loading_state as _dash_load
+
             build_started = time.perf_counter()
-            state = live_draft.build_live_draft_state(
-                draft=draft_detail,
-                picks=picks,
-                df_players=df_players,
-                roster_df=roster_df,
-                roster_profiles=roster_profiles,
-                rosters=rosters,
-                my_roster_id=my_roster_id,
-                league_settings=league_settings,
-                score_field=score_field,
-                previous_ranks=previous_ranks,
-                previous_team_ranks=previous_team_ranks,
-            )
+            with _dash_load.hydrate_placeholder(
+                _dash_load.ROUTE_LIVE_DRAFT,
+                title="Refreshing live draft rankings...",
+            ):
+                state = live_draft.build_live_draft_state(
+                    draft=draft_detail,
+                    picks=picks,
+                    df_players=df_players,
+                    roster_df=roster_df,
+                    roster_profiles=roster_profiles,
+                    rosters=rosters,
+                    my_roster_id=my_roster_id,
+                    league_settings=league_settings,
+                    score_field=score_field,
+                    previous_ranks=previous_ranks,
+                    previous_team_ranks=previous_team_ranks,
+                )
             if not pick_error:
                 st.session_state[state_key] = state
                 st.session_state[signature_key] = signature

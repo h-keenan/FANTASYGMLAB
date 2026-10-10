@@ -271,7 +271,19 @@ def compare_row_html(row: CompareRow) -> str:
 
     def cell(value: float | None, wins: bool) -> str:
         pill_class = "pqv-compare-pill pqv-compare-pill-win" if wins else "pqv-compare-pill"
-        return f"<div class='pqv-compare-cell'><span class='{pill_class}'>{_display(row, value)}</span></div>"
+        # WCAG 1.4.1: the winning side must not be distinguishable by color
+        # alone -- a visible checkmark plus a screen-reader-only "Better"
+        # label ride along with the existing green pill styling.
+        win_markup = (
+            "<span class='pqv-compare-win-badge' aria-hidden='true'>&#10003;</span>"
+            "<span class='sr-only'>Better: </span>"
+            if wins
+            else ""
+        )
+        return (
+            f"<div class='pqv-compare-cell'><span class='{pill_class}'>"
+            f"{win_markup}{_display(row, value)}</span></div>"
+        )
 
     return (
         "<div class='pqv-compare-row'>"

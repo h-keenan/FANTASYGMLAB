@@ -306,13 +306,28 @@ def render_draft_assistant(
         draft_assistant.clear_sleeper_draft_caches()
         st.session_state[refresh_key] = datetime.now().timestamp()
 
-    context = draft_assistant.build_live_draft_context(
-        league_id,
-        username=username,
-        my_roster_id=my_roster_id,
-        selected_draft_id=selected_draft_id,
-        refresh=False,
-    )
+    if refresh_clicked:
+        from modules import dashboard_loading_state as _dash_load
+
+        with _dash_load.hydrate_placeholder(
+            _dash_load.ROUTE_DRAFT_CENTER,
+            title="Refreshing the draft board...",
+        ):
+            context = draft_assistant.build_live_draft_context(
+                league_id,
+                username=username,
+                my_roster_id=my_roster_id,
+                selected_draft_id=selected_draft_id,
+                refresh=False,
+            )
+    else:
+        context = draft_assistant.build_live_draft_context(
+            league_id,
+            username=username,
+            my_roster_id=my_roster_id,
+            selected_draft_id=selected_draft_id,
+            refresh=False,
+        )
     draft_player_pool = draft_assistant.apply_draft_pool_filter(df_players, context)
     match_analysis = draft_assistant.analyze_drafted_pick_matches(
         context.get("live_picks"),

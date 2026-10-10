@@ -8451,6 +8451,7 @@ def render_home_dashboard(
             render_snapshot=lambda items: render_summary_tiles(items, compact=True),
             render_quick_actions=render_home_quick_actions,
             render_league_pulse=_render_dashboard_league_pulse,
+            commit_platform_destination=_commit_platform_destination,
             render_orientation=_render_dashboard_orientation,
             render_todays_game_plan=_render_todays_game_plan,
             render_guest_continuity=_render_guest_continuity,

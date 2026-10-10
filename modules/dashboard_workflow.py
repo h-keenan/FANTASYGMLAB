@@ -117,6 +117,7 @@ def render_dashboard_workflow(
     render_what_changed: Callable[[], None] | None = None,
     render_guest_continuity: Callable[[], None] | None = None,
     render_page_context: Callable[[], None] | None = None,
+    commit_platform_destination: Callable[..., None] | None = None,
 ) -> None:
     """Render one executive briefing from precomputed inputs.
 
@@ -271,12 +272,19 @@ def render_dashboard_workflow(
                 render_snapshot(snapshot_tiles)
             if _teaser:
                 _render_html_fragment(_teaser_html)
-                if st.button(
+                _recap_button_kwargs = {}
+                if commit_platform_destination is not None:
+                    _recap_button_kwargs["on_click"] = commit_platform_destination
+                    _recap_button_kwargs["args"] = ("league_recaps",)
+                    _recap_button_kwargs["kwargs"] = {
+                        "source": "dashboard_recap_teaser"
+                    }
+                st.button(
                     _teaser.get("cta") or "Read recap",
                     key="dashboard_league_recap_teaser",
                     use_container_width=False,
-                ):
-                    st.session_state["platform_nav_page"] = "league_recaps"
+                    **_recap_button_kwargs,
+                )
 
             ui_primitives.render_section_header(
                 "Explore",

@@ -215,6 +215,33 @@ def test_archive_orders_this_week_then_previous():
     assert archive["previous_weeks"] == [5, 3, 2]
 
 
+def test_split_archive_pill_overflow_caps_pinned_count_and_keeps_every_week():
+    """The week-picker pill row grows by one every completed week all season
+    and used to hard-clip once it ran out of room (#244). Deep into a
+    season, only the most recent weeks stay pinned as pills; the rest moves
+    to the "More weeks" overflow select -- never dropped outright."""
+
+    archive = league_recaps.archive_weeks(latest=14, available=range(1, 15))
+    pinned, overflow = league_recaps.split_archive_pill_overflow(
+        archive["previous_weeks"], pinned_count=7
+    )
+    assert pinned == [13, 12, 11, 10, 9, 8, 7]
+    assert overflow == [6, 5, 4, 3, 2, 1]
+    assert set(pinned) | set(overflow) == set(archive["previous_weeks"])
+
+
+def test_split_archive_pill_overflow_no_overflow_when_under_budget():
+    pinned, overflow = league_recaps.split_archive_pill_overflow([5, 4, 3], pinned_count=8)
+    assert pinned == [5, 4, 3]
+    assert overflow == []
+
+
+def test_split_archive_pill_overflow_clamps_negative_budget_to_zero():
+    pinned, overflow = league_recaps.split_archive_pill_overflow([5, 4, 3], pinned_count=-1)
+    assert pinned == []
+    assert overflow == [5, 4, 3]
+
+
 def test_history_deep_links_and_session_cache_do_not_duplicate():
     session: dict = {}
     first = league_recaps.get_or_build_weekly_recap(

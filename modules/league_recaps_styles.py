@@ -259,7 +259,7 @@ div[class*="st-key-league_recaps_archive_"] [data-baseweb="button-group"] button
     min-width:0!important;
     overflow:hidden;
     padding-inline:0.35rem!important;
-    text-overflow:clip;
+    text-overflow:ellipsis;
     white-space:nowrap;
 }
 div[class*="st-key-league_memory_view_"] [data-testid="stPills"] button[kind="primary"],

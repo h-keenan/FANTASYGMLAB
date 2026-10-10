@@ -61,7 +61,7 @@ div[class*="st-key-league_history_filter_"] [data-baseweb="button-group"] button
     min-width:0!important;
     overflow:hidden;
     padding-inline:0.35rem!important;
-    text-overflow:clip;
+    text-overflow:ellipsis;
     white-space:nowrap;
 }
 div[class*="st-key-league_history_season_"] [data-testid="stPills"] button[kind="primary"],

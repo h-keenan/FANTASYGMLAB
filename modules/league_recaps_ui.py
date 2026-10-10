@@ -19,6 +19,13 @@ from modules.semantic_glyphs import glyph_html
 
 MEMORY_VIEWS = ("Recaps", "History", "Storylines")
 
+# Equal-width st.pills buttons hard-clip and keep adding one per completed
+# week all season (#244) -- cap the pill row at a reasonable count and move
+# anything older into a "More weeks" select, the same overflow-affordance
+# idiom other pill pickers in this app fall back to for unbounded lists.
+MAX_RECAP_ARCHIVE_PILLS = 8
+MORE_WEEKS_PLACEHOLDER = "More weeks..."
+
 # Presentation-only grouping taxonomy for the recap board — mirrors the
 # mobile RecapScreen's storyCategory()/categoryMeta() collapse of the ten
 # backend story types into the handful of categories a reader actually
@@ -395,7 +402,15 @@ def render_league_recaps_page(
         label = f"This week · {completed}"
         labels.append(label)
         label_to_week[label] = completed
-    for week in archive["previous_weeks"]:
+    # Keep the pill row to a reasonable, constant-width count regardless of
+    # how far into the season this league is -- older weeks move into the
+    # "More weeks" overflow select below instead of adding another
+    # ever-shrinking pill (#244).
+    pinned_weeks, overflow_weeks = league_recaps.split_archive_pill_overflow(
+        archive["previous_weeks"],
+        pinned_count=MAX_RECAP_ARCHIVE_PILLS - len(labels),
+    )
+    for week in pinned_weeks:
         label = f"Week {week}"
         labels.append(label)
         label_to_week[label] = week
@@ -411,6 +426,17 @@ def render_league_recaps_page(
         key=f"league_recaps_archive_{home_league_id}",
     ) or labels[0]
     selected_week = label_to_week.get(selected_label, completed)
+    if overflow_weeks:
+        overflow_labels = [f"Week {week}" for week in overflow_weeks]
+        overflow_label_to_week = dict(zip(overflow_labels, overflow_weeks))
+        overflow_choice = st.selectbox(
+            "More weeks",
+            [MORE_WEEKS_PLACEHOLDER] + overflow_labels,
+            key=f"league_recaps_archive_overflow_{home_league_id}",
+            label_visibility="collapsed",
+        )
+        if overflow_choice != MORE_WEEKS_PLACEHOLDER:
+            selected_week = overflow_label_to_week[overflow_choice]
     recap = league_recaps.get_or_build_weekly_recap(
         st.session_state,
         league_id=home_league_id,
