@@ -18,6 +18,13 @@ div[class*="st-key-executive_workspace_shell"] {
     padding: 0;
 }
 
+/* Tablet band: protect identity from the rail's 28rem floor. */
+@media (min-width: 761px) and (max-width: 900px) {
+    div[class*="st-key-executive_workspace_shell"] {
+        grid-template-columns: minmax(12rem, 1fr) minmax(min(100%, 28rem), 1fr);
+    }
+}
+
 /* Flatten Streamlit wrappers so identity | commands share one band height.
    Do not set height:100% on grid children — that resolves against an
    indefinite parent and blocks align-self: stretch. */
@@ -77,7 +84,8 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementConta
     align-items: center;
     display: grid;
     gap: var(--space-sm) var(--space-lg);
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    /* meta/status keep a protected floor against title's auto track. */
+    grid-template-columns: minmax(0, auto) minmax(6rem, 1fr);
     min-width: 0;
 }
 
@@ -142,15 +150,14 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementConta
 }
 
 .dg-executive-shell__status {
-    align-items: center;
     color: var(--color-text-muted);
-    display: flex;
-    flex-wrap: nowrap;
+    /* block, not flex -- flex containers never ellipsis-truncate children. */
+    display: block;
     font-size: var(--font-size-caption);
-    gap: var(--space-xs);
     line-height: var(--line-height-caption);
     min-width: 0;
     overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 

@@ -1087,6 +1087,22 @@ def archive_weeks(*, latest: int, available: Sequence[int]) -> dict[str, list[in
     return {"this_week": this_week, "previous_weeks": previous}
 
 
+def split_archive_pill_overflow(
+    previous_weeks: Sequence[int], *, pinned_count: int
+) -> tuple[list[int], list[int]]:
+    """Split ``archive_weeks()["previous_weeks"]`` into (pinned, overflow).
+
+    The week-picker pill row grows by one every completed week all season
+    (#244) and hard-clips once it runs out of room. ``pinned_count`` most
+    recent weeks stay as pills; everything older is ``overflow`` for the
+    UI's "More weeks" select instead of one more ever-shrinking pill.
+    """
+
+    budget = max(0, int(pinned_count))
+    weeks = list(previous_weeks)
+    return weeks[:budget], weeks[budget:]
+
+
 def store_recap(session: MutableMapping[str, Any], recap: Mapping[str, Any]) -> Mapping[str, Any]:
     cache = session.get(SESSION_CACHE_KEY)
     if not isinstance(cache, dict):

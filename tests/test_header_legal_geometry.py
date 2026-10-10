@@ -52,7 +52,7 @@ def test_streamlit_column_gap_and_alignment_do_not_skew_commands():
 
 def test_identity_shell_owns_block_centerline_geometry():
     assert "dg-executive-shell__meta" in SHELL_HTML
-    assert "grid-template-columns: minmax(0, auto) minmax(0, 1fr)" in APPLICATION_SHELL_CSS
+    assert "grid-template-columns: minmax(0, auto) minmax(6rem, 1fr)" in APPLICATION_SHELL_CSS
     assert "grid-row: 1 / 3" not in APPLICATION_SHELL_CSS
     assert ".dg-executive-shell__meta" in APPLICATION_SHELL_CSS
     assert "height: 100%" in APPLICATION_SHELL_CSS

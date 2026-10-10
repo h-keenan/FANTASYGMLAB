@@ -45,3 +45,24 @@ def test_live_draft_prefers_trade_hub_commit_callback():
     source = (ROOT / "modules" / "live_draft_ui.py").read_text(encoding="utf-8")
     assert "open_trade_hub_for_player" in source
     assert "on_click=open_trade_hub_for_player" in source
+
+
+def test_dashboard_read_recap_button_commits_via_on_click_not_direct_mutation():
+    """The "Read recap" teaser button used to set
+    ``st.session_state["platform_nav_page"]`` directly inside the button's
+    ``if st.button(...):`` body -- too late, since ``current_page`` is
+    already resolved earlier in app.py's dispatch before this button
+    renders, so the click visibly did nothing (#244). Same fix as the
+    adjacent Explore quick actions: wire it through ``on_click=``.
+    """
+
+    source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
+    start = source.index('"dashboard_league_recap_teaser"')
+    body = source[max(0, start - 400) : start + 400]
+    assert '"on_click"] = commit_platform_destination' in body
+    assert 'st.session_state["platform_nav_page"] = "league_recaps"' not in body
+
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    call_start = app_source.index("dashboard_workflow.render_dashboard_workflow(")
+    call_body = app_source[call_start : call_start + 1200]
+    assert "commit_platform_destination=_commit_platform_destination" in call_body
