@@ -28,6 +28,7 @@ DENSE_LIST_CSS = """
 .dg-team-comparison-slot-label{color:var(--text-muted);font:var(--type-supporting-metadata);letter-spacing:.03em;text-transform:uppercase}
 .dg-team-comparison-state strong,.dg-team-comparison-activity strong{color:var(--text-primary);font:var(--type-card-title);overflow-wrap:normal;word-break:normal}
 .dg-team-comparison-tendencies>span:last-child{color:var(--text-secondary);font:var(--type-supporting-metadata);overflow-wrap:normal;word-break:normal}
+.dg-team-comparison-badges{display:flex;flex-wrap:wrap;gap:var(--space-2xs);grid-column:1/-1}
 .dg-dense-dual-rank__item strong{color:var(--text-primary);font-weight:var(--font-weight-display)}
 .dg-ranked-identity,.dg-dense-identity{align-items:center;display:flex;gap:var(--space-xs);min-width:0}
 .dg-ranked-copy,.dg-dense-identity__copy{display:grid;gap:0;min-width:0}
@@ -38,6 +39,7 @@ DENSE_LIST_CSS = """
 .dg-ranked-logo img{height:100%;object-fit:cover;width:100%}
 .dg-dense-metric,.dg-ranked-metric{align-content:start;display:grid;gap:0;justify-items:end;min-width:0}
 .dg-dense-metric__value,.dg-ranked-metric-value{color:var(--text-primary);font:var(--type-primary-metric);font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.05;max-width:none;min-width:max-content;overflow:visible;text-overflow:clip;white-space:nowrap}
+.dg-ranked-metric-value--low{color:var(--color-danger)}.dg-ranked-metric-value--mid{color:var(--color-action)}.dg-ranked-metric-value--high{color:var(--color-success)}
 .dg-dense-metric__label,.dg-ranked-metric-label{color:var(--text-muted);font:var(--type-supporting-metadata);max-width:7rem;text-align:right}
 .dg-dense-trail{display:grid;gap:var(--space-2xs);min-width:0}
 .dg-dense-status,.dg-ranked-interp{color:var(--text-secondary);display:inline-flex;flex-wrap:wrap;font:var(--font-weight-metadata) var(--font-size-caption)/1.25 var(--font-family-sans);gap:0 var(--space-2xs);min-width:0}

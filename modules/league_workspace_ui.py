@@ -6,6 +6,7 @@ import streamlit as st
 
 from modules import league_maturity
 from modules import metric_graphic_primitives as mgp
+from modules import team_badges
 from modules import team_eval as team_eval_module
 from modules import ui_primitives
 from modules import workspace_ui
@@ -120,6 +121,32 @@ def _format_rank(value, *, tied: bool = False) -> str:
     if rank <= 0:
         return "N/A"
     return f"T{rank}" if tied else f"#{rank}"
+
+
+def _percentile_from_rank(rank: int, total_teams: int) -> float | None:
+    """Best team in a group -> 100, worst -> 0 — same transform as mobile's
+    percentileFromRank (mobile/src/lib/percentile.ts), so a dense league
+    rank gets the identical percentile a raw 0-100 score would."""
+
+    if rank is None or rank <= 0 or total_teams is None or total_teams <= 1:
+        return None
+    return ((total_teams - rank) / (total_teams - 1)) * 100
+
+
+def _metric_tone_band(percentile: float | None) -> str:
+    """Red/gold/green percentile banding for a ranked-row metric value —
+    same thresholds as modules.player_quick_view._percentile_band and the
+    mobile app's percentileColor ramp (mobile/src/lib/percentile.ts), kept
+    as a small local copy here rather than importing the valuation-heavy
+    player_quick_view module into this lighter workspace module."""
+
+    if percentile is None:
+        return ""
+    if percentile < 34:
+        return "low"
+    if percentile < 67:
+        return "mid"
+    return "high"
 
 
 def compact_activity_metric(value) -> str:
@@ -837,8 +864,19 @@ def ranked_leaderboard_row_html(
     status_subtype: str = "",
     exception: str = "",
     density: str = "compact",
+    metric_tone: str = "",
+    status_badge: tuple[str, str] | None = None,
 ) -> str:
-    """Dense ranked row: lead → identity → metric → status → meta → exception."""
+    """Dense ranked row: lead → identity → metric → status → meta → exception.
+
+    metric_tone: optional "low"/"mid"/"high" percentile band (mirrors the
+    mobile app's percentileColor ramp and modules.player_quick_view's own
+    _percentile_band thresholds) to color-code the primary metric value
+    instead of always rendering it flat --text-primary.
+    status_badge: optional (label, tone) rendered as a colored pill
+    (e.g. ("Clinched", "success") / ("Eliminated", "danger")) instead of
+    folding that status into the plain-text interpretation line.
+    """
 
     from modules import dense_list_primitives
 
@@ -888,17 +926,30 @@ def ranked_leaderboard_row_html(
     # Keep legacy metric class hooks for existing selectors/tests.
     metric_html = metric_html.replace("dg-dense-metric'", "dg-dense-metric dg-ranked-metric'")
     metric_html = metric_html.replace(
-        "dg-dense-metric__value'",
-        "dg-dense-metric__value dg-ranked-metric-value'",
-    )
-    metric_html = metric_html.replace(
         "dg-dense-metric__label'",
         "dg-dense-metric__label dg-ranked-metric-label'",
     )
+    tone_key = metric_tone.strip().lower() if metric_tone in {"low", "mid", "high"} else ""
+    value_classes = "dg-dense-metric__value dg-ranked-metric-value"
+    if tone_key:
+        value_classes += f" dg-ranked-metric-value--{tone_key}"
+    metric_html = metric_html.replace(
+        "dg-dense-metric__value'",
+        f"{value_classes}'",
+    )
+    badge_html = ""
+    if status_badge:
+        badge_label, badge_tone = status_badge
+        badge_tone = badge_tone if badge_tone in {"success", "danger", "caution", "information"} else "neutral"
+        if badge_label:
+            badge_html = f"<span class='dg-ui-badge dg-ui-badge--{badge_tone}'>{escape(badge_label)}</span>"
     trail_html = (
-        f"<div class='dg-dense-trail'>{status_html}{meta_html}{exception_html}</div>"
-        if (status_html or meta_html or exception_html)
+        f"<div class='dg-dense-trail'>{badge_html}{status_html}{meta_html}{exception_html}</div>"
+        if (badge_html or status_html or meta_html or exception_html)
         else ""
+    )
+    you_badge_html = (
+        " <span class='dg-ui-badge dg-ui-badge--information'>You</span>" if is_current else ""
     )
 
     return (
@@ -908,7 +959,7 @@ def ranked_leaderboard_row_html(
         f"<div class='dg-dense-identity dg-ranked-identity'>"
         f"{logo_html}"
         f"<div class='dg-dense-identity__copy dg-ranked-copy'>"
-        f"<div class='dg-dense-identity__primary dg-ranked-team'>{escape(team_name)}</div>"
+        f"<div class='dg-dense-identity__primary dg-ranked-team'>{escape(team_name)}{you_badge_html}</div>"
         f"<div class='dg-dense-identity__secondary dg-ranked-owner'>{escape(owner_text)}</div>"
         f"</div></div>"
         f"{metric_html}"
@@ -1121,6 +1172,11 @@ def render_power_rankings_board(
         )
         roster_key = _safe_text(row.get("roster_id")).strip()
         tap_class, tap_attrs = team_tap_markup(row)
+        # Standings and Playoff Odds boards already color-code their primary
+        # metric on this same red/gold/green percentile ramp (metric_tone /
+        # _metric_tone_band below) — Power Rankings/Teams was the one board
+        # still rendering a flat --text-primary value for every rank.
+        metric_tone = _metric_tone_band(_percentile_from_rank(rank_value, len(ordered)))
         board_rows.append(
             ranked_leaderboard_row_html(
                 rank_label=_format_rank(rank_value, tied=bool(row.get(f"{rank_column}_tied"))),
@@ -1143,6 +1199,7 @@ def render_power_rankings_board(
                 first_place=bool(rank_value == 1),
                 is_current=bool(current_key and roster_key and roster_key == current_key),
                 density="compact",
+                metric_tone=metric_tone,
             )
         )
     clicked = render_team_card_tap_grid(
@@ -1171,8 +1228,15 @@ def team_comparison_row_html(
     tap_class: str = "",
     tap_attrs: str = "",
     is_current: bool = False,
+    signal_badges: list[str] | None = None,
 ) -> str:
-    """Compact league comparison row: ranks, identity, archetype, style, activity."""
+    """Compact league comparison row: ranks, identity, archetype, style, activity.
+
+    signal_badges: zero, one, or several real, data-backed team signals
+    (modules.team_badges — mirrors mobile TeamsScreen's TEAM_BADGE_VISUALS
+    row), rendered as tone-colored `.dg-ui-badge` chips instead of folding
+    into the plain-text archetype/activity strings above.
+    """
 
     from modules import dense_list_primitives
 
@@ -1211,9 +1275,17 @@ def team_comparison_row_html(
         "<span class='dg-team-comparison-slot-label'>Activity</span>"
         f"<strong>{escape(_safe_text(activity, 'Average Activity'))}</strong></div>"
     )
+    badges_html = ""
+    if signal_badges:
+        chips = "".join(
+            f"<span class='dg-ui-badge dg-ui-badge--{team_badges.badge_tone(label)}'>"
+            f"{escape(label)}</span>"
+            for label in signal_badges
+        )
+        badges_html = f"<div class='dg-team-comparison-badges'>{chips}</div>"
     return (
         f"<div class='{' '.join(classes)}'{tap_attrs}>"
-        f"{lead_html}{identity_html}{state_html}{tendencies_html}{activity_html}</div>"
+        f"{lead_html}{identity_html}{state_html}{tendencies_html}{activity_html}{badges_html}</div>"
     )
 
 
@@ -1225,6 +1297,7 @@ def render_team_comparison_board(
     open_league_team_from_tap: Callable,
     team_logo_html: Callable,
     current_roster_id: object = None,
+    league_id: str = "",
 ) -> None:
     """Primary League Overview comparison — dense rows, no spreadsheet scroll."""
 
@@ -1234,6 +1307,14 @@ def render_team_comparison_board(
     ordered = df_display.sort_values(sort_cols, ascending=True) if sort_cols else df_display
     ordered = ordered.reset_index(drop=True)
     current_key = _safe_text(current_roster_id).strip()
+    try:
+        badges_by_roster = (
+            team_badges.compute_team_signal_badges(ordered, league_id) if league_id else {}
+        )
+    except Exception:
+        # Best-effort signal layer — a scan failure here must never block the
+        # primary rank/identity comparison board from rendering.
+        badges_by_roster = {}
     board_rows = []
     for _, row in ordered.iterrows():
         owner_text = owner_handle(
@@ -1264,6 +1345,7 @@ def render_team_comparison_board(
                 tap_class=tap_class,
                 tap_attrs=tap_attrs,
                 is_current=bool(current_key and roster_key and roster_key == current_key),
+                signal_badges=badges_by_roster.get(roster_key, []),
             )
         )
     clicked = render_team_card_tap_grid(
@@ -1345,6 +1427,9 @@ def render_standings_board(
             if division_label and not group_label:
                 secondary_parts.insert(0, division_label)
             standing_rank = _safe_positive_int(row.get("standing_rank"), rank_value)
+            metric_tone = _metric_tone_band(
+                _percentile_from_rank(standing_rank, len(frame))
+            )
             roster_key = _safe_text(row.get("roster_id")).strip()
             tap_class, tap_attrs = team_tap_markup(row)
             aria_bits = [
@@ -1380,6 +1465,7 @@ def render_standings_board(
                     is_current=bool(
                         current_key and roster_key and roster_key == current_key
                     ),
+                    metric_tone=metric_tone,
                 )
             )
             if bool(row.get("on_playoff_line")):
@@ -1451,17 +1537,24 @@ def render_playoff_odds_board(
     board_chunks: list[str] = []
     for rank_value, team in enumerate(teams, start=1):
         probability = team.get("playoff_probability")
+        probability_value: float | None
         try:
-            probability_label = f"{float(probability):.0f}%"
+            probability_value = float(probability)
+            probability_label = f"{probability_value:.0f}%"
         except (TypeError, ValueError):
+            probability_value = None
             probability_label = "—"
         record_label = _safe_text(team.get("record_label"), "0-0")
         median_label = f"Proj {team.get('median_final_wins', '—')}-{team.get('median_final_losses', '—')}"
         seed_label = f"Seed #{team.get('median_seed', '—')}"
-        status = "Clinched" if team.get("clinched") else ("Eliminated" if team.get("eliminated") else "")
+        status_badge = (
+            ("Clinched", "success")
+            if team.get("clinched")
+            else ("Eliminated", "danger")
+            if team.get("eliminated")
+            else None
+        )
         interpretation_parts = [median_label, seed_label]
-        if status:
-            interpretation_parts.append(status)
         roster_key = _safe_text(team.get("roster_id")).strip()
         tap_class, tap_attrs = team_tap_markup(team)
         board_chunks.append(
@@ -1483,6 +1576,8 @@ def render_playoff_odds_board(
                 top_three=rank_value <= 3,
                 first_place=rank_value == 1,
                 is_current=bool(current_key and roster_key == current_key),
+                metric_tone=_metric_tone_band(probability_value),
+                status_badge=status_badge,
             )
         )
 

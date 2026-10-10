@@ -943,6 +943,19 @@ def render_your_draft_posture(
                 ),
                 "note": f"{_format_score(team_row.get('draft_capital'))} total capital",
                 "tone": "franchise",
+                # Reuse the same gold/silver/bronze leader mark
+                # render_team_rank_cards already gives top-3 ranks
+                # (mgp.rank_badge_html, gated to 1<=rank<=3 the same way
+                # there) so a top-3 posture reads the same way here it does
+                # elsewhere — mirrors mobile's rank-1 gold-tint on this tile.
+                "graphic": (
+                    mgp.rank_badge_html(
+                        _safe_positive_int(team_row.get("draft_capital_rank"), 0),
+                        tied=bool(team_row.get("draft_capital_rank_tied")),
+                    )
+                    if 1 <= _safe_positive_int(team_row.get("draft_capital_rank"), 0) <= 3
+                    else ""
+                ),
             },
             {
                 "label": "Future Capital Rank",
@@ -952,6 +965,14 @@ def render_your_draft_posture(
                 ),
                 "note": f"{_format_score(team_row.get('future_draft_capital'))} beyond the current rookie draft",
                 "tone": "opportunity",
+                "graphic": (
+                    mgp.rank_badge_html(
+                        _safe_positive_int(team_row.get("future_draft_capital_rank"), 0),
+                        tied=bool(team_row.get("future_draft_capital_rank_tied")),
+                    )
+                    if 1 <= _safe_positive_int(team_row.get("future_draft_capital_rank"), 0) <= 3
+                    else ""
+                ),
             },
             {
                 "label": "Current Strategy",
@@ -1910,6 +1931,42 @@ def render_draft_capital_dashboard(
         )
 
 
+def _future_pick_card_html(pick: dict, *, safe_pick_value: Callable) -> str:
+    """One future-pick asset card — mirrors mobile's DraftPickAssetRow (round
+    badge + label + projected-slot/tier meta + trailing value) instead of the
+    flat, unstyled data-grid row Streamlit's st.dataframe would otherwise
+    produce. Reuses the existing draft-review-pick-card/-grade visual
+    language (live-draft completed-pick review) rather than inventing a new
+    card style."""
+
+    season = _safe_text(pick.get("season"))
+    round_num = _safe_positive_int(pick.get("round"), 0)
+    round_label = f"R{round_num}" if round_num else "Pick"
+    label = _safe_text(pick.get("label"), "Draft pick")
+    title = f"{season} {label}".strip() if season else label
+    tier = _safe_text(pick.get("pick_tier"))
+    projected_range = _safe_text(pick.get("projected_pick_range"))
+    meta_bits = [part for part in (projected_range, tier) if part]
+    original_team = _safe_text(pick.get("original_team_name"))
+    if original_team:
+        meta_bits.append(f"Owned via {original_team}")
+    value_text = _format_score(safe_pick_value(pick))
+    return (
+        "<div class='draft-review-pick-card'>"
+        "<div class='draft-review-pick-top'>"
+        f"<div class='draft-review-grade grade-solid'>{escape(round_label)}</div>"
+        f"<div class='draft-review-player-name'>{escape(title)}</div>"
+        f"<div class='draft-review-value'>{escape(value_text)}</div>"
+        "</div>"
+        + (
+            f"<div class='draft-review-meta'>{escape(' · '.join(meta_bits))}</div>"
+            if meta_bits
+            else ""
+        )
+        + "</div>"
+    )
+
+
 def render_team_pick_expanders(
     draft_capital_summary: pd.DataFrame,
     draft_picks: list[dict],
@@ -1948,32 +2005,13 @@ def render_team_pick_expanders(
             if not picks:
                 st.caption("No tracked future picks for this roster.")
                 continue
-            st.dataframe(
-                pd.DataFrame(
-                    [
-                        {
-                            "Season": pick.get("season") or "",
-                            "Round": pick.get("round") or "",
-                            "Pick": pick.get("label", "Draft pick"),
-                            "Tier": pick.get("pick_tier") or "",
-                            "Projected Range": (
-                                pick.get("projected_pick_range") or ""
-                            ),
-                            "Projection": (
-                                f"E {round((_safe_float(pick.get('early_probability'), 0.0)) * 100):d}% | "
-                                f"M {round((_safe_float(pick.get('mid_probability'), 0.0)) * 100):d}% | "
-                                f"L {round((_safe_float(pick.get('late_probability'), 0.0)) * 100):d}%"
-                            ),
-                            "Value": safe_pick_value(pick),
-                            "Original Team": (
-                                pick.get("original_team_name") or ""
-                            ),
-                        }
-                        for pick in picks
-                    ]
-                ),
-                width="stretch",
-                hide_index=True,
+            cards_html = "".join(
+                _future_pick_card_html(pick, safe_pick_value=safe_pick_value)
+                for pick in picks
+            )
+            st.markdown(
+                f"<div class='draft-review-round-grid'>{cards_html}</div>",
+                unsafe_allow_html=True,
             )
 
 

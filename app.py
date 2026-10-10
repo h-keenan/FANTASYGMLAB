@@ -16145,6 +16145,7 @@ def render_team_comparison_board(df_display: pd.DataFrame):
         open_league_team_from_tap=_open_league_team_from_tap,
         team_logo_html=team_logo_html,
         current_roster_id=active_context.get("my_roster_id"),
+        league_id=_safe_text(active_context.get("selected_league_id")),
     )
 
 
