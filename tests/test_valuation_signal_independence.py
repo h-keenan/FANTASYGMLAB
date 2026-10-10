@@ -110,6 +110,105 @@ def test_usage_can_move_opportunity_without_changing_depth():
     assert "season_usage_rates" in high["opportunity_source_flags"]
 
 
+def test_kicker_snap_share_does_not_affect_opportunity():
+    # Kicker season/weekly snap_share is a structural data artifact (Sleeper's
+    # offensive-line snap counting never applies to K — see
+    # modules/sleeper.py's off_snp/tm_off_snp aggregation, which reports 0.0
+    # for every kicker regardless of actual role), not a real usage signal.
+    # It must never corroborate — up or down — a kicker's opportunity score.
+    no_snap = rankings.opportunity_profile(
+        "K",
+        "K2",
+        market_score=5000,
+        depth_chart_order=2,
+        years_exp=5,
+        age=28,
+        games_played=16,
+        snap_share=None,
+    )
+    zero_snap = rankings.opportunity_profile(
+        "K",
+        "K2",
+        market_score=5000,
+        depth_chart_order=2,
+        years_exp=5,
+        age=28,
+        games_played=16,
+        snap_share=0.0,
+    )
+    high_snap = rankings.opportunity_profile(
+        "K",
+        "K2",
+        market_score=5000,
+        depth_chart_order=2,
+        years_exp=5,
+        age=28,
+        games_played=16,
+        snap_share=0.9,
+    )
+    assert no_snap["opportunity_score"] == zero_snap["opportunity_score"] == high_snap["opportunity_score"]
+    assert "season_snap_share" not in zero_snap["opportunity_source_flags"]
+    assert "season_snap_share" not in high_snap["opportunity_source_flags"]
+
+
+def test_defense_snap_share_does_not_affect_opportunity():
+    # DEF is a team unit with no individual usage/snap stats at all; guard
+    # against the same class of bug if a snap_share value is ever attached.
+    zero_snap = rankings.opportunity_profile(
+        "DEF",
+        "DEF1",
+        market_score=5000,
+        depth_chart_order=1,
+        years_exp=5,
+        age=28,
+        games_played=16,
+        snap_share=0.0,
+    )
+    high_snap = rankings.opportunity_profile(
+        "DEF",
+        "DEF1",
+        market_score=5000,
+        depth_chart_order=1,
+        years_exp=5,
+        age=28,
+        games_played=16,
+        snap_share=0.95,
+    )
+    assert zero_snap["opportunity_score"] == high_snap["opportunity_score"]
+    assert "season_snap_share" not in zero_snap["opportunity_source_flags"]
+    assert "season_snap_share" not in high_snap["opportunity_source_flags"]
+
+
+def test_rb_snap_share_still_moves_opportunity_contrast():
+    # Contrast case: a position where snap_share IS a real usage signal must
+    # keep moving — low snap share should score lower than high snap share.
+    # Proves the K/DEF fix above is a position-scoped exclusion, not a
+    # blanket disabling of snap-share corroboration.
+    low_snap = rankings.opportunity_profile(
+        "RB",
+        "RB2",
+        market_score=5000,
+        depth_chart_order=2,
+        years_exp=3,
+        age=24,
+        games_played=14,
+        snap_share=0.10,
+    )
+    high_snap = rankings.opportunity_profile(
+        "RB",
+        "RB2",
+        market_score=5000,
+        depth_chart_order=2,
+        years_exp=3,
+        age=24,
+        games_played=14,
+        snap_share=0.85,
+    )
+    assert high_snap["opportunity_score"] > low_snap["opportunity_score"]
+    assert "season_snap_share" in high_snap["opportunity_source_flags"]
+    assert "season_snap_share" in low_snap["opportunity_source_flags"]
+
+
 def test_same_market_workload_divergence_is_material_and_bounded():
     bell = _score_row(
         player_id="a",
