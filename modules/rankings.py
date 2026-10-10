@@ -76,6 +76,18 @@ PRODUCTION_SCORE_CEILING = 10000.0
 PRODUCTION_NEUTRAL_ANCHOR = 2200.0
 OPPORTUNITY_NEUTRAL_ANCHOR = 2800.0
 
+# Positions with no meaningful "usage"/workload signal in this data feed.
+# K's season/weekly snap_share is a structural artifact (offensive-line snap
+# counting; kickers register 0.0 every week regardless of role — see
+# modules/sleeper.py's off_snp/tm_off_snp aggregation), not a real workload
+# read, and DEF is a team unit with no individual usage stats at all.
+# weekly_usage_rate()/_usage_quality_from_rates() already return None for
+# these positions for the targets/carries/attempts signal; this set gates
+# the separate snap_share corroboration path in opportunity_profile() the
+# same way, so a structurally-zero snap_share never reads as "low usage"
+# for a kicker or defense.
+NO_USAGE_SIGNAL_POSITIONS = {"K", "DEF"}
+
 # Capped weekly-recency authority applied inside opportunity (not a new weight).
 RECENCY_MIN_SAMPLE = 3
 RECENCY_WINDOW = 4
@@ -1892,8 +1904,11 @@ def opportunity_profile(
         _append_source_flag(source_flags, "usage_unavailable")
 
     # Preserve/consume season snap_share already aggregated from Sleeper weeks.
-    # Do not invent shares; do not null a reliable attached field.
-    snap_val = normalize_snap_share(snap_share)
+    # Do not invent shares; do not null a reliable attached field. Excluded for
+    # K/DEF: their snap_share is not a real usage signal (see
+    # NO_USAGE_SIGNAL_POSITIONS) and must never corroborate opportunity up or
+    # down for those positions.
+    snap_val = None if position in NO_USAGE_SIGNAL_POSITIONS else normalize_snap_share(snap_share)
     if snap_val is not None and (usage_conf > 0 or snap_val > 0.0):
         # Require a season sample (games_played) before letting zero/low snaps
         # pull opportunity down — avoids punishing players with no GP evidence.
