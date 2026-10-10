@@ -140,6 +140,22 @@ LEAGUE_RECAPS_CSS = """
     font-weight:var(--font-weight-title);
     margin:0;
 }
+.dg-recap-identity{
+    align-items:center;
+    display:flex;
+    flex-wrap:wrap;
+    gap:var(--space-xs);
+}
+.dg-recap-identity .dg-recap-team-logo{
+    flex:0 0 1.375rem;
+    height:1.375rem;
+    width:1.375rem;
+}
+.dg-recap-identity .dg-recap-team-logo img{
+    height:100%;
+    object-fit:cover;
+    width:100%;
+}
 .dg-recap-summary,.dg-recap-lens,.dg-recap-empty,.dg-recap-teaser-note{
     color:var(--color-text-secondary);
     font-size:var(--font-size-body);

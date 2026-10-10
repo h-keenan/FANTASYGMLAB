@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import functools
+from html import escape
 from typing import Any, Mapping
 
 import streamlit as st
@@ -37,12 +38,44 @@ from modules import (
     auth_supabase,
     dashboard_engine,
     gm_targets,
+    metric_graphic_primitives as mgp,
     premium,
     saved_leagues,
     team_stance,
 )
-from modules.html_rendering import render_html_fragment
-from modules.ui_primitives import content_card_html, empty_state_panel_html, status_badge_html
+from modules.daily_gm_briefing import CATEGORY_LABELS
+from modules.html_rendering import inject_global_styles, render_html_fragment
+from modules.semantic_glyphs import glyph_html
+from modules.ui_primitives import empty_state_panel_html, status_badge_html
+
+# Mobile's Portfolio/Dashboard screens color- and icon-code every "top item"
+# by its DashboardItemCategory (lib/dashboardItemPresentation.ts
+# categoryMeta) — this is that same mapping, onto the app's existing badge
+# variants/glyph concepts (no new visual language). Web's Portfolio page
+# previously dropped `category` on the floor and rendered every league's
+# headline/reason as identical plain text.
+_CATEGORY_BADGE_VARIANT = {
+    "top_priority": "danger",
+    "watch": "caution",
+    "waiver_opportunity": "opportunity",
+    "league_movement": "information",
+}
+_CATEGORY_GLYPH_CONCEPT = {
+    "top_priority": "alerts",
+    "watch": "health",
+    "waiver_opportunity": "waiver",
+    "league_movement": "rankings",
+}
+
+# Route-owned CSS (never part of APP_CSS's byte budget — same convention as
+# modules/league_recaps_styles.py etc.): just enough layout to put the #1/#2/#3
+# rank mark beside the team title and the category badge beside its headline,
+# both already-existing primitives (mgp.rank_badge_html, status_badge_html).
+PORTFOLIO_CSS = """
+.dg-portfolio-card-top{align-items:flex-start;display:flex;gap:var(--space-sm);justify-content:space-between}
+.dg-portfolio-badges{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-2xs);margin-top:var(--space-2xs)}
+.dg-portfolio-item{align-items:center;display:flex;gap:var(--space-2xs);margin-top:var(--space-2xs)}
+"""
 
 PAGE_KEY = "portfolio"
 NAV_LABEL = "Portfolio"
@@ -210,6 +243,7 @@ def render_portfolio_page() -> dict[str, Any]:
     see module docstring for how the caller should act on it."""
 
     actions: dict[str, Any] = {"open_league": None}
+    inject_global_styles(PORTFOLIO_CSS)
 
     entitlement = premium.get_user_entitlement(session_state=st.session_state)
     if entitlement != premium.PREMIUM:
@@ -323,26 +357,70 @@ def render_portfolio_page() -> dict[str, Any]:
     for entry in leagues:
         summary = entry["summary"]
         top_item = summary.get("top_item") or {}
+        category = _safe_text(top_item.get("category"))
         headline = _safe_text(top_item.get("headline"), "Open this league to see your Next Move.")
         reason = _safe_text(top_item.get("reason"))
         team_name = _safe_text(summary.get("team_name"), "Unclaimed team")
-        metadata_bits = [
-            bit
-            for bit in (
-                _record_label(summary),
-                _rank_label(summary),
-                summary.get("health_flag") if summary.get("health_flag") not in (None, "Stable") else "",
-            )
-            if bit
-        ]
-        render_html_fragment(
-            content_card_html(
-                reason or headline,
-                title=f"{team_name} — {entry['league_name']}",
-                metadata=" · ".join(metadata_bits),
-                footer=headline if reason else "",
-            )
+        title_text = f"{team_name} — {entry['league_name']}"
+
+        power_rank_raw = summary.get("power_rank")
+        try:
+            power_rank = int(power_rank_raw) if power_rank_raw is not None else 0
+        except (TypeError, ValueError):
+            power_rank = 0
+        # Top-3 gets the same gold/silver/bronze leader mark every other
+        # top-3 rank surface in the app already uses (mgp.rank_badge_html,
+        # mirroring mobile's champion-gold tile on the #1 league) instead of
+        # reading identically to every other rank as plain "#N" text.
+        rank_badge = (
+            mgp.rank_badge_html(power_rank, tied=bool(summary.get("power_rank_tied")))
+            if 1 <= power_rank <= 3
+            else ""
         )
+        rank_text = "" if rank_badge else _rank_label(summary)
+
+        health_flag = summary.get("health_flag")
+        # Was plain comma-joined metadata text; now the same caution badge
+        # already used above for the "couldn't load N leagues" note, so a
+        # real league health problem reads with real visual urgency.
+        health_badge = (
+            status_badge_html(health_flag, variant="caution")
+            if health_flag not in (None, "Stable") and _safe_text(health_flag)
+            else ""
+        )
+
+        # Mirrors mobile's InsightRow: the top Next Move item gets an
+        # icon + color-coded category badge (categoryMeta), not bare text —
+        # `category` was already computed server-side and simply dropped here.
+        category_badge = ""
+        if category:
+            concept = _CATEGORY_GLYPH_CONCEPT.get(category, "insights")
+            variant = _CATEGORY_BADGE_VARIANT.get(category, "neutral")
+            label = CATEGORY_LABELS.get(category, "Next Move")
+            category_badge = glyph_html(concept, size="row") + status_badge_html(label, variant=variant)
+
+        metadata_text = " · ".join(bit for bit in (_record_label(summary), rank_text) if bit)
+        body_text = reason or headline
+        footer_text = headline if reason else ""
+        footer_html = (
+            f"<div class='dg-portfolio-item'>{category_badge}<span>{escape(footer_text)}</span></div>"
+            if category_badge and footer_text
+            else (f"<div class='dg-ui-card-footer'>{escape(footer_text)}</div>" if footer_text else "")
+        )
+
+        card_html = (
+            "<article class='dg-ui-card dg-ui-card--default'>"
+            "<div class='dg-portfolio-card-top'>"
+            f"<h3 class='dg-ui-card-title'>{escape(title_text)}</h3>"
+            + (f"<div class='dg-portfolio-badges'>{rank_badge}</div>" if rank_badge else "")
+            + "</div>"
+            + (f"<div class='dg-ui-card-metadata'>{escape(metadata_text)}</div>" if metadata_text else "")
+            + (f"<div class='dg-portfolio-badges'>{health_badge}</div>" if health_badge else "")
+            + (f"<div class='dg-ui-card-body'>{escape(body_text)}</div>" if body_text else "")
+            + footer_html
+            + "</article>"
+        )
+        render_html_fragment(card_html)
         if st.button(
             f"Open {entry['league_name']} Dashboard",
             key=f"portfolio_open_{entry['league_id']}",
