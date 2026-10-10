@@ -2235,6 +2235,7 @@ def _team_initials(name: str) -> str:
 
 PAGE_GLYPHS = {
     "dashboard": "GM",
+    "gm_plan": "GP",
     "my_team": "TM",
     "matchup": "MU",
     "players": "PL",
@@ -18601,6 +18602,53 @@ def main():
             my_roster_player_ids=stance_my_ids,
             df_players=df_players,
         )
+
+    # GM PLAN — season-arc roadmap, a fuller companion to Dashboard's
+    # one-off "Next Move" tile. Pure exposure of modules.gm_plan (already
+    # live on mobile); no new valuation math here (see modules.gm_plan_ui).
+    if current_page == "gm_plan":
+        render_page_shell(
+            page_key="gm_plan",
+            title="GM Plan",
+            subtitle="A season-arc roadmap: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation.",
+            meta_items=[
+                (selected_league_name or "League", "success"),
+            ],
+        )
+        if startup_mode and selected_league_id:
+            workspace_notices.render_startup_blocked_notice(
+                "GM Plan unlocks after the startup draft completes."
+            )
+        elif (
+            st.session_state.get("active_platform") == "espn"
+            and st.session_state.get("espn_limited_mode")
+            and not selected_league_id
+        ):
+            st.markdown(
+                "<div class='app-degraded-state'>GM Plan needs a fully mapped Sleeper league. ESPN imports currently show mapping review and limited status only.</div>",
+                unsafe_allow_html=True,
+            )
+        elif not username or not selected_league_id:
+            render_onboarding_handoff(
+                username=username,
+                selected_league_id=selected_league_id,
+                note="Import your Sleeper league to see your GM Plan.",
+            )
+        elif my_roster_id is None:
+            workspace_notices.render_roster_mismatch_notice()
+        else:
+            from modules import gm_plan_ui
+
+            gm_plan_ui.render_gm_plan_workspace(
+                session=st.session_state,
+                league_id=_safe_text(selected_league_id),
+                my_roster_id=my_roster_id,
+                df_players=df_players,
+                score_field=score_field,
+                league_value_settings=league_value_settings,
+                team_strategy=active_team_strategy,
+                players_db_path=DB_PATH,
+            )
 
     # ALL PLAYERS
     if current_page == "players":

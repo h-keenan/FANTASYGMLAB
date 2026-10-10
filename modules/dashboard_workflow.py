@@ -297,6 +297,7 @@ def render_dashboard_workflow(
                     ("My Team", "my_team"),
                     ("Trade Hub", "trade_hub"),
                     ("Draft Center", "draft_summary"),
+                    ("GM Plan", "gm_plan"),
                 ]
             )
             _log_dashboard_milestone("dashboard_deep_analysis_complete")

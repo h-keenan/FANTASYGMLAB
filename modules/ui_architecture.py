@@ -38,6 +38,14 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         category="CORE",
         beta_visible=True,
     ),
+    PageDefinition(
+        "gm_plan",
+        "GM Plan",
+        "HOME",
+        "Season-arc roadmap: where you stand, your best trade paths, and roster construction, framed by your declared Team Situation.",
+        category="CORE",
+        beta_visible=True,
+    ),
     PageDefinition("my_team", "My Team", "ROSTER", "Hands-on roster management surface.", category="CORE", beta_visible=True),
     PageDefinition(
         "matchup",
