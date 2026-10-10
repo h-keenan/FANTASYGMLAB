@@ -139,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
+      (event, nextSession) => {
         const nextUserId = nextSession?.user?.id ?? null;
         void (async () => {
           if (!isMounted) return;
@@ -150,7 +150,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (nextSession) {
             void identifyRevenueCatUser(nextSession.user.id);
             void syncPushToken();
-            void syncDevicePreferences();
+            // Only re-pull device preferences (density/theme/last-league)
+            // on a session actually being established (a real sign-in, or
+            // this listener's own initial emission) — never on a plain
+            // TOKEN_REFRESHED, which Supabase fires routinely whenever the
+            // app comes back to the foreground with a near-expiry token,
+            // completely unrelated to the user changing anything. Syncing
+            // there re-fetched the server's copy and overwrote whatever
+            // was set locally; if that local change's own write to the
+            // server hadn't landed yet (e.g. the user backgrounded the
+            // app right after flipping Guided/Compact in Settings — a
+            // routine mobile interaction, not an edge case), the next
+            // foreground silently reverted the toggle back to its old
+            // value, which is exactly what made it look like switching
+            // modes "didn't do anything".
+            if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+              void syncDevicePreferences();
+            }
           }
         })();
       },
