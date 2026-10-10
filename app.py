@@ -5371,12 +5371,22 @@ def render_player_detail_content(
         render_section_header("News", kicker="Latest Context", note="Recent player-specific headlines and Sleeper-style update context when available.")
         news_pool = st.session_state.get("news", [])
         if not news_pool:
+            # Same non-blocking contract the News/Alerts surfaces use
+            # (modules.news.schedule_news_cache_refresh docstring): read
+            # whatever is already on disk and let a background thread catch
+            # a stale cache up, rather than blocking this render on a
+            # synchronous live RSS fetch every time a visitor opens a Player
+            # Detail page with an empty session news pool.
             try:
-                news_pool = fetch_news() or []
+                news_pool = load_cached_news_pool() or []
             except Exception:
                 news_pool = []
             if news_pool:
                 st.session_state["news"] = news_pool
+            try:
+                schedule_news_cache_refresh()
+            except Exception:
+                pass
         player_news = filter_news_for_players(news_pool, [player_display_name(row)], {_safe_text(row.get("team"))}) if news_pool else []
         player_news = curate_player_news(player_news, max_items=3) if player_news else []
         if not player_news:
