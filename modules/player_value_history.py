@@ -1,0 +1,266 @@
+"""Rolling one-step valuation history for "what changed and why" exports.
+
+Captures each player's composite score (``dynasty_score``/``score``) plus its
+component sub-scores (``market_score``, ``age_curve_score``, ``role_score``,
+``scarcity_score``, ``opportunity_score``, ``production_score``) every time
+the source players.db refreshes, and diffs the new snapshot against the prior
+one to report, per player, how much the overall score moved and which
+component moved the most.
+
+This is modeled on ``public_player_snapshot.py``'s fingerprint-gated
+single-slot comparison pattern (reusing
+``rankings.public_player_source_fingerprint`` and
+``public_player_snapshot.source_fingerprint_digest`` directly rather than
+reinventing fingerprinting), but it is deliberately a SEPARATE side-store.
+``public_player_snapshot.py``'s contract explicitly forbids persisting
+valuation/score columns (``FORBIDDEN_SNAPSHOT_COLUMNS`` includes
+``market_score``, ``age_curve_score``, ``role_score``, ``dynasty_score``,
+``score``, ...) because that snapshot exists only for deterministic
+public-player *identity* hydration, not valuation. Valuation history is a
+different concern for a different consumer (service-to-service exports —
+see ``services/fantasy_content.py``), so it gets its own file next to
+players.db instead of weakening that contract.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping
+
+import pandas as pd
+
+from modules import public_player_snapshot, rankings
+
+
+VALUE_HISTORY_SCHEMA_VERSION = 1
+
+# Same composite weights rankings.compose_composite_score() uses, referenced
+# by value rather than hard-coded a second time so a weight tuning there is
+# automatically reflected in "why did this change" here.
+_COMPONENT_WEIGHTS: dict[str, float] = {
+    "market_score": rankings.COMPOSITE_WEIGHT_MARKET,
+    "age_curve_score": rankings.COMPOSITE_WEIGHT_AGE,
+    "production_score": rankings.COMPOSITE_WEIGHT_PRODUCTION,
+    "scarcity_score": rankings.COMPOSITE_WEIGHT_SCARCITY,
+    "role_score": rankings.COMPOSITE_WEIGHT_ROLE,
+    "opportunity_score": rankings.COMPOSITE_WEIGHT_OPPORTUNITY,
+}
+
+RISK_DRIVER = "risk"
+
+_DRIVER_LABELS: dict[str, str] = {
+    "market_score": "Market value",
+    "age_curve_score": "Age-curve adjustment",
+    "production_score": "On-field production",
+    "scarcity_score": "Positional scarcity",
+    "role_score": "Depth-chart role",
+    "opportunity_score": "Opportunity/role outlook",
+    RISK_DRIVER: "Injury or availability risk",
+}
+
+_SCORE_COLUMN_CANDIDATES = ("dynasty_score", "score")
+
+
+def history_path(db_path: str | Path) -> Path:
+    stem = Path(db_path).with_suffix("")
+    return Path(f"{stem}.value-history.json")
+
+
+def _score_column(frame: pd.DataFrame) -> str:
+    for column in _SCORE_COLUMN_CANDIDATES:
+        if column in frame.columns:
+            return column
+    return "score"
+
+
+def capture_snapshot(frame: pd.DataFrame) -> dict[str, dict[str, float]]:
+    """``{player_id: {"score": ..., <component columns>: ...}}`` from a loaded frame."""
+
+    if frame is None or frame.empty or "player_id" not in frame.columns:
+        return {}
+    score_column = _score_column(frame)
+    component_columns = [c for c in _COMPONENT_WEIGHTS if c in frame.columns]
+    columns = [score_column, *component_columns] if score_column in frame.columns else component_columns
+    if not columns:
+        return {}
+    work = frame.loc[:, ["player_id", *dict.fromkeys(columns)]].copy()
+    work["player_id"] = work["player_id"].fillna("").astype(str)
+    work = work[work["player_id"].ne("")]
+    snapshot: dict[str, dict[str, float]] = {}
+    for record in work.to_dict("records"):
+        player_id = record.pop("player_id")
+        clean: dict[str, float] = {}
+        for key, value in record.items():
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                numeric = 0.0
+            clean["score" if key == score_column else key] = numeric
+        snapshot[player_id] = clean
+    return snapshot
+
+
+def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f"{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            json.dump(payload, handle, sort_keys=True, separators=(",", ":"))
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
+
+
+def _load_state(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if int(payload.get("schema_version") or 0) != VALUE_HISTORY_SCHEMA_VERSION:
+            return None
+        if not isinstance(payload.get("snapshot"), dict) or not isinstance(payload.get("changes"), list):
+            return None
+        return payload
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _driver_for_player(
+    previous: Mapping[str, float], current: Mapping[str, float]
+) -> tuple[str, float]:
+    """Largest-magnitude weighted component contribution.
+
+    ``risk`` absorbs the remainder (injury/availability-multiplier swings
+    plus rounding) whenever no tracked additive sub-score moved enough to
+    explain the overall delta on its own.
+    """
+
+    best_key = RISK_DRIVER
+    best_contribution = 0.0
+    tracked_total = 0.0
+    for column, weight in _COMPONENT_WEIGHTS.items():
+        prev_value = float(previous.get(column, 0.0))
+        curr_value = float(current.get(column, 0.0))
+        contribution = (curr_value - prev_value) * weight
+        tracked_total += contribution
+        if abs(contribution) > abs(best_contribution):
+            best_contribution = contribution
+            best_key = column
+    score_delta = float(current.get("score", 0.0)) - float(previous.get("score", 0.0))
+    residual = score_delta - tracked_total
+    if abs(residual) > abs(best_contribution):
+        best_contribution = residual
+        best_key = RISK_DRIVER
+    return best_key, best_contribution
+
+
+def diff_snapshots(
+    previous: Mapping[str, Mapping[str, float]],
+    current: Mapping[str, Mapping[str, float]],
+) -> list[dict[str, Any]]:
+    """Per-player overall-score delta plus a structured "why" since ``previous``.
+
+    Players absent from ``previous`` (new to the pool) and players with no
+    score movement are omitted — there is nothing to explain yet. Sorted by
+    the largest absolute delta first, then ``player_id`` for determinism.
+    """
+
+    changes: list[dict[str, Any]] = []
+    for player_id, current_components in current.items():
+        previous_components = previous.get(player_id)
+        if previous_components is None:
+            continue
+        previous_score = float(previous_components.get("score", 0.0))
+        current_score = float(current_components.get("score", 0.0))
+        delta = current_score - previous_score
+        if delta == 0:
+            continue
+        driver_key, contribution = _driver_for_player(previous_components, current_components)
+        direction = "increased" if contribution >= 0 else "decreased"
+        driver_label = _DRIVER_LABELS.get(driver_key, "Valuation inputs")
+        rounded_delta = int(round(delta))
+        reason = (
+            f"{driver_label} {direction}, moving the overall score "
+            f"{'up' if rounded_delta > 0 else 'down'} {abs(rounded_delta)} point"
+            f"{'s' if abs(rounded_delta) != 1 else ''} since the last refresh."
+        )
+        changes.append(
+            {
+                "player_id": player_id,
+                "previous_score": int(round(previous_score)),
+                "current_score": int(round(current_score)),
+                "delta": rounded_delta,
+                "driver_factor": driver_key,
+                "driver_label": driver_label,
+                "reason": reason,
+            }
+        )
+    changes.sort(key=lambda row: (-abs(row["delta"]), row["player_id"]))
+    return changes
+
+
+def value_changes_since_last_refresh(
+    db_path: str | Path,
+    frame: pd.DataFrame,
+    *,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    """Overall-score deltas plus a structured reason, computed once per refresh.
+
+    Gated on the same public-source fingerprint the rest of the public
+    hydration pipeline uses (``rankings.public_player_source_fingerprint``):
+    repeated calls between refreshes return the same cached diff instead of
+    comparing a snapshot against itself (which would silently erase the
+    reportable change after the first post-refresh call). The very first call
+    for a given ``db_path`` has nothing to diff against and returns ``[]``
+    while it captures the initial baseline.
+
+    Fail-neutral: returns ``[]`` on any unexpected shape or I/O failure,
+    never raises — this backs a read-only external export and must not take
+    the feed down.
+    """
+
+    try:
+        path = history_path(db_path)
+        current_snapshot = capture_snapshot(frame)
+        if not current_snapshot:
+            return []
+        fingerprint_digest = public_player_snapshot.source_fingerprint_digest(
+            rankings.public_player_source_fingerprint(str(db_path))
+        )
+        state = _load_state(path)
+        if state is not None and state.get("fingerprint") == fingerprint_digest:
+            cached_changes = state.get("changes")
+            return cached_changes[: max(0, int(limit))] if isinstance(cached_changes, list) else []
+
+        previous_snapshot = state.get("snapshot") if state else {}
+        changes = diff_snapshots(previous_snapshot or {}, current_snapshot)
+        _atomic_write_json(
+            path,
+            {
+                "schema_version": VALUE_HISTORY_SCHEMA_VERSION,
+                "fingerprint": fingerprint_digest,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "snapshot": current_snapshot,
+                "changes": changes,
+            },
+        )
+        return changes[: max(0, int(limit))]
+    except Exception:
+        return []
