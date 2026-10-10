@@ -437,6 +437,143 @@ class TestShallowPositionRooms(unittest.TestCase):
         self.assertTrue(rooms["K"]["true_need"])
         self.assertTrue(rooms["DEF"]["true_need"])
 
+    def test_taxi_stashed_rookie_does_not_mask_a_real_short_term_rb_need(self):
+        # One real starter plus one elite rookie RB parked on taxi squad.
+        # Sleeper taxi squad players are never legal weekly-lineup fill-ins
+        # (an explicit roster move is required to activate them), but a
+        # strong rookie grade/value easily clears _is_playable_cover's
+        # threshold and the player's NFL `status` often still reads
+        # "Active" (real 53-man roster, just not promoted off taxi). Passing
+        # taxi_player_ids must stop that player from being credited as
+        # weekly RB coverage.
+        roster = pd.DataFrame(
+            [
+                player("starter", "RB", age=26, years_exp=4, value=70, tier="Star"),
+                player(
+                    "taxi-rookie",
+                    "RB",
+                    age=21,
+                    years_exp=0,
+                    value=68,
+                    tier="Star",
+                    role="Rookie",
+                ),
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = [True, False]
+
+        needs, rooms = true_roster_needs(
+            roster,
+            lineup,
+            {"rb_count": 2},
+            ["RB"],
+            taxi_player_ids=["taxi-rookie"],
+        )
+
+        self.assertIn("RB", needs)
+        self.assertTrue(rooms["RB"]["true_need"])
+        self.assertTrue(rooms["RB"]["short_term_need"])
+        self.assertEqual(rooms["RB"]["active_coverage_count"], 1)
+        self.assertEqual(rooms["RB"]["playable_backups"], [])
+        self.assertEqual(rooms["RB"]["taxi_stashed_assets"], ["taxi-rookie"])
+        # Still credited toward future/developmental tracking -- a taxi
+        # stash is a real prospect, just not current-week-startable.
+        self.assertIn("taxi-rookie", rooms["RB"]["developmental_assets"])
+
+    def test_taxi_player_ids_omitted_keeps_prior_behavior(self):
+        # Backward compatibility: callers that don't pass taxi membership
+        # (nothing in the codebase currently plumbs real Sleeper taxi data
+        # into this call path) must see byte-identical behavior to before
+        # this parameter existed.
+        roster = pd.DataFrame(
+            [
+                player("starter", "RB", age=26, years_exp=4, value=70, tier="Star"),
+                player(
+                    "taxi-rookie",
+                    "RB",
+                    age=21,
+                    years_exp=0,
+                    value=68,
+                    tier="Star",
+                    role="Rookie",
+                ),
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = [True, False]
+
+        needs, rooms = true_roster_needs(roster, lineup, {"rb_count": 2}, [])
+
+        self.assertNotIn("RB", needs)
+        self.assertFalse(rooms["RB"]["true_need"])
+
+    def test_taxi_stash_with_real_playable_backup_still_covered(self):
+        # Taxi exclusion only removes the taxi player's own contribution --
+        # a team with a genuine playable backup AND a taxi stash is still
+        # correctly read as covered.
+        roster = pd.DataFrame(
+            [
+                player("starter", "RB", age=26, years_exp=4, value=70, tier="Star"),
+                player("real-backup", "RB", age=27, years_exp=5, value=40, opportunity="Strong Opportunity"),
+                player(
+                    "taxi-rookie",
+                    "RB",
+                    age=21,
+                    years_exp=0,
+                    value=68,
+                    tier="Star",
+                    role="Rookie",
+                ),
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = [True, False, False]
+
+        needs, rooms = true_roster_needs(
+            roster,
+            lineup,
+            {"rb_count": 2},
+            [],
+            taxi_player_ids=["taxi-rookie"],
+        )
+
+        self.assertNotIn("RB", needs)
+        self.assertFalse(rooms["RB"]["true_need"])
+        self.assertEqual(rooms["RB"]["active_coverage_count"], 2)
+        self.assertEqual(rooms["RB"]["taxi_stashed_assets"], ["taxi-rookie"])
+        self.assertNotIn("taxi-rookie", rooms["RB"]["active_starters"])
+        self.assertNotIn("taxi-rookie", rooms["RB"]["playable_backups"])
+
+    def test_assess_team_needs_threads_taxi_player_ids(self):
+        roster = pd.DataFrame(
+            [
+                player("starter", "RB", age=26, years_exp=4, value=70, tier="Star"),
+                player(
+                    "taxi-rookie",
+                    "RB",
+                    age=21,
+                    years_exp=0,
+                    value=68,
+                    tier="Star",
+                    role="Rookie",
+                ),
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = [True, False]
+
+        assessment = assess_team_needs(
+            roster,
+            lineup,
+            {"rb_count": 2},
+            taxi_player_ids=["taxi-rookie"],
+        )
+
+        self.assertIn("RB", assessment.true_needs)
+        rb_assessment = assessment.for_position("RB")
+        self.assertEqual(rb_assessment.classification, "short_term_need")
+
 
 if __name__ == "__main__":
     unittest.main()
