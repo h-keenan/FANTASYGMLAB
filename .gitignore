@@ -75,6 +75,7 @@ feedback_reports.jsonl
 # Generated player-cache sidecars (derived from data/players.db)
 data/*.public-player-snapshot.json
 data/*.public-player-snapshot.pkl
+data/*.value-history.json
 
 # Runtime-fetched NFL schedule cache (modules.nfl_schedule) — refetched
 # periodically from nflverse, never a committed fixture.

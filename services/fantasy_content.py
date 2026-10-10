@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException
-from modules import rankings, player_eligibility, player_quick_view, sleeper
+from modules import player_value_history, rankings, player_eligibility, player_quick_view, sleeper
 from modules.public_roster_percentages import roster_percentages
 
 
@@ -104,11 +104,49 @@ def build_feed(db_path, news_loader):
         news = []
     # Explicit allowlist: no account, roster, league, billing, or session data is exported.
     news = [{k: item.get(k) for k in ("title", "link", "source", "summary", "published_ts", "event_type", "speculative")} for item in news[:20]]
+
+    # Overall-score deltas + a structured "why" since the last players.db
+    # refresh (see modules.player_value_history). Gated on the same source
+    # fingerprint the public hydration pipeline already uses, so repeated
+    # feed reads between refreshes return the same cached diff.
+    try:
+        raw_changes = player_value_history.value_changes_since_last_refresh(db_path, frame, limit=40)
+    except Exception:
+        raw_changes = []
+    value_changes = []
+    for change in raw_changes:
+        player = by_id.get(str(change.get("player_id")))
+        if not player:
+            continue
+        value_changes.append({**change, "name": player["name"], "team": player["team"],
+                              "position": player["position"], "overall_rating": player["overall_rating"]})
+
+    # Sleeper global add-velocity over the trailing week (168h), distinct from
+    # the 24h "ideas" list above — raw counts for any trending player, not a
+    # curated/roster%-filtered top-8. Reuses sleeper.trending_add_rank_map's
+    # existing cached call (see modules/sleeper.py's TRENDING_ENDPOINT_TTL_SECONDS),
+    # so this never adds a second uncached hot path to Sleeper.
+    try:
+        week_trends = sleeper.trending_add_rank_map(lookback_hours=24 * 7, limit=100)
+    except Exception:
+        week_trends = {}
+    trending_adds_week = []
+    for pid, trend in sorted(week_trends.items(), key=lambda pair: pair[1].get("rank", 999)):
+        player = by_id.get(str(pid))
+        count = trend.get("count")
+        if not player or not isinstance(count, int) or count <= 0:
+            continue
+        trending_adds_week.append({"player_id": str(pid), "name": player["name"], "team": player["team"],
+                                   "position": player["position"], "add_count": count,
+                                   "rank": trend.get("rank"), "lookback_hours": 24 * 7})
+
     return {"schema_version": 1, "generated_at": now,
             "rankings": {"schema_version": 1, "source_id": "FantasyGM Lab API", "format_id": "base-dynasty",
                          "model_version": str(rankings.VALUATION_AUTHORITY_CONTRACT_VERSION),
                          "source_at": source_at, "generated_at": now, "players": players},
             "waiver_watch": ideas[:8], "news": news,
+            "value_changes": value_changes,
+            "trending_adds_week": trending_adds_week,
             "roster_percentage_status": "available" if any(i["rostered"] for i in ideas) else "unavailable", "audience": "general-public"}
 
 
