@@ -2237,6 +2237,22 @@ def _team_initials(name: str) -> str:
     return "".join(part[0] for part in parts[:2]).upper() or "GM"
 
 
+# Trade Hub / Trade Analyzer / Waivers share one tabbed page (consolidation
+# requested by coridian_, mirroring mobile/src/screens/TradesScreen.tsx). The
+# three PLATFORM_DESTINATIONS keys stay independent so every existing nav call
+# site keeps routing correctly; TRADES_TAB_RADIO_KEY is only which of the three
+# tabs is currently showing. See the routing-resolution comment above
+# `current_page_definition = destination_lookup.get(...)` for why this is a
+# session-state-backed st.radio rather than st.tabs().
+TRADES_TAB_ROUTE_ORDER: tuple = ("trade_hub", "trade_analyzer", "waivers")
+TRADES_TAB_LABELS: dict = {
+    "trade_hub": "Trade Hub",
+    "trade_analyzer": "Trade Analyzer",
+    "waivers": "Waivers",
+}
+TRADES_TAB_RADIO_KEY = "trades_hub_active_tab"
+
+
 PAGE_GLYPHS = {
     "dashboard": "GM",
     "gm_plan": "GP",
@@ -17462,6 +17478,50 @@ def main():
         if current_page not in destination_lookup and destination_definitions:
             current_page = destination_definitions[0].key
             st.session_state["platform_nav_page"] = current_page
+        # Trade Hub / Trade Analyzer / Waivers consolidation (coridian_ request,
+        # mirrors mobile's TradesScreen.tsx tab host): the three destinations stay
+        # distinct PLATFORM_DESTINATIONS keys so every existing sidebar/dashboard
+        # tile/GM-orb/notification call site that routes to one of them keeps
+        # working unchanged, but they now render as tabs of one page. Resolved
+        # here (before the sidebar button loop and query-param sync below) so
+        # both stay in sync with whichever tab is actually showing, with no
+        # extra rerun.
+        #
+        # st.tabs() cannot be pointed at a specific tab from code (no supported
+        # default-index/session-state hook in streamlit>=1.58,<2 — see
+        # streamlit/streamlit#5083), which would break "land on the right tab"
+        # deep links from those call sites. A horizontal st.radio keyed to
+        # session_state is the segmented-control pattern already used for this
+        # exact need elsewhere (modules/team_stance_ui.py, the Players/Picks
+        # toggle in modules/trade_analyzer_ui.py), so it's reused here instead
+        # of introducing a second convention.
+        if current_page in TRADES_TAB_ROUTE_ORDER:
+            _trades_previous_route = _safe_text(
+                st.session_state.get("_dg_last_rendered_page")
+            )
+            _trades_fresh_entry = _trades_previous_route != current_page
+            if TRADES_TAB_RADIO_KEY not in st.session_state or _trades_fresh_entry:
+                # Cross-page navigation (sidebar, dashboard tile, GM orb,
+                # notification, Player Quick View, Live Draft, etc.) always
+                # wins and snaps the tab bar to match the destination clicked.
+                st.session_state[TRADES_TAB_RADIO_KEY] = TRADES_TAB_LABELS[current_page]
+            else:
+                # No cross-page nav happened this run, so this rerun was caused
+                # by something else — most likely the tab radio itself. Let it
+                # (not the unchanged current_page value) decide which of the
+                # three bodies renders.
+                _trades_requested_label = st.session_state.get(TRADES_TAB_RADIO_KEY)
+                _trades_requested_key = next(
+                    (
+                        key
+                        for key, label in TRADES_TAB_LABELS.items()
+                        if label == _trades_requested_label
+                    ),
+                    current_page,
+                )
+                if _trades_requested_key != current_page:
+                    current_page = _trades_requested_key
+                    st.session_state["platform_nav_page"] = current_page
         current_page_definition = destination_lookup.get(current_page, destination_definitions[0] if destination_definitions else None)
         for group in available_groups:
             group_destinations = destinations_by_group.get(group, [])
@@ -18352,6 +18412,20 @@ def main():
             )
         except Exception:
             st.session_state.setdefault("_cached_live_draft_active", False)
+
+    # TRADES TAB BAR — one shared segmented control for Trade Hub / Trade
+    # Analyzer / Waivers (see TRADES_TAB_ROUTE_ORDER above). session_state is
+    # already authoritative by this point (resolved earlier, before the
+    # sidebar nav rendered), so this just paints the control; it never decides
+    # anything itself.
+    if current_page in TRADES_TAB_ROUTE_ORDER:
+        st.radio(
+            "Trades section",
+            [TRADES_TAB_LABELS[key] for key in TRADES_TAB_ROUTE_ORDER],
+            key=TRADES_TAB_RADIO_KEY,
+            horizontal=True,
+            label_visibility="collapsed",
+        )
 
     # HOME DASHBOARD
     if current_page == "dashboard":
