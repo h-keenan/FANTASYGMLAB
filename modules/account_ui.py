@@ -19,6 +19,33 @@ from modules import startup_critical_path
 from modules import theme_mode
 from modules import ui_primitives
 from modules import user_preferences
+from modules.html_rendering import inject_global_styles
+
+# The durable-auth storage bridge is an invisible 1x1 custom component
+# (reads/writes browser localStorage; no visible content). Left in normal
+# flex flow it still consumes a full inter-element `gap` on each side,
+# producing dead space in the real Dashboard layout (#coridian_ dead-space
+# report). Pull it out of flow the same way other zero-content utility
+# components in this codebase do (see modules/viewport_preservation.py,
+# modules/player_headshot_runtime.py).
+AUTH_STORAGE_BRIDGE_CSS = """
+[class*="st-key-supabase_auth_storage_"] {
+    clip: rect(0, 0, 1px, 1px) !important;
+    height: 1px !important;
+    margin: 0 !important;
+    max-height: 1px !important;
+    max-width: 1px !important;
+    min-width: 1px !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    position: fixed !important;
+    left: -10px !important;
+    top: -10px !important;
+    opacity: 0 !important;
+    width: 1px !important;
+}
+"""
 
 AUTH_STORAGE_COMPONENT = st.components.v2.component(
     "supabase_auth_storage",
@@ -671,6 +698,7 @@ def flush_durable_auth_persistence(
         return result
 
     try:
+        inject_global_styles(AUTH_STORAGE_BRIDGE_CSS)
         AUTH_STORAGE_COMPONENT(
             key="supabase_auth_storage_flush",
             data={
@@ -793,6 +821,7 @@ def render_durable_auth_bridge(*, config: dict) -> dict:
     actions["mount_id"] = mount_id
 
     try:
+        inject_global_styles(AUTH_STORAGE_BRIDGE_CSS)
         auth_storage_handshake.mark_component_mount_start(st.session_state)
         result = AUTH_STORAGE_COMPONENT(
             key="supabase_auth_storage_bridge",
