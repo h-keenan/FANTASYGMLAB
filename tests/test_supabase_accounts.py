@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
@@ -645,6 +646,215 @@ class TestSupabaseAccounts(unittest.TestCase):
 
         self.assertFalse(sent)
         self.assertIn("60 seconds", error)
+
+    def test_request_password_reset_posts_to_recover_endpoint(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        response = Mock(status_code=200)
+        response.json.return_value = {}
+
+        with patch.object(auth_supabase.requests, "post", return_value=response) as post:
+            sent, error = auth_supabase.request_password_reset(config, "user@example.com")
+
+        self.assertTrue(sent, error)
+        self.assertFalse(error)
+        self.assertIn("/auth/v1/recover", post.call_args.args[0])
+        self.assertEqual(post.call_args.kwargs["json"], {"email": "user@example.com"})
+
+    def test_request_password_reset_rejects_invalid_email_without_network_call(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+
+        with patch.object(auth_supabase.requests, "post") as post:
+            sent, error = auth_supabase.request_password_reset(config, "not-an-email")
+
+        post.assert_not_called()
+        self.assertFalse(sent)
+        self.assertIn("valid email", error.casefold())
+
+    def test_password_reset_request_never_reveals_whether_email_has_an_account(self):
+        # Supabase's own /recover endpoint returns HTTP 200 for both an
+        # existing and a nonexistent email (anti user-enumeration). Even if
+        # some error text would otherwise classify as "an account already
+        # exists for that email" (classify_auth_error's duplicate_user
+        # category), the caller-facing copy must never surface that — it
+        # would leak account existence through what has to stay a neutral
+        # "forgot password" flow.
+        message = auth_supabase.password_reset_request_user_message(
+            "A user with this email address has already been registered"
+        )
+
+        self.assertNotIn("already", message.casefold())
+        self.assertIn("if an account exists", message.casefold())
+
+        # Genuinely actionable failures that cannot leak account existence
+        # (rate limiting, bad request shape, provider outage) are still
+        # surfaced as-is rather than always collapsing to the neutral copy.
+        rate_limited = auth_supabase.password_reset_request_user_message("Too many requests")
+        self.assertIn("too many attempts", rate_limited.casefold())
+
+    def test_update_user_password_requires_minimum_length_without_network_call(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+
+        with patch.object(auth_supabase.requests, "put") as put:
+            payload, error = auth_supabase.update_user_password(config, "access-token", "short")
+
+        put.assert_not_called()
+        self.assertIsNone(payload)
+        self.assertIn("6 characters", error)
+
+    def test_update_user_password_puts_to_user_endpoint_with_bearer_token(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        response = Mock(status_code=200)
+        response.json.return_value = {"id": "user-1", "email": "user@example.com"}
+
+        with patch.object(auth_supabase.requests, "put", return_value=response) as put:
+            payload, error = auth_supabase.update_user_password(
+                config, "recovery-access-token", "newpassword123"
+            )
+
+        self.assertFalse(error)
+        self.assertEqual(payload["id"], "user-1")
+        self.assertIn("/auth/v1/user", put.call_args.args[0])
+        self.assertEqual(put.call_args.kwargs["json"], {"password": "newpassword123"})
+        self.assertEqual(
+            put.call_args.kwargs["headers"]["Authorization"], "Bearer recovery-access-token"
+        )
+
+    def test_password_recovery_pending_state_round_trips(self):
+        session_state = {}
+        self.assertFalse(auth_supabase.is_password_recovery_pending(session_state))
+
+        auth_supabase.enter_password_recovery_pending(session_state)
+        self.assertTrue(auth_supabase.is_password_recovery_pending(session_state))
+
+        auth_supabase.clear_password_recovery_pending(session_state)
+        self.assertFalse(auth_supabase.is_password_recovery_pending(session_state))
+
+    def test_logout_clears_password_recovery_pending(self):
+        session_state = {auth_supabase.PASSWORD_RECOVERY_PENDING_KEY: True}
+        auth_supabase.clear_auth_session(session_state)
+        self.assertFalse(auth_supabase.is_password_recovery_pending(session_state))
+
+    def test_password_recovery_pending_blocks_normal_signed_in_launch_ui(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {
+            auth_supabase.AUTH_SESSION_KEY: {"access_token": "recovery-token", "user_id": "user-1"},
+            auth_supabase.AUTH_USER_KEY: {"id": "user-1", "email": "user@example.com"},
+            auth_supabase.PASSWORD_RECOVERY_PENDING_KEY: True,
+        }
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ) as markdown, patch.object(account_ui.st, "text_input", return_value=""), patch.object(
+            account_ui.st, "button", return_value=False
+        ):
+            actions = account_ui.render_mobile_auth_entry(config=config)
+
+        self.assertFalse(actions["continue_guest"])
+        self.assertIn("data-fgl-password-recovery", markdown.call_args.args[0])
+
+    def test_password_recovery_card_sets_new_password_and_clears_pending(self):
+        # No st.rerun() anywhere in this flow (the codebase caps explicit
+        # rerun() call sites — see render_password_recovery_card's
+        # docstring/comment) — success is signaled via the returned
+        # actions dict instead, which render_mobile_auth_entry uses to
+        # fall through to the normal signed-in branch in the same pass.
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {
+            auth_supabase.AUTH_SESSION_KEY: {"access_token": "recovery-token", "user_id": "user-1"},
+            auth_supabase.PASSWORD_RECOVERY_PENDING_KEY: True,
+        }
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(
+            account_ui.st, "text_input", side_effect=["newpassword123", "newpassword123"]
+        ), patch.object(
+            account_ui.st,
+            "button",
+            side_effect=lambda label, **_kwargs: label == "Set new password",
+        ), patch.object(account_ui.st, "success") as success, patch.object(
+            auth_supabase, "update_user_password", return_value=({"id": "user-1"}, "")
+        ) as update_password:
+            result = account_ui.render_password_recovery_card(config=config)
+
+        update_password.assert_called_once_with(config, "recovery-token", "newpassword123")
+        self.assertFalse(auth_supabase.is_password_recovery_pending(session_state))
+        self.assertTrue(result["completed"])
+        success.assert_called_once()
+
+    def test_password_recovery_card_rejects_mismatched_passwords(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {
+            auth_supabase.AUTH_SESSION_KEY: {"access_token": "recovery-token", "user_id": "user-1"},
+            auth_supabase.PASSWORD_RECOVERY_PENDING_KEY: True,
+        }
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(
+            account_ui.st, "text_input", side_effect=["newpassword123", "different"]
+        ), patch.object(
+            account_ui.st,
+            "button",
+            side_effect=lambda label, **_kwargs: label == "Set new password",
+        ), patch.object(account_ui.st, "warning") as warning, patch.object(
+            auth_supabase, "update_user_password"
+        ) as update_password:
+            result = account_ui.render_password_recovery_card(config=config)
+
+        update_password.assert_not_called()
+        self.assertFalse(result["completed"])
+        warning.assert_called_once_with("Passwords do not match.")
+        # Pending stays set — the viewer can retry on this same card.
+        self.assertTrue(auth_supabase.is_password_recovery_pending(session_state))
+
+    def test_signin_form_includes_forgot_password_expander(self):
+        # "Forgot password?" is an inline expander on the sign-in form
+        # (no mode switch, no st.rerun()) rather than a button that swaps
+        # to a separate screen — see the comment above it in
+        # render_mobile_auth_entry.
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {"launch_account_form": "signin"}
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(account_ui.st, "text_input", side_effect=["", "", ""]), patch.object(
+            account_ui.st, "button", return_value=False
+        ), patch.object(
+            account_ui.st, "expander", return_value=nullcontext()
+        ) as expander:
+            account_ui.render_mobile_auth_entry(config=config)
+
+        labels = [call.args[0] for call in expander.call_args_list if call.args]
+        self.assertIn("Forgot password?", labels)
+
+    def test_reset_password_request_shows_enumeration_safe_notice(self):
+        config = {"enabled": True, "url": "https://example.supabase.co", "anon_key": "anon"}
+        session_state = {"launch_account_form": "signin"}
+
+        with patch.object(account_ui.st, "session_state", session_state), patch.object(
+            account_ui.st,
+            "markdown",
+        ), patch.object(account_ui.st, "text_input", side_effect=["", "", "user@example.com"]), patch.object(
+            account_ui.st,
+            "button",
+            side_effect=lambda label, **_kwargs: label == "Send reset link",
+        ), patch.object(account_ui.st, "success") as success, patch.object(
+            account_ui.st, "expander", return_value=nullcontext()
+        ), patch.object(
+            auth_supabase,
+            "request_password_reset",
+            return_value=(False, "A user with this email address has already been registered"),
+        ):
+            account_ui.render_mobile_auth_entry(config=config)
+
+        notice = success.call_args.args[0]
+        self.assertIn("if an account exists", notice.casefold())
+        self.assertNotIn("already", notice.casefold())
 
     def test_guest_mode_account_panel_when_config_missing(self):
         with patch.object(account_ui.st, "markdown"), patch.object(account_ui.st, "subheader"), patch.object(
