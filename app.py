@@ -12079,6 +12079,47 @@ def render_executive_profile_control(
                 )
             if identity["signed_in"]:
                 from modules import account_ui as _account_ui
+                from modules import account_store as _account_store
+
+                export_payload_key = f"{key_prefix}_export_payload"
+                if st.button(
+                    "Export My Data",
+                    key=f"{key_prefix}_export_data",
+                    use_container_width=True,
+                ):
+                    account_user_id = auth_supabase.current_user_id(st.session_state)
+                    account_access_token = auth_supabase.current_access_token(st.session_state)
+                    if account_user_id and account_access_token:
+                        from datetime import timezone as _timezone
+
+                        tables = _account_store.export_account_data(
+                            auth_supabase.get_supabase_config(secrets=secrets),
+                            account_access_token,
+                            user_id=account_user_id,
+                        )
+                        st.session_state[export_payload_key] = json.dumps(
+                            {
+                                "generated_at": datetime.now(_timezone.utc).isoformat(),
+                                "user": {
+                                    "id": account_user_id,
+                                    "email": identity["display_identity"],
+                                },
+                                "tables": tables,
+                            },
+                            indent=2,
+                            default=str,
+                        )
+                    else:
+                        st.warning(_account_store.SESSION_EXPIRED_COPY)
+                if st.session_state.get(export_payload_key):
+                    st.download_button(
+                        "Download my data (.json)",
+                        data=st.session_state[export_payload_key],
+                        file_name=f"fantasygmlab-my-data-{int(time.time())}.json",
+                        mime="application/json",
+                        key=f"{key_prefix}_export_download",
+                        use_container_width=True,
+                    )
 
                 if st.button(
                     "Sign out",
@@ -20848,6 +20889,28 @@ def main():
                         "Draft Capital Score",
                         rank_column="draft_capital_rank",
                         score_column="draft_capital",
+                    )
+                    render_section_header(
+                        "Starter Quality",
+                        kicker="Who starts best",
+                        note="Combined strength of each team's starting lineup only — bench excluded.",
+                    )
+                    render_power_rankings_board(
+                        df_intel,
+                        "Starter Score",
+                        rank_column="starter_rank",
+                        score_column="starter_score",
+                    )
+                    render_section_header(
+                        "Bench Depth",
+                        kicker="Who's deepest",
+                        note="Depth and value of each team's bench — usable reinforcements if a starter goes down.",
+                    )
+                    render_power_rankings_board(
+                        df_intel,
+                        "Bench Score",
+                        rank_column="bench_rank",
+                        score_column="bench_score",
                     )
                     concept_items = [
                                 {

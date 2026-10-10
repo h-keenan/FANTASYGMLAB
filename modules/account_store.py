@@ -451,3 +451,39 @@ def default_saved_league(rows: list[dict], *, require_default: bool = False) -> 
     if require_default and not default_rows:
         return {}
     return dict((default_rows or rows)[0])
+
+
+# Every Supabase table that stores a row keyed to this user's own auth id.
+# Mirrors services/mobile_api_service.py's _EXPORTABLE_USER_TABLES (and that
+# module's own mirror of docs/supabase_delete_account.sql's cascade list) —
+# kept in sync manually since this is a DB-level FK cascade with no single
+# code list of its own. Add a table here whenever a new one gets added to
+# that cascade.
+EXPORTABLE_USER_TABLES = (
+    "profiles",
+    "user_settings",
+    "saved_leagues",
+    "gm_targets",
+    "mobile_alert_reads",
+    "trade_outcomes",
+    "push_tokens",
+    "team_stance",
+    "scouting_reports",
+    "prospect_watchlist",
+    "decision_memory_events",
+    "decision_memory_baselines",
+    "notification_read_state",
+)
+
+
+def export_account_data(config: dict, access_token: str, *, user_id: str) -> dict[str, Any]:
+    """Every row this account owns across every Supabase table, as one dict —
+    the same GDPR/CCPA self-service export GET /v1/me/export builds for
+    mobile (services/mobile_api_service.py's export_my_data), reused here so
+    web's "Export My Data" can't silently drift out of sync with it."""
+
+    tables: dict[str, Any] = {}
+    for table in EXPORTABLE_USER_TABLES:
+        rows, error = fetch_rows(config, access_token, table, user_id=user_id)
+        tables[table] = rows if not error else {"error": error}
+    return tables
