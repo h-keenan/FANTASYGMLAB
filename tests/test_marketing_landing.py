@@ -145,6 +145,46 @@ def test_marketing_assets_exist():
         assert path.stat().st_size > 40, name
 
 
+def test_screenshot_captions_do_not_duplicate_the_feature_list():
+    """Regression test for the "What it does" bug: the same content used to
+
+    render twice — once as screenshot-gallery captions, once as its own
+    list section. Each screenshot caption must say something specific to
+    that screen, and none of that caption text may be repeated verbatim in
+    the separate "Why it's different" / "Founder Beta" detail copy.
+    """
+
+    detail_html = marketing_landing.landing_body_html(
+        billing_configured=False, detail=True, include_pricing=False
+    )
+    assert "Front-office tools for the league you manage" not in detail_html
+    assert "<div class='fgl-landing__kicker'>What it does</div>" not in detail_html
+    captions = [body for _title, body, _file in marketing_landing.WHAT_IT_DOES]
+    assert len(captions) == len(set(captions)), "screenshot captions must be distinct"
+    for caption in captions:
+        assert caption not in detail_html
+    titles = [title for title, _body, _file in marketing_landing.WHAT_IT_DOES]
+    assert len(titles) == len(set(titles))
+    assert 2 <= len(marketing_landing.WHAT_IT_DOES) <= 3
+
+
+def test_why_different_section_is_merged_not_split():
+    """"Why it's different" and the old standalone "Trust" section made the
+
+    same overlapping claims twice. They're one list now.
+    """
+
+    html = marketing_landing.landing_body_html(
+        billing_configured=False, detail=True, include_pricing=False
+    )
+    assert "Why it's different" in html
+    assert "<div class='fgl-landing__kicker'>Trust</div>" not in html
+    assert "What's experimental" not in html
+    assert "What's included" not in html
+    assert "Founder Beta" in html
+    assert "ESPN import" in html
+
+
 def test_landing_css_is_not_global_app_css():
     app_styles = (ROOT / "modules" / "app_styles.py").read_text(encoding="utf-8")
     assert "MARKETING_LANDING_CSS" not in app_styles

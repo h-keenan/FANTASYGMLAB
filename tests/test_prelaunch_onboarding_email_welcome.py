@@ -108,7 +108,10 @@ def test_welcome_cold_paint_defers_feature_lists():
     detail = marketing_landing.landing_body_html(
         billing_configured=False, detail=True, include_pricing=True
     )
-    assert "What it does" in detail
+    # "What it does" was a redundant standalone section duplicating the
+    # screenshot-gallery captions; it was folded away. "Why it's different"
+    # is the real deferred detail section now.
+    assert "Why it's different" in detail
     assert "Free includes" in detail
 
 

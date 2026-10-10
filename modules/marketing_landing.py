@@ -71,53 +71,36 @@ PRIMARY_CTA_LABEL = "Import your league"
 SECONDARY_CTA_LABEL = "Sign in"
 GUEST_CTA_LABEL = "Continue as guest"
 
+# Three real screens, each caption specific to ITS screen — not a restatement
+# of the next one, and not duplicated again as a separate feature list below
+# (see render_screenshot_gallery, the sole place these captions render).
 WHAT_IT_DOES = (
     (
         "Today's Game Plan",
-        "A short stack of what to do next — trades, waivers, and roster priorities for this league.",
+        "Open the dashboard and your highest-value move this week is already ranked — no digging through menus first.",
         "dashboard.jpg",
     ),
     (
         "Trade Hub",
-        "Generated trade paths with package review, partner context, and value change you can inspect.",
+        "Every suggested trade shows the value change and the partner's likely reason to say yes.",
         "trade-share.jpg",
     ),
     (
-        "Waivers",
-        "Priority Adds and deeper waiver boards so you can act before the window closes.",
-        "waiver-share.jpg",
-    ),
-    (
-        "Player rankings & context",
-        "Player Quick View with current value, recommendation, and the context behind the call.",
+        "Player Quick View",
+        "Tap any player to see the call and the reasoning behind it, not just a rank number.",
         "player-share.jpg",
     ),
-    (
-        "What Changed / Decision Memory",
-        "Session What Changed on Free; Decision Memory adds durable cross-session history on Premium.",
-        "decision-memory.jpg",
-    ),
-    (
-        "GM Targets",
-        "Saved players to monitor — rank, ownership, and advice without changing recommendations. "
-        "Free keeps up to three; Premium expands to the full board.",
-        "dashboard-desktop.jpg",
-    ),
 )
 
+# Merges the former "Why it's different" and "Trust" sections — they made
+# overlapping claims (league-awareness, inspectable context, consistency)
+# across two separate walls of text. One tight list says it once.
 WHY_DIFFERENT = (
-    ("League-aware", "Advice is scoped to the league you imported."),
-    ("Scoring-aware", "Reads respect your league's scoring and roster shape."),
-    ("Recommendation context", "See why a move is suggested, not only a ranked name."),
-    ("Current rankings", "Player context stays tied to the current ranking set."),
-    ("Canonical consistency", "Trade Hub, Waivers, and PQV share one recommendation source of truth."),
-    ("Decision history", "What Changed (Free) and Decision Memory (Premium) keep priorities visible."),
-)
-
-FOUNDER_INCLUDED = (
-    "Free core workflow: import, Game Plan, trade preview, Priority Adds, core roster tools.",
-    "Early Access Premium depth on the same surfaces — not a separate product.",
-    "Labeled experimental lanes when enabled.",
+    ("League-aware", "Scoped to the exact roster and scoring you imported — not generic rankings."),
+    ("Shows its work", "Trade, waiver, and ranking calls come with the reasoning behind them, inspectable in-product."),
+    ("One source of truth", "Dashboard, Trade Hub, Waivers, and Player Quick View always agree with each other."),
+    ("Remembers priorities", "What Changed (Free) and Decision Memory (Premium) keep your last calls visible."),
+    ("Labeled, not oversold", "Experimental tools are marked as such. Roadmap ideas are never billed as guarantees."),
 )
 
 # Decision Memory, GM Targets, and Share Recommendation graduated to shipped
@@ -125,14 +108,12 @@ FOUNDER_INCLUDED = (
 # FEATURE_MATRIX and modules/premium_page.py's explicit "graduated features
 # must not appear here" guard on PREMIUM_EXPERIMENTAL_WHEN_ENABLED). ESPN
 # import is the one surface still genuinely labeled experimental today.
-FOUNDER_EXPERIMENTAL = (
-    "ESPN import — labeled limited; Sleeper has full parity, ESPN support is still catching up.",
-)
-
-TRUST_POINTS = (
-    "Recommendations stay consistent across Dashboard, Trade Hub, Waivers, and PQV.",
-    "Ranking and advice context are inspectable in-product — not a black-box pitch.",
-    "Experimental tools are labeled; roadmap ideas are not billed as guarantees.",
+# One paragraph, not a two-column included/experimental list split — the
+# pricing section below already does the detailed Free vs Premium comparison.
+FOUNDER_BETA_SUMMARY = (
+    "Free covers the core workflow today: import, Game Plan, trade preview, and Priority "
+    "Adds, no account required. Early Access Premium adds depth on those same surfaces, "
+    "not a separate product. ESPN import is still labeled experimental; Sleeper has full parity."
 )
 
 
@@ -565,15 +546,9 @@ def landing_body_html(
 
     sections: list[str] = []
     if detail:
-        what_lines = tuple(f"{title} — {body}" for title, body, _file in WHAT_IT_DOES)
         why_lines = tuple(f"{title} — {body}" for title, body in WHY_DIFFERENT)
         sections.append(
             "<section class='fgl-landing__section' id='fgl-how-it-works'>"
-            "<div class='fgl-landing__kicker'>What it does</div>"
-            "<h2>Front-office tools for the league you manage</h2>"
-            f"{_list_html(what_lines)}"
-            "</section>"
-            "<section class='fgl-landing__section'>"
             "<div class='fgl-landing__kicker'>Why it's different</div>"
             "<h2>League-aware recommendations with inspectable context</h2>"
             f"{_list_html(why_lines)}"
@@ -581,17 +556,7 @@ def landing_body_html(
             "<section class='fgl-landing__section' id='fgl-founder-beta'>"
             "<div class='fgl-landing__kicker'>Founder Beta</div>"
             "<h2>Early access with clear labels</h2>"
-            "<div class='fgl-landing__split'>"
-            "<div><h3>What's included</h3>"
-            f"{_list_html(FOUNDER_INCLUDED)}"
-            "</div><div><h3>What's experimental</h3>"
-            f"{_list_html(FOUNDER_EXPERIMENTAL)}"
-            "<p class='fgl-landing__note'>Experimental tools do not change core recommendation generation.</p>"
-            "</div></div></section>"
-            "<section class='fgl-landing__section'>"
-            "<div class='fgl-landing__kicker'>Trust</div>"
-            "<h2>Inspectable recommendations, not hype</h2>"
-            f"{_list_html(TRUST_POINTS)}"
+            f"<p>{escape(FOUNDER_BETA_SUMMARY)}</p>"
             "</section>"
         )
     if include_pricing:
@@ -619,9 +584,9 @@ def render_screenshot_gallery() -> None:
 
     st.markdown(
         "<div class='fgl-landing__gallery-intro'>"
-        "<div class='fgl-landing__kicker'>Product surfaces</div>"
+        "<div class='fgl-landing__kicker'>See it in action</div>"
         "<h2>Real FantasyGM Lab screens</h2>"
-        "<p>Captured from the product UI fixtures — not marketing mockups.</p>"
+        "<p>Captured from the product UI — not marketing mockups.</p>"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -634,7 +599,7 @@ def render_screenshot_gallery() -> None:
         shown_files.add(filename)
         st.markdown(
             f"<div class='fgl-landing__shot-caption'><strong>{escape(title)}</strong>"
-            f" — {escape(body)}</div>",
+            f"{escape(body)}</div>",
             unsafe_allow_html=True,
         )
         st.image(str(path), use_container_width=True)
