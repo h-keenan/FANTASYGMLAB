@@ -197,13 +197,22 @@ def decision_memory_timeline_item_html(event: history.DecisionChangeEvent) -> st
     meta_parts = [history.age_label(event.timestamp)]
     if event.category:
         meta_parts.insert(0, event.category)
-    if event.current_confidence_band:
-        meta_parts.append(f"{event.current_confidence_band.title()} confidence")
     if event.scoring_format:
         meta_parts.append(event.scoring_format)
     state_label = _lifecycle_state_label(event.lifecycle_transition)
     if state_label:
         meta_parts.append(state_label)
+    # Confidence reads as a tone-coded badge, not metadata text — matches the
+    # app's existing confidence/status-band convention (ui_primitives.
+    # status_badge_html's dg-ui-badge family) instead of folding it into the
+    # plain '·'-joined meta string this detail view used before.
+    confidence_badge_html = ""
+    if event.current_confidence_band:
+        band = event.current_confidence_band.strip().casefold()
+        variant = {"high": "success", "medium": "information", "low": "neutral"}.get(band, "neutral")
+        confidence_badge_html = ui_primitives.status_badge_html(
+            f"{event.current_confidence_band.title()} confidence", variant=variant
+        )
     blocks = [f"<div class='dg-decision-timeline-name'>{escape(name)}</div>"]
     if changed:
         blocks.append(
@@ -213,6 +222,8 @@ def decision_memory_timeline_item_html(event: history.DecisionChangeEvent) -> st
         blocks.append(
             f"<div class='dg-decision-timeline-transition'>{escape(transition)}</div>"
         )
+    if confidence_badge_html:
+        blocks.append(f"<div class='dg-decision-timeline-confidence'>{confidence_badge_html}</div>")
     blocks.append(
         f"<div class='dg-decision-timeline-meta'>{escape(' · '.join(meta_parts))}</div>"
     )
