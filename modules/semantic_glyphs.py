@@ -43,6 +43,7 @@ DESTINATION_CONCEPT = {
     "trade_hub": "trade",
     "trade_analyzer": "trade",
     "waivers": "waiver",
+    "trade_history": "history",
     "startup_draft_center": "draft",
     "draft_summary": "draft",
     "live_draft": "draft",

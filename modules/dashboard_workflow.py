@@ -298,6 +298,7 @@ def render_dashboard_workflow(
                     ("Trade Hub", "trade_hub"),
                     ("Draft Center", "draft_summary"),
                     ("GM Plan", "gm_plan"),
+                    ("Trade History", "trade_history"),
                     ("College Scouting", "college_scouting"),
                 ]
             )
