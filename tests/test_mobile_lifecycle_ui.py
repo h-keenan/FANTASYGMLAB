@@ -180,7 +180,4 @@ def test_route_body_owner_clears_on_change():
 def test_explicit_rerun_inventory_not_increased_by_lifecycle_pass():
     from scripts.measure_interaction_rerun_architecture import count_explicit_reruns
 
-    # 63 -> 64: one new shared rerun call site for the welcome page's
-    # feature-explanation slideshow Prev/Next buttons
-    # (modules/marketing_landing.py render_landing_detail_slideshow).
-    assert count_explicit_reruns() <= 64
+    assert count_explicit_reruns() <= 63

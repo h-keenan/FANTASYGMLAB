@@ -84,10 +84,7 @@ def test_no_stmain_bottom_inset_and_app_css_budget():
 
 
 def test_explicit_rerun_count_unchanged():
-    # 63 -> 64: one new shared rerun call site for the welcome page's
-    # feature-explanation slideshow Prev/Next buttons
-    # (modules/marketing_landing.py render_landing_detail_slideshow).
-    assert count_explicit_reruns() <= 64
+    assert count_explicit_reruns() <= 63
 
 
 def test_helper_module_has_no_rerun_or_provider():
