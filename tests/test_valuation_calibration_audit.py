@@ -100,11 +100,22 @@ def test_age_multiplier_continuous_and_position_aware():
     lo = rankings.age_multiplier("RB", 27)
     hi = rankings.age_multiplier("RB", 28)
     assert min(lo, hi) <= mid <= max(lo, hi)
-    # Peak windows: young RB/WR premium; QB stays elevated longer.
+    # Peak windows: RB's prime arrives earliest and is shortest-lived; QB
+    # stays elevated longest.
     assert rankings.age_multiplier("RB", 22) > rankings.age_multiplier("RB", 30)
     assert rankings.age_multiplier("QB", 32) > rankings.age_multiplier("RB", 32)
+    # The curve is unimodal: it rises from the youngest tracked age to a
+    # single mid-career peak, then declines monotonically — never a second
+    # hump, and never a cliff that makes an older age "more valuable" once
+    # the decline has begun. (Regression: an earlier version of this curve
+    # put the peak at the YOUNGEST tracked age and declined every year after
+    # — i.e. modeled a 20-year-old rookie RB as the most valuable version of
+    # that player ever, backwards from real dynasty consensus.)
     rb_curve = [rankings.age_multiplier("RB", age) for age in AGES]
-    assert all(rb_curve[i] >= rb_curve[i + 1] for i in range(len(rb_curve) - 1))
+    peak_idx = rb_curve.index(max(rb_curve))
+    assert 0 < peak_idx < len(rb_curve) - 1, "RB peak must not sit at either tabulated edge"
+    assert all(rb_curve[i] <= rb_curve[i + 1] for i in range(peak_idx))
+    assert all(rb_curve[i] >= rb_curve[i + 1] for i in range(peak_idx, len(rb_curve) - 1))
 
 
 def test_rank_to_value_is_monotonic_across_tier_boundaries():
@@ -193,10 +204,15 @@ def test_holding_market_constant_age_alone_changes_value():
             )
             for age in AGES
         ]
-        # Younger should not be strictly worse than older at same market.
-        assert scores[0] >= scores[-1]
-        if pos == "RB":
-            assert all(scores[i] >= scores[i + 1] for i in range(len(scores) - 1))
+        # Age is the only varying input here, so the composite must trace the
+        # same unimodal shape the age curve itself has: rise to the
+        # position's own mid-career peak, then decline — never a flat
+        # "youngest always wins" line (the bug this curve redesign fixed)
+        # and never a second hump.
+        peak_idx = scores.index(max(scores))
+        assert 0 < peak_idx < len(scores) - 1, (pos, scores)
+        assert all(scores[i] <= scores[i + 1] for i in range(peak_idx))
+        assert all(scores[i] >= scores[i + 1] for i in range(peak_idx, len(scores) - 1))
 
 
 def test_injury_monotonicity_risk_and_availability():

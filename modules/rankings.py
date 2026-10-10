@@ -94,12 +94,24 @@ RECENCY_DISPLAY_HIGH_CONFIDENCE = 0.99
 
 # Continuous dynasty age curves: piecewise-linear control points (age → multiplier).
 # Designed for smooth adjacent-year movement (no giant step cliffs).
+#
+# Each skill-position curve RISES from a young/rookie age to a realistic
+# mid-career peak/plateau, THEN declines — never the other way around. (A
+# prior version of every one of these four curves put its peak multiplier at
+# the YOUNGEST tabulated age and declined every year after that, modeling a
+# 20-year-old rookie WR as the single most valuable version of that player
+# ever — backwards from real dynasty consensus and from reality. See PR that
+# introduced this comment for the full calibration writeup.) The post-peak
+# decline STEEPNESS for RB/WR/TE below is carried over unchanged from the
+# prior curve's decline phase — only the age at which the decline begins
+# (and the rise before it) moved. QB's decline phase (33→42) is likewise
+# unchanged; only the 21→27 approach to peak was added.
 AGE_CURVE_CONTROL_POINTS: Dict[str, tuple[tuple[float, float], ...]] = {
     "QB": (
-        (21.0, 1.08),
-        (24.0, 1.08),
-        (27.0, 1.05),
-        (30.0, 1.02),
+        (21.0, 0.85),  # rookie: noticeably below peak, unproven/often not starting
+        (24.0, 0.95),
+        (27.0, 1.08),  # peak plateau begins
+        (30.0, 1.08),  # peak plateau ends — QB prime runs long
         (33.0, 0.96),
         (35.0, 0.86),
         (37.0, 0.72),
@@ -107,9 +119,9 @@ AGE_CURVE_CONTROL_POINTS: Dict[str, tuple[tuple[float, float], ...]] = {
         (42.0, 0.42),
     ),
     "RB": (
-        (20.0, 1.17),
-        (22.0, 1.14),
-        (24.0, 1.08),
+        (20.0, 0.82),  # rookie: below peak — RBs usually need a year+ to claim a role
+        (22.0, 0.92),
+        (24.0, 1.08),  # peak — shortest, earliest-arriving prime of any position
         (25.0, 1.03),
         (26.0, 0.97),
         (27.0, 0.89),
@@ -121,32 +133,35 @@ AGE_CURVE_CONTROL_POINTS: Dict[str, tuple[tuple[float, float], ...]] = {
         (34.0, 0.26),
     ),
     "WR": (
-        (20.0, 1.16),
-        (22.0, 1.14),
+        (20.0, 0.85),  # rookie: below peak — most WRs break out year 2-3
+        (22.0, 0.96),
         (24.0, 1.10),
-        (26.0, 1.05),
-        (28.0, 1.00),
-        (29.0, 0.94),
-        (30.0, 0.86),
-        (31.0, 0.76),
+        (26.0, 1.16),  # peak
+        (28.0, 1.14),  # plateau holds through 28 before decline
+        (29.0, 1.02),
+        (30.0, 0.90),
+        (31.0, 0.78),
         (32.0, 0.66),
         (33.0, 0.56),
         (34.0, 0.48),
         (36.0, 0.38),
     ),
     "TE": (
-        (21.0, 1.12),
-        (23.0, 1.10),
-        (25.0, 1.06),
-        (27.0, 1.04),
-        (29.0, 1.00),
-        (30.0, 0.94),
+        (21.0, 0.84),  # rookie: TEs break out later than any other skill position
+        (23.0, 0.95),
+        (26.0, 1.12),  # peak — same peak value the old (mis-placed) curve used
+        (29.0, 1.00),  # plateau/early decline — unchanged from the prior curve's
+        (30.0, 0.94),  # decline phase onward (29→37 values carried over as-is)
         (31.0, 0.86),
         (32.0, 0.76),
         (33.0, 0.68),
         (35.0, 0.55),
         (37.0, 0.46),
     ),
+    # K is intentionally left alone: kickers don't have a real "develops into a
+    # physical peak then declines" arc the way skill positions do — accuracy is
+    # mechanics-driven and already stable by the earliest tracked age (24), so a
+    # flat-then-slowly-declining shape is the realistic one, not a bug.
     "K": (
         (24.0, 1.00),
         (34.0, 0.98),
@@ -962,12 +977,19 @@ def age_multiplier_series(positions: Sequence[Any], ages: Sequence[Any]) -> pd.S
 
 # A "prime window" derived directly from AGE_CURVE_CONTROL_POINTS — the same
 # curve already discounting every player's dynasty value by age — rather
-# than a separately invented number. Every curve above starts at its own
-# peak multiplier and is non-increasing from there, so "prime" is defined as
-# the age range where the multiplier stays within this fraction of that
-# position's peak: the first control point (the peak/plateau) through the
-# age where the curve first drops below the threshold, linearly interpolated
-# for a smooth boundary rather than snapping to the nearest tabulated age.
+# than a separately invented number. Each curve above RISES to its own peak/
+# plateau and then declines, so "prime" is the age range where the
+# multiplier stays within this fraction of that position's peak: from the
+# age where the curve first rises to the threshold through the age where it
+# first drops back below it, each boundary linearly interpolated for a
+# smooth edge rather than snapping to the nearest tabulated age.
+#
+# (An earlier version of this function assumed every curve's first control
+# point WAS the peak — true only because every curve back then wrongly put
+# its peak at the youngest tabulated age. Now that each curve has a real
+# rise phase before the peak, the window's start must be found the same way
+# its end already was: by walking the curve for a threshold crossing, not by
+# assuming the first point is the start.)
 PRIME_WINDOW_THRESHOLD = 0.90
 
 
@@ -982,6 +1004,14 @@ def prime_window_for_position(position: str) -> tuple[float, float] | None:
     threshold = peak * PRIME_WINDOW_THRESHOLD
     start_age = points[0][0]
     end_age = points[-1][0]
+    for (age_a, mult_a), (age_b, mult_b) in zip(points, points[1:]):
+        if mult_a < threshold <= mult_b:
+            frac = (threshold - mult_a) / (mult_b - mult_a)
+            start_age = age_a + frac * (age_b - age_a)
+            break
+        if mult_a >= threshold:
+            start_age = age_a
+            break
     for (age_a, mult_a), (age_b, mult_b) in zip(points, points[1:]):
         if mult_a >= threshold and mult_b < threshold:
             frac = (mult_a - threshold) / (mult_a - mult_b)

@@ -34,7 +34,7 @@
     {
       "title": "Prime window",
       "paragraphs": [
-        "Every player's age band on Player Detail \u2014 \"Enters Prime,\" \"In Prime,\" or \"Past Prime\" \u2014 comes directly from the same age curve used in the weighting above, not a separate projection. It marks the age range where that curve stays within 90% of its own peak for the position: roughly 20-24 for running backs, 20-26 for receivers, 21-28 for tight ends, and 21-32 for quarterbacks, matching how much longer those positions typically stay productive. It is descriptive, not predictive \u2014 it does not forecast a specific player's career, only where they sit against their position's typical shape."
+        "Every player's age band on Player Detail \u2014 \"Enters Prime,\" \"In Prime,\" or \"Past Prime\" \u2014 comes directly from the same age curve used in the weighting above, not a separate projection. It marks the age range where that curve stays within 90% of its own peak for the position: roughly 23-26 for running backs, 23-29 for receivers, 24-29 for tight ends, and 25-33 for quarterbacks, matching how much longer those positions typically stay productive. It is descriptive, not predictive \u2014 it does not forecast a specific player's career, only where they sit against their position's typical shape."
       ],
       "bullets": []
     },
