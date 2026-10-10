@@ -46,6 +46,25 @@ def _fake_redis_for_tests():
         redis_cache.reset_redis_client_for_testing()
 
 
+@pytest.fixture(autouse=True)
+def _reset_college_scouting_cache_for_tests():
+    """modules.college_scouting's in-process prospects/reports/class-strength
+    caches are module-level dicts shared across the whole test process (the
+    same idiom as modules.sleeper's lru_cache-backed live-league caches).
+    Without a reset, a test earlier in the run that warms the cache with its
+    own fixture rows could leak stale data into a later test expecting a
+    fresh Supabase fetch — not necessarily a loud failure, possibly just a
+    silently wrong assertion. Reset before and after every test."""
+
+    from modules import college_scouting
+
+    college_scouting._reset_cache_for_tests()
+    try:
+        yield
+    finally:
+        college_scouting._reset_cache_for_tests()
+
+
 @pytest.fixture
 def cached_2025_stats_season(monkeypatch):
     """The committed valuation golden uses 2025 current / 2024 prior stats."""

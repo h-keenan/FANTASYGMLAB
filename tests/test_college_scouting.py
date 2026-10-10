@@ -271,3 +271,133 @@ def test_crowd_signal_for_unscouted_year_has_no_effect():
     assert crowd_signal == {}
     blended = trade_ideas._rookie_class_strength_multiplier(2026, None, crowd_signal)
     assert blended == trade_ideas._rookie_class_strength_multiplier(2026)
+
+
+# ---------------------------------------------------------------------------
+# In-process caching of the Supabase prospects/reports fetch. Before this,
+# modules.college_scouting_ui's College Scouting page (and the mobile
+# scouting endpoint) called fetch_all_prospects/fetch_all_scouting_reports
+# directly on every single render/request — two uncached Supabase round
+# trips per view of a slow-moving, identical-for-every-caller shared
+# catalog. Same bug class as the Player Detail News blocking-RSS fetch
+# (#958) and the NFL-schedule CSV re-parse (#960); same fix idiom (an
+# in-process TTL cache verified by network-call count, not just behavior).
+# ---------------------------------------------------------------------------
+
+
+def _fake_response(rows):
+    class _FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return rows
+
+    return _FakeResponse()
+
+
+def test_get_cached_all_prospects_does_not_refetch_within_the_ttl_window(monkeypatch):
+    cs._reset_cache_for_tests()
+    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: True)
+    calls = {"n": 0}
+
+    def _get(*args, **kwargs):
+        calls["n"] += 1
+        return _fake_response([{"id": "p1", "name": "QB1", "position": "QB", "school": "X", "draft_year": 2026}])
+
+    monkeypatch.setattr(cs.requests, "get", _get)
+
+    first, first_error = cs.get_cached_all_prospects({}, "token", now=1000.0)
+    second, second_error = cs.get_cached_all_prospects({}, "token", now=1000.0 + cs.CACHE_TTL_SECONDS - 1)
+
+    assert calls["n"] == 1
+    assert first_error == "" and second_error == ""
+    assert first == second
+    cs._reset_cache_for_tests()
+
+
+def test_get_cached_all_prospects_refetches_once_the_ttl_expires(monkeypatch):
+    cs._reset_cache_for_tests()
+    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: True)
+    calls = {"n": 0}
+
+    def _get(*args, **kwargs):
+        calls["n"] += 1
+        return _fake_response([{"id": "p1", "name": "QB1", "position": "QB", "school": "X", "draft_year": 2026}])
+
+    monkeypatch.setattr(cs.requests, "get", _get)
+
+    cs.get_cached_all_prospects({}, "token", now=1000.0)
+    cs.get_cached_all_prospects({}, "token", now=1000.0 + cs.CACHE_TTL_SECONDS + 1)
+
+    assert calls["n"] == 2
+    cs._reset_cache_for_tests()
+
+
+def test_get_cached_all_prospects_does_not_cache_a_failed_fetch(monkeypatch):
+    """An unreachable table must not poison the cache as empty-forever —
+    the very next call should try again, not just reuse the failure."""
+
+    cs._reset_cache_for_tests()
+    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: True)
+    calls = {"n": 0}
+
+    def _get(*args, **kwargs):
+        calls["n"] += 1
+        raise ConnectionError("boom")
+
+    monkeypatch.setattr(cs.requests, "get", _get)
+
+    cs.get_cached_all_prospects({}, "token", now=1000.0)
+    cs.get_cached_all_prospects({}, "token", now=1000.1)
+
+    assert calls["n"] == 2
+    cs._reset_cache_for_tests()
+
+
+def test_get_cached_all_scouting_reports_does_not_refetch_within_the_ttl_window(monkeypatch):
+    cs._reset_cache_for_tests()
+    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: True)
+    calls = {"n": 0}
+
+    def _get(*args, **kwargs):
+        calls["n"] += 1
+        return _fake_response([{"user_id": "u1", "prospect_id": "p1", "grade": 4}])
+
+    monkeypatch.setattr(cs.requests, "get", _get)
+
+    cs.get_cached_all_scouting_reports({}, "token", now=2000.0)
+    cs.get_cached_all_scouting_reports({}, "token", now=2000.0 + cs.CACHE_TTL_SECONDS - 1)
+
+    assert calls["n"] == 1
+    cs._reset_cache_for_tests()
+
+
+def test_get_cached_crowd_class_strength_by_year_reuses_the_prospects_and_reports_caches(monkeypatch):
+    """The class-strength wrapper must not duplicate the raw-list fetches:
+    once get_cached_all_prospects/get_cached_all_scouting_reports have
+    already warmed the cache (e.g. from a College Scouting page view in
+    the same process), computing the crowd signal must reuse that data
+    rather than issuing its own second round of Supabase calls."""
+
+    cs._reset_cache_for_tests()
+    monkeypatch.setattr(cs.auth_supabase, "is_configured", lambda config: True)
+    calls = {"n": 0}
+
+    def _get(url, *args, **kwargs):
+        calls["n"] += 1
+        if "college_prospects" in url:
+            return _fake_response(
+                [{"id": "p1", "name": "QB1", "position": "QB", "school": "X", "draft_year": 2026}]
+            )
+        return _fake_response([{"user_id": "u1", "prospect_id": "p1", "grade": 4}])
+
+    monkeypatch.setattr(cs.requests, "get", _get)
+    monkeypatch.setattr(cs.auth_supabase, "rest_api_url", lambda config, table, query: table)
+
+    cs.get_cached_all_prospects({}, "token", now=3000.0)
+    cs.get_cached_all_scouting_reports({}, "token", now=3000.0)
+    assert calls["n"] == 2
+
+    cs.get_cached_crowd_class_strength_by_year({}, "token", now=3000.0)
+    assert calls["n"] == 2  # unchanged — reused both warm caches
+    cs._reset_cache_for_tests()
