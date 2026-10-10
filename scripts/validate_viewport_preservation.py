@@ -233,6 +233,28 @@ def focus_feedback_and_measure(page: Page) -> dict[str, Any]:
     return {"before": before, "after": after}
 
 
+def check_intentional_nav_key(page: Page, key: str) -> dict[str, Any]:
+    """Pointerdown a real DOM button carrying this literal Streamlit ``key=``
+    and read back the real shipped ``isIntentionalNav()`` verdict.
+
+    This exercises the actual component JS the browser runs (keyFrom()'s DOM
+    class-walk + isIntentionalNavKey()'s EXACT/PREFIXES/SUFFIXES match),
+    not a re-implementation of that logic — the thing that would silently
+    regress (per #937/#939/#95x) is the DOM-traversal or class-matching code
+    itself, which a pure Python string-presence test (see
+    tests/test_viewport_preservation.py's
+    test_intentional_nav_detection_covers_real_navigation_call_sites) cannot
+    catch on its own.
+    """
+
+    locator = page.locator(f".st-key-{key} button, .st-key-{key}[role='button']").first
+    locator.wait_for(state="visible", timeout=90_000)
+    page.wait_for_function("window.__dgViewportPreserveBound === true", timeout=90_000)
+    locator.dispatch_event("pointerdown")
+    anchor = page.evaluate("window.__dgInPlaceAnchor")
+    return anchor or {}
+
+
 def run_viewport_matrix(page: Page, *, base_url: str) -> dict[str, Any]:
     report: dict[str, Any] = {"cases": {}}
     page.goto(
