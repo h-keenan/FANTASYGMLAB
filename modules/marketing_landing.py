@@ -74,49 +74,49 @@ GUEST_CTA_LABEL = "Continue as guest"
 WHAT_IT_DOES = (
     (
         "Today's Game Plan",
-        "A short stack of what to do next — trades, waivers, and roster priorities for this league.",
+        "This league's top trades, waivers, and roster moves.",
         "dashboard.jpg",
     ),
     (
         "Trade Hub",
-        "Generated trade paths with package review, partner context, and value change you can inspect.",
+        "Trade paths with package review, partner context, and inspectable value change.",
         "trade-share.jpg",
     ),
     (
         "Waivers",
-        "Priority Adds and deeper waiver boards so you can act before the window closes.",
+        "Priority Adds plus full waiver boards — act before the window closes.",
         "waiver-share.jpg",
     ),
     (
         "Player rankings & context",
-        "Player Quick View with current value, recommendation, and the context behind the call.",
+        "Current value, recommendation, and the reasoning behind each call.",
         "player-share.jpg",
     ),
     (
         "What Changed / Decision Memory",
-        "Session What Changed on Free; Decision Memory adds durable cross-session history on Premium.",
+        "Free tracks this session; Premium adds durable cross-session history.",
         "decision-memory.jpg",
     ),
     (
         "GM Targets",
-        "Saved players to monitor — rank, ownership, and advice without changing recommendations. "
-        "Free keeps up to three; Premium expands to the full board.",
+        "Watchlist with rank, ownership, and advice — never changes recommendations. "
+        "Free: 3 players; Premium: full board.",
         "dashboard-desktop.jpg",
     ),
 )
 
 WHY_DIFFERENT = (
-    ("League-aware", "Advice is scoped to the league you imported."),
-    ("Scoring-aware", "Reads respect your league's scoring and roster shape."),
-    ("Recommendation context", "See why a move is suggested, not only a ranked name."),
-    ("Current rankings", "Player context stays tied to the current ranking set."),
-    ("Canonical consistency", "Trade Hub, Waivers, and PQV share one recommendation source of truth."),
-    ("Decision history", "What Changed (Free) and Decision Memory (Premium) keep priorities visible."),
+    ("League-aware", "Scoped to your league."),
+    ("Scoring-aware", "Matches your league's scoring and roster shape."),
+    ("Recommendation context", "See why, not just a ranked name."),
+    ("Current rankings", "Stays tied to current rankings."),
+    ("Canonical consistency", "Trade Hub, Waivers, and PQV share one source."),
+    ("Decision history", "What Changed (Free) and Decision Memory (Premium) stay visible."),
 )
 
 FOUNDER_INCLUDED = (
-    "Free core workflow: import, Game Plan, trade preview, Priority Adds, core roster tools.",
-    "Early Access Premium depth on the same surfaces — not a separate product.",
+    "Free: import, Game Plan, trade preview, Priority Adds, roster tools.",
+    "Early Access Premium: more depth, same surfaces — not a separate product.",
     "Labeled experimental lanes when enabled.",
 )
 
@@ -126,13 +126,13 @@ FOUNDER_INCLUDED = (
 # must not appear here" guard on PREMIUM_EXPERIMENTAL_WHEN_ENABLED). ESPN
 # import is the one surface still genuinely labeled experimental today.
 FOUNDER_EXPERIMENTAL = (
-    "ESPN import — labeled limited; Sleeper has full parity, ESPN support is still catching up.",
+    "ESPN import is limited while Sleeper has full support.",
 )
 
 TRUST_POINTS = (
-    "Recommendations stay consistent across Dashboard, Trade Hub, Waivers, and PQV.",
-    "Ranking and advice context are inspectable in-product — not a black-box pitch.",
-    "Experimental tools are labeled; roadmap ideas are not billed as guarantees.",
+    "Consistent across Dashboard, Trade Hub, Waivers, and PQV.",
+    "Ranking and advice context are inspectable, not a black-box pitch.",
+    "Experimental tools are labeled; roadmap ideas aren't guarantees.",
 )
 
 
