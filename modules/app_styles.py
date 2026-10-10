@@ -1112,7 +1112,9 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     margin: 0.65rem 0 1rem;
 }
 .summary-tile-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* auto-fit (not a fixed repeat(3,...)) so a row with fewer than 3 tiles
+       collapses its unused trailing column instead of leaving it blank. */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 .summary-tile-grid-compact {
     gap: 0.6rem;
@@ -1145,7 +1147,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 .analysis-grid,
 .decision-panel-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 .summary-tile,
 .analysis-card,
@@ -1580,7 +1582,9 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .prospect-grid {
     display: grid;
     gap: 0.75rem;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* auto-fit so a 1- or 2-card row (e.g. My Team's Strength & Pressure)
+       doesn't leave an empty trailing column at desktop widths. */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     margin: 0.65rem 0 1rem;
 }
 .advice-card,

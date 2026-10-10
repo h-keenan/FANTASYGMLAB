@@ -238,17 +238,37 @@ def _card(title: str, body: str, *, extra_class: str = "") -> str:
 
 
 def methodology_page_html() -> str:
+    # The 2-column factor/strategy grids leave a blank trailing cell when the
+    # item count is odd — span the lone last card across both columns
+    # instead of leaving that space empty.
+    factor_count = len(FACTORS)
     factors = "".join(
-        _card(title, body, extra_class="methodology-factor") for title, body in FACTORS
+        _card(
+            title,
+            body,
+            extra_class=(
+                "methodology-factor methodology-grid-span-full"
+                if factor_count % 2 == 1 and index == factor_count - 1
+                else "methodology-factor"
+            ),
+        )
+        for index, (title, body) in enumerate(FACTORS)
     )
+    strategy_count = len(STRATEGY_ITEMS)
     strategies = "".join(
         (
-            "<div class='methodology-strategy'>"
+            "<div class='methodology-strategy"
+            + (
+                " methodology-grid-span-full"
+                if strategy_count % 2 == 1 and index == strategy_count - 1
+                else ""
+            )
+            + "'>"
             f"<div class='methodology-strategy-label'>{escape(label)}</div>"
             f"<p class='methodology-copy'>{escape(body)}</p>"
             "</div>"
         )
-        for label, body in STRATEGY_ITEMS
+        for index, (label, body) in enumerate(STRATEGY_ITEMS)
     )
     rec_items = "".join(f"<li>{escape(item)}</li>" for item in RECS_BULLETS)
     limits = "".join(f"<li>{escape(item)}</li>" for item in DOES_NOT_CLAIM)

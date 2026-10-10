@@ -945,6 +945,45 @@ def _recommendation_player_row(
     return None
 
 
+def _home_command_row_extend_classes(items: list[dict]) -> list[str]:
+    """Which cards should stretch to absorb their row's leftover columns.
+
+    .home-command-grid is a fixed 12-column grid where each card explicitly
+    spans 4 (secondary) or 8 (primary/wide) columns. When a row's cards
+    don't sum to exactly 12, the remainder renders as blank dead space
+    (e.g. a lone secondary card left alone on the final row). This mirrors
+    the browser's own (sparse, non-dense) row-major auto-placement to find
+    each row's last card and, if that row underfills, grows that card's
+    span by the leftover amount so the row has no empty trailing columns.
+    """
+
+    spans = [
+        8 if (item.get("wide") or item.get("priority") == "primary") else 4
+        for item in items
+    ]
+    rows: list[list[int]] = []
+    current_row: list[int] = []
+    cursor = 0
+    for idx, span in enumerate(spans):
+        if cursor + span > 12:
+            rows.append(current_row)
+            current_row = []
+            cursor = 0
+        current_row.append(idx)
+        cursor += span
+    if current_row:
+        rows.append(current_row)
+
+    extend_classes = [""] * len(items)
+    for row in rows:
+        used = sum(spans[i] for i in row)
+        leftover = 12 - used
+        if leftover > 0 and row:
+            last_idx = row[-1]
+            extend_classes[last_idx] = f" home-command-card-row-extend-{spans[last_idx] + leftover}"
+    return extend_classes
+
+
 def render_home_command_tiles(
     items: list[dict],
     *,
@@ -959,7 +998,8 @@ def render_home_command_tiles(
     cards = []
     quick_view_meta: dict[str, dict[str, str]] = {}
     route_meta: dict[str, dict[str, str]] = {}
-    for item in items:
+    row_extend_classes = _home_command_row_extend_classes(items)
+    for item_index, item in enumerate(items):
         label = _safe_text(item.get("label"))
         value = _safe_text(item.get("value"))
         full_note = _safe_text(item.get("note"))
@@ -990,6 +1030,7 @@ def render_home_command_tiles(
             if item.get("wide") or item.get("priority") == "primary"
             else " home-command-card-secondary"
         )
+        row_extend_class = row_extend_classes[item_index]
         route_key = _safe_text(item.get("route_key")).strip()
         route_player_id = _safe_text(item.get("route_player_id")).strip()
         route_focus_mode = _safe_text(item.get("route_focus_mode")).strip()
@@ -1044,6 +1085,7 @@ def render_home_command_tiles(
                 + escape(tone)
                 + wide_class
                 + priority_class
+                + row_extend_class
                 + " home-command-player-card"
                 + route_class
                 + "'"
@@ -1086,6 +1128,7 @@ def render_home_command_tiles(
             + escape(tone)
             + wide_class
             + priority_class
+            + row_extend_class
             + route_class
             + "'"
             + route_attrs
