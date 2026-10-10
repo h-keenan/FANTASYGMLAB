@@ -542,57 +542,6 @@ def _list_html(items: tuple[str, ...]) -> str:
     return "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
 
 
-_DETAIL_SLIDE_INDEX_KEY = "landing_detail_slide_idx"
-
-
-def _detail_slide_specs() -> tuple[tuple[str, str, str, str], ...]:
-    """The 4 feature-explanation slides as (anchor_id, kicker, heading, body_html).
-
-    Single source of truth for both the flat (``landing_body_html``) and the
-    paginated (``render_landing_detail_slideshow``) presentations, so neither
-    can silently drop a title/body pair from WHAT_IT_DOES / WHY_DIFFERENT /
-    FOUNDER_INCLUDED / FOUNDER_EXPERIMENTAL / TRUST_POINTS.
-    """
-
-    what_lines = tuple(f"{title} — {body}" for title, body, _file in WHAT_IT_DOES)
-    why_lines = tuple(f"{title} — {body}" for title, body in WHY_DIFFERENT)
-    founder_body = (
-        "<div class='fgl-landing__split'>"
-        "<div><h3>What's included</h3>"
-        f"{_list_html(FOUNDER_INCLUDED)}"
-        "</div><div><h3>What's experimental</h3>"
-        f"{_list_html(FOUNDER_EXPERIMENTAL)}"
-        "<p class='fgl-landing__note'>Experimental tools do not change core recommendation generation.</p>"
-        "</div></div>"
-    )
-    return (
-        (
-            "fgl-how-it-works",
-            "What it does",
-            "Front-office tools for the league you manage",
-            _list_html(what_lines),
-        ),
-        (
-            "",
-            "Why it's different",
-            "League-aware recommendations with inspectable context",
-            _list_html(why_lines),
-        ),
-        (
-            "fgl-founder-beta",
-            "Founder Beta",
-            "Early access with clear labels",
-            founder_body,
-        ),
-        (
-            "",
-            "Trust",
-            "Inspectable recommendations, not hype",
-            _list_html(TRUST_POINTS),
-        ),
-    )
-
-
 def landing_body_html(
     *,
     billing_configured: bool,
@@ -616,15 +565,35 @@ def landing_body_html(
 
     sections: list[str] = []
     if detail:
-        for anchor_id, kicker, heading, body_html in _detail_slide_specs():
-            id_attr = f" id='{escape(anchor_id)}'" if anchor_id else ""
-            sections.append(
-                f"<section class='fgl-landing__section'{id_attr}>"
-                f"<div class='fgl-landing__kicker'>{escape(kicker)}</div>"
-                f"<h2>{escape(heading)}</h2>"
-                f"{body_html}"
-                "</section>"
-            )
+        what_lines = tuple(f"{title} — {body}" for title, body, _file in WHAT_IT_DOES)
+        why_lines = tuple(f"{title} — {body}" for title, body in WHY_DIFFERENT)
+        sections.append(
+            "<section class='fgl-landing__section' id='fgl-how-it-works'>"
+            "<div class='fgl-landing__kicker'>What it does</div>"
+            "<h2>Front-office tools for the league you manage</h2>"
+            f"{_list_html(what_lines)}"
+            "</section>"
+            "<section class='fgl-landing__section'>"
+            "<div class='fgl-landing__kicker'>Why it's different</div>"
+            "<h2>League-aware recommendations with inspectable context</h2>"
+            f"{_list_html(why_lines)}"
+            "</section>"
+            "<section class='fgl-landing__section' id='fgl-founder-beta'>"
+            "<div class='fgl-landing__kicker'>Founder Beta</div>"
+            "<h2>Early access with clear labels</h2>"
+            "<div class='fgl-landing__split'>"
+            "<div><h3>What's included</h3>"
+            f"{_list_html(FOUNDER_INCLUDED)}"
+            "</div><div><h3>What's experimental</h3>"
+            f"{_list_html(FOUNDER_EXPERIMENTAL)}"
+            "<p class='fgl-landing__note'>Experimental tools do not change core recommendation generation.</p>"
+            "</div></div></section>"
+            "<section class='fgl-landing__section'>"
+            "<div class='fgl-landing__kicker'>Trust</div>"
+            "<h2>Inspectable recommendations, not hype</h2>"
+            f"{_list_html(TRUST_POINTS)}"
+            "</section>"
+        )
     if include_pricing:
         sections.append(
             "<section class='fgl-landing__section' id='fgl-pricing'>"
@@ -643,77 +612,6 @@ def landing_body_html(
             "</section>"
         )
     return "".join(sections)
-
-
-def _clamped_detail_slide_index(total: int) -> int:
-    raw = st.session_state.get(_DETAIL_SLIDE_INDEX_KEY, 0)
-    try:
-        idx = int(raw)
-    except (TypeError, ValueError):
-        idx = 0
-    return max(0, min(idx, max(total - 1, 0)))
-
-
-def render_landing_detail_slideshow() -> None:
-    """One feature-explanation slide at a time, with Prev/Next navigation.
-
-    Streamlit-native (session_state + st.button) rather than a CSS-only
-    radio/label carousel: a hidden-radio build of this was verified against
-    the real rendered app (Playwright) and its :checked state did not
-    persist past the triggering click — real clicks never advanced past
-    slide 1 even though the mechanism worked fine in an isolated page. This
-    reruns on every Prev/Next click like every other button-driven surface
-    in this app, so it rides the same viewport-preservation path already
-    proven for in-place actions, instead of a one-off DOM trick.
-    """
-
-    slides = _detail_slide_specs()
-    total = len(slides)
-    if total == 0:
-        return
-    idx = _clamped_detail_slide_index(total)
-    anchor_id, kicker, heading, body_html = slides[idx]
-    id_attr = f" id='{escape(anchor_id)}'" if anchor_id else ""
-
-    st.markdown(
-        f"<section class='fgl-landing__section fgl-landing__slide-active'{id_attr} "
-        f"role='tabpanel' aria-label='{escape(heading)} (slide {idx + 1} of {total})'>"
-        f"<div class='fgl-landing__kicker'>{escape(kicker)}</div>"
-        f"<h2>{escape(heading)}</h2>"
-        f"{body_html}"
-        "</section>",
-        unsafe_allow_html=True,
-    )
-
-    # One shared rerun call site for both buttons (app-wide explicit-rerun
-    # budget in tests/test_viewport_preservation.py), not one per button.
-    requested_delta = 0
-    nav_prev, nav_next = st.columns(2)
-    with nav_prev:
-        if st.button(
-            "‹ Prev",
-            key="landing_slide_prev",
-            disabled=idx == 0,
-            use_container_width=True,
-        ):
-            requested_delta = -1
-    with nav_next:
-        if st.button(
-            "Next ›",
-            key="landing_slide_next",
-            disabled=idx == total - 1,
-            use_container_width=True,
-        ):
-            requested_delta = 1
-    st.markdown(
-        f"<p class='fgl-landing__slide-position'>Slide {idx + 1} of {total}</p>",
-        unsafe_allow_html=True,
-    )
-    if requested_delta:
-        st.session_state[_DETAIL_SLIDE_INDEX_KEY] = max(
-            0, min(total - 1, idx + requested_delta)
-        )
-        st.rerun()
 
 
 def render_screenshot_gallery() -> None:
@@ -856,11 +754,10 @@ def render_marketing_landing_deferred(*, include_proof: bool = True) -> dict[str
         include_pricing = True
 
     render_screenshot_gallery()
-    render_landing_detail_slideshow()
 
     deferred = landing_body_html(
         billing_configured=billing_configured,
-        detail=False,
+        detail=True,
         include_pricing=include_pricing,
     )
     if deferred:

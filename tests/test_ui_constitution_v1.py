@@ -202,10 +202,7 @@ def test_no_per_player_portrait_hacks_in_pqv():
 
 
 def test_explicit_rerun_budget_and_app_css():
-    # 63 -> 64: one new shared rerun call site for the welcome page's
-    # feature-explanation slideshow Prev/Next buttons
-    # (modules/marketing_landing.py render_landing_detail_slideshow).
-    assert count_explicit_reruns() <= 64
+    assert count_explicit_reruns() <= 63
     assert len(APP_CSS) < 390_000
 
 
