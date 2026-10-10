@@ -20,6 +20,17 @@ public-player *identity* hydration, not valuation. Valuation history is a
 different concern for a different consumer (service-to-service exports —
 see ``services/fantasy_content.py``), so it gets its own file next to
 players.db instead of weakening that contract.
+
+The residual ("none of the six additive components explain this") fallback
+is only ever labeled "Injury or availability risk" when a real
+injury/availability signal from ``rankings.py`` (``risk_multiplier``,
+``non_injury_risk_multiplier``, ``injury_risk_score``) actually corroborates
+it; otherwise it is labeled the honest, generic "Other factors" — see
+``_risk_signal_changed``. Every returned change also carries
+``snapshot_refreshed_at``, the timestamp of the valuation snapshot itself
+(reusing the same fingerprint-gated ``captured_at`` this module already
+persists), so a downstream consumer of ``/v1/content/feed`` can distinguish
+"when the snapshot was taken" from "whenever I happened to poll the feed".
 """
 
 from __future__ import annotations
@@ -51,6 +62,7 @@ _COMPONENT_WEIGHTS: dict[str, float] = {
 }
 
 RISK_DRIVER = "risk"
+OTHER_DRIVER = "other"
 
 _DRIVER_LABELS: dict[str, str] = {
     "market_score": "Market value",
@@ -60,9 +72,24 @@ _DRIVER_LABELS: dict[str, str] = {
     "role_score": "Depth-chart role",
     "opportunity_score": "Opportunity/role outlook",
     RISK_DRIVER: "Injury or availability risk",
+    OTHER_DRIVER: "Other factors",
 }
 
 _SCORE_COLUMN_CANDIDATES = ("dynasty_score", "score")
+
+# Real injury/availability signals rankings.py already derives from each
+# player's live ``status``/``injury_status`` (see
+# rankings.apply_injury_risk_fields(), rankings.risk_multiplier(),
+# rankings.non_injury_risk_multiplier()) -- captured alongside the six
+# additive components solely so the residual-attribution fallback below can
+# check whether an actual injury/availability input moved, rather than
+# inferring "injury" purely from an unexplained score residual.
+_CORROBORATION_COLUMNS: tuple[str, ...] = (
+    "risk_multiplier",
+    "non_injury_risk_multiplier",
+    "injury_risk_score",
+)
+_CORROBORATION_EPSILON = 1e-6
 
 
 def history_path(db_path: str | Path) -> Path:
@@ -84,7 +111,13 @@ def capture_snapshot(frame: pd.DataFrame) -> dict[str, dict[str, float]]:
         return {}
     score_column = _score_column(frame)
     component_columns = [c for c in _COMPONENT_WEIGHTS if c in frame.columns]
-    columns = [score_column, *component_columns] if score_column in frame.columns else component_columns
+    # Corroboration-only columns: carried through the snapshot so a later
+    # diff can confirm (or fail to confirm) an actual injury/availability
+    # move, but never added to _COMPONENT_WEIGHTS/tracked_total -- they are
+    # not additive composite inputs.
+    corroboration_columns = [c for c in _CORROBORATION_COLUMNS if c in frame.columns]
+    all_columns = [*component_columns, *corroboration_columns]
+    columns = [score_column, *all_columns] if score_column in frame.columns else all_columns
     if not columns:
         return {}
     work = frame.loc[:, ["player_id", *dict.fromkeys(columns)]].copy()
@@ -141,14 +174,41 @@ def _load_state(path: Path) -> dict[str, Any] | None:
         return None
 
 
+def _risk_signal_changed(previous: Mapping[str, float], current: Mapping[str, float]) -> bool:
+    """True only when a real injury/availability input actually moved.
+
+    Checks the same risk/injury fields rankings.compose_composite_score()
+    derives from each player's live ``status``/``injury_status``
+    (``risk_multiplier``, ``non_injury_risk_multiplier``,
+    ``injury_risk_score`` -- see ``_CORROBORATION_COLUMNS``). If those
+    columns were not captured in the snapshot (older snapshot predating
+    this change, or a caller-supplied frame missing them), both sides
+    default to ``0.0`` and this correctly returns ``False`` -- "no signal
+    available" and "signal available but unchanged" are both treated as
+    "cannot corroborate injury/availability", never as confirmation.
+    """
+
+    for column in _CORROBORATION_COLUMNS:
+        prev_value = float(previous.get(column, 0.0))
+        curr_value = float(current.get(column, 0.0))
+        if abs(curr_value - prev_value) > _CORROBORATION_EPSILON:
+            return True
+    return False
+
+
 def _driver_for_player(
     previous: Mapping[str, float], current: Mapping[str, float]
 ) -> tuple[str, float]:
     """Largest-magnitude weighted component contribution.
 
-    ``risk`` absorbs the remainder (injury/availability-multiplier swings
-    plus rounding) whenever no tracked additive sub-score moved enough to
-    explain the overall delta on its own.
+    The remainder (rounding plus anything not captured by a tracked
+    additive sub-score) is attributed to ``risk`` -- "Injury or
+    availability risk" -- ONLY when a real injury/availability signal
+    (see ``_risk_signal_changed``) actually corroborates that read.
+    Labeling an unexplained residual as "injury" without that corroboration
+    would assert a specific causal claim the data does not support, so an
+    uncorroborated residual is attributed to ``other`` -- "Other factors"
+    -- an honest "we don't know what explains this" instead.
     """
 
     best_key = RISK_DRIVER
@@ -166,7 +226,7 @@ def _driver_for_player(
     residual = score_delta - tracked_total
     if abs(residual) > abs(best_contribution):
         best_contribution = residual
-        best_key = RISK_DRIVER
+        best_key = RISK_DRIVER if _risk_signal_changed(previous, current) else OTHER_DRIVER
     return best_key, best_contribution
 
 
@@ -215,6 +275,25 @@ def diff_snapshots(
     return changes
 
 
+def _with_snapshot_refreshed_at(
+    changes: list[dict[str, Any]], captured_at: Any
+) -> list[dict[str, Any]]:
+    """Stamp each change with when its underlying snapshot was captured.
+
+    ``captured_at`` comes from the same fingerprint-gated state this module
+    already persists on every real refresh (see ``_atomic_write_json``
+    above) -- it is the moment the *valuation snapshot* was taken, not
+    "now". Reusing it (rather than a fresh ``datetime.now()`` here) is what
+    lets a downstream consumer tell a snapshot refresh apart from whenever
+    *they* happened to poll ``/v1/content/feed``: repeated feed reads
+    between refreshes carry the same ``snapshot_refreshed_at`` value, and it
+    only advances when players.db actually refreshes.
+    """
+
+    stamp = captured_at if isinstance(captured_at, str) and captured_at else None
+    return [{**row, "snapshot_refreshed_at": stamp} for row in changes]
+
+
 def value_changes_since_last_refresh(
     db_path: str | Path,
     frame: pd.DataFrame,
@@ -247,20 +326,25 @@ def value_changes_since_last_refresh(
         state = _load_state(path)
         if state is not None and state.get("fingerprint") == fingerprint_digest:
             cached_changes = state.get("changes")
-            return cached_changes[: max(0, int(limit))] if isinstance(cached_changes, list) else []
+            if not isinstance(cached_changes, list):
+                return []
+            return _with_snapshot_refreshed_at(
+                cached_changes[: max(0, int(limit))], state.get("captured_at")
+            )
 
         previous_snapshot = state.get("snapshot") if state else {}
         changes = diff_snapshots(previous_snapshot or {}, current_snapshot)
+        captured_at = datetime.now(timezone.utc).isoformat()
         _atomic_write_json(
             path,
             {
                 "schema_version": VALUE_HISTORY_SCHEMA_VERSION,
                 "fingerprint": fingerprint_digest,
-                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "captured_at": captured_at,
                 "snapshot": current_snapshot,
                 "changes": changes,
             },
         )
-        return changes[: max(0, int(limit))]
+        return _with_snapshot_refreshed_at(changes[: max(0, int(limit))], captured_at)
     except Exception:
         return []
