@@ -118,6 +118,7 @@ SURFACES = {
     "viewport-preserve",
     "recaps",
     "alerts",
+    "news",
     "summary-probe",
 }
 
@@ -2896,6 +2897,86 @@ def _alerts() -> None:
     )
 
 
+def _news() -> None:
+    """General News page — web counterpart to mobile's NewsScreen
+    (mobile/src/screens/NewsScreen.tsx). A separate, non-roster-scoped
+    surface from Dashboard's 3-tile news digest and the roster-scoped
+    Alerts timeline — this fixture proves it renders real grouped content,
+    not an empty/broken state, without touching the committed news cache
+    or reaching a live RSS feed."""
+
+    from modules import general_news_ui
+    from modules import news as canonical_news
+    from modules.general_news_styles import GENERAL_NEWS_CSS
+
+    # Browser fixtures never call providers or mutate the committed cache.
+    canonical_news.schedule_news_cache_refresh = lambda **_kwargs: False
+
+    inject_global_styles(GENERAL_NEWS_CSS)
+    _marker(
+        "news",
+        (
+            "News",
+            "Around the league",
+            "Injury / Status",
+            "Transaction",
+            "Role / Depth Chart",
+            "Off-Field",
+        ),
+    )
+    _workspace("News", "General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your rosters.")
+
+    now = 1_787_600_000.0
+    fixture_items = [
+        {
+            "title": "Star RB downgraded to out after Friday's final practice report",
+            "link": "https://example.com/fixture/news-injury-1",
+            "source": "ESPN",
+            "summary": "The team ruled him out for Sunday's game with an ankle injury suffered in Wednesday's practice.",
+            "published_ts": now - 2 * 3600,
+            "event_type": "injury/status",
+            "speculative": False,
+        },
+        {
+            "title": "Backup corner elevated after starter's late scratch",
+            "link": "https://example.com/fixture/news-injury-2",
+            "source": "CBS Sports",
+            "summary": "A groin tightness kept the starter out of pregame warmups.",
+            "published_ts": now - 3 * 3600,
+            "event_type": "injury/status",
+            "speculative": True,
+        },
+        {
+            "title": "Veteran receiver traded to contender ahead of the deadline",
+            "link": "https://example.com/fixture/news-transaction-1",
+            "source": "RotoWire",
+            "summary": "The move reshapes the receiver room on both sides of the deal.",
+            "published_ts": now - 6 * 3600,
+            "event_type": "transaction",
+            "speculative": False,
+        },
+        {
+            "title": "Rookie wideout to see expanded route share after bye week",
+            "link": "https://example.com/fixture/news-role-1",
+            "source": "Pro Football Talk",
+            "summary": "The coaching staff signaled a larger role as the team's offense searches for a spark.",
+            "published_ts": now - 26 * 3600,
+            "event_type": "role/depth chart",
+            "speculative": False,
+        },
+        {
+            "title": "Star QB fined for postgame comments about officiating",
+            "link": "https://example.com/fixture/news-offfield-1",
+            "source": "Yahoo Sports",
+            "summary": "The league office issued a five-figure fine for public criticism of the officiating crew.",
+            "published_ts": now - 50 * 3600,
+            "event_type": "off-field/drama",
+            "speculative": False,
+        },
+    ]
+    general_news_ui.render_general_news_feed(fixture_items, now_ts=now)
+
+
 def main() -> None:
     st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     viewport_preservation.render_viewport_preservation()
@@ -2938,6 +3019,7 @@ def main() -> None:
         "viewport-preserve": _viewport_preserve,
         "recaps": _recaps,
         "alerts": _alerts,
+        "news": _news,
         "summary-probe": _summary_component_probe,
     }[surface]()
     viewport_preservation.render_viewport_restore_kick()

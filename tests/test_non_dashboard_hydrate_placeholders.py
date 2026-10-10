@@ -138,10 +138,13 @@ def test_app_migrated_known_spinner_sites_to_hydrate_placeholder():
     assert 'with st.spinner("Checking fallback NFL headlines..."):' not in APP
     assert 'with st.spinner("Searching acquisition paths..."):' not in APP
 
-    assert APP.count("_dash_load.hydrate_placeholder(") >= 6
+    # News graduated to a general, non-roster-scoped feed (the web
+    # counterpart to mobile's NewsScreen) that never does a synchronous RSS
+    # fetch on this route — mirrors GET /v1/news's non-blocking contract —
+    # so its two hydrate_placeholder sites (ROUTE_PLAYER_NEWS,
+    # ROUTE_NFL_HEADLINES_FALLBACK) are gone, not un-migrated.
+    assert APP.count("_dash_load.hydrate_placeholder(") >= 4
     assert "dashboard_loading_state.ROUTE_TRADE_HUB_SEARCH" in APP or "_dash_load.ROUTE_TRADE_HUB_SEARCH" in APP
     assert "_dash_load.ROUTE_TRADE_HUB_ACQUISITION_SEARCH" in APP
     assert "_dash_load.ROUTE_PLAYER_QUICK_VIEW_WEEKLY_POINTS" in APP
     assert "_dash_load.ROUTE_LEAGUE_LOADING" in APP
-    assert "_dash_load.ROUTE_PLAYER_NEWS" in APP
-    assert "_dash_load.ROUTE_NFL_HEADLINES_FALLBACK" in APP

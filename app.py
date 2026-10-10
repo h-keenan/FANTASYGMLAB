@@ -131,8 +131,6 @@ from modules import league_recaps
 from modules import league_recaps_ui
 from modules import league_standings
 from modules import playoff_simulator
-from modules import league_intelligence as league_intelligence_feed
-from modules import league_intelligence_ui
 from modules import league_maturity
 from modules import live_draft
 from modules import live_draft_ui
@@ -231,7 +229,6 @@ from modules.accounts import get_current_account, upsert_account
 from modules.profile import load_profile_key, save_profile_key
 from modules.my_news import (
     build_quick_news_summary,
-    build_sleeper_roster_updates,
     curate_player_news,
     filter_news_for_players,
     relative_news_time,
@@ -330,18 +327,25 @@ def load_cached_news_pool(*args, **kwargs):
     return _load_cached_news_pool(*args, **kwargs)
 
 
-def fetch_roster_news(*args, **kwargs):
-    """Load optional roster-news infrastructure outside the startup path."""
-
-    from modules.news import fetch_roster_news as _fetch_roster_news
-
-    return _fetch_roster_news(*args, **kwargs)
-
-
 def get_news_status(*args, **kwargs):
     from modules.news import get_news_status as _get_news_status
 
     return _get_news_status(*args, **kwargs)
+
+
+def schedule_news_cache_refresh(*args, **kwargs):
+    from modules.news import schedule_news_cache_refresh as _schedule_news_cache_refresh
+
+    return _schedule_news_cache_refresh(*args, **kwargs)
+
+
+def general_news_feed(*args, **kwargs):
+    """General, non-roster-scoped NFL news — the web News page's data
+    source, shared with mobile's NewsScreen via GET /v1/news."""
+
+    from modules.news import general_news_feed as _general_news_feed
+
+    return _general_news_feed(*args, **kwargs)
 
 
 def explain_player_decision(*args, **kwargs):
@@ -17545,7 +17549,7 @@ def main():
         "startup_draft_center": "Draft-first workflow for leagues that are still building rosters.",
         "draft_summary": "Draft Center for rookie status, draft posture, pick strategy, and partner discovery.",
         "live_draft": "Read-only Sleeper live draft assistant for active draft rooms.",
-        "news": "Roster-specific news and automatic Sleeper update monitoring.",
+        "news": "General NFL news — injury, role, transaction, and off-field signal. Not filtered to your rosters.",
         "alerts": "Priority signals and a deeper activity timeline.",
         "archetypes": "Supporting franchise identity context for League Overview and Teams.",
         "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
@@ -21892,199 +21896,37 @@ def main():
                     render_analysis_cards=render_analysis_cards,
                 )
 
-    # MY PLAYERS' NEWS
+    # GENERAL NEWS — web counterpart to mobile's NewsScreen
+    # (mobile/src/screens/NewsScreen.tsx): a general, non-roster-scoped NFL
+    # feed grouped by day then event type. This is intentionally a third,
+    # separate surface from Dashboard's 3-tile news digest and the
+    # roster-scoped Alerts timeline — neither of those changes here.
     if current_page == "news":
+        from modules import general_news_ui
+        from modules.general_news_styles import GENERAL_NEWS_CSS
+
+        inject_global_styles(GENERAL_NEWS_CSS)
         render_section_header(
             "News",
-            kicker="What matters now",
-            note="Player news translated into who owns them in your league and what you should do next.",
+            kicker="Around the league",
+            note="General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your rosters.",
         )
 
-        if my_roster_id is None or not selected_league_id:
-            st.warning("Roster not found for this username in the selected league.")
-        else:
-            now = time.time()
-            refresh_news = st.button("Refresh news")
-            news_context = get_shared_league_context(
-                include_intelligence=False,
-                include_trust=False,
-                include_maturity=False,
+        refresh_news = st.button("Refresh news", key="general_news_refresh")
+        # Same non-blocking contract services/mobile_api_service.py's GET
+        # /v1/news uses: schedule a background refresh only when the
+        # on-disk cache is stale (or the reader asked for one), and render
+        # whatever is currently cached rather than waiting on live RSS.
+        schedule_news_cache_refresh(force=bool(refresh_news))
+        news_items = general_news_feed(30)
+        news_status = get_news_status()
+        if news_items:
+            st.caption(
+                f"Showing {len(news_items)} general NFL items (injury, role, transaction, off-field)."
             )
-            news_roster_player_map = news_context.get("roster_player_map") or {}
-            if not news_roster_player_map:
-                news_rosters = get_rosters(selected_league_id) or []
-                news_roster_player_map = _build_roster_player_map(news_rosters)
-            news_roster_profiles = (
-                news_context.get("roster_profiles")
-                or get_league_roster_profiles(selected_league_id)
-                or {}
-            )
-            league_player_ids = {
-                str(player_id)
-                for roster_players in news_roster_player_map.values()
-                for player_id in roster_players
-            }
-            league_player_frame = df_players[
-                df_players["player_id"].astype(str).isin(league_player_ids)
-            ]
-            league_player_names = league_player_frame["name"].dropna().tolist()
-            league_player_teams = (
-                league_player_frame["team"].dropna().astype(str).unique().tolist()
-            )
-
-            player_ids = [
-                str(pid)
-                for pid in news_roster_player_map.get(str(my_roster_id), ())
-                if pid is not None
-            ]
-            if not player_ids:
-                player_ids = [
-                    str(pid)
-                    for pid in get_roster_player_ids(selected_league_id, my_roster_id) or []
-                ]
-            if not player_ids:
-                st.warning("No players found on this roster to match news.")
-            else:
-                my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
-                my_names = my_team_df["name"].dropna().tolist()
-                roster_teams = my_team_df["team"].dropna().astype(str).unique().tolist()
-
-                st.caption(
-                    f"Tracking news for {len(my_names)} roster players "
-                    f"(e.g. {', '.join(my_names[:5])}{'...' if len(my_names) > 5 else ''})"
-                )
-
-                roster_news_key = f"roster_news_{selected_league_id}_{my_roster_id}"
-                roster_news_last_fetch_key = f"{roster_news_key}_last_fetch"
-                last_roster_fetch = st.session_state.get(roster_news_last_fetch_key, 0)
-                if (
-                    refresh_news
-                    or roster_news_key not in st.session_state
-                    or now - last_roster_fetch > 900
-                ):
-                    from modules import dashboard_loading_state as _dash_load
-
-                    with _dash_load.hydrate_placeholder(
-                        _dash_load.ROUTE_PLAYER_NEWS,
-                        title="Loading player-specific news...",
-                    ):
-                        st.session_state[roster_news_key] = fetch_roster_news(
-                            my_names,
-                            force_refresh=refresh_news,
-                        )
-                        st.session_state[roster_news_last_fetch_key] = now
-
-                roster_news = st.session_state.get(roster_news_key, [])
-                all_news = []
-                my_news = []
-                if not roster_news:
-                    last_fetch = st.session_state.get("news_last_fetch", 0)
-                    if refresh_news or not st.session_state.get("news") or now - last_fetch > 900:
-                        from modules import dashboard_loading_state as _dash_load
-
-                        with _dash_load.hydrate_placeholder(
-                            _dash_load.ROUTE_NFL_HEADLINES_FALLBACK,
-                            title="Checking fallback NFL headlines...",
-                        ):
-                            st.session_state["news"] = fetch_news() or []
-                            st.session_state["news_last_fetch"] = now
-                    all_news = st.session_state.get("news", [])
-                    my_news = filter_news_for_players(all_news, my_names, roster_teams)
-
-                cached_global_news = all_news or st.session_state.get("news", [])
-                league_news = (
-                    filter_news_for_players(
-                        cached_global_news,
-                        league_player_names,
-                        league_player_teams,
-                    )
-                    if cached_global_news and league_player_names
-                    else []
-                )
-                display_news = curate_player_news(
-                    [*(roster_news or my_news), *league_news],
-                    max_items=12,
-                )
-                sleeper_updates = []
-                if not display_news:
-                    sleeper_updates = build_sleeper_roster_updates(my_team_df)
-                    display_news = sleeper_updates
-
-                news_status = get_news_status()
-                if roster_news:
-                    if news_status.get("source") == "roster_cache":
-                        st.warning("Player-specific headlines are from cache.")
-                    elif news_status.get("source") == "roster_live":
-                        st.caption("Loaded player-specific headlines.")
-                elif my_news:
-                    if news_status.get("source") == "cache":
-                        st.warning(
-                            "Live news feeds could not be reached, so these matched items are from cached headlines."
-                        )
-                    elif news_status.get("source") == "live":
-                        st.caption("Loaded fallback NFL headlines.")
-                elif sleeper_updates:
-                    if news_status.get("source") in {"empty", "roster_empty"}:
-                        st.warning(
-                            "Player-specific headlines could not be reached, so this section is showing automatic Sleeper roster updates."
-                        )
-                    else:
-                        st.caption(
-                            "No player-specific headlines matched your roster, so this section is showing automatic Sleeper roster updates."
-                        )
-                elif news_status.get("source") in {"empty", "roster_empty"}:
-                    st.error(
-                        "Player-specific headlines could not be reached and no Sleeper roster updates were available."
-                    )
-
-                if roster_news:
-                    st.caption(
-                        f"Showing {len(display_news)} league-relevant items, led by player-specific headlines."
-                    )
-                elif sleeper_updates and not my_news:
-                    st.caption(
-                        f"Showing {len(display_news)} automatic Sleeper roster updates. "
-                        f"External headline pool: {len(all_news)}."
-                    )
-                else:
-                    st.caption(
-                        f"Showing {len(display_news)} league-relevant items from {len(cached_global_news)} cached headlines."
-                    )
-
-                if not display_news:
-                    league_intelligence_ui.render_league_intelligence_feed(
-                        league_intelligence_feed.LeagueIntelligenceFeed(
-                            items=(),
-                            player_rows_by_id={},
-                            player_lookup_count=0,
-                        ),
-                        score_field=score_field,
-                        score_label=league_score_label(score_field),
-                        player_card_builder=_compact_player_row_html,
-                        render_tappable_player_html=_render_tappable_player_html,
-                        open_player_quick_view=open_player_quick_view,
-                    )
-                else:
-                    intelligence_feed = league_intelligence_feed.build_league_intelligence_feed(
-                        display_news,
-                        df_players,
-                        roster_player_map=news_roster_player_map,
-                        roster_names=league_intelligence_feed.roster_name_index(
-                            {"roster_profiles": news_roster_profiles}
-                        ),
-                        current_roster_id=_safe_text(my_roster_id),
-                        summary_builder=build_quick_news_summary,
-                        relative_time_builder=relative_news_time,
-                        now_timestamp=now,
-                    )
-                    league_intelligence_ui.render_league_intelligence_feed(
-                        intelligence_feed,
-                        score_field=score_field,
-                        score_label=league_score_label(score_field),
-                        player_card_builder=_compact_player_row_html,
-                        render_tappable_player_html=_render_tappable_player_html,
-                        open_player_quick_view=open_player_quick_view,
-                    )
+        elif news_status.get("source") in {"empty", "roster_empty", "none"}:
+            st.warning("Live news feeds could not be reached and no cached headlines are available yet.")
+        general_news_ui.render_general_news_feed(news_items)
 
     # TRADE IDEAS
     if current_page == "trade_hub":

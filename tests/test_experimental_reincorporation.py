@@ -67,16 +67,21 @@ def test_players_core_and_duplicates_archived():
         "weekly_report",
         "manager_tendencies",
         "player_detail",
-        "news",
         "archetypes",
     ):
         assert by_key[key].category == "ARCHIVED"
         assert key in ARCHIVED_DESTINATION_KEYS
+    # News (general, non-roster NFL feed) graduated to CORE — a third,
+    # standalone general-news surface alongside Dashboard's tiles and the
+    # roster-scoped Alerts timeline.
+    assert by_key["news"].category == "CORE"
+    assert "news" not in ARCHIVED_DESTINATION_KEYS
     visible = {page.key for page in current_platform_destinations(False)}
     assert "players" in visible
     assert "gm_targets" not in visible
     assert "trade_analyzer" in visible
     assert "teams" not in visible
+    assert "news" in visible
     conditional = {
         page.key
         for page in current_platform_destinations(

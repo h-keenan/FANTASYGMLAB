@@ -124,8 +124,12 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "news",
         "News",
         "INTELLIGENCE",
-        "Archived roster news route — Dashboard / League Intelligence owns the feed.",
-        category="ARCHIVED",
+        "General NFL news feed — injury, role, transaction, and off-field "
+        "signal, grouped by day and event type. Not roster-scoped: see "
+        "Dashboard for the 3-tile roster digest, or Alerts for the "
+        "roster-aware activity timeline.",
+        category="CORE",
+        beta_visible=True,
     ),
     PageDefinition(
         "archetypes",

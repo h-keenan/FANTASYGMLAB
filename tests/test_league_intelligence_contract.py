@@ -30,13 +30,17 @@ def test_feed_module_is_isolated_from_football_engines():
         assert forbidden not in source.lower()
 
 
-def test_production_route_uses_feed_without_replacing_player_detail_news():
+def test_news_route_is_general_feed_not_league_intelligence():
+    # News graduated from the old roster-scoped league_intelligence feed to
+    # a general, non-roster-scoped feed — the web counterpart to mobile's
+    # NewsScreen (mobile/src/screens/NewsScreen.tsx). build_league_intelligence_feed
+    # / render_league_intelligence_feed are no longer wired into app.py at
+    # all; player-detail's own "Recent News" section still reuses the
+    # shared render_news_card card renderer.
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    route = source.split("# MY PLAYERS' NEWS", 1)[1].split("# TRADE IDEAS", 1)[0]
-    assert "build_league_intelligence_feed" in route
-    assert "render_league_intelligence_feed" in route
-    assert "league_player_names" in route
-    assert "news_roster_player_map" in route
-    assert "get_shared_league_context()" not in route
-    assert "render_news_card(item, news_idx)" not in route
+    route = source.split('if current_page == "news":', 1)[1].split("# TRADE IDEAS", 1)[0]
+    assert "build_league_intelligence_feed" not in source
+    assert "render_league_intelligence_feed" not in source
+    assert "general_news_feed(" in route
+    assert "render_general_news_feed(" in route
     assert "def render_news_card" in source
