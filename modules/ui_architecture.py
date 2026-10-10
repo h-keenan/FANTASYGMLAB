@@ -119,6 +119,15 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         beta_visible=True,
     ),
     PageDefinition("waivers", "Waivers", "TRANSACTIONS", "Find available upgrades, injury replacements, and FAAB guidance.", category="CORE", beta_visible=True),
+    PageDefinition(
+        "trade_history",
+        "Trade History",
+        "TRANSACTIONS",
+        "Trades you've confirmed you made, plus a real before/after read once a "
+        "confirmed trade has had a few weeks to play out — matches mobile's Trade History screen.",
+        category="CORE",
+        beta_visible=True,
+    ),
     PageDefinition("startup_draft_center", "Startup Draft Center", "DRAFT", "Startup-only draft-first dashboard.", category="CORE", beta_visible=True),
     PageDefinition("draft_summary", "Draft Center", "DRAFT", "Primary rookie-draft, draft posture, and pick-strategy workspace.", category="CORE", beta_visible=True),
     PageDefinition(

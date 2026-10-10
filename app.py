@@ -143,6 +143,7 @@ from modules import roster_primary_actions
 from modules import onboarding_ui
 from modules import platform_import_ui
 from modules import portfolio_page
+from modules import trade_outcomes_page
 from modules import premium
 from modules import premium_page
 from modules import performance
@@ -2263,6 +2264,7 @@ PAGE_GLYPHS = {
     "trade_hub": "TH",
     "trade_analyzer": "TA",
     "waivers": "WV",
+    "trade_history": "TO",
     "teams": "LG",
     "draft_summary": "DR",
     "startup_draft_center": "SD",
@@ -23762,6 +23764,18 @@ def main():
         if portfolio_actions.get("open_league"):
             _resume_saved_supabase_league(portfolio_actions["open_league"], route_to_dashboard=True)
             st.rerun()
+
+    # TRADE HISTORY — quiet "did it work out?" follow-up, already fully
+    # built on mobile and the backend (modules.trade_outcome_results,
+    # services/mobile_api_service.py's /v1/trade-outcomes endpoints). Pure
+    # web exposure of the same trade_outcomes rows; no new valuation math.
+    if current_page == trade_outcomes_page.PAGE_KEY:
+        render_page_shell(
+            page_key=trade_outcomes_page.PAGE_KEY,
+            title=trade_outcomes_page.NAV_LABEL,
+            subtitle="Trades you've confirmed you made, and how they've worked out since.",
+        )
+        trade_outcomes_page.render_trade_history_page()
 
     if current_page == methodology_page.PAGE_KEY:
         methodology_page.render_methodology_page()
