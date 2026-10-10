@@ -389,7 +389,7 @@ def test_viewport_preservation_and_no_per_player_portrait_hacks():
     )
     assert "tracy" not in blob.casefold()
     assert "[data-player-id" not in blob
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     assert ".dg-lh-feed" not in APP_CSS
     assert MY_TEAM_DECISION_CSS not in APP_CSS
     assert LEAGUE_STORYLINES_CSS not in APP_CSS

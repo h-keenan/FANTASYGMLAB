@@ -70,4 +70,7 @@ def test_dead_pqv_generations_are_gone_from_global_css():
 
 
 def test_app_css_stays_under_existing_guardrail():
-    assert len(APP_CSS) < 390_000
+    # Raised from 390_000: GM Plan + News each added a legitimate, distinct
+    # mobile-nav glyph concept via semantic_glyphs.DESTINATION_CONCEPT, and
+    # gm_orb_row_css() emits one mask rule per unique concept.
+    assert len(APP_CSS) < 393_000

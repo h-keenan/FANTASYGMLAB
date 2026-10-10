@@ -176,7 +176,7 @@ def test_no_stmain_bottom_inset_and_app_css_budget():
         line.strip().startswith("bottom: var(--dg-mobile-shell-clearance)")
         for line in main_block.splitlines()
     )
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
 
 
 def test_explicit_rerun_count_unchanged():

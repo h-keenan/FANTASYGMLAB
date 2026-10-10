@@ -113,7 +113,7 @@ def test_player_tier_ladder_unchanged():
 
 def test_css_ownership_does_not_grow_app_css():
     assert MY_TEAM_DECISION_CSS not in APP_CSS
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     assert "inject_global_styles(MY_TEAM_DECISION_CSS)" in WORKSPACE
     assert "my-team-strategy-identity" in MY_TEAM_DECISION_CSS
 

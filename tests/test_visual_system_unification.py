@@ -306,7 +306,7 @@ def test_css_budget_and_lazy_analyzer_owner():
     assert "dg-compact-asset" not in APP_CSS
     assert "dg-compact-asset" in TRADE_ANALYZER_CSS
     assert "toa-share-card" not in APP_CSS
-    assert len(APP_CSS) < 390_000
+    assert len(APP_CSS) < 393_000
     tokens = Path("modules/design_tokens.py").read_text(encoding="utf-8")
     assert "--size-asset-compact" in tokens
     assert "--size-asset-standard" in tokens
