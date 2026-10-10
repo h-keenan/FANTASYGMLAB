@@ -68,6 +68,18 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         grid-column: span 8 !important;
     }
 
+    /* A card that's left alone (or trailing) on an underfilled 12-column
+       row stretches to absorb the leftover columns instead of leaving
+       blank dead space beside/below it — see
+       workspace_ui._home_command_row_extend_classes. */
+    .home-command-card-row-extend-8 {
+        grid-column: span 8 !important;
+    }
+
+    .home-command-card-row-extend-12 {
+        grid-column: span 12 !important;
+    }
+
     .home-command-card:first-child:not(.home-command-card-primary):not(.home-command-card-wide) {
         grid-column: span 4 !important;
     }
@@ -93,7 +105,9 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     .decision-panel-grid,
     .analysis-grid {
         gap: var(--dg-exec-column-gap) !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        /* auto-fit collapses unused trailing columns instead of leaving a
+           blank third column when a row renders only 1-2 cards. */
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
     }
 
     .home-hero-stats {
@@ -408,7 +422,9 @@ div[class*="st-key-"][class*="what_is_auto"] button {
     .summary-tile-grid-compact,
     .decision-panel-grid,
     .analysis-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        /* auto-fit so a single-card row fills the width instead of leaving
+           a blank second column at tablet widths. */
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
     }
 
 }

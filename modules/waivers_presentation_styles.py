@@ -319,7 +319,9 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
 
 @media (min-width: 72rem) {
     .free-agent-summary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        /* auto-fit so a single remaining free agent doesn't leave a blank
+           second column on the summary row. */
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     }
 
     .free-agent-card .waiver-card-decision-grid {
@@ -343,7 +345,9 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
 
 @media (min-width: 90rem) {
     .free-agent-summary-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        /* auto-fit so 1-2 available targets don't leave a blank trailing
+           column on wide desktop viewports. */
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     }
 }
 

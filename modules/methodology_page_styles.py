@@ -18,6 +18,6 @@ METHODOLOGY_PAGE_CSS = """
 .methodology-faq-item summary::-webkit-details-marker{display:none}
 .methodology-faq-item[open] summary{margin-bottom:var(--space-xs)}
 .methodology-limits{border-left:var(--border-width-semantic) solid var(--border-strong);padding-left:var(--space-sm)}
-@media (min-width: 700px){.methodology-page{max-width:56rem}.methodology-factor-grid{grid-template-columns:1fr 1fr}.methodology-strategy-list{grid-template-columns:1fr 1fr}}
+@media (min-width: 700px){.methodology-page{max-width:56rem}.methodology-factor-grid{grid-template-columns:1fr 1fr}.methodology-strategy-list{grid-template-columns:1fr 1fr}.methodology-grid-span-full{grid-column:1 / -1}}
 @media (max-width: 430px){.methodology-page{gap:var(--space-md);padding-inline:0}.methodology-hero,.methodology-card,.methodology-strategy,.methodology-faq-item{padding:var(--space-sm) var(--space-md)}}
 """
