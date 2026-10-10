@@ -145,6 +145,25 @@ VIEWPORT_PRESERVE_JS = """
           if (href.indexOf("?page=") >= 0) return true
         }
         if (isIntentionalNavKey(keyFrom(el))) return true
+        // Dashboard "module" tiles (render_home_command_tiles in
+        // workspace_ui.py) are plain HTML cards injected into ONE shared
+        // st.components.v2 tap-delegation root (interaction_contract.py's
+        // TAP_DELEGATION_JS) alongside sibling cards that open an in-place
+        // Player Quick View. Every card in that root shares a single
+        // Streamlit widget key, so keyFrom()/isIntentionalNavKey() can never
+        // tell a navigating card apart from an in-place one by key alone —
+        // the key only identifies the whole grid, not which card inside it
+        // was tapped. The route-navigating cards are the only ones Python
+        // marks with data-route (see _open_home_command_route /
+        // commit_destination_navigation), so check that attribute directly
+        // instead of relying on key matching. Without this, tapping a
+        // module tile that routes to another page (Trade Hub, Waivers, My
+        // Team, ...) was always treated as an in-place click: the restore()
+        // ladder raced the real navigation's scroll-reset-to-top and could
+        // re-anchor the new page to the old card's on-screen offset,
+        // producing the "jumps me around like I'm scrolling" / tap
+        // "doesn't always register" reports on mobile.
+        if (el.closest("[data-route]")) return true
         return false
       }
 

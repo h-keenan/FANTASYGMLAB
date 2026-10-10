@@ -2768,6 +2768,26 @@ def _viewport_preserve() -> None:
         st.button("Open fixture", key="founder_labs_open_nav_fixture", use_container_width=True)
         st.button("Open premium", key="nav_fixture_open_premium", use_container_width=True)
 
+    # Dashboard "module" tile fixture (#95x-class regression, mobile tap).
+    # render_home_command_tiles (modules/workspace_ui.py) renders
+    # route-navigating cards and in-place Player Quick View cards as plain
+    # HTML inside ONE shared st.components.v2 tap-delegation root
+    # (interaction_contract.TAP_DELEGATION_JS), so every card in that root
+    # carries the same Streamlit widget key — isIntentionalNav() cannot
+    # distinguish them by key and instead checks the data-route attribute
+    # that only the navigating card carries. This renders both card shapes
+    # with plain HTML (no live component round-trip needed) so Playwright
+    # can pointerdown the real DOM and read the real shipped
+    # isIntentionalNav() verdict off window.__dgInPlaceAnchor.nav.
+    render_html_fragment(
+        "<div class='home-command-card home-command-route-card'"
+        " data-route='viewport_fixture_route' role='button' tabindex='0'"
+        " aria-label='Open module fixture route'>Module tile (routes away)</div>"
+        "<div class='home-command-card home-command-player-card'"
+        " role='button' tabindex='0'"
+        " aria-label='Open module fixture quick view'>Module tile (in-place)</div>"
+    )
+
     with st.container(key="mobile_gm_sheet_trigger_viewport"):
         render_html_fragment(brand_identity.gm_orb_floating_trigger_html())
         st.button(
