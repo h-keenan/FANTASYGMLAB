@@ -292,6 +292,61 @@ def delete_rows(
     return True, ""
 
 
+def call_rpc(
+    config: dict,
+    access_token: str,
+    function_name: str,
+    *,
+    payload: dict | None = None,
+    timing_label: str = "supabase_call_rpc",
+    timeout: float = 15,
+) -> tuple[bool, str]:
+    """POST a Postgres RPC function via PostgREST (`/rest/v1/rpc/<function_name>`).
+
+    Shared by any account action that is implemented as a Supabase RPC
+    (SECURITY DEFINER function) rather than a plain table write — the
+    `delete_user` RPC (see ``delete_account``) is the first caller.
+    """
+
+    if not auth_supabase.is_configured(config):
+        return False, "Accounts are not configured."
+    if not _safe_text(access_token):
+        return False, SESSION_EXPIRED_COPY
+    try:
+        with performance.time_block(timing_label, category="supabase"):
+            response = requests.post(
+                _rest_url(config, f"rpc/{_safe_text(function_name)}"),
+                headers=auth_supabase.auth_headers(config, access_token),
+                json=payload or {},
+                timeout=timeout,
+            )
+    except Exception:
+        return False, "Could not reach Supabase table storage."
+    if response.status_code >= 400:
+        return False, _safe_error(response)
+    return True, ""
+
+
+def delete_account(config: dict, access_token: str) -> tuple[bool, str]:
+    """Permanently delete the signed-in user via the `delete_user` RPC.
+
+    Mirrors the mobile app's account-deletion path
+    (`mobile/src/context/AuthContext.tsx` -> `supabase.rpc('delete_user')`):
+    a SECURITY DEFINER Postgres function, `public.delete_user()`
+    (docs/supabase_delete_account.sql), that deletes the caller's own
+    auth.users row and lets ``on delete cascade`` remove every owned row
+    (profiles, saved_leagues, gm_targets, trade_outcomes, ...). Caller must
+    have already confirmed with the user: this is irreversible.
+    """
+
+    return call_rpc(
+        config,
+        access_token,
+        "delete_user",
+        timing_label="supabase_delete_account",
+    )
+
+
 def upsert_profile(config: dict, access_token: str, payload: dict) -> tuple[bool, str]:
     return upsert_row(config, access_token, "profiles", payload, on_conflict="user_id")
 

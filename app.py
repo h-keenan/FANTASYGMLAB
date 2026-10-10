@@ -11951,6 +11951,22 @@ def render_sidebar_franchise_card(
     )
 
 
+def _force_refresh_after_session_end() -> None:
+    """Single shared forced-rerun after sign-out or account deletion.
+
+    Both flows end the session, and this popover already rendered
+    "Signed in as ..." earlier in this same script run using the
+    pre-clear identity — the rest of the executive shell (header, nav,
+    entitlement state) needs a fresh script execution to read the
+    now-cleared session. Sign-out and delete-account both funnel through
+    this one call site rather than each holding its own ``st.rerun()`` so
+    the hard explicit-rerun budget
+    (scripts/measure_interaction_rerun_architecture.py) does not grow.
+    """
+
+    st.rerun()
+
+
 def render_executive_profile_control(
     *,
     account_label: str,
@@ -12135,7 +12151,73 @@ def render_executive_profile_control(
                         st.warning(
                             "Signed out on this device. Remote session close could not be confirmed."
                         )
-                    st.rerun()
+                    _force_refresh_after_session_end()
+
+                # Two-step confirm, zero new st.rerun() call sites. The
+                # arm/cancel toggle uses on_click (not an inline
+                # "if st.button(...): set flag"): a button's on_click
+                # callback runs BEFORE Streamlit's already-automatic
+                # rerun-on-click re-executes this function body, so the
+                # flag it sets is already in session_state by the time the
+                # if/else below reads it on that same click's redraw — no
+                # explicit st.rerun() needed. (An inline "if st.button():
+                # set flag" would set the flag too late to affect this same
+                # redraw, leaving the warning invisible for one extra
+                # click.) Only the actual delete, which ends the session
+                # and must refresh chrome rendered earlier in this same
+                # script run, reuses the shared forced-refresh helper above.
+                delete_armed_key = f"{key_prefix}_delete_account_armed"
+
+                def _arm_delete_account_confirm() -> None:
+                    st.session_state[delete_armed_key] = True
+
+                def _cancel_delete_account_confirm() -> None:
+                    st.session_state.pop(delete_armed_key, None)
+
+                if not st.session_state.get(delete_armed_key):
+                    st.button(
+                        "Delete account",
+                        key=f"{key_prefix}_delete_account",
+                        use_container_width=True,
+                        on_click=_arm_delete_account_confirm,
+                    )
+                else:
+                    st.warning(
+                        "This permanently deletes your account and all data: "
+                        "saved leagues, GM Targets, trade history. "
+                        "This cannot be undone."
+                    )
+                    confirm_col, cancel_col = st.columns(2)
+                    with confirm_col:
+                        confirm_delete_clicked = st.button(
+                            "Yes, delete",
+                            key=f"{key_prefix}_delete_account_confirm",
+                            use_container_width=True,
+                            type="primary",
+                        )
+                    with cancel_col:
+                        st.button(
+                            "Cancel",
+                            key=f"{key_prefix}_delete_account_cancel",
+                            use_container_width=True,
+                            on_click=_cancel_delete_account_confirm,
+                        )
+                    if confirm_delete_clicked:
+                        st.session_state.pop(delete_armed_key, None)
+                        deleted, delete_error = _account_ui.complete_delete_account(
+                            st.session_state,
+                            secrets=secrets,
+                        )
+                        if deleted:
+                            st.success("Account deleted. You have been signed out.")
+                            _force_refresh_after_session_end()
+                        else:
+                            st.warning(
+                                _account_store.customer_safe_error(
+                                    delete_error, context="request"
+                                )
+                            )
+
 
 def render_platform_topbar(
     *,
