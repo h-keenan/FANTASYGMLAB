@@ -2672,6 +2672,45 @@ def _recaps() -> None:
     )
 
 
+@st.fragment
+def _fragment_reveal_fixture() -> None:
+    """@st.fragment regression fixture (#95x-class, third recurrence).
+
+    Module-level @st.fragment, exactly like modules/team_stance_ui.py's
+    render_team_stance_workspace and modules/founder_analytics_ui.py's
+    render_founder_analytics (both decorated once at import time, not
+    re-created on every script run) — the real production shape. A
+    fragment-scoped rerun never re-executes anything outside the fragment,
+    so it never re-mounts render_viewport_preservation()/
+    render_viewport_restore_kick() the way a full rerun does — those two
+    calls live in app.py's main(), outside every @st.fragment in the app
+    (including app.py's pre-existing Trade Hub "Show more" feed-reveal
+    fragment, from #198). Before the record()-anchored ladder fix, that
+    meant an in-place action inside a fragment that inserted new content
+    above the tapped control (exactly this button's shape: tap reveals an
+    info block ABOVE itself) had nothing deterministic left to correct the
+    resulting scroll position — the focusin/scroll listeners only fire on
+    an actual focus or scroll change, not a pure layout reflow, and are not
+    guaranteed to fire again after the reflow settles.
+    """
+
+    revealed = bool(st.session_state.get("viewport_fragment_revealed"))
+    if revealed:
+        st.info("Fragment-scoped reveal inserted above the tapped button.")
+
+    def _toggle_fragment_reveal() -> None:
+        st.session_state["viewport_fragment_revealed"] = not bool(
+            st.session_state.get("viewport_fragment_revealed")
+        )
+
+    st.button(
+        "Fragment reveal toggle",
+        key="viewport_fragment_reveal_toggle",
+        on_click=_toggle_fragment_reveal,
+        use_container_width=True,
+    )
+
+
 def _viewport_preserve() -> None:
     """Long-page in-place actions plus footer chrome — viewport contract fixture."""
 
@@ -2751,6 +2790,10 @@ def _viewport_preserve() -> None:
         st.session_state["viewport_refreshed"] = True
     if st.session_state.get("viewport_refreshed"):
         st.caption("Recommendations refreshed in place.")
+
+    # @st.fragment regression fixture (#95x-class, third recurrence). See
+    # _fragment_reveal_fixture's own docstring below.
+    _fragment_reveal_fixture()
 
     # Real-browser nav-key-detection fixture (#95x-class regression check).
     # These buttons are no-ops — they exist only so a real rendered DOM
