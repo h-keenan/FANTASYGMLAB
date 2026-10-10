@@ -5003,6 +5003,22 @@ def render_player_quick_view_content(
                     ),
                     unsafe_allow_html=True,
                 )
+                # Decision Fit sentence + the Market/Opportunity/Scarcity/
+                # Role/Durability color-banded chip row — same data mobile's
+                # Model Breakdown card (PlayerDetailScreen.tsx's
+                # ModelSection) already shows, computed here for a while
+                # (player_quick_view.decision_fit_narrative/sub_ratings) but
+                # never rendered on web's own PQV until now.
+                decision_fit_html = player_quick_view.decision_fit_html(
+                    player_quick_view.decision_fit_narrative(df_players, row)
+                )
+                if decision_fit_html:
+                    st.markdown(decision_fit_html, unsafe_allow_html=True)
+                sub_rating_row_html = player_quick_view.sub_rating_row_html(
+                    player_quick_view.sub_ratings(df_players, row)
+                )
+                if sub_rating_row_html:
+                    st.markdown(sub_rating_row_html, unsafe_allow_html=True)
                 st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)
                 interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
 

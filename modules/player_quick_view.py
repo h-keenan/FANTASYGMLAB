@@ -724,6 +724,89 @@ def sub_ratings(
     return ratings
 
 
+#: Display order + abbreviation for ``sub_ratings()``'s five factors — same
+#: "MKT 91 - OPP 84 - SCR 62 - ROLE 73 - DUR 58" chip row the mobile app's
+#: SubRatingRow renders in PlayerDetailScreen.tsx's Model Breakdown card.
+_SUB_RATING_DISPLAY: tuple[tuple[str, str], ...] = (
+    ("market_rating", "MKT"),
+    ("opportunity_rating", "OPP"),
+    ("scarcity_rating", "SCR"),
+    ("role_rating", "ROLE"),
+    ("durability_rating", "DUR"),
+)
+
+
+def sub_rating_row_html(ratings: Mapping[str, int | None]) -> str:
+    """Market/Opportunity/Scarcity/Role/Durability as small color-banded
+    chips — the web Model tab's own gap versus mobile, not a new metric.
+    ``sub_ratings()`` already re-expresses each factor on the same 0-99
+    scale the headline OVR ring uses; this was computed but never rendered
+    anywhere on web's PQV (the plain, uncolored market/opportunity/scarcity
+    numbers in the Model tab's matrix are the raw composite-score inputs,
+    a different scale — see the metric_cards built in
+    app.py's render_player_quick_view_content). Reuses
+    ``_overall_rating_band``'s existing low/mid/high color bands (the same
+    danger/action/success tokens the OVR ring and ``.pqv-ovr--{band}`` rank
+    cells already use) instead of a new color scheme, and the same pill
+    shape ``.pqv-signal-badge``/``.pqv-hero-tier--solid`` already use.
+    ``None`` ratings are omitted rather than shown as a fabricated 0.
+    """
+
+    chips = []
+    for key, abbr in _SUB_RATING_DISPLAY:
+        value = ratings.get(key)
+        if value is None:
+            continue
+        rating = int(value)
+        band = _overall_rating_band(rating)
+        chips.append(
+            f"<span class='pqv-sub-rating-chip pqv-sub-rating-chip--{band}' "
+            f"aria-label='{escape(abbr)} rating {rating} of 99'>"
+            f"<span class='pqv-sub-rating-chip-label'>{escape(abbr)}</span>"
+            f"<strong>{rating}</strong></span>"
+        )
+    if not chips:
+        return ""
+    return (
+        "<div class='pqv-sub-rating-row' role='group' aria-label='Model sub-ratings'>"
+        + "".join(chips)
+        + "</div>"
+    )
+
+
+def decision_fit_html(narrative: str | None) -> str:
+    """The Decision Fit sentence (``decision_fit_narrative``) as a visible
+    callout — real backend output already served to mobile's ModelSection
+    (PlayerDetailScreen.tsx) and to Compare (modules.player_compare.
+    decision_fit_pair), but never rendered on web's own PQV dossier (see
+    player_compare.decision_fit_pair's docstring). Reuses the same
+    accent-bordered callout convention ``.pqv-decision-panel``/
+    ``.pqv-why-factor`` already use elsewhere on this screen rather than
+    inventing a new box style. Returns "" (render nothing) when the
+    percentile pool was too thin to name a driver — never a fabricated
+    sentence.
+    """
+
+    text = _text(narrative)
+    if not text:
+        return ""
+    # "Decision Fit", not "Why" — the main Decision panel elsewhere on this
+    # screen already owns a "Why" heading (why_factors_grid_html's Why/Fit/
+    # Risk grid). Both can be visible to the same viewer across tabs for the
+    # same player, so this one needs its own distinct label.
+    heading = dossier_section_heading_html("Decision Fit").replace(
+        "<h3>",
+        "<h3 id='pqv-decision-fit-title'>",
+        1,
+    )
+    return (
+        "<section class='pqv-decision-fit' aria-labelledby='pqv-decision-fit-title'>"
+        + heading
+        + f"<p class='pqv-decision-fit-text'>{escape(text)}</p>"
+        "</section>"
+    )
+
+
 def _with_percentile(item: Mapping[str, object], percentile: float | None) -> dict:
     cloned = dict(item)
     if percentile is not None:
@@ -979,10 +1062,25 @@ def rank_strip_html(
 ) -> str:
     """One compact value/rank owner: dynasty value, overall, position, format."""
 
-    cells: list[tuple[str, str, str]] = []
+    # The headline Overall rating gets its own gauge-ring cell (matching the
+    # mobile app's CircularProgressRing around its "N OVR" hero number)
+    # instead of sitting in the generic plain-text `cells` list below — same
+    # "N/99" figure, same band color, just rendered inside a conic-gradient
+    # ring (see .pqv-ovr-ring in player_quick_view_styles.py).
+    ring_html = ""
     if overall_rating is not None:
-        band = _overall_rating_band(int(overall_rating))
-        cells.append(("Overall rating", f"{int(overall_rating)}/99", f" pqv-ovr--{band}"))
+        rating = int(overall_rating)
+        band = _overall_rating_band(rating)
+        ring_html = (
+            "<div class='player-dossier-rank-cell'>"
+            "<span>Overall rating</span>"
+            f"<div class='pqv-ovr-ring pqv-ovr-ring--{band}' style='--pqv-ovr-pct:{rating}' "
+            f"role='img' aria-label='Overall rating {rating} of 99'>"
+            f"<span class='pqv-ovr-ring-value'><strong>{rating}</strong><span>/99</span></span>"
+            "</div></div>"
+        )
+
+    cells: list[tuple[str, str, str]] = []
     overall = _text(overall_display)
     if overall and overall.casefold() not in {
         "rank unavailable",
@@ -1000,9 +1098,9 @@ def rank_strip_html(
     fmt = _text(scoring_format)
     if fmt:
         cells.append(("Format", fmt, ""))
-    if not cells:
+    if not cells and not ring_html:
         return ""
-    cell_html = "".join(
+    cell_html = ring_html + "".join(
         "<div class='player-dossier-rank-cell'>"
         f"<span>{escape(label)}</span>"
         + (

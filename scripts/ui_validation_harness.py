@@ -2751,6 +2751,22 @@ def _viewport_preserve() -> None:
     if st.session_state.get("viewport_refreshed"):
         st.caption("Recommendations refreshed in place.")
 
+    # Real-browser nav-key-detection fixture (#95x-class regression check).
+    # These buttons are no-ops — they exist only so a real rendered DOM
+    # button carries each literal key= string from a newly-fixed real
+    # navigation call site (see modules/viewport_preservation.py's
+    # INTENTIONAL_NAV_KEY_EXACT/PREFIXES/SUFFIXES and the paired call sites
+    # pinned in tests/test_viewport_preservation.py), so Playwright can
+    # pointerdown the real DOM and read the real shipped isIntentionalNav()
+    # result off window.__dgInPlaceAnchor.nav — not a re-implementation of
+    # that logic, the actual component JS the browser runs. One case per
+    # category: an EXACT key, a PREFIXES-matched key, and a SUFFIXES-matched
+    # key.
+    with st.container(key="dg_nav_detection_fixture"):
+        st.button("Read recap", key="dashboard_league_recap_teaser", use_container_width=True)
+        st.button("Open fixture", key="founder_labs_open_nav_fixture", use_container_width=True)
+        st.button("Open premium", key="nav_fixture_open_premium", use_container_width=True)
+
     with st.container(key="mobile_gm_sheet_trigger_viewport"):
         render_html_fragment(brand_identity.gm_orb_floating_trigger_html())
         st.button(

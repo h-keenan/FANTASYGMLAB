@@ -89,6 +89,14 @@ def test_intentional_nav_detection_covers_real_navigation_call_sites():
     dashboard_orientation_src = (
         ROOT / "modules" / "dashboard_orientation.py"
     ).read_text(encoding="utf-8")
+    dashboard_workflow_src = (
+        ROOT / "modules" / "dashboard_workflow.py"
+    ).read_text(encoding="utf-8")
+    founder_ops_ui_src = (ROOT / "modules" / "founder_ops_ui.py").read_text(encoding="utf-8")
+    founder_labs_ui_src = (ROOT / "modules" / "founder_labs_ui.py").read_text(encoding="utf-8")
+    notification_center_src = (
+        ROOT / "modules" / "notification_center.py"
+    ).read_text(encoding="utf-8")
 
     # (source holding the real call site, the literal key= there, the
     # matching prefix pattern that must appear in VIEWPORT_PRESERVE_JS)
@@ -99,6 +107,16 @@ def test_intentional_nav_detection_covers_real_navigation_call_sites():
         (APP, 'key=f"mobile_sheet_nav_{page.key}"', "mobile_sheet_nav_"),
         (gm_targets_ui_src, 'key=f"gm_targets_handoff_{dest_key}_{card.player_id}"', "gm_targets_handoff_"),
         (live_draft_ui_src, 'key=f"live_rank_trade_{player_id}"', "live_rank_trade_"),
+        # #95x-class regression: added by later PRs without a matching key
+        # pattern, reintroducing the #937/#939 jump.
+        (founder_labs_ui_src, 'key=f"founder_labs_open_{row.key}"', "founder_labs_open_"),
+        (APP, 'key=f"workflow_return_{current_page}_{context.origin_page}"', "workflow_return_"),
+        (
+            notification_center_src,
+            'key=f"urgent_delivery_open_{_text(record.get(\'id\'))}"',
+            "urgent_delivery_open_",
+        ),
+        (APP, 'key_prefix=f"executive_notifications_{current_page or \'home\'}"', "executive_notifications_"),
     ]
     for source, literal_key, pattern in prefix_cases:
         assert literal_key in source, f"navigation call site moved or renamed: {literal_key!r}"
@@ -109,6 +127,13 @@ def test_intentional_nav_detection_covers_real_navigation_call_sites():
         (APP, 'key=f"{key_prefix}_open_trade_hub"', "_open_trade_hub"),
         (APP, 'key=f"{key_prefix}_open_trade_analyzer"', "_open_trade_analyzer"),
         (dashboard_orientation_src, 'key=f"{scope_key}_my_team"', "_my_team"),
+        # #95x-class regression: added by later PRs without a matching key
+        # pattern, reintroducing the #937/#939 jump.
+        (APP, 'key=f"{key_prefix}_open_premium"', "_open_premium"),
+        (APP, 'key=f"{key_prefix}_open_team_stance"', "_open_team_stance"),
+        (APP, 'key=f"{key_prefix}_open_founder_labs"', "_open_founder_labs"),
+        (APP, 'key=f"{key_prefix}_open_founder_ops"', "_open_founder_ops"),
+        (notification_center_src, 'key=f"{action_key_prefix}_see_all"', "_see_all"),
     ]
     for source, literal_key, pattern in suffix_cases:
         assert literal_key in source, f"navigation call site moved or renamed: {literal_key!r}"
@@ -116,6 +141,25 @@ def test_intentional_nav_detection_covers_real_navigation_call_sites():
 
     assert 'key="gm_targets_empty_open_players"' in gm_targets_ui_src
     assert '"gm_targets_empty_open_players"' in VIEWPORT_PRESERVE_JS
+
+    # Exact-match call sites added by later PRs (dead "Read recap" button
+    # wired live, the player-detail Back button, header League management,
+    # and the founder pages) that never got a matching key pattern — the
+    # #95x-class regression this fix is comprehensively closing.
+    exact_cases = [
+        (dashboard_workflow_src, 'key="dashboard_league_recap_teaser"'),
+        (APP, 'key="player_detail_back_btn"'),
+        (APP, 'key="top_header_change_league"'),
+        (APP, 'key="top_header_import_league"'),
+        (APP, 'key="top_header_manage_import_empty"'),
+        (founder_ops_ui_src, 'key="founder_ops_home"'),
+        (founder_labs_ui_src, 'key="founder_labs_to_ops"'),
+        (founder_labs_ui_src, 'key="founder_labs_home"'),
+    ]
+    for source, literal_key in exact_cases:
+        assert literal_key in source, f"navigation call site moved or renamed: {literal_key!r}"
+        exact_key = literal_key.split('"')[1]
+        assert f'"{exact_key}"' in VIEWPORT_PRESERVE_JS, f"missing intentional-nav exact key: {exact_key!r}"
 
 
 def test_navigation_tracker_reads_stmain_scroller():
@@ -294,5 +338,44 @@ def test_guest_landing_completes_once_without_js_errors(harness_url, auth):
                 assert page.evaluate("window.__dgViewportRestoreKickSeq") > result["before"]["kickSeq"]
                 page.evaluate("window.__dgRestoreInPlaceAnchor()")
             assert not errors, errors
+        finally:
+            browser.close()
+
+
+def test_real_dom_click_recognizes_fixed_navigation_keys(harness_url):
+    """Real-browser regression check for the #95x-class jump.
+
+    test_intentional_nav_detection_covers_real_navigation_call_sites (above)
+    pins the literal key= strings against the JS source as plain Python
+    strings — it would not catch a bug in keyFrom()'s DOM class-walk or
+    isIntentionalNavKey()'s matching itself. This drives a real Chromium
+    pointerdown at a real rendered button carrying each literal key= from
+    one of the previously-missing real navigation call sites (one EXACT
+    key, one PREFIXES-matched key, one SUFFIXES-matched key — see the
+    dg_nav_detection_fixture block in scripts/ui_validation_harness.py's
+    _viewport_preserve()) and reads back the real shipped isIntentionalNav()
+    verdict the browser actually computed, off window.__dgInPlaceAnchor.nav.
+    """
+    from playwright.sync_api import sync_playwright
+    from scripts.validate_viewport_preservation import check_intentional_nav_key, wait_app
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        try:
+            page.goto(f"{harness_url}/?surface=viewport-preserve")
+            wait_app(page)
+            for key in (
+                "dashboard_league_recap_teaser",  # INTENTIONAL_NAV_KEY_EXACT
+                "founder_labs_open_nav_fixture",  # INTENTIONAL_NAV_KEY_PREFIXES
+                "nav_fixture_open_premium",  # INTENTIONAL_NAV_KEY_SUFFIXES
+            ):
+                anchor = check_intentional_nav_key(page, key)
+                assert anchor.get("nav") is True, f"{key}: expected isIntentionalNav() to recognize this key, got {anchor!r}"
+                assert anchor.get("key") == f"st-key-{key}", f"{key}: keyFrom() resolved the wrong class: {anchor!r}"
+            # Negative control: an un-namespaced key must NOT be treated as
+            # navigation, or this check would be vacuously true for anything.
+            anchor = check_intentional_nav_key(page, "viewport_refresh_inplace")
+            assert anchor.get("nav") is False, f"control key wrongly recognized as nav: {anchor!r}"
         finally:
             browser.close()

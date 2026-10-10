@@ -70,9 +70,20 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .player-dossier-rank-cell span,.pqv-signal-badge-question,.pqv-why-factor span,.pqv-recommendation-confidence,.pqv-glance-cell span,.pqv-career-glance-cell span,.pqv-kicker{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .player-dossier-rank-cell strong,.pqv-signal-badge-answer{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
 .pqv-signal-badge-group{display:flex;flex-wrap:wrap;gap:var(--space-sm);margin:var(--space-xs) 0 0}
-.pqv-signal-badge{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
-.pqv-signal-badge--risk{border-left-color:var(--color-warning)}
+/* Chip pill, not a flat left-tick divider — matches the rounded, tinted
+   context tags the mobile app renders for the same role/status signals
+   (mobile/src/components/PlayerTags.tsx's "outline" pill), reusing the same
+   --radius-pill token .pqv-hero-tier--solid already uses for the tier pill
+   above so the two stay visually consistent with each other. */
+.pqv-signal-badge{background:var(--color-surface-muted);border:var(--border-width-semantic) solid var(--color-border-strong);border-radius:var(--radius-pill);display:grid;gap:2px;min-width:0;padding:var(--space-2xs) var(--space-sm)}
+.pqv-signal-badge--risk{border-color:var(--color-warning)}
 .pqv-signal-badge--risk .pqv-signal-badge-answer{color:var(--color-warning)}
+/* Status glyph on the Health signal specifically — the same "●" dot
+   convention modules/founder_labs_ui.py and modules/player_history.py
+   already use for status/achievement markers, colored by the existing
+   warning token instead of a new icon font, echoing the color-coded
+   health read the mobile app gives this same field. */
+.pqv-signal-badge--risk .pqv-signal-badge-answer::before{content:"● "}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio{margin:0 0 var(--space-sm);max-width:none}
 .player-quick-view-shell{max-width:54rem;min-width:0;overflow-x:clip}
 .player-quick-view-shell .dg-tier-legend{margin:var(--space-2xs) 0 0;max-width:22rem}
@@ -109,6 +120,42 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .player-dossier-rank-cell strong.pqv-ovr--low{color:var(--color-danger)}
 .player-dossier-rank-cell strong.pqv-ovr--mid{color:var(--color-action)}
 .player-dossier-rank-cell strong.pqv-ovr--high{color:var(--color-success)}
+/* Overall-rating gauge ring — the headline 0-99 rating gets the same
+   conic-gradient ring treatment the mobile app gives it (CircularProgressRing
+   around "N OVR" in PlayerHero.tsx) instead of a plain colored number.
+   Pattern copied from modules/trade_visual_language.py's .tvl-conf-ring
+   (same conic-gradient + punched-out center technique, different metric)
+   rather than inventing a new gauge mechanism. Band color keyed off the
+   same --color-danger/--color-action/--color-success tokens pqv-ovr--low/
+   mid/high above already use, so the ring's color always matches what the
+   plain-text band would have shown. */
+.pqv-ovr-ring{--pqv-ovr-tone:var(--color-action);align-items:center;background:conic-gradient(var(--pqv-ovr-tone) calc(var(--pqv-ovr-pct,0) * 1%),var(--color-border) 0);border-radius:50%;display:grid;height:2.75rem;place-items:center;position:relative;width:2.75rem}
+.pqv-ovr-ring::after{background:var(--surface-1);border-radius:50%;content:'';inset:.36rem;position:absolute}
+.pqv-ovr-ring-value{align-items:baseline;color:var(--pqv-ovr-tone);display:flex;font-variant-numeric:tabular-nums;gap:1px;position:relative;z-index:1}
+.pqv-ovr-ring-value strong{font-size:var(--font-size-body);font-weight:var(--font-weight-display)}
+.pqv-ovr-ring-value span{color:var(--color-text-muted);font-size:var(--font-size-badge)}
+.pqv-ovr-ring--low{--pqv-ovr-tone:var(--color-danger)}
+.pqv-ovr-ring--mid{--pqv-ovr-tone:var(--color-action)}
+.pqv-ovr-ring--high{--pqv-ovr-tone:var(--color-success)}
+/* Model tab's Decision Fit sentence + sub-rating chip row — matching the
+   mobile app's Model Breakdown card (ModelSection in PlayerDetailScreen.tsx:
+   decision_fit_narrative text, then the SubRatingRow chips). The callout
+   reuses the same accent-bordered-paragraph convention .pqv-decision-panel/
+   .pqv-why-factor already use elsewhere on this screen; the chips reuse the
+   exact same low/mid/high danger/action/success tone tokens the OVR ring
+   (.pqv-ovr-ring--{band}) and rank-strip text (.pqv-ovr--{band}) already use,
+   and the same pill shape .pqv-signal-badge/.pqv-hero-tier--solid already
+   use — no new color scheme or shape introduced for this. */
+.pqv-decision-fit{border-left:var(--border-width-semantic) solid var(--color-information);margin:0 0 var(--space-sm);padding-left:var(--space-md)}
+.pqv-decision-fit .player-dossier-section-heading{padding:0 0 var(--space-2xs)}
+.pqv-decision-fit-text{color:var(--color-text-secondary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0;overflow-wrap:anywhere}
+.pqv-sub-rating-row{display:flex;flex-wrap:wrap;gap:var(--space-xs);margin:0 0 var(--space-sm)}
+.pqv-sub-rating-chip{align-items:baseline;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border-strong);border-radius:var(--radius-pill);display:inline-flex;gap:var(--space-2xs);padding:var(--space-2xs) var(--space-sm)}
+.pqv-sub-rating-chip-label{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.pqv-sub-rating-chip strong{font-size:var(--font-size-body);font-variant-numeric:tabular-nums}
+.pqv-sub-rating-chip--low strong{color:var(--color-danger)}
+.pqv-sub-rating-chip--mid strong{color:var(--color-action)}
+.pqv-sub-rating-chip--high strong{color:var(--color-success)}
 .player-dossier-timeline-metrics{display:grid;gap:var(--space-2xs) var(--space-sm);grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-dossier-timeline-metrics span{color:var(--color-text-secondary);font-size:var(--font-size-caption);overflow-wrap:anywhere}
 .player-dossier-timeline-year{display:grid;gap:2px}

@@ -67,10 +67,34 @@ VIEWPORT_PRESERVE_JS = """
       // keyed widget a stable "st-key-<key>" class, so every real navigation
       // call site is recognized by its own widget key instead. Keep this list
       // in sync with every button that routes through
-      // commit_destination_navigation / _commit_platform_destination (see
+      // commit_destination_navigation / _commit_platform_destination /
+      // queue_destination_navigation / _queue_platform_route (see
       // tests/test_viewport_preservation.py for the paired call-site check).
+      //
+      // #937/#939 regressed a second time (#95x-class) because several of
+      // these call sites were added by *later* PRs (the dashboard "Read
+      // recap" button, the profile menu's Premium/Team Situation/Founder
+      // links, the player-detail Back button, the header's League
+      // management actions, and the cross-page workflow-continuity "Back to
+      // X" banner) without anyone remembering to add their key here. There
+      // is no compiler check that forces a new navigation button to appear
+      // in this list, so when you add a new real cross-page navigation
+      // button anywhere in the app, add its key (or a shared prefix/suffix
+      // covering it) here in the same change, and add the literal key=
+      // string to the pinned cases in
+      // test_intentional_nav_detection_covers_real_navigation_call_sites so
+      // a future rename or a missed addition fails CI instead of silently
+      // reintroducing the jump.
       const INTENTIONAL_NAV_KEY_EXACT = new Set([
         "gm_targets_empty_open_players",
+        "dashboard_league_recap_teaser",
+        "player_detail_back_btn",
+        "top_header_change_league",
+        "top_header_import_league",
+        "top_header_manage_import_empty",
+        "founder_ops_home",
+        "founder_labs_to_ops",
+        "founder_labs_home",
       ])
       const INTENTIONAL_NAV_KEY_PREFIXES = [
         "home_quick_action_",
@@ -79,12 +103,21 @@ VIEWPORT_PRESERVE_JS = """
         "mobile_sheet_nav_",
         "gm_targets_handoff_",
         "live_rank_trade_",
+        "founder_labs_open_",
+        "workflow_return_",
+        "urgent_delivery_open_",
+        "executive_notifications_",
       ]
       const INTENTIONAL_NAV_KEY_SUFFIXES = [
         "_handoff",
         "_open_trade_hub",
         "_open_trade_analyzer",
         "_my_team",
+        "_open_premium",
+        "_open_team_stance",
+        "_open_founder_labs",
+        "_open_founder_ops",
+        "_see_all",
       ]
 
       const isIntentionalNavKey = (rawKey) => {
