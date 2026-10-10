@@ -384,6 +384,40 @@ def complete_sign_out(
     return error
 
 
+def complete_delete_account(
+    session_state: MutableMapping[str, Any] | None = None,
+    *,
+    config: dict | None = None,
+    secrets: Any = None,
+) -> tuple[bool, str]:
+    """Permanently delete the signed-in user's account, then sign out locally.
+
+    Caller must already have a confirmed, explicit "yes, delete" from the
+    user — see the two-step confirm UI in
+    ``render_executive_profile_control`` (app.py). On success this runs the
+    same canonical logout as ``complete_sign_out`` (durable clear, session
+    wipe, launch reset): there is no account left to keep a session open
+    for, and the account row itself is already gone server-side via the
+    ``delete_user`` RPC cascade.
+    """
+
+    state = session_state if session_state is not None else st.session_state
+    cfg = config if isinstance(config, dict) else auth_supabase.get_supabase_config(
+        secrets=secrets
+    )
+    token = auth_supabase.current_access_token(state)
+    if not token:
+        return False, "Your session expired. Sign in again to continue."
+    deleted, error = account_store.delete_account(cfg, token)
+    if not deleted:
+        return False, error
+    auth_supabase.queue_durable_auth_clear(state)
+    auth_supabase.clear_auth_session(state)
+    startup_coordinator.reset_startup_coordinator(state)
+    state["platform_nav_page"] = "dashboard"
+    return True, ""
+
+
 def _auth_email(session_state) -> str:
     return _safe_text(session_state.get(auth_supabase.AUTH_EMAIL_KEY))
 
