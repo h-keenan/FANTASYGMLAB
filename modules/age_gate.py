@@ -61,7 +61,7 @@ def render_age_confirmation(key_prefix: str) -> bool:
         return False
 
     st.caption(
-        f"You must be at least {MINIMUM_AGE} to create an account. "
+        f"You must be at least {MINIMUM_AGE} to use {brand_identity.PRODUCT_NAME}. "
         "Enter your date of birth — it is not stored."
     )
     cols = st.columns(3)
