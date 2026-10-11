@@ -35,6 +35,7 @@ from modules import trade_hub_engine
 from modules import ui_primitives
 from modules.html_rendering import render_html_fragment
 from modules.league_value_settings import VALUATION_LENS_TO_SCORE_FIELD
+from modules.page_shell import page_body
 from modules.semantic_glyphs import glyph_html
 from modules.sleeper import get_league, get_rosters
 
@@ -207,143 +208,144 @@ def render_gm_plan_workspace(
     team_strategy: str,
     players_db_path: str,
 ) -> None:
-    league_key = str(league_id or "").strip()
-    if (
-        not league_key
-        or my_roster_id is None
-        or df_players is None
-        or getattr(df_players, "empty", True)
-    ):
-        ui_primitives.render_empty_state_panel(
-            "GM Plan isn't ready yet",
-            "We don't have enough league data to build a GM Plan right now.",
-            kind="unavailable",
-        )
-        return
-
-    league = get_league(league_key) or {}
-    raw_settings = league.get("settings") or {}
-    # Same "leg"/"week" field modules.league_standings already reads off
-    # Sleeper's raw league settings — reused, not recomputed (matches
-    # services/mobile_api_service.py's get_gm_plan).
-    current_week = raw_settings.get("leg") or raw_settings.get("week")
-    playoff_week_start = raw_settings.get("playoff_week_start")
-    season_phase = gm_plan.derive_season_phase(current_week, playoff_week_start)
-
-    declared_stance = team_stance.fetch_stance_for_league(session, league_id=league_key)
-
-    rosters = get_rosters(league_key) or []
-    my_roster = next(
-        (
-            roster
-            for roster in rosters
-            if str(roster.get("roster_id") or "") == str(my_roster_id)
-        ),
-        None,
-    )
-    if my_roster is None:
-        ui_primitives.render_empty_state_panel(
-            "GM Plan isn't ready yet",
-            "Your roster could not be matched in this league.",
-            kind="unavailable",
-        )
-        return
-
-    lens = _lens_for_score_field(score_field)
-
-    injury_context: dict[str, Any] = {}
-    roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
-    if roster_ids and "player_id" in df_players.columns:
-        roster_df = df_players[df_players["player_id"].astype(str).isin(roster_ids)].copy()
-        if not roster_df.empty:
-            lineup_df = team_eval_module.suggest_optimal_lineup(
-                roster_df, league_value_settings, score_field=score_field
+    with page_body("gm_plan_workspace", gap="md"):
+        league_key = str(league_id or "").strip()
+        if (
+            not league_key
+            or my_roster_id is None
+            or df_players is None
+            or getattr(df_players, "empty", True)
+        ):
+            ui_primitives.render_empty_state_panel(
+                "GM Plan isn't ready yet",
+                "We don't have enough league data to build a GM Plan right now.",
+                kind="unavailable",
             )
-            injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+            return
 
-    rankings_row: dict[str, Any] | None = None
-    total_teams: int | None = None
-    try:
-        rankings_frame = league_rankings.build_league_rankings_frame_cached(
-            league_id=league_key, lens=lens, players_db_path=players_db_path
+        league = get_league(league_key) or {}
+        raw_settings = league.get("settings") or {}
+        # Same "leg"/"week" field modules.league_standings already reads off
+        # Sleeper's raw league settings — reused, not recomputed (matches
+        # services/mobile_api_service.py's get_gm_plan).
+        current_week = raw_settings.get("leg") or raw_settings.get("week")
+        playoff_week_start = raw_settings.get("playoff_week_start")
+        season_phase = gm_plan.derive_season_phase(current_week, playoff_week_start)
+
+        declared_stance = team_stance.fetch_stance_for_league(session, league_id=league_key)
+
+        rosters = get_rosters(league_key) or []
+        my_roster = next(
+            (
+                roster
+                for roster in rosters
+                if str(roster.get("roster_id") or "") == str(my_roster_id)
+            ),
+            None,
         )
-    except Exception:
-        rankings_frame = pd.DataFrame()
-    if not rankings_frame.empty and "roster_id" in rankings_frame.columns:
-        total_teams = int(len(rankings_frame))
-        match = rankings_frame[rankings_frame["roster_id"].astype(str) == str(my_roster_id)]
-        if not match.empty:
-            rankings_row = match.iloc[0].to_dict()
+        if my_roster is None:
+            ui_primitives.render_empty_state_panel(
+                "GM Plan isn't ready yet",
+                "Your roster could not be matched in this league.",
+                kind="unavailable",
+            )
+            return
 
-    my_playoff_odds: dict[str, Any] | None = None
-    try:
-        playoff_odds_result = playoff_simulator.build_league_playoff_odds_cached(
-            league_id=league_key, lens=lens, players_db_path=players_db_path
-        )
-    except Exception:
-        playoff_odds_result = {}
-    for team in (playoff_odds_result or {}).get("teams") or []:
-        if str(team.get("roster_id") or "") == str(my_roster_id):
-            my_playoff_odds = team
-            break
+        lens = _lens_for_score_field(score_field)
 
-    gm_targets.ensure_membership_cache(session, league_id=league_key)
-    gm_target_ids = gm_targets.cached_target_ids(session, league_id=league_key)
-    untouchable_ids = gm_targets.cached_untouchable_ids(session, league_id=league_key)
+        injury_context: dict[str, Any] = {}
+        roster_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+        if roster_ids and "player_id" in df_players.columns:
+            roster_df = df_players[df_players["player_id"].astype(str).isin(roster_ids)].copy()
+            if not roster_df.empty:
+                lineup_df = team_eval_module.suggest_optimal_lineup(
+                    roster_df, league_value_settings, score_field=score_field
+                )
+                injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
 
-    trade_idea_records: list[dict[str, Any]] = []
-    try:
-        trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
-            league_id=league_key,
-            roster_id=int(my_roster_id),
-            strategy=str(team_strategy or "retool"),
-            lens=lens,
-            players_db_path=players_db_path,
-            untouchable_player_ids=tuple(sorted(untouchable_ids)),
-            gm_target_player_ids=tuple(sorted(gm_target_ids)),
+        rankings_row: dict[str, Any] | None = None
+        total_teams: int | None = None
+        try:
+            rankings_frame = league_rankings.build_league_rankings_frame_cached(
+                league_id=league_key, lens=lens, players_db_path=players_db_path
+            )
+        except Exception:
+            rankings_frame = pd.DataFrame()
+        if not rankings_frame.empty and "roster_id" in rankings_frame.columns:
+            total_teams = int(len(rankings_frame))
+            match = rankings_frame[rankings_frame["roster_id"].astype(str) == str(my_roster_id)]
+            if not match.empty:
+                rankings_row = match.iloc[0].to_dict()
+
+        my_playoff_odds: dict[str, Any] | None = None
+        try:
+            playoff_odds_result = playoff_simulator.build_league_playoff_odds_cached(
+                league_id=league_key, lens=lens, players_db_path=players_db_path
+            )
+        except Exception:
+            playoff_odds_result = {}
+        for team in (playoff_odds_result or {}).get("teams") or []:
+            if str(team.get("roster_id") or "") == str(my_roster_id):
+                my_playoff_odds = team
+                break
+
+        gm_targets.ensure_membership_cache(session, league_id=league_key)
+        gm_target_ids = gm_targets.cached_target_ids(session, league_id=league_key)
+        untouchable_ids = gm_targets.cached_untouchable_ids(session, league_id=league_key)
+
+        trade_idea_records: list[dict[str, Any]] = []
+        try:
+            trade_idea_records = trade_hub_engine.generate_trade_idea_records_cached(
+                league_id=league_key,
+                roster_id=int(my_roster_id),
+                strategy=str(team_strategy or "retool"),
+                lens=lens,
+                players_db_path=players_db_path,
+                untouchable_player_ids=tuple(sorted(untouchable_ids)),
+                gm_target_player_ids=tuple(sorted(gm_target_ids)),
+                team_stance=declared_stance,
+            )
+        except (TypeError, ValueError):
+            trade_idea_records = []
+
+        roster_settings = my_roster.get("settings") or {}
+        record = {
+            "wins": roster_settings.get("wins"),
+            "losses": roster_settings.get("losses"),
+            "ties": roster_settings.get("ties"),
+        }
+
+        plan = gm_plan.build_gm_plan(
             team_stance=declared_stance,
+            season_phase=season_phase,
+            rankings_row=rankings_row,
+            total_teams=total_teams,
+            record=record,
+            playoff_odds=my_playoff_odds,
+            trade_ideas=trade_idea_records,
+            injury_context=injury_context,
         )
-    except (TypeError, ValueError):
-        trade_idea_records = []
 
-    roster_settings = my_roster.get("settings") or {}
-    record = {
-        "wins": roster_settings.get("wins"),
-        "losses": roster_settings.get("losses"),
-        "ties": roster_settings.get("ties"),
-    }
+        phase_label = str(plan.get("season_phase_label") or "").upper()
+        stance_label = str(plan.get("team_stance_label") or "")
+        badge_html = ""
+        if phase_label:
+            badge_html += ui_primitives.status_badge_html(phase_label, variant="information")
+        if stance_label:
+            badge_html += " " + ui_primitives.status_badge_html(stance_label, variant="premium")
+        if badge_html:
+            st.markdown(badge_html, unsafe_allow_html=True)
+        st.subheader(str(plan.get("headline") or ""))
 
-    plan = gm_plan.build_gm_plan(
-        team_stance=declared_stance,
-        season_phase=season_phase,
-        rankings_row=rankings_row,
-        total_teams=total_teams,
-        record=record,
-        playoff_odds=my_playoff_odds,
-        trade_ideas=trade_idea_records,
-        injury_context=injury_context,
-    )
+        focus_areas = plan.get("focus_areas") or []
+        if not focus_areas:
+            ui_primitives.render_empty_state_panel(
+                "GM Plan isn't ready yet",
+                "We don't have enough to build a GM Plan for this league yet.",
+                kind="no-data",
+            )
+            return
 
-    phase_label = str(plan.get("season_phase_label") or "").upper()
-    stance_label = str(plan.get("team_stance_label") or "")
-    badge_html = ""
-    if phase_label:
-        badge_html += ui_primitives.status_badge_html(phase_label, variant="information")
-    if stance_label:
-        badge_html += " " + ui_primitives.status_badge_html(stance_label, variant="premium")
-    if badge_html:
-        st.markdown(badge_html, unsafe_allow_html=True)
-    st.subheader(str(plan.get("headline") or ""))
-
-    focus_areas = plan.get("focus_areas") or []
-    if not focus_areas:
-        ui_primitives.render_empty_state_panel(
-            "GM Plan isn't ready yet",
-            "We don't have enough to build a GM Plan for this league yet.",
-            kind="no-data",
-        )
-        return
-
-    for focus_area in focus_areas:
-        if isinstance(focus_area, dict):
-            _render_focus_area(focus_area)
+        for focus_area in focus_areas:
+            if isinstance(focus_area, dict):
+                _render_focus_area(focus_area)
