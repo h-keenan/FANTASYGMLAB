@@ -526,7 +526,7 @@ def _navigation() -> None:
                     **button_kwargs,
                 )
 
-        st.caption("Core")
+        st.caption("League")
         _fixture_route_row(
             "Dashboard",
             "dashboard",
@@ -535,6 +535,8 @@ def _navigation() -> None:
         _fixture_route_row("My Team", "my_team")
         _fixture_route_row("League Overview", "rankings")
         _fixture_route_row("League Recaps / History", "league_recaps")
+        _fixture_route_row("Players", "players")
+        st.caption("GM Tools")
         _fixture_route_row(
             "Trade Hub",
             "trade_hub",
@@ -547,9 +549,8 @@ def _navigation() -> None:
         _fixture_route_row("Trade Analyzer", "trade_analyzer")
         _fixture_route_row("Draft Center", "draft_summary")
         _fixture_route_row("GM Targets", "gm_targets")
+        st.caption("General")
         _fixture_route_row("Premium", "premium")
-        st.caption("Support")
-        _fixture_route_row("Players", "players")
         st.caption("Experimental · Early access")
         st.markdown(
             "<div class='mobile-gm-experimental-note'>Early access capability. Available when enabled for your account.</div>",

@@ -34,7 +34,7 @@ def test_methodology_is_support_not_primary_nav():
 def test_methodology_footer_and_route_wiring():
     from modules import legal_pages
 
-    assert (methodology_page.FOOTER_LABEL, methodology_page.PAGE_KEY) in legal_pages.LEGAL_FOOTER_LINKS
+    assert (methodology_page.FOOTER_LABEL, methodology_page.PAGE_KEY, "") in legal_pages.LEGAL_FOOTER_LINKS
     assert methodology_page.PAGE_KEY not in legal_pages.LEGAL_PAGE_KEYS
     assert f'"{methodology_page.PAGE_KEY}": methodology_page.PAGE_PURPOSE' in APP
     assert "methodology_page.render_methodology_page()" in APP

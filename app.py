@@ -243,8 +243,10 @@ from modules.platforms.sleeper import get_sleeper_adapter
 from modules.ui_architecture import (
     PLATFORM_DESTINATIONS,
     current_platform_destinations,
+    domain_grouped_nav_destinations,
     routable_platform_destinations,
 )
+from modules import ui_architecture
 from modules.navigation_state import (
     LAST_DESTINATION_KEY,
     PENDING_ROUTE_SOURCE_KEY,
@@ -2301,8 +2303,10 @@ PAGE_GLYPHS = {
     "founder_labs": "LB",
     "methodology": "HV",
     "about_disclaimer": "AB",
+    "legal": "LE",
     "terms": "TO",
     "privacy": "PR",
+    "subscription_terms": "ST",
     "no_affiliation": "NA",
 }
 
@@ -13849,16 +13853,46 @@ def render_mobile_destination_sheet(
             )
         guest_conversion.render_gm_menu_save_entry()
 
-        category_labels = (
-            ("CORE", "Core"),
-            ("CONDITIONAL", "Active now"),
-            ("SUPPORT", "Support"),
+        # Customer-visible routes (CORE / CONDITIONAL / SUPPORT) are grouped
+        # by the shared domain taxonomy — the same League / GM Tools /
+        # General scheme as the desktop sidebar (structural web/mobile
+        # shell-parity pass, 2026-10-11; mirrors mobile's GmOrb.tsx groups).
+        # Visibility-tier-only sections (EXPERIMENTAL / DEV_ONLY /
+        # FOUNDER_LABS / FOUNDER_OPS) keep their own category headings
+        # unchanged — those describe WHO can see the route, not WHAT domain
+        # it belongs to, and that filtering logic is untouched by this pass.
+        customer_visible_pages = [
+            page for page in all_pages if page.category in {"CORE", "CONDITIONAL", "SUPPORT"}
+        ]
+        current_page_is_legal_doc = current_page in (
+            ui_architecture.LEGAL_CONSOLIDATED_SUBKEYS + ("legal",)
+        )
+        for _domain_key, domain_label, domain_pages in domain_grouped_nav_destinations(tuple(customer_visible_pages)):
+            st.caption(domain_label)
+            for page in domain_pages:
+                button_label = button_labels.get(page.key, page.label)
+                command_label = button_label
+                is_active = page.key == current_page or (
+                    page.key == "legal" and current_page_is_legal_doc
+                )
+                button_type = "primary" if is_active else "secondary"
+                with st.container(key=f"mobile_sheet_row_{page.key}"):
+                    st.button(
+                        command_label,
+                        key=f"mobile_sheet_nav_{page.key}",
+                        use_container_width=True,
+                        type=button_type,
+                        on_click=_navigate_from_mobile_destination,
+                        args=(page.key,),
+                    )
+
+        tier_only_labels = (
             ("EXPERIMENTAL", brand_identity.experimental_caption("Experimental")),
             ("DEV_ONLY", "Developer"),
             ("FOUNDER_LABS", "Internal"),
             ("FOUNDER_OPS", "Internal"),
         )
-        for category, heading in category_labels:
+        for category, heading in tier_only_labels:
             category_pages = [page for page in all_pages if page.category == category]
             if not category_pages:
                 continue
@@ -17586,17 +17620,25 @@ def main():
                     current_page = _trades_requested_key
                     st.session_state["platform_nav_page"] = current_page
         current_page_definition = destination_lookup.get(current_page, destination_definitions[0] if destination_definitions else None)
-        for group in available_groups:
-            group_destinations = destinations_by_group.get(group, [])
-            if not group_destinations:
-                continue
-            st.caption(group.title())
-            for destination in group_destinations:
+        # Shared domain taxonomy (League / GM Tools / General / Internal),
+        # matching mobile's GmOrb.tsx groups — same grouping scheme used by
+        # the mobile destination sheet below. A direct deep link to one of
+        # the 4 consolidated legal documents still highlights "Legal" here.
+        current_page_is_legal_doc = current_page in (
+            ui_architecture.LEGAL_CONSOLIDATED_SUBKEYS + ("legal",)
+        )
+        for _domain_key, domain_label, domain_destinations in domain_grouped_nav_destinations(destination_definitions):
+            st.caption(domain_label)
+            for destination in domain_destinations:
+                is_active = (
+                    destination.key == current_page
+                    or (destination.key == "legal" and current_page_is_legal_doc)
+                )
                 st.button(
                     destination.label,
                     key=f"desktop_nav_{destination.key}",
                     use_container_width=True,
-                    type="primary" if destination.key == current_page else "secondary",
+                    type="primary" if is_active else "secondary",
                     on_click=_commit_platform_destination,
                     args=(destination.key,),
                     kwargs={"source": "sidebar_destination"},
@@ -17780,6 +17822,7 @@ def main():
         "founder_labs": "Founder/dev inventory of dormant and hidden product surfaces.",
         "methodology": methodology_page.PAGE_PURPOSE,
         "about_disclaimer": "Product information, recommendation limits, and general disclaimer.",
+        "legal": "Terms, privacy, subscription terms, and the no-affiliation disclaimer in one place.",
         "terms": "Plain-language terms for using FantasyGM Lab.",
         "privacy": "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.",
         "no_affiliation": "Independent-product and third-party ownership notice.",
@@ -23923,7 +23966,18 @@ def main():
                 navigate=_queue_platform_route,
             )
 
-    if current_page in legal_pages.LEGAL_PAGE_KEYS:
+    if current_page == "legal":
+        try:
+            _legal_doc_raw = st.query_params.get("doc", "")
+        except Exception:
+            _legal_doc_raw = ""
+        if isinstance(_legal_doc_raw, list):
+            _legal_doc_raw = _legal_doc_raw[0] if _legal_doc_raw else ""
+        _legal_doc_param = _safe_text(_legal_doc_raw).strip().casefold()
+        legal_pages.render_legal_hub(
+            active_doc_key=_legal_doc_param if _legal_doc_param in legal_pages.LEGAL_DOC_KEYS else ""
+        )
+    elif current_page in legal_pages.LEGAL_PAGE_KEYS:
         legal_pages.render_legal_page(current_page)
 
     runtime_trace.mark("page_calculation_complete")

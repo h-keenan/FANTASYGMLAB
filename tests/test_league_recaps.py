@@ -735,30 +735,37 @@ def test_league_recaps_page_header_has_single_owner():
     assert "Load league recaps" not in joined.casefold()
 
 
-def test_gm_orb_lists_league_recaps_under_core_via_category_not_group():
+def test_gm_orb_lists_league_recaps_under_league_domain():
+    """League Recaps shares the shared domain taxonomy (structural
+    web/mobile shell-parity pass, 2026-10-11) — the mobile destination
+    sheet groups customer-visible routes by `page.domain` (League / GM
+    Tools / General), the same scheme the desktop sidebar now uses, rather
+    than the old mobile-only `page.category` (Core/Active now/Support)
+    sectioning. League Recaps still sits right after League Overview, now
+    under the "League" domain heading instead of "Core"."""
+
     from modules.ui_architecture import current_platform_destinations
 
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     sheet = app.split("def render_mobile_destination_sheet", 1)[1].split(
         "def render_mobile_navigation_shell", 1
     )[0]
-    assert "page.category == category" in sheet
+    assert "domain_grouped_nav_destinations" in sheet
+    assert "page.category == category" in sheet  # still used for the tier-only sections
     assert "page.group ==" not in sheet
-    assert '("CORE", "Core")' in sheet
     destinations = current_platform_destinations(startup_mode=False)
     core_keys = [page.key for page in destinations if page.category == "CORE"]
-    league_group = [page.key for page in destinations if page.group == "LEAGUE"]
+    league_domain_keys = [page.key for page in destinations if page.domain == "LEAGUE"]
     assert "league_recaps" in core_keys
-    assert "league_recaps" in league_group
-    assert core_keys.index("rankings") + 1 == core_keys.index("league_recaps")
+    assert "league_recaps" in league_domain_keys
+    assert "rankings" in league_domain_keys
+    assert league_domain_keys.index("rankings") + 1 == league_domain_keys.index("league_recaps")
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     nav = harness.split("def _navigation()", 1)[1].split("def _header_geometry()", 1)[0]
-    core = nav.split('st.caption("Core")', 1)[1].split('st.caption("Support")', 1)[0]
-    support = nav.split('st.caption("Support")', 1)[1]
-    assert '"League Recaps / History"' in core
-    assert '"League Overview"' in core
-    assert core.index("League Overview") < core.index("League Recaps / History")
-    assert '"League Recaps / History"' not in support
+    league = nav.split('st.caption("League")', 1)[1].split('st.caption("GM Tools")', 1)[0]
+    assert '"League Recaps / History"' in league
+    assert '"League Overview"' in league
+    assert league.index("League Overview") < league.index("League Recaps / History")
 
 
 def test_recaps_story_grading_reuses_cached_transaction_grades():
