@@ -9,6 +9,7 @@ import streamlit as st
 
 from modules import recommendation_lifecycle
 from modules import ui_primitives
+from modules.page_shell import page_body
 
 
 INTELLIGENCE_LABELS = frozenset(
@@ -129,8 +130,12 @@ def render_dashboard_workflow(
 
     # The keyed container is the canonical workflow root.  A former zero-height
     # markdown marker still occupied a Streamlit flex slot, creating a blank row
-    # between the command header and Dashboard context on mobile.
-    with st.container(key="dashboard_workflow"):
+    # between the command header and Dashboard context on mobile. Opened via
+    # the shared page_shell.page_body so Dashboard uses the same reusable
+    # shell primitive other pages adopt (Phase 2 pilot) -- its rhythm CSS
+    # stays owned by dashboard_workflow_styles.py (inject_css=False) since
+    # that file already declares the equivalent flex/gap rule for this key.
+    with page_body("dashboard_workflow", gap="lg", mobile_gap="md", inject_css=False):
         if render_page_context is not None:
             render_page_context()
         _log_dashboard_milestone("dashboard_header_complete")
