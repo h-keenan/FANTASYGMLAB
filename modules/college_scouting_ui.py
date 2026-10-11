@@ -300,6 +300,7 @@ def _render_prospect(
             )
 
 
+@st.fragment
 def render_college_scouting_workspace(
     *,
     session: MutableMapping[str, Any],
@@ -311,6 +312,19 @@ def render_college_scouting_workspace(
     ``college_prospects`` table is the honest "No prospects yet" empty
     state, never a fabricated row (modules.college_scouting's "NO
     FABRICATED DATA" policy).
+
+    Fragment-scoped: app.py's "college_scouting" route calls this once and
+    nothing else on the page reads its output (no return value consumed, no
+    Player Quick View, no platform navigation triggered from inside). Every
+    widget here — the view pills, the per-prospect Follow/Unfollow button,
+    and the grade/round/note inputs with Submit/Update/Remove — already
+    avoids explicit st.rerun() (plain widget rerun or on_click callback),
+    so scoping the fragment only stops that rerun from re-executing the
+    rest of app.py's ~24k-line script on every tap here. A tap that shifts
+    this fragment's own layout (e.g. a flash message appearing above the
+    tapped button) is covered by the record()-time restore ladder in
+    modules/viewport_preservation.py, which now rearms on every tap
+    regardless of whether the rerun is fragment- or full-page-scoped.
     """
 
     html_rendering.inject_global_styles(COLLEGE_SCOUTING_CSS)
