@@ -168,6 +168,16 @@ def note_gate_seen(*, feature: str, title: str = "", surface: str = "premium_loc
         feature=token,
         once_key=once,
     )
+    # Relaunch taxonomy: every existing premium lock/gate surface is a
+    # paywall-shown moment. `trigger` identifies which locked feature caused
+    # it (same attribution token already used for premium_gate_seen).
+    track_premium_event(
+        "paywall_viewed",
+        surface=surface,
+        feature=token,
+        extra={"trigger": token},
+        once_key=once,
+    )
 
 
 def begin_upgrade_flow(
