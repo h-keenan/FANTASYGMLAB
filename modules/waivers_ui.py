@@ -27,6 +27,7 @@ from modules import redis_cache
 from modules import sleeper
 from modules.faab import format_faab_block_html, recommend_faab_guidance
 from modules.html_rendering import inject_global_styles
+from modules.page_shell import page_body
 from modules.trade_visual_language import TRADE_VISUAL_LANGUAGE_CSS, confidence_indicator_html
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 
@@ -1448,203 +1449,204 @@ def render_waiver_workspace_sections(
     priority_adds: pd.DataFrame | None = None,
     render_guest_continuity: Callable | None = None,
 ) -> None:
-    _inject_waivers_presentation_css()
-    priority_board = (
-        priority_adds
-        if priority_adds is not None
-        else featured_free_agents.head(6)
-    )
-    _, stash_candidates, watchlist_candidates, faab_targets = _dedupe_waiver_sections(
-        priority_board if not priority_board.empty else featured_free_agents.head(6),
-        stash_candidates,
-        watchlist_candidates,
-        faab_targets,
-    )
-    with _waiver_hot_path(
-        "waivers_priority_adds_emit",
-        "waivers_ui.priority_adds",
-        "emit",
-    ):
-        st.markdown(
-            waiver_section_header_html(
-                "Priority Adds",
-                kicker="Next Add",
-                note=priority_adds_section_note(
-                    league_score_label(score_field),
-                    needed_positions,
-                ),
-                preset="opportunity-list",
-            ),
-            unsafe_allow_html=True,
+    with page_body("waivers_workspace", gap="md"):
+        _inject_waivers_presentation_css()
+        priority_board = (
+            priority_adds
+            if priority_adds is not None
+            else featured_free_agents.head(6)
         )
-        st.caption(
-            "FantasyGM Lab does not submit waiver claims for you — "
-            "place the claim in your Sleeper league once you've decided."
+        _, stash_candidates, watchlist_candidates, faab_targets = _dedupe_waiver_sections(
+            priority_board if not priority_board.empty else featured_free_agents.head(6),
+            stash_candidates,
+            watchlist_candidates,
+            faab_targets,
         )
-        if injury_positions:
-            highlighted_positions = " / ".join(sorted(injury_positions))
-            st.caption(
-                f"Injury replacement watch is active for "
-                f"{highlighted_positions}. Your current lineup is carrying "
-                f"{injured_starters} injured "
-                f"starter{'s' if injured_starters != 1 else ''}."
-            )
-        if priority_board is None or priority_board.empty:
-            st.caption(
-                "No waiver option materially improves your current roster right now. "
-                "Use Waiver Snapshot below for best available by position."
-            )
-        else:
-            render_free_agent_cards(
-                priority_board.head(6),
-                score_field,
-                max_items=6,
-                needed_positions=needed_positions,
-                key_prefix=f"waivers_priority_{selected_league_id or 'none'}",
-            )
-
-    with _waiver_hot_path(
-        "waivers_secondary_sections_emit",
-        "waivers_ui.snapshot_and_secondary",
-        "emit",
-    ):
-        # Personalized, roster-aware content (Stash/Watchlist/FAAB Shortlist)
-        # renders here, immediately after Priority Adds and before the
-        # generic Best Available browsing below — Magna Carta §31:
-        # "Personalized Priority Adds should normally appear before generic
-        # Best Available browsing." It no longer sits behind a collapsed
-        # expander: that made premium users click to reveal the very content
-        # their subscription pays for, and buried it below a full page of
-        # generic wire browsing to boot.
-        if is_premium:
+        with _waiver_hot_path(
+            "waivers_priority_adds_emit",
+            "waivers_ui.priority_adds",
+            "emit",
+        ):
             st.markdown(
                 waiver_section_header_html(
-                    "Beyond Priority Adds",
-                    kicker="More Options",
-                    note="Upside stashes, deeper bench depth, and a fast FAAB shortlist beyond today's top picks.",
-                    preset="secondary",
+                    "Priority Adds",
+                    kicker="Next Add",
+                    note=priority_adds_section_note(
+                        league_score_label(score_field),
+                        needed_positions,
+                    ),
+                    preset="opportunity-list",
                 ),
                 unsafe_allow_html=True,
             )
-            has_secondary_candidates = (
-                not stash_candidates.empty
-                or not watchlist_candidates.empty
-                or not faab_targets.empty
+            st.caption(
+                "FantasyGM Lab does not submit waiver claims for you — "
+                "place the claim in your Sleeper league once you've decided."
             )
-            if not has_secondary_candidates:
-                st.caption("No additional stash, watchlist, or FAAB shortlist candidates right now.")
-            else:
-                if not stash_candidates.empty:
-                    st.markdown(
-                        waiver_section_header_html(
-                            "Stash Candidates",
-                            kicker="Upside Bench",
-                            note="Younger upside bets and players with a clearer path to future usage.",
-                            preset="player-list",
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                    render_free_agent_cards(
-                        stash_candidates.head(6),
-                        score_field,
-                        max_items=6,
-                        needed_positions=needed_positions,
-                        key_prefix=f"waivers_stash_{selected_league_id or 'none'}",
-                    )
-
-                if not watchlist_candidates.empty:
-                    st.markdown(
-                        waiver_section_header_html(
-                            "Watchlist Depth",
-                            kicker="Secondary Board",
-                            note="Bench insulation, contingency adds, and position-specific fallback options.",
-                            preset="secondary",
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                    render_free_agent_cards(
-                        watchlist_candidates.head(6),
-                        score_field,
-                        max_items=6,
-                        needed_positions=needed_positions,
-                        key_prefix=f"waivers_watch_{selected_league_id or 'none'}",
-                    )
-
-                if not faab_targets.empty:
-                    st.markdown(
-                        waiver_section_header_html(
-                            "FAAB Shortlist",
-                            kicker="Bid Prep",
-                            note="Best quick bid candidates before opening the helper.",
-                            preset="primary-action",
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                    render_free_agent_cards(
-                        faab_targets.head(4),
-                        score_field,
-                        max_items=4,
-                        needed_positions=needed_positions,
-                        key_prefix=f"waivers_faab_{selected_league_id or 'none'}",
-                    )
-        elif render_premium_lock is not None:
-            render_premium_lock(
-                "Full waiver board and FAAB shortlist",
-                "Priority Adds stay free — Premium adds stashes, watchlist depth, and FAAB shortlist so you do not miss the next claim.",
-                feature="Premium Waivers",
-            )
-
-        st.markdown(
-            waiver_section_header_html(
-                "Waiver Snapshot",
-                kicker="Wire Status",
-                note="Best available options by position — broad wire scan, not roster priorities.",
-                preset="metrics",
-            ),
-            unsafe_allow_html=True,
-        )
-        render_free_agent_summary_cards(free_agents_ranked, score_field)
-
-        if render_guest_continuity is not None:
-            render_guest_continuity()
-
-        if not is_premium:
-            return
-
-        with st.expander("Detailed Table View", expanded=False):
-            section_id = f"waivers_detailed_table_{selected_league_id or 'none'}"
-            if not deferred_rendering.render_section_gate(
-                st,
-                st.session_state,
-                section_id,
-                button_label="Load waiver table",
-                note="The full waiver table stays collapsed until you need it. Priority Adds and Waiver Snapshot above already surface the top targets by need and position.",
-            ):
-                return
-            present = df_free_display
-            total_rows = 0 if present is None else int(len(present))
-            if total_rows > WAIVERS_DETAILED_TABLE_PREVIEW_ROWS:
-                present = present.head(WAIVERS_DETAILED_TABLE_PREVIEW_ROWS)
+            if injury_positions:
+                highlighted_positions = " / ".join(sorted(injury_positions))
                 st.caption(
-                    f"Showing top {WAIVERS_DETAILED_TABLE_PREVIEW_ROWS} of {total_rows} available players."
+                    f"Injury replacement watch is active for "
+                    f"{highlighted_positions}. Your current lineup is carrying "
+                    f"{injured_starters} injured "
+                    f"starter{'s' if injured_starters != 1 else ''}."
                 )
-            display_cols = [col for col in waiver_display_cols if col in present.columns]
-            display_frame = add_injury_markers(
-                format_score_columns(present[display_cols]),
-                present,
-            ).rename(columns={"player_tier": "Tier"}).reset_index(drop=True)
-            from modules import executive_table_ui
+            if priority_board is None or priority_board.empty:
+                st.caption(
+                    "No waiver option materially improves your current roster right now. "
+                    "Use Waiver Snapshot below for best available by position."
+                )
+            else:
+                render_free_agent_cards(
+                    priority_board.head(6),
+                    score_field,
+                    max_items=6,
+                    needed_positions=needed_positions,
+                    key_prefix=f"waivers_priority_{selected_league_id or 'none'}",
+                )
 
-            executive_table_ui.render_executive_table_disclosure(
-                display_frame,
-                title="Waiver board detail",
-                primary_column="name" if "name" in display_frame.columns else display_frame.columns[0],
-                secondary_columns=tuple(
-                    column
-                    for column in ("position", "team", "Tier", score_field)
-                    if column in display_frame.columns
+        with _waiver_hot_path(
+            "waivers_secondary_sections_emit",
+            "waivers_ui.snapshot_and_secondary",
+            "emit",
+        ):
+            # Personalized, roster-aware content (Stash/Watchlist/FAAB Shortlist)
+            # renders here, immediately after Priority Adds and before the
+            # generic Best Available browsing below — Magna Carta §31:
+            # "Personalized Priority Adds should normally appear before generic
+            # Best Available browsing." It no longer sits behind a collapsed
+            # expander: that made premium users click to reveal the very content
+            # their subscription pays for, and buried it below a full page of
+            # generic wire browsing to boot.
+            if is_premium:
+                st.markdown(
+                    waiver_section_header_html(
+                        "Beyond Priority Adds",
+                        kicker="More Options",
+                        note="Upside stashes, deeper bench depth, and a fast FAAB shortlist beyond today's top picks.",
+                        preset="secondary",
+                    ),
+                    unsafe_allow_html=True,
+                )
+                has_secondary_candidates = (
+                    not stash_candidates.empty
+                    or not watchlist_candidates.empty
+                    or not faab_targets.empty
+                )
+                if not has_secondary_candidates:
+                    st.caption("No additional stash, watchlist, or FAAB shortlist candidates right now.")
+                else:
+                    if not stash_candidates.empty:
+                        st.markdown(
+                            waiver_section_header_html(
+                                "Stash Candidates",
+                                kicker="Upside Bench",
+                                note="Younger upside bets and players with a clearer path to future usage.",
+                                preset="player-list",
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                        render_free_agent_cards(
+                            stash_candidates.head(6),
+                            score_field,
+                            max_items=6,
+                            needed_positions=needed_positions,
+                            key_prefix=f"waivers_stash_{selected_league_id or 'none'}",
+                        )
+
+                    if not watchlist_candidates.empty:
+                        st.markdown(
+                            waiver_section_header_html(
+                                "Watchlist Depth",
+                                kicker="Secondary Board",
+                                note="Bench insulation, contingency adds, and position-specific fallback options.",
+                                preset="secondary",
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                        render_free_agent_cards(
+                            watchlist_candidates.head(6),
+                            score_field,
+                            max_items=6,
+                            needed_positions=needed_positions,
+                            key_prefix=f"waivers_watch_{selected_league_id or 'none'}",
+                        )
+
+                    if not faab_targets.empty:
+                        st.markdown(
+                            waiver_section_header_html(
+                                "FAAB Shortlist",
+                                kicker="Bid Prep",
+                                note="Best quick bid candidates before opening the helper.",
+                                preset="primary-action",
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                        render_free_agent_cards(
+                            faab_targets.head(4),
+                            score_field,
+                            max_items=4,
+                            needed_positions=needed_positions,
+                            key_prefix=f"waivers_faab_{selected_league_id or 'none'}",
+                        )
+            elif render_premium_lock is not None:
+                render_premium_lock(
+                    "Full waiver board and FAAB shortlist",
+                    "Priority Adds stay free — Premium adds stashes, watchlist depth, and FAAB shortlist so you do not miss the next claim.",
+                    feature="Premium Waivers",
+                )
+
+            st.markdown(
+                waiver_section_header_html(
+                    "Waiver Snapshot",
+                    kicker="Wire Status",
+                    note="Best available options by position — broad wire scan, not roster priorities.",
+                    preset="metrics",
                 ),
-                max_summary_rows=10,
-                include_expander=False,
-                key_suffix="waivers_detail_table",
+                unsafe_allow_html=True,
             )
+            render_free_agent_summary_cards(free_agents_ranked, score_field)
+
+            if render_guest_continuity is not None:
+                render_guest_continuity()
+
+            if not is_premium:
+                return
+
+            with st.expander("Detailed Table View", expanded=False):
+                section_id = f"waivers_detailed_table_{selected_league_id or 'none'}"
+                if not deferred_rendering.render_section_gate(
+                    st,
+                    st.session_state,
+                    section_id,
+                    button_label="Load waiver table",
+                    note="The full waiver table stays collapsed until you need it. Priority Adds and Waiver Snapshot above already surface the top targets by need and position.",
+                ):
+                    return
+                present = df_free_display
+                total_rows = 0 if present is None else int(len(present))
+                if total_rows > WAIVERS_DETAILED_TABLE_PREVIEW_ROWS:
+                    present = present.head(WAIVERS_DETAILED_TABLE_PREVIEW_ROWS)
+                    st.caption(
+                        f"Showing top {WAIVERS_DETAILED_TABLE_PREVIEW_ROWS} of {total_rows} available players."
+                    )
+                display_cols = [col for col in waiver_display_cols if col in present.columns]
+                display_frame = add_injury_markers(
+                    format_score_columns(present[display_cols]),
+                    present,
+                ).rename(columns={"player_tier": "Tier"}).reset_index(drop=True)
+                from modules import executive_table_ui
+
+                executive_table_ui.render_executive_table_disclosure(
+                    display_frame,
+                    title="Waiver board detail",
+                    primary_column="name" if "name" in display_frame.columns else display_frame.columns[0],
+                    secondary_columns=tuple(
+                        column
+                        for column in ("position", "team", "Tier", score_field)
+                        if column in display_frame.columns
+                    ),
+                    max_summary_rows=10,
+                    include_expander=False,
+                    key_suffix="waivers_detail_table",
+                )
