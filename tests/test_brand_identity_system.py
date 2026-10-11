@@ -76,8 +76,7 @@ def test_brand_api_paths_and_helpers():
     assert "data:image/png;base64," in html
     assert "aria-label='FantasyGM Lab'" in html
     assert brand_identity.asset_path("brand_compact").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
-    assert "FantasyGM Lab" in brand_identity.founder_beta_badge_html(compact=False)
-    assert "Founder Beta" in brand_identity.founder_beta_badge_html(compact=True)
+    assert not hasattr(brand_identity, "founder_beta_badge_html")
     assert brand_identity.GM_ORB_LABEL == "GM"
     assert "Open GM menu" in brand_identity.GM_ORB_ARIA_LABEL
     # Retired Arc Monogram trajectory colors no longer exist as brand constants —

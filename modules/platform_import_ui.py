@@ -183,7 +183,7 @@ def render_espn_diagnostics(result: dict[str, Any]) -> None:
     c6.metric("Ambiguous", _safe_int(diagnostics.get("ambiguous_count"), 0))
     st.caption(
         f"ESPN import status: {status}. Cookie values are never displayed or saved by this "
-        "Founder Beta import flow."
+        "import flow."
     )
 
     unmatched = diagnostics.get("unmatched_examples") or []
@@ -245,7 +245,7 @@ def render_platform_import_panel(df_players: pd.DataFrame) -> dict[str, Any]:
     st.caption(
         "ESPN support is experimental. Private ESPN leagues require SWID and ESPN_S2 cookies. "
         "Cookie values are sensitive; do not paste them on shared or public devices. "
-        "Cookies are session-only for this Founder Beta and are not saved."
+        "Cookies are session-only for this import and are not saved."
     )
     with st.form("espn_experimental_import_form", clear_on_submit=False):
         league_id = st.text_input(

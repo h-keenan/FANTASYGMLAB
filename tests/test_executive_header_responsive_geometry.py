@@ -40,11 +40,6 @@ def test_chevron_column_and_flexible_rail_owned_by_command_header_module():
     assert "border-inline-start: 0 !important;" in css
 
 
-def test_founder_badge_has_max_width_so_it_cannot_starve_commands():
-    assert "max-width: 9.75rem;" in APPLICATION_SHELL_CSS
-    assert ".dg-executive-shell__title-row .dg-founder-badge" in APPLICATION_SHELL_CSS
-
-
 def test_harness_and_production_share_command_column_weights():
     harness = (ROOT / "scripts" / "ui_validation_harness.py").read_text(encoding="utf-8")
     app = (ROOT / "app.py").read_text(encoding="utf-8")

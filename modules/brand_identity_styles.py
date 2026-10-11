@@ -1,4 +1,4 @@
-"""FantasyGM Lab Founder Beta brand and identity presentation layer.
+"""FantasyGM Lab brand and identity presentation layer.
 
 Appended last so branding wins over legacy chrome without redesigning layouts.
 """
@@ -19,85 +19,6 @@ BRAND_IDENTITY_CSS = """
 .dg-startup-mark-img{height:40px;width:40px}
 .home-hero-logo-img{display:inline-block}
 
-.dg-founder-badge {
-    align-items: center;
-    background: color-mix(in srgb, var(--color-shell, #090a0c) 72%, transparent);
-    border: var(--border-width-default, 1px) solid color-mix(in srgb, var(--color-border, #2a2e35) 70%, transparent);
-    border-inline-start: 2px solid color-mix(in srgb, var(--color-brand-accent, #22d3ee) 72%, transparent);
-    box-sizing: border-box;
-    color: var(--color-text-secondary, #e5e7eb);
-    display: inline-flex;
-    gap: 0.55rem;
-    max-width: 100%;
-    padding: 0.28rem 0.55rem 0.28rem 0.28rem;
-}
-
-.dg-founder-badge__mark,
-.dg-founder-badge__mark-img {
-    align-items: center;
-    display: inline-flex;
-    flex: 0 0 auto;
-    height: 1.45rem;
-    justify-content: center;
-    min-width: 1.45rem;
-    overflow: hidden;
-    width: 1.45rem;
-}
-
-.dg-founder-badge__mark {
-    background: var(--color-text-primary, #f8fafc);
-    color: var(--color-brand-mark-ink, #0b1220);
-    font-size: 0.58rem;
-    font-weight: 900;
-    letter-spacing: 0.06em;
-}
-
-.dg-founder-badge__copy {
-    display: grid;
-    gap: 0.05rem;
-    min-width: 0;
-    text-align: left;
-}
-
-.dg-founder-badge__copy strong {
-    color: var(--color-text-primary, #f8fafc);
-    font-size: 0.68rem;
-    font-weight: 850;
-    letter-spacing: 0.01em;
-    line-height: 1.1;
-}
-
-.dg-founder-badge__copy em {
-    color: rgba(148, 163, 184, 0.92);
-    font-size: 0.56rem;
-    font-style: normal;
-    font-weight: 750;
-    letter-spacing: 0.08em;
-    line-height: 1;
-    text-transform: uppercase;
-}
-
-.dg-founder-badge--compact {
-    gap: 0.4rem;
-    padding: 0.18rem 0.42rem 0.18rem 0.18rem;
-}
-
-.dg-founder-badge--compact .dg-founder-badge__mark,
-.dg-founder-badge--compact .dg-founder-badge__mark-img {
-    font-size: 0.5rem;
-    height: 1.2rem;
-    min-width: 1.2rem;
-    width: 1.2rem;
-}
-
-.dg-founder-badge--compact .dg-founder-badge__copy strong {
-    font-size: 0.6rem;
-}
-
-.dg-founder-badge--compact .dg-founder-badge__copy em {
-    font-size: 0.5rem;
-}
-
 .app-hero {
     align-items: flex-start;
     background:
@@ -109,22 +30,6 @@ BRAND_IDENTITY_CSS = """
     gap: 0.42rem;
     margin: 0 0 0.7rem;
     padding: 0.72rem 0.9rem;
-}
-
-.app-hero-top {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.55rem;
-    justify-content: space-between;
-}
-
-.app-eyebrow {
-    color: rgba(148, 163, 184, 0.88);
-    font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
 }
 
 .app-hero h1 {

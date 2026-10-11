@@ -29,10 +29,6 @@ EXECUTIVE_DESIGN_UNIFY_CSS = (
     "margin:0!important}"
     ".dg-executive-shell__brand{border-inline-start-color:var(--color-border-strong)!important}"
     ".dg-executive-shell__room{color:var(--color-text-muted)!important}"
-    ".dg-executive-shell__title-row .dg-founder-badge__mark,"
-    ".dg-executive-shell__title-row .dg-founder-badge__copy strong{display:none!important}"
-    ".dg-executive-shell__title-row .dg-founder-badge{"
-    "border-inline-start-color:var(--color-premium)!important}"
     ".dg-ui-section-header--primary .dg-ui-section-title{"
     "color:var(--color-text-primary)!important;font:var(--type-page-title)!important}"
     ".dg-ui-section-header--secondary .dg-ui-section-title{font:var(--type-section-title)!important}"
@@ -80,5 +76,4 @@ EXECUTIVE_DESIGN_UNIFY_CSS = (
     "div[class*=st-key-dashboard_page_context]{margin:0!important}"
     ".dg-ui-section-header--primary .dg-ui-section-title{"
     "font-size:clamp(1.35rem,6vw,1.75rem)!important}}"
-    ".dg-executive-shell__title-row .dg-founder-badge{align-items:center!important;min-height:0!important;padding-block:0!important}"
 )

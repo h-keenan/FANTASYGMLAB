@@ -145,8 +145,7 @@ def test_status_and_tier_chips_use_semantic_color_tokens():
 def test_startup_splash_text_is_not_hardcoded_white():
     # Bug: the app's startup/loading splash (modules/startup_coordinator, shown on
     # every app boot via StartupCoordinator._render -> startup_shell_html) hardcoded
-    # `color: #f8fafc` (near-white) on ``.dg-startup-card`` and
-    # ``.dg-startup-badge-wrap .dg-founder-badge__copy strong`` while its own
+    # `color: #f8fafc` (near-white) on ``.dg-startup-card`` while its own
     # background resolves through the theme-adaptive ``var(--color-bg, ...)`` /
     # ``var(--color-shell, ...)`` tokens. In light mode those tokens resolve to a
     # near-white background, so the splash text became white-on-white (its sibling
@@ -154,7 +153,7 @@ def test_startup_splash_text_is_not_hardcoded_white():
     # correctly -- these two were simply inconsistent with it).
     html = startup_shell_html(StartupPhase.PAGE_READY)
     assert "color: #f8fafc;" not in html
-    assert html.count("color: var(--color-text-primary, #f8fafc);") >= 2
+    assert html.count("color: var(--color-text-primary, #f8fafc);") >= 1
 
 
 def test_player_support_chip_premium_no_longer_mismatches_its_own_gold_background():

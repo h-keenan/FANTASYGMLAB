@@ -774,7 +774,7 @@ class TestStripeBilling(unittest.TestCase):
             ),
         )
 
-        self.assertIn("Secure Founder Premium checkout uses Stripe test mode", html)
+        self.assertIn("Secure Premium checkout uses Stripe test mode", html)
         self.assertIn("no live charge will be made", html.casefold())
 
     def test_premium_page_shows_recurring_live_billing_contract(self):
@@ -788,7 +788,7 @@ class TestStripeBilling(unittest.TestCase):
             ),
         )
 
-        self.assertIn("Secure recurring Founder Premium checkout", html)
+        self.assertIn("Secure recurring Premium checkout", html)
         self.assertIn("renewal or cancellation", html)
         self.assertNotIn("no live charge", html.casefold())
 

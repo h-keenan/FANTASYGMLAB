@@ -76,7 +76,6 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
         "<div class='dg-executive-shell__brief'>"
         "<div class='dg-executive-shell__title-row'>"
         f"<div class='dg-executive-shell__title' role='heading' aria-level='1'>{escape(page_title)}</div>"
-        f"{brand_identity.founder_beta_badge_html(compact=True)}"
         "</div>"
         "<div class='dg-executive-shell__meta'>"
         "<div class='dg-executive-shell__context'>"

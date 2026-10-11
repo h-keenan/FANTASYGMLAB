@@ -97,13 +97,6 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementConta
     min-width: 0;
 }
 
-/* Founder Beta stays readable but must not starve the command rail */
-.dg-executive-shell__title-row .dg-founder-badge {
-    flex: 0 1 auto;
-    max-width: 9.75rem;
-    min-width: 0;
-}
-
 .dg-executive-shell__title {
     align-items: center;
     color: var(--color-text-primary);
@@ -232,10 +225,6 @@ div[data-testid="stDialog"] [role="dialog"] {
         gap: var(--space-xs);
         min-width: 0;
         width: 100%;
-    }
-
-    .dg-executive-shell__title-row .dg-founder-badge {
-        display: none;
     }
 
     .dg-executive-shell__title {

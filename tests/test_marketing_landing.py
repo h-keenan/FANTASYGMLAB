@@ -1,4 +1,4 @@
-"""Public Founder Beta marketing landing contracts."""
+"""Public marketing landing contracts."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def test_landing_copy_answers_core_questions_without_hype():
     assert "Waivers" in html
     assert "Decision Memory" in html
     assert "GM Targets" in html
-    assert "Founder Beta" in html
+    assert "Founder Beta" not in html
     assert "Free includes" not in cold
     assert "Free includes" in html
     assert "Included now with Premium" in html
@@ -188,7 +188,7 @@ def test_why_different_section_is_merged_not_split():
     assert "<div class='fgl-landing__kicker'>Trust</div>" not in html
     assert "What's experimental" not in html
     assert "What's included" not in html
-    assert "Founder Beta" in html
+    assert "Founder Beta" not in html
     assert "ESPN import" in html
 
 

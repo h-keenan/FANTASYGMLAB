@@ -110,7 +110,7 @@ def test_startup_shell_is_full_viewport_centered_responsive_and_accessible():
     assert "aria-live='polite'" in markup
     assert "role='progressbar'" in markup
     assert "FantasyGM Lab" in markup
-    assert "Founder Beta" in markup
+    assert "Founder Beta" not in markup
     assert "dg-startup-milestone" in markup
     assert "--dg-startup-progress:" in markup
     # Progress width is phase-driven; only a decorative sheen may animate.

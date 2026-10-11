@@ -36,7 +36,7 @@
     },
     "terms": {
       "title": "Terms of Use",
-      "kicker": "Founder Beta Terms",
+      "kicker": "Terms",
       "note": "Plain-language conditions for using FantasyGM Lab.",
       "sections": [
         {
@@ -61,7 +61,7 @@
         {
           "title": "Availability and changes",
           "paragraphs": [
-            "FantasyGM Lab is an evolving Founder Beta product. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
+            "FantasyGM Lab is an evolving product. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
             "These terms may be updated as the product changes. Continued use after an update means you accept the revised terms."
           ],
           "bullets": []
@@ -98,7 +98,7 @@
     },
     "privacy": {
       "title": "Privacy Policy",
-      "kicker": "Founder Beta Privacy",
+      "kicker": "Privacy",
       "note": "A practical summary of the data FantasyGM Lab may handle.",
       "sections": [
         {
@@ -114,7 +114,7 @@
           "title": "How data is used",
           "paragraphs": [
             "This information is used to load the requested league, personalize analysis, preserve expected app context, diagnose problems, and improve the product.",
-            "Some information may be stored in the browser session, local application files, caches, or other project storage used by the current Founder Beta. FantasyGM Lab does not claim that these systems provide perfect security or permanent retention."
+            "Some information may be stored in the browser session, local application files, caches, or other project storage used by the current product. FantasyGM Lab does not claim that these systems provide perfect security or permanent retention."
           ],
           "bullets": []
         },
@@ -149,7 +149,7 @@
         {
           "title": "Retention and security",
           "paragraphs": [
-            "Data may be retained while the Founder Beta is operated, tested, or improved. Users can clear local browser or session state where supported, but some operational or feedback records may remain in application storage.",
+            "Data may be retained while the product is operated, tested, or improved. Users can clear local browser or session state where supported, but some operational or feedback records may remain in application storage.",
             "Reasonable care is taken with application data, but no internet service or local storage method can be guaranteed completely secure."
           ],
           "bullets": []

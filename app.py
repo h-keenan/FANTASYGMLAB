@@ -12088,8 +12088,7 @@ def render_executive_profile_control(
                     f"{escape(identity['display_identity'])}"
                     "</div>"
                     "<div class='dg-profile-panel__meta'>"
-                    f"{escape(identity['entitlement_label'])} · "
-                    f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
+                    f"{escape(identity['entitlement_label'])}"
                     f"</div>{badge}</div>"
                 )
             else:
@@ -12098,8 +12097,7 @@ def render_executive_profile_control(
                     f"<div class='dg-profile-panel__title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
                     "<div class='dg-profile-panel__meta'>"
                     f"{escape(_safe_text(account_label, guest_conversion.GUEST_STATE_LABEL))} · "
-                    f"{escape(_safe_text(entitlement_label, 'Free'))} · "
-                    f"{escape(brand_identity.FOUNDER_BETA_LABEL)}"
+                    f"{escape(_safe_text(entitlement_label, 'Free'))}"
                     "</div></div>"
                 )
             from modules import guest_conversion as _guest_conversion
@@ -13815,7 +13813,7 @@ def render_mobile_destination_sheet(
             "<div class='mobile-gm-sheet-title'>Where to go</div>"
             f"<div class='mobile-gm-current-page'>Current: {escape(_safe_text(button_labels.get(current_page, current_page.replace('_', ' ').title())))}</div>"
             "</div>"
-            f"<div class='mobile-gm-sheet-note'>{escape(brand_identity.FOUNDER_BETA_LABEL)} · Core routes first. "
+            "<div class='mobile-gm-sheet-note'>Core routes first. "
             "Experimental routes are early access when enabled.</div>"
             "</div>",
             unsafe_allow_html=True,
@@ -16501,10 +16499,6 @@ def main():
             st.markdown(
                 f"""
             <div class="app-hero" data-fgl-shell-ready="1">
-                <div class="app-hero-top">
-                    <div class="app-eyebrow">{brand_identity.FOUNDER_BETA_LABEL}</div>
-                    {brand_identity.founder_beta_badge_html(compact=True)}
-                </div>
                 <h1>{brand_identity.PRODUCT_NAME}</h1>
                 <p>{brand_identity.PRODUCT_TAGLINE}</p>
             </div>
@@ -23820,7 +23814,6 @@ def main():
             subtitle=premium_conversion.VALUE_PROP_HEADLINE + ".",
             meta_items=[
                 (f"Current plan: {premium_page.plan_status_label(current_user_entitlement())}", "primary"),
-                (brand_identity.FOUNDER_BETA_LABEL, "premium"),
             ],
         )
         premium_page.render_premium_page(entitlement=current_user_entitlement())
@@ -23865,7 +23858,6 @@ def main():
             title="Founder Ops",
             subtitle="Read-only operational health for FantasyGM Lab founders.",
             meta_items=[
-                (brand_identity.FOUNDER_BETA_LABEL, "premium"),
                 ("Founder only", "primary"),
             ],
         )
@@ -23890,7 +23882,6 @@ def main():
             title="Founder Labs",
             subtitle="Trusted inventory of dormant and hidden product surfaces.",
             meta_items=[
-                (brand_identity.FOUNDER_BETA_LABEL, "premium"),
                 ("Founder only", "primary"),
             ],
         )

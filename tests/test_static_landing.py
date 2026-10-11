@@ -14,7 +14,7 @@ def test_static_landing_exists_with_brand_and_cta():
     assert 'data-fgl-static-landing="1"' in html
     assert 'data-fgl-shell-ready="1"' in html
     assert "FantasyGM Lab" in html
-    assert "Founder Beta" in html
+    assert "Founder Beta" not in html
     assert "Import your league" in html
     assert "utm_source=static_landing" in html
     assert "app.fantasygmlab.com" in html

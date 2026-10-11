@@ -176,7 +176,7 @@ def _render_global_feedback_form_body(
         if saved:
             st.session_state[_LAST_FEEDBACK_FINGERPRINT_KEY] = fingerprint
             st.success(
-                "Feedback submitted. Thank you — the Founder Beta team will review it."
+                "Feedback submitted. Thank you — our team will review it."
             )
         else:
             st.warning("Feedback could not be saved right now. Please try again later.")
@@ -212,7 +212,7 @@ def render_global_feedback_button(
                     default_email=default_email,
                 )
             return
-        with st.popover("Feedback", help="Send Founder Beta feedback or report an issue"):
+        with st.popover("Feedback", help="Send feedback or report an issue"):
             _render_global_feedback_form_body(
                 context=context,
                 build_global_feedback_report=build_global_feedback_report,

@@ -27,8 +27,6 @@ PRODUCT_DOMAIN = "fantasygmlab.com"
 PRODUCT_URL = f"https://{PRODUCT_DOMAIN}"
 PRODUCT_TAGLINE = "Your fantasy football front office"
 PRODUCT_TAGLINE_LEGACY = "Franchise decisions with clear leverage."
-FOUNDER_BETA_LABEL = "Founder Beta"
-FOUNDER_BETA_NOTE = "Exclusive early access"
 EXPERIMENTAL_LABEL = "[EXPERIMENTAL]"
 EXPERIMENTAL_NOTE = "Early access capability"
 PREMIUM_LABEL = "Premium"
@@ -235,35 +233,6 @@ def mark_img_html(
         f"<img class='dg-brand-plate__img' src='{uri}' width='{px}' height='{px}' "
         "alt='' aria-hidden='true' />"
         "</span>"
-    )
-
-
-def founder_beta_badge_html(*, compact: bool = False) -> str:
-    """Subtle exclusive Founder Beta badge for shells and loading.
-
-    Compact mode omits the nested mark so shells that already show the
-    compact logo do not duplicate artwork or the product name lockup.
-    """
-
-    size_class = " dg-founder-badge--compact" if compact else ""
-    if compact:
-        # Restrained chip — product name lives on the adjacent mark/title.
-        return (
-            f"<span class='dg-founder-badge{size_class}' "
-            f"title='{escape(FOUNDER_BETA_NOTE)}'>"
-            f"<span class='dg-founder-badge__copy'>"
-            f"<em>{escape(FOUNDER_BETA_LABEL)}</em>"
-            f"</span></span>"
-        )
-    mark = mark_img_html(size_px=22, css_class="dg-founder-badge__mark-img")
-    return (
-        f"<span class='dg-founder-badge{size_class}' "
-        f"title='{escape(FOUNDER_BETA_NOTE)}'>"
-        f"{mark}"
-        f"<span class='dg-founder-badge__copy'>"
-        f"<strong>{escape(PRODUCT_NAME)}</strong>"
-        f"<em>{escape(FOUNDER_BETA_LABEL)}</em>"
-        f"</span></span>"
     )
 
 

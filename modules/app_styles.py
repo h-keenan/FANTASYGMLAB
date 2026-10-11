@@ -484,13 +484,6 @@ main h4 {
     margin: 0 0 0.7rem;
     padding: 0.75rem 0.95rem;
 }
-.app-eyebrow {
-    color: var(--color-accent-strong);
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0;
-    text-transform: uppercase;
-}
 .app-hero h1 {
     font-size: 1.3rem;
     line-height: 1.05;
