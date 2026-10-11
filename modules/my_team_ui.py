@@ -1303,8 +1303,7 @@ def render_my_team_workspace(
             if starters_value_text
             else ""
         )
-        + "Projected roster core from existing player values and league roster settings — "
-        "not a live Sleeper starting-lineup lock."
+        + "Not a live Sleeper lineup lock."
     )
     starter_groups = _starter_groups(starters)
     with st.container(key="my_team_roster_core"):
