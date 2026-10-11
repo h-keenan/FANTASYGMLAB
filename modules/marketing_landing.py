@@ -486,7 +486,12 @@ def landing_mobile_soon_badge_html() -> str:
 
 
 def landing_hero_html(*, compact: bool = False) -> str:
-    mark = brand_identity.mark_img_html(size_px=36 if compact else 40, css_class="fgl-landing__mark")
+    # compact=False: match the app's full-color header mark (see
+    # modules/application_shell.py) rather than auto-downgrading to the
+    # flat monochrome silhouette this small size would otherwise pick.
+    mark = brand_identity.mark_img_html(
+        size_px=36 if compact else 40, compact=False, css_class="fgl-landing__mark"
+    )
     badge = brand_identity.founder_beta_badge_html(compact=True)
     if compact:
         return (
