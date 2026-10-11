@@ -232,24 +232,19 @@ def render_dashboard_workflow(
             with st.container(key="dashboard_league_insights"):
                 ui_primitives.render_section_header("League Insights", weight="secondary")
                 st.caption(
-                    "Market and league signals that may change your next move. "
-                    "Uses already-computed tiles — not a new analysis pass."
+                    "Market and league signals that may change your next move."
                     + (
                         f" {insight_count} signal"
                         + ("s" if insight_count != 1 else "")
                         + " ready."
                         if insight_count
-                        else " No extra market signal beyond Game Plan."
+                        else " None beyond Game Plan right now."
                     )
                 )
                 if intelligence_tiles:
                     render_tiles(
                         intelligence_tiles,
                         key_prefix="dashboard_intelligence",
-                    )
-                else:
-                    st.caption(
-                        "No separate market signal is stronger than your current Game Plan."
                     )
             _log_dashboard_milestone("dashboard_summary_tiles_complete")
 

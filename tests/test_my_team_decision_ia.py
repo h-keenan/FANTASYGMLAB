@@ -85,7 +85,10 @@ def test_league_insights_are_not_a_deferred_gate():
         DASHBOARD.index("dashboard_league_insights") : DASHBOARD.index("dashboard_team_snapshot")
     ]
     assert "render_deferred_section_gate" not in insights
-    assert "already-computed" in insights
+    # Tiles render unconditionally from already-computed data — no click-to-load
+    # gate sits between the section header and the content.
+    assert "if intelligence_tiles:" in insights
+    assert "render_tiles(" in insights
 
 
 def test_detailed_tables_remain_deferred():

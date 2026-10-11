@@ -1478,8 +1478,7 @@ def render_waiver_workspace_sections(
             unsafe_allow_html=True,
         )
         st.caption(
-            "Tap any recommendation to open the full breakdown — that's where "
-            "you decide. FantasyGM Lab does not submit waiver claims for you; "
+            "FantasyGM Lab does not submit waiver claims for you — "
             "place the claim in your Sleeper league once you've decided."
         )
         if injury_positions:
@@ -1627,8 +1626,7 @@ def render_waiver_workspace_sections(
             if total_rows > WAIVERS_DETAILED_TABLE_PREVIEW_ROWS:
                 present = present.head(WAIVERS_DETAILED_TABLE_PREVIEW_ROWS)
                 st.caption(
-                    f"Showing top {WAIVERS_DETAILED_TABLE_PREVIEW_ROWS} of {total_rows} available players. "
-                    "Priority Adds and Waiver Snapshot above already cover the top targets by position."
+                    f"Showing top {WAIVERS_DETAILED_TABLE_PREVIEW_ROWS} of {total_rows} available players."
                 )
             display_cols = [col for col in waiver_display_cols if col in present.columns]
             display_frame = add_injury_markers(
