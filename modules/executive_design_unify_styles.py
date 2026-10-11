@@ -61,8 +61,23 @@ EXECUTIVE_DESIGN_UNIFY_CSS = (
     ".dashboard-clear-state{"
     "border-inline-start:var(--border-width-semantic) solid var(--color-success)!important}"
     "@media (min-width:1440px){.st-key-dashboard_workflow{gap:var(--space-lg)!important}}"
+    # coridian_ (2026-10-10): the gap below "How valuation works" before
+    # Today's Game Plan read as too generous on mobile — not the invisible
+    # zero-height marker class already fixed in #973/#976/#977, but this
+    # container's own bottom margin (set unconditionally above:
+    # margin:0 0 var(--space-sm)!important = 8px) *stacking* with
+    # .st-key-dashboard_workflow's flex `gap` between it and the next
+    # section, two spacing mechanisms adding on the same axis (measured
+    # 24px at 390px width: 8px margin + 16px gap). The flex `gap` is made
+    # the single source of truth for inter-section spacing at this
+    # breakpoint: the container's own margin is zeroed and the gap is
+    # brought down one step to --space-md (12px), matching the mobile
+    # app's own major-section spacing (`spacing.md` in
+    # mobile/src/theme.ts, used for DashboardScreen's quickActionsSection/
+    # groupSection/lockWrap margins).
     "@media (max-width:760px){"
-    ".st-key-dashboard_workflow{gap:var(--space-lg)!important}"
+    ".st-key-dashboard_workflow{gap:var(--space-md)!important}"
+    "div[class*=st-key-dashboard_page_context]{margin:0!important}"
     ".dg-ui-section-header--primary .dg-ui-section-title{"
     "font-size:clamp(1.35rem,6vw,1.75rem)!important}}"
     ".dg-executive-shell__title-row .dg-founder-badge{align-items:center!important;min-height:0!important;padding-block:0!important}"

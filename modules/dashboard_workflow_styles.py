@@ -185,6 +185,13 @@ div[class*="st-key-dashboard_page_context"] [data-testid="stSelectbox"] label {
 }
 
 @media (max-width: 760px) {
+    /* The authoritative mobile value for both of these selectors is set
+       with !important in EXECUTIVE_DESIGN_UNIFY_CSS (loaded later in
+       APP_CSS, so it wins the cascade over any non-!important rule here
+       regardless of source order) — see that file for the real fix to the
+       "How valuation works" -> Today's Game Plan gap. Kept non-!important
+       here so this file doesn't silently fight that one.
+    */
     .st-key-dashboard_page_context,
     div[class*="st-key-dashboard_page_context"] {
         gap: var(--space-2xs);
