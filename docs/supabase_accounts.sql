@@ -9,7 +9,13 @@ create table if not exists public.profiles (
     email text,
     display_name text,
     sleeper_username text,
-    entitlement text not null default 'free' check (entitlement in ('free', 'premium')),
+    -- 3-tier pricing model: 'premium' is the legacy name still written for
+    -- GM Pro (kept so mobile's own raw `entitlement == "premium"` checks in
+    -- services/mobile_api_service.py do not regress — see modules/premium.py's
+    -- module docstring). 'front_office' is the new top tier. 'pro' is
+    -- accepted too for forward-compatibility if a future webhook ever
+    -- writes it directly.
+    entitlement text not null default 'free' check (entitlement in ('free', 'premium', 'pro', 'front_office')),
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
@@ -35,6 +41,11 @@ create table if not exists public.user_settings (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+-- Note: `create table if not exists` above only applies this 3-tier check
+-- constraint on a brand-new install. An already-deployed `profiles` table
+-- needs docs/supabase_premium_tiers_migration.sql re-run to widen its
+-- existing constraint.
 
 create or replace function public.set_updated_at()
 returns trigger

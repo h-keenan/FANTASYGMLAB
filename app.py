@@ -5827,7 +5827,7 @@ def refresh_current_user_entitlement() -> str:
     if (
         user_id
         and memo_user == user_id
-        and memo_value in {premium.FREE, premium.PREMIUM}
+        and memo_value in premium.ALL_TIERS
         and before == memo_value
     ):
         return memo_value
@@ -5859,8 +5859,8 @@ def current_user_entitlement() -> str:
     user_id = auth_supabase.current_user_id(st.session_state)
     entitlement = _safe_text(st.session_state.get("_effective_entitlement")).casefold()
     if not user_id:
-        # Guests must never inherit a leftover account Premium memo.
-        if entitlement == premium.PREMIUM:
+        # Guests must never inherit a leftover account paid-tier memo.
+        if premium.is_at_least(entitlement, premium.PRO):
             st.session_state.pop("_effective_entitlement", None)
             st.session_state.pop(auth_restore_lifecycle.ENTITLEMENT_MEMO_KEY, None)
             st.session_state.pop(auth_restore_lifecycle.ENTITLEMENT_MEMO_USER_KEY, None)
@@ -5868,13 +5868,15 @@ def current_user_entitlement() -> str:
         if entitlement == premium.FREE:
             return premium.FREE
         return refresh_current_user_entitlement()
-    if entitlement not in {premium.FREE, premium.PREMIUM}:
+    if entitlement not in premium.ALL_TIERS:
         entitlement = refresh_current_user_entitlement()
     return entitlement
 
 
 def current_user_is_premium() -> bool:
-    return current_user_entitlement() == premium.PREMIUM
+    """True for GM Pro or Front Office — "has paid access"."""
+
+    return premium.is_at_least(current_user_entitlement(), premium.PRO)
 
 
 def render_deferred_section_gate(
@@ -6660,7 +6662,7 @@ def dashboard_premium_content_state(
 ) -> dict[str, bool]:
     """Resolve Dashboard content visibility from the canonical entitlement."""
 
-    is_premium = effective_entitlement == premium.PREMIUM
+    is_premium = premium.is_at_least(effective_entitlement, premium.PRO)
     return {
         "is_premium": is_premium,
         "show_upgrade_prompts": not is_premium,

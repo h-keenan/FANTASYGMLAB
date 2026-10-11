@@ -159,7 +159,7 @@ def test_cancel_at_period_end_keeps_premium_while_active():
             },
         }
     )
-    assert action["entitlement"] == premium.PREMIUM
+    assert action["entitlement"] == stripe_billing.RAW_PRO
     assert action["cancel_at_period_end"] == "true"
 
 

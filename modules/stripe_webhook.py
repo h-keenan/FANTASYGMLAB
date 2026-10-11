@@ -108,14 +108,17 @@ def _profile_update_url(config: SupabaseWebhookConfig, user_id: str) -> str:
     return f"{base}/rest/v1/profiles?user_id=eq.{_safe_text(user_id)}"
 
 
+SUPPORTED_ENTITLEMENT_VALUES = {"free", "premium", "front_office"}
+
+
 def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
     entitlement = _safe_text(action.get("entitlement")).casefold()
-    if entitlement and entitlement not in {"free", "premium"}:
+    if entitlement and entitlement not in SUPPORTED_ENTITLEMENT_VALUES:
         raise StripeWebhookUpdateError("Stripe event did not produce a supported entitlement update.")
     payload: dict[str, str] = {
         "premium_updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    if entitlement in {"free", "premium"}:
+    if entitlement in SUPPORTED_ENTITLEMENT_VALUES:
         payload["entitlement"] = entitlement
     optional_fields = {
         "stripe_customer_id": action.get("stripe_customer_id"),
@@ -348,15 +351,18 @@ def process_verified_stripe_webhook(
             "action": action,
         }
     entitlement = _safe_text(action.get("entitlement")).casefold()
-    if entitlement == "premium" and stripe_config.billing_mode == "live":
+    if entitlement in {"premium", "front_office"} and stripe_config.billing_mode == "live":
         allowed_prices = {
             _safe_text(stripe_config.price_monthly),
             _safe_text(stripe_config.price_annual),
+            _safe_text(stripe_config.price_pro_annual_launch_week),
+            _safe_text(stripe_config.price_front_office_annual),
         } - {""}
         event_price = _safe_text(action.get("stripe_price_id"))
         if not allowed_prices or event_price not in allowed_prices:
-            # A signed event is necessary but not sufficient to grant Premium:
-            # production grants must also belong to an explicitly configured plan.
+            # A signed event is necessary but not sufficient to grant paid
+            # access: production grants must also belong to an explicitly
+            # configured plan for *some* tier.
             return {
                 "ok": True,
                 "skipped": True,
@@ -364,7 +370,7 @@ def process_verified_stripe_webhook(
                 "event_id": event_id,
                 "action": {**action, "entitlement": ""},
             }
-    if entitlement not in {"free", "premium"}:
+    if entitlement not in SUPPORTED_ENTITLEMENT_VALUES:
         if event_id:
             _remember_event_id(event_id)
         return {

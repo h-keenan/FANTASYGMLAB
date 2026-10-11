@@ -9,8 +9,50 @@ import streamlit as st
 from modules import app_config
 
 
+# --------------------------------------------------------------------------
+# Tier model
+#
+# Three tiers, ordered FREE < PRO < FRONT_OFFICE. Any caller that used to do
+# `entitlement == PREMIUM` for "has paid access" should now do
+# `is_at_least(entitlement, PRO)` — Front Office includes everything Pro
+# has, so a bare equality check against one tier silently excludes the tier
+# above it.
+#
+# Storage note (read this before changing raw-value handling below): the
+# Supabase `profiles.entitlement` column keeps writing the *legacy* literal
+# "premium" for the Pro tier — not "pro" — on purpose. `services/mobile_api_service.py`
+# reads that same raw column directly (it does not import this module) and
+# does `profile.get("entitlement") == "premium"` in a dozen places; renaming
+# the stored value out from under it would silently downgrade every mobile
+# Pro subscriber to Free the next time this webhook fires. Only the brand
+# new Front Office tier gets a brand-new raw value ("front_office") — mobile
+# has no Front Office support yet anyway, so there is nothing to break.
+# `_normalize_tier` below is what turns that raw "premium" into the
+# canonical PRO value for every *web* caller; new code should store/compare
+# against PRO/FRONT_OFFICE and never hardcode "premium" again.
 FREE = "free"
-PREMIUM = "premium"
+PRO = "pro"
+FRONT_OFFICE = "front_office"
+
+# Back-compat alias: the previous binary model's one paid tier was named
+# PREMIUM. Every existing `premium.PREMIUM` call site keeps working and now
+# means "Pro" (the direct successor of the old single paid tier) rather than
+# a second, independent concept. New code should prefer PRO.
+PREMIUM = PRO
+
+# Raw legacy value still written to Supabase `profiles.entitlement` for the
+# Pro tier. See the module docstring above for why this does not say "pro".
+_LEGACY_PRO_RAW_VALUE = "premium"
+
+_TIER_RANK: dict[str, int] = {FREE: 0, PRO: 1, FRONT_OFFICE: 2}
+_KNOWN_TIERS = frozenset(_TIER_RANK)
+
+# Public: every valid canonical/resolved entitlement value. Callers that
+# memoize an already-resolved entitlement (e.g. app.py's session-state
+# memo) should validate against this rather than hand-rolling
+# `{FREE, PRO}` and silently treating FRONT_OFFICE as "needs refresh".
+ALL_TIERS = (FREE, PRO, FRONT_OFFICE)
+
 PREMIUM_OVERRIDE_ENV = "DYNASTYGM_PREMIUM_OVERRIDE"
 PREMIUM_OVERRIDE_SECRET = "DYNASTYGM_PREMIUM_OVERRIDE"
 DEBUG_AUTH_ENV = "DYNASTYGM_DEBUG_AUTH"
@@ -35,6 +77,78 @@ def _truthy(value: Any) -> bool:
 
 def _is_mapping(value: Any) -> bool:
     return isinstance(value, Mapping)
+
+
+def _normalize_tier(raw: Any) -> str:
+    """Map any raw stored/legacy value to one of FREE/PRO/FRONT_OFFICE.
+
+    Unknown or empty values degrade to FREE — an entitlement resolver must
+    never fail open. "premium" (the legacy single-paid-tier value still
+    written to Supabase) and "pro"/"paid" all resolve to PRO.
+    """
+
+    value = _safe_text(raw).casefold().replace("-", "_").replace(" ", "_")
+    if value in {"front_office", "frontoffice", "front_office_tier"}:
+        return FRONT_OFFICE
+    if value in {_LEGACY_PRO_RAW_VALUE, "pro", "paid"}:
+        return PRO
+    return FREE
+
+
+def is_at_least(entitlement: Any, minimum_tier: Any) -> bool:
+    """True when `entitlement` is at `minimum_tier` or a tier above it.
+
+    Normalizes both sides first, so callers may pass either a raw stored
+    value or an already-canonical tier constant. The one place tier
+    ordering is defined — callers should never hand-roll
+    `entitlement in (PRO, FRONT_OFFICE)` checks.
+    """
+
+    return _TIER_RANK.get(_normalize_tier(entitlement), 0) >= _TIER_RANK.get(
+        _normalize_tier(minimum_tier), 0
+    )
+
+
+def canonical_tier(raw: Any) -> str:
+    """Public wrapper around the raw-value normalizer, for other modules
+    that need to interpret a stored entitlement string (e.g. a webhook
+    payload) without duplicating the tier-name mapping."""
+
+    return _normalize_tier(raw)
+
+
+# --------------------------------------------------------------------------
+# Tier capability flags
+#
+# These are deliberately dumb boolean/str lookups with no UI or gating logic
+# attached — the paywall-trigger surfaces that call them own when/how to
+# show an upsell. Keeping them here means tier ordering and feature
+# membership have exactly one source of truth.
+
+def can_export_share_card(entitlement: Any = None) -> bool:
+    """Shareable trade-grade / power-ranking PNG export — a growth feature,
+    unlimited on every tier including Free. The actual PNG generation is a
+    separate workstream; this only states that it is never gated."""
+
+    return True
+
+
+def has_cross_league_exposure(entitlement: Any) -> bool:
+    """Front Office's cross-league player-ownership view."""
+
+    return _normalize_tier(entitlement) == FRONT_OFFICE
+
+
+def has_early_access_flag(entitlement: Any) -> bool:
+    """Front Office's "early access to new models/features" flag."""
+
+    return _normalize_tier(entitlement) == FRONT_OFFICE
+
+
+def has_priority_support_badge(entitlement: Any) -> bool:
+    """Front Office's priority-support badge."""
+
+    return _normalize_tier(entitlement) == FRONT_OFFICE
 
 
 def premium_override_enabled(*, environ: dict | None = None, secrets: Any = None) -> bool:
@@ -97,8 +211,9 @@ def get_entitlement_debug(
 ) -> dict[str, Any]:
     if premium_override_enabled(environ=environ, secrets=secrets):
         return {
-            "entitlement": PREMIUM,
+            "entitlement": PRO,
             "is_premium": True,
+            "is_front_office": False,
             "source": "dev_override",
             "source_field": PREMIUM_OVERRIDE_ENV,
             "raw_value": "enabled",
@@ -149,10 +264,12 @@ def get_entitlement_debug(
             source_name = "user_settings.entitlement"
 
     if canonical_value:
-        is_premium = canonical_value == PREMIUM
+        tier = _normalize_tier(canonical_value)
+        is_premium = tier != FREE
         return {
-            "entitlement": PREMIUM if is_premium else FREE,
+            "entitlement": tier,
             "is_premium": is_premium,
+            "is_front_office": tier == FRONT_OFFICE,
             "source": source_name,
             "source_field": source_name,
             "raw_value": canonical_value,
@@ -161,18 +278,20 @@ def get_entitlement_debug(
             "profile_error": profile_error,
         }
 
-    tier = _safe_text(
+    tier_field = _safe_text(
         fallback_settings.get("subscription_tier")
         or fallback_settings.get("plan")
         or fallback_settings.get("tier")
     ).casefold()
-    if tier in {"premium", "pro", "paid"}:
+    if tier_field and _normalize_tier(tier_field) != FREE:
+        tier = _normalize_tier(tier_field)
         return {
-            "entitlement": PREMIUM,
+            "entitlement": tier,
             "is_premium": True,
+            "is_front_office": tier == FRONT_OFFICE,
             "source": "fallback_field",
             "source_field": "plan/tier",
-            "raw_value": tier,
+            "raw_value": tier_field,
             "reason": "fallback_field",
             "profile_status": profile_status,
             "profile_error": profile_error,
@@ -181,8 +300,9 @@ def get_entitlement_debug(
     for key in ("is_premium", "premium", "premium_enabled", "has_premium"):
         if _truthy(fallback_settings.get(key)):
             return {
-                "entitlement": PREMIUM,
+                "entitlement": PRO,
                 "is_premium": True,
+                "is_front_office": False,
                 "source": "fallback_field",
                 "source_field": key,
                 "raw_value": _safe_text(fallback_settings.get(key)),
@@ -199,6 +319,7 @@ def get_entitlement_debug(
     return {
         "entitlement": FREE,
         "is_premium": False,
+        "is_front_office": False,
         "source": reason,
         "source_field": "",
         "raw_value": "",
@@ -217,11 +338,12 @@ def effective_entitlement(
 ) -> str:
     """Resolve the product entitlement from one authoritative source chain.
 
-    Development override wins. In production, only the authenticated Supabase
-    profile may grant Premium; absent or non-Premium profile data resolves Free.
+    Development override wins. In production, only the authenticated
+    Supabase profile may grant a paid tier; absent or free profile data
+    resolves Free. Returns one of FREE / PRO / FRONT_OFFICE.
     """
     if premium_override_enabled(environ=environ, secrets=secrets):
-        return PREMIUM
+        return PRO
 
     profile = account_profile if _is_mapping(account_profile) else None
     if profile is None and _is_mapping(session_state):
@@ -234,7 +356,8 @@ def effective_entitlement(
         environ={},
         secrets=None,
     )
-    return PREMIUM if resolved.get("entitlement") == PREMIUM else FREE
+    tier = resolved.get("entitlement")
+    return tier if tier in _KNOWN_TIERS else FREE
 
 
 def get_user_entitlement(
@@ -259,7 +382,13 @@ def get_user_entitlement(
 
 
 def is_premium_user(*args, **kwargs) -> bool:
-    return get_user_entitlement(*args, **kwargs) == PREMIUM
+    """True for Pro or Front Office (i.e. "has paid access")."""
+
+    return is_at_least(get_user_entitlement(*args, **kwargs), PRO)
+
+
+def is_front_office_user(*args, **kwargs) -> bool:
+    return get_user_entitlement(*args, **kwargs) == FRONT_OFFICE
 
 
 def premium_enabled(*args, **kwargs) -> bool:
