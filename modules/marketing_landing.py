@@ -28,11 +28,15 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 MARKETING_ASSET_DIR = _REPO_ROOT / "assets" / "marketing"
 
 # Application welcome (Streamlit). Static marketing site may keep PRIMARY_CTA_LABEL.
-APP_HERO_STATEMENT = "Dynasty decisions, built around your league."
+# Relaunch positioning (2026-10): tagline mirrors brand_identity.PRODUCT_TAGLINE
+# exactly, and the support line is the approved one-liner — the sell is
+# strategy + continuity (GM Plan, GM Targets, Decision Memory), not the
+# trade evaluator, which stays table-stakes free functionality elsewhere.
+APP_HERO_STATEMENT = "Your fantasy football front office."
 APP_HERO_SUPPORT = (
-    "Import your Sleeper league and FantasyGM evaluates roster needs, "
-    "trades, waivers, and players in the context that actually changes "
-    "the decision."
+    "The only dynasty tool that runs your team like a front office: a "
+    "plan, a target board, and a memory, built on your real Sleeper "
+    "league."
 )
 APP_PRIMARY_CTA_LABEL = "Import Sleeper League"
 APP_PRIMARY_CTA_HINT = "No account required"
