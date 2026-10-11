@@ -25,6 +25,7 @@ import streamlit as st
 
 from modules.my_news import build_quick_news_summary, relative_news_time
 from modules.semantic_glyphs import glyph_html
+from modules.ui_primitives import render_empty_state_panel
 
 EVENT_TYPE_LABELS = {
     "injury/status": "Injury / Status",
@@ -139,22 +140,38 @@ def render_news_item_card(item: dict, idx: int) -> None:
     if speculative:
         badge_parts.append("<span class='news-badge news-badge-warning'>Unconfirmed / speculative</span>")
 
-    title_html = (
-        f"<a class='news-card-title' href='{escape(link, quote=True)}' target='_blank' rel='noopener noreferrer'>{title}</a>"
-        if link
-        else f"<div class='news-card-title'>{title}</div>"
-    )
+    # Title stays a plain element here — the whole card below is the link
+    # when one exists, not just the title text.
+    title_html = f"<div class='news-card-title'>{title}</div>"
     badges_html = "".join(badge_parts)
 
-    html = f"""
-    <div class="news-card" id="general-news-card-{idx}">
+    body_html = f"""
         <div class="news-card-top">
             <div>{title_html}</div>
             <div class="news-badges">{badges_html}</div>
         </div>
         <div class="news-summary">{summary}</div>
-    </div>
     """
+
+    # Mobile's NewsRow wraps the entire row in a TouchableOpacity — tapping
+    # anywhere opens the story, not just the headline text. The web card
+    # previously only linked the title, giving it a much smaller tap target
+    # than mobile (and than this app's own interactive-card convention,
+    # modules/ui_primitives.py's dg-ui-card-link, which wraps a whole card in
+    # one anchor). Matches both here: the full card is the link when one
+    # exists.
+    if link:
+        html = f"""
+        <a class="news-card news-card-link" id="general-news-card-{idx}" href="{escape(link, quote=True)}" target="_blank" rel="noopener noreferrer">
+            {body_html}
+        </a>
+        """
+    else:
+        html = f"""
+        <div class="news-card" id="general-news-card-{idx}">
+            {body_html}
+        </div>
+        """
     st.markdown(html, unsafe_allow_html=True)
 
 
@@ -164,8 +181,13 @@ def render_general_news_feed(items: list, *, now_ts: float | None = None) -> Non
     and the roster-scoped Alerts timeline."""
 
     if not items:
-        st.info(
-            "No news right now. Check back later for injury, role, transaction, and off-field updates."
+        # Matches mobile's EmptyState (icon + title + subtitle) and this
+        # app's own empty-state convention elsewhere (modules/ui_primitives.
+        # render_empty_state_panel) rather than a bare st.info sentence.
+        render_empty_state_panel(
+            "No news right now",
+            "Check back later for injury, role, transaction, and off-field updates.",
+            kind="no-data",
         )
         return
 

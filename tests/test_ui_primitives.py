@@ -276,6 +276,7 @@ def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
         "dashboard_workflow.py",
         "decision_change_history_ui.py",
         "draft_center_ui.py",
+        "general_news_ui.py",
         "gm_plan_ui.py",
         "gm_targets_ui.py",
         "league_intelligence_ui.py",
