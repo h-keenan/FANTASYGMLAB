@@ -267,6 +267,24 @@ class TestPremiumEntitlements(unittest.TestCase):
         )
         self.assertIn("DYNASTYGM_PREMIUM_OVERRIDE=true", debug_html)
 
+    def test_premium_page_highlights_the_two_most_quantified_unlocks(self):
+        # Parity fix: mobile's PaywallScreen bolds + badges "GM Targets" and
+        # "Trade Hub" (its two most concretely quantified unlocks — 50 vs. a
+        # 3-player cap, every idea vs. the first 2) instead of a flat
+        # checklist where every row reads with equal weight. Web's
+        # comparison table had the identical gap; this pins that the same
+        # two rows (and only those two) get the matching "Biggest unlock"
+        # treatment here.
+        html = premium_page.premium_page_html(entitlement=premium.FREE)
+
+        self.assertEqual(html.count("Biggest unlock"), 2)
+        self.assertEqual(html.count("premium-plan-row-highlight"), 2)
+        # Free-tier rows (e.g. the limited GM Targets row) never get the
+        # Premium-only highlight treatment, even though its title also
+        # contains "GM Targets".
+        free_section = html[html.index("Free includes"):html.index("Included now with Premium")]
+        self.assertNotIn("premium-plan-row-highlight", free_section)
+
     def test_premium_page_displays_premium_current_plan(self):
         html = premium_page.premium_page_html(entitlement=premium.PREMIUM)
 

@@ -8,7 +8,50 @@ from modules import brand_identity
 from modules import premium
 from modules import product_copy
 from modules import stripe_billing
+from modules.html_rendering import inject_global_styles
 from modules.semantic_glyphs import glyph_html
+
+
+# Mobile's PaywallScreen (isHighImpactFeature) bolds and badges the two most
+# concretely quantified Premium unlocks — GM Targets' 50-vs-3 cap and Trade
+# Hub's full-ideas-vs-first-2 cap — instead of a flat checklist where every
+# line reads with equal weight. Web's comparison table had the identical
+# "every row weighted the same" gap PaywallScreen was built to fix; this
+# mirrors that same substring match against the premium feature list's
+# titles below so the two surfaces can never highlight a different pair of
+# features. (Deliberately not spelling the tuple's own name here — a test
+# locates that constant's definition by searching the file for its exact
+# name, and an earlier incidental match would shift that search.)
+def _is_high_impact_premium_feature(title: str) -> bool:
+    return "GM Targets" in title or "Trade Hub" in title
+
+
+# Route-scoped, not part of APP_CSS (modules/app_styles.py is already at the
+# APP_CSS byte-budget ceiling — see tests/test_app_css_architecture.py). Only
+# injected on the Premium route itself via render_premium_page(), same
+# lazy-injection pattern as modules.alerts_activity_styles /
+# modules.compact_fantasy_assets.
+PREMIUM_HIGHLIGHT_CSS = """
+.premium-plan-row-highlight{
+    background:color-mix(in srgb,var(--color-premium) 9%,transparent);
+    border-left:3px solid var(--color-premium);
+    border-top-color:transparent;
+    margin-left:calc(var(--space-md) * -1);
+    padding-left:var(--space-md);
+}
+.premium-plan-row-badge{
+    background:color-mix(in srgb,var(--color-premium) 20%,transparent);
+    border-radius:999px;
+    color:var(--color-premium);
+    font-size:0.6875rem;
+    font-weight:700;
+    letter-spacing:0.02em;
+    margin-left:var(--space-xs);
+    padding:0.1rem 0.5rem;
+    text-transform:uppercase;
+    white-space:nowrap;
+}
+"""
 
 
 PREMIUM_PLAN_CTA_COMPONENT = st.components.v2.component(
@@ -243,12 +286,19 @@ def _plan_option_html(
 
 
 def _plan_row_html(title: str, body: str, *, premium_row: bool = False) -> str:
+    highlight = premium_row and _is_high_impact_premium_feature(title)
     row_class = "premium-plan-row premium-plan-row-premium" if premium_row else "premium-plan-row"
+    if highlight:
+        row_class += " premium-plan-row-highlight"
+    badge_html = (
+        "<span class='premium-plan-row-badge'>Biggest unlock</span>" if highlight else ""
+    )
     return (
         f"<div class='{row_class}'>"
         "<div class='premium-plan-row-heading'>"
         f"{glyph_html(CAPABILITY_GLYPHS.get(title, 'more'), size='card')}"
         f"<div class='premium-plan-row-title'>{escape(title)}</div>"
+        f"{badge_html}"
         "</div>"
         f"<div class='premium-plan-row-body'>{escape(body)}</div>"
         "</div>"
@@ -383,6 +433,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     from modules import guest_conversion
     from modules import premium_conversion
 
+    inject_global_styles(PREMIUM_HIGHLIGHT_CSS)
     config = stripe_billing.load_stripe_config(secrets=st.secrets)
     try:
         billing_flag = str(st.query_params.get("billing", "") or "").strip().casefold()
