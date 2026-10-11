@@ -1033,6 +1033,10 @@ class TestSupabaseAccounts(unittest.TestCase):
             account_ui.st,
             "button",
             side_effect=lambda label, **_kwargs: buttons.get(label, False),
+        ), patch.object(account_ui.st, "form", return_value=_Tabs()), patch.object(
+            account_ui.st,
+            "form_submit_button",
+            side_effect=lambda label, **_kwargs: buttons.get(label, False),
         ), patch.object(account_ui.st, "caption"), patch.object(account_ui.st, "warning") as warning, patch.object(
             account_ui.st, "rerun"
         ), patch.object(
@@ -1072,6 +1076,10 @@ class TestSupabaseAccounts(unittest.TestCase):
         ), patch.object(
             account_ui.st,
             "button",
+            side_effect=lambda label, **_kwargs: buttons.get(label, False),
+        ), patch.object(account_ui.st, "form", return_value=_StreamlitContext()), patch.object(
+            account_ui.st,
+            "form_submit_button",
             side_effect=lambda label, **_kwargs: buttons.get(label, False),
         ), patch.object(account_ui.st, "caption"), patch.object(account_ui.st, "success"), patch.object(
             account_ui.st,
@@ -1135,6 +1143,10 @@ class TestSupabaseAccounts(unittest.TestCase):
         ), patch.object(
             account_ui.st,
             "button",
+            side_effect=lambda label, **_kwargs: buttons.get(label, False),
+        ), patch.object(account_ui.st, "form", return_value=_StreamlitContext()), patch.object(
+            account_ui.st,
+            "form_submit_button",
             side_effect=lambda label, **_kwargs: buttons.get(label, False),
         ), patch.object(account_ui.st, "caption"), patch.object(account_ui.st, "warning") as warning, patch.object(
             auth_supabase,
@@ -1212,6 +1224,10 @@ class TestSupabaseAccounts(unittest.TestCase):
         ), patch.object(
             account_ui.st,
             "button",
+            side_effect=lambda label, **_kwargs: buttons.get(label, False),
+        ), patch.object(account_ui.st, "form", return_value=_StreamlitContext()), patch.object(
+            account_ui.st,
+            "form_submit_button",
             side_effect=lambda label, **_kwargs: buttons.get(label, False),
         ), patch.object(account_ui.st, "caption"), patch.object(account_ui.st, "success"), patch.object(
             account_ui.st,
