@@ -1612,23 +1612,29 @@ def render_mobile_auth_entry(
             "</div>",
             unsafe_allow_html=True,
         )
-        login_email = st.text_input(
-            "Email",
-            key="launch_account_login_email",
-            autocomplete="email",
-        )
-        login_password = st.text_input(
-            "Password",
-            type="password",
-            key="launch_account_login_password",
-            autocomplete="current-password",
-        )
-        if st.button(
-            "Sign in",
-            key="launch_account_login_button",
-            use_container_width=True,
-            type="primary",
-        ):
+        # Wrapped in st.form so Enter submits from either field on the first
+        # press. Bare text_input + button only submits on Enter from the
+        # last-focused widget's own rerun, which read as "sometimes needs a
+        # couple tries" (reported by product).
+        with st.form("launch_account_login_form", clear_on_submit=False):
+            login_email = st.text_input(
+                "Email",
+                key="launch_account_login_email",
+                autocomplete="email",
+            )
+            login_password = st.text_input(
+                "Password",
+                type="password",
+                key="launch_account_login_password",
+                autocomplete="current-password",
+            )
+            login_submitted = st.form_submit_button(
+                "Sign in",
+                key="launch_account_login_button",
+                use_container_width=True,
+                type="primary",
+            )
+        if login_submitted:
             payload, error = auth_supabase.sign_in(config, login_email, login_password)
             if error:
                 if auth_supabase.auth_error_requires_email_confirmation(error):
