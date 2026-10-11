@@ -18,6 +18,13 @@ from modules.marketing_landing_styles import MARKETING_LANDING_CSS
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+# Kept pointed at the lightweight top-level marketing assets folder, never
+# at its "launch" subfolder — that heavier kit must stay out of the
+# authenticated/hot app path (see test_launch_marketing_kit.py). Nothing in
+# this module reads from it directly anymore (the in-app screenshot gallery
+# that used to was removed — two of its three images were synthetic
+# share-card renders, not real product screens), but the constant stays as
+# the documented, guarded home for any future in-app marketing asset.
 MARKETING_ASSET_DIR = _REPO_ROOT / "assets" / "marketing"
 
 # Application welcome (Streamlit). Static marketing site may keep PRIMARY_CTA_LABEL.
@@ -71,27 +78,6 @@ PRIMARY_CTA_LABEL = "Import your league"
 SECONDARY_CTA_LABEL = "Sign in"
 GUEST_CTA_LABEL = "Continue as guest"
 
-# Three real screens, each caption specific to ITS screen — not a restatement
-# of the next one, and not duplicated again as a separate feature list below
-# (see render_screenshot_gallery, the sole place these captions render).
-WHAT_IT_DOES = (
-    (
-        "Today's Game Plan",
-        "Open the dashboard and your highest-value move this week is already ranked — no digging through menus first.",
-        "dashboard.jpg",
-    ),
-    (
-        "Trade Hub",
-        "Every suggested trade shows the value change and the partner's likely reason to say yes.",
-        "trade-share.jpg",
-    ),
-    (
-        "Player Quick View",
-        "Tap any player to see the call and the reasoning behind it, not just a rank number.",
-        "player-share.jpg",
-    ),
-)
-
 # Merges the former "Why it's different" and "Trust" sections — they made
 # overlapping claims (league-awareness, inspectable context, consistency)
 # across two separate walls of text. One tight list says it once.
@@ -115,14 +101,6 @@ FOUNDER_BETA_SUMMARY = (
     "Adds, no account required. Early Access Premium adds depth on those same surfaces, "
     "not a separate product. ESPN import is still labeled experimental; Sleeper has full parity."
 )
-
-
-def screenshot_path(filename: str) -> Path:
-    return MARKETING_ASSET_DIR / filename
-
-
-def available_screenshots() -> tuple[Path, ...]:
-    return tuple(sorted(MARKETING_ASSET_DIR.glob("*.jpg")))
 
 
 def _track(event: str, *, source_surface: str, once_key: str = "") -> None:
@@ -584,35 +562,6 @@ def landing_body_html(
     return "".join(sections)
 
 
-def render_screenshot_gallery() -> None:
-    """Progressive product proof — only after secondary CTA to keep cold payload light."""
-
-    st.markdown(
-        "<div class='fgl-landing__gallery-intro'>"
-        "<div class='fgl-landing__kicker'>See it in action</div>"
-        "<h2>Real FantasyGM Lab screens</h2>"
-        "<p>Captured from the product UI — not marketing mockups.</p>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    shown_files: set[str] = set()
-    shown = 0
-    for title, body, filename in WHAT_IT_DOES:
-        path = screenshot_path(filename)
-        if not path.exists() or filename in shown_files:
-            continue
-        shown_files.add(filename)
-        st.markdown(
-            f"<div class='fgl-landing__shot-caption'><strong>{escape(title)}</strong>"
-            f"{escape(body)}</div>",
-            unsafe_allow_html=True,
-        )
-        st.image(str(path), use_container_width=True)
-        shown += 1
-    if shown == 0:
-        st.caption("Product screenshots will appear here once the marketing asset pack is generated.")
-
-
 def render_marketing_landing() -> dict[str, bool]:
     """State-driven signed-out entry. No provider I/O."""
 
@@ -682,6 +631,7 @@ def render_marketing_landing() -> dict[str, bool]:
         )
     deferred = render_marketing_landing_deferred(include_proof=False)
     actions["pricing"] = bool(deferred.get("pricing"))
+    actions["how_it_works"] = bool(deferred.get("how_it_works"))
     st.session_state["_welcome_deferred_mounted"] = True
     return actions
 
@@ -703,9 +653,10 @@ def render_marketing_landing_deferred(*, include_proof: bool = True) -> dict[str
         billing_configured = bool(billing.configured)
     except Exception:
         billing_configured = False
-    actions = {"primary": False, "secondary": False, "pricing": False}
+    actions = {"primary": False, "secondary": False, "pricing": False, "how_it_works": False}
     focus = _safe_focus_key(st.session_state.get("landing_focus"))
     include_pricing = focus == "pricing" or bool(st.session_state.get("landing_show_pricing"))
+    show_detail = focus == "how_it_works" or bool(st.session_state.get("landing_show_how_it_works"))
 
     if include_proof:
         st.markdown(
@@ -714,6 +665,19 @@ def render_marketing_landing_deferred(*, include_proof: bool = True) -> dict[str
             "</div>",
             unsafe_allow_html=True,
         )
+    # Two opt-in deep dives, not an automatic wall of copy under the hero —
+    # a visitor who only wants to import never has to scroll past either one
+    # (see the task's "content splattered everywhere" complaint). Mirrors
+    # how the mobile app's own onboarding reveals one idea per tap instead
+    # of dumping everything on first paint.
+    if st.button(
+        HOW_IT_WORKS_CTA_LABEL, key="landing_how_it_works_cta", use_container_width=False
+    ):
+        actions["how_it_works"] = True
+        st.session_state["landing_focus"] = "how_it_works"
+        st.session_state["landing_show_how_it_works"] = True
+        _track("how_it_works_viewed", source_surface="landing_how_it_works", once_key="session")
+        show_detail = True
     if st.button(
         PRICING_CTA_LABEL, key="landing_pricing_cta", use_container_width=False
     ):
@@ -723,11 +687,9 @@ def render_marketing_landing_deferred(*, include_proof: bool = True) -> dict[str
         _track("pricing_viewed", source_surface="landing_pricing", once_key="session")
         include_pricing = True
 
-    render_screenshot_gallery()
-
     deferred = landing_body_html(
         billing_configured=billing_configured,
-        detail=True,
+        detail=show_detail,
         include_pricing=include_pricing,
     )
     if deferred:

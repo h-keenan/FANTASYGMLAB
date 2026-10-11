@@ -145,27 +145,26 @@ def test_marketing_assets_exist():
         assert path.stat().st_size > 40, name
 
 
-def test_screenshot_captions_do_not_duplicate_the_feature_list():
-    """Regression test for the "What it does" bug: the same content used to
+def test_screenshot_gallery_was_removed_not_just_renamed():
+    """Regression test for the "fake renderings" complaint: the landing used
 
-    render twice — once as screenshot-gallery captions, once as its own
-    list section. Each screenshot caption must say something specific to
-    that screen, and none of that caption text may be repeated verbatim in
-    the separate "Why it's different" / "Founder Beta" detail copy.
+    to claim its gallery was "Captured from the product UI — not marketing
+    mockups" while two of the three images were synthetic share-card
+    renders (literal "Synthetic Young WR" placeholder data, generic
+    silhouette avatars) built by modules/share_card_renderer.py, not real
+    captured screens. Rather than patch the caption, the gallery and its
+    image-rendering machinery were removed from the in-app landing
+    entirely — the abstract, honest preview rail (landing_product_preview_html)
+    is the one "what it does" moment now.
     """
 
-    detail_html = marketing_landing.landing_body_html(
-        billing_configured=False, detail=True, include_pricing=False
-    )
-    assert "Front-office tools for the league you manage" not in detail_html
-    assert "<div class='fgl-landing__kicker'>What it does</div>" not in detail_html
-    captions = [body for _title, body, _file in marketing_landing.WHAT_IT_DOES]
-    assert len(captions) == len(set(captions)), "screenshot captions must be distinct"
-    for caption in captions:
-        assert caption not in detail_html
-    titles = [title for title, _body, _file in marketing_landing.WHAT_IT_DOES]
-    assert len(titles) == len(set(titles))
-    assert 2 <= len(marketing_landing.WHAT_IT_DOES) <= 3
+    source = (ROOT / "modules" / "marketing_landing.py").read_text(encoding="utf-8")
+    assert "render_screenshot_gallery" not in source
+    assert "WHAT_IT_DOES" not in source
+    assert "not marketing mockups" not in source
+    assert not hasattr(marketing_landing, "render_screenshot_gallery")
+    assert not hasattr(marketing_landing, "WHAT_IT_DOES")
+    assert not hasattr(marketing_landing, "screenshot_path")
 
 
 def test_why_different_section_is_merged_not_split():

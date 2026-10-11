@@ -82,12 +82,15 @@ def test_hero_sign_in_sets_account_mode():
     assert state.get("launch_auth_mode") == "account"
     assert state.get("launch_account_form") == "signin"
     joined = "\n".join(markdown)
-    # The welcome screen's deferred mount now wires up the real product
-    # screenshot gallery (render_screenshot_gallery) and detail copy
-    # (landing_body_html(detail=True)) — see modules/marketing_landing.py.
-    # This same render pass still shows them even mid-click because the
-    # click's flow transition only takes effect on the next rerun.
-    assert "Real FantasyGM Lab screens" in joined
+    # The welcome screen's deferred mount still shows the abstract "what it
+    # does" preview rail on this same render pass (it's cold-paint content,
+    # not gated behind a click) even mid-click, because the click's flow
+    # transition only takes effect on the next rerun. The "Why it's
+    # different" / "Founder Beta" detail copy, by contrast, is gated behind
+    # the "See how it works" button and the mocked `_button` above only
+    # returns True for Sign in, so that detail copy stays hidden here.
+    assert "Your league changes the answer" in joined
+    assert "Why it's different" not in joined
     assert "load_leagues_for_username" not in cold_render_source()
 
 

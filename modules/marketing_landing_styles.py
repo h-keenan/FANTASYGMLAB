@@ -40,12 +40,6 @@ body:has(.fgl-landing) .dg-build-identity{
 .fgl-landing__preview-item{display:grid;gap:.12rem}
 .fgl-landing__preview-item strong{color:var(--color-text-primary,#f8fafc);font-size:.92rem;font-weight:750}
 .fgl-landing__preview-item span{color:var(--color-text-secondary,rgba(203,213,225,.9));font-size:.84rem;line-height:1.35;overflow-wrap:anywhere}
-.fgl-landing__gallery-intro{display:grid;gap:.25rem;padding:.75rem 0 .35rem}
-.fgl-landing__gallery-intro h2{color:var(--color-text-primary,#f8fafc);font-size:1.1rem;font-weight:800;margin:0}
-.fgl-landing__gallery-intro p{color:var(--color-text-secondary,rgba(203,213,225,.9));font-size:.84rem;line-height:1.4;margin:0}
-body:has(.fgl-landing) [data-testid="stImage"] img{border:1px solid color-mix(in srgb,var(--color-border,#2a2e35) 80%,transparent);border-radius:.6rem;box-sizing:border-box}
-.fgl-landing__shot-caption{background:var(--color-surface-primary,rgba(15,23,42,.45));border:1px solid var(--color-border,rgba(148,163,184,.14));border-inline-start:2px solid color-mix(in srgb,var(--color-accent,#22d3ee) 72%,transparent);border-radius:.5rem;box-sizing:border-box;color:var(--color-text-secondary,rgba(203,213,225,.92));font-size:.86rem;line-height:1.4;margin:.6rem 0 .35rem;padding:.45rem .6rem}
-.fgl-landing__shot-caption strong{color:var(--color-text-primary,#f8fafc);display:block;font-size:.84rem;font-weight:750;margin-bottom:.1rem}
 .fgl-landing__section{border-block-start:1px solid var(--color-border,rgba(148,163,184,.14));display:grid;gap:.4rem;padding:.7rem 0 .1rem}
 .fgl-landing__section h2{color:var(--color-text-primary,#f8fafc);font-size:1.05rem;font-weight:800;margin:0}
 .fgl-landing__section h3{color:var(--color-text-primary,#f8fafc);font-size:.9rem;font-weight:750;margin:0 0 .15rem}
@@ -66,6 +60,7 @@ body:has(.fgl-landing) [class*="st-key-landing_back_cta"] button{font-weight:600
 body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_primary_cta"],
 body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_secondary_cta"]{max-width:100%}
 body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_primary_cta"] button{min-height:2.7rem}
+body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_how_it_works_cta"],
 body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_pricing_cta"]{margin-top:.05rem;max-width:16rem}
 body:has([data-fgl-welcome-flow="welcome"]) [data-testid="stCaptionContainer"]{margin-top:-.15rem;margin-bottom:.05rem;max-width:22rem}
 @media (max-width:430px){
