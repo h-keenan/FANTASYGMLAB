@@ -14,8 +14,8 @@ div[data-testid="stDialog"] > div {
     border-radius: var(--radius-none) !important;
 }
 
-div[data-testid="stDialog"] > div > div[role="dialog"],
-div[role="dialog"] {
+div[data-testid="stDialog"] > div > [role="dialog"],
+[role="dialog"] {
     background: var(--color-shell) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
     border-radius: var(--radius-none) !important;
@@ -26,16 +26,16 @@ div[role="dialog"] {
     padding: var(--space-lg) !important;
 }
 
-div[data-testid="stDialog"] > div > div[role="dialog"] > div:first-child,
-div[data-testid="stDialog"] > div > div[role="dialog"] > div:last-child,
-div[role="dialog"] > div:first-child,
-div[role="dialog"] > div:last-child {
+div[data-testid="stDialog"] > div > [role="dialog"] > div:first-child,
+div[data-testid="stDialog"] > div > [role="dialog"] > div:last-child,
+[role="dialog"] > div:first-child,
+[role="dialog"] > div:last-child {
     background: var(--color-shell) !important;
     border-radius: var(--radius-none) !important;
 }
 
-div[data-testid="stDialog"] > div > div[role="dialog"] > div:last-child,
-div[role="dialog"] > div:last-child {
+div[data-testid="stDialog"] > div > [role="dialog"] > div:last-child,
+[role="dialog"] > div:last-child {
     max-height: calc(90dvh - (2 * var(--space-lg))) !important;
     overflow-x: hidden !important;
     overflow-y: auto !important;
@@ -108,20 +108,25 @@ div[data-testid="stDialog"] h2 {
 }
 
 @media (max-width: 700px) {
-    div[data-testid="stDialog"] > div > div[role="dialog"],
-    div[role="dialog"] {
+    /* max-width/width are relative to this element's own flow parent
+       (100%), not the viewport: Streamlit's own stDialog wrapper already
+       caps that parent to calc(100% - 32px) of the viewport and centers
+       it, so a viewport-relative (vw) width here would overflow the
+       parent — and the viewport — by the parent's own side inset. */
+    div[data-testid="stDialog"] > div > [role="dialog"],
+    [role="dialog"] {
         max-height: calc(100dvh - (2 * var(--space-sm))) !important;
-        max-width: calc(100vw - (2 * var(--space-sm))) !important;
+        max-width: 100% !important;
         padding:
             var(--space-md)
             max(var(--space-md), env(safe-area-inset-right))
             max(var(--space-md), env(safe-area-inset-bottom))
             max(var(--space-md), env(safe-area-inset-left)) !important;
-        width: calc(100vw - (2 * var(--space-sm))) !important;
+        width: 100% !important;
     }
 
-    div[data-testid="stDialog"] > div > div[role="dialog"] > div:last-child,
-    div[role="dialog"] > div:last-child {
+    div[data-testid="stDialog"] > div > [role="dialog"] > div:last-child,
+    [role="dialog"] > div:last-child {
         max-height: calc(100dvh - (4 * var(--space-md))) !important;
     }
 

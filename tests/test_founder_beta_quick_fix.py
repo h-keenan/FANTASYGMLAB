@@ -17,7 +17,10 @@ def test_quick_fix_loads_after_shell_and_before_overlay():
 
 
 def test_founder_dialog_contracts_remain_in_quick_fix():
-    assert 'div[role="dialog"]' in FOUNDER_BETA_QUICK_FIX_CSS
+    # Streamlit renders the dialog landmark on a <section>, not a <div> —
+    # the selector must stay tag-agnostic or it silently stops matching.
+    assert 'div[role="dialog"]' not in FOUNDER_BETA_QUICK_FIX_CSS
+    assert '[role="dialog"]' in FOUNDER_BETA_QUICK_FIX_CSS
     assert "border-radius: var(--radius-none) !important" in FOUNDER_BETA_QUICK_FIX_CSS
     assert "max-height: min(90dvh, 920px) !important" in FOUNDER_BETA_QUICK_FIX_CSS
     assert "--radius-panel: 0" in DESIGN_TOKEN_CSS

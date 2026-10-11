@@ -185,7 +185,7 @@ div[data-testid="stExpander"]{
     min-height: var(--touch-target-min);
 }
 
-div[data-testid="stDialog"] div[role="dialog"] {
+div[data-testid="stDialog"] [role="dialog"] {
     padding: var(--space-xl) !important;
 }
 
@@ -272,7 +272,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
         display: none;
     }
 
-    div[data-testid="stDialog"] div[role="dialog"] {
+    div[data-testid="stDialog"] [role="dialog"] {
         max-height: calc(100dvh - (2 * var(--space-md)));
         max-width: calc(100vw - (2 * var(--space-md)));
         padding:

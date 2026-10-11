@@ -413,7 +413,11 @@ class TestPlayerCards(unittest.TestCase):
         ]:
             self.assertIn(selector, APP_CSS)
 
-        self.assertIn('div[data-testid="stDialog"] div[role="dialog"]', APP_CSS)
+        # Streamlit renders the dialog landmark on a <section>, not a
+        # <div> — the selector must stay tag-agnostic or it silently
+        # stops matching every mobile dialog-sizing/collapse rule.
+        self.assertNotIn('div[data-testid="stDialog"] div[role="dialog"]', APP_CSS)
+        self.assertIn('div[data-testid="stDialog"] [role="dialog"]', APP_CSS)
         self.assertIn("border-radius: var(--radius-pill) !important", APP_CSS)
         self.assertIn("border-radius: 2px !important", APP_CSS)
         self.assertIn("grid-template-columns: minmax(5.6rem, 0.36fr) minmax(0, 1fr)", APP_CSS)

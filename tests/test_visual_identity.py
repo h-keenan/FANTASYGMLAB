@@ -96,7 +96,11 @@ def test_controls_preserve_focus_and_mobile_touch_targets():
 
 
 def test_tables_and_dialogs_use_command_center_contract():
-    assert 'div[data-testid="stDialog"] div[role="dialog"]' in COMMAND_CENTER_CSS
+    # Streamlit renders the dialog landmark on a <section>, not a <div> —
+    # the selector must stay tag-agnostic or it silently stops matching
+    # (see visual_identity_styles.py).
+    assert 'div[data-testid="stDialog"] div[role="dialog"]' not in COMMAND_CENTER_CSS
+    assert 'div[data-testid="stDialog"] [role="dialog"]' in COMMAND_CENTER_CSS
     assert "border-radius: var(--radius-none) !important" in COMMAND_CENTER_CSS
     assert "font-variant-numeric: tabular-nums" in COMMAND_CENTER_CSS
     assert "table tbody tr:nth-child(even)" in COMMAND_CENTER_CSS
