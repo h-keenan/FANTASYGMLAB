@@ -324,7 +324,7 @@ def premium_page_html(
     else:
         billing_body = (
             "Premium checkout will appear here once billing is enabled for your account. "
-            "Live billing is not enabled. Your current plan status is shown above."
+            "Live billing is not enabled."
         )
     local_override_note = (
         "<div class='premium-billing-note-body premium-dev-note'>Local testing: set "
