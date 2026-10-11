@@ -274,8 +274,8 @@ div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[cl
 .player-dossier-decision p,.player-dossier-context-summary,.player-dossier-context-note,.player-dossier-career-empty{color:var(--color-text-secondary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0}
 .player-dossier-career-empty,.player-dossier-context-summary,.player-dossier-context-note{padding:var(--space-sm) var(--space-md)}
 .player-dossier-context-note{border-top:var(--border-width-default) solid var(--color-border);color:var(--color-text-muted)}
-div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell){max-height: min(88vh, 920px) !important}
-div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div:last-child{overflow-y: auto !important;overscroll-behavior:contain}
+div[data-testid="stDialog"] [role="dialog"]:has(.player-quick-view-shell){max-height: min(88vh, 920px) !important}
+div[data-testid="stDialog"] [role="dialog"]:has(.player-quick-view-shell)>div:last-child{overflow-y: auto !important;overscroll-behavior:contain}
 @media (max-width: 900px){
 .pqv-workspace-top,.pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1fr)}
 .player-dossier-snapshot-grid,.player-dossier-executive-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -302,7 +302,7 @@ div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell)>div
 .pqv-model-summary-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (min-width: 1024px){
-div[data-testid="stDialog"] div[role="dialog"]:has(.player-quick-view-shell){max-width:min(54rem,calc(100dvw - 4rem)) !important;width:min(54rem,calc(100dvw - 4rem)) !important}
+div[data-testid="stDialog"] [role="dialog"]:has(.player-quick-view-shell){max-width:min(54rem,calc(100dvw - 4rem)) !important;width:min(54rem,calc(100dvw - 4rem)) !important}
 .player-quick-view-shell,.pqv-workspace{max-width:54rem}
 div[class*="st-key-pqv_actions_"],div[class*="st-key-pqv_detail_nav_rail"]{max-width:54rem}
 div[class*="st-key-pqv_actions_strip"]{max-width:54rem}

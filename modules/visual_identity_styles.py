@@ -84,7 +84,7 @@ div[data-testid="stExpander"]{
 }
 
 .dg-ui-card--elevated,
-div[data-testid="stDialog"] div[role="dialog"]{
+div[data-testid="stDialog"] [role="dialog"]{
     box-shadow: var(--shadow-card) !important;
 }
 
@@ -217,7 +217,7 @@ table tbody tr:nth-child(even) {
 }
 
 /* Existing modal framework, restyled rather than replaced. */
-div[data-testid="stDialog"] div[role="dialog"] {
+div[data-testid="stDialog"] [role="dialog"] {
     background: var(--color-shell) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
     border-radius: var(--radius-none) !important;

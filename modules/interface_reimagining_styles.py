@@ -267,7 +267,7 @@ main:has(.dg-page-shell--players) .compact-player-row{
     text-transform: uppercase;
 }
 
-div[data-testid="stDialog"] div[role="dialog"] {
+div[data-testid="stDialog"] [role="dialog"] {
     border: var(--border-width-default) solid var(--color-text-secondary) !important;
     border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-overlay) !important;

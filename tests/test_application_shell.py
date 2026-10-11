@@ -122,6 +122,10 @@ def test_cross_page_state_styles_share_one_canonical_rhythm():
         ".dg-ui-empty-state",
         '[data-testid="stAlert"]',
         '[data-testid="stSpinner"]',
-        'div[data-testid="stDialog"] div[role="dialog"]',
+        # Streamlit renders the dialog landmark on a <section>, not a
+        # <div> — the selector must stay tag-agnostic or it silently
+        # stops matching (see application_shell_styles.py).
+        'div[data-testid="stDialog"] [role="dialog"]',
     ):
         assert selector in APPLICATION_SHELL_CSS
+    assert 'div[data-testid="stDialog"] div[role="dialog"]' not in APPLICATION_SHELL_CSS

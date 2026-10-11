@@ -948,7 +948,7 @@ main h4 {
     font-size: 0.82rem;
     line-height: 1.32;
 }
-div[data-testid="stDialog"] div[role="dialog"] {
+div[data-testid="stDialog"] [role="dialog"] {
     max-width: min(760px, calc(100vw - 1rem)) !important;
     width: min(760px, calc(100vw - 1rem)) !important;
 }
@@ -5656,7 +5656,7 @@ main,
         border-left-width: 3px !important;
     }
 }
-div[data-testid="stDialog"] div[role="dialog"] {
+div[data-testid="stDialog"] [role="dialog"] {
     background:
         linear-gradient(180deg, rgba(8, 9, 12, 0.98), rgba(2, 3, 5, 0.99)) !important;
     border: 1px solid rgba(229, 231, 235, 0.16) !important;
@@ -5668,7 +5668,7 @@ div[data-testid="stDialog"] div[role="dialog"] {
     max-width: min(760px, calc(100vw - 0.75rem)) !important;
     overflow: hidden !important;
 }
-div[data-testid="stDialog"] div[role="dialog"] > div:first-child {
+div[data-testid="stDialog"] [role="dialog"] > div:first-child {
     border-bottom: 1px solid rgba(229, 231, 235, 0.1) !important;
 }
 div[data-testid="stDialog"] h2,
@@ -5883,7 +5883,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 
 @media (max-width: 900px) {
-    div[data-testid="stDialog"] div[role="dialog"] {
+    div[data-testid="stDialog"] [role="dialog"] {
         max-width: calc(100vw - 0.4rem) !important;
         width: calc(100vw - 0.4rem) !important;
     }
@@ -6999,7 +6999,7 @@ h3 .dg-semantic-icon {
 .player-detail-section {
     border-radius: 2px;
 }
-div[data-testid="stDialog"] div[role="dialog"] {
+div[data-testid="stDialog"] [role="dialog"] {
     padding: 0.44rem !important;
 }
 div[data-testid="stDialog"] .dg-quick-view-panel.player-quick-view-shell,
@@ -7439,7 +7439,7 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
 }
 
 @media (max-width: 900px) {
-    div[data-testid="stDialog"] div[role="dialog"] {
+    div[data-testid="stDialog"] [role="dialog"] {
         padding: 0.28rem !important;
     }
     div[data-testid="stDialog"] .player-quick-view-header-band.player-quick-view-hero,

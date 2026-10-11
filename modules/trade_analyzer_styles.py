@@ -446,4 +446,24 @@ div[data-testid="stHorizontalBlock"]:has(.toa-block-send):has(.toa-block-receive
     width: 100%;
   }
 }
+
+/* Roster-browse rows pair the canonical compact-player card with a fixed
+   ~5.25rem Add button (see the .toa-result-row rules above), leaving the
+   card only ~60% of the row's width. The card's own "standard"-density
+   avatar (var(--size-roster-core-portrait), 5.5rem) was sized for
+   full-width contexts like My Team/Players; inside this narrower pairing
+   it can leave too little room for the name/meta column at phone widths,
+   wrapping names mid-word (e.g. "Jonathan Taylor" -> "Jonat/han/Taylor").
+   Shrink just this row's avatar back to the compact token instead. */
+@media (max-width: 480px) {
+  div[class*="st-key-toa_roster_"] .dg-football-asset.compact-player-row,
+  div[class*="st-key-toa_roster_"] .dg-football-asset--standard {
+    grid-template-columns: var(--size-asset-standard, 2.75rem) minmax(0, 1fr) auto;
+  }
+  div[class*="st-key-toa_roster_"] .dg-football-asset.compact-player-row .dg-player-portrait,
+  div[class*="st-key-toa_roster_"] .dg-football-asset--standard .dg-player-portrait {
+    height: var(--size-asset-standard, 2.75rem);
+    width: var(--size-asset-standard, 2.75rem);
+  }
+}
 """

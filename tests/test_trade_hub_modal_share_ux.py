@@ -159,7 +159,16 @@ def test_modal_css_keeps_phone_matchup_and_desktop_width():
     from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
 
     assert ':has(.trade-detail-modal, .player-quick-view-shell)' in DECISION_SURFACE_DIALOG_CSS
-    assert "calc(100dvw - (2 * var(--space-xs)))" in DECISION_SURFACE_DIALOG_CSS
+    # Width is parent-relative (100%), not viewport-relative (100dvw): the
+    # dialog's own flow parent already caps itself to calc(100% - 32px) of
+    # the viewport, so a dvw-based width here overflows that parent by its
+    # own side margins. Also pin the role=dialog selector itself as
+    # tag-agnostic -- Streamlit renders the dialog landmark as
+    # <section role="dialog">, not <div role="dialog">; a tag-qualified
+    # selector here silently never matches in production.
+    assert 'div[data-testid="stDialog"] [role="dialog"]' in DECISION_SURFACE_DIALOG_CSS
+    assert 'div[role="dialog"]' not in DECISION_SURFACE_DIALOG_CSS
+    assert "width: 100% !important;" in DECISION_SURFACE_DIALOG_CSS
     assert "grid-template-columns: auto auto minmax(9rem, 1fr) auto" in TRADE_DETAIL_CSS
     assert ".tvl-edge-mark" in TRADE_DETAIL_CSS and "width: 100%" in TRADE_DETAIL_CSS
 
