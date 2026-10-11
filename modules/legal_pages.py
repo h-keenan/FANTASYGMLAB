@@ -347,13 +347,33 @@ LEGAL_PAGES: dict[str, LegalPage] = {
 }
 
 LEGAL_PAGE_KEYS = tuple(LEGAL_PAGES)
+
+# The 4 standalone legal documents, consolidated behind the single "legal"
+# nav entry (structural web/mobile shell-parity pass, 2026-10-11) — matches
+# mobile's one parametrized LegalPage screen. About/Disclaimer is
+# deliberately NOT in this list: it stays its own top-level destination,
+# same as on mobile (MoreScreen still lists it as a separate LegalPage
+# pageKey alongside, not folded into, the other four).
+LEGAL_DOC_KEYS: tuple[str, ...] = (
+    "terms",
+    "privacy",
+    "subscription_terms",
+    "no_affiliation",
+)
+
+LEGAL_HUB_RADIO_KEY = "legal_hub_doc_radio"
+
+# (label, page_key, doc_key) — doc_key is "" for a direct top-level page
+# (How We Evaluate, About/Disclaimer) and set for a consolidated-legal
+# sub-document, whose link now points at `?page=legal&doc=<doc_key>`
+# instead of its old standalone `?page=<doc_key>` link.
 LEGAL_FOOTER_LINKS = (
-    ("How We Evaluate", "methodology"),
-    ("About / Disclaimer", "about_disclaimer"),
-    ("Terms", "terms"),
-    ("Privacy", "privacy"),
-    ("Subscription Terms", "subscription_terms"),
-    ("No Affiliation", "no_affiliation"),
+    ("How We Evaluate", "methodology", ""),
+    ("About / Disclaimer", "about_disclaimer", ""),
+    ("Terms", "legal", "terms"),
+    ("Privacy", "legal", "privacy"),
+    ("Subscription Terms", "legal", "subscription_terms"),
+    ("No Affiliation", "legal", "no_affiliation"),
 )
 
 
@@ -373,6 +393,64 @@ def render_legal_page(page_key: str) -> None:
             st.markdown("\n".join(f"- {item}" for item in section.bullets))
 
 
+def render_legal_hub(active_doc_key: str = "") -> str:
+    """Single consolidated nav entry for the 4 standalone legal documents.
+
+    Matches mobile's one parametrized LegalPage screen: one top-level
+    "Legal" destination instead of 4 (Terms / Privacy / Subscription Terms /
+    No-Affiliation Disclaimer), with a simple segmented control to switch
+    between them. `active_doc_key`, when one of LEGAL_DOC_KEYS, pre-selects
+    that document (used for `?page=legal&doc=<key>` deep links, e.g. from
+    the site-wide legal footer). Every document's content is rendered by
+    the unchanged `render_legal_page` — this only changes the entry point.
+    Returns the resolved active document key.
+    """
+
+    requested = active_doc_key if active_doc_key in LEGAL_DOC_KEYS else ""
+    if requested:
+        requested_label = LEGAL_PAGES[requested].title
+        if st.session_state.get(LEGAL_HUB_RADIO_KEY) != requested_label:
+            st.session_state[LEGAL_HUB_RADIO_KEY] = requested_label
+    if LEGAL_HUB_RADIO_KEY not in st.session_state:
+        st.session_state[LEGAL_HUB_RADIO_KEY] = LEGAL_PAGES["terms"].title
+
+    labels = [LEGAL_PAGES[key].title for key in LEGAL_DOC_KEYS]
+    current_label = st.session_state[LEGAL_HUB_RADIO_KEY]
+    default_index = labels.index(current_label) if current_label in labels else 0
+    selected_label = st.radio(
+        "Legal document",
+        labels,
+        index=default_index,
+        horizontal=True,
+        label_visibility="collapsed",
+        key=LEGAL_HUB_RADIO_KEY,
+    )
+    selected_key = next(
+        (key for key in LEGAL_DOC_KEYS if LEGAL_PAGES[key].title == selected_label),
+        "terms",
+    )
+    render_legal_page(selected_key)
+    return selected_key
+
+
+def active_legal_hub_doc_key() -> str:
+    """Best-effort lookup of the currently-selected document on the Legal hub.
+
+    Used by the site-wide footer to highlight the right link while the
+    "legal" page is current; returns "" if the hub hasn't rendered yet
+    this run (safe default — no highlight).
+    """
+
+    try:
+        selected_label = st.session_state.get(LEGAL_HUB_RADIO_KEY, "")
+    except Exception:
+        return ""
+    for key in LEGAL_DOC_KEYS:
+        if LEGAL_PAGES[key].title == selected_label:
+            return key
+    return ""
+
+
 def render_legal_footer(
     *,
     current_page: str,
@@ -383,12 +461,20 @@ def render_legal_footer(
         "Independent fantasy football analysis. Informational and entertainment use only. "
         "Verify important league, player, injury, and news information before acting."
     )
+    active_doc = active_legal_hub_doc_key() if current_page == "legal" else ""
     links = []
-    for label, page_key in LEGAL_FOOTER_LINKS:
-        active_class = " legal-footer-link-active" if current_page == page_key else ""
-        links.append(
-            f"<a class='legal-footer-link{active_class}' href='?page={escape(page_key)}'>{escape(label)}</a>"
-        )
+    for label, page_key, doc_key in LEGAL_FOOTER_LINKS:
+        if doc_key:
+            active_class = (
+                " legal-footer-link-active"
+                if current_page == page_key and active_doc == doc_key
+                else ""
+            )
+            href = f"?page={escape(page_key)}&doc={escape(doc_key)}"
+        else:
+            active_class = " legal-footer-link-active" if current_page == page_key else ""
+            href = f"?page={escape(page_key)}"
+        links.append(f"<a class='legal-footer-link{active_class}' href='{href}'>{escape(label)}</a>")
     st.markdown(
         "<nav class='legal-footer-links' aria-label='Legal and support links'>"
         + "".join(links)

@@ -4,6 +4,24 @@ APPLICATION_SHELL_CSS = """
 /* Canonical executive shell and cross-page rhythm.
    .block-container width/padding owned solely by DESKTOP_EXECUTIVE_LAYOUT_CSS. */
 
+/* Sticky app-shell chrome, matching mobile's persistent header (structural
+   web/mobile shell-parity pass, 2026-10-11). Scoped to the real executive
+   shell so the guest .app-hero (same DOM slot) never pins. z-index sits
+   below the mobile destination sheet (1000) and GM orb trigger (1001000).
+   sticky (not fixed) keeps layout space reserved, so no compensating
+   padding is needed on the content below it. Targets the keyed slot's
+   generated WRAPPER (`div:has(> ... st-key-...)`), not the keyed div
+   itself — Streamlit auto-sizes that wrapper to exactly the slot's own
+   content height, which gives position:sticky a zero-height "containing
+   block" (no room to stay stuck); its own parent is the full-height page
+   column, which is what the sticky calculation needs to find. */
+body:has(.dg-executive-shell) div:has(> div[class*="st-key-application_command_header_slot"]) {
+    background: var(--color-surface-primary);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
 /* Sole owner: outer shell geometry + identity layout. */
 div[class*="st-key-executive_workspace_shell"] {
     align-items: stretch;

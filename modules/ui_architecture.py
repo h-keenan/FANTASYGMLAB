@@ -11,6 +11,7 @@ class PageDefinition:
     notes: str = ""
     category: str = "EXPERIMENTAL"
     beta_visible: bool = False
+    domain: str = "GENERAL"
 
 
 # Category meanings (PR #226 graduation):
@@ -19,9 +20,47 @@ class PageDefinition:
 # EXPERIMENTAL — kill-switch / SHOW_EXPERIMENTAL only; not launch-critical
 # ARCHIVED — never in nav (superseded / duplicate); handlers may remain for safety
 # FOUNDER_OPS / FOUNDER_LABS / DEV_ONLY — ops tooling
+#
+# Domain meanings (structural web/mobile shell-parity pass, 2026-10-11):
+# a SEPARATE axis from `group` (desktop sidebar caption, legacy) and
+# `category` (visibility tier — who can see it, untouched by this pass).
+# `domain` is the single user-facing taxonomy shared by the desktop sidebar
+# and the mobile-web destination sheet, mirroring mobile app's GmOrb.tsx
+# three destination groups (coreLeagueDestinations / gmToolsDestinations /
+# generalDestinations):
+#   LEAGUE   — roster/league/weekly surfaces (mobile's coreLeagueDestinations)
+#   GM_TOOLS — trade, waiver, draft, and team-stance workflows (mobile's
+#              gmToolsDestinations)
+#   GENERAL  — account-wide/marketing/legal surfaces (mobile's
+#              generalDestinations)
+#   OPS      — founder/dev-only tooling; not part of mobile's nav at all
+DOMAIN_ORDER: Tuple[str, ...] = ("LEAGUE", "GM_TOOLS", "GENERAL", "OPS")
+DOMAIN_LABELS: dict = {
+    "LEAGUE": "League",
+    "GM_TOOLS": "GM Tools",
+    "GENERAL": "General",
+    "OPS": "Internal",
+}
+
+# The 4 standalone legal documents collapsed into the single "legal" nav
+# entry (structural web/mobile shell-parity pass, 2026-10-11), matching
+# mobile's one parametrized LegalPage screen. These keys stay fully
+# routable (still PageDefinition entries below, still in
+# current_platform_destinations/routable_platform_destinations) so any
+# existing `?page=terms` / `?page=privacy` / `?page=subscription_terms` /
+# `?page=no_affiliation` deep link keeps working unchanged — this constant
+# only tells the nav-rendering loops (desktop sidebar, mobile destination
+# sheet) to skip drawing a separate button for them, since "legal" is the
+# one button a user clicks.
+LEGAL_CONSOLIDATED_SUBKEYS: Tuple[str, ...] = (
+    "terms",
+    "privacy",
+    "subscription_terms",
+    "no_affiliation",
+)
 
 PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
-    PageDefinition("dashboard", "Dashboard", "HOME", "Primary franchise landing page.", category="CORE", beta_visible=True),
+    PageDefinition("dashboard", "Dashboard", "HOME", "Primary franchise landing page.", category="CORE", beta_visible=True, domain="LEAGUE"),
     PageDefinition(
         "portfolio",
         "Portfolio",
@@ -29,6 +68,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Standing, record, and top need or opportunity across every saved league at once (Premium).",
         category="CORE",
         beta_visible=True,
+        domain="GENERAL",
     ),
     PageDefinition(
         "alerts",
@@ -37,6 +77,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Priority signals and activity timeline for the current league.",
         category="CORE",
         beta_visible=True,
+        domain="LEAGUE",
     ),
     PageDefinition(
         "gm_plan",
@@ -45,8 +86,9 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Season-arc roadmap: where you stand, your best trade paths, and roster construction, framed by your declared Team Situation.",
         category="CORE",
         beta_visible=True,
+        domain="GM_TOOLS",
     ),
-    PageDefinition("my_team", "My Team", "ROSTER", "Hands-on roster management surface.", category="CORE", beta_visible=True),
+    PageDefinition("my_team", "My Team", "ROSTER", "Hands-on roster management surface.", category="CORE", beta_visible=True, domain="LEAGUE"),
     PageDefinition(
         "matchup",
         "Matchup",
@@ -54,6 +96,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "This week's real head-to-head: live Sleeper lineup/points for both rosters, plus real per-player weekly projections.",
         category="CORE",
         beta_visible=True,
+        domain="LEAGUE",
     ),
     PageDefinition(
         "players",
@@ -62,6 +105,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Discover and filter players across the league pool into Player Quick View.",
         category="CORE",
         beta_visible=True,
+        domain="LEAGUE",
     ),
     PageDefinition(
         "gm_targets",
@@ -69,6 +113,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "ROSTER",
         "Keep an eye on players you're considering buying, selling, adding, or monitoring.",
         category="CONDITIONAL",
+        domain="GM_TOOLS",
     ),
     PageDefinition(
         "team_stance",
@@ -76,6 +121,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "SUPPORT",
         "Declare your team's stance (Rebuilding/Competing/Balanced) and manage protected players — biases trade-idea language only, never valuation.",
         category="CONDITIONAL",
+        domain="GM_TOOLS",
     ),
     PageDefinition(
         "player_detail",
@@ -83,10 +129,12 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "ROSTER",
         "Archived full-page profile — Player Quick View is canonical.",
         category="ARCHIVED",
+        domain="LEAGUE",
     ),
-    PageDefinition("rankings", "League Overview", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True),
-    # GM Orb visible sections are page.category (Core / Active now / Support), not group.
-    # Recaps stays CORE so it sits with League Overview; group=LEAGUE is sidebar only.
+    PageDefinition("rankings", "League Overview", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True, domain="LEAGUE"),
+    # GM Orb visible sections are page.domain (League / GM Tools / General),
+    # not group. Recaps stays CORE so it's visible by default; group=LEAGUE
+    # is sidebar-caption-legacy only, domain=LEAGUE drives the shared taxonomy.
     PageDefinition(
         "league_recaps",
         "League Recaps / History",
@@ -94,6 +142,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Weekly recap, transaction history, and season storylines — what mattered and what happened.",
         category="CORE",
         beta_visible=True,
+        domain="LEAGUE",
     ),
     PageDefinition(
         "teams",
@@ -101,6 +150,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "LEAGUE",
         "Archived — League Overview owns the Teams section.",
         category="ARCHIVED",
+        domain="LEAGUE",
     ),
     PageDefinition(
         "weekly_report",
@@ -108,8 +158,9 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "LEAGUE",
         "Archived — Dashboard owns daily briefing; week semantics unfinished.",
         category="ARCHIVED",
+        domain="LEAGUE",
     ),
-    PageDefinition("trade_hub", "Trade Hub", "TRANSACTIONS", "Find realistic trades for your roster — ranked by fit and fairness.", category="CORE", beta_visible=True),
+    PageDefinition("trade_hub", "Trade Hub", "TRANSACTIONS", "Find realistic trades for your roster — ranked by fit and fairness.", category="CORE", beta_visible=True, domain="GM_TOOLS"),
     PageDefinition(
         "trade_analyzer",
         "Trade Analyzer",
@@ -117,8 +168,9 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Evaluate an incoming dynasty offer — accept, decline, or counter.",
         category="CORE",
         beta_visible=True,
+        domain="GM_TOOLS",
     ),
-    PageDefinition("waivers", "Waivers", "TRANSACTIONS", "Find available upgrades, injury replacements, and FAAB guidance.", category="CORE", beta_visible=True),
+    PageDefinition("waivers", "Waivers", "TRANSACTIONS", "Find available upgrades, injury replacements, and FAAB guidance.", category="CORE", beta_visible=True, domain="GM_TOOLS"),
     PageDefinition(
         "trade_history",
         "Trade History",
@@ -127,15 +179,17 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "confirmed trade has had a few weeks to play out — matches mobile's Trade History screen.",
         category="CORE",
         beta_visible=True,
+        domain="GM_TOOLS",
     ),
-    PageDefinition("startup_draft_center", "Startup Draft Center", "DRAFT", "Startup-only draft-first dashboard.", category="CORE", beta_visible=True),
-    PageDefinition("draft_summary", "Draft Center", "DRAFT", "Primary rookie-draft, draft posture, and pick-strategy workspace.", category="CORE", beta_visible=True),
+    PageDefinition("startup_draft_center", "Startup Draft Center", "DRAFT", "Startup-only draft-first dashboard.", category="CORE", beta_visible=True, domain="GM_TOOLS"),
+    PageDefinition("draft_summary", "Draft Center", "DRAFT", "Primary rookie-draft, draft posture, and pick-strategy workspace.", category="CORE", beta_visible=True, domain="GM_TOOLS"),
     PageDefinition(
         "live_draft",
         "Live Draft",
         "DRAFT",
         "Read-only Sleeper live draft assistant for active draft rooms.",
         category="CONDITIONAL",
+        domain="GM_TOOLS",
     ),
     PageDefinition(
         "college_scouting",
@@ -144,6 +198,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Submit a 1-5 grade on college prospects, pooled into a shared signal, plus a personal watchlist.",
         category="CORE",
         beta_visible=True,
+        domain="GM_TOOLS",
     ),
     PageDefinition(
         "news",
@@ -155,6 +210,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "roster-aware activity timeline.",
         category="CORE",
         beta_visible=True,
+        domain="GENERAL",
     ),
     PageDefinition(
         "archetypes",
@@ -162,6 +218,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "INTELLIGENCE",
         "Archived standalone archetypes route — League Overview owns franchise context.",
         category="ARCHIVED",
+        domain="LEAGUE",
     ),
     PageDefinition(
         "manager_tendencies",
@@ -169,14 +226,28 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "INTELLIGENCE",
         "Archived standalone route — Trade Hub and League Overview own tendencies context.",
         category="ARCHIVED",
+        domain="GM_TOOLS",
     ),
-    PageDefinition("premium", "Premium", "SUPPORT", "Free and Premium plan preview for FantasyGM Lab.", category="SUPPORT", beta_visible=True),
-    PageDefinition("methodology", "How We Evaluate", "SUPPORT", "How FantasyGM Lab evaluates players in league context, and how rankings differ from trade recommendations.", category="SUPPORT", beta_visible=True),
-    PageDefinition("about_disclaimer", "About / Disclaimer", "SUPPORT", "Product information, recommendation limits, and general disclaimer.", category="SUPPORT", beta_visible=True),
-    PageDefinition("terms", "Terms of Use", "SUPPORT", "Plain-language terms for using FantasyGM Lab.", category="SUPPORT", beta_visible=True),
-    PageDefinition("privacy", "Privacy Policy", "SUPPORT", "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.", category="SUPPORT", beta_visible=True),
-    PageDefinition("subscription_terms", "Subscription Terms", "SUPPORT", "Auto-renewal, billing, and cancellation terms for FantasyGM Lab Premium.", category="SUPPORT", beta_visible=True),
-    PageDefinition("no_affiliation", "No-Affiliation Disclaimer", "SUPPORT", "Independent-product and third-party ownership notice.", category="SUPPORT", beta_visible=True),
+    PageDefinition("premium", "Premium", "SUPPORT", "Free and Premium plan preview for FantasyGM Lab.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("methodology", "How We Evaluate", "SUPPORT", "How FantasyGM Lab evaluates players in league context, and how rankings differ from trade recommendations.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("about_disclaimer", "About / Disclaimer", "SUPPORT", "Product information, recommendation limits, and general disclaimer.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    # The 4 standalone legal documents below stay routable (still visible,
+    # still SUPPORT category) so `?page=terms` etc. keep working directly,
+    # but LEGAL_CONSOLIDATED_SUBKEYS (above) tells the nav-rendering loops to
+    # skip a separate button for each — "legal" (below) is the one nav entry.
+    PageDefinition("terms", "Terms of Use", "SUPPORT", "Plain-language terms for using FantasyGM Lab.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("privacy", "Privacy Policy", "SUPPORT", "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("subscription_terms", "Subscription Terms", "SUPPORT", "Auto-renewal, billing, and cancellation terms for FantasyGM Lab Premium.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("no_affiliation", "No-Affiliation Disclaimer", "SUPPORT", "Independent-product and third-party ownership notice.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition(
+        "legal",
+        "Legal",
+        "SUPPORT",
+        "Terms of Use, Privacy Policy, Subscription Terms, and the No-Affiliation Disclaimer in one place.",
+        category="SUPPORT",
+        beta_visible=True,
+        domain="GENERAL",
+    ),
     PageDefinition(
         "founder_ops",
         "Founder Ops",
@@ -184,6 +255,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Founder-only operational health and read-only diagnostics.",
         category="FOUNDER_OPS",
         beta_visible=False,
+        domain="OPS",
     ),
     PageDefinition(
         "founder_labs",
@@ -192,6 +264,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "Trusted founder/dev inventory of dormant and hidden product surfaces.",
         category="FOUNDER_LABS",
         beta_visible=False,
+        domain="OPS",
     ),
 )
 
@@ -273,6 +346,7 @@ def current_platform_destinations(
                 notes=page.notes,
                 category=page.category,
                 beta_visible=page.beta_visible,
+                domain=page.domain,
             )
         )
     return tuple(destinations)
@@ -372,3 +446,33 @@ def mobile_secondary_destinations(
         )
         if page.key not in primary_keys and page.key not in ARCHIVED_DESTINATION_KEYS
     )
+
+
+def domain_grouped_nav_destinations(
+    destinations: Tuple[PageDefinition, ...],
+) -> Tuple[Tuple[str, str, Tuple[PageDefinition, ...]], ...]:
+    """Group already-visible destinations into the shared domain taxonomy.
+
+    Single source of truth for the nav-facing grouping used by BOTH the
+    desktop sidebar and the mobile-web destination sheet (structural
+    web/mobile shell-parity pass, 2026-10-11) — before this, the two
+    surfaces used two unrelated schemes (`group` captions on desktop,
+    `category` tiers on mobile). Returns `(domain_key, domain_label,
+    destinations_in_domain)` tuples in DOMAIN_ORDER, skipping empty domains.
+    `LEGAL_CONSOLIDATED_SUBKEYS` destinations are always excluded — they
+    stay independently routable (deep links), but the single "legal" entry
+    is the one nav button for all four.
+    """
+
+    by_domain: dict[str, list] = {}
+    for destination in destinations:
+        if destination.key in LEGAL_CONSOLIDATED_SUBKEYS:
+            continue
+        by_domain.setdefault(destination.domain, []).append(destination)
+    grouped = []
+    for domain_key in DOMAIN_ORDER:
+        items = by_domain.get(domain_key)
+        if not items:
+            continue
+        grouped.append((domain_key, DOMAIN_LABELS.get(domain_key, domain_key.title()), tuple(items)))
+    return tuple(grouped)

@@ -51,6 +51,7 @@ DESTINATION_CONCEPT = {
     "premium": "more",
     "methodology": "more",
     "about_disclaimer": "more",
+    "legal": "more",
     "terms": "more",
     "privacy": "more",
     "subscription_terms": "more",

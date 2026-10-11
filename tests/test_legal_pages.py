@@ -94,10 +94,70 @@ def test_render_legal_footer_exposes_all_links():
         )
 
     rendered = " ".join(str(call.args[0]) for call in markdown.call_args_list)
-    for label, page_key in legal_pages.LEGAL_FOOTER_LINKS:
+    for label, page_key, doc_key in legal_pages.LEGAL_FOOTER_LINKS:
         assert label in rendered
-        assert f"?page={page_key}" in rendered
+        if doc_key:
+            assert f"?page={page_key}&doc={doc_key}" in rendered
+        else:
+            assert f"?page={page_key}" in rendered
     rendered_fragments = " ".join(str(call.args[0]) for call in fragment.call_args_list)
     assert "dg-build-identity" in rendered_fragments
     assert "Build " in rendered_fragments
     navigate.assert_not_called()
+
+
+def test_legal_hub_defaults_to_terms_and_honors_active_doc_key():
+    """Consolidated "Legal" nav entry (structural web/mobile shell-parity
+    pass, 2026-10-11): one top-level destination collapsing the 4 standalone
+    legal pages, matching mobile's single parametrized LegalPage screen.
+    Regression coverage for a real bug found during live verification: a
+    bare `st.session_state[key] = ...` pre-seed (no `index=`) was silently
+    ignored on a brand-new widget's first run, so a `?page=legal&doc=X`
+    deep link rendered X's content correctly but left the radio control
+    visually stuck on "Terms of Use". `render_legal_hub` now also passes
+    `index=`, which Streamlit widget creation actually honors.
+
+    Uses mocks (not AppTest) deliberately: sequential AppTest() instances
+    were observed to bleed session_state between each other only when run
+    as part of the full suite (never in isolation) — the same category of
+    cross-test pollution already called out for
+    tests/test_trade_board_visual_harness.py. Mocking st.radio/session_state
+    directly sidesteps that flakiness entirely.
+    """
+
+    labels = [
+        legal_pages.LEGAL_PAGES[key].title for key in legal_pages.LEGAL_DOC_KEYS
+    ]
+
+    with (
+        patch.object(legal_pages.st, "session_state", {}),
+        patch.object(legal_pages.st, "radio", return_value="Terms of Use") as radio,
+        patch.object(legal_pages, "render_legal_page") as render_page,
+    ):
+        result = legal_pages.render_legal_hub()
+    assert result == "terms"
+    render_page.assert_called_once_with("terms")
+    assert radio.call_args.args[1] == labels
+    assert radio.call_args.kwargs.get("index") == 0
+
+    with (
+        patch.object(legal_pages.st, "session_state", {}),
+        patch.object(
+            legal_pages.st, "radio", return_value="Subscription Terms"
+        ) as radio,
+        patch.object(legal_pages, "render_legal_page") as render_page,
+    ):
+        result = legal_pages.render_legal_hub(active_doc_key="subscription_terms")
+    assert result == "subscription_terms"
+    render_page.assert_called_once_with("subscription_terms")
+    assert radio.call_args.kwargs.get("index") == labels.index("Subscription Terms")
+
+    with (
+        patch.object(legal_pages.st, "session_state", {}),
+        patch.object(legal_pages.st, "radio", return_value="Terms of Use") as radio,
+        patch.object(legal_pages, "render_legal_page") as render_page,
+    ):
+        result = legal_pages.render_legal_hub(active_doc_key="not_a_real_doc")
+    assert result == "terms"
+    render_page.assert_called_once_with("terms")
+    assert radio.call_args.kwargs.get("index") == 0
