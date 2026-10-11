@@ -18,10 +18,51 @@ from html import escape
 from typing import Any, MutableMapping
 
 from modules import runtime_trace
+from modules.html_rendering import inject_global_styles
 
 LAST_ROUTE_KEY = "_fgl_last_painted_route"
 CHANGED_KEY = "_fgl_route_changed_this_run"
 SLOT_ENTERED_KEY = "_fgl_route_body_entered"
+
+# General fix for the "invisible marker eats a flex `gap`" bug class (#973,
+# #coridian_ dead-space re-report). #973 pulled two specific zero-content
+# custom components (auth storage bridge, scroll-track markers) off-canvas
+# with per-component `st-key-*` selectors — but any ``st.markdown(...,
+# unsafe_allow_html=True)`` call whose entire rendered body is a single,
+# genuinely hidden (HTML ``hidden`` attribute) node produces the exact same
+# dead-space symptom, and keeps recurring under a *different* marker each
+# time (most recently this module's own route-root span and app.py's
+# dashboard-root div — both built with no ``key=``, so they can't be
+# targeted by an ``st-key-*`` selector at all). Target the *authoring
+# pattern* instead of any one marker's identity: an element-container whose
+# only Markdown content is a lone ``[hidden]`` node (optionally wrapped in
+# one ``<p>``) is never visible, so pulling it out of the flex flow can
+# never hide real content — this is intentionally broad so a future marker
+# built the same way is covered automatically instead of needing a fifth
+# patch.
+HIDDEN_MARKDOWN_MARKER_CSS = """
+div[data-testid="stElementContainer"]:has(
+    > div[data-testid="stMarkdown"] div[data-testid="stMarkdownContainer"] > :only-child[hidden]
+),
+div[data-testid="stElementContainer"]:has(
+    > div[data-testid="stMarkdown"] div[data-testid="stMarkdownContainer"] > p:only-child > :only-child[hidden]
+) {
+    clip: rect(0, 0, 1px, 1px) !important;
+    height: 1px !important;
+    margin: 0 !important;
+    max-height: 1px !important;
+    max-width: 1px !important;
+    min-width: 1px !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    position: fixed !important;
+    left: -10px !important;
+    top: -10px !important;
+    opacity: 0 !important;
+    width: 1px !important;
+}
+"""
 
 def last_route(state: MutableMapping[str, Any] | None) -> str:
     return str((state or {}).get(LAST_ROUTE_KEY) or "").strip()
@@ -62,6 +103,7 @@ def enter_after_chrome(
         f'<span data-fgl-route-root="{escape(current, quote=True)}" hidden></span>',
         unsafe_allow_html=True,
     )
+    inject_global_styles(HIDDEN_MARKDOWN_MARKER_CSS)
     state[SLOT_ENTERED_KEY] = True
     runtime_trace.mark("route_body_entered")
     return active_container
