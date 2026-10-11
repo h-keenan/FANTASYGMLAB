@@ -470,6 +470,32 @@ LEAGUE_SWITCH_CARD_COMPONENT = st.components.v2.component(
 )
 
 
+# The scroll reset/track markers are invisible 1x1 custom components with no
+# visible content. Left in normal flex flow they each still consume a full
+# inter-element `gap` on every side, producing dead space in the real
+# Dashboard layout (#coridian_ dead-space report). Pull them out of flow the
+# same way other zero-content utility components in this codebase do (see
+# modules/viewport_preservation.py, modules/player_headshot_runtime.py).
+NAVIGATION_SCROLL_MARKER_CSS = """
+[class*="st-key-navigation_scroll_"] {
+    clip: rect(0, 0, 1px, 1px) !important;
+    height: 1px !important;
+    margin: 0 !important;
+    max-height: 1px !important;
+    max-width: 1px !important;
+    min-width: 1px !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    position: fixed !important;
+    left: -10px !important;
+    top: -10px !important;
+    opacity: 0 !important;
+    width: 1px !important;
+}
+"""
+
+
 NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
     "navigation_scroll_reset",
     html="<span class='navigation-scroll-reset-marker' aria-hidden='true'></span>",
@@ -12507,6 +12533,7 @@ def _render_navigation_scroll_reset(current_page: str, *, league_id: str = "") -
         pass
     scope = scroll_storage_scope(st.session_state, league_id=league_id)
     pending = consume_scroll_reset(st.session_state, current_page)
+    inject_global_styles(NAVIGATION_SCROLL_MARKER_CSS)
     if pending:
         performance.record_timing(
             "navigation_scroll_reset_consume",
