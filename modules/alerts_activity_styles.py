@@ -154,21 +154,26 @@ div[class*="st-key-alerts_actions_"] [data-testid="stButton"] > button{
     margin:var(--space-xs) 0 0;
 }
 .dg-alerts-badge{
+    background:color-mix(in srgb,var(--color-text-secondary) 12%,transparent);
     border:var(--border-width-default) solid var(--color-border);
+    border-radius:var(--radius-pill);
     color:var(--color-text-secondary);
     font:var(--type-supporting-metadata);
     letter-spacing:var(--letter-spacing-badge);
     padding:0.15rem var(--space-xs);
 }
 .dg-alerts-badge--my{
+    background:color-mix(in srgb,var(--color-accent) 14%,transparent);
     border-color:var(--color-accent);
     color:var(--color-accent);
 }
 .dg-alerts-badge--risk{
+    background:color-mix(in srgb,var(--color-danger) 14%,transparent);
     border-color:var(--color-danger);
     color:var(--color-danger);
 }
 .dg-alerts-badge--pending{
+    background:color-mix(in srgb,var(--color-warning) 14%,transparent);
     border-color:var(--color-warning);
     color:var(--color-warning);
 }
