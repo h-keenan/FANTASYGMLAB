@@ -24,6 +24,7 @@ from html import escape
 import streamlit as st
 
 from modules.my_news import build_quick_news_summary, relative_news_time
+from modules.semantic_glyphs import glyph_html
 
 EVENT_TYPE_LABELS = {
     "injury/status": "Injury / Status",
@@ -40,6 +41,19 @@ EVENT_TYPE_COLOR_VARS = {
     "transaction": "var(--color-accent)",
     "role/depth chart": "var(--color-success)",
     "off-field/drama": "var(--color-text-secondary)",
+}
+
+# Mobile's NewsScreen pairs each event-type label with an Ionicons glyph
+# (medkit-outline / swap-horizontal-outline / layers-outline /
+# alert-circle-outline) — web previously rendered the colored accent bar and
+# label text only, with no icon. Reuses the same shared glyph set Alerts
+# already draws on (modules/semantic_glyphs.py) rather than inventing a
+# News-specific icon.
+EVENT_TYPE_GLYPH_CONCEPT = {
+    "injury/status": "health",
+    "transaction": "trade",
+    "role/depth chart": "roster",
+    "off-field/drama": "alerts",
 }
 
 DATE_BUCKET_ORDER = ("Today", "Yesterday", "Earlier")
@@ -166,10 +180,12 @@ def render_general_news_feed(items: list, *, now_ts: float | None = None) -> Non
         for event_type, group_items in groups:
             accent = EVENT_TYPE_COLOR_VARS.get(event_type, "var(--color-text-secondary)")
             label = _event_type_label(event_type)
+            glyph_concept = EVENT_TYPE_GLYPH_CONCEPT.get(event_type, "more")
+            glyph = glyph_html(glyph_concept, size="kicker")
             st.markdown(
                 "<div class='news-group-header'>"
                 f"<span class='news-group-accent-bar' style='background:{accent}'></span>"
-                f"<span class='news-group-label' style='color:{accent}'>{escape(label)}</span>"
+                f"<span class='news-group-label' style='color:{accent}'>{glyph}{escape(label)}</span>"
                 "</div>",
                 unsafe_allow_html=True,
             )

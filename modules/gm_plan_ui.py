@@ -18,6 +18,7 @@ math lives here; modules.gm_plan itself does only pure aggregation/framing.
 
 from __future__ import annotations
 
+from html import escape
 from typing import Any, MutableMapping
 
 import pandas as pd
@@ -32,7 +33,9 @@ from modules import team_stance
 from modules import trade_analyzer_fit
 from modules import trade_hub_engine
 from modules import ui_primitives
+from modules.html_rendering import render_html_fragment
 from modules.league_value_settings import VALUATION_LENS_TO_SCORE_FIELD
+from modules.semantic_glyphs import glyph_html
 from modules.sleeper import get_league, get_rosters
 
 _LENS_FOR_SCORE_FIELD: dict[str, str] = {
@@ -130,6 +133,44 @@ def _item_presentation(item: dict[str, Any]) -> tuple[str, str, bool]:
     return str(item.get("label") or ""), "", False
 
 
+def _item_glyph_concept(item: dict[str, Any]) -> str:
+    """Icon concept for one focus-area item — mirrors GmPlanScreen.tsx's
+    per-item-type InsightRow icon (information-circle-outline /
+    swap-horizontal-outline / alert-circle-outline|checkmark-circle-outline /
+    ribbon-outline / trophy-outline), mapped onto the shared glyph set
+    (modules/semantic_glyphs.py) web already uses elsewhere — no new icons.
+    """
+
+    if "partner_team_name" in item:
+        return "trade"
+    if "injury_need_positions" in item:
+        return "health"
+    if "rank" in item:
+        return "rankings"
+    if "wins" in item:
+        return "league"
+    if "playoff_probability" in item:
+        return "insights"
+    return "insights"
+
+
+def _render_focus_item_card(headline: str, detail: str, *, is_risk: bool, concept: str) -> None:
+    """Same card shape/classes as ui_primitives.content_card_html, plus the
+    per-item icon mobile's InsightRow always shows — content_card_html's
+    `title` is escaped-text-only by design (no arbitrary child HTML), so
+    this builds the equivalent markup directly rather than loosening that
+    primitive for every other caller.
+    """
+
+    tone = "warning" if is_risk else "elevated"
+    glyph = glyph_html(concept, size="kicker")
+    title_html = f'<h3 class="dg-ui-card-title">{glyph}{escape(headline)}</h3>' if headline else ""
+    body_html = f'<div class="dg-ui-card-body">{escape(detail)}</div>' if detail else ""
+    render_html_fragment(
+        f'<article class="dg-ui-card dg-ui-card--{tone}">{title_html}{body_html}</article>'
+    )
+
+
 def _render_focus_area(focus_area: dict[str, Any]) -> None:
     ui_primitives.render_section_header(
         focus_area.get("title", ""),
@@ -147,10 +188,11 @@ def _render_focus_area(focus_area: dict[str, Any]) -> None:
         if not isinstance(item, dict):
             continue
         headline, detail, is_risk = _item_presentation(item)
-        ui_primitives.render_content_card(
+        _render_focus_item_card(
+            headline,
             detail,
-            title=headline,
-            variant="warning" if is_risk else "elevated",
+            is_risk=is_risk,
+            concept=_item_glyph_concept(item),
         )
 
 

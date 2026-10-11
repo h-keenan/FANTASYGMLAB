@@ -15,5 +15,12 @@ GENERAL_NEWS_CSS = """
 .news-date-header:first-of-type{margin-top:.2rem}
 .news-group-header{align-items:center;display:flex;gap:.45rem;margin:.7rem 0 .4rem}
 .news-group-accent-bar{border-radius:var(--radius-pill);flex-shrink:0;height:.85rem;width:3px}
-.news-group-label{font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.news-group-label{align-items:center;display:inline-flex;font-size:.72rem;font-weight:800;gap:.3rem;letter-spacing:.04em;text-transform:uppercase}
+/* Mobile pairs each event-type label with a colored Ionicons glyph (same
+   hue as the label/accent bar). The shared glyph set's own per-concept
+   default colors (modules/semantic_glyphs.py's .dg-glyph--trade etc.) are
+   tuned for other surfaces (e.g. GM Orb nav rows) and would mismatch this
+   row's own accent color, so this forces the icon to inherit the inline
+   accent color set on news-group-label instead. */
+.news-group-header .dg-glyph{color:inherit!important;margin-right:0}
 """
