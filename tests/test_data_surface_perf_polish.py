@@ -172,6 +172,38 @@ def test_draft_center_detailed_table_is_deferred():
     assert "deferred_rendering.render_section_gate" in DRAFT
 
 
+def test_league_overview_playoff_odds_is_deferred():
+    """League Overview's Playoff Odds board must never render automatically.
+
+    playoff_simulator.build_league_playoff_odds_cached is Redis-cached with a
+    3-hour TTL bucket, but the *first* navigation into a cold bucket (or a
+    cold worker after a deploy) still pays its real cost synchronously — a
+    multi-week modules.sleeper.get_matchups fetch loop plus its own
+    league_rankings.build_league_rankings_frame_cached build, both inline on
+    this render path. The GM-menu nav sheet (app.py's
+    render_mobile_destination_sheet) reaches League Overview automatically on
+    every tap, and its overlay only dismisses once the full Streamlit rerun
+    finishes, so a cold bucket here showed up as the GM menu looking frozen
+    for several seconds — the same uncached-expensive-call-on-the-render-path
+    bug class as the Player Detail News fix (#958) and the College Scouting
+    fetch fix (#969). Gating it behind an explicit tap (the same
+    render_deferred_section_gate boundary Players' detailed table and My
+    Team's role editor already use) keeps that cost off the automatic
+    GM-menu navigation path.
+    """
+
+    header_at = APP.index('"Playoff Odds"')
+    section = APP[APP.rfind("render_section_header(", 0, header_at) :]
+    assert 'button_label="Calculate playoff odds"' in section
+    gate = section.index('button_label="Calculate playoff odds"')
+    board_call = section.index("render_league_playoff_odds_board(selected_league_id)")
+    assert gate < board_call
+    assert "render_deferred_section_gate" in section[:gate]
+    # And the gate must actually guard the call (same `if render_deferred_section_gate(...):`
+    # shape used elsewhere), not just appear somewhere earlier in the file.
+    assert "if render_deferred_section_gate(" in section[:board_call]
+
+
 def test_deferred_section_gate_helper_is_session_isolated():
     st_module = MagicMock()
     state_a: dict = {}

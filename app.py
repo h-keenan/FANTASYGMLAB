@@ -21140,13 +21140,38 @@ def main():
                         kicker="What might happen next",
                         note="A real Monte Carlo simulation of the rest of the season — your real schedule, real Roster Power, thousands of simulated outcomes.",
                     )
-                    with _wrr_league.block(
-                        st.session_state,
-                        "league_overview_playoff_odds",
-                        owner="playoff_simulator.build_league_playoff_odds_cached",
-                        work_kind="compute",
+                    # Deferred — same boundary Players' "Detailed player table" and My
+                    # Team's role editor already use (render_deferred_section_gate).
+                    # playoff_simulator.build_league_playoff_odds_cached's Redis
+                    # single-flight cache only avoids RECOMPUTING within a TTL
+                    # bucket; the first navigation into a cold bucket (or a cold
+                    # worker after a deploy) still pays its real cost synchronously
+                    # — a ~14-week serial modules.sleeper.get_matchups fetch loop
+                    # plus its own league_rankings.build_league_rankings_frame_cached
+                    # build, both inline on this page's render. Rendering League
+                    # Overview reaches this automatically on every GM-menu
+                    # navigation into it, and the GM-menu overlay only dismisses once
+                    # the full rerun finishes (Streamlit only reconciles/removes a
+                    # no-longer-rendered element once the whole script completes) —
+                    # so a cold bucket here showed up as the GM menu looking frozen
+                    # for several seconds. Gating this behind an explicit tap keeps
+                    # that cost off the automatic navigation path entirely; Standings
+                    # and the Roster Power/Franchise/Draft Capital/Starter/Bench
+                    # boards below (all already-fetched df_intel, no extra I/O) still
+                    # render immediately.
+                    playoff_odds_section_id = f"league_overview_playoff_odds_{selected_league_id}"
+                    if render_deferred_section_gate(
+                        playoff_odds_section_id,
+                        button_label="Calculate playoff odds",
+                        note="Runs a real Monte Carlo simulation against your real schedule — loaded on demand so League Overview opens instantly.",
                     ):
-                        render_league_playoff_odds_board(selected_league_id)
+                        with _wrr_league.block(
+                            st.session_state,
+                            "league_overview_playoff_odds",
+                            owner="playoff_simulator.build_league_playoff_odds_cached",
+                            work_kind="compute",
+                        ):
+                            render_league_playoff_odds_board(selected_league_id)
                     render_section_header(
                         "Roster Power Rankings",
                         kicker="Who is strongest",
