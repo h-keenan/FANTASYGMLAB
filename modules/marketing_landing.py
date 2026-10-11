@@ -498,7 +498,6 @@ def landing_hero_html(*, compact: bool = False) -> str:
         "<div class='fgl-landing__hero-copy'>"
         f"<h1 class='fgl-landing__value'>{escape(APP_HERO_STATEMENT)}</h1>"
         f"<p class='fgl-landing__support'>{escape(APP_HERO_SUPPORT)}</p>"
-        f"{landing_mobile_soon_badge_html()}"
         "</div>"
         "</div>"
         "</section>"
@@ -590,6 +589,7 @@ def render_marketing_landing() -> dict[str, bool]:
             st.rerun()
         return actions
 
+    _track("landing_viewed", source_surface="landing_hero", once_key="session")
     left, right = st.columns((1.15, 0.85))
     with left:
         st.markdown(
@@ -623,6 +623,14 @@ def render_marketing_landing() -> dict[str, bool]:
         st.caption(APP_SECONDARY_CTA_HINT)
         st.markdown(
             f"<p class='fgl-landing__trust'>{escape(TRUST_LINE)}</p>",
+            unsafe_allow_html=True,
+        )
+        # Below the CTAs, not between the value prop and the button — a
+        # "coming soon" note sitting right before the primary action read as
+        # "this isn't ready yet" at the exact moment a new (likely mobile,
+        # ad-driven) visitor decides whether to click Import.
+        st.markdown(
+            landing_mobile_soon_badge_html(),
             unsafe_allow_html=True,
         )
     with right:

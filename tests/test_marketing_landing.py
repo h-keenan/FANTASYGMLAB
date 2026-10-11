@@ -43,17 +43,25 @@ def test_landing_copy_answers_core_questions_without_hype():
 
 
 def test_landing_hero_notes_mobile_apps_coming_soon_without_fabrication():
+    # The badge renders after the primary/secondary CTAs and trust line (see
+    # render_marketing_landing), not inside landing_hero_html — a "coming
+    # soon" note between the value prop and the CTA read as "not ready yet"
+    # right at the decision moment, which is the opposite of what a
+    # paid-ad landing page wants. landing_hero_html itself must stay clean.
     hero = marketing_landing.landing_hero_html()
-    assert "fgl-landing__mobile-badge" in hero
-    assert marketing_landing.MOBILE_SOON_LABEL in hero
+    assert "fgl-landing__mobile-badge" not in hero
+
+    badge = marketing_landing.landing_mobile_soon_badge_html()
+    assert "fgl-landing__mobile-badge" in badge
+    assert marketing_landing.MOBILE_SOON_LABEL in badge
     from html import escape as _escape
 
-    assert _escape(marketing_landing.MOBILE_SOON_TEXT) in hero
-    assert "iOS" in hero
-    assert "Android" in hero
-    assert "coming soon" in hero.casefold()
+    assert _escape(marketing_landing.MOBILE_SOON_TEXT) in badge
+    assert "iOS" in badge
+    assert "Android" in badge
+    assert "coming soon" in badge.casefold()
     # Honest, minimal copy only — no fabricated dates, links, or download claim.
-    lowered = hero.casefold()
+    lowered = badge.casefold()
     for needle in (
         "apps.apple.com",
         "play.google.com",
@@ -67,7 +75,7 @@ def test_landing_hero_notes_mobile_apps_coming_soon_without_fabrication():
         assert needle not in lowered
     css = (ROOT / "modules" / "marketing_landing_styles.py").read_text(encoding="utf-8")
     assert "fgl-landing__mobile-badge" in css
-    # Compact hero (mid-flow) stays uncluttered — badge is a landing-only touch.
+    # Compact hero (mid-flow) never renders the badge at all.
     compact = marketing_landing.landing_hero_html(compact=True)
     assert "fgl-landing__mobile-badge" not in compact
 
