@@ -67,7 +67,12 @@ def executive_workspace_shell_html(shell: ExecutiveWorkspaceShell) -> str:
     return (
         f"<header class='dg-executive-shell' aria-label='{escape(brand_identity.PRODUCT_NAME)} executive command header'>"
         f"<div class='dg-executive-shell__brand' aria-label='{escape(brand_identity.PRODUCT_NAME)}'>"
-        f"{brand_identity.mark_img_html(size_px=28, css_class='dg-executive-shell__mark')}</div>"
+        # compact=False: the app's own header (mobile/src/navigation/
+        # RootNavigator.tsx) uses the full-color glossy mark at this same
+        # 28px size, not a flat monochrome silhouette -- match it, since
+        # mark_img_html()'s size-based default would otherwise auto-pick
+        # the compact/monochrome variant for anything this small.
+        f"{brand_identity.mark_img_html(size_px=28, compact=False, css_class='dg-executive-shell__mark')}</div>"
         "<div class='dg-executive-shell__brief'>"
         "<div class='dg-executive-shell__title-row'>"
         f"<div class='dg-executive-shell__title' role='heading' aria-level='1'>{escape(page_title)}</div>"
