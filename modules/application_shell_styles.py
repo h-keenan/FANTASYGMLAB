@@ -69,7 +69,7 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementConta
 .dg-executive-shell__brand {
     align-items: center;
     align-self: stretch;
-    background: var(--color-text-primary);
+    background: transparent;
     border-inline-start: var(--border-width-semantic) solid var(--color-information);
     box-sizing: border-box;
     color: var(--color-bg);
