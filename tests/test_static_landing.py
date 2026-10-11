@@ -27,13 +27,25 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "landing.css" in html
     assert "fonts.googleapis" not in html
     assert "fonts.googleapis" not in css
-    assert "FantasyGM Lab — Fantasy Football Analysis" in html
-    assert "Fantasy football analysis and decision support" in html
-    assert "player rankings" in html
-    assert "trade ideas" in html
-    assert "waiver analysis" in html
-    assert "league insights" in html
-    assert "dynasty and redraft" in html
+    assert "FantasyGM Lab — Your Fantasy Football Front Office" in html
+    assert "Your fantasy football front office." in html
+    assert (
+        "The only dynasty tool that runs your team like a front office: "
+        "a plan, a target board, and a memory, built on your real Sleeper league."
+    ) in html
+    assert "Trade Calculator" not in html
+    assert "Trade Evaluator" not in html
+    # Feature order: GM Plan, then GM Targets, then Trade Hub, then Decision
+    # Memory (relaunch positioning — the sell is strategy + continuity, not
+    # the trade evaluator, which is table-stakes free functionality).
+    how_it_works_block = html.split('id="how-it-works"', 1)[1].split("</ul>", 1)[0]
+    assert how_it_works_block.index("Today's Game Plan") < how_it_works_block.index(
+        "GM Targets"
+    )
+    assert how_it_works_block.index("GM Targets") < how_it_works_block.index("Trade Hub")
+    assert how_it_works_block.index("Trade Hub") < how_it_works_block.index(
+        "Decision Memory"
+    )
     assert (LANDING / "assets" / "fantasygmlab-symbol-compact.png").exists()
     assert (LANDING / "assets" / "favicon.png").exists()
     # Premium included-now advertises graduated Premium depth (#232).
