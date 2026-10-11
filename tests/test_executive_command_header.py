@@ -94,7 +94,7 @@ def test_executive_command_header_css_is_token_backed_and_loaded():
     )
 
 
-def test_shell_html_includes_founder_badge_and_status_without_duplicate_chips():
+def test_shell_html_includes_title_and_status_without_duplicate_chips():
     html = application_shell.executive_workspace_shell_html(
         application_shell.ExecutiveWorkspaceShell(
             page_title="Trade Hub",
@@ -110,7 +110,7 @@ def test_shell_html_includes_founder_badge_and_status_without_duplicate_chips():
         )
     )
     assert "executive command header" in html
-    assert brand_identity.FOUNDER_BETA_LABEL in html
+    assert not hasattr(brand_identity, "FOUNDER_BETA_LABEL")
     assert "Premium" in html
     assert "dg-executive-shell__chip--premium" not in html
     assert "3 new" not in html

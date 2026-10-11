@@ -73,7 +73,6 @@ def test_competing_shell_contracts_removed():
     assert "min-height:var(--touch-target-min)!important;padding-block:0!important}" not in (
         EXECUTIVE_DESIGN_UNIFY_CSS
     )
-    assert "min-height:0!important" in EXECUTIVE_DESIGN_UNIFY_CSS
     # Command header must not re-own shell grid columns.
     desktop = EXECUTIVE_COMMAND_HEADER_CSS.split("@media (min-width: 761px)")[1].split(
         "@media (max-width: 760px)"

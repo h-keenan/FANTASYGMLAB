@@ -103,7 +103,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
     "terms": LegalPage(
         key="terms",
         title="Terms of Use",
-        kicker=f"{brand_identity.FOUNDER_BETA_LABEL} Terms",
+        kicker="Terms",
         note=f"Plain-language conditions for using {brand_identity.PRODUCT_NAME}.",
         sections=(
             LegalSection(
@@ -127,7 +127,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
             LegalSection(
                 "Availability and changes",
                 (
-                    f"{brand_identity.PRODUCT_NAME} is an evolving {brand_identity.FOUNDER_BETA_LABEL} product. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
+                    f"{brand_identity.PRODUCT_NAME} is an evolving product. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
                     "These terms may be updated as the product changes. Continued use after an update means you accept the revised terms.",
                 ),
             ),
@@ -190,7 +190,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
     "privacy": LegalPage(
         key="privacy",
         title="Privacy Policy",
-        kicker=f"{brand_identity.FOUNDER_BETA_LABEL} Privacy",
+        kicker="Privacy",
         note=f"A practical summary of the data {brand_identity.PRODUCT_NAME} may handle.",
         sections=(
             LegalSection(
@@ -205,7 +205,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
                 "How data is used",
                 (
                     "This information is used to load the requested league, personalize analysis, preserve expected app context, diagnose problems, and improve the product.",
-                    f"Some information may be stored in the browser session, local application files, caches, or other project storage used by the current {brand_identity.FOUNDER_BETA_LABEL}. {brand_identity.PRODUCT_NAME} does not claim that these systems provide perfect security or permanent retention.",
+                    f"Some information may be stored in the browser session, local application files, caches, or other project storage used by the current product. {brand_identity.PRODUCT_NAME} does not claim that these systems provide perfect security or permanent retention.",
                 ),
             ),
             LegalSection(
@@ -237,7 +237,7 @@ LEGAL_PAGES: dict[str, LegalPage] = {
             LegalSection(
                 "Retention and security",
                 (
-                    f"Data may be retained while the {brand_identity.FOUNDER_BETA_LABEL} is operated, tested, or improved. Users can clear local browser or session state where supported, but some operational or feedback records may remain in application storage.",
+                    "Data may be retained while the product is operated, tested, or improved. Users can clear local browser or session state where supported, but some operational or feedback records may remain in application storage.",
                     "Reasonable care is taken with application data, but no internet service or local storage method can be guaranteed completely secure.",
                 ),
             ),

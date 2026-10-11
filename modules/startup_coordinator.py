@@ -188,51 +188,6 @@ _SHELL_CSS = """
     letter-spacing: -0.03em;
     line-height: 1.05;
 }
-.dg-startup-badge-wrap {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-}
-.dg-startup-badge-wrap .dg-founder-badge {
-    background: rgba(8, 12, 20, 0.78);
-    border: 1px solid rgba(148, 163, 184, 0.24);
-    border-inline-start: 2px solid color-mix(in srgb, var(--color-accent-strong, #22d3ee) 72%, transparent);
-    display: inline-flex;
-    gap: 0.5rem;
-    padding: 0.28rem 0.55rem 0.28rem 0.28rem;
-}
-.dg-startup-badge-wrap .dg-founder-badge__mark {
-    align-items: center;
-    background: var(--color-text-primary, #f8fafc);
-    color: var(--color-brand-mark-ink, #0b1220);
-    display: inline-flex;
-    font-size: 0.52rem;
-    font-weight: 900;
-    height: 1.3rem;
-    justify-content: center;
-    letter-spacing: 0.06em;
-    min-width: 1.3rem;
-    width: 1.3rem;
-}
-.dg-startup-badge-wrap .dg-founder-badge__copy {
-    display: grid;
-    gap: 0.04rem;
-    text-align: left;
-}
-.dg-startup-badge-wrap .dg-founder-badge__copy strong {
-    color: var(--color-text-primary, #f8fafc);
-    font-size: 0.64rem;
-    font-weight: 850;
-    line-height: 1.1;
-}
-.dg-startup-badge-wrap .dg-founder-badge__copy em {
-    color: rgba(148, 163, 184, 0.92);
-    font-size: 0.52rem;
-    font-style: normal;
-    font-weight: 750;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
 .dg-startup-status {
     color: var(--color-text-secondary, #e5e7eb);
     font-size: clamp(0.9rem, 2.4vw, 1rem);
@@ -333,9 +288,6 @@ def startup_shell_html(phase: StartupPhase) -> str:
         "<div class='dg-startup-card'>"
         f"<div class='dg-startup-mark' aria-hidden='true'>{brand_identity.mark_img_html(size_px=40, css_class='dg-startup-mark-img')}</div>"
         f"<div class='dg-startup-title'>{escape(brand_identity.PRODUCT_NAME)}</div>"
-        "<div class='dg-startup-badge-wrap'>"
-        f"{brand_identity.founder_beta_badge_html(compact=True)}"
-        "</div>"
         f"<div class='dg-startup-status'>{status}</div>"
         f"{_startup_milestones_html(phase)}"
         "<div class='dg-startup-progress' role='progressbar' "

@@ -11,7 +11,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_command_bar_and_portrait_finalization_live_in_unify_layer():
     css = EXECUTIVE_DESIGN_UNIFY_CSS
-    assert "dg-founder-badge{align-items:center!important;min-height:0!important" in css
     assert "#" not in css
     from modules.application_shell_styles import APPLICATION_SHELL_CSS
 

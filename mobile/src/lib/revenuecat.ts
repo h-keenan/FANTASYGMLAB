@@ -46,7 +46,7 @@ export async function hasPremiumEntitlement(): Promise<boolean> {
   return Boolean(info.entitlements.active[PREMIUM_ENTITLEMENT_ID]);
 }
 
-/** The current offering (dashboard-configured — "Founder Beta" at the time of writing), or null if unavailable. */
+/** The current offering (dashboard-configured), or null if unavailable. */
 export async function getCurrentOffering(): Promise<PurchasesOffering | null> {
   if (!configured) return null;
   const offerings = await Purchases.getOfferings();

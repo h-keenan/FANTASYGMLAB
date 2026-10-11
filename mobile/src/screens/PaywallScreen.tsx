@@ -281,7 +281,7 @@ export default function PaywallScreen({ navigation }: Props) {
       </TouchableOpacity>
 
       <AppText style={styles.title}>FantasyGM Lab Premium</AppText>
-      <AppText style={styles.subtitle}>Founder Beta pricing — locked in for as long as you stay subscribed.</AppText>
+      <AppText style={styles.subtitle}>Your price is locked in for as long as you stay subscribed.</AppText>
 
       <SectionHeading title="What's Included" icon="checkmark-done" />
       <AppText style={styles.featuresIntro}>

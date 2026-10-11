@@ -313,7 +313,7 @@ def _premium_intro_html(*, entitlement: str) -> str:
     return (
         "<div class='premium-page premium-page-intro'>"
         "<div class='premium-page-header dg-preset-command'>"
-        f"<div class='premium-page-kicker'>{escape(brand_identity.PRODUCT_NAME)} · {escape(brand_identity.FOUNDER_BETA_LABEL)}</div>"
+        f"<div class='premium-page-kicker'>{escape(brand_identity.PRODUCT_NAME)}</div>"
         "<div class='premium-page-title'>Premium</div>"
         f"<div class='premium-page-subtitle'>{escape(premium_conversion.VALUE_PROP_HEADLINE)}. "
         f"{escape(premium_conversion.VALUE_PROP_BODY)}</div>"
@@ -363,13 +363,13 @@ def premium_page_html(
     if billing_config.configured:
         if billing_config.billing_mode == "live":
             billing_body = (
-                "Secure recurring Founder Premium checkout is processed by Stripe. "
+                "Secure recurring Premium checkout is processed by Stripe. "
                 "Manage renewal or cancellation from the billing portal."
             )
         else:
             billing_body = (
-                "Secure Founder Premium checkout uses Stripe test mode. "
-                "Use Stripe test cards during Founder Beta — no live charge will be made."
+                "Secure Premium checkout uses Stripe test mode. "
+                "Use Stripe test cards — no live charge will be made."
             )
     else:
         billing_body = (
@@ -531,7 +531,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         st.markdown(
             "<div class='premium-checkout-heading'>"
             "<div class='premium-page-kicker'>Choose your plan</div>"
-            "<div class='premium-section-title'>Founder Premium pricing</div>"
+            "<div class='premium-section-title'>Premium pricing</div>"
             "<div class='premium-checkout-support'>One click takes you to Stripe's secure checkout page.</div>"
             "</div>",
             unsafe_allow_html=True,
@@ -598,7 +598,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         st.caption(
             "Recurring subscription. Manage renewal or cancellation from the billing portal."
             if config.billing_mode == "live"
-            else "Founder Beta uses Stripe test mode. No live charge will be made from this checkout."
+            else "Test mode is enabled. No live charge will be made from this checkout."
         )
 
     if clicked_interval:

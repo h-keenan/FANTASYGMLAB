@@ -7,7 +7,6 @@ from typing import Any, Callable
 
 import streamlit as st
 
-from modules import brand_identity
 from modules import founder_labs
 from modules.html_rendering import render_html_fragment
 
@@ -66,7 +65,7 @@ def render_founder_labs(
     render_html_fragment(FOUNDER_LABS_CSS)
     st.markdown(
         "<div class='founder-labs-shell'>"
-        f"<div class='founder-labs-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)} · Labs</div>"
+        "<div class='founder-labs-kicker'>Founder · Labs</div>"
         "<p>Hidden modules that still exist in the product registry. "
         "This list is static — it does not call providers.</p>"
         "<div class='founder-labs-legend'>"

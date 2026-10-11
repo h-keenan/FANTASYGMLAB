@@ -11,11 +11,11 @@ import Animated, {
 
 import BrandMark from '../components/BrandMark';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
 
 /**
  * Branded launch/loading state, matching the web app's splash (FGL mark,
- * "FOUNDER BETA" badge, a short status line) rather than a bare spinner.
+ * product name, a short status line) rather than a bare spinner.
  *
  * The mark pulses gently — this screen can sit on cold start for a couple
  * of real seconds waiting on the auth check, and a fully static screen in
@@ -46,9 +46,6 @@ export default function LoadingScreen({ status = 'Loading…' }: { status?: stri
         <BrandMark width={180} height={122} />
       </Animated.View>
       <AppText style={styles.title}>FantasyGM Lab</AppText>
-      <View style={styles.badge}>
-        <AppText style={styles.badgeText}>FOUNDER BETA</AppText>
-      </View>
       <AppText style={styles.status}>{status}</AppText>
     </View>
   );
@@ -64,15 +61,6 @@ function createStyles(colors: ThemeColors) {
     gap: spacing.sm,
   },
   title: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md },
-  badge: {
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    marginTop: spacing.xs,
-  },
-  badgeText: { fontSize: 11, fontWeight: '700', color: colors.accent, letterSpacing: 0.6 },
   status: { fontSize: 14, color: colors.textSecondary, marginTop: spacing.lg },
   });
 }

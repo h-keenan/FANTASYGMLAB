@@ -123,14 +123,6 @@ a {
   line-height: 1.05;
 }
 
-.fgl-landing__badge {
-  color: rgba(34, 211, 238, 0.92);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 .fgl-landing__value {
   color: var(--fgl-heading);
   font-size: clamp(1.02rem, 2.3vw, 1.35rem);

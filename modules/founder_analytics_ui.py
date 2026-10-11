@@ -7,7 +7,6 @@ from typing import Any, Mapping
 
 import streamlit as st
 
-from modules import brand_identity
 from modules import founder_analytics
 from modules import founder_labs
 from modules.html_rendering import render_html_fragment
@@ -97,7 +96,7 @@ def render_founder_analytics(*, secrets: Any = None) -> None:
 
     st.markdown(
         "<div class='founder-analytics-shell'>"
-        f"<div class='founder-analytics-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)} · Analytics</div>"
+        "<div class='founder-analytics-kicker'>Founder · Analytics</div>"
         "<div class='founder-analytics-warn'>"
         f"<strong>{escape(str(storage.get('scope_label') or 'Host-local file'))}.</strong> "
         f"File <code>{escape(str(storage.get('directory') or 'data'))}/"

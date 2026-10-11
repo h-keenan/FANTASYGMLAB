@@ -7,7 +7,6 @@ from typing import Any, Callable
 
 import streamlit as st
 
-from modules import brand_identity
 from modules import founder_ops
 from modules import experimental_graduation
 from modules.html_rendering import render_html_fragment
@@ -121,7 +120,7 @@ def render_founder_ops_dashboard(
     render_html_fragment(FOUNDER_OPS_CSS)
     render_html_fragment(
         "<div class='founder-ops-shell'>"
-        f"<div class='founder-ops-kicker'>{escape(brand_identity.FOUNDER_BETA_LABEL)} · Founder only</div>"
+        "<div class='founder-ops-kicker'>Founder only</div>"
         "<div class='founder-ops-grid'>"
         + _metric_card("Build SHA", snapshot.build_sha, snapshot.build_branch or "branch unknown")
         + _metric_card("Deploy timestamp", snapshot.deploy_timestamp)

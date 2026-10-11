@@ -1,4 +1,4 @@
-"""Public Founder Beta marketing landing — presentation only.
+"""Public marketing landing — presentation only.
 
 Answers what FantasyGM Lab is, what to do next, and that guest import is allowed.
 Does not load league, rankings, or Trade Hub work.
@@ -99,9 +99,9 @@ WHY_DIFFERENT = (
 # import is the one surface still genuinely labeled experimental today.
 # One paragraph, not a two-column included/experimental list split — the
 # pricing section below already does the detailed Free vs Premium comparison.
-FOUNDER_BETA_SUMMARY = (
+PRODUCT_POSITIONING_SUMMARY = (
     "Free covers the core workflow today: import, Game Plan, trade preview, and Priority "
-    "Adds, no account required. Early Access Premium adds depth on those same surfaces, "
+    "Adds, no account required. Premium adds depth on those same surfaces, "
     "not a separate product. ESPN import is still labeled experimental; Sleeper has full parity."
 )
 
@@ -450,11 +450,10 @@ def landing_composition_html() -> str:
 
 
 def landing_mobile_soon_badge_html() -> str:
-    """Small pill noting native apps are coming — mirrors the Founder Beta
+    """Small pill noting native apps are coming.
 
-    badge's pill/left-accent visual language (see brand_identity.
-    founder_beta_badge_html) rather than inventing a new treatment. Copy is
-    intentionally minimal: no store links, no dates, no download claim.
+    Copy is intentionally minimal: no store links, no dates, no download
+    claim.
     """
 
     return (
@@ -473,7 +472,6 @@ def landing_hero_html(*, compact: bool = False) -> str:
     mark = brand_identity.mark_img_html(
         size_px=36 if compact else 40, compact=False, css_class="fgl-landing__mark"
     )
-    badge = brand_identity.founder_beta_badge_html(compact=True)
     if compact:
         return (
             "<section class='fgl-landing__hero fgl-landing__hero--compact' "
@@ -482,7 +480,6 @@ def landing_hero_html(*, compact: bool = False) -> str:
             f"{mark}"
             "<div class='fgl-landing__brand-copy'>"
             f"<div class='fgl-landing__product'>{escape(brand_identity.PRODUCT_NAME)}</div>"
-            f"{badge}"
             "</div></div>"
             "</section>"
         )
@@ -492,7 +489,6 @@ def landing_hero_html(*, compact: bool = False) -> str:
         f"{mark}"
         "<div class='fgl-landing__brand-copy'>"
         f"<div class='fgl-landing__product'>{escape(brand_identity.PRODUCT_NAME)}</div>"
-        f"{badge}"
         "</div></div>"
         "<div class='fgl-landing__hero-grid'>"
         "<div class='fgl-landing__hero-copy'>"
@@ -520,7 +516,7 @@ def landing_body_html(
     premium_titles = tuple(title for title, _ in premium_page.PREMIUM_INCLUDED_NOW)
     if billing_configured:
         billing_note = (
-            "Secure Founder Premium checkout uses Stripe test mode. "
+            "Secure Premium checkout uses Stripe test mode. "
             "No live charge will be made. Live billing is not enabled."
         )
     else:
@@ -538,10 +534,10 @@ def landing_body_html(
             "<h2>League-aware recommendations with inspectable context</h2>"
             f"{_list_html(why_lines)}"
             "</section>"
-            "<section class='fgl-landing__section' id='fgl-founder-beta'>"
-            "<div class='fgl-landing__kicker'>Founder Beta</div>"
-            "<h2>Early access with clear labels</h2>"
-            f"<p>{escape(FOUNDER_BETA_SUMMARY)}</p>"
+            "<section class='fgl-landing__section' id='fgl-how-we-work'>"
+            "<div class='fgl-landing__kicker'>How we work</div>"
+            "<h2>Clear, upfront plans</h2>"
+            f"<p>{escape(PRODUCT_POSITIONING_SUMMARY)}</p>"
             "</section>"
         )
     if include_pricing:

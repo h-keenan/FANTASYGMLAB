@@ -104,8 +104,10 @@ def test_intentional_brand_cyan_and_light_mark_contrast_are_retained():
     # Monogram's cyan arc (drawn in pure CSS). The current mark is real PNG
     # artwork, not a CSS-colored shape, so light-surface contrast is now
     # handled by asset selection (a navy monochrome cut) rather than a CSS
-    # hex — see modules/brand_identity.ASSET_PATHS["mark_mono_light"].
-    assert "var(--color-brand-accent,#22d3ee)" in BRAND_IDENTITY_CSS.replace(" ", "")
+    # hex — see modules/brand_identity.ASSET_PATHS["mark_mono_light"]. The
+    # Founder Beta badge (removed with that positioning) was the last
+    # BRAND_IDENTITY_CSS consumer of --color-brand-accent; the token itself
+    # remains defined and used elsewhere via DESIGN_TOKEN_CSS.
     assert "--color-success: #22c55e;" in DESIGN_TOKEN_CSS
     assert "--color-warning: #f59e0b;" in DESIGN_TOKEN_CSS
     assert "--color-danger: #ef4444;" in DESIGN_TOKEN_CSS
