@@ -1863,6 +1863,16 @@ def render_mobile_auth_entry(
                         once_key="session",
                         state=st.session_state,
                     )
+                    launch_analytics.track_event(
+                        "signup",
+                        props=launch_analytics.build_context_props(
+                            st.session_state,
+                            source_surface="account_signup",
+                            extra={"confirmation_required": True},
+                        ),
+                        once_key="session",
+                        state=st.session_state,
+                    )
                 except Exception:
                     pass
                 # Same-run replace: do not leave the signup form visible.
@@ -1922,6 +1932,16 @@ def render_mobile_auth_entry(
 
                     launch_analytics.track_event(
                         "signup_completed",
+                        props=launch_analytics.build_context_props(
+                            st.session_state,
+                            source_surface="account_signup",
+                            extra={"confirmation_required": False},
+                        ),
+                        once_key="session",
+                        state=st.session_state,
+                    )
+                    launch_analytics.track_event(
+                        "signup",
                         props=launch_analytics.build_context_props(
                             st.session_state,
                             source_surface="account_signup",

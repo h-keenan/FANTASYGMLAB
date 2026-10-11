@@ -473,6 +473,15 @@ def add_target(
             ),
             state=session if isinstance(session, dict) else None,
         )
+        launch_analytics.track_event(
+            "target_added",
+            props=launch_analytics.build_context_props(
+                session,
+                league_id=league_key,
+                source_surface=_safe_text(source_surface) or "gm_targets",
+            ),
+            state=session if isinstance(session, dict) else None,
+        )
     except Exception:
         pass
     return result

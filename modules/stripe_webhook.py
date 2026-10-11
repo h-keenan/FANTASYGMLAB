@@ -246,6 +246,88 @@ def update_profile_entitlement(
     return True, ""
 
 
+def _resolve_billing_interval(
+    price_id: str, *, stripe_config: stripe_billing.StripeBillingConfig
+) -> str:
+    """Best-effort interval label for analytics only — never raises.
+
+    Read-only comparison against the already-loaded StripeBillingConfig's
+    price ids; does not touch modules.stripe_billing's structure (that
+    module's entitlement/config rework is owned by a separate change).
+    """
+
+    clean = _safe_text(price_id)
+    if not clean:
+        return ""
+    if clean == _safe_text(stripe_config.price_monthly):
+        return stripe_billing.MONTHLY
+    if clean == _safe_text(stripe_config.price_annual):
+        return stripe_billing.ANNUAL
+    return ""
+
+
+def _track_subscription_lifecycle(
+    action: dict[str, str], *, stripe_config: stripe_billing.StripeBillingConfig
+) -> None:
+    """Relaunch analytics for subscription activation / trial / churn.
+
+    Fires only after update_profile_entitlement has durably persisted the
+    transition (caller passes the already-confirmed action), on the
+    canonical modules.launch_analytics.track_event primitive — same
+    fail-soft, never-raise, never-block pattern used by every other call
+    site in the app. A tracking failure here must never affect the
+    webhook's own HTTP response to Stripe.
+    """
+
+    try:
+        from modules import launch_analytics
+
+        user_id = _safe_text(action.get("user_id"))
+        entitlement = _safe_text(action.get("entitlement")).casefold()
+        # `reason` is the raw Stripe event type, optionally suffixed with
+        # ":cancel_at_period_end" (see map_stripe_event_to_entitlement) —
+        # strip that suffix to get the base event type for branching.
+        base_event_type = _safe_text(action.get("reason")).split(":")[0]
+        status = _safe_text(action.get("stripe_subscription_status")).casefold()
+        event_id = _safe_text(action.get("event_id"))
+        state: dict[str, Any] | None = {"auth_session": {"user_id": user_id}} if user_id else None
+
+        if entitlement == "premium" and base_event_type in {
+            "checkout.session.completed",
+            "customer.subscription.created",
+        }:
+            interval = _resolve_billing_interval(
+                action.get("stripe_price_id", ""), stripe_config=stripe_config
+            )
+            event_name = "trial_started" if status == "trialing" else "subscribed"
+            launch_analytics.track_event(
+                event_name,
+                props=launch_analytics.build_context_props(
+                    state,
+                    source_surface="stripe_webhook",
+                    extra={"tier": "premium", "interval": interval},
+                ),
+                once_key=event_id,
+                state=state,
+            )
+        if (
+            entitlement == "free"
+            and base_event_type in stripe_billing.INACTIVE_ENTITLEMENT_EVENTS
+        ):
+            launch_analytics.track_event(
+                "churned",
+                props=launch_analytics.build_context_props(
+                    state,
+                    source_surface="stripe_webhook",
+                    extra={"tier": "premium", "reason": base_event_type},
+                ),
+                once_key=event_id,
+                state=state,
+            )
+    except Exception:
+        pass
+
+
 def process_verified_stripe_webhook(
     *,
     payload: bytes | str,
@@ -299,6 +381,8 @@ def process_verified_stripe_webhook(
     )
     if ok and event_id:
         _remember_event_id(event_id)
+    if ok:
+        _track_subscription_lifecycle(action, stripe_config=stripe_config)
     return {
         "ok": ok,
         "skipped": False,

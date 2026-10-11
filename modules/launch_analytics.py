@@ -133,6 +133,20 @@ TRACKED_EVENTS: frozenset[str] = frozenset(
         "package_build",
         "provider_call",
         "cache_lookup",
+        # Relaunch taxonomy (3-day relaunch instrumentation pass). Additive —
+        # existing canonical events above are unchanged; these are tracked
+        # independently of their nearest existing equivalent so relaunch
+        # dashboards get the exact names product asked for.
+        "signup",
+        "sleeper_connected",
+        "league_synced",
+        "trade_eval_run",
+        "gm_plan_opened",
+        "target_added",
+        "paywall_viewed",
+        "trial_started",
+        "subscribed",
+        "churned",
     }
 )
 
@@ -160,7 +174,6 @@ LEGACY_EVENT_ALIASES: dict[str, str] = {
     "asset_opened": "pqv_opened",
     "alert_seen": "notification_center_opened",
     "alert_opened": "notification_item_opened",
-    "paywall_viewed": "premium_viewed",
     "entitlement_activated": "premium_entitlement_activated",
     "route_changed": "page_view",
 }
@@ -174,6 +187,8 @@ ALLOWED_PROP_KEYS: frozenset[str] = frozenset(
         "source_surface",
         "prompt_surface",
         "interval",
+        "trigger",
+        "tier",
         "confirmation_required",
         "experiment_decision_memory",
         "experiment_gm_targets",
@@ -285,6 +300,7 @@ CORE_FEATURE_EVENTS: frozenset[str] = frozenset(
         "draft_center_opened",
         "live_draft_opened",
         "gm_orb_opened",
+        "gm_plan_opened",
     }
 )
 
@@ -322,6 +338,7 @@ FEATURE_EVENT_MAP: dict[str, frozenset[str]] = {
     "PQV": frozenset({"pqv_opened"}),
     "Decision Memory": frozenset({"decision_memory_viewed", "decision_memory_event_opened"}),
     "GM Targets": frozenset({"gm_targets_viewed", "gm_target_added", "gm_target_opened"}),
+    "GM Plan": frozenset({"gm_plan_opened"}),
     "News": frozenset({"news_opened", "news_item_opened"}),
     "Alerts": frozenset({"notification_center_opened", "notification_item_opened"}),
     "GM Orb": frozenset({"gm_orb_opened", "gm_destination_selected"}),
@@ -350,6 +367,7 @@ ROUTE_EVENT_MAP: dict[str, str] = {
     "startup_draft_center": "draft_center_opened",
     "live_draft": "live_draft_opened",
     "news": "news_opened",
+    "gm_plan": "gm_plan_opened",
 }
 
 _LOCK = threading.Lock()

@@ -13557,6 +13557,17 @@ def load_leagues_for_username(username_raw: str, *, source: str = "") -> list[di
     try:
         from modules import launch_analytics
 
+        if lookup.status in {"ok", "no_leagues"}:
+            # user_id resolved on Sleeper's side either way — this is a
+            # successful username link even when the account has no leagues.
+            launch_analytics.track_event(
+                "sleeper_connected",
+                props=launch_analytics.build_context_props(
+                    st.session_state, source_surface="league_lookup"
+                ),
+                once_key="session",
+                state=st.session_state,
+            )
         launch_analytics.track_event(
             "league_import_started",
             props=launch_analytics.build_context_props(
@@ -13651,6 +13662,17 @@ def set_selected_league(league_id: str, league_name: str, *, route_to_dashboard:
 
             launch_analytics.track_event(
                 "league_import_completed",
+                props=launch_analytics.build_context_props(
+                    st.session_state,
+                    league_id=selected_league_id,
+                    source_surface="league_import",
+                    extra={"action": "route_dashboard" if route_to_dashboard else "select"},
+                ),
+                once_key=selected_league_id,
+                state=st.session_state,
+            )
+            launch_analytics.track_event(
+                "league_synced",
                 props=launch_analytics.build_context_props(
                     st.session_state,
                     league_id=selected_league_id,
@@ -23709,6 +23731,11 @@ def main():
                     )
                     launch_analytics.track_event(
                         "trade_analyzer_result",
+                        props=props,
+                        state=st.session_state,
+                    )
+                    launch_analytics.track_event(
+                        "trade_eval_run",
                         props=props,
                         state=st.session_state,
                     )
