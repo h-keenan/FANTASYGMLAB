@@ -20,6 +20,7 @@ from modules import theme_mode
 from modules import ui_primitives
 from modules import user_preferences
 from modules.html_rendering import inject_global_styles
+from modules.semantic_glyphs import glyph_mask_data_uri
 
 # The durable-auth storage bridge is an invisible 1x1 custom component
 # (reads/writes browser localStorage; no visible content). Left in normal
@@ -1175,6 +1176,64 @@ def _render_saved_league_cap_notice() -> None:
     )
 
 
+# Account panel action rows → semantic-glyph concept. Mirrors mobile's
+# MoreScreen, where every SettingsRow pairs a leading Ionicon with its
+# label (icon name noted per row below) — the #987 parity audit flagged
+# this panel as the one real icon gap left, closing it cleanly meant
+# reaching the app's real icon system (modules.semantic_glyphs) rather
+# than bolting on a mismatched emoji/Material icon via Streamlit's native
+# icon= kwarg. "Save league"/"Resume saved league" have no literal mobile
+# analog (mobile manages leagues from Home, not More) but both concern
+# league membership, so they take the same "league" concept mobile uses
+# for its own league-portfolio destinations. "Reset onboarding" mirrors
+# mobile's "Replay intro tutorial" (home/dashboard-scoped, no dedicated
+# "replay" concept exists) → "home". "Log out" has no row on mobile's
+# MoreScreen at all (sign-out lives elsewhere there) and none of the 12
+# concepts denote "sign out" — rather than force a misleading metaphor
+# onto it, it takes the system's own documented unknown-concept fallback,
+# "more".
+_ACCOUNT_ROW_GLYPHS: tuple[tuple[str, str], ...] = (
+    ("account_row_save_league", "league"),
+    ("account_row_resume_league", "league"),
+    ("account_row_reset_onboarding", "home"),
+    ("dg_cta_destructive_account_logout", "more"),
+)
+
+
+def _account_row_icon_css() -> str:
+    """Leading semantic-glyph icon on each Account panel action button.
+
+    Reuses the exact CSS-mask technique semantic_glyphs.gm_orb_row_css()
+    already established for the GM nav sheet — a ::before pseudo-element
+    masked to the real glyph SVG via glyph_mask_data_uri — instead of
+    wrapping every row in new HTML (more structural surgery than this
+    scoped fix needs) or Streamlit's native icon= kwarg (the audit's
+    flagged mismatch). Injected at render time via inject_global_styles,
+    the same pattern this module already uses for AUTH_STORAGE_BRIDGE_CSS,
+    so it never touches the shared APP_CSS bundle — which has almost no
+    byte budget left.
+    """
+
+    rules: list[str] = []
+    for row_key, concept in _ACCOUNT_ROW_GLYPHS:
+        base = f'div[class*="st-key-{row_key}"]'
+        mask = glyph_mask_data_uri(concept)
+        rules.append(
+            f'{base} [data-testid="stButton"] button,'
+            f'{base} button[data-testid^="stBaseButton"]'
+            "{align-items:center!important;display:flex!important;"
+            "gap:var(--space-sm)!important;justify-content:center!important;}"
+            f'{base} [data-testid="stButton"] button::before,'
+            f'{base} button[data-testid^="stBaseButton"]::before'
+            "{background-color:currentColor!important;content:\"\"!important;"
+            "display:block!important;flex:0 0 1.15rem!important;"
+            f"height:1.15rem!important;-webkit-mask:{mask} center/contain no-repeat!important;"
+            f"mask:{mask} center/contain no-repeat!important;"
+            "pointer-events:none!important;width:1.15rem!important;}"
+        )
+    return "".join(rules)
+
+
 _THEME_MODE_OPTIONS: tuple[tuple[str, str, str], ...] = (
     ("dark", "Night", "OLED-tuned dark theme — always dark"),
     ("light", "Day", "Glacier ice white — always light"),
@@ -1241,35 +1300,37 @@ def render_account_panel(
     access_token = auth_supabase.current_access_token(st.session_state)
     if user_id and access_token:
         actions["logged_in"] = True
+        inject_global_styles(_account_row_icon_css())
         email = _auth_email(st.session_state)
         st.caption(f"Signed in as {email or 'account user'}")
-        if st.button(
-            "Save league",
-            key="account_save_current_league",
-            use_container_width=True,
-            type="primary",
-        ):
-            saved, error = save_current_context(
-                config=config,
-                access_token=access_token,
-                user_id=user_id,
-                email=email,
-                username=username,
-                selected_league_id=selected_league_id,
-                selected_league_name=selected_league_name,
-                my_roster_id=my_roster_id,
-            )
-            actions["saved"] = saved
-            if saved:
-                st.success("Saved.")
-                st.session_state.pop("account_saved_leagues_cache", None)
-            elif saved_leagues.is_cap_message(error):
-                # Hitting the plan's league limit is a Premium wall, not a
-                # failure — say what happened and offer the way out
-                # instead of a dead-end "try again".
-                st.session_state[SAVED_LEAGUE_CAP_NOTICE_KEY] = error
-            else:
-                st.warning("Could not save this league right now. Please try again.")
+        with st.container(key="account_row_save_league"):
+            if st.button(
+                "Save league",
+                key="account_save_current_league",
+                use_container_width=True,
+                type="primary",
+            ):
+                saved, error = save_current_context(
+                    config=config,
+                    access_token=access_token,
+                    user_id=user_id,
+                    email=email,
+                    username=username,
+                    selected_league_id=selected_league_id,
+                    selected_league_name=selected_league_name,
+                    my_roster_id=my_roster_id,
+                )
+                actions["saved"] = saved
+                if saved:
+                    st.success("Saved.")
+                    st.session_state.pop("account_saved_leagues_cache", None)
+                elif saved_leagues.is_cap_message(error):
+                    # Hitting the plan's league limit is a Premium wall, not a
+                    # failure — say what happened and offer the way out
+                    # instead of a dead-end "try again".
+                    st.session_state[SAVED_LEAGUE_CAP_NOTICE_KEY] = error
+                else:
+                    st.warning("Could not save this league right now. Please try again.")
         _render_saved_league_cap_notice()
 
         saved_rows = st.session_state.get("account_saved_leagues_cache")
@@ -1296,8 +1357,13 @@ def render_account_panel(
                 list(option_labels.keys()),
                 key="account_saved_league_select",
             )
-            if st.button("Resume saved league", key="account_resume_saved_league", use_container_width=True):
-                actions["resume_league"] = option_labels.get(selected_label)
+            with st.container(key="account_row_resume_league"):
+                if st.button(
+                    "Resume saved league",
+                    key="account_resume_saved_league",
+                    use_container_width=True,
+                ):
+                    actions["resume_league"] = option_labels.get(selected_label)
         else:
             st.caption("No saved leagues yet.")
 
@@ -1318,21 +1384,22 @@ def render_account_panel(
                 if onboarding_hidden
                 else "Reset League Orientation to show it again on the Dashboard."
             )
-            if st.button(
-                "Reset onboarding",
-                key="account_reset_onboarding",
-                use_container_width=True,
-                help="Show League Orientation again on the Dashboard.",
-            ):
-                error = user_preferences.persist_authenticated_onboarding(
-                    config=config,
-                    session_state=st.session_state,
-                    dismissed=False,
-                )
-                if error:
-                    st.warning("Onboarding could not be reset right now. Please try again.")
-                else:
-                    st.success("League Orientation will appear again.")
+            with st.container(key="account_row_reset_onboarding"):
+                if st.button(
+                    "Reset onboarding",
+                    key="account_reset_onboarding",
+                    use_container_width=True,
+                    help="Show League Orientation again on the Dashboard.",
+                ):
+                    error = user_preferences.persist_authenticated_onboarding(
+                        config=config,
+                        session_state=st.session_state,
+                        dismissed=False,
+                    )
+                    if error:
+                        st.warning("Onboarding could not be reset right now. Please try again.")
+                    else:
+                        st.success("League Orientation will appear again.")
 
         # Sign-out gets its own visually distinct (danger-toned) surface rather
         # than sitting next to routine actions like Save league — mirrors the
