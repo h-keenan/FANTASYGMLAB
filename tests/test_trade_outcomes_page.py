@@ -118,6 +118,12 @@ def test_ready_verdict_renders_badge_and_detail_text():
     assert "+3.2 PPR pts/wk edge since the trade" in rendered
     assert "+15% value trend edge" in rendered
     assert "Player Sent" in rendered and "Player Received" in rendered
+    # Parity fix: each sent/received asset renders as a real player-identity
+    # row (mirrors mobile TradeHistoryScreen's CompactPlayerModule) via the
+    # canonical `compact_matchup_html` primitive, not a flat "Name (POS), ..."
+    # text string.
+    assert "dg-trade-matchup" in rendered
+    assert "dg-compact-asset--player" in rendered
 
 
 def test_insufficient_data_shows_no_verdict_badge_or_body():

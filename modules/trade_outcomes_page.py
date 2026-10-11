@@ -32,8 +32,8 @@ from typing import Any, Mapping
 
 import streamlit as st
 
-from modules import account_store, auth_supabase
-from modules.html_rendering import render_html_fragment
+from modules import account_store, auth_supabase, compact_fantasy_assets
+from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.trade_outcome_results import VERDICT_LABELS
 from modules.ui_primitives import content_card_html, empty_state_panel_html, status_badge_html
 
@@ -160,14 +160,26 @@ def _render_trade_history_row(row: Mapping[str, Any]) -> None:
             body = _verdict_detail_text(result)
 
     render_html_fragment(badges_html)
+    render_html_fragment(content_card_html(body, title=title))
 
-    sent_text = _asset_list_text(summary.get("send"))
-    received_text = _asset_list_text(summary.get("receive"))
+    # Mobile's TradeHistoryScreen (AssetList) renders each sent/received
+    # asset as a real player-identity row (avatar, position, trailing
+    # value) via CompactPlayerModule, not a plain "Name (POS), Name (POS)"
+    # string. `compact_matchup_html` is the existing canonical web primitive
+    # for exactly this "You send / you receive" player-identity layout
+    # (already used by Trade Offer Analyzer and Live Draft's trade
+    # evaluator) — reusing it here instead of the old text-only summary
+    # closes that gap without inventing a new card shape.
+    send_assets = summary.get("send") if isinstance(summary.get("send"), list) else []
+    receive_assets = summary.get("receive") if isinstance(summary.get("receive"), list) else []
     render_html_fragment(
-        content_card_html(
-            body,
-            title=title,
-            metadata=f"You sent: {sent_text} · You received: {received_text}",
+        compact_fantasy_assets.compact_matchup_html(
+            send_assets,
+            receive_assets,
+            send_label="You sent",
+            receive_label="You received",
+            size="standard",
+            show_value=True,
         )
     )
 
@@ -178,6 +190,11 @@ def render_trade_history_page() -> None:
     which gate on entitlement), requires only a signed-in account since
     `trade_outcomes` rows are keyed to `user_id`.
     """
+
+    # Route-scoped, not part of APP_CSS (see modules.compact_fantasy_assets
+    # docstring / its other callers like trade_hub_ui, live_draft_ui) — safe
+    # to inject here without touching the APP_CSS byte-budget guardrail.
+    inject_global_styles(compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS)
 
     config = auth_supabase.get_supabase_config()
     user_id = auth_supabase.current_user_id(st.session_state)
