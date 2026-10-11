@@ -34,6 +34,7 @@ import streamlit as st
 
 from modules import account_store, auth_supabase, compact_fantasy_assets
 from modules.html_rendering import inject_global_styles, render_html_fragment
+from modules.page_shell import page_body
 from modules.trade_outcome_results import VERDICT_LABELS
 from modules.ui_primitives import content_card_html, empty_state_panel_html, status_badge_html
 
@@ -194,52 +195,53 @@ def render_trade_history_page() -> None:
     # Route-scoped, not part of APP_CSS (see modules.compact_fantasy_assets
     # docstring / its other callers like trade_hub_ui, live_draft_ui) — safe
     # to inject here without touching the APP_CSS byte-budget guardrail.
-    inject_global_styles(compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS)
+    with page_body("trade_history", gap="md"):
+        inject_global_styles(compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS)
 
-    config = auth_supabase.get_supabase_config()
-    user_id = auth_supabase.current_user_id(st.session_state)
-    access_token = auth_supabase.current_access_token(st.session_state)
-    if not user_id or not access_token:
-        render_html_fragment(
-            empty_state_panel_html(
-                "Sign in to see your Trade History",
-                "Trade History tracks trades you've confirmed you made, so it needs a signed-in account.",
-                kind="unavailable",
+        config = auth_supabase.get_supabase_config()
+        user_id = auth_supabase.current_user_id(st.session_state)
+        access_token = auth_supabase.current_access_token(st.session_state)
+        if not user_id or not access_token:
+            render_html_fragment(
+                empty_state_panel_html(
+                    "Sign in to see your Trade History",
+                    "Trade History tracks trades you've confirmed you made, so it needs a signed-in account.",
+                    kind="unavailable",
+                )
             )
-        )
-        return
+            return
 
-    rows, error = account_store.fetch_rows(
-        config,
-        access_token,
-        TRADE_OUTCOMES_TABLE,
-        user_id=user_id,
-        extra_query=HISTORY_QUERY,
-        timing_label="supabase_trade_outcomes_lookup",
-    )
-    if error:
-        render_html_fragment(
-            empty_state_panel_html(
-                "Trade History is temporarily unavailable",
-                account_store.customer_safe_error(error, context="trade_outcomes"),
-                kind="unavailable",
+        rows, error = account_store.fetch_rows(
+            config,
+            access_token,
+            TRADE_OUTCOMES_TABLE,
+            user_id=user_id,
+            extra_query=HISTORY_QUERY,
+            timing_label="supabase_trade_outcomes_lookup",
+        )
+        if error:
+            render_html_fragment(
+                empty_state_panel_html(
+                    "Trade History is temporarily unavailable",
+                    account_store.customer_safe_error(error, context="trade_outcomes"),
+                    kind="unavailable",
+                )
             )
-        )
-        return
+            return
 
-    if not rows:
-        render_html_fragment(
-            empty_state_panel_html(
-                "No trade history yet",
-                "Answer \"Did this trade happen?\" the next time it comes up, and it'll show up "
-                "here — along with how it worked out, once there's enough real data.",
-                kind="no-data",
+        if not rows:
+            render_html_fragment(
+                empty_state_panel_html(
+                    "No trade history yet",
+                    "Answer \"Did this trade happen?\" the next time it comes up, and it'll show up "
+                    "here — along with how it worked out, once there's enough real data.",
+                    kind="no-data",
+                )
             )
-        )
-        return
+            return
 
-    st.caption(QUIET_EXPLAINER)
+        st.caption(QUIET_EXPLAINER)
 
-    for row in rows:
-        if isinstance(row, Mapping):
-            _render_trade_history_row(row)
+        for row in rows:
+            if isinstance(row, Mapping):
+                _render_trade_history_row(row)

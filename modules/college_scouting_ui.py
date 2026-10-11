@@ -27,6 +27,7 @@ from modules import auth_supabase
 from modules import college_scouting
 from modules import html_rendering
 from modules import ui_primitives
+from modules.page_shell import page_body
 from modules.player_cards import player_position_badge_html
 from modules.trade_visual_language import TRADE_VISUAL_LANGUAGE_CSS, confidence_indicator_html
 
@@ -327,78 +328,79 @@ def render_college_scouting_workspace(
     regardless of whether the rerun is fragment- or full-page-scoped.
     """
 
-    html_rendering.inject_global_styles(COLLEGE_SCOUTING_CSS)
-    html_rendering.inject_global_styles(f"<style>{TRADE_VISUAL_LANGUAGE_CSS}</style>")
+    with page_body("college_scouting_workspace", gap="md"):
+        html_rendering.inject_global_styles(COLLEGE_SCOUTING_CSS)
+        html_rendering.inject_global_styles(f"<style>{TRADE_VISUAL_LANGUAGE_CSS}</style>")
 
-    user_id = auth_supabase.current_user_id(session)
-    access_token = auth_supabase.current_access_token(session)
-    if not user_id or not access_token:
-        ui_primitives.render_empty_state_panel(
-            "Sign in to use College Scouting",
-            "Submit a grade on a college prospect and it pools into one shared "
-            "signal with every other scout.",
-            kind="unavailable",
-        )
-        return
-
-    resolved_config = config if config is not None else auth_supabase.get_supabase_config()
-
-    html_rendering.render_html_fragment(
-        "<p class='dg-college-scouting-intro'>Every signed-in user's grade on a "
-        "prospect pools into one shared signal — that shared aggregate, not "
-        "any single grade, can influence rookie draft-class strength. Your own "
-        "grade and watchlist stay yours to edit any time.</p>"
-    )
-
-    prospects, prospects_error = college_scouting.get_cached_all_prospects(resolved_config, access_token)
-    reports, _reports_error = college_scouting.get_cached_all_scouting_reports(resolved_config, access_token)
-    watchlist_rows, _watchlist_error = account_store.fetch_rows(
-        resolved_config, access_token, college_scouting.WATCHLIST_TABLE, user_id=user_id
-    )
-    watchlist_ids = {
-        _safe_text(row.get("prospect_id")) for row in watchlist_rows if row.get("prospect_id")
-    }
-
-    rows = college_scouting.build_prospect_views(
-        prospects, reports, my_user_id=user_id, watchlist_prospect_ids=watchlist_ids
-    )
-
-    if not rows:
-        if prospects_error:
+        user_id = auth_supabase.current_user_id(session)
+        access_token = auth_supabase.current_access_token(session)
+        if not user_id or not access_token:
             ui_primitives.render_empty_state_panel(
-                "College Scouting isn't connected yet",
-                "The prospect catalog isn't reachable right now. Check back soon.",
+                "Sign in to use College Scouting",
+                "Submit a grade on a college prospect and it pools into one shared "
+                "signal with every other scout.",
                 kind="unavailable",
             )
-        else:
-            ui_primitives.render_empty_state_panel(
-                "No prospects yet",
-                "Check back soon — the prospect pool is still growing.",
-                kind="no-data",
-            )
-        return
+            return
 
-    filter_choice = st.pills(
-        "College Scouting view",
-        ["All Prospects", "My Watchlist"],
-        selection_mode="single",
-        default="All Prospects",
-        key="college_scouting_filter",
-        label_visibility="collapsed",
-    )
-    visible = (
-        [row for row in rows if row.get("on_watchlist")]
-        if filter_choice == "My Watchlist"
-        else rows
-    )
+        resolved_config = config if config is not None else auth_supabase.get_supabase_config()
 
-    if not visible:
-        ui_primitives.render_empty_state_panel(
-            "No prospects followed yet",
-            "Follow a prospect from All Prospects to track them here.",
-            kind="filtered-empty",
+        html_rendering.render_html_fragment(
+            "<p class='dg-college-scouting-intro'>Every signed-in user's grade on a "
+            "prospect pools into one shared signal — that shared aggregate, not "
+            "any single grade, can influence rookie draft-class strength. Your own "
+            "grade and watchlist stay yours to edit any time.</p>"
         )
-        return
 
-    for row in visible:
-        _render_prospect(row, user_id=user_id, access_token=access_token, config=resolved_config)
+        prospects, prospects_error = college_scouting.get_cached_all_prospects(resolved_config, access_token)
+        reports, _reports_error = college_scouting.get_cached_all_scouting_reports(resolved_config, access_token)
+        watchlist_rows, _watchlist_error = account_store.fetch_rows(
+            resolved_config, access_token, college_scouting.WATCHLIST_TABLE, user_id=user_id
+        )
+        watchlist_ids = {
+            _safe_text(row.get("prospect_id")) for row in watchlist_rows if row.get("prospect_id")
+        }
+
+        rows = college_scouting.build_prospect_views(
+            prospects, reports, my_user_id=user_id, watchlist_prospect_ids=watchlist_ids
+        )
+
+        if not rows:
+            if prospects_error:
+                ui_primitives.render_empty_state_panel(
+                    "College Scouting isn't connected yet",
+                    "The prospect catalog isn't reachable right now. Check back soon.",
+                    kind="unavailable",
+                )
+            else:
+                ui_primitives.render_empty_state_panel(
+                    "No prospects yet",
+                    "Check back soon — the prospect pool is still growing.",
+                    kind="no-data",
+                )
+            return
+
+        filter_choice = st.pills(
+            "College Scouting view",
+            ["All Prospects", "My Watchlist"],
+            selection_mode="single",
+            default="All Prospects",
+            key="college_scouting_filter",
+            label_visibility="collapsed",
+        )
+        visible = (
+            [row for row in rows if row.get("on_watchlist")]
+            if filter_choice == "My Watchlist"
+            else rows
+        )
+
+        if not visible:
+            ui_primitives.render_empty_state_panel(
+                "No prospects followed yet",
+                "Follow a prospect from All Prospects to track them here.",
+                kind="filtered-empty",
+            )
+            return
+
+        for row in visible:
+            _render_prospect(row, user_id=user_id, access_token=access_token, config=resolved_config)
