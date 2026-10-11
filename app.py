@@ -13089,7 +13089,6 @@ def render_top_league_identity_header(
             interaction_latency.mark_interaction_milestone("league_switcher_open")
             st.markdown("<span class='league-actions-sheet-marker'></span>", unsafe_allow_html=True)
             st.markdown("**Current League**")
-            st.caption("Switch league" if selected_league_id else "Select a league.")
             if selected_league_id:
                 current_summary = selected_league_name or "Selected league"
                 team_label = _safe_text(
@@ -13120,7 +13119,6 @@ def render_top_league_identity_header(
                     _queue_platform_route("dashboard")
                     st.rerun()
                 st.caption("Sleeper is the recommended import path. ESPN remains experimental.")
-            st.caption("Tap a league to switch without leaving this page.")
 
 
 def _league_display_name(league_name: str = "", season = "", *, league_record: dict | None = None) -> str:
@@ -22206,9 +22204,7 @@ def main():
         news_items = general_news_feed(30)
         news_status = get_news_status()
         if news_items:
-            st.caption(
-                f"Showing {len(news_items)} general NFL items (injury, role, transaction, off-field)."
-            )
+            st.caption(f"Showing {len(news_items)} items.")
         elif news_status.get("source") in {"empty", "roster_empty", "none"}:
             st.warning("Live news feeds could not be reached and no cached headlines are available yet.")
         general_news_ui.render_general_news_feed(news_items)

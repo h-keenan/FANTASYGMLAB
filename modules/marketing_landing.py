@@ -66,7 +66,10 @@ HERO_SUPPORT = (
     "Import a Sleeper league, then work trades, waivers, and roster decisions "
     "with a clear next move."
 )
-TRUST_LINE = "No account required to try it · Sleeper supported"
+# Kept distinct from APP_PRIMARY_CTA_HINT ("No account required") shown right
+# under the primary button a few lines above — repeating that exact phrase
+# here read as the same idea stated twice in one glance.
+TRUST_LINE = "Sleeper supported"
 
 # Native mobile apps are in closed TestFlight beta today — not yet public on
 # either store. Keep this honest: no dates, no links, no download claim.
