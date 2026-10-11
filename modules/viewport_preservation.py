@@ -236,6 +236,38 @@ VIEWPORT_PRESERVE_JS = """
 
       hostWindow.__dgRestoreInPlaceAnchor = restore
 
+      // Follow-up correction ladder, anchored to the action itself rather
+      // than to this component's own re-mount. render_viewport_preservation()
+      // bumps a per-rerun token so THIS module body re-runs (and reaches the
+      // identical ladder at the bottom of this function) on every FULL
+      // Streamlit rerun — but an @st.fragment-scoped rerun (e.g.
+      // modules/team_stance_ui.py, modules/founder_analytics_ui.py, and
+      // app.py's pre-existing Trade Hub "Show more" feed-reveal fragment)
+      // never re-executes anything outside the fragment, so this component
+      // never re-mounts and that ladder never runs. The focusin/scroll
+      // listeners below are not a reliable substitute: they only fire on an
+      // actual focus or scroll change, not a pure layout reflow (e.g. new
+      // content mounted above the tapped control with focus never moving),
+      // so a fragment-scoped in-place action that shifts its own tapped
+      // control was left permanently uncorrected. Scheduling from record()
+      // — the instant the action happens — needs no full-rerun remount and
+      // so covers fragment reruns the same as full ones, with no future
+      // per-fragment maintenance required.
+      const scheduleRestoreLadder = () => {
+        const kicked = () => {
+          if (typeof hostWindow.__dgRestoreInPlaceAnchor === "function") {
+            hostWindow.__dgRestoreInPlaceAnchor()
+          }
+        }
+        hostWindow.requestAnimationFrame(() => {
+          hostWindow.requestAnimationFrame(kicked)
+        })
+        hostWindow.setTimeout(kicked, 80)
+        hostWindow.setTimeout(kicked, 220)
+        hostWindow.setTimeout(kicked, 600)
+        hostWindow.setTimeout(kicked, 1200)
+      }
+
       const record = (target) => {
         const root = pageScroller()
         if (!root || !target) return
@@ -253,6 +285,7 @@ VIEWPORT_PRESERVE_JS = """
           label: actionLabel(action),
           navToken: Number(hostWindow.__dynastyGmScrollResetToken || 0)
         }
+        scheduleRestoreLadder()
       }
 
       if (!hostWindow.__dgViewportPreserveBound) {
@@ -335,13 +368,12 @@ VIEWPORT_PRESERVE_JS = """
         }, true)
       }
 
-      hostWindow.requestAnimationFrame(() => {
-        hostWindow.requestAnimationFrame(restore)
-      })
-      hostWindow.setTimeout(restore, 80)
-      hostWindow.setTimeout(restore, 220)
-      hostWindow.setTimeout(restore, 600)
-      hostWindow.setTimeout(restore, 1200)
+      // Belt-and-suspenders for the first mount / every full rerun —
+      // redundant with scheduleRestoreLadder() above once a pointerdown has
+      // recorded an anchor (restore() is a cheap no-op without one), but
+      // this is also the ONLY ladder that ever ran before this component
+      // had recorded anything (e.g. the very first page load).
+      scheduleRestoreLadder()
     }
 """
 

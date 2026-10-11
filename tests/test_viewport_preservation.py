@@ -452,3 +452,80 @@ def test_real_dom_mobile_tap_recognizes_module_route_cards(harness_url):
             )
         finally:
             browser.close()
+
+
+def test_real_dom_fragment_scoped_action_keeps_tapped_control_anchored(harness_url):
+    """Real-browser regression check for the third recurrence of coridian_'s
+    "modules jump around when tapping" report.
+
+    #955's data-route fix (covered above) was correct but addressed a
+    different gap than this one. Between #955 and the third report, PR #972
+    added @st.fragment to modules/team_stance_ui.py and
+    modules/founder_analytics_ui.py (and app.py already had an older
+    @st.fragment-scoped Trade Hub "Show more" feed-reveal, from #198) — a
+    fragment-scoped rerun never re-executes anything outside the fragment,
+    so it never re-mounts render_viewport_preservation()/
+    render_viewport_restore_kick(), which live in app.py's main() outside
+    every fragment. Those two mounts are what re-schedule the proactive
+    rAF/setTimeout restore ladder on every FULL rerun; without a re-mount,
+    an in-place action that reveals new content ABOVE the tapped control
+    (this fixture's shape, and Trade Hub's "Show more" shape) had nothing
+    deterministic left to correct the resulting scroll offset — the
+    focusin/scroll listeners only fire on an actual focus or scroll change,
+    not a pure layout reflow. The fix schedules that same ladder from
+    record() itself (the pointerdown instant), which needs no full-rerun
+    remount and so covers fragment reruns the same as full ones.
+
+    A real tap here needs a long enough settle after page load before
+    interacting: the component's OWN initial-mount ladder (scheduled at
+    page load, independent of this bug) can still have a pending setTimeout
+    around 1200ms out, and tapping before that expires lets a leftover
+    startup timer coincidentally "rescue" the anchor — passing even on the
+    unfixed code and masking the exact regression this test exists to
+    catch. Waiting comfortably past that window (2.5s) before the first
+    interaction reflects a real user tapping well after the page has
+    settled, not an accidental rescue from page-load timing.
+
+    This clicks the real "Fragment reveal toggle" button inside a real,
+    module-level @st.fragment (scripts/ui_validation_harness.py's
+    _fragment_reveal_fixture, mounted inside the viewport-preserve surface
+    — decorated at import time, exactly like the two production call sites)
+    and asserts its on-screen position holds across the fragment rerun that
+    reveals an st.info block above it — not a re-implementation of the
+    restore logic, the real shipped JS the browser runs.
+    """
+    from playwright.sync_api import sync_playwright
+    from scripts.validate_viewport_preservation import wait_app
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(
+            viewport={"width": 390, "height": 844},
+            is_mobile=True,
+            has_touch=True,
+        )
+        try:
+            page.goto(f"{harness_url}/?surface=viewport-preserve")
+            wait_app(page)
+            locator = page.get_by_role("button", name="Fragment reveal toggle")
+            locator.scroll_into_view_if_needed()
+            # Let any residual startup-mount ladder fully expire (see
+            # docstring) before recording the baseline position.
+            page.wait_for_timeout(2500)
+            before = locator.bounding_box()
+            assert before is not None
+            locator.click()
+            # Give the record()-anchored restore ladder its full window
+            # (rAF double + setTimeouts up to 1200ms) plus margin. This
+            # interaction never bumps __dgViewportRestoreKickSeq (that
+            # counter only increments on a FULL rerun's remount — the
+            # exact gap under test), so we cannot wait on that signal here.
+            page.wait_for_timeout(2000)
+            after = locator.bounding_box()
+            assert after is not None
+            assert abs(after["y"] - before["y"]) < 4, (
+                "fragment-scoped reveal shifted the tapped control on "
+                f"screen (jump bug): before={before!r} after={after!r}"
+            )
+        finally:
+            browser.close()
