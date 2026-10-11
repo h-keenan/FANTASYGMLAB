@@ -157,9 +157,10 @@ div[data-testid="stLayoutWrapper"]:has(> {_GM_ORB_KEY}) {{
     background-position: center !important;
     background-repeat: no-repeat !important;
     background-size: contain !important;
-    border: var(--border-width-default, 1px) solid var(--color-border-strong, rgba(226, 232, 240, 0.4)) !important;
+    /* Match mobile GmOrb.tsx's cyan border + cyan glow, not a neutral border/plain shadow. */
+    border: var(--border-width-default, 1px) solid color-mix(in srgb, var(--color-accent) 55%, transparent) !important;
     border-radius: 50% !important;
-    box-shadow: var(--shadow-overlay, 0 10px 28px rgba(0, 0, 0, 0.3)) !important;
+    box-shadow: var(--shadow-overlay, 0 10px 28px rgba(0, 0, 0, 0.3)), 0 0 14px color-mix(in srgb, var(--color-accent) 35%, transparent) !important;
     box-sizing: border-box !important;
     color: transparent !important;
     display: inline-flex !important;
