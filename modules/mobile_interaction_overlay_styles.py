@@ -84,6 +84,16 @@ MOBILE_INTERACTION_OVERLAY_CSS = f"""
     width: var(--dg-gm-orb-size) !important;
     z-index: var(--dg-overlay-z-nav) !important;
 }}
+/* Streamlit wraps every element-container in its own stLayoutWrapper. Giving
+   {_GM_ORB_KEY} `position: fixed` collapses ITS box to zero height (fixed
+   children don't contribute to a parent's layout size) -- but that doesn't
+   remove the stLayoutWrapper parent from the page's flex-column flow, so it
+   still consumed a full flex-gap boundary at zero height, same dead-space
+   bug class as #973/#976. display:contents removes the wrapper's own box
+   from layout entirely while leaving the fixed child unaffected. */
+div[data-testid="stLayoutWrapper"]:has(> {_GM_ORB_KEY}) {{
+    display: contents !important;
+}}
 /* Marker markdown container must not consume layout or flex gap. */
 {_GM_ORB_BLOCK} > div[data-testid="stElementContainer"]:has(.mobile-gm-floating-trigger-marker),
 {_GM_ORB_KEY} > div[data-testid="stElementContainer"]:has(.mobile-gm-floating-trigger-marker) {{
