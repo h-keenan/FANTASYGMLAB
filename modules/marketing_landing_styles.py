@@ -5,8 +5,10 @@ body:has(.fgl-landing) .app-hero{display:none!important}
 body:has(.fgl-landing) [data-testid="stSidebar"]{display:none!important}
 body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_primary_cta"] button,
 body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_secondary_cta"] button{
-  letter-spacing:normal!important;text-transform:none!important;font-weight:700!important
+  letter-spacing:normal!important;text-transform:none!important
 }
+body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_primary_cta"] button{font-weight:700!important}
+body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_secondary_cta"] button{font-weight:600!important}
 body:has(.fgl-landing) div[class*="st-key-"][class*="_global_feedback_control"]{display:none!important}
 body:has(.fgl-landing) [data-testid="stMainBlockContainer"]{
   box-sizing:border-box;margin-inline:auto;max-width:min(72rem,calc(100vw - 1.5rem));padding-inline:.2rem;width:100%
@@ -77,6 +79,5 @@ body:has(.fgl-landing) [data-testid="stMainBlockContainer"]{max-width:calc(100vw
 .fgl-preview__rail{gap:.5rem}
 body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_primary_cta"],
 body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_secondary_cta"]{max-width:22rem}
-body:has([data-fgl-welcome-flow="welcome"]) [class*="st-key-landing_secondary_cta"] button{font-weight:600!important}
 }
 """

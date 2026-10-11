@@ -16449,12 +16449,12 @@ def main():
             reason="script_start",
             restored=bool(st.session_state.get("auth_session")),
         )
-        launch_analytics.track_event(
-            "landing_viewed",
-            props=launch_analytics.build_context_props(st.session_state, route="landing"),
-            once_key="session",
-            state=st.session_state,
-        )
+        # landing_viewed is emitted by modules.marketing_landing itself, only
+        # when the signed-out welcome hero actually renders — firing it here
+        # unconditionally for every script run (including already
+        # authenticated sessions that never see this page) silently inflated
+        # the funnel's denominator and masked the true landing-page
+        # conversion rate (primary_cta_clicked / landing_viewed).
     except Exception:
         pass
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
