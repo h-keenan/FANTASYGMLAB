@@ -121,19 +121,21 @@ def _assert_rich(plan: dgb.DailyGmBriefing) -> None:
     trade_html = daily_gm_briefing_ui._card_visual_html(trade)
     watch_html = daily_gm_briefing_ui._card_visual_html(watch)
     waiver_html = daily_gm_briefing_ui._card_visual_html(waiver)
+    # Dashboard's Top Priority teaser is a compact "Trade: A -> B" summary,
+    # not Trade Hub's full give/get avatar breakdown (coridian_ rejected that
+    # density on PR #1016) — but the real presentation data (names, pick
+    # label, value edge) must still survive a package-hit rerun intact.
     assert "Tyrone Tracy" in trade_html
     assert "Pat Bryant" in trade_html
-    assert "You give" in trade_html
-    assert "You get" in trade_html
-    assert "+237 VALUE EDGE" in trade_html
-    assert "dg-compact-asset-avatar" in trade_html
+    assert "2027 Round 3" in trade_html
+    assert "+237" in trade_html
+    assert "dg-compact-asset-avatar" not in trade_html
     assert daily_gm_briefing_ui._should_show_headline(trade) is False
     assert "Cam" in watch_html and "Skattebo" in watch_html
     assert " | " not in watch_html
     assert daily_gm_briefing_ui._should_show_reason(watch, watch_html) is False
     assert "Emanuel Wilson" in waiver_html
-    assert "Handcuff" in waiver_html
-    assert "dg-compact-asset-avatar" in waiver_html
+    assert "dg-compact-asset-avatar" not in waiver_html
     assert daily_gm_briefing_ui._should_show_headline(waiver) is False
 
 

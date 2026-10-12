@@ -12,9 +12,10 @@ import streamlit as st
 from modules import daily_gm_briefing as briefing_mod
 from modules import compact_fantasy_assets
 from modules import ui_primitives
+from modules.football_assets import player_name_html
 from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.semantic_glyphs import glyph_html
-from modules.trade_visual_language import priority_tier_html
+from modules.trade_visual_language import confidence_level, parse_signed_edge, priority_tier_html
 
 
 # Scoped to Dashboard Game Plan renders — keep off the global cold-path CSS budget.
@@ -40,6 +41,19 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
 .dg-daily-briefing-reason{color:var(--color-text-secondary);font:var(--type-caption-emphasis);max-width:40rem}
 .dg-daily-briefing-rank{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 .dg-game-plan-card .dg-compact-asset--standard{--size-asset-standard:3.25rem}
+.dg-gp-mini-trade{display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0}
+.dg-gp-mini-trade-headline{color:var(--color-text-primary);font:var(--font-card-title);overflow-wrap:break-word}
+.dg-game-plan-card-primary .dg-gp-mini-trade-headline{font:var(--type-section-title)}
+.dg-gp-mini-indicators{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs)}
+.dg-gp-mini-chip{background:var(--color-surface-secondary);border-radius:var(--radius-pill);color:var(--color-text-secondary);display:inline-flex;font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);padding:2px var(--space-xs);text-transform:uppercase;white-space:nowrap}
+.dg-gp-mini-chip--pos{color:var(--color-success)}
+.dg-gp-mini-chip--neg{color:var(--color-danger)}
+.dg-gp-mini-chip--conf-high{color:var(--color-success)}
+.dg-gp-mini-chip--conf-low{color:var(--color-warning)}
+.dg-gp-mini-waiver{align-items:baseline;display:flex;flex-wrap:wrap;gap:var(--space-xs);min-width:0}
+.dg-gp-mini-waiver-name{color:var(--color-text-primary);font:var(--font-card-title);overflow-wrap:break-word}
+.dg-game-plan-card-primary .dg-gp-mini-waiver-name{font:var(--type-section-title)}
+.dg-gp-mini-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 div[class*="st-key-"][class*="_header"]{align-items:flex-start;display:flex;flex-direction:column;gap:var(--space-2xs);min-width:0;width:100%}
 div[class*="st-key-"][class*="_header"] .dg-ui-section-header{margin:0!important;padding:0 0 var(--space-2xs)!important;width:100%}
 div[class*="st-key-"][class*="_header"] .dg-ui-section-title{margin:0!important;text-align:left}
@@ -327,6 +341,92 @@ def render_todays_game_plan(
                     )
 
 
+def _asset_label(asset: object) -> str:
+    """Player name or pick label — ``presentation_asset`` uses different keys
+    for the two asset types (``name`` for a player, ``label`` for a pick)."""
+
+    if not isinstance(asset, Mapping):
+        return ""
+    return str(asset.get("name") or asset.get("label") or "").strip()
+
+
+def _trade_mini_indicators_html(presentation: Mapping) -> str:
+    """A tiny value-edge + confidence chip row — not the full progress
+    bar/ring Trade Hub renders; just enough to scan at Dashboard-teaser size.
+    """
+
+    chips: list[str] = []
+    value_edge = str(presentation.get("value_edge") or "").strip()
+    if value_edge:
+        label, polarity = parse_signed_edge(value_edge)
+        chips.append(
+            f"<span class='dg-gp-mini-chip dg-gp-mini-chip--{polarity}'>{escape(label)}</span>"
+        )
+    confidence = str(presentation.get("confidence") or "").strip()
+    if confidence:
+        level = confidence_level(confidence)
+        visible = (
+            confidence.replace(" confidence", "").replace("Confidence", "").strip()
+            or confidence
+        )
+        chips.append(
+            f"<span class='dg-gp-mini-chip dg-gp-mini-chip--conf-{level}'>"
+            f"{escape(visible)}</span>"
+        )
+    return f"<div class='dg-gp-mini-indicators'>{''.join(chips)}</div>" if chips else ""
+
+
+def _trade_summary_visual_html(presentation: Mapping) -> str:
+    """Compact Dashboard teaser for the Top Priority trade: one headline
+    naming the real assets plus a small value/confidence chip row. The full
+    give/get breakdown with avatars, pick plates, and a progress bar is
+    Trade Hub's job (``compact_fantasy_assets.game_plan_trade_visual_html``,
+    unchanged) — this teaser only has to say "here's the move, go look."
+    """
+
+    send = presentation.get("send") or []
+    receive = presentation.get("receive") or []
+    give = " + ".join(
+        label for label in (_asset_label(asset) for asset in send) if label
+    )
+    get = " + ".join(
+        label for label in (_asset_label(asset) for asset in receive) if label
+    )
+    if not give and not get:
+        return ""
+    if give and get:
+        headline = f"Trade: {give} → {get}"
+    else:
+        headline = f"Trade: {give or get}"
+    indicators_html = _trade_mini_indicators_html(presentation)
+    return (
+        "<div class='dg-gp-mini-trade'>"
+        f"<div class='dg-gp-mini-trade-headline'>{escape(headline)}</div>"
+        f"{indicators_html}"
+        "</div>"
+    )
+
+
+def _waiver_summary_visual_html(player: Mapping) -> str:
+    """Compact Dashboard teaser for the Top Waiver Opportunity: a name plus
+    position/team text, no avatar circle — Waivers itself already shows the
+    full identity card once the user taps through.
+    """
+
+    name = str(player.get("name") or "").strip()
+    if not name:
+        return ""
+    bits = [str(player.get(key) or "").strip().upper() for key in ("position", "team")]
+    meta = " · ".join(bit for bit in bits if bit)
+    meta_html = f"<span class='dg-gp-mini-meta'>{escape(meta)}</span>" if meta else ""
+    return (
+        "<div class='dg-gp-mini-waiver'>"
+        f"<span class='dg-gp-mini-waiver-name'>{player_name_html(name)}</span>"
+        f"{meta_html}"
+        "</div>"
+    )
+
+
 def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
     presentation = _presentation_dict(item) or None
     if item.category == briefing_mod.CATEGORY_WATCH:
@@ -335,11 +435,10 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
     if item.destination == "waivers" or item.category == briefing_mod.CATEGORY_WAIVER:
         player = (presentation or {}).get("player") if presentation else None
         if isinstance(player, dict) and player:
-            chip = compact_fantasy_assets.compact_asset_html(
-                player, size="standard", show_value=False
-            )
-            return f"<div class='dg-gp-identity-row'>{chip}</div>" if chip else ""
+            return _waiver_summary_visual_html(player)
         return ""
     if item.destination == "trade_hub" or item.category == briefing_mod.CATEGORY_TOP_PRIORITY:
-        return compact_fantasy_assets.game_plan_trade_visual_html(presentation)
+        if not isinstance(presentation, Mapping):
+            return ""
+        return _trade_summary_visual_html(presentation)
     return ""

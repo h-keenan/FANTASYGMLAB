@@ -116,7 +116,6 @@ def test_dashboard_uses_canonical_standard_portrait_primitive():
     )
     assert "dg-compact-asset--standard" in watch
     ui = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert 'size="standard"' in ui
     assert "--size-asset-standard:3.25rem" in ui.replace(" ", "")
 
 
