@@ -24,6 +24,7 @@ from html import escape
 import streamlit as st
 
 from modules.my_news import build_quick_news_summary, relative_news_time
+from modules.page_shell import page_body
 from modules.semantic_glyphs import glyph_html
 from modules.ui_primitives import render_empty_state_panel
 
@@ -180,37 +181,38 @@ def render_general_news_feed(items: list, *, now_ts: float | None = None) -> Non
     roster-scoped — a separate surface from Dashboard's 3-tile news digest
     and the roster-scoped Alerts timeline."""
 
-    if not items:
-        # Matches mobile's EmptyState (icon + title + subtitle) and this
-        # app's own empty-state convention elsewhere (modules/ui_primitives.
-        # render_empty_state_panel) rather than a bare st.info sentence.
-        render_empty_state_panel(
-            "No news right now",
-            "Check back later for injury, role, transaction, and off-field updates.",
-            kind="no-data",
-        )
-        return
+    with page_body("general_news_workspace", gap="md"):
+        if not items:
+            # Matches mobile's EmptyState (icon + title + subtitle) and this
+            # app's own empty-state convention elsewhere (modules/ui_primitives.
+            # render_empty_state_panel) rather than a bare st.info sentence.
+            render_empty_state_panel(
+                "No news right now",
+                "Check back later for injury, role, transaction, and off-field updates.",
+                kind="no-data",
+            )
+            return
 
-    resolved_now = now_ts if now_ts is not None else time.time()
-    sections = _group_by_date(items, resolved_now)
-    card_idx = 0
-    for bucket_label, groups in sections:
-        st.markdown(
-            f"<div class='news-date-header'>{escape(bucket_label)}</div>",
-            unsafe_allow_html=True,
-        )
-        for event_type, group_items in groups:
-            accent = EVENT_TYPE_COLOR_VARS.get(event_type, "var(--color-text-secondary)")
-            label = _event_type_label(event_type)
-            glyph_concept = EVENT_TYPE_GLYPH_CONCEPT.get(event_type, "more")
-            glyph = glyph_html(glyph_concept, size="kicker")
+        resolved_now = now_ts if now_ts is not None else time.time()
+        sections = _group_by_date(items, resolved_now)
+        card_idx = 0
+        for bucket_label, groups in sections:
             st.markdown(
-                "<div class='news-group-header'>"
-                f"<span class='news-group-accent-bar' style='background:{accent}'></span>"
-                f"<span class='news-group-label' style='color:{accent}'>{glyph}{escape(label)}</span>"
-                "</div>",
+                f"<div class='news-date-header'>{escape(bucket_label)}</div>",
                 unsafe_allow_html=True,
             )
-            for item in group_items:
-                render_news_item_card(item, card_idx)
-                card_idx += 1
+            for event_type, group_items in groups:
+                accent = EVENT_TYPE_COLOR_VARS.get(event_type, "var(--color-text-secondary)")
+                label = _event_type_label(event_type)
+                glyph_concept = EVENT_TYPE_GLYPH_CONCEPT.get(event_type, "more")
+                glyph = glyph_html(glyph_concept, size="kicker")
+                st.markdown(
+                    "<div class='news-group-header'>"
+                    f"<span class='news-group-accent-bar' style='background:{accent}'></span>"
+                    f"<span class='news-group-label' style='color:{accent}'>{glyph}{escape(label)}</span>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                for item in group_items:
+                    render_news_item_card(item, card_idx)
+                    card_idx += 1

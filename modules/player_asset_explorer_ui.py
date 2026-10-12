@@ -11,6 +11,7 @@ import streamlit as st
 from modules import html_rendering
 from modules import product_copy
 from modules import ui_primitives
+from modules.page_shell import page_body
 from modules.player_state_authority import rostered_player_ids
 from modules.player_asset_explorer_styles import PLAYER_ASSET_EXPLORER_CSS
 
@@ -247,285 +248,286 @@ def render_player_asset_explorer(
     """Render the explorer and return the visible player result frame."""
 
     # Lazy CSS — keep PLAYER_ASSET_EXPLORER_CSS off cold APP_CSS / protobuf path.
-    html_rendering.inject_global_styles(PLAYER_ASSET_EXPLORER_CSS)
-    # Search/filter chrome is supporting UI, not the decision-relevant content
-    # the user came here for — keep it quieter than the ranked results below
-    # (weight intentionally omitted; defaults to the lightest "context" tier).
-    ui_primitives.render_section_header(
-        product_copy.PLAYERS_EXPLORER_TITLE,
-        eyebrow="Market Search",
-        subtitle=product_copy.PLAYERS_EXPLORER_SUBTITLE,
-        heading_level=2,
-    )
-    query = st.text_input(
-        "Search players and picks",
-        key="player_asset_explorer_query",
-        placeholder="Player, team, position, or pick shorthand (for example: 2027 1st)",
-        autocomplete="off",
-    )
-    asset_scope = st.pills(
-        "Asset type",
-        ASSET_SCOPES,
-        default="All assets",
-        key="player_asset_explorer_scope",
-    ) or "All assets"
-    available_players_scope = asset_scope == AVAILABLE_PLAYERS_SCOPE
-    roster_ownership_known = ownership_context_is_known(
-        roster_player_map,
-        ownership_known=ownership_known,
-    )
-    if available_players_scope:
-        st.caption("Players currently unrostered in this league.")
+    with page_body("player_asset_explorer_workspace", gap="md"):
+        html_rendering.inject_global_styles(PLAYER_ASSET_EXPLORER_CSS)
+        # Search/filter chrome is supporting UI, not the decision-relevant content
+        # the user came here for — keep it quieter than the ranked results below
+        # (weight intentionally omitted; defaults to the lightest "context" tier).
+        ui_primitives.render_section_header(
+            product_copy.PLAYERS_EXPLORER_TITLE,
+            eyebrow="Market Search",
+            subtitle=product_copy.PLAYERS_EXPLORER_SUBTITLE,
+            heading_level=2,
+        )
+        query = st.text_input(
+            "Search players and picks",
+            key="player_asset_explorer_query",
+            placeholder="Player, team, position, or pick shorthand (for example: 2027 1st)",
+            autocomplete="off",
+        )
+        asset_scope = st.pills(
+            "Asset type",
+            ASSET_SCOPES,
+            default="All assets",
+            key="player_asset_explorer_scope",
+        ) or "All assets"
+        available_players_scope = asset_scope == AVAILABLE_PLAYERS_SCOPE
+        roster_ownership_known = ownership_context_is_known(
+            roster_player_map,
+            ownership_known=ownership_known,
+        )
+        if available_players_scope:
+            st.caption("Players currently unrostered in this league.")
 
-    filter_count = 3 if available_players_scope else 4
-    filter_columns = st.columns(filter_count)
-    with filter_columns[0]:
-        positions = tuple(
-            st.multiselect(
-                "Position",
-                ["QB", "RB", "WR", "TE", "K"],
-                key="player_asset_explorer_positions",
+        filter_count = 3 if available_players_scope else 4
+        filter_columns = st.columns(filter_count)
+        with filter_columns[0]:
+            positions = tuple(
+                st.multiselect(
+                    "Position",
+                    ["QB", "RB", "WR", "TE", "K"],
+                    key="player_asset_explorer_positions",
+                )
             )
-        )
-    with filter_columns[1]:
-        age_filter = st.selectbox(
-            "Age",
-            AGE_FILTERS,
-            key="player_asset_explorer_age",
-        )
-    with filter_columns[2]:
-        status_filter = st.selectbox(
-            "Status",
-            STATUS_FILTERS,
-            key="player_asset_explorer_status",
-        )
-    if available_players_scope:
-        availability_filter = "Available"
-    else:
-        with filter_columns[3]:
-            availability_filter = st.selectbox(
-                "Availability",
-                (
-                    AVAILABILITY_FILTERS
-                    if roster_ownership_known
-                    else ("All availability",)
-                ),
-                key="player_asset_explorer_availability",
+        with filter_columns[1]:
+            age_filter = st.selectbox(
+                "Age",
+                AGE_FILTERS,
+                key="player_asset_explorer_age",
             )
+        with filter_columns[2]:
+            status_filter = st.selectbox(
+                "Status",
+                STATUS_FILTERS,
+                key="player_asset_explorer_status",
+            )
+        if available_players_scope:
+            availability_filter = "Available"
+        else:
+            with filter_columns[3]:
+                availability_filter = st.selectbox(
+                    "Availability",
+                    (
+                        AVAILABILITY_FILTERS
+                        if roster_ownership_known
+                        else ("All availability",)
+                    ),
+                    key="player_asset_explorer_availability",
+                )
 
-    ranked = ranked_player_frame(df_players, score_field)
-    rank_map: dict[str, int] = {}
-    for _, row in ranked.iterrows():
-        pid = _text(row.get("player_id"))
-        if not pid:
-            continue
-        try:
-            explorer_rank = int(row.get("explorer_rank"))
-        except (TypeError, ValueError):
-            continue
-        if explorer_rank > 0:
-            rank_map[pid] = explorer_rank
+        ranked = ranked_player_frame(df_players, score_field)
+        rank_map: dict[str, int] = {}
+        for _, row in ranked.iterrows():
+            pid = _text(row.get("player_id"))
+            if not pid:
+                continue
+            try:
+                explorer_rank = int(row.get("explorer_rank"))
+            except (TypeError, ValueError):
+                continue
+            if explorer_rank > 0:
+                rank_map[pid] = explorer_rank
 
-    current_year = current_draft_year
-    if not current_year:
-        pick_seasons = [
-            int(value)
-            for value in pd.to_numeric(
-                pd.Series([pick.get("season") for pick in draft_picks or []]),
-                errors="coerce",
-            ).dropna()
-        ]
-        if pick_seasons:
-            current_year = min(pick_seasons)
+        current_year = current_draft_year
+        if not current_year:
+            pick_seasons = [
+                int(value)
+                for value in pd.to_numeric(
+                    pd.Series([pick.get("season") for pick in draft_picks or []]),
+                    errors="coerce",
+                ).dropna()
+            ]
+            if pick_seasons:
+                current_year = min(pick_seasons)
 
-    include_players = asset_scope in {
-        "Players",
-        AVAILABLE_PLAYERS_SCOPE,
-        "All assets",
-    }
-    include_picks = asset_scope in {"Rookie picks", "Future picks", "All assets"}
-    rostered_ids = rostered_player_id_set(roster_player_map)
-    if available_players_scope and not roster_ownership_known:
-        ui_primitives.render_empty_state_panel(
-            "League roster context unavailable",
-            "Available Players needs a loaded league roster to know who is unrostered.",
-            kind="unavailable",
-            recovery_guidance="Load a supported league, then return to Players.",
-        )
-        return pd.DataFrame(columns=list(df_players.columns) if df_players is not None else [])
+        include_players = asset_scope in {
+            "Players",
+            AVAILABLE_PLAYERS_SCOPE,
+            "All assets",
+        }
+        include_picks = asset_scope in {"Rookie picks", "Future picks", "All assets"}
+        rostered_ids = rostered_player_id_set(roster_player_map)
+        if available_players_scope and not roster_ownership_known:
+            ui_primitives.render_empty_state_panel(
+                "League roster context unavailable",
+                "Available Players needs a loaded league roster to know who is unrostered.",
+                kind="unavailable",
+                recovery_guidance="Load a supported league, then return to Players.",
+            )
+            return pd.DataFrame(columns=list(df_players.columns) if df_players is not None else [])
 
-    searched = pd.DataFrame()
-    if query.strip():
-        searched = search_assets(
-            df_players,
-            draft_picks,
-            query,
-            score_field=score_field,
-            pick_score_multiplier=pick_score_multiplier,
-            asset_filter=(
-                "Players"
-                if asset_scope in {"Players", AVAILABLE_PLAYERS_SCOPE}
-                else "Picks"
-                if asset_scope in {"Rookie picks", "Future picks"}
-                else "All"
-            ),
-            limit=60,
-        )
-
-    if query.strip():
-        player_results = (
-            searched[searched.get("asset_type", "").eq("player")].copy()
-            if not searched.empty and "asset_type" in searched.columns
-            else pd.DataFrame()
-        )
-        pick_results = (
-            searched[searched.get("asset_type", "").eq("pick")].copy()
-            if not searched.empty and "asset_type" in searched.columns
-            else pd.DataFrame()
-        )
-    else:
-        player_results = ranked.copy() if include_players else pd.DataFrame()
-        pick_results = (
-            filter_pick_results(
+        searched = pd.DataFrame()
+        if query.strip():
+            searched = search_assets(
+                df_players,
                 draft_picks,
+                query,
+                score_field=score_field,
+                pick_score_multiplier=pick_score_multiplier,
+                asset_filter=(
+                    "Players"
+                    if asset_scope in {"Players", AVAILABLE_PLAYERS_SCOPE}
+                    else "Picks"
+                    if asset_scope in {"Rookie picks", "Future picks"}
+                    else "All"
+                ),
+                limit=60,
+            )
+
+        if query.strip():
+            player_results = (
+                searched[searched.get("asset_type", "").eq("player")].copy()
+                if not searched.empty and "asset_type" in searched.columns
+                else pd.DataFrame()
+            )
+            pick_results = (
+                searched[searched.get("asset_type", "").eq("pick")].copy()
+                if not searched.empty and "asset_type" in searched.columns
+                else pd.DataFrame()
+            )
+        else:
+            player_results = ranked.copy() if include_players else pd.DataFrame()
+            pick_results = (
+                filter_pick_results(
+                    draft_picks,
+                    asset_scope=asset_scope,
+                    current_draft_year=current_year,
+                )
+                if include_picks
+                else pd.DataFrame()
+            )
+
+        if not player_results.empty:
+            player_results["explorer_rank"] = (
+                player_results.get(
+                    "player_id",
+                    pd.Series("", index=player_results.index),
+                )
+                .fillna("")
+                .astype(str)
+                .map(rank_map)
+            )
+        player_results = filter_player_results(
+            player_results,
+            positions=positions,
+            age_filter=age_filter,
+            status_filter=status_filter,
+            availability_filter=availability_filter,
+            rostered_player_ids=rostered_ids,
+            is_injury_status=is_injury_status,
+        )
+        if include_picks:
+            pick_results = filter_pick_results(
+                pick_results,
                 asset_scope=asset_scope,
                 current_draft_year=current_year,
             )
-            if include_picks
-            else pd.DataFrame()
-        )
+        else:
+            pick_results = pd.DataFrame()
 
-    if not player_results.empty:
-        player_results["explorer_rank"] = (
-            player_results.get(
-                "player_id",
-                pd.Series("", index=player_results.index),
-            )
-            .fillna("")
-            .astype(str)
-            .map(rank_map)
+        result_count = len(player_results) + len(pick_results)
+        visible_count = min(len(player_results), MAX_VISIBLE_PLAYER_RESULTS) + min(
+            len(pick_results), MAX_VISIBLE_PICK_RESULTS
         )
-    player_results = filter_player_results(
-        player_results,
-        positions=positions,
-        age_filter=age_filter,
-        status_filter=status_filter,
-        availability_filter=availability_filter,
-        rostered_player_ids=rostered_ids,
-        is_injury_status=is_injury_status,
-    )
-    if include_picks:
-        pick_results = filter_pick_results(
-            pick_results,
-            asset_scope=asset_scope,
-            current_draft_year=current_year,
-        )
-    else:
-        pick_results = pd.DataFrame()
-
-    result_count = len(player_results) + len(pick_results)
-    visible_count = min(len(player_results), MAX_VISIBLE_PLAYER_RESULTS) + min(
-        len(pick_results), MAX_VISIBLE_PICK_RESULTS
-    )
-    if visible_count < result_count:
-        st.caption(
-            f"Showing the top {visible_count} of {result_count} matching assets, "
-            "ranked by current value. Results keep the existing search and value ordering."
-        )
-    else:
-        st.caption(
-            f"{result_count} matching asset{'s' if result_count != 1 else ''}. "
-            "Results keep the existing search and value ordering."
-        )
-    if result_count == 0:
-        if query.strip():
-            ui_primitives.render_empty_state_panel(
-                "No matching assets",
-                "No players or supported picks match this search and filter combination.",
-                kind="filtered-empty",
-                recovery_guidance="Check the spelling, remove a filter, or try pick shorthand such as 2027 1st.",
-            )
-        elif available_players_scope:
-            ui_primitives.render_empty_state_panel(
-                "No available players",
-                "Every matching player is currently rostered in this league, or filters removed the rest.",
-                kind="filtered-empty",
-                recovery_guidance="Clear position, age, or status filters, or switch Asset type to Players.",
-            )
-        elif include_picks and not draft_picks:
-            ui_primitives.render_empty_state_panel(
-                "Draft-pick data unavailable",
-                "No supported rookie or future-pick assets are available for the active league.",
-                kind="unavailable",
-                recovery_guidance="Load a supported league to explore its draft capital.",
+        if visible_count < result_count:
+            st.caption(
+                f"Showing the top {visible_count} of {result_count} matching assets, "
+                "ranked by current value. Results keep the existing search and value ordering."
             )
         else:
-            ui_primitives.render_empty_state_panel(
-                "No players match these filters",
-                "The current position, age, status, and availability filters remove every player.",
-                kind="filtered-empty",
-                recovery_guidance="Clear one or more filters to restore the player board.",
+            st.caption(
+                f"{result_count} matching asset{'s' if result_count != 1 else ''}. "
+                "Results keep the existing search and value ordering."
+            )
+        if result_count == 0:
+            if query.strip():
+                ui_primitives.render_empty_state_panel(
+                    "No matching assets",
+                    "No players or supported picks match this search and filter combination.",
+                    kind="filtered-empty",
+                    recovery_guidance="Check the spelling, remove a filter, or try pick shorthand such as 2027 1st.",
+                )
+            elif available_players_scope:
+                ui_primitives.render_empty_state_panel(
+                    "No available players",
+                    "Every matching player is currently rostered in this league, or filters removed the rest.",
+                    kind="filtered-empty",
+                    recovery_guidance="Clear position, age, or status filters, or switch Asset type to Players.",
+                )
+            elif include_picks and not draft_picks:
+                ui_primitives.render_empty_state_panel(
+                    "Draft-pick data unavailable",
+                    "No supported rookie or future-pick assets are available for the active league.",
+                    kind="unavailable",
+                    recovery_guidance="Load a supported league to explore its draft capital.",
+                )
+            else:
+                ui_primitives.render_empty_state_panel(
+                    "No players match these filters",
+                    "The current position, age, status, and availability filters remove every player.",
+                    kind="filtered-empty",
+                    recovery_guidance="Clear one or more filters to restore the player board.",
+                )
+            return player_results
+
+        if not player_results.empty:
+            # Ranked players are the decision-relevant content this page exists
+            # for — give the header more visual weight than the search chrome above.
+            ui_primitives.render_section_header(
+                "Players",
+                eyebrow="Ranked Results",
+                subtitle="Dynasty value, rank, and current context in one scan.",
+                heading_level=3,
+                weight="secondary",
+            )
+
+            def player_context(row) -> str:
+                # Rank only — player_tier and opportunity_label are already
+                # surfaced on this same row via the shared prestige badge and
+                # opportunity/status chips (player_cards.player_scan_tags).
+                # Repeating them here under a "Why:" label duplicated that
+                # signal in a second visual language and read as a
+                # recommendation rationale on what is a browse/search surface.
+                from modules import canonical_player_ranking
+
+                return canonical_player_ranking.format_compact_rank(
+                    row.get("canonical_overall_rank", row.get("overall_rank")),
+                    row.get("canonical_position_rank", row.get("position_rank")),
+                    row.get("position"),
+                    unavailable_reason=row.get("rank_unavailable_reason"),
+                )
+
+            render_player_scan_cards(
+                player_results,
+                score_field=score_field,
+                title="Player results",
+                note="Open any result for Player Quick View.",
+                max_items=MAX_VISIBLE_PLAYER_RESULTS,
+                compact=True,
+                enable_quick_view=True,
+                quick_view_source_label=product_copy.PLAYERS_SOURCE_LABEL,
+                quick_view_key_prefix="player_asset_explorer",
+                note_fn=player_context,
+                show_inline_reason=True,
+                show_header=False,
+                design_system=True,
+            )
+
+        if not pick_results.empty:
+            ui_primitives.render_section_header(
+                "Draft Picks",
+                eyebrow="League Assets",
+                subtitle="Current values and ownership context; pick valuation is unchanged.",
+                heading_level=3,
+                weight="secondary",
+            )
+            st.markdown(
+                "<div class='explorer-pick-grid'>"
+                + "".join(
+                    pick_card_html(row.to_dict(), score_label=score_label)
+                    for _, row in pick_results.head(MAX_VISIBLE_PICK_RESULTS).iterrows()
+                )
+                + "</div>",
+                unsafe_allow_html=True,
             )
         return player_results
-
-    if not player_results.empty:
-        # Ranked players are the decision-relevant content this page exists
-        # for — give the header more visual weight than the search chrome above.
-        ui_primitives.render_section_header(
-            "Players",
-            eyebrow="Ranked Results",
-            subtitle="Dynasty value, rank, and current context in one scan.",
-            heading_level=3,
-            weight="secondary",
-        )
-
-        def player_context(row) -> str:
-            # Rank only — player_tier and opportunity_label are already
-            # surfaced on this same row via the shared prestige badge and
-            # opportunity/status chips (player_cards.player_scan_tags).
-            # Repeating them here under a "Why:" label duplicated that
-            # signal in a second visual language and read as a
-            # recommendation rationale on what is a browse/search surface.
-            from modules import canonical_player_ranking
-
-            return canonical_player_ranking.format_compact_rank(
-                row.get("canonical_overall_rank", row.get("overall_rank")),
-                row.get("canonical_position_rank", row.get("position_rank")),
-                row.get("position"),
-                unavailable_reason=row.get("rank_unavailable_reason"),
-            )
-
-        render_player_scan_cards(
-            player_results,
-            score_field=score_field,
-            title="Player results",
-            note="Open any result for Player Quick View.",
-            max_items=MAX_VISIBLE_PLAYER_RESULTS,
-            compact=True,
-            enable_quick_view=True,
-            quick_view_source_label=product_copy.PLAYERS_SOURCE_LABEL,
-            quick_view_key_prefix="player_asset_explorer",
-            note_fn=player_context,
-            show_inline_reason=True,
-            show_header=False,
-            design_system=True,
-        )
-
-    if not pick_results.empty:
-        ui_primitives.render_section_header(
-            "Draft Picks",
-            eyebrow="League Assets",
-            subtitle="Current values and ownership context; pick valuation is unchanged.",
-            heading_level=3,
-            weight="secondary",
-        )
-        st.markdown(
-            "<div class='explorer-pick-grid'>"
-            + "".join(
-                pick_card_html(row.to_dict(), score_label=score_label)
-                for _, row in pick_results.head(MAX_VISIBLE_PICK_RESULTS).iterrows()
-            )
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-    return player_results

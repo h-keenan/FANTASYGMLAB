@@ -335,7 +335,7 @@ def test_alerts_page_header_has_single_owner():
     assert "render_section_header(" not in alerts_block
     assert alerts_block.count("render_section_header=render_section_header") == 2
     ui = (ROOT / "modules" / "alerts_activity_ui.py").read_text(encoding="utf-8")
-    assert ui.count('render_section_header(\n            "Alerts"') == 1
+    assert ui.count('render_section_header(\n                "Alerts"') == 1
     assert "<h2>Alerts</h2>" not in ui
     assert "Not a second History" not in ui
 
