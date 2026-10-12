@@ -155,7 +155,7 @@ class TestDestinationVisibility(unittest.TestCase):
         self.assertNotIn("mobile_gm_command_menu_", css)
         self.assertIn("_global_feedback_control", css)
         self.assertIn("left: max(env(safe-area-inset-left", css)
-        self.assertIn("right: calc(0.85rem + env(safe-area-inset-right))", css)
+        self.assertIn("right: max(16px, env(safe-area-inset-right))", css)
 
     def test_quick_view_avatar_containment_rules_remain(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")

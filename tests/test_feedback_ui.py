@@ -176,10 +176,11 @@ class TestFeedbackUI(unittest.TestCase):
     def test_global_feedback_shell_is_bottom_right_and_distinct_from_gm(self):
         css = Path("modules/app_styles.py").read_text(encoding="utf-8")
         app_source = Path("app.py").read_text(encoding="utf-8")
+        overlay_css = Path("modules/mobile_interaction_overlay_styles.py").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("_global_feedback_control", css)
-        self.assertIn("right: calc(0.85rem + env(safe-area-inset-right))", css)
-        self.assertIn("bottom: calc(0.85rem + env(safe-area-inset-bottom))", css)
         self.assertIn("right: max(16px, env(safe-area-inset-right))", css)
         self.assertIn("bottom: max(16px, env(safe-area-inset-bottom))", css)
         self.assertIn("pointer-events: none !important", css)
@@ -189,7 +190,11 @@ class TestFeedbackUI(unittest.TestCase):
         self.assertIn("mobile_gm_sheet_trigger_", css)
         self.assertIn("mobile-gm-floating-trigger-marker", css)
         self.assertNotIn("mobile_gm_command_menu_", css)
-        self.assertIn("z-index: 1001000", css)
+        # The orb's own z-index (distinct from feedback's 1000990 above) now
+        # lives solely in MOBILE_INTERACTION_OVERLAY_CSS as --dg-overlay-z-nav
+        # — app_styles.py's duplicate literal was dead CSS (always shadowed
+        # by this later-cascading token) and was removed.
+        self.assertIn("--dg-overlay-z-nav: 1001000", overlay_css)
         self.assertIn("render_global_feedback_entry(", app_source)
         self.assertIn("feedback_context_payload(", app_source)
         self.assertIn("build_global_feedback_report", app_source)

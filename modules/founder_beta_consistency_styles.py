@@ -78,11 +78,6 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
     padding-top: var(--space-sm);
 }
 
-.dg-ui-section-header,
-.section-header {
-    margin: var(--space-xl) 0 var(--space-md) !important;
-}
-
 .dg-ui-card,
 .dg-ui-empty-state,
 .summary-tile,

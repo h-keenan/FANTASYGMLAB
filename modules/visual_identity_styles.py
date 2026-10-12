@@ -10,6 +10,10 @@ by position, and football_asset_styles.py already carries the matching
 (position_slug() never emits one for any other position) — the override here
 just lets that existing, otherwise-dead color system win instead of adding a
 new one.
+
+Same exception, same reason, for player_support_chip_html()'s
+.player-support-chip-<tone> classes (modules/player_cards.py): the tone
+color was being silently flattened by the .player-support-chip rule above.
 """
 
 COMMAND_CENTER_CSS = """
@@ -180,6 +184,17 @@ div[data-testid="stDialog"] [role="dialog"]{
 .dg-football-position--te{color:var(--color-position-te)!important}
 .dg-football-position--k{color:var(--color-position-k)!important}
 
+/* Same carve-out as above: player_support_chip_html()'s tone classes
+   (GM Targets injury-risk chips, Trade Hub opportunity/risk chips, Waivers
+   success/warning/hold/risk chips) already carry real tone colors, but the
+   .player-support-chip flatten two rules up was silently winning on color
+   for every tone since it is !important and the tone classes were not. */
+.player-support-chip-success{color:var(--color-success)!important}
+.player-support-chip-warning{color:var(--color-warning)!important}
+.player-support-chip-premium{color:var(--color-premium)!important}
+.player-support-chip-hold{color:var(--color-text-secondary)!important}
+.player-support-chip-risk{color:var(--color-danger)!important}
+
 /* Section hierarchy and dashboard density. */
 .dg-ui-eyebrow,
 .section-kicker,
@@ -194,11 +209,6 @@ div[data-testid="stDialog"] [role="dialog"]{
 .section-header {
     border-bottom: var(--border-width-default) solid var(--color-border);
     padding-bottom: var(--space-sm);
-}
-
-.dg-ui-section-title,
-.section-title{
-    letter-spacing: -0.01em;
 }
 
 /* Analytics tables. */
