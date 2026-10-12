@@ -351,6 +351,26 @@ def compact_asset_html(
     if avatar_ring:
         avatar_class += " dg-tier-frame dg-tier-frame--ring"
     avatar = avatar_html(image_url, _initials(name), css_class=avatar_class)
+    # Role/injury line is independent of position_pill — swapping plain-text
+    # position for the colored pill must not silently drop "Handcuff"/
+    # "Questionable"-style context that callers (e.g. the Dashboard's Top
+    # Waiver Opportunity card) still rely on.
+    role = _text(payload.get("role"))
+    extras: list[str] = []
+    if size != "chip" and show_role and role:
+        extras.append(role)
+    injury_status = _text(payload.get("injury_status"))
+    if (
+        size != "chip"
+        and injury_status
+        and injury_status.casefold() not in {"active", "healthy", "na", "none"}
+    ):
+        extras.append(injury_status)
+    extra_html = (
+        f"<div class='dg-compact-asset-role'>{escape(' · '.join(extras))}</div>"
+        if extras
+        else ""
+    )
     if position_pill:
         position_value = _text(payload.get("position")).upper()
         team_value = _text(payload.get("team")).upper()
@@ -366,7 +386,6 @@ def compact_asset_html(
             if (pill_bit or team_bit)
             else ""
         )
-        extra_html = ""
     else:
         identity_bits = [
             bit
@@ -384,22 +403,6 @@ def compact_asset_html(
                 pass
         meta = " · ".join(identity_bits) if identity_bits else "Player"
         meta_html = f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(meta)}</div>"
-        role = _text(payload.get("role"))
-        extras: list[str] = []
-        if size != "chip" and show_role and role:
-            extras.append(role)
-        injury_status = _text(payload.get("injury_status"))
-        if (
-            size != "chip"
-            and injury_status
-            and injury_status.casefold() not in {"active", "healthy", "na", "none"}
-        ):
-            extras.append(injury_status)
-        extra_html = (
-            f"<div class='dg-compact-asset-role'>{escape(' · '.join(extras))}</div>"
-            if extras
-            else ""
-        )
     return (
         f"<div class='{classes}' data-player-id='{escape(player_id, quote=True)}' "
         f"role='button' tabindex='0' aria-label='Open player {escape(name, quote=True)}'>"
@@ -503,7 +506,27 @@ def watch_attention_html(players: Sequence[Mapping[str, Any]] | None) -> str:
     return f"<div class='dg-gp-watch-list' data-gp-watch='1'>{''.join(rows)}</div>"
 
 
-def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
+def game_plan_trade_visual_html(
+    presentation: Mapping[str, Any] | None,
+    *,
+    position_pill: bool = False,
+    avatar_ring: bool = False,
+) -> str:
+    """League Movement's give/get trade teaser (secondary tier, trade_hub).
+
+    ``position_pill``/``avatar_ring`` are the same opt-in flags
+    ``compact_asset_html`` already exposes (default off, so this function's
+    only other reference — the regression tests in
+    ``tests/test_trade_visual_hierarchy.py`` — stay byte-identical). The
+    Dashboard's League Movement card passes both True so its give/get
+    portraits share the Top Priority card's colored position pill + circular
+    vivid-ring avatar language; it intentionally keeps its own radial
+    ``confidence_indicator_html`` and plain (non-pill) ``value_edge_html``
+    rather than ``game_plan_top_priority_trade_html``'s segmented confidence
+    bar/value pill — those stay the Top Priority card's distinguishing,
+    higher-emphasis treatment.
+    """
+
     if not isinstance(presentation, Mapping):
         return ""
     send = presentation.get("send") or []
@@ -519,12 +542,12 @@ def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
         "<div class='dg-gp-trade-visual' data-gp-trade-visual='1'>"
         "<div class='dg-gp-trade-side dg-gp-trade-side--give'>"
         "<div class='dg-gp-trade-side-label'>You give</div>"
-        f"{compact_asset_stack_html(send, size='standard', show_value=False)}"
+        f"{compact_asset_stack_html(send, size='standard', show_value=False, position_pill=position_pill, avatar_ring=avatar_ring)}"
         "</div>"
         f"{exchange_marker_html(extra_class='dg-gp-trade-for')}"
         "<div class='dg-gp-trade-side dg-gp-trade-side--get'>"
         "<div class='dg-gp-trade-side-label'>You get</div>"
-        f"{compact_asset_stack_html(receive, size='standard', show_value=False)}"
+        f"{compact_asset_stack_html(receive, size='standard', show_value=False, position_pill=position_pill, avatar_ring=avatar_ring)}"
         "</div>"
         "</div>"
         f"{metrics}"
