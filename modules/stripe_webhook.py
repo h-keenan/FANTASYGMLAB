@@ -295,7 +295,11 @@ def _track_subscription_lifecycle(
         event_id = _safe_text(action.get("event_id"))
         state: dict[str, Any] | None = {"auth_session": {"user_id": user_id}} if user_id else None
 
-        if entitlement == "premium" and base_event_type in {
+        from modules import premium
+
+        tier = premium.canonical_tier(entitlement)
+
+        if tier in (premium.PRO, premium.FRONT_OFFICE) and base_event_type in {
             "checkout.session.completed",
             "customer.subscription.created",
         }:
@@ -308,7 +312,7 @@ def _track_subscription_lifecycle(
                 props=launch_analytics.build_context_props(
                     state,
                     source_surface="stripe_webhook",
-                    extra={"tier": "premium", "interval": interval},
+                    extra={"tier": tier, "interval": interval},
                 ),
                 once_key=event_id,
                 state=state,
@@ -317,12 +321,16 @@ def _track_subscription_lifecycle(
             entitlement == "free"
             and base_event_type in stripe_billing.INACTIVE_ENTITLEMENT_EVENTS
         ):
+            # The new entitlement is always "free" here, which tells us
+            # nothing about which paid tier was lost -- this webhook payload
+            # doesn't carry the prior entitlement, so "tier" is omitted
+            # rather than guessed.
             launch_analytics.track_event(
                 "churned",
                 props=launch_analytics.build_context_props(
                     state,
                     source_surface="stripe_webhook",
-                    extra={"tier": "premium", "reason": base_event_type},
+                    extra={"reason": base_event_type},
                 ),
                 once_key=event_id,
                 state=state,
