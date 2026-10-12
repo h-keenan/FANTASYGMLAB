@@ -13667,6 +13667,19 @@ def load_leagues_for_username(username_raw: str, *, source: str = "") -> list[di
                 once_key="session",
                 state=st.session_state,
             )
+            try:
+                # Referral attribution (modules.referrals): a no-op unless
+                # this session arrived via a `?ref=` link and is signed in
+                # — see capture_referral_code in main(). Fail-soft: never
+                # blocks this Sleeper connection on a referral-credit error.
+                from modules import referrals as _referrals_connected
+
+                _referrals_connected.handle_sleeper_connected(
+                    config=_supabase_config(),
+                    session_state=st.session_state,
+                )
+            except Exception:
+                pass
         launch_analytics.track_event(
             "league_import_started",
             props=launch_analytics.build_context_props(
@@ -16607,6 +16620,19 @@ def main():
         # authenticated sessions that never see this page) silently inflated
         # the funnel's denominator and masked the true landing-page
         # conversion rate (primary_cta_clicked / landing_viewed).
+    except Exception:
+        pass
+    try:
+        # Referral arrival capture (modules.referrals): cheap, idempotent,
+        # safe on every script run — a `?ref=` link brought this visitor
+        # in. Session-only until modules.referrals.handle_sleeper_connected
+        # persists the attribution once they authenticate and connect.
+        from modules import referrals as _referrals_arrival
+
+        _referrals_arrival.capture_referral_code(
+            st.query_params.get(_referrals_arrival.REFERRAL_QUERY_PARAM, ""),
+            st.session_state,
+        )
     except Exception:
         pass
     startup = startup_coordinator.StartupCoordinator.begin(st.session_state)
@@ -21252,6 +21278,12 @@ def main():
                     )
 
                 if league_section == "Rankings":
+                    try:
+                        from modules import referral_ui
+
+                        referral_ui.render_invite_cta(session_state=st.session_state)
+                    except Exception:
+                        pass
                     standings_rosters = league_context.get("rosters") or []
                     standings_league = league_context.get("league") or {}
                     if not standings_rosters:

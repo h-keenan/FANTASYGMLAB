@@ -329,10 +329,28 @@ def get_entitlement_debug(
     }
 
 
+def _referral_comp_is_active(user_settings: Any) -> bool:
+    """True when this account holds a live, unexpired referral comp window.
+
+    Deferred import — modules.referrals is the comp's own owner (encoding,
+    the 3-referral threshold, the 3-month cap); this module only consumes
+    the single "is a comp live right now" boolean so the reward logic has
+    exactly one implementation. Fails closed (never grants on an import or
+    parse error) rather than raising into entitlement resolution.
+    """
+    try:
+        from modules import referrals
+
+        return referrals.comp_is_active(user_settings)
+    except Exception:
+        return False
+
+
 def effective_entitlement(
     *,
     account_profile: dict | None = None,
     session_state: dict | None = None,
+    user_settings: dict | None = None,
     environ: dict | None = None,
     secrets: Any = None,
 ) -> str:
@@ -341,6 +359,15 @@ def effective_entitlement(
     Development override wins. In production, only the authenticated
     Supabase profile may grant a paid tier; absent or free profile data
     resolves Free. Returns one of FREE / PRO / FRONT_OFFICE.
+
+    Referral comp (see modules.referrals): a live, unexpired
+    ``referral_program.comp_until`` on this account's own `user_settings`
+    upgrades an otherwise-Free resolution to Pro. It never applies when the
+    Stripe-derived profile tier already resolved Pro or Front Office — a
+    real paid subscription is authoritative and is never downgraded,
+    reinterpreted, or "stacked" by a comp; the comp only ever fills in for
+    an actually-Free account. This is additive to the existing source
+    chain above, not a replacement of it.
     """
     if premium_override_enabled(environ=environ, secrets=secrets):
         return PRO
@@ -348,6 +375,10 @@ def effective_entitlement(
     profile = account_profile if _is_mapping(account_profile) else None
     if profile is None and _is_mapping(session_state):
         profile = _session_sources(session_state).get("account_profile")
+
+    # No authenticated Supabase account at all (guest) — a referral comp is
+    # account-scoped state, so there is nothing to check; keep the original
+    # immediate-Free behavior exactly as it was before this comp addition.
     if not _is_mapping(profile) or not profile:
         return FREE
 
@@ -356,8 +387,17 @@ def effective_entitlement(
         environ={},
         secrets=None,
     )
-    tier = resolved.get("entitlement")
-    return tier if tier in _KNOWN_TIERS else FREE
+    resolved_tier = resolved.get("entitlement")
+    tier = resolved_tier if resolved_tier in _KNOWN_TIERS else FREE
+
+    if tier == FREE:
+        settings = user_settings if _is_mapping(user_settings) else None
+        if settings is None and _is_mapping(session_state):
+            settings = session_state.get("account_user_settings")
+        if _is_mapping(settings) and _referral_comp_is_active(settings):
+            return PRO
+
+    return tier
 
 
 def get_user_entitlement(
