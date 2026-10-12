@@ -57,6 +57,34 @@ _GAP_TOKEN: dict[str, str] = {
     "lg": "var(--space-lg)",
 }
 
+# Rendered as the first element inside every page_body() container so
+# modules/viewport_preservation.py's keyFrom() can recognize this div as a
+# page-wide layout shell -- not a specific widget's identity -- and keep
+# climbing past it instead of returning its "st-key-<key>" class. See the
+# keyFrom() comment in viewport_preservation.py for the full story: before
+# this shell existed, a control with no key of its own (e.g. a plain
+# st.expander summary) had no ancestor "st-key-" class at all, so keyFrom()
+# correctly returned "". Once page_body() wraps the whole page in one keyed
+# container, that same walk now finds THIS container's key instead -- and
+# restore() then mistakes the entire page's content block for the tapped
+# control, producing a huge, effectively random scroll jump.
+_PAGE_SHELL_MARKER_HTML = '<span class="dg-page-shell-marker" aria-hidden="true"></span>'
+_PAGE_SHELL_MARKER_CSS = """
+.dg-page-shell-marker {
+    clip: rect(0, 0, 1px, 1px) !important;
+    height: 1px !important;
+    margin: 0 !important;
+    max-height: 1px !important;
+    max-width: 1px !important;
+    min-width: 1px !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    width: 1px !important;
+}
+"""
+
 
 def _resolve_gap(gap: str) -> str:
     return _GAP_TOKEN.get(str(gap or "").strip().lower(), _GAP_TOKEN["md"])
@@ -148,5 +176,10 @@ def page_body(
     normalized_key = _resolve_key(key)
     if inject_css:
         inject_global_styles(shell_rhythm_css(normalized_key, gap=gap, mobile_gap=mobile_gap))
+    # Marker CSS/HTML are unconditional (independent of inject_css) -- a page
+    # that already owns its own rhythm CSS still needs viewport_preservation
+    # to recognize this container as a page-wide shell, not a widget's key.
+    inject_global_styles(_PAGE_SHELL_MARKER_CSS)
     with st.container(key=normalized_key):
+        st.markdown(_PAGE_SHELL_MARKER_HTML, unsafe_allow_html=True)
         yield

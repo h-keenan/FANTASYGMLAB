@@ -64,8 +64,17 @@ class TestPageBodyContextManager(unittest.TestCase):
 
             container.assert_called_once_with(key="my_team_workspace")
             self.assertTrue(inject.called)
-            injected_css = inject.call_args.args[0]
-            self.assertIn('st-key-my_team_workspace', injected_css)
+            injected_css_calls = [call_args.args[0] for call_args in inject.call_args_list]
+            self.assertTrue(
+                any('st-key-my_team_workspace' in css for css in injected_css_calls)
+            )
+            # The page-shell marker CSS is always injected, independent of
+            # inject_css, so viewport_preservation.py's keyFrom() can
+            # recognize this container as a page-wide shell rather than a
+            # specific widget's identity (see keyFrom()'s comment).
+            self.assertTrue(
+                any('.dg-page-shell-marker' in css for css in injected_css_calls)
+            )
 
     def test_page_body_inject_css_false_skips_injection_but_still_opens_container(self):
         with (
@@ -80,7 +89,17 @@ class TestPageBodyContextManager(unittest.TestCase):
                 pass
 
             container.assert_called_once_with(key="dashboard_workflow")
-            inject.assert_not_called()
+            # inject_css=False skips the per-key rhythm CSS (the page already
+            # owns an equivalent rule) but the page-shell marker CSS is
+            # unconditional -- this page still needs keyFrom() to recognize
+            # its page_body() container as a shell, not a widget's key.
+            injected_css_calls = [call_args.args[0] for call_args in inject.call_args_list]
+            self.assertTrue(
+                all('st-key-dashboard_workflow' not in css for css in injected_css_calls)
+            )
+            self.assertTrue(
+                any('.dg-page-shell-marker' in css for css in injected_css_calls)
+            )
 
     def test_page_body_rejects_empty_key(self):
         with self.assertRaises(ValueError):

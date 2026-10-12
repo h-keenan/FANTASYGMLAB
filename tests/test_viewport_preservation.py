@@ -529,3 +529,63 @@ def test_real_dom_fragment_scoped_action_keeps_tapped_control_anchored(harness_u
             )
         finally:
             browser.close()
+
+
+def test_real_dom_page_shell_container_is_not_mistaken_for_a_widget_key(harness_url):
+    """Real-browser regression check for the fourth recurrence of coridian_'s
+    "tapping randomly jumps where you are on the page, scrolling wise".
+
+    The first three recurrences each had a genuinely different cause (an
+    isIntentionalNav() key-allowlist gap, a shared tap-delegation zone
+    needing data-route instead of key-matching, and @st.fragment reruns
+    never re-scheduling the restore ladder from mount — see the tests
+    above). This one is different again: modules/page_shell.py's
+    page_body() (Phase 2 web-shell rollout, #998-#1000) wraps an ENTIRE
+    adopting page's top-level sections in one keyed container so it can own
+    a single flex gap. A control with no key of its own inside that
+    container — the real shape of my_team_ui.py's "Key backups" st.expander
+    and waivers_ui.py's "Detailed Table View" st.expander, reproduced here
+    by scripts/ui_validation_harness.py's page_body() fixture block — used
+    to have NO ancestor "st-key-" class at all, so keyFrom() correctly
+    returned "" for it and restore() fell back to the (correct,
+    pre-existing) "snap to near top/bottom" heuristic. Once page_body()
+    wraps the page, that same upward walk now finds page_body's own
+    page-wide key instead — and restore()'s
+    ``doc.querySelector("." + last.key)`` fallback then resolves to the
+    ENTIRE page's content block (not the tapped control), so the delta
+    between that block's top and the offset recorded for the actual control
+    is huge and effectively random. This pointerdowns the real unkeyed
+    st.expander summary inside the real page_body() container and reads
+    back the real shipped keyFrom() verdict off
+    window.__dgInPlaceAnchor.key — not a re-implementation of that logic.
+    """
+    from playwright.sync_api import sync_playwright
+    from scripts.validate_viewport_preservation import wait_app
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+        try:
+            page.goto(f"{harness_url}/?surface=viewport-preserve")
+            wait_app(page)
+            # The page_body() container itself really does carry a
+            # "st-key-" class — this is the regression's precondition, not
+            # a sanity check on something else.
+            assert (
+                page.locator(".st-key-viewport_preserve_page_shell_fixture").count()
+                == 1
+            )
+            summary = page.locator(
+                "summary:has-text('Key backups fixture')"
+            ).first
+            summary.scroll_into_view_if_needed()
+            page.wait_for_function("window.__dgViewportPreserveBound === true", timeout=90_000)
+            summary.dispatch_event("pointerdown")
+            anchor = page.evaluate("window.__dgInPlaceAnchor")
+            assert anchor is not None
+            assert anchor.get("key") == "", (
+                "keyFrom() resolved the page_body() shell's own page-wide "
+                f"key instead of recognizing it as a non-identity shell: {anchor!r}"
+            )
+        finally:
+            browser.close()
