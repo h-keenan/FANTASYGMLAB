@@ -115,6 +115,84 @@ HEADER_CONCEPT = {
     "team snapshot": "roster",
 }
 
+# Per-destination semantic accent, mirroring mobile's GmOrb.tsx fixed
+# palette (see that file's own comment block): cyan = core app/GM
+# intelligence/active navigation, green = roster/waiver/positive-action,
+# amber = draft/trade-capital, purple = secondary/analytical, red = alerts
+# only. Web's matching tokens (modules/design_tokens.py): --color-accent
+# (cyan), --color-success (green), --color-premium (amber),
+# --color-diagnostic (purple — that token's own light-mode value is derived
+# from mobile's lightColors.violet, see design_tokens.py), --color-danger
+# (red). Destinations left out stay neutral/flat, matching mobile's
+# colors.textSecondary "More" row — never an invented sixth hue.
+DESTINATION_COLOR = {
+    "dashboard": "accent",
+    "rankings": "accent",
+    "alerts": "danger",
+    "my_team": "success",
+    "matchup": "success",
+    "waivers": "success",
+    "players": "diagnostic",
+    "portfolio": "diagnostic",
+    "news": "diagnostic",
+    "league_recaps": "diagnostic",
+    "trade_hub": "premium",
+    "trade_analyzer": "premium",
+    "trade_history": "premium",
+    "gm_targets": "premium",
+    "team_stance": "premium",
+    "gm_plan": "premium",
+    "startup_draft_center": "premium",
+    "draft_summary": "premium",
+    "live_draft": "premium",
+    "college_scouting": "premium",
+    "premium": "premium",
+}
+
+
+def color_token_for_destination(page_key: object) -> str:
+    """Semantic color-token name (e.g. ``"accent"``) for a destination, or
+    ``""`` if it has no semantic family (stays neutral)."""
+
+    return DESTINATION_COLOR.get(str(page_key or "").strip().lower(), "")
+
+
+def gm_orb_row_color_marker_html(page_key: object) -> str:
+    """Tiny aria-hidden marker tag for a destination's color family, or
+    ``""`` for a neutral destination (no markup at all).
+
+    Callers render this once inside the SAME ``st.container`` as the
+    destination's row button (any sibling position works). It carries only a
+    ``dg-row-c-<color>`` class — never the destination key — so
+    ``gm_orb_row_color_css`` only needs one rule per color family (5), not
+    one per destination (20+): a per-key ``[class*=...]`` selector list would
+    cost far more of the APP_CSS byte budget than a per-key marker span does.
+    """
+
+    color = color_token_for_destination(page_key)
+    return f"<span class='dg-row-c-{color}' aria-hidden='true'></span>" if color else ""
+
+
+def gm_orb_row_color_css() -> str:
+    """One ``--dg-rc`` rule per color family (not per destination).
+
+    Matches the ``dg-row-c-<color>`` marker (see ``gm_orb_row_color_marker_html``)
+    anywhere inside a destination's ``st-key-mobile_sheet_row_*`` container and
+    sets the variable there; it inherits down to the row's button (and that
+    button's ``::before`` glyph pseudo-element), where ``gm_orb_row_css`` and
+    ``MOBILE_INTERACTION_OVERLAY_CSS`` read it for the icon tint and left rail
+    respectively.
+    """
+
+    colors = sorted(set(DESTINATION_COLOR.values()))
+    rules = [
+        f'div[class*="st-key-mobile_sheet_row_"]:has(.dg-row-c-{color})'
+        f"{{--dg-rc:var(--color-{color})}}"
+        for color in colors
+    ]
+    return "".join(rules)
+
+
 _STROKE = (
     "fill='none' stroke='currentColor' stroke-width='1.75' "
     "stroke-linecap='square' stroke-linejoin='miter'"
@@ -269,6 +347,7 @@ def gm_orb_row_css() -> str:
         )
         mask_rules.append(f"{selectors}{{--dg-orb-glyph-mask:{glyph_mask_data_uri(concept)}}}")
     masks = "".join(mask_rules)
+    colors = gm_orb_row_color_css()
     return f"""
 div[class*="st-key-mobile_sheet_row_"]{{
     --dg-orb-glyph-gap:var(--space-sm);
@@ -287,9 +366,10 @@ div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"]{{
     text-align:left!important;
 }}
 {masks}
+{colors}
 div[class*="st-key-mobile_sheet_nav_"] [data-testid="stButton"] button::before,
 div[class*="st-key-mobile_sheet_nav_"] button[data-testid^="stBaseButton"]::before{{
-    background-color:currentColor!important;
+    background-color:var(--dg-rc,currentColor)!important;
     content:""!important;
     display:block!important;
     flex:0 0 var(--dg-orb-glyph-slot)!important;

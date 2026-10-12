@@ -66,6 +66,7 @@ from modules import (
     player_profile_ui,
     player_quick_view,
     player_tier_identity,
+    semantic_glyphs,
     trade_hub_ui,
     ui_primitives,
     waivers_ui,
@@ -519,6 +520,9 @@ def _navigation() -> None:
             )
         def _fixture_route_row(label: str, page_key: str, **button_kwargs) -> None:
             with st.container(key=f"mobile_sheet_row_{page_key}"):
+                marker = semantic_glyphs.gm_orb_row_color_marker_html(page_key)
+                if marker:
+                    render_html_fragment(marker)
                 st.button(
                     label,
                     key=f"mobile_sheet_nav_{page_key}_fixture",
