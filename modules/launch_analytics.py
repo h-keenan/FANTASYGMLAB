@@ -147,6 +147,11 @@ TRACKED_EVENTS: frozenset[str] = frozenset(
         "trial_started",
         "subscribed",
         "churned",
+        # Referral program — the invite CTA's own share/copy action, and a
+        # referred signup's Sleeper connection getting attributed back to
+        # the referrer (see modules.referrals / modules.referral_ui).
+        "referral_sent",
+        "referral_connected",
     }
 )
 

@@ -455,6 +455,27 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         st.info("Checkout cancelled. Your Free plan is unchanged — you can resume anytime.")
     show_override = premium.debug_auth_enabled(secrets=st.secrets)
     st.markdown(_premium_intro_html(entitlement=entitlement), unsafe_allow_html=True)
+
+    # --- Referral comp indicator (modules.referrals) -----------------------
+    # Self-contained addition, deliberately kept separate from the
+    # checkout/plan-selection UI above and below: it only reads
+    # account_user_settings and never touches Stripe config/plan rendering.
+    # See modules.premium.effective_entitlement for how a live comp window
+    # resolves to Pro without ever overriding a real paid subscription.
+    try:
+        from modules import referrals as _referral_comp
+
+        _comp_settings = st.session_state.get("account_user_settings")
+        if _referral_comp.comp_is_active(_comp_settings):
+            _comp_program = _referral_comp.program_state(_comp_settings)
+            st.info(
+                f"You have {_comp_program.get('comp_months_granted', 0)} free month(s) of "
+                "GM Pro from referrals active on your account."
+            )
+    except Exception:
+        pass
+    # --- end referral comp indicator ---------------------------------------
+
     if not config.configured:
         st.markdown(
             premium_details_html(
