@@ -140,7 +140,38 @@ def test_app_preserves_entitlement_slice_and_existing_dashboard_inputs():
     assert "dashboard_workflow.organize_dashboard_items(" in dashboard
     assert "dashboard_workflow.render_dashboard_workflow(" in dashboard
     assert "render_home_command_hero(" not in dashboard
-    snapshot = dashboard.split("snapshot_items = [", 1)[1].split("]\n\n", 1)[0]
+    # Bounded on the literal list's own closing bracket (not "]\n\n", which
+    # doesn't actually occur right after this list and previously let the
+    # match run on into unrelated later code) so this only inspects Team
+    # Snapshot's own five tiles -- the ones snapshot_items builds. League
+    # Snapshot (the mobile-parity feature) is a deliberately separate list
+    # (league_snapshot_items, right below this one) that does carry
+    # Power Rank/Franchise Rank -- see
+    # test_league_snapshot_is_separate_from_team_snapshot below.
+    snapshot = dashboard.split("snapshot_items = [", 1)[1].split("]", 1)[0]
     assert '"Power Rank"' not in snapshot
     assert '"Franchise Rank"' not in snapshot
     assert '"Average Age"' in snapshot
+
+
+def test_league_snapshot_is_separate_from_team_snapshot():
+    """New mobile-parity section: Record/Power Rank/Franchise Rank/Avg Age/
+    Injuries, built from real already-computed data (team_row power_rank/
+    franchise_rank, record_label, average_age_label, injured_starters) --
+    not fabricated, and not merged into Team Snapshot's own five tiles
+    (which intentionally exclude Power/Franchise Rank; see the test above).
+    """
+
+    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    dashboard = source.split("def render_home_dashboard(", 1)[1].split(
+        "STARTUP_DRAFT_STRATEGIES", 1
+    )[0]
+    league_snapshot = dashboard.split("league_snapshot_items = [", 1)[1].split(
+        "]", 1
+    )[0]
+    assert '"Power Rank"' in league_snapshot
+    assert '"Franchise Rank"' in league_snapshot
+    assert '"Injuries"' in league_snapshot
+    assert "team_row.get(\"power_rank\")" in league_snapshot
+    assert "team_row.get(\"franchise_rank\")" in league_snapshot
+    assert "league_snapshot_items=league_snapshot_items" in dashboard

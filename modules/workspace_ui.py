@@ -10,7 +10,14 @@ from streamlit.errors import StreamlitAPIException
 
 from modules import ui_modal
 from modules import canonical_recommendation_narrative
-from modules.semantic_glyphs import concept_for, glyph_html
+from modules.semantic_glyphs import (
+    color_token_for_destination,
+    concept_for,
+    concept_for_destination,
+    glyph_mask_data_uri,
+    glyph_html,
+)
+from modules.html_rendering import inject_global_styles
 from modules.interaction_contract import on_clicked_change
 
 
@@ -1218,6 +1225,53 @@ def render_home_command_tiles(
             st.markdown(grid_html, unsafe_allow_html=True)
 
 
+def _quick_action_icon_css(cell_keys: list[tuple[str, str]]) -> str:
+    """Route-scoped CSS: colored-circle icon above each quick-action label.
+
+    Reuses semantic_glyphs.color_token_for_destination (established tonight
+    for the GM nav sheet's icon tint) and glyph_mask_data_uri for the glyph
+    shape itself -- no new icon set, no new color vocabulary. Each cell key
+    already encodes its own route, so this keys off the exact container (not
+    a per-color-family :has() rule) since the destination count here is
+    small (a handful, not 20+) and every caller of render_home_quick_actions
+    injects this itself via inject_global_styles, never into the shared
+    APP_CSS bundle -- see modules/dashboard_workflow_styles.py's own budget
+    note for why that bundle has no room left.
+    """
+
+    rules: list[str] = []
+    for cell_key, route_key in cell_keys:
+        color = color_token_for_destination(route_key) or "accent"
+        mask = glyph_mask_data_uri(concept_for_destination(route_key))
+        base = f'div[class*="st-key-{cell_key}"]'
+        rules.append(
+            f'{base} [data-testid="stButton"] button,'
+            f'{base} button[data-testid^="stBaseButton"]'
+            "{align-items:center!important;display:grid!important;"
+            "grid-template-columns:1fr!important;grid-template-rows:2.5rem auto!important;"
+            "justify-items:center!important;row-gap:var(--space-2xs)!important;"
+            "height:auto!important;min-height:6rem!important;padding-block:var(--space-sm)!important;"
+            "text-align:center!important;white-space:normal!important;}"
+            f"{base} [data-testid=\"stButton\"] button::before,"
+            f"{base} button[data-testid^=\"stBaseButton\"]::before"
+            "{background-color:color-mix(in srgb,var(--color-"
+            + color
+            + ") 16%,transparent)!important;border-radius:50%;content:\"\";"
+            "display:block;grid-column:1;grid-row:1;height:2.5rem;width:2.5rem;}"
+            f"{base} [data-testid=\"stButton\"] button::after,"
+            f"{base} button[data-testid^=\"stBaseButton\"]::after"
+            "{background-color:var(--color-"
+            + color
+            + ")!important;content:\"\";display:block;grid-column:1;grid-row:1;"
+            f"height:1.2rem;-webkit-mask:{mask} center/contain no-repeat;"
+            f"mask:{mask} center/contain no-repeat;width:1.2rem;}}"
+            f'{base} [data-testid="stButton"] button [data-testid="stMarkdownContainer"],'
+            f'{base} button[data-testid^="stBaseButton"] [data-testid="stMarkdownContainer"]'
+            "{grid-row:2;}"
+        )
+    return "".join(rules)
+
+
 def render_home_quick_actions(
     actions: list[tuple[str, str]],
     *,
@@ -1230,16 +1284,19 @@ def render_home_quick_actions(
     # names Deep Analysis; buttons own the interactive affordance.
     with st.container(key="dashboard_deep_analysis_nav"):
         rows = [actions[idx : idx + 2] for idx in range(0, len(actions), 2)]
+        cell_keys: list[tuple[str, str]] = []
         for row_idx, row in enumerate(rows):
             columns = st.columns(2, gap="small")
             for col_idx, column in enumerate(columns):
                 if col_idx >= len(row):
                     continue
                 label, route_key = row[col_idx]
+                cell_key = f"dg_cta_secondary_deep_{row_idx}_{route_key}"
+                cell_keys.append((cell_key, route_key))
                 with column:
                     # Secondary (not tertiary): tertiary polish strips borders and
                     # reads as floating text inside the nav panel.
-                    with st.container(key=f"dg_cta_secondary_deep_{row_idx}_{route_key}"):
+                    with st.container(key=cell_key):
                         st.button(
                             label,
                             key=f"home_quick_action_{row_idx}_{route_key}",
@@ -1249,3 +1306,5 @@ def render_home_quick_actions(
                             args=(route_key,),
                             kwargs={"source": "dashboard_quick_action"},
                         )
+        if cell_keys:
+            inject_global_styles(_quick_action_icon_css(cell_keys))

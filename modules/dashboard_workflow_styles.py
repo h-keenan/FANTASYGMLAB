@@ -421,5 +421,34 @@ div[class*="st-key-dashboard_league_insights"] .dg-football-prestige {
         grid-column: auto;
     }
 }
+
+/* League Snapshot: five individually bordered tiles (default summary-tile
+   chrome -- unlike Team Snapshot above, this section has no grouped-panel
+   override) in a 3-then-2 grid at every width, matching mobile's Next Move
+   layout. Higher selector specificity than the generic mobile 2-column rule
+   above wins regardless of source order. */
+div[class*="st-key-dashboard_league_snapshot"] .summary-tile-grid,
+div[class*="st-key-dashboard_league_snapshot"] .summary-tile-grid-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* League Pulse: give each of the four tones its own left-border color,
+   matching mobile's cyan / amber / green / purple cards. summary-tile-power
+   and summary-tile-franchise already carry a left-border color from
+   card_hierarchy_styles.py (information / premium) reused as-is here; only
+   strategy and opportunity need a League-Pulse-scoped addition, and
+   franchise is re-pointed to diagnostic (purple) here only -- this section's
+   own franchise tile (Most Active Manager) means something different from
+   Team Snapshot's Bench Strength franchise tile, so the override stays
+   scoped to this one container instead of touching the shared tone class. */
+div[class*="st-key-dashboard_league_pulse_tiles"] .summary-tile-strategy {
+    border-inline-start: var(--border-width-semantic) solid var(--color-premium) !important;
+}
+div[class*="st-key-dashboard_league_pulse_tiles"] .summary-tile-opportunity {
+    border-inline-start: var(--border-width-semantic) solid var(--color-success) !important;
+}
+div[class*="st-key-dashboard_league_pulse_tiles"] .summary-tile-franchise {
+    border-inline-start: var(--border-width-semantic) solid var(--color-diagnostic) !important;
+}
 </style>
 """
