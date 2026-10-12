@@ -13,6 +13,22 @@ from modules import metric_graphic_primitives as mgp
 from modules import team_eval as team_eval_module
 from modules import ui_primitives
 from modules import workspace_ui
+from modules.html_rendering import inject_global_styles
+
+# Manual overrides' "Mark Drafted" / "Reset Manual Marks" pair was a bare
+# 2-column st.columns() button row — Streamlit's default collapses that to
+# one full-width button stacked per row at phone width instead of staying a
+# horizontal pair. Same fix family as Player Quick View's action row (PR
+# #1014's pqv_actions_ CSS): force the row's stHorizontalBlock to stay flex
+# and size each button to its content, and give the buttons the same
+# bordered/uppercase treatment every other action button in the app uses
+# instead of bare Streamlit defaults.
+DRAFT_ASSISTANT_MANUAL_ACTIONS_CSS = """
+div[class*="st-key-draft_assistant_manual_actions_"]{margin:0 0 var(--space-xs);max-width:40rem}
+div[class*="st-key-draft_assistant_manual_actions_"] [data-testid="stHorizontalBlock"]{align-items:center!important;display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:var(--space-xs)!important}
+div[class*="st-key-draft_assistant_manual_actions_"] [data-testid="stHorizontalBlock"]>div{flex:0 0 auto!important;min-width:0!important;width:auto!important}
+div[class*="st-key-draft_assistant_manual_actions_"] [data-testid="stButton"] button,div[class*="st-key-draft_assistant_manual_actions_"] button[data-testid^="stBaseButton"]{background:var(--color-surface-raised)!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:0!important;color:var(--color-text-secondary)!important;font-size:var(--font-size-badge)!important;letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min)!important;padding-inline:var(--space-sm)!important;text-transform:uppercase!important;width:auto!important}
+"""
 
 # Draft posture's five tones ("power"/"weakness"/"strategy"/"opportunity"/
 # "risk" — see _draft_posture_profile below) onto the app's existing
@@ -485,36 +501,40 @@ def render_draft_assistant(
                 list(option_lookup.keys()),
                 key=f"draft_assistant_manual_player_{league_id}_{selected_draft_id or 'manual'}",
             )
-            mark_cols = st.columns([1, 1])
-            with mark_cols[0]:
-                def _mark_drafted() -> None:
-                    player_id = option_lookup.get(selected_player_label)
-                    if player_id and player_id not in list(
-                        st.session_state.get(manual_key, [])
-                    ):
-                        current = [
-                            str(pid)
-                            for pid in st.session_state.get(manual_key, [])
-                            if str(pid)
-                        ]
-                        st.session_state[manual_key] = sorted(set(current + [player_id]))
+            inject_global_styles(DRAFT_ASSISTANT_MANUAL_ACTIONS_CSS)
+            with st.container(
+                key=f"draft_assistant_manual_actions_{league_id}_{selected_draft_id or 'manual'}"
+            ):
+                mark_cols = st.columns([1, 1])
+                with mark_cols[0]:
+                    def _mark_drafted() -> None:
+                        player_id = option_lookup.get(selected_player_label)
+                        if player_id and player_id not in list(
+                            st.session_state.get(manual_key, [])
+                        ):
+                            current = [
+                                str(pid)
+                                for pid in st.session_state.get(manual_key, [])
+                                if str(pid)
+                            ]
+                            st.session_state[manual_key] = sorted(set(current + [player_id]))
 
-                st.button(
-                    "Mark Drafted",
-                    key=f"draft_assistant_mark_{league_id}_{selected_draft_id or 'manual'}",
-                    use_container_width=True,
-                    on_click=_mark_drafted,
-                )
-            with mark_cols[1]:
-                def _reset_marks() -> None:
-                    st.session_state[manual_key] = []
+                    st.button(
+                        "Mark Drafted",
+                        key=f"draft_assistant_mark_{league_id}_{selected_draft_id or 'manual'}",
+                        use_container_width=True,
+                        on_click=_mark_drafted,
+                    )
+                with mark_cols[1]:
+                    def _reset_marks() -> None:
+                        st.session_state[manual_key] = []
 
-                st.button(
-                    "Reset Manual Marks",
-                    key=f"draft_assistant_reset_{league_id}_{selected_draft_id or 'manual'}",
-                    use_container_width=True,
-                    on_click=_reset_marks,
-                )
+                    st.button(
+                        "Reset Manual Marks",
+                        key=f"draft_assistant_reset_{league_id}_{selected_draft_id or 'manual'}",
+                        use_container_width=True,
+                        on_click=_reset_marks,
+                    )
         else:
             st.caption("No matching available players under the current search.")
         if manual_ids:
