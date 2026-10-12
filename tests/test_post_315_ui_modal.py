@@ -101,7 +101,10 @@ def test_share_still_embeds_full_res_bytes_in_preview_and_share():
 
 
 def test_modal_skips_nonessential_hub_tree_when_dialog_open():
-    board = APP.split("def render_top_trade_opportunities()", 1)[1].split(
+    # render_top_trade_opportunities / _trade_hub_visible_feed now live in
+    # modules/trade_hub_ui.py's render_trade_hub_workspace, extracted out of
+    # app.py's route dispatch.
+    board = HUB.split("def render_top_trade_opportunities()", 1)[1].split(
         "def render_search_around_player()", 1
     )[0]
     assert "_dialog_open_after_board" in board
@@ -111,11 +114,11 @@ def test_modal_skips_nonessential_hub_tree_when_dialog_open():
     assert "if not _dialog_open_after_board:" in board
     assert "if not open_trade_key and len(ranked_feed) > local_visible:" in board
     assert 'if not _dialog_open:' in board
-    feed = APP.split("def _trade_hub_visible_feed()", 1)[1].split(
+    feed = HUB.split("def _trade_hub_visible_feed()", 1)[1].split(
         "_trade_hub_visible_feed()", 1
     )[0]
     assert "if card_key != open_trade_key:" in feed
-    assert "@st.fragment" in APP
+    assert "@st.fragment" in HUB
     assert "time.sleep" not in HUB.split("def _trade_detail_dialog()", 1)[1][:2500]
 
 

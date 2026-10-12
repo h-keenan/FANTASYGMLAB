@@ -221,7 +221,11 @@ class TestPremiumEntitlements(unittest.TestCase):
         my_team_source = Path("modules/my_team_ui.py").read_text(encoding="utf-8")
 
         self.assertIn("visible_action_items = action_center_items if is_premium else action_center_items[:4]", app_source)
-        self.assertIn("trade_hub_ui.trade_hub_entitlement_presentation(", app_source)
+        # This call site moved into modules/trade_hub_ui.py's
+        # render_trade_hub_workspace, extracted out of app.py's route
+        # dispatch; it is now an unqualified in-module call.
+        trade_hub_ui_source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
+        self.assertIn("trade_hub_entitlement_presentation(", trade_hub_ui_source)
         self.assertIn("rank_priority_add_candidates(", waiver_source)
         self.assertIn("priority_adds", waiver_source)
         self.assertIn("if not is_premium:", waiver_source)

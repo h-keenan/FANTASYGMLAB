@@ -13,10 +13,11 @@ WIDTHS = (320, 390, 430, 768, 1024, 1280, 1440, 1600, 1920)
 
 
 def test_trade_hub_progressive_loading_has_no_fake_skeleton_or_global_css():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    hub = app[
-        app.index('if current_page == "trade_hub"') : app.index("# TRADE ANALYZER")
-    ]
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    app = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    hub = app[app.index("def render_trade_hub_workspace(") :]
     assert "LOADING_TRADE_IDEAS" in hub
     assert "Building the trade board" not in hub
     assert "skeleton" not in hub.casefold()
@@ -27,10 +28,11 @@ def test_trade_hub_progressive_loading_has_no_fake_skeleton_or_global_css():
 
 
 def test_trade_hub_chrome_before_board_generation():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    hub = app[
-        app.index('if current_page == "trade_hub"') : app.index("# TRADE ANALYZER")
-    ]
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    app = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    hub = app[app.index("def render_trade_hub_workspace(") :]
     strategy_idx = hub.index("render_trade_strategy_selector(")
     board_idx = hub.index("get_or_build_presentation_board(")
     assert strategy_idx < board_idx

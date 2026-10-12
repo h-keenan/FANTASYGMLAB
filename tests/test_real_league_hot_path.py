@@ -111,7 +111,10 @@ def test_trade_dialog_skips_live_draft_and_startup_context_lookup():
 
 def test_modal_open_does_not_add_timed_fragment():
     assert "@st.fragment" in APP
-    assert "run_every=" not in APP.split("def _trade_hub_visible_feed()", 1)[1][:800]
+    # _trade_hub_visible_feed now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert "run_every=" not in hub_src.split("def _trade_hub_visible_feed()", 1)[1][:800]
     workflow = (ROOT / "modules/dashboard_workflow.py").read_text(encoding="utf-8")
     assert "run_every=" not in workflow
 

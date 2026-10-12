@@ -98,9 +98,13 @@ def test_core_gates_use_canonical_empty_states():
 
 
 def test_trade_hub_loading_copy_is_scoped_not_board_jargon():
-    assert "product_copy.LOADING_TRADE_IDEAS" in APP
+    # The Trade Hub route body was extracted out of app.py's route
+    # dispatch into modules/trade_hub_ui.py's render_trade_hub_workspace.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert "product_copy.LOADING_TRADE_IDEAS" in hub_src
     assert product_copy.LOADING_TRADE_IDEAS == "Loading trade ideas…"
     assert "Building the trade board" not in APP
+    assert "Building the trade board" not in hub_src
 
 
 def test_premium_and_landing_use_full_trade_hub():

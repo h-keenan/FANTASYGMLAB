@@ -41,7 +41,9 @@ def test_trade_hub_board_is_headline_plus_secondary_grid():
     assert "st-key-trade_hub_show_more" in css
     assert "st-key-trade_hub_controls" in css
     assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)" in css
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
+    # _trade_hub_visible_feed now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    app = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     feed = app.split("def _trade_hub_visible_feed()", 1)[1].split("_trade_hub_visible_feed()", 1)[0]
     assert "trade_hub_headline" in feed
     assert "trade_hub_more_ideas" in feed

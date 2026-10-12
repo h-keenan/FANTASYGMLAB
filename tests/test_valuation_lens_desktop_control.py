@@ -30,8 +30,11 @@ def test_dashboard_page_context_is_the_only_lens_widget():
     assert 'CANONICAL_LENS_SESSION_KEY' in UI
     assert 'key="dashboard_page_context"' in UI
     assert "render_evaluation_lens_control(" in UI
-    assert "Evaluation" in APP
-    assert "TRADE_SETUP_CAPTION" in APP or "Evaluation changes how packages are scored" in APP
+    # "Evaluation" moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    trade_hub_ui_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert "Evaluation" in trade_hub_ui_source
+    assert "TRADE_SETUP_CAPTION" in trade_hub_ui_source or "Evaluation changes how packages are scored" in trade_hub_ui_source
     sidebar = APP.split("with st.sidebar:", 1)[1].split(
         "account_actions = account_ui.render_account_panel(", 1
     )[0]

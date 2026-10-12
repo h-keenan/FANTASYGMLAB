@@ -79,8 +79,12 @@ def test_absent_handoff_leaves_board_order():
 def test_app_stores_and_applies_handoff_recommendation_id():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "trade_hub_focus_recommendation_id_" in app
-    assert "apply_handoff_recommendation(" in app
-    assert "handoff_stale_copy(" in app
+    # apply_handoff_recommendation / handoff_stale_copy now live in
+    # modules/trade_hub_ui.py's render_trade_hub_workspace, extracted out
+    # of app.py's route dispatch.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert "apply_handoff_recommendation(" in hub_src
+    assert "handoff_stale_copy(" in hub_src
     my_team = (ROOT / "modules" / "my_team_ui.py").read_text(encoding="utf-8")
     assert '"recommendation_id"' in my_team
     integrity = (ROOT / "modules" / "session_integrity.py").read_text(encoding="utf-8")

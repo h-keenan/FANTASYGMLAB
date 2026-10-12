@@ -61,8 +61,11 @@ def test_trade_hub_lead_is_presentation_first_card():
     assert "order_trade_hub_visible_ideas" in selector
     assert "ordered[0]" in selector
     assert "market_realism_label" not in selector
-    board = source[
-        source.index("def render_top_trade_opportunities()") : source.index(
+    # render_top_trade_opportunities now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    trade_hub_ui_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    board = trade_hub_ui_source[
+        trade_hub_ui_source.index("def render_top_trade_opportunities()") : trade_hub_ui_source.index(
             "def render_search_around_player()"
         )
     ]
@@ -73,8 +76,12 @@ def test_trade_hub_lead_is_presentation_first_card():
 
 def test_player_and_acquisition_boards_order_before_render():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
+    trade_hub_ui_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     assert "order_trade_hub_visible_ideas(ideas[:max_ideas])" in source
-    assert "order_trade_hub_visible_ideas(hub_ideas)" in source
+    # Formerly `trade_hub_ui.order_trade_hub_visible_ideas(hub_ideas)` inside
+    # app.py's trade_hub route body; now an unqualified in-module call inside
+    # modules/trade_hub_ui.py's extracted render_trade_hub_workspace.
+    assert "order_trade_hub_visible_ideas(hub_ideas)" in trade_hub_ui_source
 
 
 def test_command_bar_uses_content_aware_columns_and_shared_control_metrics():

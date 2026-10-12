@@ -149,6 +149,10 @@ def test_secondary_work_is_behind_explicit_interaction_boundaries():
 
 def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysis():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # trade_hub_context's include_intelligence=False call site moved into
+    # modules/trade_hub_ui.py's render_trade_hub_workspace, extracted out of
+    # app.py's route dispatch; the budget below is counted across both files.
+    trade_hub_ui_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
 
     # Team Situation (#232 follow-up) is a new lightweight, non-deep-analysis
     # route (modules.team_stance_ui) — same reduced-context shape GM Targets
@@ -159,12 +163,16 @@ def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysi
     # league/roster context at all — its one include_intelligence=False
     # call site (news_context = get_shared_league_context(...)) is gone,
     # so the budget drops by exactly one from its #232-follow-up value.
-    assert source.count("include_intelligence=False") == 7
+    assert (
+        source.count("include_intelligence=False")
+        + trade_hub_ui_source.count("include_intelligence=False")
+        == 7
+    )
     assert "league_context = get_shared_league_context(include_trust=False)" in source
-    assert "trade_hub_context = get_shared_league_context(" in source
-    assert "include_intelligence=False" in source[
-        source.index("if current_page == \"trade_hub\"") : source.index(
-            "# TRADE ANALYZER"
+    assert "trade_hub_context = get_shared_league_context(" in trade_hub_ui_source
+    assert "include_intelligence=False" in trade_hub_ui_source[
+        trade_hub_ui_source.index("def render_trade_hub_workspace(") : trade_hub_ui_source.index(
+            "def render_top_trade_opportunities()"
         )
     ]
     assert "targets_context = (" in source
@@ -175,7 +183,9 @@ def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysi
 
 
 def test_trade_board_pagination_uses_widget_callback_not_explicit_rerun():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # _trade_hub_visible_feed now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     start = source.index("def _trade_hub_visible_feed()")
     end = source.index("_trade_hub_visible_feed()", start + 10)
     pagination = source[start:end]

@@ -355,11 +355,27 @@ def test_production_helper_reuses_loaded_context_without_roster_fetch(monkeypatc
 
 def test_all_production_cached_trade_retrievals_enforce_before_enrichment():
     source = open("app.py", encoding="utf-8").read()
+    # Some of these production call sites moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch;
+    # the totals below are counted across both files.
+    trade_hub_ui_source = open("modules/trade_hub_ui.py", encoding="utf-8").read()
 
-    assert source.count("= cached_trade_ideas(") == 2
-    assert source.count("= cached_player_trade_hub_ideas(") == 3
+    assert (
+        source.count("= cached_trade_ideas(")
+        + trade_hub_ui_source.count("= cached_trade_ideas(")
+        == 2
+    )
+    assert (
+        source.count("= cached_player_trade_hub_ideas(")
+        + trade_hub_ui_source.count("= cached_player_trade_hub_ideas(")
+        == 3
+    )
     assert source.count("= cached_dashboard_trade_headline(") == 1
-    assert source.count("enforce_cached_trade_ideas(") == 8  # helper plus seven production boundaries
+    assert (
+        source.count("enforce_cached_trade_ideas(")
+        + trade_hub_ui_source.count("enforce_cached_trade_ideas(")
+        == 8
+    )  # helper plus seven production boundaries
 
 
 def test_trade_trust_context_is_not_stored_in_public_player_cache():

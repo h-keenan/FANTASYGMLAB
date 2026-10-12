@@ -145,6 +145,10 @@ def test_app_migrated_known_spinner_sites_to_hydrate_placeholder():
     # ROUTE_NFL_HEADLINES_FALLBACK) are gone, not un-migrated.
     assert APP.count("_dash_load.hydrate_placeholder(") >= 4
     assert "dashboard_loading_state.ROUTE_TRADE_HUB_SEARCH" in APP or "_dash_load.ROUTE_TRADE_HUB_SEARCH" in APP
-    assert "_dash_load.ROUTE_TRADE_HUB_ACQUISITION_SEARCH" in APP
+    # ROUTE_TRADE_HUB_ACQUISITION_SEARCH's call site moved into
+    # modules/trade_hub_ui.py's render_trade_hub_workspace, extracted out
+    # of app.py's route dispatch.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert "_dash_load.ROUTE_TRADE_HUB_ACQUISITION_SEARCH" in hub_src
     assert "_dash_load.ROUTE_PLAYER_QUICK_VIEW_WEEKLY_POINTS" in APP
     assert "_dash_load.ROUTE_LEAGUE_LOADING" in APP

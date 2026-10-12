@@ -77,7 +77,9 @@ def test_repository_integrity_audit_passes():
 
 
 def test_trade_entitlement_is_applied_after_generation_and_trust():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # render_top_trade_opportunities now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     trade = source[source.index("def render_top_trade_opportunities()") : source.index("def render_search_around_player()")]
     assert trade.index("cached_trade_ideas(") < trade.index("enforce_cached_trade_ideas(")
     assert trade.index("enforce_cached_trade_ideas(") < trade.index("trade_hub_entitlement_presentation(")

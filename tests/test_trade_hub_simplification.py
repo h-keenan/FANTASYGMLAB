@@ -37,7 +37,9 @@ def test_annotate_trade_hub_feed_preserves_order_and_sets_category_badges():
 
 
 def test_trade_hub_route_uses_unified_feed_without_category_pills():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # render_top_trade_opportunities now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     board = source[
         source.index("def render_top_trade_opportunities()") : source.index(
             "def render_search_around_player()"

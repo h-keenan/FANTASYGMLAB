@@ -122,7 +122,11 @@ def test_wiring_uses_guest_conversion_module():
     assert "from modules import guest_conversion" in app
     assert 'surface="dashboard"' in app
     assert 'surface="my_team"' in app
-    assert 'surface="trade_hub"' in app
+    # surface="trade_hub" moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    assert 'surface="trade_hub"' in (ROOT / "modules" / "trade_hub_ui.py").read_text(
+        encoding="utf-8"
+    )
     assert 'surface="waivers"' in app
     assert "render_guest_auth_dialog" in app
     assert "Browsing as guest" in (ROOT / "modules" / "guest_conversion.py").read_text(

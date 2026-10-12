@@ -75,7 +75,9 @@ def test_gm_targets_and_share_avoid_explicit_rerun():
 
 
 def test_trade_show_more_is_fragment_scoped_without_board_rebuild():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # _trade_hub_visible_feed now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     start = source.index("def _trade_hub_visible_feed()")
     assert "@st.fragment" in source[max(0, start - 40) : start]
     body = source[start : source.index("_trade_hub_visible_feed()", start + 10)]

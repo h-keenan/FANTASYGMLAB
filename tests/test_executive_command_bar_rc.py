@@ -97,8 +97,11 @@ def test_trade_hub_and_waivers_do_not_restack_page_titles():
     assert "render_waivers_page_header" not in (ROOT / "modules" / "waivers_ui.py").read_text(
         encoding="utf-8"
     )
-    board = app_source[
-        app_source.index("def render_top_trade_opportunities()") : app_source.index(
+    # render_top_trade_opportunities now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    trade_hub_ui_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    board = trade_hub_ui_source[
+        trade_hub_ui_source.index("def render_top_trade_opportunities()") : trade_hub_ui_source.index(
             "def render_search_around_player()"
         )
     ]

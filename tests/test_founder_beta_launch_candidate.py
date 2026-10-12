@@ -43,13 +43,11 @@ def test_customer_surfaces_avoid_developer_infrastructure_copy():
 
 def test_trade_hub_launch_contract_remains_unified_feed():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    board = source[
-        source.index("if current_page == \"trade_hub\":") : source.index(
-            "# TRADE ANALYZER"
-        )
-        if "# TRADE ANALYZER" in source
-        else source.index("if current_page == \"trade_analyzer\":")
-    ]
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    board = hub_src[hub_src.index("def render_trade_hub_workspace(") :]
     assert "annotate_trade_hub_feed_categories(" in board
     assert "render_trade_hub_section_filter(" not in board
     assert "st.pills(" not in board

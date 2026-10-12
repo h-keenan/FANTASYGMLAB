@@ -19,10 +19,11 @@ def test_injury_level_cache_preserves_classification_and_hits():
 
 
 def test_trade_hub_reuses_roster_map_instead_of_second_sleeper_fetch():
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
-    hub = source[
-        source.index('if current_page == "trade_hub"') : source.index("# TRADE ANALYZER")
-    ]
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    hub = source[source.index("def render_trade_hub_workspace(") :]
     # Owned roster IDs come from shared-context roster_player_map (my_player_ids),
     # not a second Sleeper get_roster_player_ids fetch.
     assert "my_player_ids = {" in hub

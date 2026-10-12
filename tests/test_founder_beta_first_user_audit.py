@@ -37,7 +37,9 @@ def test_customer_facing_copy_uses_gm_language_not_engineering_jargon():
     assert 'GM_ORB_LABEL = "GM"' in brand
     assert "Where to go" in app
     assert "More next moves" in app
-    assert "Import your Sleeper league to see trade ideas" in app
+    # This onboarding-handoff note moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    assert "Import your Sleeper league to see trade ideas" in trade_hub
     assert "All Destinations" not in app
 
 

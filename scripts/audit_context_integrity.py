@@ -12,6 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 def audit() -> dict:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     main = source[source.index("def main():") :]
+    # Trade Hub's route body (including its shared-context call and the
+    # generation -> trust -> entitlement ordering checked below) was
+    # extracted out of app.py's route dispatch into
+    # modules/trade_hub_ui.py's render_trade_hub_workspace.
+    trade_hub_ui_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    trade_hub_board_builder = trade_hub_ui_source[
+        trade_hub_ui_source.index("def render_top_trade_opportunities()") : trade_hub_ui_source.index(
+            "def render_search_around_player()"
+        )
+    ]
     set_selected = source[
         source.index("def set_selected_league(") : source.index(
             "def _open_mobile_destination_sheet",
@@ -58,7 +68,7 @@ def audit() -> dict:
         "dashboard_uses_canonical_identity": "selected_league_id=selected_league_id"
         in main,
         "trade_hub_uses_shared_context": "trade_hub_context = get_shared_league_context("
-        in main,
+        in trade_hub_ui_source,
         "waivers_use_canonical_league": "selected_league_id=selected_league_id"
         in main[main.index('if current_page == "waivers"') :],
         # News graduated from a roster-scoped feed to a general,
@@ -71,8 +81,10 @@ def audit() -> dict:
             and 'roster_news_key = f"roster_news_{selected_league_id}_{my_roster_id}"'
             not in main
         ),
-        "trade_entitlement_after_trust": main.index("ideas = enforce_cached_trade_ideas(")
-        < main.index("trade_hub_ui.trade_hub_entitlement_presentation("),
+        "trade_entitlement_after_trust": trade_hub_board_builder.index(
+            "ideas = enforce_cached_trade_ideas("
+        )
+        < trade_hub_board_builder.index("trade_hub_entitlement_presentation("),
         "league_switch_invalidates_active_context": 'st.session_state.pop("active_league_context", None)'
         in set_selected,
         "league_switch_clears_transient_via_canonical_owner": (
