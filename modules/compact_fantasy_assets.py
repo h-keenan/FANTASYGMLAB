@@ -9,14 +9,16 @@ from __future__ import annotations
 from html import escape
 from typing import Any, Mapping, Sequence
 
-from modules.football_assets import player_name_html
+from modules.football_assets import injury_badge_html, player_name_html, position_badge_html
 from modules.player_images import get_player_image_url
 from modules.player_profile_ui import avatar_html
+from modules.player_tier_identity import portrait_frame_classes, resolve_player_tier_identity
 from modules.portrait_normalization import card_focus_x
 from modules.trade_visual_language import (
     TRADE_VISUAL_LANGUAGE_CSS,
     confidence_indicator_html,
     exchange_marker_html,
+    priority_tier_html,
     value_edge_html,
 )
 
@@ -40,6 +42,8 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-compact-asset-copy{align-content:center;display:grid;gap:0;justify-items:start;margin:0;min-width:0;padding:0;text-align:left}
 .dg-compact-asset-name,.toa-chip-name{color:var(--color-text-primary);font:var(--font-card-title);line-height:1.15;margin:0;overflow-wrap:break-word;padding:0;text-align:left;word-break:normal}
 .dg-compact-asset-meta,.toa-chip-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);line-height:1.2;margin:0;padding:0;text-align:left}
+.dg-compact-asset-meta--pills{align-items:center;display:inline-flex;flex-wrap:wrap;gap:var(--space-xs)}
+.dg-compact-asset-extras--pills{align-items:center;display:inline-flex;flex-wrap:wrap;gap:var(--space-xs);margin-top:var(--space-2xs)}
 .dg-compact-asset-role{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);line-height:1.2;margin:0;padding:0;text-align:left}
 .dg-compact-asset-value,.toa-chip-value{align-self:center;color:var(--color-text-secondary);font-variant-numeric:tabular-nums;font:var(--type-supporting-metadata);justify-self:end;white-space:nowrap}
 .dg-compact-asset--player.dg-player-asset-tap,.dg-player-asset-tap{cursor:pointer;min-height:var(--touch-target-min);min-width:var(--touch-target-min)}
@@ -246,7 +250,18 @@ def compact_asset_html(
     show_value: bool = True,
     show_role: bool = True,
     format_score=None,
+    rich_identity: bool = False,
 ) -> str:
+    """Render one compact player/pick row.
+
+    ``rich_identity`` opts a caller into the same graphical identity
+    treatment already shipped for My Team / Waivers / Trade Hub / Draft
+    (``modules.football_assets.player_card_html`` + ``player_tier_identity``):
+    a tier-colored avatar ring and colored position/role pills instead of
+    plain "POS · TEAM" text. Default stays off so every existing caller of
+    this shared renderer (Trade Analyzer, League History, Trade Hub summary,
+    Live Draft) keeps its current plain-text look unchanged.
+    """
     payload = presentation_asset(asset)
     if not payload:
         return ""
@@ -325,45 +340,77 @@ def compact_asset_html(
     avatar_class = "dg-compact-asset-avatar"
     if size == "chip":
         avatar_class += " dg-compact-asset-avatar--chip"
-    avatar = avatar_html(image_url, _initials(name), css_class=avatar_class)
-    identity_bits = [
-        bit
-        for bit in (
-            _text(payload.get("position")).upper(),
-            _text(payload.get("team")).upper(),
+    if rich_identity and size != "chip":
+        # Same tier ladder the data layer already carries (presentation_asset's
+        # "tier" field) rendered through the one portrait-frame helper every
+        # other surface (My Team, Waivers, Trade Hub, Draft) already uses —
+        # no new ring CSS, just the existing .dg-tier-frame-- classes.
+        identity = resolve_player_tier_identity(payload)
+        avatar_class = portrait_frame_classes(
+            identity, base=f"{avatar_class} dg-player-portrait", frame_mode="ring"
         )
-        if bit
-    ]
+    avatar = avatar_html(image_url, _initials(name), css_class=avatar_class)
+    position_text = _text(payload.get("position")).upper()
+    team_text = _text(payload.get("team")).upper()
     age = payload.get("age")
+    age_text = ""
     if size != "chip" and age not in (None, ""):
         try:
-            identity_bits.append(f"Age {int(float(age))}")
+            age_text = f"Age {int(float(age))}"
         except (TypeError, ValueError):
-            pass
-    meta = " · ".join(identity_bits) if identity_bits else "Player"
+            age_text = ""
+    position_pill_html = ""
+    text_bits: list[str] = []
+    if rich_identity and size != "chip" and position_text:
+        position_pill_html = position_badge_html(position_text)
+    elif position_text:
+        text_bits.append(position_text)
+    if team_text:
+        text_bits.append(team_text)
+    if age_text:
+        text_bits.append(age_text)
+    meta_text = " · ".join(text_bits) if text_bits else ("" if position_pill_html else "Player")
+    if position_pill_html:
+        meta_span = f"<span>{escape(meta_text)}</span>" if meta_text else ""
+        meta_html = (
+            "<div class='dg-compact-asset-meta toa-chip-meta dg-compact-asset-meta--pills'>"
+            f"{position_pill_html}{meta_span}</div>"
+        )
+    else:
+        meta_html = f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(meta_text)}</div>"
     role = _text(payload.get("role"))
-    extras: list[str] = []
-    if size != "chip" and show_role and role:
-        extras.append(role)
     injury_status = _text(payload.get("injury_status"))
-    if (
+    show_injury = (
         size != "chip"
         and injury_status
         and injury_status.casefold() not in {"active", "healthy", "na", "none"}
-    ):
-        extras.append(injury_status)
-    extra_html = (
-        f"<div class='dg-compact-asset-role'>{escape(' · '.join(extras))}</div>"
-        if extras
-        else ""
     )
+    if rich_identity and size != "chip":
+        role_html = priority_tier_html(role) if show_role and role else ""
+        injury_html = injury_badge_html(injury_status) if show_injury else ""
+        extra_html = (
+            f"<div class='dg-compact-asset-extras--pills'>{role_html}{injury_html}</div>"
+            if role_html or injury_html
+            else ""
+        )
+    else:
+        extras: list[str] = []
+        if size != "chip" and show_role and role:
+            extras.append(role)
+        if show_injury:
+            extras.append(injury_status)
+        extra_html = (
+            f"<div class='dg-compact-asset-role'>{escape(' · '.join(extras))}</div>"
+            if extras
+            else ""
+        )
     return (
         f"<div class='{classes}' data-player-id='{escape(player_id, quote=True)}' "
         f"role='button' tabindex='0' aria-label='Open player {escape(name, quote=True)}'>"
         f"{avatar}"
         "<div class='dg-compact-asset-copy toa-chip-copy'>"
         f"<div class='dg-compact-asset-name toa-chip-name'>{player_name_html(name)}</div>"
-        f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(meta)}</div>"
+        f"{meta_html}"
         f"{extra_html}"
         "</div>"
         f"{value_html}"
@@ -378,6 +425,7 @@ def compact_asset_stack_html(
     show_value: bool = True,
     show_role: bool = True,
     format_score=None,
+    rich_identity: bool = False,
 ) -> str:
     rows = [
         compact_asset_html(
@@ -386,6 +434,7 @@ def compact_asset_stack_html(
             show_value=show_value,
             show_role=show_role,
             format_score=format_score,
+            rich_identity=rich_identity,
         )
         for asset in (assets or [])
         if isinstance(asset, Mapping)
@@ -446,7 +495,7 @@ def watch_attention_html(players: Sequence[Mapping[str, Any]] | None) -> str:
     """Compact attention rows — portraits + identity, not debug pipes."""
 
     rows = [
-        compact_asset_html(player, size="standard", show_value=False)
+        compact_asset_html(player, size="standard", show_value=False, rich_identity=True)
         for player in (players or [])
         if isinstance(player, Mapping)
     ]
@@ -472,12 +521,12 @@ def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
         "<div class='dg-gp-trade-visual' data-gp-trade-visual='1'>"
         "<div class='dg-gp-trade-side dg-gp-trade-side--give'>"
         "<div class='dg-gp-trade-side-label'>You give</div>"
-        f"{compact_asset_stack_html(send, size='standard', show_value=False)}"
+        f"{compact_asset_stack_html(send, size='standard', show_value=False, rich_identity=True)}"
         "</div>"
         f"{exchange_marker_html(extra_class='dg-gp-trade-for')}"
         "<div class='dg-gp-trade-side dg-gp-trade-side--get'>"
         "<div class='dg-gp-trade-side-label'>You get</div>"
-        f"{compact_asset_stack_html(receive, size='standard', show_value=False)}"
+        f"{compact_asset_stack_html(receive, size='standard', show_value=False, rich_identity=True)}"
         "</div>"
         "</div>"
         f"{metrics}"

@@ -336,7 +336,7 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
         player = (presentation or {}).get("player") if presentation else None
         if isinstance(player, dict) and player:
             chip = compact_fantasy_assets.compact_asset_html(
-                player, size="standard", show_value=False
+                player, size="standard", show_value=False, rich_identity=True
             )
             return f"<div class='dg-gp-identity-row'>{chip}</div>" if chip else ""
         return ""

@@ -97,7 +97,9 @@ def test_watch_attention_uses_portraits_not_debug_pipes():
     )
     assert "Cam" in html and "Skattebo" in html
     assert "Kenyon" in html and "Sadiq" in html
-    assert "Starter" in html
+    # Role now renders as the same uppercase pill (tvl-tier) used by every
+    # other priority/tier badge, not plain text — case changes, role survives.
+    assert "STARTER" in html
     assert " | " not in html
     assert "dg-gp-watch-list" in html
     assert "dg-compact-asset--standard" in html

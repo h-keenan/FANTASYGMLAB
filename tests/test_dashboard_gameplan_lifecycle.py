@@ -132,7 +132,9 @@ def _assert_rich(plan: dgb.DailyGmBriefing) -> None:
     assert " | " not in watch_html
     assert daily_gm_briefing_ui._should_show_reason(watch, watch_html) is False
     assert "Emanuel Wilson" in waiver_html
-    assert "Handcuff" in waiver_html
+    # Role now renders as the same uppercase pill (tvl-tier) used by every
+    # other priority/tier badge, not plain text — case changes, role survives.
+    assert "HANDCUFF" in waiver_html
     assert "dg-compact-asset-avatar" in waiver_html
     assert daily_gm_briefing_ui._should_show_headline(waiver) is False
 
