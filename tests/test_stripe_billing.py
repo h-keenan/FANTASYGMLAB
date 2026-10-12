@@ -1,6 +1,6 @@
 import sys
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 from pathlib import Path
@@ -306,7 +306,7 @@ class TestStripeBilling(unittest.TestCase):
         )
 
         self.assertEqual(action["user_id"], "user-1")
-        self.assertEqual(action["entitlement"], premium.PREMIUM)
+        self.assertEqual(action["entitlement"], stripe_billing.RAW_PRO)
         self.assertEqual(action["stripe_customer_id"], "cus_123")
 
     def test_webhook_maps_canceled_subscription_to_free(self):
@@ -397,7 +397,7 @@ class TestStripeBilling(unittest.TestCase):
         )
 
         self.assertEqual(action["user_id"], "user-1")
-        self.assertEqual(action["entitlement"], premium.PREMIUM)
+        self.assertEqual(action["entitlement"], stripe_billing.RAW_PRO)
         self.assertEqual(action["stripe_subscription_id"], "sub_123")
 
     def test_customer_metadata_user_id_fallback_is_supported(self):
@@ -418,7 +418,7 @@ class TestStripeBilling(unittest.TestCase):
         )
 
         self.assertEqual(action["user_id"], "user-from-customer")
-        self.assertEqual(action["entitlement"], premium.PREMIUM)
+        self.assertEqual(action["entitlement"], stripe_billing.RAW_PRO)
 
     def test_price_id_is_extracted_from_subscription_items(self):
         action = stripe_billing.map_stripe_event_to_entitlement(
@@ -489,13 +489,13 @@ class TestStripeBilling(unittest.TestCase):
 
         self.assertEqual(action["event_id"], "evt_123")
         self.assertEqual(action["user_id"], "user-1")
-        self.assertEqual(action["entitlement"], premium.PREMIUM)
+        self.assertEqual(action["entitlement"], stripe_billing.RAW_PRO)
         self.assertEqual(action["stripe_price_id"], "price_month")
 
     def test_supabase_update_payload_targets_entitlement_and_stripe_fields(self):
         payload = stripe_webhook.build_profile_entitlement_payload(
             {
-                "entitlement": premium.PREMIUM,
+                "entitlement": stripe_billing.RAW_PRO,
                 "stripe_customer_id": "cus_123",
                 "stripe_subscription_id": "sub_123",
                 "stripe_subscription_status": "active",
@@ -505,7 +505,7 @@ class TestStripeBilling(unittest.TestCase):
             }
         )
 
-        self.assertEqual(payload["entitlement"], premium.PREMIUM)
+        self.assertEqual(payload["entitlement"], stripe_billing.RAW_PRO)
         self.assertEqual(payload["stripe_customer_id"], "cus_123")
         self.assertEqual(payload["stripe_subscription_status"], "active")
         self.assertIn("premium_updated_at", payload)
@@ -525,7 +525,7 @@ class TestStripeBilling(unittest.TestCase):
             request_session=session,
             action={
                 "user_id": "user-1",
-                "entitlement": premium.PREMIUM,
+                "entitlement": stripe_billing.RAW_PRO,
                 "stripe_customer_id": "cus_123",
             },
         )
@@ -534,7 +534,7 @@ class TestStripeBilling(unittest.TestCase):
         self.assertFalse(error)
         call = session.patch.call_args
         self.assertIn("/rest/v1/profiles?user_id=eq.user-1", call.args[0])
-        self.assertEqual(call.kwargs["json"]["entitlement"], premium.PREMIUM)
+        self.assertEqual(call.kwargs["json"]["entitlement"], stripe_billing.RAW_PRO)
         self.assertEqual(call.kwargs["headers"]["Authorization"], "Bearer service-key")
 
     def test_supabase_update_orders_verified_events_durably(self):
@@ -582,25 +582,25 @@ class TestStripeBilling(unittest.TestCase):
             )
 
         duplicate = _DurableSupabaseStub()
-        apply(duplicate, event_id="evt_same", created=1_700_000_000, entitlement=premium.PREMIUM)
-        apply(duplicate, event_id="evt_same", created=1_700_000_000, entitlement=premium.PREMIUM)
+        apply(duplicate, event_id="evt_same", created=1_700_000_000, entitlement=stripe_billing.RAW_PRO)
+        apply(duplicate, event_id="evt_same", created=1_700_000_000, entitlement=stripe_billing.RAW_PRO)
         self.assertEqual(duplicate.effective_mutations, 1)
 
         ordered = _DurableSupabaseStub()
-        apply(ordered, event_id="evt_new", created=1_700_000_001, entitlement=premium.PREMIUM)
+        apply(ordered, event_id="evt_new", created=1_700_000_001, entitlement=stripe_billing.RAW_PRO)
         apply(ordered, event_id="evt_old", created=1_700_000_000, entitlement=premium.FREE)
-        self.assertEqual(ordered.entitlement, premium.PREMIUM)
+        self.assertEqual(ordered.entitlement, stripe_billing.RAW_PRO)
         apply(ordered, event_id="evt_newer", created=1_700_000_002, entitlement=premium.FREE)
         self.assertEqual(ordered.entitlement, premium.FREE)
 
         grant_then_revoke = _DurableSupabaseStub()
-        apply(grant_then_revoke, event_id="evt_grant", created=1_700_000_000, entitlement=premium.PREMIUM)
+        apply(grant_then_revoke, event_id="evt_grant", created=1_700_000_000, entitlement=stripe_billing.RAW_PRO)
         apply(grant_then_revoke, event_id="evt_revoke", created=1_700_000_000, entitlement=premium.FREE)
         self.assertEqual(grant_then_revoke.entitlement, premium.FREE)
 
         revoke_then_grant = _DurableSupabaseStub()
         apply(revoke_then_grant, event_id="evt_revoke", created=1_700_000_000, entitlement=premium.FREE)
-        apply(revoke_then_grant, event_id="evt_grant", created=1_700_000_000, entitlement=premium.PREMIUM)
+        apply(revoke_then_grant, event_id="evt_grant", created=1_700_000_000, entitlement=stripe_billing.RAW_PRO)
         self.assertEqual(revoke_then_grant.entitlement, premium.FREE)
 
     def test_supabase_update_requires_user_id_and_supported_entitlement(self):
@@ -608,7 +608,7 @@ class TestStripeBilling(unittest.TestCase):
 
         ok, error = stripe_webhook.update_profile_entitlement(
             config=config,
-            action={"entitlement": premium.PREMIUM},
+            action={"entitlement": stripe_billing.RAW_PRO},
         )
         self.assertFalse(ok)
         self.assertIn("Supabase user id", error)
@@ -631,7 +631,7 @@ class TestStripeBilling(unittest.TestCase):
             request_session=session,
             action={
                 "user_id": "user-1",
-                "entitlement": premium.PREMIUM,
+                "entitlement": stripe_billing.RAW_PRO,
                 "stripe_customer_id": "cus_123",
             },
         )
@@ -676,8 +676,8 @@ class TestStripeBilling(unittest.TestCase):
             )
 
         self.assertTrue(result["ok"])
-        self.assertEqual(result["action"]["entitlement"], premium.PREMIUM)
-        self.assertEqual(session.patch.call_args.kwargs["json"]["entitlement"], premium.PREMIUM)
+        self.assertEqual(result["action"]["entitlement"], stripe_billing.RAW_PRO)
+        self.assertEqual(session.patch.call_args.kwargs["json"]["entitlement"], stripe_billing.RAW_PRO)
 
     def test_live_webhook_grants_only_for_a_configured_price(self):
         class FakeWebhook:
@@ -730,7 +730,7 @@ class TestStripeBilling(unittest.TestCase):
             )
 
         self.assertTrue(accepted["ok"])
-        self.assertEqual(accepted["action"]["entitlement"], premium.PREMIUM)
+        self.assertEqual(accepted["action"]["entitlement"], stripe_billing.RAW_PRO)
         self.assertTrue(rejected["skipped"])
         self.assertEqual(rejected["action"]["entitlement"], "")
         self.assertEqual(session.patch.call_count, 1)
@@ -739,7 +739,7 @@ class TestStripeBilling(unittest.TestCase):
         action = {
             "event_id": "evt_repeat",
             "user_id": "user-1",
-            "entitlement": premium.PREMIUM,
+            "entitlement": stripe_billing.RAW_PRO,
             "stripe_customer_id": "cus_123",
             "stripe_subscription_id": "sub_123",
             "stripe_subscription_status": "active",
@@ -819,7 +819,7 @@ class TestStripeBilling(unittest.TestCase):
                     "ok": True,
                     "event_id": "evt_123",
                     "action": {
-                        "entitlement": premium.PREMIUM,
+                        "entitlement": stripe_billing.RAW_PRO,
                         "stripe_subscription_status": "active",
                     },
                 },
@@ -838,6 +838,280 @@ class TestStripeBilling(unittest.TestCase):
         self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", web_block)
         self.assertIn("SUPABASE_SERVICE_ROLE_KEY", backend_block)
         self.assertIn("uvicorn services.stripe_webhook_service:app", backend_block)
+
+
+class TestThreeTierBilling(unittest.TestCase):
+    """GM Pro / Front Office price resolution, Launch Week promo, trials."""
+
+    def test_launch_week_window_is_oct_12_through_18_ct(self):
+        before = datetime(2026, 10, 11, 23, 59, 59, tzinfo=timezone.utc)  # 6:59pm CT Oct 11
+        start = datetime(2026, 10, 12, 5, 0, 0, tzinfo=timezone.utc)  # midnight CT Oct 12
+        end = datetime(2026, 10, 19, 4, 59, 59, tzinfo=timezone.utc)  # 11:59:59pm CT Oct 18
+        after = datetime(2026, 10, 19, 5, 0, 1, tzinfo=timezone.utc)  # just past midnight CT Oct 19
+
+        self.assertFalse(stripe_billing.launch_week_active(now=before))
+        self.assertTrue(stripe_billing.launch_week_active(now=start))
+        self.assertTrue(stripe_billing.launch_week_active(now=end))
+        self.assertFalse(stripe_billing.launch_week_active(now=after))
+
+    def test_price_id_for_plan_resolves_pro_monthly_and_annual(self):
+        config = stripe_billing.StripeBillingConfig(
+            price_monthly="price_pro_month",
+            price_annual="price_pro_year",
+        )
+
+        self.assertEqual(
+            stripe_billing.price_id_for_plan(config, "pro", stripe_billing.MONTHLY),
+            "price_pro_month",
+        )
+        self.assertEqual(
+            stripe_billing.price_id_for_plan(config, "pro", stripe_billing.ANNUAL),
+            "price_pro_year",
+        )
+
+    def test_price_id_for_plan_uses_launch_week_price_only_during_window(self):
+        config = stripe_billing.StripeBillingConfig(
+            price_monthly="price_pro_month",
+            price_annual="price_pro_year",
+            price_pro_annual_launch_week="price_launch_week_promo",
+        )
+        during = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
+        outside = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
+
+        self.assertEqual(
+            stripe_billing.price_id_for_plan(config, "pro", stripe_billing.ANNUAL, now=during),
+            "price_launch_week_promo",
+        )
+        self.assertEqual(
+            stripe_billing.price_id_for_plan(config, "pro", stripe_billing.ANNUAL, now=outside),
+            "price_pro_year",
+        )
+
+    def test_price_id_for_plan_front_office_is_annual_only(self):
+        config = stripe_billing.StripeBillingConfig(price_front_office_annual="price_fo_year")
+
+        self.assertEqual(
+            stripe_billing.price_id_for_plan(config, "front_office", stripe_billing.ANNUAL),
+            "price_fo_year",
+        )
+        with self.assertRaises(stripe_billing.BillingConfigurationError):
+            stripe_billing.price_id_for_plan(config, "front_office", stripe_billing.MONTHLY)
+
+    def test_price_id_for_plan_fails_closed_when_price_missing(self):
+        empty_config = stripe_billing.StripeBillingConfig()
+
+        with self.assertRaises(stripe_billing.BillingConfigurationError):
+            stripe_billing.price_id_for_plan(empty_config, "pro", stripe_billing.MONTHLY)
+        with self.assertRaises(stripe_billing.BillingConfigurationError):
+            stripe_billing.price_id_for_plan(empty_config, "front_office", stripe_billing.ANNUAL)
+        with self.assertRaises(stripe_billing.BillingConfigurationError):
+            stripe_billing.price_id_for_plan(empty_config, "gold_tier", stripe_billing.ANNUAL)
+
+    def test_pro_specific_env_keys_take_priority_over_legacy_keys(self):
+        config = stripe_billing.load_stripe_config(
+            environ={
+                "STRIPE_PRICE_MONTHLY": "legacy_month",
+                "STRIPE_PRICE_ANNUAL": "legacy_year",
+                "STRIPE_PRICE_PRO_MONTHLY": "pro_month",
+                "STRIPE_PRICE_PRO_ANNUAL": "pro_year",
+                "STRIPE_PRICE_FRONT_OFFICE_ANNUAL": "fo_year",
+                "STRIPE_PRICE_PRO_ANNUAL_LAUNCH_WEEK": "launch_week_year",
+            },
+            secrets={},
+        )
+
+        self.assertEqual(config.price_monthly, "pro_month")
+        self.assertEqual(config.price_annual, "pro_year")
+        self.assertEqual(config.price_front_office_annual, "fo_year")
+        self.assertEqual(config.price_pro_annual_launch_week, "launch_week_year")
+
+    def test_legacy_env_keys_still_work_when_pro_specific_keys_are_unset(self):
+        config = stripe_billing.load_stripe_config(
+            environ={
+                "STRIPE_SECRET_KEY": "sk_test_123",
+                "STRIPE_PRICE_MONTHLY": "legacy_month",
+                "STRIPE_PRICE_ANNUAL": "legacy_year",
+            },
+            secrets={},
+        )
+
+        self.assertEqual(config.price_monthly, "legacy_month")
+        self.assertEqual(config.price_annual, "legacy_year")
+        self.assertTrue(config.configured)
+
+    def test_checkout_session_defaults_to_pro_with_seven_day_trial_both_intervals(self):
+        for interval in (stripe_billing.MONTHLY, stripe_billing.ANNUAL):
+            created = Mock(return_value=SimpleNamespace(url="https://checkout.test/session"))
+            fake_stripe = SimpleNamespace(
+                api_key="",
+                checkout=SimpleNamespace(Session=SimpleNamespace(create=created)),
+            )
+            config = stripe_billing.StripeBillingConfig(
+                secret_key="sk_test_123",
+                price_monthly="price_month",
+                price_annual="price_year",
+            )
+
+            with patch.dict(sys.modules, {"stripe": fake_stripe}):
+                stripe_billing.create_checkout_session(
+                    config=config,
+                    user_id="user-1",
+                    email="user@example.com",
+                    interval=interval,
+                    now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+                )
+
+            kwargs = created.call_args.kwargs
+            self.assertEqual(
+                kwargs["subscription_data"]["trial_period_days"], stripe_billing.PRO_TRIAL_DAYS
+            )
+            self.assertEqual(kwargs["metadata"]["billing_tier"], "pro")
+
+    def test_checkout_session_front_office_has_no_trial_and_uses_annual_price(self):
+        created = Mock(return_value=SimpleNamespace(url="https://checkout.test/session"))
+        fake_stripe = SimpleNamespace(
+            api_key="",
+            checkout=SimpleNamespace(Session=SimpleNamespace(create=created)),
+        )
+        config = stripe_billing.StripeBillingConfig(
+            secret_key="sk_test_123",
+            price_front_office_annual="price_fo_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            stripe_billing.create_checkout_session(
+                config=config,
+                user_id="user-1",
+                email="user@example.com",
+                interval=stripe_billing.ANNUAL,
+                tier="front_office",
+                now=datetime(2026, 11, 1, tzinfo=timezone.utc),
+            )
+
+        kwargs = created.call_args.kwargs
+        self.assertEqual(kwargs["line_items"][0]["price"], "price_fo_year")
+        self.assertNotIn("trial_period_days", kwargs["subscription_data"])
+        self.assertEqual(kwargs["metadata"]["billing_tier"], "front_office")
+
+    def test_checkout_session_fails_closed_when_front_office_price_unset(self):
+        config = stripe_billing.StripeBillingConfig(secret_key="sk_test_123")
+
+        with self.assertRaises(stripe_billing.BillingConfigurationError):
+            stripe_billing.create_checkout_session(
+                config=config,
+                user_id="user-1",
+                email="user@example.com",
+                interval=stripe_billing.ANNUAL,
+                tier="front_office",
+            )
+
+    def test_webhook_resolves_front_office_when_price_matches_configured_price(self):
+        config = stripe_billing.StripeBillingConfig(price_front_office_annual="price_fo_year")
+        action = stripe_billing.map_stripe_event_to_entitlement(
+            {
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_123",
+                        "customer": "cus_123",
+                        "status": "active",
+                        "metadata": {"supabase_user_id": "user-1"},
+                        "items": {"data": [{"price": {"id": "price_fo_year"}}]},
+                    }
+                },
+            },
+            config=config,
+        )
+
+        self.assertEqual(action["entitlement"], "front_office")
+
+    def test_webhook_resolves_pro_for_trialing_subscription(self):
+        action = stripe_billing.map_stripe_event_to_entitlement(
+            {
+                "type": "customer.subscription.created",
+                "data": {
+                    "object": {
+                        "id": "sub_123",
+                        "customer": "cus_123",
+                        "status": "trialing",
+                        "metadata": {"supabase_user_id": "user-1"},
+                    }
+                },
+            }
+        )
+
+        self.assertEqual(action["entitlement"], stripe_billing.RAW_PRO)
+
+    def test_webhook_without_config_defaults_unmatched_price_to_pro(self):
+        # Back-compat: a caller that never passes a config (as every test
+        # above this class does) must see exactly the old behavior.
+        action = stripe_billing.map_stripe_event_to_entitlement(
+            {
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_123",
+                        "customer": "cus_123",
+                        "status": "active",
+                        "metadata": {"supabase_user_id": "user-1"},
+                        "items": {"data": [{"price": {"id": "price_unknown"}}]},
+                    }
+                },
+            }
+        )
+
+        self.assertEqual(action["entitlement"], stripe_billing.RAW_PRO)
+
+    def test_live_webhook_accepts_front_office_price_and_rejects_unconfigured_one(self):
+        class FakeWebhook:
+            event_price = "price_fo_year"
+
+            @classmethod
+            def construct_event(cls, *_args, **_kwargs):
+                return {
+                    "id": f"evt_live_{cls.event_price}",
+                    "livemode": True,
+                    "type": "customer.subscription.updated",
+                    "data": {"object": {
+                        "id": "sub_123",
+                        "status": "active",
+                        "metadata": {"supabase_user_id": "user-1"},
+                        "items": {"data": [{"price": {"id": cls.event_price}}]},
+                    }},
+                }
+
+        fake_stripe = SimpleNamespace(Webhook=FakeWebhook)
+        response = SimpleNamespace(status_code=204)
+        session = SimpleNamespace(patch=Mock(return_value=response))
+        config = stripe_billing.StripeBillingConfig(
+            billing_mode="live",
+            secret_key="sk_live_123",
+            webhook_secret="whsec_123",
+            price_monthly="price_month",
+            price_annual="price_year",
+            price_front_office_annual="price_fo_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            accepted = stripe_webhook.process_verified_stripe_webhook(
+                payload="{}",
+                signature="sig",
+                stripe_config=config,
+                supabase_config=stripe_webhook.SupabaseWebhookConfig(
+                    url="https://example.supabase.co", service_role_key="service-key"
+                ),
+                request_session=session,
+            )
+
+        self.assertTrue(accepted["ok"])
+        self.assertEqual(accepted["action"]["entitlement"], "front_office")
+
+    def test_build_profile_entitlement_payload_accepts_front_office(self):
+        payload = stripe_webhook.build_profile_entitlement_payload(
+            {"entitlement": "front_office", "event_id": "evt_1", "event_created": "1700000000"}
+        )
+
+        self.assertEqual(payload["entitlement"], "front_office")
 
 
 if __name__ == "__main__":

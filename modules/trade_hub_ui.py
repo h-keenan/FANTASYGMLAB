@@ -1235,7 +1235,9 @@ def trade_hub_entitlement_presentation(
     approved = list(primary_ideas or []) + list(secondary_ideas or [])
     ranked = order_trade_hub_visible_ideas(approved)
     approved_count = len(ranked)
-    is_premium = str(entitlement or "").strip().casefold() == premium.PREMIUM
+    # Unlimited Trade Hub + trade ideas board is a GM Pro feature (Front
+    # Office includes everything Pro has) — not Pro-exclusive.
+    is_premium = premium.is_at_least(entitlement, premium.PRO)
     visible_ideas = ranked if is_premium else ranked[:FREE_VISIBLE_IDEAS]
     hidden_count = approved_count - len(visible_ideas)
     visible_labels = [
@@ -1246,7 +1248,7 @@ def trade_hub_entitlement_presentation(
         label == "low" for label in visible_labels
     )
     return {
-        "entitlement": premium.PREMIUM if is_premium else premium.FREE,
+        "entitlement": premium.canonical_tier(entitlement) if is_premium else premium.FREE,
         "is_premium": is_premium,
         "approved_count": approved_count,
         "visible_ideas": visible_ideas,

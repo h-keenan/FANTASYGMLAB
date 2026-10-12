@@ -40,8 +40,12 @@ disables checkout (fail-closed) and does **not** take down the app.
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase / Render | webhook only | **Yes** | Webhook yes; **must be absent** on Streamlit | No | empty | Forbidden on managed web (fail closed); webhook `/ready` 503 | Yes (webhook) |
 | `STRIPE_SECRET_KEY` | Stripe / Render | `stripe_billing`, webhook | **Yes** | If charging | No | empty | Checkout unavailable | Yes |
 | `STRIPE_BILLING_MODE` | Render | `stripe_billing` | No | If charging (`test` or `live`) | No | `test` | Live keys without `live` stay OFF | Yes |
-| `STRIPE_PRICE_MONTHLY` | Stripe / Render | `stripe_billing` | No | If charging | No | empty | Checkout unavailable | Yes |
-| `STRIPE_PRICE_ANNUAL` | Stripe / Render | `stripe_billing` | No | If charging | No | empty | Checkout unavailable | Yes |
+| `STRIPE_PRICE_MONTHLY` | Stripe / Render | `stripe_billing` | No | If charging (GM Pro, legacy name) | No | empty | Checkout unavailable; `STRIPE_PRICE_PRO_MONTHLY` wins if both set | Yes |
+| `STRIPE_PRICE_ANNUAL` | Stripe / Render | `stripe_billing` | No | If charging (GM Pro, legacy name) | No | empty | Checkout unavailable; `STRIPE_PRICE_PRO_ANNUAL` wins if both set | Yes |
+| `STRIPE_PRICE_PRO_MONTHLY` | Stripe / Render | `stripe_billing` | No | If charging (GM Pro) | No | empty; falls back to `STRIPE_PRICE_MONTHLY` | Checkout unavailable | Yes |
+| `STRIPE_PRICE_PRO_ANNUAL` | Stripe / Render | `stripe_billing` | No | If charging (GM Pro) | No | empty; falls back to `STRIPE_PRICE_ANNUAL` | Checkout unavailable | Yes |
+| `STRIPE_PRICE_PRO_ANNUAL_LAUNCH_WEEK` | Stripe / Render | `stripe_billing` | No | Optional (Launch Week promo only) | No | empty | Falls back to `STRIPE_PRICE_PRO_ANNUAL` outside Oct 12-18 CT or if unset | Yes |
+| `STRIPE_PRICE_FRONT_OFFICE_ANNUAL` | Stripe / Render | `stripe_billing` | No | If selling Front Office | No | empty | Front Office checkout unavailable | Yes |
 | `STRIPE_CHECKOUT_SUCCESS_URL` | Render | `stripe_billing` | No | Recommended | No | built from `APP_BASE_URL` | Safe default | Yes |
 | `STRIPE_CHECKOUT_CANCEL_URL` | Render | `stripe_billing` | No | Recommended | No | built from `APP_BASE_URL` | Safe default | Yes |
 | `STRIPE_CUSTOMER_PORTAL_RETURN_URL` | Render | `stripe_billing` | No | If portal used | No | `/?page=premium` on app base | Safe default | Yes |

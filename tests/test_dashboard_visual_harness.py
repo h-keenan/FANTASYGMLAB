@@ -3,6 +3,7 @@ from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 from modules import dashboard_orientation
+from modules import premium
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,7 +56,7 @@ def test_free_dashboard_first_render_has_orientation_game_plan_and_gated_pulse()
 
 def test_premium_dashboard_shows_full_fixture_content_without_upgrade_prompts():
     application = _app()
-    application.sidebar.radio[1].set_value("premium").run()
+    application.sidebar.radio[1].set_value(premium.PRO).run()
     markup = _markdown_text(application)
 
     assert not application.exception

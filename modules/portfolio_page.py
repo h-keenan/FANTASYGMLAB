@@ -246,7 +246,7 @@ def render_portfolio_page() -> dict[str, Any]:
     inject_global_styles(PORTFOLIO_CSS)
 
     entitlement = premium.get_user_entitlement(session_state=st.session_state)
-    if entitlement != premium.PREMIUM:
+    if not premium.is_at_least(entitlement, premium.PRO):
         premium.render_premium_lock(
             PORTFOLIO_UPSELL_TITLE, PORTFOLIO_UPSELL_BODY, feature="Portfolio"
         )

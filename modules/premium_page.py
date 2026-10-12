@@ -227,7 +227,9 @@ POSSIBLE_FUTURE_FEATURES = (
 
 
 def plan_status_label(entitlement: str) -> str:
-    return "Premium" if entitlement == premium.PREMIUM else "Free"
+    if premium.canonical_tier(entitlement) == premium.FRONT_OFFICE:
+        return "Front Office"
+    return "Premium" if premium.is_at_least(entitlement, premium.PRO) else "Free"
 
 
 # Static fallback used for interval validation and whenever no live-fetched
@@ -309,7 +311,9 @@ def _premium_intro_html(*, entitlement: str) -> str:
     from modules import premium_conversion
 
     current_plan = plan_status_label(entitlement)
-    status_class = "premium-status-premium" if entitlement == premium.PREMIUM else "premium-status-free"
+    status_class = (
+        "premium-status-premium" if premium.is_at_least(entitlement, premium.PRO) else "premium-status-free"
+    )
     return (
         "<div class='premium-page premium-page-intro'>"
         "<div class='premium-page-header dg-preset-command'>"
@@ -469,7 +473,7 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
     email = str(state.get("auth_email") or account_profile.get("email") or "").strip()
     stripe_customer_id = str(account_profile.get("stripe_customer_id") or "").strip()
 
-    if entitlement == premium.PREMIUM:
+    if premium.is_at_least(entitlement, premium.PRO):
         if stripe_customer_id:
             if st.button("Manage Billing", key="premium_manage_billing_test", use_container_width=True):
                 try:

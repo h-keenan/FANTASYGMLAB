@@ -1249,7 +1249,7 @@ class TestSupabaseAccounts(unittest.TestCase):
         self.assertIn("create table if not exists public.profiles", sql)
         self.assertIn("user_id uuid primary key references auth.users(id)", sql)
         self.assertIn("entitlement text not null default 'free'", sql)
-        self.assertIn("entitlement in ('free', 'premium')", sql)
+        self.assertIn("entitlement in ('free', 'premium', 'pro', 'front_office')", sql)
         self.assertIn("create table if not exists public.saved_leagues", sql)
         self.assertIn("league_id text not null", sql)
         self.assertIn("is_default boolean not null default false", sql)
