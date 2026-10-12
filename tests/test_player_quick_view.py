@@ -687,3 +687,91 @@ def test_sub_ratings_durability_none_when_neither_multiplier_is_present():
     assert ratings["durability_rating"] is None
     # No position pool either -> every factor rating is also None.
     assert ratings["market_rating"] is None
+
+
+def test_schedule_week_row_html_played_week_shows_final_score_and_tone():
+    html = player_quick_view.schedule_week_row_html(
+        {
+            "week": 1,
+            "opponent": "CLE",
+            "is_home": True,
+            "played": True,
+            "team_score": 34,
+            "opponent_score": 10,
+            "bye": False,
+            "opponent_defense_tier": "tough",
+        }
+    )
+    assert "WK 1" in html
+    assert "vs CLE" in html
+    assert "Final: 34-10" in html
+    assert "pqv-schedule-opponent--low" in html
+
+
+def test_schedule_week_row_html_weak_defense_is_high_tone():
+    html = player_quick_view.schedule_week_row_html(
+        {
+            "week": 8,
+            "opponent": "IND",
+            "is_home": True,
+            "played": False,
+            "bye": False,
+            "spread_line": None,
+            "total_line": None,
+            "opponent_defense_tier": "weak",
+        }
+    )
+    assert "vs IND" in html
+    assert "pqv-schedule-opponent--high" in html
+    assert "Line not posted yet" in html
+
+
+def test_schedule_week_row_html_unplayed_week_shows_market_line():
+    html = player_quick_view.schedule_week_row_html(
+        {
+            "week": 6,
+            "opponent": "HOU",
+            "is_home": True,
+            "played": False,
+            "bye": False,
+            "spread_line": 3.0,
+            "total_line": 43.5,
+            "opponent_defense_tier": None,
+        }
+    )
+    assert "Underdog by 3.0" in html
+    assert "O/U 43.5" in html
+    # No tone class when the tier is unknown/average.
+    assert "pqv-schedule-opponent--" not in html
+
+
+def test_schedule_week_row_html_bye_week():
+    html = player_quick_view.schedule_week_row_html(
+        {"week": 7, "opponent": None, "bye": True, "played": False}
+    )
+    assert "WK 7" in html
+    assert "pqv-schedule-row--bye" in html
+    assert ">BYE<" in html
+
+
+def test_schedule_table_html_includes_disclaimer_and_all_rows():
+    weeks = [
+        {
+            "week": 1,
+            "opponent": "CLE",
+            "is_home": True,
+            "played": True,
+            "team_score": 34,
+            "opponent_score": 10,
+            "bye": False,
+        },
+        {"week": 2, "opponent": None, "bye": True, "played": False},
+    ]
+    html = player_quick_view.schedule_table_html(weeks)
+    assert "never used to adjust this player's value or rankings" in html
+    assert "WK 1" in html
+    assert "WK 2" in html
+
+
+def test_schedule_table_html_empty_when_no_weeks():
+    assert player_quick_view.schedule_table_html([]) == ""

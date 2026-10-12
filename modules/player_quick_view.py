@@ -1040,6 +1040,107 @@ def dossier_section_heading_html(title: str, subtitle: str = "") -> str:
     )
 
 
+#: Opponent-strength color for one schedule row — reuses the exact same
+#: low/high danger-success tokens the Stats tab's percentile bars already
+#: use (``.pqv-stat-percentile--low/--high``): a tough defense is the same
+#: "unfavorable" read as a low percentile, a weak defense the same
+#: "favorable" read as a high one. ``None``/"average" render in the default
+#: text color (no signal strong enough to color-code either way).
+def _schedule_opponent_tone(tier: str | None) -> str:
+    if tier == "tough":
+        return "low"
+    if tier == "weak":
+        return "high"
+    return ""
+
+
+def schedule_disclaimer_html() -> str:
+    return (
+        "<p class='pqv-schedule-disclaimer'>Real opponent, market lines, and "
+        "opponent defense strength (from actual points allowed) — never used "
+        "to adjust this player's value or rankings.</p>"
+    )
+
+
+def schedule_week_row_html(week: Mapping[str, object]) -> str:
+    """One real schedule week — mirrors mobile's Schedule tab row (opponent,
+    home/away, final score or market line) from the exact same
+    ``modules.nfl_schedule.team_schedule``/``team_defense_strength`` output
+    the mobile API's ``/v1/players/{id}/schedule`` endpoint already serves,
+    computed in-process here instead of over HTTP — same "real backend
+    output, just not on web yet" pattern the Model tab's sub-rating chips
+    and Decision Fit sentence already used."""
+
+    week_no = _integer(week.get("week")) or 0
+    if week.get("bye"):
+        return (
+            "<div class='pqv-schedule-row pqv-schedule-row--bye'>"
+            f"<div class='pqv-schedule-week'>WK {week_no}</div>"
+            "<div class='pqv-schedule-main'>"
+            "<span class='pqv-schedule-bye'>BYE</span>"
+            "</div></div>"
+        )
+    opponent = _text(week.get("opponent"))
+    if not opponent:
+        return ""
+    prefix = "vs" if week.get("is_home") else "@"
+    tone = _schedule_opponent_tone(_text(week.get("opponent_defense_tier")) or None)
+    tone_class = f" pqv-schedule-opponent--{tone}" if tone else ""
+    opponent_html = (
+        f"<span class='pqv-schedule-opponent{tone_class}'>"
+        f"{escape(prefix)} {escape(opponent)}</span>"
+    )
+    if week.get("played"):
+        team_score = _integer(week.get("team_score"))
+        opp_score = _integer(week.get("opponent_score"))
+        detail = (
+            f"Final: {team_score}-{opp_score}"
+            if team_score is not None and opp_score is not None
+            else "Final"
+        )
+    else:
+        spread = week.get("spread_line")
+        total = week.get("total_line")
+        line_parts: list[str] = []
+        try:
+            spread_val = float(spread) if spread is not None and not pd.isna(spread) else None
+        except (TypeError, ValueError):
+            spread_val = None
+        if spread_val is not None:
+            if spread_val > 0:
+                line_parts.append(f"Underdog by {spread_val:.1f}")
+            elif spread_val < 0:
+                line_parts.append(f"Favorite by {abs(spread_val):.1f}")
+            else:
+                line_parts.append("Pick 'em")
+        try:
+            total_val = float(total) if total is not None and not pd.isna(total) else None
+        except (TypeError, ValueError):
+            total_val = None
+        if total_val is not None:
+            line_parts.append(f"O/U {total_val:.1f}")
+        detail = " · ".join(line_parts) if line_parts else "Line not posted yet"
+    return (
+        "<div class='pqv-schedule-row'>"
+        f"<div class='pqv-schedule-week'>WK {week_no}</div>"
+        f"<div class='pqv-schedule-main'>{opponent_html}"
+        f"<div class='pqv-schedule-detail'>{escape(detail)}</div>"
+        "</div></div>"
+    )
+
+
+def schedule_table_html(weeks: Sequence[Mapping[str, object]]) -> str:
+    rows = "".join(schedule_week_row_html(week) for week in weeks)
+    if not rows:
+        return ""
+    return (
+        "<div class='pqv-schedule'>"
+        + schedule_disclaimer_html()
+        + f"<div class='pqv-schedule-rows'>{rows}</div>"
+        "</div>"
+    )
+
+
 #: OVR badge banding on the rating's own 1-99 scale (see
 #: ``_OVERALL_RATING_CURVE``): a 62 is already the curve's own mid-pack
 #: reference point, so only a clearly below-curve rating reads as low and

@@ -1,4 +1,16 @@
-"""My Team decision-first IA styles — route-owned, not APP_CSS."""
+"""My Team decision-first IA styles — route-owned, not APP_CSS.
+
+Plain CSS only, no embedded ``<style>`` tag: ``modules.html_rendering.
+normalized_style_block`` (what ``inject_global_styles`` calls) wraps this
+whole string in exactly one ``<style>...</style>`` itself. An extra
+``<style>`` tag inside the string (as this file briefly had) makes a
+browser's raw-text parser for ``<style>`` stop at that FIRST inner
+``</style>``, truncating every rule after it and leaving a stray literal
+``<style>`` token inside the live stylesheet text — so none of this file's
+own selectors (ring gauge, strategy identity, decision-card rows, ...) ever
+actually applied. Keep this file single-wrapped, matching
+``modules.player_quick_view_styles.PLAYER_QUICK_VIEW_CSS``'s pattern.
+"""
 
 MY_TEAM_DECISION_CSS = """
 div[class*="st-key-my_team_alerted_player_focus"] {
@@ -12,7 +24,6 @@ div[class*="st-key-my_team_alerted_player_focus"] .player-support-chip-warning {
     border-color: color-mix(in srgb, var(--color-warning) 55%, transparent);
     color: var(--color-warning);
 }
-<style>
 .my-team-strategy-identity {
     display: flex;
     flex-direction: column;
@@ -50,6 +61,76 @@ div[class*="st-key-my_team_alerted_player_focus"] .player-support-chip-warning {
 }
 .st-key-my_team_strategy_panel {
     margin: 0 0 var(--space-md);
+}
+/* Team Snapshot — Team Value ring gauge + archetype/power-rank meta,
+   matching mobile's My Team Overview header card. Ring is the same
+   conic-gradient + punched-out-center technique as player_quick_view's
+   .pqv-ovr-ring, own namespace since this is a team-level (not
+   player-level) metric. */
+.st-key-my_team_team_snapshot {
+    margin: 0 0 var(--space-sm);
+}
+.mt-team-snapshot {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm) var(--space-md);
+}
+.mt-value-ring-wrap {
+    display: grid;
+    gap: var(--space-2xs);
+    justify-items: center;
+}
+.mt-value-ring {
+    --mt-value-tone: var(--color-action);
+    align-items: center;
+    background: conic-gradient(var(--mt-value-tone) calc(var(--mt-value-pct, 0) * 1%), var(--color-border) 0);
+    border-radius: 50%;
+    display: grid;
+    height: 4rem;
+    place-items: center;
+    position: relative;
+    width: 4rem;
+}
+.mt-value-ring::after {
+    background: var(--surface-1);
+    border-radius: 50%;
+    content: '';
+    inset: 0.5rem;
+    position: absolute;
+}
+.mt-value-ring-value {
+    color: var(--mt-value-tone);
+    font-size: var(--font-size-card-title);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-display);
+    position: relative;
+    z-index: 1;
+}
+.mt-value-ring-label {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-badge);
+    letter-spacing: var(--letter-spacing-badge);
+    text-transform: uppercase;
+}
+.mt-value-ring--low {
+    --mt-value-tone: var(--color-danger);
+}
+.mt-value-ring--mid {
+    --mt-value-tone: var(--color-action);
+}
+.mt-value-ring--high {
+    --mt-value-tone: var(--color-success);
+}
+.mt-team-snapshot-meta {
+    display: grid;
+    gap: var(--space-2xs);
+    min-width: 0;
+}
+.mt-team-snapshot-power,
+.mt-team-snapshot-value {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-body);
 }
 .st-key-my_team_roster_decisions .compact-player-row,
 .st-key-my_team_roster_decisions .dg-football-asset--dense {
@@ -116,5 +197,4 @@ div[class*="st-key-my_team_"] .dg-ui-section-header {
         min-width: 0;
     }
 }
-</style>
 """

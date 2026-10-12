@@ -4935,8 +4935,8 @@ def render_player_quick_view_content(
             "<div class='pqv-detail-nav-label'>Detail</div>",
             unsafe_allow_html=True,
         )
-        nav_cols = st.columns(3, gap="small")
-        for column, label in zip(nav_cols, ("STATS", "CAREER", "MODEL")):
+        nav_cols = st.columns(4, gap="small")
+        for column, label in zip(nav_cols, ("STATS", "SCHEDULE", "CAREER", "MODEL")):
             with column:
                 st.button(
                     label,
@@ -4969,6 +4969,43 @@ def render_player_quick_view_content(
                 # season card is one PPG number, this is the shape behind it.
                 _render_pqv_weekly_points(player_id=player_id, player_name=clean_name)
                 player_quick_view.render_college_production(quick_view_stats, omit_empty=True)
+                interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
+    elif detail_choice == "SCHEDULE":
+        # Real opponent/home-away/market-line schedule — the exact same
+        # modules.nfl_schedule output the mobile API's own
+        # /v1/players/{id}/schedule endpoint serves (services/
+        # mobile_api_service.py's get_player_schedule), computed in-process
+        # here instead of over HTTP so web's Player Quick View gets the same
+        # Schedule tab mobile already has.
+        with _pqv_exclusive("pqv_schedule_prepare"):
+            with st.container(key=f"pqv_detail_schedule_{player_id or 'unknown'}"):
+                st.markdown(
+                    player_quick_view.dossier_section_heading_html(
+                        "Schedule",
+                        "Real opponents and market lines for the rest of the season.",
+                    ),
+                    unsafe_allow_html=True,
+                )
+                from modules import nfl_schedule
+
+                schedule_team = _safe_text(row.get("team")).strip()
+                if not schedule_team or schedule_team.upper() == "FA":
+                    st.caption("No team on record for this player, so no schedule is available.")
+                else:
+                    schedule_season = default_player_stats_season()
+                    schedule_weeks = nfl_schedule.team_schedule(schedule_team, schedule_season)
+                    if schedule_weeks:
+                        defense_strength = nfl_schedule.team_defense_strength(schedule_season)
+                        for week_row in schedule_weeks:
+                            opponent = week_row.get("opponent")
+                            entry = defense_strength.get(str(opponent)) if opponent else None
+                            week_row["opponent_defense_tier"] = entry["tier"] if entry else None
+                        st.markdown(
+                            player_quick_view.schedule_table_html(schedule_weeks),
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.caption("Schedule data is not available for this player yet.")
                 interaction_latency.mark_interaction_milestone("pqv_secondary_ready")
     elif detail_choice == "CAREER":
         with _pqv_exclusive("pqv_career_prepare"):

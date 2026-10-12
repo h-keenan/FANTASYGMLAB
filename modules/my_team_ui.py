@@ -7,6 +7,7 @@ import streamlit as st
 from modules import canonical_player_ranking
 from modules import canonical_recommendation_narrative
 from modules import league_format_context
+from modules import league_workspace_ui
 from modules import workspace_ui
 from modules.html_rendering import inject_global_styles
 from modules.my_team_decision_styles import MY_TEAM_DECISION_CSS
@@ -16,6 +17,7 @@ from modules.roster_room_presentation import canonicalize_surplus_and_thin
 from modules.ui_primitives import (
     render_empty_state_panel,
     render_section_header as render_canonical_section_header,
+    status_badge_html,
 )
 
 
@@ -74,6 +76,76 @@ def _roster_scan_narrative(
 
 def _strategy_panel_key(league_id: str, roster_id) -> str:
     return f"my_team_strategy_panel_{_safe_text(league_id)}_{_safe_text(roster_id)}"
+
+
+def team_value_percentile(power_rank: object, league_size: object) -> float | None:
+    """League-relative percentile for this team's real ``power_rank`` (1 =
+    best) among ``league_size`` real teams. Thin wrapper around
+    ``league_workspace_ui._percentile_from_rank`` — the same rank-to-
+    percentile transform mobile's own ``percentileFromRank`` uses — so the
+    Team Value ring never disagrees with the percentile reads League
+    Intelligence already shows for the identical rank. ``None`` when either
+    input is missing/invalid so the ring is simply omitted rather than
+    showing a fabricated number."""
+
+    try:
+        rank = int(power_rank)
+        size = int(league_size)
+    except (TypeError, ValueError):
+        return None
+    return league_workspace_ui._percentile_from_rank(rank, size)
+
+
+def team_snapshot_html(
+    *,
+    value_display: str,
+    percentile: float | None,
+    archetype_label: str,
+    power_rank_label: str,
+) -> str:
+    """Team Value ring gauge + archetype pill — matches mobile's Team
+    Snapshot card (My Team, Overview tab): a colored ring gauge for the
+    roster's league-relative value percentile, plus the construction
+    archetype shown as a pill instead of plain text. Reuses the exact
+    conic-gradient ring mechanism modules/player_quick_view.py's
+    ``.pqv-ovr-ring`` already uses for the player-level OVR badge (same
+    technique, team-level metric, own CSS namespace below) and the shared
+    ``ui_primitives.status_badge_html`` pill component already used
+    elsewhere in the app, so no new color system is introduced."""
+
+    ring_html = ""
+    if percentile is not None:
+        clamped = max(1, min(100, round(percentile)))
+        band = league_workspace_ui._metric_tone_band(clamped) or "mid"
+        ring_html = (
+            "<div class='mt-value-ring-wrap'>"
+            f"<div class='mt-value-ring mt-value-ring--{band}' "
+            f"style='--mt-value-pct:{clamped}' role='img' "
+            f"aria-label='Team value {clamped}th percentile'>"
+            f"<span class='mt-value-ring-value'>{clamped}</span>"
+            "</div>"
+            "<span class='mt-value-ring-label'>Team Value</span>"
+            "</div>"
+        )
+    meta_parts: list[str] = []
+    archetype = _safe_text(archetype_label)
+    if archetype:
+        meta_parts.append(status_badge_html(archetype, variant="information"))
+    power_rank = _safe_text(power_rank_label)
+    if power_rank:
+        meta_parts.append(f"<div class='mt-team-snapshot-power'>{escape(power_rank)}</div>")
+    value = _safe_text(value_display)
+    if value:
+        meta_parts.append(f"<div class='mt-team-snapshot-value'>{escape(value)} value</div>")
+    if not ring_html and not meta_parts:
+        return ""
+    return (
+        "<div class='mt-team-snapshot' role='group' aria-label='Team snapshot'>"
+        + ring_html
+        + "<div class='mt-team-snapshot-meta'>"
+        + "".join(meta_parts)
+        + "</div></div>"
+    )
 
 
 def strategy_identity_html(
@@ -765,6 +837,30 @@ def render_my_team_workspace(
             team_row.get("archetype_label") if hasattr(team_row, "get") else "",
             "",
         )
+        with st.container(key="my_team_team_snapshot"):
+            league_size = (
+                int(len(league_rank_rows))
+                if league_rank_rows is not None and not getattr(league_rank_rows, "empty", True)
+                else None
+            )
+            power_rank_raw = team_row.get("power_rank") if hasattr(team_row, "get") else None
+            power_rank_text = format_rank(
+                power_rank_raw,
+                tied=bool(team_row.get("power_rank_tied")) if hasattr(team_row, "get") else False,
+            )
+            power_rank_label = (
+                f"Power Rank {power_rank_text} of {league_size}"
+                if power_rank_text and power_rank_text != "N/A" and league_size
+                else ""
+            )
+            snapshot_html = team_snapshot_html(
+                value_display=format_score(team_total_value) if team_total_value else "",
+                percentile=team_value_percentile(power_rank_raw, league_size),
+                archetype_label=archetype_label,
+                power_rank_label=power_rank_label,
+            )
+            if snapshot_html:
+                st.markdown(snapshot_html, unsafe_allow_html=True)
         panel_key = _strategy_panel_key(selected_league_id, my_roster_id)
         with st.container(key="my_team_strategy_gateway"):
             st.markdown(
