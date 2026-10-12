@@ -19,7 +19,7 @@ from modules import startup_critical_path
 from modules import theme_mode
 from modules import ui_primitives
 from modules import user_preferences
-from modules.html_rendering import inject_global_styles
+from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.semantic_glyphs import glyph_mask_data_uri
 
 # The durable-auth storage bridge is an invisible 1x1 custom component
@@ -1156,20 +1156,37 @@ def _render_saved_league_cap_notice() -> None:
 
     One-shot: popped as it renders so the notice follows the click that
     caused it rather than sticking to the panel for the rest of the session.
+
+    Relaunch paywall trigger "second_league_gate" — blurred preview (a
+    locked second league slot) plus the lock/CTA, not just a bare warning.
     """
 
     message = _safe_text(st.session_state.pop(SAVED_LEAGUE_CAP_NOTICE_KEY, ""))
     if not message:
         return
+    from modules import paywall_gate_styles
+    from modules import premium
     from modules import premium_conversion
 
-    st.warning(message)
+    inject_global_styles(paywall_gate_styles.PAYWALL_GATE_CSS)
+    render_html_fragment(premium.premium_blur_preview_html("Another saved league", rows=1))
+    premium.render_premium_lock(
+        "Save more leagues",
+        message,
+        feature="second_league_gate",
+        cta="Unlock with GM Pro",
+    )
+    premium_conversion.note_gate_seen(
+        feature="second_league_gate",
+        title="Save more leagues",
+        surface="account_panel",
+    )
     st.button(
         premium_conversion.PRIMARY_CTA,
         key="account_saved_league_cap_upgrade",
         use_container_width=True,
         on_click=lambda: premium_conversion.begin_upgrade_flow(
-            feature="saved_leagues",
+            feature="second_league_gate",
             title="Save more leagues",
             surface="account_panel",
         ),
