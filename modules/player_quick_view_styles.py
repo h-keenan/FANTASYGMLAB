@@ -54,6 +54,15 @@ div[class*="st-key-pqv_actions_"] [data-testid="stHorizontalBlock"]>div{flex:0 0
 div[class*="st-key-pqv_actions_"] [data-testid="stButton"] button,div[class*="st-key-pqv_actions_"] button[data-testid^="stBaseButton"],div[class*="st-key-pqv_actions_"] [data-testid="stPopover"] > div[aria-haspopup="true"] > button{background:var(--color-surface-raised)!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:0!important;color:var(--color-text-secondary)!important;font-size:var(--font-size-badge)!important;letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min)!important;padding-inline:var(--space-sm)!important;text-transform:uppercase!important;width:auto!important}
 div[class*="st-key-pqv_action_bar_primary"] [data-testid="stButton"] button,div[class*="st-key-pqv_action_bar_primary"] button[data-testid^="stBaseButton"]{background:var(--color-surface-interactive, var(--color-surface-raised))!important;border-color:var(--border-accent, var(--color-border-strong))!important;color:var(--color-text-primary)!important}
 div[class*="st-key-pqv_detail_nav_rail"]{margin:0;max-width:56rem}
+/* Stats/Schedule/Career/Model as one horizontal tab-pill row (matching
+   mobile Player Detail's Stats/Trends/Schedule/Career/Model pill row in
+   PlayerDetailScreen.tsx) instead of Streamlit's st.columns default, which
+   stacks into one full-width button per row at phone width. Same forced-
+   flex [data-testid="stHorizontalBlock"] pattern pqv_actions_strip_ already
+   uses below, plus the active-tab fill pqv_weekly_season_rail's button[kind=
+   "primary"] rule above already establishes for this exact file. */
+div[class*="st-key-pqv_detail_nav_rail"] [data-testid="stHorizontalBlock"]{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:var(--space-xs)!important}
+div[class*="st-key-pqv_detail_nav_rail"] [data-testid="stHorizontalBlock"]>div{flex:0 0 auto!important;min-width:0!important;width:auto!important}
 .pqv-hero-portrait{--dg-headshot-focus:22%;--dg-headshot-scale:1.65;--pqv-portrait-size:clamp(3.5rem,16vw,4.5rem);align-self:start !important;background:var(--color-surface-muted);border-radius:var(--radius-none);box-sizing:border-box;display:flex;flex:0 0 var(--pqv-portrait-size) !important;height:var(--pqv-portrait-size) !important;max-height:var(--pqv-portrait-size) !important;max-width:var(--pqv-portrait-size) !important;min-height:0 !important;min-width:0 !important;overflow:hidden;position:relative;width:var(--pqv-portrait-size) !important}
 .pqv-hero-portrait.dg-tier-frame{overflow:hidden}
 .pqv-hero-portrait .player-quick-view-avatar,.pqv-hero-portrait .player-detail-avatar,.pqv-hero-portrait .dg-player-headshot{--avatar-size:100% !important;align-self:stretch !important;border-radius:0 !important;flex:1 1 auto !important;height:100% !important;max-height:100% !important;max-width:100% !important;min-height:0 !important;min-width:0 !important;overflow:hidden;position:relative;width:100% !important}
@@ -158,10 +167,12 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .player-dossier-timeline-metrics{display:grid;gap:var(--space-2xs) var(--space-sm);grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-dossier-timeline-metrics span{color:var(--color-text-secondary);font-size:var(--font-size-caption);overflow-wrap:anywhere}
 .player-dossier-timeline-year{display:grid;gap:2px}
-.pqv-glance-cell{display:grid;gap:2px;min-width:0}
+/* Each glance tile is a bordered card, matching the mobile Player Detail
+   screen's stat tiles (PlayerDetailScreen.tsx's Stats tab) instead of a
+   bare label+number pair — and the Stats tab's own .player-quick-view-
+   stat-section/-row tiles (modules/app_styles.py) it should look like. */
+.pqv-glance-cell{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:grid;gap:2px;min-width:0;padding:var(--space-xs) var(--space-sm)}
 .pqv-glance-cell strong{color:var(--color-text-primary);font-size:var(--font-size-card-title);line-height:var(--line-height-card);overflow-wrap:anywhere}
-.pqv-glance-bar{background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border-strong);box-sizing:border-box;display:block;height:8px;margin-top:4px;max-width:6.5rem;overflow:hidden;width:100%}
-.pqv-glance-bar-fill,.pqv-glance-bar>span{background:var(--color-information);display:block;height:100%;max-width:100%}
 .pqv-model-summary-row{display:grid;gap:var(--space-xs) var(--space-sm);grid-template-columns:repeat(4,minmax(0,1fr));min-width:0}
 .pqv-model-summary-cell{display:grid;gap:2px;min-width:0}
 .pqv-model-summary-cell span{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
@@ -194,7 +205,8 @@ div[class*="st-key-pqv_actions_"] button[data-testid^="stBaseButton"]{min-height
 div[class*="st-key-pqv_actions_"] [data-testid="stHorizontalBlock"]{align-items:center!important;display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:var(--space-xs)!important}
 div[class*="st-key-pqv_actions_"] [data-testid="stHorizontalBlock"]>div{flex:0 0 auto!important;min-width:0!important;width:auto!important}
 .pqv-detail-nav-label{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-2xs);text-transform:uppercase}
-div[class*="st-key-pqv_detail_nav_rail"] [data-testid="stButton"] button,div[class*="st-key-pqv_detail_nav_rail"] button[data-testid^="stBaseButton"]{background:var(--color-surface-raised)!important;background-image:none!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:0!important;color:var(--color-text-secondary)!important;font-size:var(--font-size-badge)!important;letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min)!important;text-transform:uppercase!important}
+div[class*="st-key-pqv_detail_nav_rail"] [data-testid="stButton"] button,div[class*="st-key-pqv_detail_nav_rail"] button[data-testid^="stBaseButton"]{background:var(--color-surface-raised)!important;background-image:none!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:var(--radius-pill)!important;color:var(--color-text-secondary)!important;font-size:var(--font-size-badge)!important;letter-spacing:var(--letter-spacing-badge);min-height:var(--touch-target-min)!important;text-transform:uppercase!important;width:auto!important}
+div[class*="st-key-pqv_detail_nav_rail"] button[kind="primary"],div[class*="st-key-pqv_detail_nav_rail"] button[data-testid="stBaseButton-primary"]{background:var(--color-information)!important;border-color:var(--color-information)!important;color:var(--color-text-primary)!important}
 div[class*="st-key-pqv_actions_tertiary"]{margin:0}
 div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[class*="st-key-pqv_actions_tertiary"] button[data-testid^="stBaseButton"]{background:transparent!important;background-image:none!important;border:0!important;border-block-end:var(--border-width-default) solid var(--color-danger)!important;border-left:0!important;color:var(--color-danger)!important;font-size:var(--font-size-caption)!important;min-height:auto!important;padding-inline:0!important;text-transform:none!important}
 .pqv-decision-grid,.pqv-context-grid{display:grid;gap:var(--space-md);margin:0 0 var(--space-sm);max-width:48rem}

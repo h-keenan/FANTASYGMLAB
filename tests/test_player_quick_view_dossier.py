@@ -230,12 +230,85 @@ def test_at_a_glance_uses_compact_stat_dashboard():
     assert "At a glance" not in html
     assert "pqv-glance-grid" in html
     assert "PPR PPG" in html
-    assert "pqv-glance-bar" in html
-    assert "pqv-glance-bar-fill" in html
-    assert "width:78%" in html
     assert "Rush Yards" in html
     assert "Touches" in html
     assert "Role" not in html
+    # No peer pool was provided, so nothing here has a trustworthy percentile
+    # — the glance grid must show zero percentile bars rather than inventing
+    # one from the raw "%" in a value (the old, misleading heuristic).
+    assert "pqv-stat-percentile" not in html
+
+
+def test_at_a_glance_percentile_bars_match_every_tile_that_has_one():
+    """Every glance tile with a real percentile gets the same banded bar the
+    Stats tab's dense_section_html uses — not just whichever tile happens to
+    have a "%" in its raw value (snap share previously got a bar this way
+    while PPR PPG/Targets/Receptions/Rec Yards never did, even though all of
+    them have equally real percentiles once a peer pool is present)."""
+
+    pd = __import__("pandas")
+    peers = []
+    for index in range(12):
+        peers.append(
+            {
+                "player_id": f"rb-{index}",
+                "name": f"RB {index}",
+                "position": "RB",
+                "team": "NYJ",
+                "status": "Active",
+                "active": True,
+                "stats_season": 2025,
+                "games_played": 17,
+                "rush_attempts": 10 * index,
+                "rushing_yards": 40 * index,
+                "targets": 3 * index,
+                "receptions": 2 * index,
+                "receiving_yards": 10 * index,
+                "fantasy_points_ppr": 10.0 * index,
+                "ppg": 1.0 * index,
+                "snap_share": 0.05 * index,
+                "is_current_fantasy_eligible": True,
+                "player_eligibility_reason": "active_fantasy_player",
+                "trust_enforcement": "pass",
+                "trust_evidence_confidence": 1.0,
+                "trust_block_reason": "",
+                "trust_validation_fingerprint": f"fp-{index}",
+            }
+        )
+    subject = dict(peers[-1])
+    subject.update(
+        {
+            "player_id": "fixture-rb",
+            "name": "Fixture RB",
+            "rush_attempts": 287,
+            "rushing_yards": 1400,
+            "targets": 103,
+            "receptions": 79,
+            "receiving_yards": 820,
+            "fantasy_points_ppr": 370,
+            "ppg": 21.8,
+            "snap_share": 0.78,
+        }
+    )
+    players_df = pd.concat([pd.DataFrame(peers), pd.DataFrame([subject])], ignore_index=True)
+    subject_row = players_df[players_df["player_id"] == "fixture-rb"].iloc[0]
+
+    html = player_quick_view.current_season_summary_html(
+        player_quick_view.build_stats_view(subject_row, players_df)
+    )
+    # Best line in the pool on every ranked metric -> every percentile bar
+    # present is the same top-of-distribution high band, not a flat generic
+    # blue bar reserved for whichever tile happened to contain a "%" sign.
+    assert html.count("pqv-stat-percentile--high") >= 4
+    assert "pqv-stat-percentile--low" not in html
+    # Games is never percentiled (availability, not performance) on either
+    # surface, so its tile must still render with no bar at all.
+    cells = html.split("pqv-glance-cell")[1:]
+    games_cell = next(cell for cell in cells if ">17<" in cell)
+    assert "pqv-stat-percentile" not in games_cell
+
+
+def test_labeled_signal_badges_order_and_empty_case():
     html = player_quick_view.labeled_signal_badges_html(
         (
             ("Health", "Questionable"),
@@ -302,8 +375,8 @@ def test_compact_model_and_career_summaries_are_scannable():
         position_finish=5,
     ) == "2025 · 17.1 PPR PPG"
     css = PLAYER_QUICK_VIEW_CSS.replace("\n", "")
-    assert "pqv-glance-bar{background:var(--color-surface-muted);border:" in css
-    assert "pqv-glance-bar-fill" in css
+    assert "pqv-glance-cell{background:var(--color-surface-muted);border:" in css
+    assert "pqv-glance-bar" not in css
 
 
 def test_current_season_is_position_aware_and_hides_empty():

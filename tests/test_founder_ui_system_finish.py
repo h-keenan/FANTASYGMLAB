@@ -367,7 +367,12 @@ def test_pqv_decision_summary_and_actions_compact():
             "def render_player_detail_content("
         )
     ]
-    assert "st.columns((1.6, 1.1, 0.9)" in pqv
+    # Trade Hub / GM Targets / Share / Feedback / Compare now share one
+    # horizontal flex row (st.container(horizontal=True)) instead of a
+    # 3-column grid that stranded Share+Feedback in one narrow column and
+    # pushed Compare onto its own separate full-width row below.
+    assert 'key=f"pqv_actions_strip_{player_id}"' in pqv
+    assert "horizontal=True" in pqv[pqv.index('key=f"pqv_actions_strip_{player_id}"') :][:200]
     # Detail nav rail: Stats / Schedule / Career / Model (4 columns) —
     # matches the mobile Player Detail tab set (Stats/Trends/Schedule/
     # Career/Model, minus Trends which lives inline under Stats on web).

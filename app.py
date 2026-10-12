@@ -4419,7 +4419,7 @@ def render_player_quick_view_content(
             opportunity_metric_note,
         ),
         (
-            "Age",
+            age_metric_label,
             age_metric_value,
             age_metric_note,
         ),
@@ -4709,7 +4709,7 @@ def render_player_quick_view_content(
             ("Market", market_score),
             ("Opportunity", opportunity_score),
             ("Scarcity", scarcity_score),
-            ("Age", age_metric_value),
+            (age_metric_label, age_metric_value),
         )
     )
     row_payload = row.to_dict() if hasattr(row, "to_dict") else dict(row)
@@ -4805,124 +4805,134 @@ def render_player_quick_view_content(
 
     with st.container(key=f"pqv_actions_{player_id}"):
         trade_hub_disabled = not selected_league_id or my_roster_id is None
-        with st.container(key=f"pqv_actions_strip_{player_id}"):
-            action_cols = st.columns((1.6, 1.1, 0.9), gap="small")
-            with action_cols[0]:
-                with st.container(key=f"pqv_action_bar_primary_{player_id}"):
-                    trade_hub_clicked = st.button(
-                        "Open in Trade Hub",
-                        key=f"player_quick_view_trade_hub_{player_id}",
-                        use_container_width=False,
-                        type="primary",
-                        disabled=trade_hub_disabled,
-                    )
-                    if trade_hub_clicked:
-                        interaction_latency.mark_interaction_milestone("pqv_trade_hub_click")
-                        _open_trade_hub_for_player_focus(
-                            player_row=row,
-                            selected_league_id=selected_league_id,
-                            my_roster_id=my_roster_id,
-                            username=username,
-                        )
-                        interaction_latency.mark_interaction_milestone("full_app_rerun_requested")
-                        st.rerun(scope="app")
-            with action_cols[1]:
-                with _pqv_exclusive("pqv_gm_targets_state"):
-                    gm_targets_ui.render_pqv_target_control(
-                        session=st.session_state,
-                        league_id=_safe_text(selected_league_id),
-                        player_id=player_id,
-                        source_surface="player_quick_view",
-                        compact=True,
-                    )
-            with action_cols[2]:
-                if share_card is not None and share_card.is_shareable:
-                    share_recommendation_ui.render_share_controls(
-                        share_card,
-                        key=f"pqv_share_{_safe_text(player_id)}",
-                        state=st.session_state,
-                        button_label="Share",
-                        use_container_width=False,
-                    )
-                elif share_eligible:
-                    def _open_pqv_share() -> None:
-                        st.session_state[share_open_key] = True
-
-                    st.button(
-                        "Share",
-                        key=f"pqv_share_open_{_safe_text(player_id)}",
-                        use_container_width=False,
-                        on_click=_open_pqv_share,
-                    )
-                render_recommendation_feedback(
-                    page="player_quick_view",
-                    surface="Player Quick View Recommendation",
-                    recommendation_type="player_action",
-                    key_prefix=f"player_quick_view_feedback_{player_id}",
-                    recommendation_title=(
-                        bound_narrative.action
-                        if bound_narrative is not None
-                        and bound_narrative.is_active_recommendation
-                        and bound_narrative.action
-                        else (action_value if show_action_tile else primary_status)
-                    ),
-                    recommendation_summary=(
-                        bound_narrative.shorten("reason", 160)
-                        if bound_narrative is not None
-                        and bound_narrative.is_active_recommendation
-                        else (action_note if show_action_tile else summary_text)
-                    ),
-                    player_ids=[player_id],
-                    player_names=[clean_name],
-                    score_fields={
-                        "dynasty_score": row.get("dynasty_score", row.get("value_score")),
-                        "market_score": row.get("market_score"),
-                        "opportunity_score": row.get("opportunity_score"),
-                        "age_curve_score": row.get("age_curve_score"),
-                    },
-                    confidence_fields={
-                        "opportunity_confidence": row.get("opportunity_confidence"),
-                    },
-                    reason_fields={
-                        "primary_status": primary_status,
-                        "roster_context": roster_classification if on_roster else "League Target",
-                        "source_label": source_label,
-                        "source_note": source_note,
-                        "summary": summary_text,
-                        "recommendation_id": (
-                            bound_narrative.recommendation_id if bound_narrative is not None else ""
-                        ),
-                    },
-                    roster_id=_safe_text(my_roster_id),
-                    enabled=True,
-                    button_label="Feedback",
+        # One flex row for every action (Trade Hub / GM Targets / Share /
+        # Feedback / Compare / Untouchable) instead of a 3-column grid plus
+        # separate full-width containers below it — Share and Feedback used
+        # to be stacked inside one narrow column, and Compare/Untouchable
+        # each fell onto their own full-width row underneath, instead of
+        # lining up with everything else. Nested containers below keep their
+        # own existing keys (and, for Untouchable, its distinct destructive
+        # styling) — they are just flex items of this one row now.
+        with st.container(
+            key=f"pqv_actions_strip_{player_id}",
+            horizontal=True,
+            horizontal_alignment="left",
+            vertical_alignment="center",
+            gap="small",
+        ):
+            with st.container(key=f"pqv_action_bar_primary_{player_id}"):
+                trade_hub_clicked = st.button(
+                    "Open in Trade Hub",
+                    key=f"player_quick_view_trade_hub_{player_id}",
+                    use_container_width=False,
+                    type="primary",
+                    disabled=trade_hub_disabled,
                 )
-        with st.container(key=f"pqv_actions_compare_{player_id}"):
-            st.button(
-                "Compare",
-                key=f"player_quick_view_compare_{player_id}",
-                use_container_width=False,
-                type="tertiary",
-                on_click=open_player_compare,
-                kwargs={"player_id": player_id},
-            )
-        if on_roster:
-            with st.container(key=f"pqv_actions_tertiary_{player_id}"):
-                untouchable_disabled = not (username and selected_league_id)
-                untouchable_label = "Remove" if is_untouchable else "Untouchable"
+                if trade_hub_clicked:
+                    interaction_latency.mark_interaction_milestone("pqv_trade_hub_click")
+                    _open_trade_hub_for_player_focus(
+                        player_row=row,
+                        selected_league_id=selected_league_id,
+                        my_roster_id=my_roster_id,
+                        username=username,
+                    )
+                    interaction_latency.mark_interaction_milestone("full_app_rerun_requested")
+                    st.rerun(scope="app")
+            with _pqv_exclusive("pqv_gm_targets_state"):
+                gm_targets_ui.render_pqv_target_control(
+                    session=st.session_state,
+                    league_id=_safe_text(selected_league_id),
+                    player_id=player_id,
+                    source_surface="player_quick_view",
+                    compact=True,
+                )
+            if share_card is not None and share_card.is_shareable:
+                share_recommendation_ui.render_share_controls(
+                    share_card,
+                    key=f"pqv_share_{_safe_text(player_id)}",
+                    state=st.session_state,
+                    button_label="Share",
+                    use_container_width=False,
+                )
+            elif share_eligible:
+                def _open_pqv_share() -> None:
+                    st.session_state[share_open_key] = True
+
                 st.button(
-                    untouchable_label,
-                    key=f"player_quick_view_untouchable_{player_id}",
+                    "Share",
+                    key=f"pqv_share_open_{_safe_text(player_id)}",
+                    use_container_width=False,
+                    on_click=_open_pqv_share,
+                )
+            render_recommendation_feedback(
+                page="player_quick_view",
+                surface="Player Quick View Recommendation",
+                recommendation_type="player_action",
+                key_prefix=f"player_quick_view_feedback_{player_id}",
+                recommendation_title=(
+                    bound_narrative.action
+                    if bound_narrative is not None
+                    and bound_narrative.is_active_recommendation
+                    and bound_narrative.action
+                    else (action_value if show_action_tile else primary_status)
+                ),
+                recommendation_summary=(
+                    bound_narrative.shorten("reason", 160)
+                    if bound_narrative is not None
+                    and bound_narrative.is_active_recommendation
+                    else (action_note if show_action_tile else summary_text)
+                ),
+                player_ids=[player_id],
+                player_names=[clean_name],
+                score_fields={
+                    "dynasty_score": row.get("dynasty_score", row.get("value_score")),
+                    "market_score": row.get("market_score"),
+                    "opportunity_score": row.get("opportunity_score"),
+                    "age_curve_score": row.get("age_curve_score"),
+                },
+                confidence_fields={
+                    "opportunity_confidence": row.get("opportunity_confidence"),
+                },
+                reason_fields={
+                    "primary_status": primary_status,
+                    "roster_context": roster_classification if on_roster else "League Target",
+                    "source_label": source_label,
+                    "source_note": source_note,
+                    "summary": summary_text,
+                    "recommendation_id": (
+                        bound_narrative.recommendation_id if bound_narrative is not None else ""
+                    ),
+                },
+                roster_id=_safe_text(my_roster_id),
+                enabled=True,
+                button_label="Feedback",
+            )
+            with st.container(key=f"pqv_actions_compare_{player_id}"):
+                st.button(
+                    "Compare",
+                    key=f"player_quick_view_compare_{player_id}",
                     use_container_width=False,
                     type="tertiary",
-                    disabled=untouchable_disabled,
-                    on_click=_toggle_player_untouchable,
-                    kwargs={
-                        "player_row": row,
-                        "username": username,
-                        "selected_league_id": selected_league_id,
-                    },
+                    on_click=open_player_compare,
+                    kwargs={"player_id": player_id},
                 )
+            if on_roster:
+                with st.container(key=f"pqv_actions_tertiary_{player_id}"):
+                    untouchable_disabled = not (username and selected_league_id)
+                    untouchable_label = "Remove" if is_untouchable else "Untouchable"
+                    st.button(
+                        untouchable_label,
+                        key=f"player_quick_view_untouchable_{player_id}",
+                        use_container_width=False,
+                        type="tertiary",
+                        disabled=untouchable_disabled,
+                        on_click=_toggle_player_untouchable,
+                        kwargs={
+                            "player_row": row,
+                            "username": username,
+                            "selected_league_id": selected_league_id,
+                        },
+                    )
 
     nav_key = f"pqv_detail_nav_{player_id or 'unknown'}"
 
@@ -4930,18 +4940,28 @@ def render_player_quick_view_content(
         current = str(st.session_state.get(nav_key) or "").strip().upper()
         st.session_state[nav_key] = "" if current == label else label
 
+    # Computed before the rail renders (rather than after, as before) so the
+    # active tab can be marked type="primary" below — a horizontal tab-pill
+    # row needs to show which tab is open, matching the mobile reference
+    # (PlayerDetailScreen.tsx's filled active pill among Stats/Schedule/
+    # Career/Model), not five visually identical buttons.
+    detail_choice = str(st.session_state.get(nav_key) or "").strip().upper()
     with st.container(key=f"pqv_detail_nav_rail_{player_id or 'unknown'}"):
         st.markdown(
             "<div class='pqv-detail-nav-label'>Detail</div>",
             unsafe_allow_html=True,
         )
+        # A single horizontal flex row of pill buttons (same pattern already
+        # used for pqv_actions_strip_'s CSS-forced [data-testid=
+        # "stHorizontalBlock"]) instead of a 4-column grid, which Streamlit
+        # stacks into one full-width button per row at mobile widths.
         nav_cols = st.columns(4, gap="small")
         for column, label in zip(nav_cols, ("STATS", "SCHEDULE", "CAREER", "MODEL")):
             with column:
                 st.button(
                     label,
                     key=f"{nav_key}_{label.lower()}",
-                    type="secondary",
+                    type="primary" if detail_choice == label else "secondary",
                     use_container_width=True,
                     help=f"Open {label.title()} detail",
                     on_click=_set_pqv_detail_nav,
@@ -4952,7 +4972,6 @@ def render_player_quick_view_content(
         config=_supabase_config(),
         body="Save this league so player context is waiting when you return.",
     )
-    detail_choice = str(st.session_state.get(nav_key) or "").strip().upper()
 
     if detail_choice == "STATS":
         with _pqv_exclusive("pqv_current_season"):

@@ -2481,40 +2481,53 @@ def current_season_summary_html(
 
     model = _stats_model(stats)
     selected = model.seasons[0] if model.seasons else None
-    metrics: list[tuple[str, str]] = []
+    #: (label, value, percentile) — the percentile rides along from the same
+    #: StatItem the Stats tab's dense_section_html already percentiles (see
+    #: StatItem.percentile / _stat_percentiles), so this first-paint glance
+    #: grid and the full Stats tab can never disagree about which tiles get
+    #: a percentile bar and which band color it shows.
+    metrics: list[tuple[str, str, float | None]] = []
     if selected is not None:
-        fantasy_points = _present_snapshot_value(
-            next(
-                (
-                    item.value
-                    for item in selected.fantasy
-                    if item.label.casefold() in {"fantasy points", "ppr", "fantasy ppr"}
-                ),
-                "",
-            )
+        fantasy_points_item = next(
+            (
+                item
+                for item in selected.fantasy
+                if item.label.casefold() in {"fantasy points", "ppr", "fantasy ppr"}
+            ),
+            None,
         )
-        ppg = _present_snapshot_value(
-            next(
-                (item.value for item in selected.fantasy if "PPG" in item.label.upper()),
-                "",
-            )
+        fantasy_points = (
+            _present_snapshot_value(fantasy_points_item.value) if fantasy_points_item else ""
         )
+        ppg_item = next(
+            (item for item in selected.fantasy if "PPG" in item.label.upper()),
+            None,
+        )
+        ppg = _present_snapshot_value(ppg_item.value) if ppg_item else ""
         by_label = {
-            item.label: _present_snapshot_value(item.value)
+            item.label: item
             for item in selected.key_stats
             if item.label and _present_snapshot_value(item.value)
         }
         if selected.games is not None:
-            metrics.append(("Games", str(selected.games)))
+            # Availability is not a performance stat, so Games never gets a
+            # percentile bar here either — matches the Stats tab exactly.
+            metrics.append(("Games", str(selected.games), None))
         if ppg:
-            metrics.append(("PPR PPG", ppg))
+            metrics.append(("PPR PPG", ppg, ppg_item.percentile if ppg_item else None))
         elif fantasy_points:
-            metrics.append(("PPR Pts", fantasy_points))
+            metrics.append(
+                (
+                    "PPR Pts",
+                    fantasy_points,
+                    fantasy_points_item.percentile if fantasy_points_item else None,
+                )
+            )
         for item in selected.usage:
             label_key = item.label.casefold()
             snap_value = _present_snapshot_value(item.value)
             if snap_value and "snap" in label_key:
-                metrics.append((item.label, snap_value))
+                metrics.append((item.label, snap_value, item.percentile))
                 break
         extra_compact: list[tuple[str, str]] = []
         extra_seen: set[str] = set()
@@ -2531,7 +2544,7 @@ def current_season_summary_html(
         for heading, detail in extra_compact:
             if len(metrics) >= _SNAPSHOT_MAX_FACTS:
                 break
-            metrics.append((heading, detail))
+            metrics.append((heading, detail, None))
         position_key = _text(position).upper() or _text(model.position).upper()
         preferred_production = _CURRENT_SEASON_PRODUCTION.get(
             position_key,
@@ -2540,45 +2553,46 @@ def current_season_summary_html(
         for label in preferred_production:
             if len(metrics) >= _SNAPSHOT_MAX_FACTS:
                 break
-            value = (
-                _snapshot_touches_value(by_label)
-                if label == "Touches"
-                else by_label.get(label, "")
-            )
+            if label == "Touches":
+                # A derived combo stat (rush + rec attempts) has no single
+                # percentile column of its own to borrow.
+                value = _snapshot_touches_value(
+                    {lbl: _present_snapshot_value(it.value) for lbl, it in by_label.items()}
+                )
+                percentile = None
+            else:
+                item = by_label.get(label)
+                value = _present_snapshot_value(item.value) if item else ""
+                percentile = item.percentile if item else None
             if not value:
                 continue
-            metrics.append((label, value))
+            metrics.append((label, value, percentile))
     seen: set[str] = set()
-    compact: list[tuple[str, str]] = []
-    for label, value in metrics:
+    compact: list[tuple[str, str, float | None]] = []
+    for label, value, percentile in metrics:
         key = label.casefold()
         if key in seen or not value:
             continue
         seen.add(key)
-        compact.append((label, value))
+        compact.append((label, value, percentile))
         if len(compact) >= _SNAPSHOT_MAX_FACTS:
             break
     if not compact:
         return ""
 
-    def _glance_cell(label: str, value: str) -> str:
-        bar = ""
-        if "%" in value:
-            digits = "".join(ch for ch in value if ch.isdigit() or ch == ".")
-            try:
-                pct = max(0, min(100, int(round(float(digits)))))
-            except ValueError:
-                pct = 0
-            bar = (
-                f"<span class='pqv-glance-bar' aria-hidden='true'>"
-                f"<span class='pqv-glance-bar-fill' style='width:{pct}%'></span></span>"
-            )
+    def _glance_cell(label: str, value: str, percentile: float | None) -> str:
+        # Same banded chip the Stats tab's dense_section_html uses
+        # (_percentile_chip_html) — one percentile-bar treatment for this
+        # whole screen instead of a second, inconsistent implementation here.
+        bar = _percentile_chip_html(percentile)
         return (
             "<div class='pqv-glance-cell'>"
             f"<strong>{escape(value)}</strong><span>{escape(label)}</span>{bar}</div>"
         )
 
-    metric_html = "".join(_glance_cell(label, value) for label, value in compact)
+    metric_html = "".join(
+        _glance_cell(label, value, percentile) for label, value, percentile in compact
+    )
     subtitle = selected.label if selected is not None else ""
     heading = dossier_section_heading_html(
         "Current Season",
