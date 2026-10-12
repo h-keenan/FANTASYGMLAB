@@ -38,22 +38,26 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
 .dg-gp-priority-icon{align-items:center;color:var(--color-accent);display:inline-flex;flex:0 0 auto;height:1rem;width:1rem}
 .dg-gp-priority-icon svg{display:block;height:100%;width:100%}
 .dg-gp-kind-pill{background:var(--color-surface-secondary);border:var(--border-width-default) solid var(--color-border-strong);border-radius:var(--radius-pill);padding:2px var(--space-sm)}
-/* Both sides of the Top Priority card's give/get rows use one uniform
-   accent ring (not a per-player tier color) — overrides the custom
+/* Every Game Plan card's ring-opted avatars (Top Priority give/get, Top
+   Waiver Opportunity's single player, League Movement's give/get) use one
+   uniform accent ring (not a per-player tier color) — overrides the custom
    property player_tier_identity.portrait_frame_classes()'s shared
    dg-tier-frame--ring box-shadow reads, same mechanism My Team/Trade Hub
-   use for tier rings, just pinned to a single color here. */
+   use for tier rings, just pinned to a single color here. Scoped to
+   .dg-game-plan-card (the shared base class every card carries, not just
+   .dg-game-plan-card-primary) so the three cards on the same Dashboard
+   screen read as one consistent design language instead of one polished
+   card next to two plain ones. */
 /* Reference ring reads as a vivid lime-green, not the card's cyan accent —
    --color-success is the closest existing semantic green token (no new
    color invented). Scoped to the ringed avatar itself (not every avatar in
-   the card) so it only ever touches the give/get portraits that actually
-   opted into avatar_ring=True. Also circles the avatar here only: every
-   avatar site-wide stays square (.dg-compact-asset-avatar has no
-   border-radius outside this scope) — that's a bigger decision the product
-   owner hasn't made. overflow:hidden on .dg-compact-asset-avatar already
-   clips the absolutely-positioned, object-fit:cover headshot cleanly to
-   the circle. */
-.dg-game-plan-card-primary .dg-compact-asset-avatar.dg-tier-frame--ring{--dg-tier-a:var(--color-success);border-radius:50%;box-shadow:0 0 0 3px var(--dg-tier-a),0 0 4px 0 color-mix(in srgb,var(--dg-tier-a) 30%,transparent)}
+   the card) so it only ever touches the portraits that actually opted into
+   avatar_ring=True. Also circles the avatar here only: every avatar
+   site-wide stays square (.dg-compact-asset-avatar has no border-radius
+   outside this scope) — that's a bigger decision the product owner hasn't
+   made. overflow:hidden on .dg-compact-asset-avatar already clips the
+   absolutely-positioned, object-fit:cover headshot cleanly to the circle. */
+.dg-game-plan-card .dg-compact-asset-avatar.dg-tier-frame--ring{--dg-tier-a:var(--color-success);border-radius:50%;box-shadow:0 0 0 3px var(--dg-tier-a),0 0 4px 0 color-mix(in srgb,var(--dg-tier-a) 30%,transparent)}
 /* Value-as-pill: value_edge_html()'s own markup is reused verbatim — this
    only hides the directional triangle/magnitude bar and fills the number
    as a chip, color-keyed off the polarity data attribute it already emits. */
@@ -404,8 +408,17 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
     if item.destination == "waivers" or item.category == briefing_mod.CATEGORY_WAIVER:
         player = (presentation or {}).get("player") if presentation else None
         if isinstance(player, dict) and player:
+            # Same ring + colored position pill primitives as the Top
+            # Priority card (position_pill=True/avatar_ring=True are the
+            # general compact_asset_html opt-ins, not Top-Priority-only) —
+            # single-player card, so no give/get sides, confidence bar, or
+            # value pill (those stay trade-specific).
             chip = compact_fantasy_assets.compact_asset_html(
-                player, size="standard", show_value=False
+                player,
+                size="standard",
+                show_value=False,
+                position_pill=True,
+                avatar_ring=True,
             )
             return f"<div class='dg-gp-identity-row'>{chip}</div>" if chip else ""
         return ""
@@ -417,5 +430,14 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
             # card (secondary League Movement opportunities) keeps the
             # original, separately-tested give/get visual below.
             return compact_fantasy_assets.game_plan_top_priority_trade_html(presentation)
-        return compact_fantasy_assets.game_plan_trade_visual_html(presentation)
+        # League Movement: same give/get structure (it IS a trade — can
+        # carry more than one asset per side), with the same ring + colored
+        # position pill primitives as Top Priority's give/get portraits.
+        # Deliberately keeps its own radial confidence ring and plain
+        # (non-pill) value edge rather than Top Priority's segmented
+        # confidence bar/value pill — those stay the primary card's
+        # distinguishing, higher-emphasis treatment.
+        return compact_fantasy_assets.game_plan_trade_visual_html(
+            presentation, position_pill=True, avatar_ring=True
+        )
     return ""
