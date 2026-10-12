@@ -83,8 +83,8 @@ TRADE_VISUAL_LANGUAGE_CSS = """
    numeric percentage; deliberately one uniform fill color (not per-level,
    unlike tvl-conf-ring above), matching the mobile reference exactly. */
 .tvl-seg-row{align-items:center;column-gap:var(--space-xs);display:inline-flex;flex-wrap:wrap;max-width:100%}
-.tvl-seg-track{column-gap:2px;display:inline-flex}
-.tvl-seg{background:var(--color-border);display:inline-block;height:.5rem;width:.85rem}
+.tvl-seg-track{column-gap:4px;display:inline-flex}
+.tvl-seg{background:var(--color-border);border-radius:var(--radius-segment);display:inline-block;height:.4rem;width:1.5rem}
 .tvl-seg--on{background:var(--color-accent)}
 .tvl-seg-label{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);white-space:nowrap}
 @media (max-width:430px){

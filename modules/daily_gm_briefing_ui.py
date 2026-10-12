@@ -30,6 +30,11 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
 .dg-game-plan-card-primary{background:var(--color-surface-raised);border:var(--border-width-semantic) solid var(--color-accent)}
 .dg-gp-opponent{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-top:calc(-1 * var(--space-2xs))}
+/* Top Priority card only (mobile Next Move parity): the opponent username
+   reads as a card-title-weight name, not a muted caption — scoped to
+   .dg-game-plan-card-primary so every other dg-gp-opponent context (none
+   today, but the base rule above stays the safe default) is unaffected. */
+.dg-game-plan-card-primary .dg-gp-opponent{color:var(--color-text-primary);font:var(--font-card-title);letter-spacing:normal;margin-top:0;text-transform:none}
 .dg-gp-priority-icon{align-items:center;color:var(--color-accent);display:inline-flex;flex:0 0 auto;height:1rem;width:1rem}
 .dg-gp-priority-icon svg{display:block;height:100%;width:100%}
 .dg-gp-kind-pill{background:var(--color-surface-secondary);border:var(--border-width-default) solid var(--color-border-strong);border-radius:var(--radius-pill);padding:2px var(--space-sm)}
@@ -38,7 +43,17 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
    property player_tier_identity.portrait_frame_classes()'s shared
    dg-tier-frame--ring box-shadow reads, same mechanism My Team/Trade Hub
    use for tier rings, just pinned to a single color here. */
-.dg-game-plan-card-primary .dg-tier-frame--ring{--dg-tier-a:var(--color-accent)}
+/* Reference ring reads as a vivid lime-green, not the card's cyan accent —
+   --color-success is the closest existing semantic green token (no new
+   color invented). Scoped to the ringed avatar itself (not every avatar in
+   the card) so it only ever touches the give/get portraits that actually
+   opted into avatar_ring=True. Also circles the avatar here only: every
+   avatar site-wide stays square (.dg-compact-asset-avatar has no
+   border-radius outside this scope) — that's a bigger decision the product
+   owner hasn't made. overflow:hidden on .dg-compact-asset-avatar already
+   clips the absolutely-positioned, object-fit:cover headshot cleanly to
+   the circle. */
+.dg-game-plan-card-primary .dg-compact-asset-avatar.dg-tier-frame--ring{--dg-tier-a:var(--color-success);border-radius:50%;box-shadow:0 0 0 3px var(--dg-tier-a),0 0 4px 0 color-mix(in srgb,var(--dg-tier-a) 30%,transparent)}
 /* Value-as-pill: value_edge_html()'s own markup is reused verbatim — this
    only hides the directional triangle/magnitude bar and fills the number
    as a chip, color-keyed off the polarity data attribute it already emits. */
