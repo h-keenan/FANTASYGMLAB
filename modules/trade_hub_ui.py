@@ -2290,6 +2290,19 @@ def render_trade_idea_card(
                         state=st.session_state,
                         button_label=share_cards.TRADE_HUB_SHARE_LABEL,
                     )
+                    # Additive growth card: both sides' value, an A-F
+                    # letter grade, and who won — distinct from the trade
+                    # idea card above (same underlying data, different
+                    # fixed 1080x1350 presentation). Never gated by
+                    # entitlement (modules.premium.can_export_share_card).
+                    from modules import growth_share_cards
+
+                    growth_share_cards.render_trade_grade_share_controls(
+                        share_card,
+                        key=f"{summary_key}_grade_share",
+                        state=st.session_state,
+                        source_surface="trade_review",
+                    )
             except Exception:
                 pass
             # Health risk stays in the Risk row only — no duplicate st.warning.

@@ -21370,6 +21370,23 @@ def main():
                         rank_column="power_rank",
                         score_column="power_score",
                     )
+                    try:
+                        from modules import growth_share_cards
+
+                        growth_share_cards.render_power_rankings_share_controls(
+                            selected_league_name or "League",
+                            growth_share_cards.build_power_rankings_rows(
+                                df_intel,
+                                rank_column="power_rank",
+                                score_column="power_score",
+                            ),
+                            key=f"league_overview_power_rankings_{selected_league_id}",
+                            state=st.session_state,
+                            source_surface="league_overview",
+                            score_label="Starter-Weighted Score",
+                        )
+                    except Exception:
+                        pass
                     render_section_header(
                         "Franchise Value",
                         kicker="Dynasty value",
