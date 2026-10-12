@@ -67,7 +67,8 @@ MULTIPLE_RECOMMENDATIONS = (
         "tone": "trade",
         "route_key": "trade_hub",
         "presentation": {
-            "value_edge": "+237",
+            "value_edge": "-1028",
+            "confidence": "Low confidence",
             "send": [
                 {
                     "asset_type": "player",
