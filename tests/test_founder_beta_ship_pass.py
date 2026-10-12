@@ -116,7 +116,11 @@ def test_dashboard_uses_canonical_standard_portrait_primitive():
     )
     assert "dg-compact-asset--standard" in watch
     ui = (ROOT / "modules" / "daily_gm_briefing_ui.py").read_text(encoding="utf-8")
-    assert 'size="standard"' in ui
+    # Watch still renders at standard size via watch_attention_html (above);
+    # the Top Priority trade/Top Waiver teasers deliberately render at
+    # compact size (36px) instead — Trade Hub's own 52px give/get breakdown
+    # is the wrong density for a one-glance Dashboard summary tile.
+    assert 'size="compact"' in ui
     assert "--size-asset-standard:3.25rem" in ui.replace(" ", "")
 
 

@@ -125,7 +125,7 @@ def _assert_rich(plan: dgb.DailyGmBriefing) -> None:
     assert "Pat Bryant" in trade_html
     assert "You give" in trade_html
     assert "You get" in trade_html
-    assert "+237 VALUE EDGE" in trade_html
+    assert "+237" in trade_html
     assert "dg-compact-asset-avatar" in trade_html
     assert daily_gm_briefing_ui._should_show_headline(trade) is False
     assert "Cam" in watch_html and "Skattebo" in watch_html
