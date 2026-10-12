@@ -364,7 +364,7 @@ body:has(.mobile-gm-sheet-marker)::before {{
     background: var(--color-surface-primary) !important;
     border: 0 !important;
     border-bottom: var(--border-width-default) solid var(--color-border) !important;
-    border-left: var(--border-width-semantic) solid transparent !important;
+    border-left: var(--border-width-semantic) solid var(--dg-rc, transparent) !important;
     border-radius: var(--radius-none) !important;
     box-shadow: var(--shadow-none) !important;
     box-sizing: border-box !important;
@@ -414,6 +414,11 @@ body:has(.mobile-gm-sheet-marker)::before {{
     font-size: var(--font-size-badge) !important;
     font-weight: var(--font-weight-title) !important;
     letter-spacing: var(--letter-spacing-badge) !important;
+}}
+/* Current row's glyph reads accent too, matching mobile's DestIcon override. */
+{_GM_SHEET_BLOCK} [data-testid="stButton"] button[kind="primary"]::before,
+{_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"][kind="primary"]::before {{
+    background-color: var(--color-accent) !important;
 }}
 {_GM_SHEET_BLOCK} [data-testid="stButton"] button:hover,
 {_GM_SHEET_BLOCK} button[data-testid^="stBaseButton"]:hover {{

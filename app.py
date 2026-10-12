@@ -57,6 +57,7 @@ from modules import account_store
 from modules import account_ui
 from modules import application_shell
 from modules import brand_identity
+from modules import semantic_glyphs
 from modules import canonical_player_ranking
 from modules import design_tokens
 from modules import theme_mode
@@ -13877,6 +13878,9 @@ def render_mobile_destination_sheet(
                 )
                 button_type = "primary" if is_active else "secondary"
                 with st.container(key=f"mobile_sheet_row_{page.key}"):
+                    row_color_marker = semantic_glyphs.gm_orb_row_color_marker_html(page.key)
+                    if row_color_marker:
+                        st.markdown(row_color_marker, unsafe_allow_html=True)
                     st.button(
                         command_label,
                         key=f"mobile_sheet_nav_{page.key}",
