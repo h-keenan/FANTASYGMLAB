@@ -7104,6 +7104,9 @@ def render_home_dashboard(
             cached_package
         )
         snapshot_items = list(cached_package.get("snapshot_items") or [])
+        league_snapshot_items = list(
+            cached_package.get("league_snapshot_items") or []
+        )
         df_intel = pd.DataFrame()
         premium_content = dashboard_premium_content_state(effective_entitlement)
         # Ephemeral news intelligence: refresh alert tiles from disk cache without
@@ -8118,6 +8121,47 @@ def render_home_dashboard(
                 "comparison": snapshot_comparisons.get("Bench Strength"),
             },
         ]
+        # League Snapshot: the record/standing/health read mobile's Dashboard
+        # leads with (Record, Power Rank, Franchise Rank, Avg Age, Injuries).
+        # Reuses the exact same real values already computed above for
+        # snapshot_items/action_center_items (team_row power/franchise rank,
+        # record_label, average_age_label, injured_starters) -- no new data
+        # plumbing, and deliberately a separate list from snapshot_items
+        # (Team Snapshot) rather than relabeling it, since Team Snapshot's own
+        # contract already guarantees it never carries Power/Franchise Rank
+        # (see tests/test_dashboard_workflow.py).
+        league_snapshot_items = [
+            {
+                "label": "Record",
+                "value": record_label or "Unavailable",
+                "note": "Current league record",
+                "tone": "current",
+            },
+            {
+                "label": "Power Rank",
+                "value": _format_rank(team_row.get("power_rank"), tied=bool(team_row.get("power_rank_tied"))),
+                "note": "Roster power across the league",
+                "tone": "power",
+            },
+            {
+                "label": "Franchise Rank",
+                "value": _format_rank(team_row.get("franchise_rank"), tied=bool(team_row.get("franchise_rank_tied"))),
+                "note": "Dynasty asset value rank",
+                "tone": "franchise",
+            },
+            {
+                "label": "Avg Age",
+                "value": average_age_label,
+                "note": "Active roster profile",
+                "tone": "current",
+            },
+            {
+                "label": "Injuries",
+                "value": str(injured_starters),
+                "note": health_flag or "Active roster availability",
+                "tone": "risk" if injured_starters else "opportunity",
+            },
+        ]
         _briefing_mark["snapshot"] = time.perf_counter()
         briefing_assembly_elapsed = (time.perf_counter() - briefing_assembly_started) * 1000
         try:
@@ -8217,6 +8261,9 @@ def render_home_dashboard(
                     dashboard_briefing
                 ),
                 "snapshot_items": [dict(item) for item in (snapshot_items or [])],
+                "league_snapshot_items": [
+                    dict(item) for item in (league_snapshot_items or [])
+                ],
                 "recommendation_ids": [
                     str(item.recommendation_id)
                     for item in todays_game_plan.items
@@ -8311,11 +8358,17 @@ def render_home_dashboard(
                         "league_intelligence_frame", pd.DataFrame()
                     )
                 league_pulse_items = build_home_league_pulse_items(pulse_intel)
-            render_summary_tiles(
-                league_pulse_items,
-                compact=True,
-                detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
-            )
+            # Keyed container gives dashboard_workflow_styles.py's route-scoped
+            # CSS a stable hook to give each League Pulse tone its own left-
+            # border color (mobile's cyan/amber/green/purple cards) without
+            # touching summary_tiles_html's shared dg-card-* classes used
+            # elsewhere (My Team, GM Targets, etc.).
+            with st.container(key="dashboard_league_pulse_tiles"):
+                render_summary_tiles(
+                    league_pulse_items,
+                    compact=True,
+                    detail_dialog_renderer=workspace_ui.render_canonical_summary_tile_detail_dialog,
+                )
 
     def _render_full_recommendations_lock() -> None:
         render_premium_lock(
@@ -8572,8 +8625,10 @@ def render_home_dashboard(
         dashboard_workflow.render_dashboard_workflow(
             dashboard_briefing,
             snapshot_items=snapshot_items,
+            league_snapshot_items=league_snapshot_items,
             render_tiles=render_home_command_tiles,
             render_snapshot=lambda items: render_summary_tiles(items, compact=True),
+            render_league_snapshot=lambda items: render_summary_tiles(items, compact=True),
             render_quick_actions=render_home_quick_actions,
             render_league_pulse=_render_dashboard_league_pulse,
             commit_platform_destination=_commit_platform_destination,

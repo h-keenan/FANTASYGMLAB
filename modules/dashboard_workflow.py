@@ -111,6 +111,8 @@ def render_dashboard_workflow(
     render_snapshot: Callable[[list[dict]], None],
     render_quick_actions: Callable[[list[tuple[str, str]]], None],
     render_league_pulse: Callable[[], None],
+    league_snapshot_items: Sequence[Mapping] = (),
+    render_league_snapshot: Callable[[list[dict]], None] | None = None,
     render_orientation: Callable[[], None] | None = None,
     render_full_recommendations_lock: Callable[[], None] | None = None,
     render_league_pulse_lock: Callable[[], None] | None = None,
@@ -163,6 +165,7 @@ def render_dashboard_workflow(
             additional_tiles = [dict(item) for item in briefing.additional] if briefing.additional else []
             intelligence_tiles = [dict(item) for item in briefing.intelligence] if briefing.intelligence else []
             snapshot_tiles = [dict(item) for item in snapshot_items]
+            league_snapshot_tiles = [dict(item) for item in league_snapshot_items]
 
             if render_what_changed is not None:
                 render_what_changed()
@@ -256,6 +259,22 @@ def render_dashboard_workflow(
             if render_orientation is not None:
                 render_orientation()
 
+            # League Snapshot: record + league-wide standing (power/franchise
+            # rank) + health at a glance, the five-tile read mobile's Next
+            # Move screen leads with. Distinct from Team Snapshot below (which
+            # covers roster construction — starter/bench strength) so neither
+            # section duplicates the other's five tiles; both reuse the same
+            # render_summary_tiles primitive, just different real data already
+            # computed for Today's Game Plan (team_row power/franchise rank,
+            # record, roster age, injured-starter count — no new plumbing).
+            if render_league_snapshot is not None and league_snapshot_tiles:
+                with st.container(key="dashboard_league_snapshot"):
+                    ui_primitives.render_section_header(
+                        "League Snapshot", weight="secondary"
+                    )
+                    st.caption("Record, league standing, and health at a glance.")
+                    render_league_snapshot(league_snapshot_tiles)
+
             # Secondary context, demoted below the actionable feed: Team Snapshot
             # (pure record/health/construction reference) now sits with the league
             # recap nudge and Quick Actions rather than beside League Insights.
@@ -296,6 +315,7 @@ def render_dashboard_workflow(
                     ("League Overview", "rankings"),
                     ("My Team", "my_team"),
                     ("Trade Hub", "trade_hub"),
+                    ("Waivers", "waivers"),
                     ("Draft Center", "draft_summary"),
                     ("GM Plan", "gm_plan"),
                     ("Trade History", "trade_history"),

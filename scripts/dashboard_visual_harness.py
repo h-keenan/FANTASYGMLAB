@@ -159,12 +159,32 @@ LEAGUE_PULSE = (
         ),
     },
     {
-        "label": "Draft Capital Leader",
+        "label": "Biggest Rebuilder",
         "value": "Fixture Rebuilder",
+        "note": "Draft 1st | Rebuild",
+        "tone": "strategy",
+    },
+    {
+        "label": "Draft Capital Leader",
+        "value": "Fixture Capital Leader",
         "note": "Largest synthetic future-pick position.",
-        "tone": "draft",
+        "tone": "opportunity",
         "detail": "This summarizes fixture draft-capital ownership without live league data.",
     },
+    {
+        "label": "Most Active Manager",
+        "value": "fixture_trader",
+        "note": "Fixture Franchise | 4 completed trades",
+        "tone": "franchise",
+    },
+)
+
+LEAGUE_SNAPSHOT = (
+    {"label": "Record", "value": "7-3", "note": "Current league record", "tone": "current"},
+    {"label": "Power Rank", "value": "#2", "note": "Roster power across the league", "tone": "power"},
+    {"label": "Franchise Rank", "value": "#4", "note": "Dynasty asset value rank", "tone": "franchise"},
+    {"label": "Avg Age", "value": "25.8", "note": "Active roster profile", "tone": "current"},
+    {"label": "Injuries", "value": "1", "note": "Stable", "tone": "risk"},
 )
 
 
@@ -294,6 +314,14 @@ def _render_dashboard(
             key_prefix=f"visual_daily_gm_{league['id']}",
         )
 
+    def render_league_pulse() -> None:
+        with st.container(key="dashboard_league_pulse_tiles"):
+            app.render_summary_tiles(
+                list(LEAGUE_PULSE),
+                compact=True,
+                detail_dialog_renderer=app.workspace_ui.render_canonical_summary_tile_detail_dialog,
+            )
+
     dashboard_workflow.render_dashboard_workflow(
         briefing,
         snapshot_items=[
@@ -303,15 +331,13 @@ def _render_dashboard(
             {"label": "Starter Strength", "value": "#2", "note": "Projected lineup rank", "tone": "power"},
             {"label": "Bench Strength", "value": "#5", "note": "Depth rank", "tone": "franchise"},
         ],
+        league_snapshot_items=list(LEAGUE_SNAPSHOT),
         render_tiles=app.render_home_command_tiles,
         render_snapshot=lambda items: app.render_summary_tiles(items, compact=True),
+        render_league_snapshot=lambda items: app.render_summary_tiles(items, compact=True),
         render_quick_actions=app.render_home_quick_actions,
         render_orientation=orientation,
-        render_league_pulse=lambda: app.render_summary_tiles(
-            list(LEAGUE_PULSE),
-            compact=True,
-            detail_dialog_renderer=app.workspace_ui.render_canonical_summary_tile_detail_dialog,
-        ),
+        render_league_pulse=render_league_pulse,
         render_full_recommendations_lock=(
             full_recommendations_lock
             if entitlement == premium.FREE and len(action_items) > len(visible_items)
