@@ -2,6 +2,14 @@
 
 This stylesheet intentionally follows all legacy page CSS so shared contracts
 win without changing page renderers or business behavior.
+
+The position-badge rule below is "prestige is the only accent language" with
+one deliberate, narrow exception: mobile's PositionBadge tints QB/RB/WR/TE/K
+by position, and football_asset_styles.py already carries the matching
+--color-position-* tokens plus a dg-football-position--<slug> modifier class
+(position_slug() never emits one for any other position) — the override here
+just lets that existing, otherwise-dead color system win instead of adding a
+new one.
 """
 
 COMMAND_CENTER_CSS = """
@@ -164,6 +172,13 @@ div[data-testid="stDialog"] [role="dialog"]{
     border-radius: var(--radius-none) !important;
     color: var(--color-text-secondary) !important;
 }
+
+.dg-football-position--qb,.dg-football-position--rb,.dg-football-position--wr,.dg-football-position--te,.dg-football-position--k{border-color:currentColor!important}
+.dg-football-position--qb{color:var(--color-position-qb)!important}
+.dg-football-position--rb{color:var(--color-position-rb)!important}
+.dg-football-position--wr{color:var(--color-position-wr)!important}
+.dg-football-position--te{color:var(--color-position-te)!important}
+.dg-football-position--k{color:var(--color-position-k)!important}
 
 /* Section hierarchy and dashboard density. */
 .dg-ui-eyebrow,
