@@ -537,7 +537,11 @@ def test_app_remains_the_only_shared_renderer_and_dossier_does_not_recompute_val
     assert "Load recent news" not in renderer
     assert "pqv_detail_nav_" in renderer
     assert "pqv_actions_strip_" in renderer
-    assert "st.columns(2" in renderer or "st.columns(3" in renderer
+    assert (
+        "st.columns(2" in renderer
+        or "st.columns(3" in renderer
+        or "st.columns(4" in renderer
+    )
     assert "pqv_primary_workspace_html(" in renderer
     assert renderer.index("pqv_hero_html") < renderer.index("recommendation_context_html")
     assert renderer.index("recommendation_context_html") < renderer.index(

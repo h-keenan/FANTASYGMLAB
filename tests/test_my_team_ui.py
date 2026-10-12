@@ -531,5 +531,55 @@ class TestMyTeamUI(unittest.TestCase):
         self.assertIn("Sleeper remains the full My Team path", source)
 
 
+def test_team_value_percentile_matches_league_workspace_ui_transform():
+    from modules import league_workspace_ui
+
+    assert my_team_ui.team_value_percentile(4, 10) == league_workspace_ui._percentile_from_rank(4, 10)
+    assert my_team_ui.team_value_percentile(1, 10) == 100.0
+
+
+def test_team_value_percentile_none_on_missing_inputs():
+    assert my_team_ui.team_value_percentile(None, 10) is None
+    assert my_team_ui.team_value_percentile(4, None) is None
+    assert my_team_ui.team_value_percentile("not-a-rank", 10) is None
+
+
+def test_team_snapshot_html_renders_ring_pill_and_power_rank():
+    html = my_team_ui.team_snapshot_html(
+        value_display="70,945",
+        percentile=66.7,
+        archetype_label="Asset Consolidator",
+        power_rank_label="Power Rank #6 of 10",
+    )
+    assert "mt-value-ring" in html
+    assert "--mt-value-pct:67" in html
+    assert "Asset Consolidator" in html
+    assert "Power Rank #6 of 10" in html
+    assert "70,945 value" in html
+
+
+def test_team_snapshot_html_omits_ring_when_percentile_unavailable():
+    html = my_team_ui.team_snapshot_html(
+        value_display="70,945",
+        percentile=None,
+        archetype_label="Asset Consolidator",
+        power_rank_label="",
+    )
+    assert "mt-value-ring" not in html
+    assert "Asset Consolidator" in html
+
+
+def test_team_snapshot_html_empty_when_nothing_to_show():
+    assert (
+        my_team_ui.team_snapshot_html(
+            value_display="",
+            percentile=None,
+            archetype_label="",
+            power_rank_label="",
+        )
+        == ""
+    )
+
+
 if __name__ == "__main__":
     unittest.main()

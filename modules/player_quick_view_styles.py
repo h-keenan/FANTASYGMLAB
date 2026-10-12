@@ -274,6 +274,22 @@ div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[cl
 .player-dossier-decision p,.player-dossier-context-summary,.player-dossier-context-note,.player-dossier-career-empty{color:var(--color-text-secondary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0}
 .player-dossier-career-empty,.player-dossier-context-summary,.player-dossier-context-note{padding:var(--space-sm) var(--space-md)}
 .player-dossier-context-note{border-top:var(--border-width-default) solid var(--color-border);color:var(--color-text-muted)}
+/* Schedule tab — real opponent/home-away/market-line rows (modules/
+   player_quick_view.py's schedule_table_html), matching mobile's Schedule
+   tab. Opponent tone reuses the same low/high danger-success tokens the
+   Stats tab's percentile bars already use; no new color scheme. */
+.pqv-schedule{display:grid;gap:var(--space-sm);max-width:40rem}
+.pqv-schedule-disclaimer{color:var(--color-text-muted);font-size:var(--font-size-caption);line-height:var(--line-height-caption);margin:0}
+.pqv-schedule-rows{display:grid}
+.pqv-schedule-row{border-bottom:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-sm);grid-template-columns:3.5rem minmax(0,1fr);padding:var(--space-xs) 0}
+.pqv-schedule-row:last-child{border-bottom:0}
+.pqv-schedule-week{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge)}
+.pqv-schedule-main{display:grid;gap:2px;min-width:0}
+.pqv-schedule-opponent{color:var(--color-text-primary);font-weight:var(--font-weight-button)}
+.pqv-schedule-opponent--low{color:var(--color-danger)}
+.pqv-schedule-opponent--high{color:var(--color-success)}
+.pqv-schedule-detail{color:var(--color-text-secondary);font-size:var(--font-size-caption)}
+.pqv-schedule-bye{color:var(--color-danger);font-weight:var(--font-weight-button);text-transform:uppercase}
 div[data-testid="stDialog"] [role="dialog"]:has(.player-quick-view-shell){max-height: min(88vh, 920px) !important}
 div[data-testid="stDialog"] [role="dialog"]:has(.player-quick-view-shell)>div:last-child{overflow-y: auto !important;overscroll-behavior:contain}
 @media (max-width: 900px){

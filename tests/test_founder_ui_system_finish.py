@@ -368,10 +368,14 @@ def test_pqv_decision_summary_and_actions_compact():
         )
     ]
     assert "st.columns((1.6, 1.1, 0.9)" in pqv
-    assert "st.columns(3" in pqv
-    assert "st.columns(4)" not in pqv
+    # Detail nav rail: Stats / Schedule / Career / Model (4 columns) —
+    # matches the mobile Player Detail tab set (Stats/Trends/Schedule/
+    # Career/Model, minus Trends which lives inline under Stats on web).
+    assert "st.columns(4" in pqv
+    assert "st.columns(5)" not in pqv
     assert "pqv_detail_nav_" in pqv
     assert "compact_bio_html" in pqv
+    assert '"SCHEDULE"' in pqv
     assert '"MODEL"' in pqv
     assert "pqv-model-matrix" in pqv
     assert PLAYER_QUICK_VIEW_CSS.count("pqv-decision-topline") >= 1
