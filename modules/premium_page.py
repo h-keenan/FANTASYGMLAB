@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from html import escape
 
 import streamlit as st
@@ -49,6 +50,49 @@ PREMIUM_HIGHLIGHT_CSS = """
     margin-left:var(--space-xs);
     padding:0.1rem 0.5rem;
     text-transform:uppercase;
+    white-space:nowrap;
+}
+.premium-checkout-option-savings{
+    background:color-mix(in srgb,var(--color-success) 18%,transparent);
+    border-radius:999px;
+    color:var(--color-success);
+    display:inline-block;
+    font-size:0.6875rem;
+    font-weight:800;
+    margin-top:var(--space-xs);
+    padding:0.1rem 0.5rem;
+    text-transform:uppercase;
+}
+.premium-launch-week-banner{
+    align-items:center;
+    display:flex;
+    flex-wrap:wrap;
+    gap:var(--space-sm);
+    justify-content:space-between;
+    margin:0 0 var(--space-md);
+    padding:var(--space-sm) var(--space-md);
+}
+.premium-launch-week-badge{
+    background:color-mix(in srgb,var(--color-premium) 24%,transparent);
+    border-radius:999px;
+    color:var(--color-premium);
+    font-size:0.6875rem;
+    font-weight:800;
+    letter-spacing:0.04em;
+    padding:0.15rem 0.6rem;
+    text-transform:uppercase;
+    white-space:nowrap;
+}
+.premium-launch-week-copy{
+    color:var(--color-text);
+    flex:1 1 auto;
+    font-size:0.8rem;
+    font-weight:600;
+}
+.premium-launch-week-countdown{
+    color:var(--color-text-muted);
+    font-size:0.72rem;
+    font-weight:700;
     white-space:nowrap;
 }
 """
@@ -266,6 +310,61 @@ def normalize_checkout_interval(value: object) -> str:
     return interval if interval in PLAN_DETAILS else stripe_billing.MONTHLY
 
 
+# Launch Week promo copy (Oct 12 00:00 - Oct 18 23:59 America/Chicago — see
+# stripe_billing.launch_week_active). The actual charge always comes from
+# price_id_for_plan(config, PRO, "annual"), which already resolves the
+# discounted Stripe Price automatically while the window is active; these
+# two strings are display-only and must stay in sync with that Price's
+# real amounts. Label is "Launch Week" — never "beta" or anything
+# beta-adjacent (that framing was deliberately removed; see PRs #993/#994).
+LAUNCH_WEEK_LABEL = "Launch Week"
+LAUNCH_WEEK_REGULAR_ANNUAL_PRICE = "$39.99"
+LAUNCH_WEEK_PROMO_ANNUAL_PRICE = "$29.99"
+
+
+def launch_week_countdown_text(*, now: datetime | None = None) -> str:
+    """Short "ends in" copy for the Launch Week banner. Pure function of time."""
+
+    current = now if now is not None else datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    remaining_seconds = max(
+        0, int((stripe_billing.LAUNCH_WEEK_END - current).total_seconds())
+    )
+    days, rem_seconds = divmod(remaining_seconds, 86400)
+    hours, rem_seconds = divmod(rem_seconds, 3600)
+    minutes = rem_seconds // 60
+    if days > 0:
+        return f"Ends in {days}d {hours}h"
+    if hours > 0:
+        return f"Ends in {hours}h {minutes}m"
+    return f"Ends in {max(1, minutes)}m"
+
+
+def launch_week_banner_html(*, now: datetime | None = None) -> str:
+    """Promo banner for the paywall/Premium page. "" outside the window."""
+
+    if not stripe_billing.launch_week_active(now=now):
+        return ""
+    countdown = launch_week_countdown_text(now=now)
+    return (
+        "<div class='premium-launch-week-banner dg-preset-primary-action'>"
+        f"<span class='premium-launch-week-badge'>{escape(LAUNCH_WEEK_LABEL)}</span>"
+        "<div class='premium-launch-week-copy'>GM Pro annual is "
+        f"{escape(LAUNCH_WEEK_PROMO_ANNUAL_PRICE)} instead of "
+        f"{escape(LAUNCH_WEEK_REGULAR_ANNUAL_PRICE)} this week only.</div>"
+        f"<span class='premium-launch-week-countdown'>{escape(countdown)}</span>"
+        "</div>"
+    )
+
+
+# Annual vs monthly framing, preselected by default below — a fixed
+# marketing figure per the relaunch pricing spec, independent of whichever
+# live/fallback price tuple is on screen (Launch Week's temporarily lower
+# annual price only makes this framing look even better, never worse).
+ANNUAL_SAVINGS_BADGE_TEXT = "Save 52%"
+
+
 def _plan_option_html(
     interval: str,
     *,
@@ -273,9 +372,15 @@ def _plan_option_html(
     plan_details: dict[str, tuple[str, str, str]] | None = None,
 ) -> str:
     details = plan_details or PLAN_DETAILS
-    label, price, cadence = details[normalize_checkout_interval(interval)]
+    resolved_interval = normalize_checkout_interval(interval)
+    label, price, cadence = details[resolved_interval]
     selected_class = " premium-checkout-option-selected" if selected else ""
     selected_text = "Selected plan" if selected else "Available plan"
+    savings_badge = (
+        f"<span class='premium-checkout-option-savings'>{escape(ANNUAL_SAVINGS_BADGE_TEXT)} vs. monthly</span>"
+        if resolved_interval == stripe_billing.ANNUAL
+        else ""
+    )
     return (
         f"<div class='premium-checkout-option{selected_class}' "
         f"data-premium-plan='{escape(interval)}' aria-label='{escape(label)} plan, {escape(price)} {escape(cadence)}, {selected_text}'>"
@@ -283,6 +388,7 @@ def _plan_option_html(
         f"<div class='premium-checkout-option-name'>{escape(label)}</div>"
         f"<div class='premium-checkout-option-price'>{escape(price)}</div>"
         f"<div class='premium-checkout-option-cadence'>{escape(cadence)}</div>"
+        f"{savings_badge}"
         "</div>"
     )
 
@@ -538,9 +644,12 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         st.caption("Welcome back — continue checkout when you are ready.")
         st.session_state.pop(premium_conversion.RESUME_CHECKOUT_FLAG, None)
     intent = premium_conversion.peek_checkout_intent()
-    default_interval = intent.get("interval") or stripe_billing.MONTHLY
+    # Annual preselected by default ("Save 52%" vs. monthly — see
+    # ANNUAL_SAVINGS_BADGE_TEXT) unless the user's captured checkout intent
+    # already named a plan.
+    default_interval = intent.get("interval") or stripe_billing.ANNUAL
     if default_interval not in {stripe_billing.MONTHLY, stripe_billing.ANNUAL}:
-        default_interval = stripe_billing.MONTHLY
+        default_interval = stripe_billing.ANNUAL
     interval_key = "premium_test_checkout_interval"
     if interval_key not in st.session_state:
         st.session_state[interval_key] = default_interval
@@ -552,6 +661,9 @@ def render_premium_page(*, entitlement: str = premium.FREE) -> None:
         ),
         unsafe_allow_html=True,
     )
+    launch_week_html = launch_week_banner_html()
+    if launch_week_html:
+        st.markdown(launch_week_html, unsafe_allow_html=True)
     with st.container(key="premium_plan_purchase"):
         st.markdown(
             "<div class='premium-checkout-heading'>"

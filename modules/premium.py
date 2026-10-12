@@ -474,3 +474,27 @@ def render_premium_lock(
         premium_lock_html(title, body, feature=feature, cta=cta),
         unsafe_allow_html=True,
     )
+
+
+def premium_blur_preview_html(label: str, *, rows: int = 3) -> str:
+    """Abstract, non-data-revealing preview rows for a locked section.
+
+    Pairs with render_premium_lock (rendered immediately after this) so a
+    locked feature stays visible — per the relaunch paywall spec: a
+    blurred preview plus an "Unlock" CTA, never hidden outright. The rows
+    are empty placeholders with a literal CSS blur() (see
+    modules.paywall_gate_styles.PAYWALL_GATE_CSS), not a blur() filter over
+    real Pro-only data — same "tease the shape, not the content" principle
+    as modules.trade_hub_ui.trade_hub_locked_preview_html.
+    """
+
+    slots = max(0, min(int(rows or 0), 5))
+    bars = "".join(
+        "<div class='paywall-blur-row' aria-hidden='true'></div>" for _ in range(slots)
+    )
+    return (
+        "<div class='paywall-blur-preview'>"
+        f"<p class='paywall-blur-label'>{escape(_safe_text(label, 'Locked'))}</p>"
+        f"{bars}"
+        "</div>"
+    )

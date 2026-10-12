@@ -19042,6 +19042,22 @@ def main():
             )
         elif my_roster_id is None:
             workspace_notices.render_roster_mismatch_notice()
+        elif not current_user_is_premium():
+            # GM Plan is a GM Pro feature (relaunch paywall trigger). Blurred
+            # preview + lock, never hidden outright — see
+            # modules.premium.premium_blur_preview_html.
+            from modules import paywall_gate_styles
+
+            inject_global_styles(paywall_gate_styles.PAYWALL_GATE_CSS)
+            render_html_fragment(
+                premium.premium_blur_preview_html("Your season-arc roadmap", rows=3)
+            )
+            render_premium_lock(
+                "GM Plan",
+                "A season-arc roadmap: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation.",
+                feature="gm_plan_gate",
+                cta="Unlock with GM Pro",
+            )
         else:
             from modules import gm_plan_ui
 
@@ -19061,16 +19077,31 @@ def main():
     # exposure of modules.college_scouting (already live on mobile); no new
     # valuation math here (see modules.college_scouting_ui). Not
     # league-scoped — the same shared prospect pool is graded by every
-    # signed-in user regardless of which league is selected.
+    # signed-in user regardless of which league is selected. GM Pro feature
+    # (relaunch paywall trigger) — blurred preview + lock, never hidden.
     if current_page == "college_scouting":
         render_page_shell(
             page_key="college_scouting",
             title="College Scouting",
             subtitle="Submit a 1-5 grade on any college prospect — your grade pools into one shared signal with every other scout. Follow prospects you're tracking on your personal watchlist.",
         )
-        from modules import college_scouting_ui
+        if not current_user_is_premium():
+            from modules import paywall_gate_styles
 
-        college_scouting_ui.render_college_scouting_workspace(session=st.session_state)
+            inject_global_styles(paywall_gate_styles.PAYWALL_GATE_CSS)
+            render_html_fragment(
+                premium.premium_blur_preview_html("Shared prospect grades", rows=3)
+            )
+            render_premium_lock(
+                "College Scouting",
+                "Submit grades on college prospects and see the crowdsourced signal every other scout is building.",
+                feature="scouting_gate",
+                cta="Unlock with GM Pro",
+            )
+        else:
+            from modules import college_scouting_ui
+
+            college_scouting_ui.render_college_scouting_workspace(session=st.session_state)
 
     # ALL PLAYERS
     if current_page == "players":
@@ -23476,6 +23507,26 @@ def main():
         except Exception:
             pass
 
+        # Weekly trade-evaluation limit (relaunch paywall trigger). Free gets
+        # 3 Trade Analyzer runs per week — see modules.trade_eval_usage. No
+        # app-wide user-timezone source exists yet (see that module's
+        # docstring), so the reset boundary uses UTC until one is wired in;
+        # this only shifts exactly when a Free account's week rolls over,
+        # never the 3/week count itself.
+        from modules import trade_eval_usage
+
+        trade_eval_entitlement = current_user_entitlement()
+        trade_eval_user_id = auth_supabase.current_user_id(st.session_state)
+        trade_eval_remaining = trade_eval_usage.trade_evals_remaining_this_week(
+            trade_eval_user_id,
+            trade_eval_entitlement,
+            user_settings=st.session_state.get("account_user_settings"),
+            tz_name=trade_eval_usage.DEFAULT_TIMEZONE,
+        )
+        trade_eval_limit_reached = (
+            trade_eval_remaining is not None and trade_eval_remaining <= 0
+        )
+
         if "trade_send_assets" not in st.session_state:
             st.session_state["trade_send_assets"] = []
         if "trade_receive_assets" not in st.session_state:
@@ -23761,7 +23812,13 @@ def main():
         if analyze_clicked:
             if ownership_warnings and any("not on the selected partner" in w for w in ownership_warnings):
                 st.error("Fix ownership issues before analyzing.")
+            elif trade_eval_limit_reached:
+                # 4th+ Trade Analyzer run this week on Free — gate it (relaunch
+                # paywall trigger). The package stays exactly as built; only
+                # the Analyze action is blocked.
+                st.session_state["trade_eval_gate_signature"] = package_sig
             else:
+                st.session_state.pop("trade_eval_gate_signature", None)
                 analyze_started = time.perf_counter()
                 trade_fit_evaluation = evaluate_trade_analyzer_fit(
                     my_team_df=my_team_df,
@@ -23931,6 +23988,42 @@ def main():
                     )
                 except Exception:
                     pass
+                if trade_eval_remaining is not None:
+                    # Free tier only — Pro/Front Office are unlimited and
+                    # trade_evals_remaining_this_week already returned None
+                    # for them. Best-effort: a persistence failure must
+                    # never block showing the result just computed above.
+                    try:
+                        trade_eval_usage.record_trade_eval_used(
+                            trade_eval_user_id,
+                            config=_supabase_config(),
+                            session_state=st.session_state,
+                            tz_name=trade_eval_usage.DEFAULT_TIMEZONE,
+                        )
+                    except Exception:
+                        pass
+
+        if (
+            st.session_state.get("trade_eval_gate_signature") == package_sig
+            and st.session_state.get("trade_analyzer_analyzed_signature") != package_sig
+        ):
+            # The second clause keeps this from stacking under a result that
+            # already ran successfully before the weekly cap was hit — a
+            # result you already have is never re-locked just because a
+            # later click on the same unchanged package got blocked.
+            from modules import paywall_gate_styles
+
+            inject_global_styles(paywall_gate_styles.PAYWALL_GATE_CSS)
+            render_html_fragment(
+                premium.premium_blur_preview_html("Your trade grade", rows=3)
+            )
+            render_premium_lock(
+                "Weekly trade evaluations used",
+                "Free includes 3 Trade Analyzer evaluations per week, resetting Monday. "
+                "Upgrade to GM Pro for unlimited evaluations.",
+                feature="trade_eval_limit",
+                cta="Unlock with GM Pro",
+            )
 
         stored = st.session_state.get("trade_analyzer_result_payload")
         if (
