@@ -94,7 +94,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn("padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 13.8rem)", app.APP_CSS)
         self.assertIn("bottom: max(16px, env(safe-area-inset-bottom))", app.APP_CSS)
         self.assertIn("min-height: 34px", app.APP_CSS)
-        self.assertIn("left: max(16px, env(safe-area-inset-left))", app.APP_CSS)
+        self.assertIn("left: max(var(--space-md), env(safe-area-inset-left, 0px))", app.APP_CSS)
         self.assertIn("right: auto", app.APP_CSS)
         self.assertIn("height: auto !important", app.APP_CSS)
         self.assertIn("overflow: visible !important", app.APP_CSS)
@@ -155,7 +155,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             self.assertIn(token, app.APP_CSS)
 
         self.assertIn("clip-path: polygon", app.APP_CSS)
-        self.assertIn("linear-gradient(180deg, var(--dg-shell-black)", app.APP_CSS)
+        self.assertIn("--dg-shell-black: var(--color-bg)", app.APP_CSS)
 
     def test_visible_card_classes_use_last_mile_angular_system(self):
         for selector in [

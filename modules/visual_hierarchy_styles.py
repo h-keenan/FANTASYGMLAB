@@ -107,13 +107,6 @@ VISUAL_HIERARCHY_CSS = """
     padding: var(--space-sm) var(--space-md) !important;
 }
 
-.summary-tile-label {
-    color: var(--color-text-primary) !important;
-    font-size: var(--font-size-badge) !important;
-    letter-spacing: var(--letter-spacing-badge) !important;
-    text-transform: uppercase;
-}
-
 .summary-tile-value {
     color: var(--color-text-primary) !important;
     font-size: var(--font-size-body) !important;
@@ -154,10 +147,6 @@ VISUAL_HIERARCHY_CSS = """
 
 /* Desktop card type scale — content width/gutters owned by DESKTOP_EXECUTIVE. */
 @media (min-width: 1024px) {
-    .home-command-grid {
-        gap: var(--space-md);
-    }
-
     .summary-tile-grid,
     .summary-tile-grid-compact {
         gap: var(--space-md);

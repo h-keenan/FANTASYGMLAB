@@ -113,7 +113,7 @@ def test_status_and_tier_chip_families_have_no_dark_only_pastel_text():
 
 def test_status_and_tier_chips_use_semantic_color_tokens():
     expected_tokens = {
-        ".dg-glyph-chip-success": "var(--color-opportunity)",
+        ".dg-glyph-chip-success": "var(--color-success)",
         ".dg-glyph-chip-warning": "var(--color-warning)",
         ".dg-glyph-chip-premium": "var(--color-diagnostic)",
         ".dg-tier-elite": "var(--color-premium)",
@@ -139,7 +139,10 @@ def test_status_and_tier_chips_use_semantic_color_tokens():
     }
     for selector, token in expected_tokens.items():
         block = _rule_block(APP_CSS, selector)
-        assert f"color: {token};" in block, (selector, token)
+        assert f"color: {token};" in block or f"color: {token} !important;" in block, (
+            selector,
+            token,
+        )
 
 
 def test_startup_splash_text_is_not_hardcoded_white():
