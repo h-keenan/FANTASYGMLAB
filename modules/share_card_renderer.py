@@ -132,7 +132,16 @@ def _font(ImageFont, size: int, *, bold: bool = False):
         except OSError:
             continue
     if font is None:
-        font = ImageFont.load_default()
+        # No system TTF resolved (e.g. production containers ship no font
+        # packages). ImageFont.load_default() with no args ignores `size`
+        # and always returns a fixed ~10px glyph set — invisible once this
+        # card is downscaled to its ~300-400px share/preview display width.
+        # Pillow >=10.1 can scale its bundled Aileron font via `size=`;
+        # fall back to the unscaled default only on older Pillow.
+        try:
+            font = ImageFont.load_default(size=size)
+        except TypeError:
+            font = ImageFont.load_default()
     _FONT_CACHE[key] = font
     return font
 
