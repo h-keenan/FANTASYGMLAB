@@ -78,6 +78,15 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .dg-gp-trade-side--give,.dg-trade-side--send,.toa-side-send{border-inline-start:var(--border-width-semantic) solid var(--color-danger);padding-inline-start:var(--space-xs)}
 .dg-gp-trade-side--get,.dg-trade-side--receive,.toa-side-receive{border-inline-start:var(--border-width-semantic) solid var(--color-success);padding-inline-start:var(--space-xs)}
 .dg-gp-trade-metrics{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-top:var(--space-2xs);max-width:40rem}
+/* Three-segment confidence bar (mobile NextMoveScreen parity) — a strict
+   count of filled/unfilled blocks from confidence_filled_segments(), never a
+   numeric percentage; deliberately one uniform fill color (not per-level,
+   unlike tvl-conf-ring above), matching the mobile reference exactly. */
+.tvl-seg-row{align-items:center;column-gap:var(--space-xs);display:inline-flex;flex-wrap:wrap;max-width:100%}
+.tvl-seg-track{column-gap:2px;display:inline-flex}
+.tvl-seg{background:var(--color-border);display:inline-block;height:.5rem;width:.85rem}
+.tvl-seg--on{background:var(--color-accent)}
+.tvl-seg-label{color:var(--color-text-secondary);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);white-space:nowrap}
 @media (max-width:430px){
 .tvl-exchange{flex-direction:row;justify-content:flex-start;min-height:1rem}
 .tvl-exchange-arrow{clip-path:polygon(0 0,100% 50%,0 100%);height:.42rem;width:.5rem}
@@ -239,6 +248,40 @@ def priority_tier_html(label: object, *, extra_class: str = "") -> str:
     if extra_class:
         classes += f" {extra_class}"
     return f"<span class='{classes}'>{escape(text.upper())}</span>"
+
+
+def confidence_segments_html(label: object, *, extra_class: str = "") -> str:
+    """Three-segment confidence bar + "<Level> confidence" text.
+
+    Web's counterpart to mobile NextMoveScreen's ``ConfidenceBar`` — same
+    strict segment count (``confidence_filled_segments``, already used by
+    ``share_card_renderer``'s PNG export) rendered as small blocks instead of
+    the radial ``tvl-conf-ring`` above. Deliberately a single fill color
+    (cyan) regardless of level, matching the mobile reference pixel-for-pixel
+    rather than this module's own per-level ring palette.
+    """
+
+    raw = str(label or "").strip()
+    if not raw:
+        return ""
+    filled = confidence_filled_segments(raw)
+    visible = (
+        raw.replace(" confidence", "").replace("Confidence", "").strip() or raw
+    )
+    segments = "".join(
+        f"<span class='tvl-seg{' tvl-seg--on' if index < filled else ''}'></span>"
+        for index in range(3)
+    )
+    classes = "tvl-seg-row"
+    if extra_class:
+        classes += f" {extra_class}"
+    accessible = raw if "confidence" in raw.casefold() else f"{raw} confidence"
+    return (
+        f"<div class='{classes}' role='img' aria-label='{escape(accessible, quote=True)}'>"
+        f"<span class='tvl-seg-track' aria-hidden='true'>{segments}</span>"
+        f"<span class='tvl-seg-label'>{escape(visible)} confidence</span>"
+        "</div>"
+    )
 
 
 def cue_html(kind: CueKind, text: object) -> str:

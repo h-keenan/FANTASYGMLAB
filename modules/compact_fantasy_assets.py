@@ -9,13 +9,14 @@ from __future__ import annotations
 from html import escape
 from typing import Any, Mapping, Sequence
 
-from modules.football_assets import player_name_html
+from modules.football_assets import player_name_html, position_badge_html
 from modules.player_images import get_player_image_url
 from modules.player_profile_ui import avatar_html
 from modules.portrait_normalization import card_focus_x
 from modules.trade_visual_language import (
     TRADE_VISUAL_LANGUAGE_CSS,
     confidence_indicator_html,
+    confidence_segments_html,
     exchange_marker_html,
     value_edge_html,
 )
@@ -29,9 +30,9 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-compact-asset{align-items:center;box-sizing:border-box;column-gap:var(--space-xs);display:grid;grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;justify-content:start;max-width:100%;min-width:0;width:max-content}
 .dg-compact-asset--chip{column-gap:var(--space-2xs);grid-template-columns:var(--size-asset-chip) minmax(0,1fr)}
 .dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard) minmax(0,1fr) max-content}
-.dg-compact-asset-avatar,.dg-compact-pick-plate{align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:inline-flex;flex:0 0 var(--size-asset-compact);height:var(--size-asset-compact);justify-content:center;margin:0;overflow:hidden;padding:0;position:relative;width:var(--size-asset-compact)}
-.dg-compact-asset--chip .dg-compact-asset-avatar,.dg-compact-asset--chip .dg-compact-pick-plate{flex-basis:var(--size-asset-chip);height:var(--size-asset-chip);width:var(--size-asset-chip)}
-.dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{flex-basis:var(--size-asset-standard);height:var(--size-asset-standard);width:var(--size-asset-standard)}
+.dg-compact-asset-avatar,.dg-compact-pick-plate{--avatar-size:var(--size-asset-compact);align-items:center;background:var(--color-surface-muted);border:var(--border-width-default) solid var(--color-border);box-sizing:border-box;display:inline-flex;flex:0 0 var(--size-asset-compact);height:var(--size-asset-compact);justify-content:center;margin:0;overflow:hidden;padding:0;position:relative;width:var(--size-asset-compact)}
+.dg-compact-asset--chip .dg-compact-asset-avatar,.dg-compact-asset--chip .dg-compact-pick-plate{--avatar-size:var(--size-asset-chip);flex-basis:var(--size-asset-chip);height:var(--size-asset-chip);width:var(--size-asset-chip)}
+.dg-compact-asset--standard .dg-compact-asset-avatar,.dg-compact-asset--standard .dg-compact-pick-plate{--avatar-size:var(--size-asset-standard);flex-basis:var(--size-asset-standard);height:var(--size-asset-standard);width:var(--size-asset-standard)}
 .dg-compact-asset-avatar .dg-player-headshot,.dg-compact-asset-avatar .dg-player-headshot-image,.dg-compact-asset-avatar img{height:100%;inset:0;object-fit:cover;object-position:var(--dg-headshot-focus-x,FOCUS_X) var(--dg-headshot-focus,18%);position:absolute;transform:scale(1.16);transform-origin:var(--dg-headshot-focus-x,FOCUS_X) var(--dg-headshot-focus,18%);width:100%;z-index:1}
 .dg-compact-asset-avatar .dg-player-headshot-fallback{align-items:center;color:var(--color-text-secondary);display:flex;font-size:var(--font-size-badge);font-weight:var(--font-weight-title);inset:0;justify-content:center;position:absolute;z-index:0}
 .dg-compact-asset-avatar:has(img.dg-player-headshot-image) .dg-player-headshot-fallback,
@@ -56,7 +57,15 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-gp-trade-side{display:grid;gap:var(--space-2xs);justify-items:start;min-width:0}
 .dg-gp-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-transform:uppercase}
 .dg-gp-trade-for{align-self:center;color:var(--color-information);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-align:center;text-transform:uppercase}
-.dg-gp-value-edge{color:var(--color-success);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-top:var(--space-2xs);max-width:40rem}
+/* No `color` here: this is only a layout hook (``value_edge_html``'s
+   ``extra_class``) — color must stay owned by trade_visual_language's own
+   .tvl-edge/.tvl-edge--pos/neg/even polarity rules, which it was
+   unconditionally overriding to green for every polarity (pre-existing;
+   surfaced once the Top Priority card turned the number into a pill, where
+   green text on a red "overpay" pill reads as a real bug). */
+.dg-gp-value-edge{font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-top:var(--space-2xs);max-width:40rem}
+.dg-compact-asset-meta--pill{align-items:center;column-gap:var(--space-2xs);display:inline-flex;flex-wrap:wrap}
+.dg-compact-asset-team{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 @media (min-width:700px){
 .dg-trade-matchup{align-items:start;grid-template-columns:minmax(0,max-content) 1.5rem minmax(0,max-content);justify-content:start}
 .dg-trade-matchup-vs{display:flex}
@@ -246,7 +255,21 @@ def compact_asset_html(
     show_value: bool = True,
     show_role: bool = True,
     format_score=None,
+    position_pill: bool = False,
+    avatar_ring: bool = False,
 ) -> str:
+    """Render one compact player/pick identity chip.
+
+    ``position_pill``/``avatar_ring`` are opt-in (default off, so every
+    existing caller — Live Draft, Trade Analyzer, Trade Outcomes — renders
+    byte-identical to before). When set, a player chip swaps its plain-text
+    position for ``football_assets.position_badge_html()``'s existing
+    colored pill, and frames the avatar with ``player_tier_identity``'s
+    existing ``dg-tier-frame``/``dg-tier-frame--ring`` box-shadow ring (same
+    mechanism My Team/Trade Hub use for tier-colored portrait rings) — the
+    caller's route CSS is expected to pin ``--dg-tier-a`` to a single accent
+    color where a uniform (not tier-derived) ring is wanted.
+    """
     payload = presentation_asset(asset)
     if not payload:
         return ""
@@ -325,45 +348,65 @@ def compact_asset_html(
     avatar_class = "dg-compact-asset-avatar"
     if size == "chip":
         avatar_class += " dg-compact-asset-avatar--chip"
+    if avatar_ring:
+        avatar_class += " dg-tier-frame dg-tier-frame--ring"
     avatar = avatar_html(image_url, _initials(name), css_class=avatar_class)
-    identity_bits = [
-        bit
-        for bit in (
-            _text(payload.get("position")).upper(),
-            _text(payload.get("team")).upper(),
+    if position_pill:
+        position_value = _text(payload.get("position")).upper()
+        team_value = _text(payload.get("team")).upper()
+        pill_bit = position_badge_html(position_value) if position_value else ""
+        team_bit = (
+            f"<span class='dg-compact-asset-team'>{escape(team_value)}</span>"
+            if team_value
+            else ""
         )
-        if bit
-    ]
-    age = payload.get("age")
-    if size != "chip" and age not in (None, ""):
-        try:
-            identity_bits.append(f"Age {int(float(age))}")
-        except (TypeError, ValueError):
-            pass
-    meta = " · ".join(identity_bits) if identity_bits else "Player"
-    role = _text(payload.get("role"))
-    extras: list[str] = []
-    if size != "chip" and show_role and role:
-        extras.append(role)
-    injury_status = _text(payload.get("injury_status"))
-    if (
-        size != "chip"
-        and injury_status
-        and injury_status.casefold() not in {"active", "healthy", "na", "none"}
-    ):
-        extras.append(injury_status)
-    extra_html = (
-        f"<div class='dg-compact-asset-role'>{escape(' · '.join(extras))}</div>"
-        if extras
-        else ""
-    )
+        meta_html = (
+            f"<div class='dg-compact-asset-meta toa-chip-meta dg-compact-asset-meta--pill'>"
+            f"{pill_bit}{team_bit}</div>"
+            if (pill_bit or team_bit)
+            else ""
+        )
+        extra_html = ""
+    else:
+        identity_bits = [
+            bit
+            for bit in (
+                _text(payload.get("position")).upper(),
+                _text(payload.get("team")).upper(),
+            )
+            if bit
+        ]
+        age = payload.get("age")
+        if size != "chip" and age not in (None, ""):
+            try:
+                identity_bits.append(f"Age {int(float(age))}")
+            except (TypeError, ValueError):
+                pass
+        meta = " · ".join(identity_bits) if identity_bits else "Player"
+        meta_html = f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(meta)}</div>"
+        role = _text(payload.get("role"))
+        extras: list[str] = []
+        if size != "chip" and show_role and role:
+            extras.append(role)
+        injury_status = _text(payload.get("injury_status"))
+        if (
+            size != "chip"
+            and injury_status
+            and injury_status.casefold() not in {"active", "healthy", "na", "none"}
+        ):
+            extras.append(injury_status)
+        extra_html = (
+            f"<div class='dg-compact-asset-role'>{escape(' · '.join(extras))}</div>"
+            if extras
+            else ""
+        )
     return (
         f"<div class='{classes}' data-player-id='{escape(player_id, quote=True)}' "
         f"role='button' tabindex='0' aria-label='Open player {escape(name, quote=True)}'>"
         f"{avatar}"
         "<div class='dg-compact-asset-copy toa-chip-copy'>"
         f"<div class='dg-compact-asset-name toa-chip-name'>{player_name_html(name)}</div>"
-        f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(meta)}</div>"
+        f"{meta_html}"
         f"{extra_html}"
         "</div>"
         f"{value_html}"
@@ -378,6 +421,8 @@ def compact_asset_stack_html(
     show_value: bool = True,
     show_role: bool = True,
     format_score=None,
+    position_pill: bool = False,
+    avatar_ring: bool = False,
 ) -> str:
     rows = [
         compact_asset_html(
@@ -386,6 +431,8 @@ def compact_asset_stack_html(
             show_value=show_value,
             show_role=show_role,
             format_score=format_score,
+            position_pill=position_pill,
+            avatar_ring=avatar_ring,
         )
         for asset in (assets or [])
         if isinstance(asset, Mapping)
@@ -478,6 +525,65 @@ def game_plan_trade_visual_html(presentation: Mapping[str, Any] | None) -> str:
         "<div class='dg-gp-trade-side dg-gp-trade-side--get'>"
         "<div class='dg-gp-trade-side-label'>You get</div>"
         f"{compact_asset_stack_html(receive, size='standard', show_value=False)}"
+        "</div>"
+        "</div>"
+        f"{metrics}"
+    )
+
+
+def game_plan_top_priority_trade_html(presentation: Mapping[str, Any] | None) -> str:
+    """Dashboard "Top Priority" trade teaser — mobile Next Move screen parity.
+
+    A distinct renderer from ``game_plan_trade_visual_html`` above (that
+    function's confidence ring / value-edge bar / standard-size give-get
+    stack are already covered by their own regression tests and stay
+    available for any other caller); this one is the exact reference the
+    product owner sent for the Dashboard's single highest-priority trade
+    tile, built entirely from existing primitives:
+
+    - Each side renders through ``compact_asset_stack_html`` at
+      ``position_pill=True`` (football_assets.position_badge_html's already
+      -existing colored QB/RB/WR/TE/K pill instead of plain text) and
+      ``avatar_ring=True`` (player_tier_identity's existing
+      ``dg-tier-frame``/``dg-tier-frame--ring`` box-shadow ring — the same
+      mechanism My Team/Trade Hub already use for tier-colored portraits,
+      reused here with the caller's route CSS pinning a single accent
+      color rather than resolving a real tier).
+    - ``value_edge_html`` supplies the "TRADE VALUE / <band>" + number
+      markup verbatim; the caller's route CSS turns the number into a
+      filled pill and hides the directional triangle/bar (this function
+      changes no HTML for that).
+    - ``confidence_segments_html`` is the 3-segment bar (mobile's
+      ``ConfidenceBar``), not the radial ring the older function above uses.
+    """
+
+    if not isinstance(presentation, Mapping):
+        return ""
+    send = presentation.get("send") or []
+    receive = presentation.get("receive") or []
+    if not send and not receive:
+        return ""
+    give_html = compact_asset_stack_html(
+        send, size="compact", show_value=False, position_pill=True, avatar_ring=True
+    )
+    get_html = compact_asset_stack_html(
+        receive, size="compact", show_value=False, position_pill=True, avatar_ring=True
+    )
+    edge_html = value_edge_html(presentation.get("value_edge"), extra_class="dg-gp-value-edge")
+    conf_html = confidence_segments_html(presentation.get("confidence"))
+    metrics = ""
+    if edge_html or conf_html:
+        metrics = f"<div class='dg-gp-trade-metrics'>{edge_html}{conf_html}</div>"
+    return (
+        "<div class='dg-gp-trade-visual dg-gp-trade-visual--top-priority' "
+        "data-gp-trade-visual='1'>"
+        "<div class='dg-gp-trade-side'>"
+        "<div class='dg-gp-trade-side-label'>You give</div>"
+        f"<div class='dg-gp-trade-side--give'>{give_html}</div>"
+        "</div>"
+        "<div class='dg-gp-trade-side'>"
+        "<div class='dg-gp-trade-side-label'>You get</div>"
+        f"<div class='dg-gp-trade-side--get'>{get_html}</div>"
         "</div>"
         "</div>"
         f"{metrics}"

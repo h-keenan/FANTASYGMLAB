@@ -28,9 +28,29 @@ DAILY_GM_BRIEFING_CSS = """
 div[class*="st-key-"][class*="_lede"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_lede"] p{color:var(--color-text-secondary);font:var(--type-caption-emphasis);margin:0}
 div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[class*="st-key-"][class*="_utility"] p{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0}
 .dg-game-plan-card{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border);display:flex;flex-direction:column;gap:var(--space-sm);height:auto;min-width:0;padding:var(--space-sm)}
-.dg-game-plan-card-primary{background:var(--color-surface-raised);border-color:var(--color-border-strong);border-inline-start:var(--border-width-semantic) solid var(--color-accent);padding-inline-start:var(--space-md)}
+.dg-game-plan-card-primary{background:var(--color-surface-raised);border:var(--border-width-semantic) solid var(--color-accent)}
+.dg-gp-opponent{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-top:calc(-1 * var(--space-2xs))}
+.dg-gp-priority-icon{align-items:center;color:var(--color-accent);display:inline-flex;flex:0 0 auto;height:1rem;width:1rem}
+.dg-gp-priority-icon svg{display:block;height:100%;width:100%}
+.dg-gp-kind-pill{background:var(--color-surface-secondary);border:var(--border-width-default) solid var(--color-border-strong);border-radius:var(--radius-pill);padding:2px var(--space-sm)}
+/* Both sides of the Top Priority card's give/get rows use one uniform
+   accent ring (not a per-player tier color) — overrides the custom
+   property player_tier_identity.portrait_frame_classes()'s shared
+   dg-tier-frame--ring box-shadow reads, same mechanism My Team/Trade Hub
+   use for tier rings, just pinned to a single color here. */
+.dg-game-plan-card-primary .dg-tier-frame--ring{--dg-tier-a:var(--color-accent)}
+/* Value-as-pill: value_edge_html()'s own markup is reused verbatim — this
+   only hides the directional triangle/magnitude bar and fills the number
+   as a chip, color-keyed off the polarity data attribute it already emits. */
+.dg-game-plan-card-primary [data-tvl-edge]{justify-content:space-between;width:100%}
+.dg-game-plan-card-primary [data-tvl-edge] .tvl-edge-dir,
+.dg-game-plan-card-primary [data-tvl-edge] .tvl-edge-mark{display:none}
+.dg-game-plan-card-primary [data-tvl-edge] .tvl-edge-num{border-radius:var(--radius-pill);display:inline-block;padding:2px var(--space-sm)}
+.dg-game-plan-card-primary [data-tvl-edge=neg] .tvl-edge-num{background:color-mix(in srgb,var(--color-danger) 20%,transparent)}
+.dg-game-plan-card-primary [data-tvl-edge=pos] .tvl-edge-num{background:color-mix(in srgb,var(--color-success) 20%,transparent)}
+.dg-game-plan-card-primary [data-tvl-edge=even] .tvl-edge-num{background:var(--color-surface-secondary)}
 .dg-daily-briefing-kicker-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);justify-content:space-between;min-width:0}
-.dg-daily-briefing-kicker{color:var(--color-text-primary);font:var(--font-card-title);letter-spacing:var(--letter-spacing-badge);opacity:1;text-transform:uppercase}
+.dg-daily-briefing-kicker{align-items:center;color:var(--color-text-primary);display:inline-flex;font:var(--font-card-title);gap:var(--space-2xs);letter-spacing:var(--letter-spacing-badge);opacity:1;text-transform:uppercase}
 .dg-game-plan-card{opacity:1}
 .dg-daily-briefing-kind{align-items:center;color:var(--color-text-secondary);display:inline-flex;font:var(--type-supporting-metadata);gap:var(--space-xs);letter-spacing:var(--letter-spacing-badge);opacity:1;text-transform:uppercase}
 .dg-daily-briefing-kind .dg-glyph{opacity:1}
@@ -54,7 +74,8 @@ div[class*="_refresh_recommendations"] button{max-width:100%;min-width:0;white-s
 div[class*="st-key-"][class*="_cards"]{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr)}
 div[class*="st-key-"][class*="_card_"] [data-testid=stButton]>button{width:100%}
 div[class*="st-key-"][class*="dg_cta_"]{margin:0}
-div[class*="st-key-"][class*="dg_cta_primary"] [data-testid=stButton]>button{border-color:var(--color-accent)!important;font-weight:var(--font-weight-button)}
+/* Outlined, not filled — transparent fill, accent border + text. */
+div[class*="st-key-"][class*="dg_cta_primary"] [data-testid=stButton]>button{background:transparent!important;border:var(--border-width-semantic) solid var(--color-accent)!important;color:var(--color-accent)!important;font-weight:var(--font-weight-button)}
 div[class*="st-key-"][class*="auto_strategy_help"] button,div[class*="st-key-auto_strategy_help"] button{min-height:var(--touch-target-min)!important;width:auto!important;white-space:nowrap!important}
 @media (min-width:1024px){
 .dg-game-plan-card{padding:var(--space-md)}
@@ -76,6 +97,20 @@ div[class*="st-key-"][class*="_card_1"]{grid-column:auto;grid-row:auto}
 }
 </style>
 """
+
+# Top Priority kicker-only lightning bolt. Deliberately NOT a semantic_glyphs
+# concept: that registry is pinned to a small, reusable 8-12 icon vocabulary
+# (tests/test_semantic_glyphs.py), and this bolt is a single-surface kicker
+# mark, not a reusable destination/kind icon — same stroke style (currentColor,
+# square linecap/miter) as the shared set, scoped locally instead.
+_PRIORITY_ICON_HTML = (
+    "<span class='dg-gp-priority-icon' aria-hidden='true'>"
+    "<svg viewBox='0 0 24 24' focusable='false'>"
+    "<path fill='none' stroke='currentColor' stroke-width='1.75' "
+    "stroke-linecap='square' stroke-linejoin='miter' "
+    "d='M13 3L6 13h5l-1 8 7-10h-5l1-8z'/>"
+    "</svg></span>"
+)
 
 _KIND_LABELS = {
     briefing_mod.CATEGORY_TOP_PRIORITY: "",
@@ -276,6 +311,9 @@ def render_todays_game_plan(
                 reason_html = (
                     f"<div class='dg-daily-briefing-reason'>{escape(item.reason)}</div>"
                 )
+            is_top_priority_trade = (
+                item.category == briefing_mod.CATEGORY_TOP_PRIORITY and _has_trade_visual(item)
+            )
             kind = _kind_badge(item)
             kind_html = ""
             if kind:
@@ -286,8 +324,11 @@ def render_todays_game_plan(
                     "Watch": "health",
                     "League": "insights",
                 }.get(kind, "more")
+                kind_class = "dg-daily-briefing-kind"
+                if is_top_priority_trade:
+                    kind_class += " dg-gp-kind-pill"
                 kind_html = (
-                    f"<div class='dg-daily-briefing-kind'>"
+                    f"<div class='{kind_class}'>"
                     f"{glyph_html(kind_concept, size='kicker')}"
                     f"<span>{escape(kind)}</span></div>"
                 )
@@ -296,6 +337,18 @@ def render_todays_game_plan(
                 kicker_raw = str(item.supporting_context or "").strip()
                 if kicker_raw:
                     kicker_html = escape(kicker_raw)
+            # Lightning-bolt kicker icon + opponent subtitle — only the real
+            # Top Priority trade card (mobile Next Move reference); every
+            # other kicker/kind combination is unchanged.
+            if is_top_priority_trade:
+                kicker_html = _PRIORITY_ICON_HTML + kicker_html
+            opponent_html = ""
+            if is_top_priority_trade:
+                opponent_name = (headline or "").strip()
+                if opponent_name:
+                    opponent_html = (
+                        f"<div class='dg-gp-opponent'>{escape(opponent_name)}</div>"
+                    )
             cta = _cta_label(item, is_primary=is_primary)
             tier = "primary" if is_primary else "secondary"
             # Real, already-computed tier word for a Next Move priority-ladder
@@ -312,6 +365,7 @@ def render_todays_game_plan(
                     f"{tier_badge_html}"
                     "</div>"
                     f"{headline_html}"
+                    f"{opponent_html}"
                     f"{visual_html}"
                     f"{reason_html}"
                     f"{rank_html}"
@@ -341,5 +395,12 @@ def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:
             return f"<div class='dg-gp-identity-row'>{chip}</div>" if chip else ""
         return ""
     if item.destination == "trade_hub" or item.category == briefing_mod.CATEGORY_TOP_PRIORITY:
+        if item.category == briefing_mod.CATEGORY_TOP_PRIORITY:
+            # The one reference-matched Top Priority trade teaser (mobile
+            # Next Move parity: colored position pill, avatar ring, 3-segment
+            # confidence bar, value pill). Any other trade_hub-destination
+            # card (secondary League Movement opportunities) keeps the
+            # original, separately-tested give/get visual below.
+            return compact_fantasy_assets.game_plan_top_priority_trade_html(presentation)
         return compact_fantasy_assets.game_plan_trade_visual_html(presentation)
     return ""
