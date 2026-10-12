@@ -60,6 +60,7 @@ from modules import (
     league_workspace_ui,
     legal_pages,
     live_draft_ui,
+    page_shell,
     player_cards,
     player_history,
     player_awards,
@@ -2835,6 +2836,25 @@ def _viewport_preserve() -> None:
         " role='button' tabindex='0'"
         " aria-label='Open module fixture quick view'>Module tile (in-place)</div>"
     )
+
+    # page_body() shell fixture (#95x-class regression, fourth recurrence).
+    # modules.page_shell.page_body() wraps an entire adopting page's
+    # top-level sections in one keyed container (#998-#1000: my_team_ui.py,
+    # waivers_ui.py, and 9 more). A control with no key of its own inside
+    # that container — a plain st.expander summary is the real shape in both
+    # my_team_ui.py's "Key backups" section and waivers_ui.py's "Detailed
+    # Table View" section — used to have no ancestor "st-key-" class at all;
+    # now it has page_body's own page-wide key, which keyFrom() must learn to
+    # see past (via the .dg-page-shell-marker page_body() renders) instead of
+    # mistaking it for the tapped control's own identity. This reproduces
+    # that exact shape with real page_body() + a real unkeyed st.expander so
+    # Playwright can pointerdown the real DOM and read the real shipped
+    # keyFrom() verdict off window.__dgInPlaceAnchor.key.
+    with page_shell.page_body("viewport_preserve_page_shell_fixture", gap="md"):
+        render_html_fragment("<div style='height:900px' aria-hidden='true'></div>")
+        with st.expander("Key backups fixture", expanded=False):
+            st.write("Unkeyed expander body content.")
+        render_html_fragment("<div style='height:900px' aria-hidden='true'></div>")
 
     with st.container(key="mobile_gm_sheet_trigger_viewport"):
         render_html_fragment(brand_identity.gm_orb_floating_trigger_html())

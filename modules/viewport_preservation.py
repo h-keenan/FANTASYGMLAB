@@ -52,8 +52,30 @@ VIEWPORT_PRESERVE_JS = """
         while (node && node !== doc.body && node !== doc.documentElement) {
           const list = node.classList
           if (list && list.length) {
+            let matched = ""
             for (const name of list) {
-              if (name.indexOf("st-key-") === 0) return name
+              if (name.indexOf("st-key-") === 0) { matched = name; break }
+            }
+            if (matched) {
+              // modules/page_shell.py's page_body() wraps an ENTIRE page's
+              // top-level section stack in one keyed container (#998-#1000)
+              // so it can own a single flex gap. A control with no key of
+              // its own (a plain st.expander summary, an unkeyed select,
+              // ...) on an adopting page used to have NO ancestor
+              // "st-key-" class at all, so this walk correctly returned ""
+              // for it. Now the first match it finds climbing from that
+              // control is page_body's own page-wide key instead -- and
+              // restore()'s `doc.querySelector("." + last.key)` fallback
+              // then resolves to the ENTIRE page's content block, not the
+              // tapped control. The delta between that block's top and the
+              // offset recorded for the actual control is huge and
+              // effectively random, producing the "jumps where you are on
+              // the page, scrolling wise" report (4th recurrence). The
+              // marker page_body() renders as its container's first child
+              // lets ANY current or future page_body() adopter be
+              // recognized and skipped here automatically -- no allowlist
+              // to keep in sync, unlike INTENTIONAL_NAV_KEY_* above.
+              if (!node.querySelector(".dg-page-shell-marker")) return matched
             }
           }
           node = node.parentElement
