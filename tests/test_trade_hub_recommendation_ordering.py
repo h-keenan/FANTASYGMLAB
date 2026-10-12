@@ -166,8 +166,12 @@ def test_presentation_order_helper_and_annotate_preserve_rank_not_category():
 
 def test_trade_hub_route_orders_visible_ideas_before_unified_feed():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    board = source[
-        source.index("def render_top_trade_opportunities()") : source.index(
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    board = hub_src[
+        hub_src.index("def render_top_trade_opportunities()") : hub_src.index(
             "def render_search_around_player()"
         )
     ]
@@ -178,9 +182,7 @@ def test_trade_hub_route_orders_visible_ideas_before_unified_feed():
     assert "group_trade_hub_ideas(" in board
     assert "ranked_feed[:local_visible]" in board
     assert "def _trade_hub_visible_feed()" in board
-    hub = source[
-        source.index('if current_page == "trade_hub"') : source.index("# TRADE ANALYZER")
-    ]
+    hub = hub_src[hub_src.index("def render_trade_hub_workspace(") :]
     assert "Evaluation" in hub
     assert "render_evaluation_lens_control(" in hub
     assert hub.index("render_evaluation_lens_control(") < hub.index(

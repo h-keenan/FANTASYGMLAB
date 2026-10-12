@@ -56,8 +56,11 @@ def test_game_plan_first_useful_milestone_at_dashboard_useful_marker():
 
 
 def test_trade_hub_target_selectbox_uses_session_state_without_index():
-    start = APP.index('target_selectbox_key = f"player_trade_hub_target_player_')
-    block = APP[start : start + 700]
+    # The target-player selectbox moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    start = hub_src.index('target_selectbox_key = f"player_trade_hub_target_player_')
+    block = hub_src[start : start + 700]
     assert "st.session_state[target_selectbox_key]" in block
     assert "index=default_target_index" not in block
     assert "key=target_selectbox_key" in block

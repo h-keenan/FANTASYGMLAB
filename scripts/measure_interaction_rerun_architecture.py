@@ -212,7 +212,9 @@ def measure_disclosure_html(*, samples: int) -> dict[str, Any]:
 
 
 def measure_show_more_contract() -> dict[str, Any]:
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # _trade_hub_visible_feed now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     start = source.index("def _trade_hub_visible_feed()")
     # Include the decorator immediately above the nested def.
     decorated = source[max(0, start - 80) : start + 20]

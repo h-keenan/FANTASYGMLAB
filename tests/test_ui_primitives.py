@@ -289,6 +289,14 @@ def test_only_the_intentionally_migrated_surfaces_use_the_primitives():
         "workspace_notices.py",
         "workspace_ui.py",
     ]
-    assert app_source.count("render_trade_hub_entitlement_summary(") == 1
-    assert "trade_hub_entitlement_presentation(" in app_source
+    # Both call sites below moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch;
+    # exclude each function's own `def` line when counting call sites.
+    trade_hub_ui_source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
+    assert (
+        trade_hub_ui_source.count("render_trade_hub_entitlement_summary(")
+        - trade_hub_ui_source.count("def render_trade_hub_entitlement_summary(")
+        == 1
+    )
+    assert "trade_hub_entitlement_presentation(" in trade_hub_ui_source
     assert "render_premium_lock(" in app_source

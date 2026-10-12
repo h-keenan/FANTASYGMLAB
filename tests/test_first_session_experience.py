@@ -178,9 +178,11 @@ def test_loading_state_lifecycle_for_first_session_surfaces():
     assert "my_team_pending" in my_team
     assert "Reading this roster" in my_team
     assert "my_team_pending.empty()" in my_team
-    trade = APP.split('if current_page == "trade_hub":', 1)[1].split(
-        "\ndef ", 1
-    )[0]
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    trade_hub_ui_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    trade = trade_hub_ui_src[trade_hub_ui_src.index("def render_trade_hub_workspace(") :]
     assert "trade_hub_pending" in trade
     assert "trade_hub_pending.empty()" in trade
     html = application_shell.surface_pending_html(

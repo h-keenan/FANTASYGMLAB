@@ -63,7 +63,9 @@ def _idea(**overrides) -> dict:
 
 
 def test_default_reveal_is_two_when_inventory_allows():
-    board = (ROOT / "app.py").read_text(encoding="utf-8")
+    # The Trade Hub route body was extracted out of app.py's route
+    # dispatch into modules/trade_hub_ui.py's render_trade_hub_workspace.
+    board = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     section = board[
         board.index("visible_count_key = f\"{feed_key}_visible\"") : board.index(
             "trade_hub_first_useful.mark_trade_hub_milestone(\"trade_hub_rec1_ready\")"

@@ -10,13 +10,19 @@ from modules import trade_hub_player_search as player_search
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / "app.py").read_text(encoding="utf-8")
+# The Trade Hub route body (including _render_search_around_player_body,
+# render_top_trade_opportunities, and render_search_around_player) was
+# extracted out of app.py's route dispatch into
+# modules/trade_hub_ui.py's render_trade_hub_workspace; those markers now
+# live there instead of in app.py.
+TRADE_HUB_UI_SRC = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
 EXPLORER = APP.split("def render_trade_return_explorer", 1)[1].split(
     "render_player_trade_hub_card = partial(", 1
 )[0]
-SEARCH_BODY = APP.split("def _render_search_around_player_body()", 1)[1].split(
-    "\n            render_top_trade_opportunities()\n", 1
+SEARCH_BODY = TRADE_HUB_UI_SRC.split("def _render_search_around_player_body()", 1)[1].split(
+    "\n        render_top_trade_opportunities()\n", 1
 )[0]
-CALL_SITE = APP.split("def _render_search_around_player_body()", 1)[1].split(
+CALL_SITE = TRADE_HUB_UI_SRC.split("def _render_search_around_player_body()", 1)[1].split(
     'trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_route_complete")',
     1,
 )[0]
@@ -140,7 +146,7 @@ def test_initial_hub_and_modal_do_not_auto_run_player_search():
     assert 'if trade_hub_focus_player_id and trade_hub_focus_mode in {"my_player", "target_player"}:' not in CALL_SITE
     explorer_start = EXPLORER.split("if show_header:", 1)[0]
     assert 'note_skip("trade_dialog_open")' in explorer_start
-    wrapper = APP.split("def render_search_around_player()", 1)[1].split(
+    wrapper = TRADE_HUB_UI_SRC.split("def render_search_around_player()", 1)[1].split(
         "def _render_search_around_player_body()", 1
     )[0]
     assert 'note_skip("trade_dialog_open")' in wrapper

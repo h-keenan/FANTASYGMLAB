@@ -114,12 +114,15 @@ def test_dashboard_skips_cosmetic_query_param_rerun():
 
 
 def test_trade_hub_skips_search_and_other_cards_while_modal_open():
-    feed = APP.split("def _trade_hub_visible_feed()", 1)[1].split(
+    # The Trade Hub route body was extracted out of app.py's route dispatch
+    # into modules/trade_hub_ui.py's render_trade_hub_workspace.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    feed = hub_src.split("def _trade_hub_visible_feed()", 1)[1].split(
         "_trade_hub_visible_feed()", 1
     )[0]
     assert "open_trade_key" in feed
     assert "if card_key != open_trade_key:" in feed
-    after_board = APP.split("def _render_search_around_player_body()", 1)[1]
+    after_board = hub_src.split("def _render_search_around_player_body()", 1)[1]
     call_site = after_board.split("trade_hub_first_useful.mark_trade_hub_milestone", 1)[0]
     assert "render_top_trade_opportunities()" in call_site
     assert "if not trade_detail_navigation.current(st.session_state).trade_key:" in call_site

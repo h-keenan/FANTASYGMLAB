@@ -281,7 +281,9 @@ def test_free_gate_copy_matches_implemented_premium_depth():
     assert "GM Targets" not in trade_hub_ui.TRADE_HUB_FREE_GATE_BODY
     assert "ranked board" in trade_hub_ui.TRADE_HUB_FREE_GATE_BODY
     assert "partners and packages" in trade_hub_ui.TRADE_HUB_FREE_GATE_BODY
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # render_top_trade_opportunities now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     board = source[
         source.index("def render_top_trade_opportunities()") : source.index(
             "def render_search_around_player()"
@@ -452,9 +454,11 @@ def test_ranking_is_format_agnostic_and_preserves_valid_pick_seasons():
 
 def test_first_session_loading_still_precedes_featured_ranking():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    hub = source[
-        source.index('if current_page == "trade_hub"') : source.index("# TRADE ANALYZER")
-    ]
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    hub = hub_src[hub_src.index("def render_trade_hub_workspace(") :]
     assert hub.index("trade_hub_pending") < hub.index("surface_pending_html(")
     assert hub.index("trade_hub_pending.empty()") < hub.index(
         "order_trade_hub_visible_ideas("

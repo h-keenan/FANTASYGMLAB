@@ -184,7 +184,11 @@ def test_grouped_cards_do_not_promote_expanded_to_best_matches():
     assert '"Other workable structures"' in grouped
     assert "present_player_search_ideas(" in source
     assert "focused_player_ids=(str(selected_player_id),)" in source
-    board_call = source.split("with trade_hub_first_useful.stage_timer(\"trust_approval_filtering\"):", 1)[1]
+    # The board-generation path (trust_approval_filtering -> manager tendency
+    # enrichment) was extracted out of app.py's route dispatch into
+    # modules/trade_hub_ui.py's render_trade_hub_workspace.
+    hub_src = open("modules/trade_hub_ui.py", encoding="utf-8").read()
+    board_call = hub_src.split("with trade_hub_first_useful.stage_timer(\"trust_approval_filtering\"):", 1)[1]
     board_call = board_call.split("Manager tendencies are presentation enrichment", 1)[0]
     assert "explicit_player_focus=True" not in board_call
     assert "focused_player_ids" not in board_call

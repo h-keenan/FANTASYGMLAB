@@ -150,7 +150,9 @@ def test_trade_hub_css_is_sticky_compact_and_mobile_contained():
 
 
 def test_trade_hub_route_renders_only_active_cached_section():
-    source = Path("app.py").read_text(encoding="utf-8")
+    # The Trade Hub route body was extracted out of app.py's route
+    # dispatch into modules/trade_hub_ui.py's render_trade_hub_workspace.
+    source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
     assert "group_trade_hub_ideas(" in source
     assert "annotate_trade_hub_feed_categories(" in source
     assert "ranked_feed[:local_visible]" in source

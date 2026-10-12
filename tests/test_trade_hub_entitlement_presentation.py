@@ -234,14 +234,20 @@ def test_cached_and_uncached_approved_lists_have_identical_presentation():
 
 
 def test_production_boundary_is_post_trust_pre_grouping_and_has_one_board_lock():
-    source = Path("app.py").read_text(encoding="utf-8")
+    # render_top_trade_opportunities now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch;
+    # its former `trade_hub_ui.`-qualified calls are unqualified in-module
+    # calls now that the code lives in the same file.
+    source = (
+        Path(__file__).resolve().parents[1] / "modules" / "trade_hub_ui.py"
+    ).read_text(encoding="utf-8")
     start = source.index("def render_top_trade_opportunities()")
     end = source.index("def render_search_around_player()", start)
     block = source[start:end]
 
     trust = block.index("ideas = enforce_cached_trade_ideas(")
-    presentation = block.index("trade_hub_ui.trade_hub_entitlement_presentation(")
-    grouping = block.index("trade_hub_ui.group_trade_hub_ideas(")
+    presentation = block.index("trade_hub_entitlement_presentation(")
+    grouping = block.index("group_trade_hub_ideas(")
     rendering = block.index("ranked_feed[:local_visible]")
 
     assert trust < presentation < grouping < rendering

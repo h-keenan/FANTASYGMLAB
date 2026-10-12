@@ -18,11 +18,14 @@ from modules import warm_route_render as wrr
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / "app.py").read_text(encoding="utf-8")
+# _render_search_around_player_body now lives in modules/trade_hub_ui.py's
+# render_trade_hub_workspace, extracted out of app.py's route dispatch.
+TRADE_HUB_UI_SRC = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
 EXPLORER = APP.split("def render_trade_return_explorer", 1)[1].split(
     "render_player_trade_hub_card = partial(", 1
 )[0]
-SEARCH_BODY = APP.split("def _render_search_around_player_body()", 1)[1].split(
-    "\n            render_top_trade_opportunities()\n", 1
+SEARCH_BODY = TRADE_HUB_UI_SRC.split("def _render_search_around_player_body()", 1)[1].split(
+    "\n        render_top_trade_opportunities()\n", 1
 )[0]
 
 
@@ -86,7 +89,7 @@ def test_warm_my_team_and_trade_hub_skip_pending_placeholder():
     my_team = APP.split("my_team_pending = st.empty()", 1)[1][:900]
     assert "process_league_context_warm()" in my_team
     assert "if not _my_team_warm:" in my_team
-    hub = APP.split("trade_hub_pending = st.empty()", 1)[1][:900]
+    hub = TRADE_HUB_UI_SRC.split("trade_hub_pending = st.empty()", 1)[1][:900]
     assert "if not _trade_hub_warm:" in hub
     assert "surface_pending_html(" in hub.split("if not _trade_hub_warm:", 1)[1]
 

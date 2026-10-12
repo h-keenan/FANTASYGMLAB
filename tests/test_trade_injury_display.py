@@ -420,15 +420,19 @@ class TestTradeInjuryDisplay(unittest.TestCase):
 
     def test_premium_lock_styles_and_page_gates_are_test_mode_only(self):
         source = open("app.py", encoding="utf-8").read()
+        # "Premium Trade Hub" moved into modules/trade_hub_ui.py's
+        # render_trade_hub_workspace, extracted out of app.py's route
+        # dispatch.
+        trade_hub_ui_source = open("modules/trade_hub_ui.py", encoding="utf-8").read()
         for marker in [
             "current_user_is_premium",
             "render_premium_lock",
-            "Premium Trade Hub",
             "Premium Waivers",
             "Premium Dashboard",
             "Premium My Team",
         ]:
             self.assertIn(marker, source)
+        self.assertIn("Premium Trade Hub", trade_hub_ui_source)
 
         for selector in [
             ".premium-lock",

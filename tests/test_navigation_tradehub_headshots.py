@@ -272,12 +272,16 @@ def test_trade_detail_is_lazy_and_instrumented():
 
 def test_trade_hub_filters_still_use_cached_section_board():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    # The Trade Hub route body was extracted out of app.py's route
+    # dispatch into modules/trade_hub_ui.py's render_trade_hub_workspace.
+    hub_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     # Unified ranked feed — no category pill selector; strategy lens + show more remain.
     assert "trade_hub_board_section_" not in app_source
-    assert "trade_hub_unified_feed_" in app_source
-    assert "annotate_trade_hub_feed_categories" in app_source
+    assert "trade_hub_board_section_" not in hub_source
+    assert "trade_hub_unified_feed_" in hub_source
+    assert "annotate_trade_hub_feed_categories" in hub_source
     assert "cached_trade_ideas(" in app_source
-    assert '"trade_hub_visible_cards_render"' in app_source
+    assert '"trade_hub_visible_cards_render"' in hub_source
 
 
 def test_headshot_presets_are_shared_and_bounded():

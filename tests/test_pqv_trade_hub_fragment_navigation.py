@@ -10,6 +10,10 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_SRC = (ROOT / "app.py").read_text(encoding="utf-8")
+# The Trade Hub route body itself (the "pop" + milestone-on-arrival lines
+# checked below) lives in modules/trade_hub_ui.py's render_trade_hub_workspace,
+# extracted out of app.py's route dispatch; check both sources.
+TRADE_HUB_UI_SRC = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
 
 
 def test_pqv_open_in_trade_hub_promotes_fragment_click_to_app_rerun():
@@ -43,8 +47,8 @@ def test_pqv_open_in_trade_hub_promotes_fragment_click_to_app_rerun():
     assert 'mark_interaction_milestone("full_app_rerun_requested")' in content
     assert 'mark_interaction_milestone("pqv_closed")' in opener
     assert 'mark_interaction_milestone("destination_committed")' in opener
-    assert 'pop("_pqv_trade_hub_nav"' in APP_SRC
-    assert 'mark_interaction_milestone("trade_hub_route_ready")' in APP_SRC
+    assert 'pop("_pqv_trade_hub_nav"' in TRADE_HUB_UI_SRC
+    assert 'mark_interaction_milestone("trade_hub_route_ready")' in TRADE_HUB_UI_SRC
 
 
 def test_pqv_trade_hub_commit_clears_dialog_before_full_rerun():

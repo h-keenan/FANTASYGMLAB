@@ -139,9 +139,15 @@ def test_recommendation_feedback_prefers_canonical_roster_over_browsed_team(monk
 def test_trade_hub_migrates_legacy_player_handoff_into_scoped_focus():
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     trade = source[source.index('if current_page == "trade_hub"') :]
-    assert 'st.session_state.pop("trade_hub_player_id"' in trade
-    assert "legacy_trade_hub_player_id" in trade
-    assert "trade_hub_focus_player_id_" in trade
+    # The legacy-player-id migration lines (and the rest of the Trade Hub
+    # route body) moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch;
+    # trade_hub_focus_player_id_ itself is still set/read elsewhere in
+    # app.py (e.g. Dashboard handoff), so check the combined source.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert "trade_hub_focus_player_id_" in source
+    assert 'st.session_state.pop("trade_hub_player_id"' in hub_src
+    assert "legacy_trade_hub_player_id" in hub_src
 
 
 def test_player_quick_view_uses_shared_player_id_not_route_models():

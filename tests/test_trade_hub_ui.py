@@ -624,7 +624,9 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("data-player-id='player-1'", html)
 
     def test_trade_hub_mobile_hierarchy_renders_active_board_before_secondary_search(self):
-        source = Path("app.py").read_text(encoding="utf-8")
+        # The Trade Hub route body was extracted out of app.py's route
+        # dispatch into modules/trade_hub_ui.py's render_trade_hub_workspace.
+        source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
 
         feed_idx = source.index("annotate_trade_hub_feed_categories(")
         active_loop_idx = source.index(
@@ -670,7 +672,9 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertNotIn("rgba(", migrated)
 
     def test_trade_hub_espn_limited_mode_has_degraded_state(self):
-        source = Path("app.py").read_text(encoding="utf-8")
+        # The Trade Hub route body was extracted out of app.py's route
+        # dispatch into modules/trade_hub_ui.py's render_trade_hub_workspace.
+        source = Path("modules/trade_hub_ui.py").read_text(encoding="utf-8")
 
         self.assertIn('"Trade Hub is gated for ESPN until free-agent', source)
         self.assertIn("st.session_state.get(\"active_platform\") == \"espn\"", source)

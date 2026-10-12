@@ -193,8 +193,15 @@ def test_actual_command_header_winning_selectors_are_square():
 
 
 def test_my_player_and_target_call_sites_share_execution_api():
-    assert APP.count("player_search.execute_queued_player_focus(") == 2
-    assert "player_search.has_queued_player_focus(" in APP
+    # One call site (my_player) moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    hub_src = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert (
+        APP.count("player_search.execute_queued_player_focus(")
+        + hub_src.count("player_search.execute_queued_player_focus(")
+        == 2
+    )
+    assert "player_search.has_queued_player_focus(" in hub_src
     old_clear = (
         'if trade_hub_focus_mode == "my_player":\n'
         '                            st.session_state.pop'

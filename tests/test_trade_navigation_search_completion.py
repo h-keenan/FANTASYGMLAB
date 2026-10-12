@@ -314,7 +314,10 @@ def test_route_body_and_text_ownership_contracts_are_production_scoped():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "route_body_slot = st.empty()" in app_source
     assert 'slot=st.empty()' not in app_source
-    assert 'data-dg-scroll-anchor="trade-hub-player-search"' in app_source
+    # This scroll anchor moved into modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    hub_source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert 'data-dg-scroll-anchor="trade-hub-player-search"' in hub_source
     css = trade_hub_ui.TRADE_SUMMARY_COMPONENT_CSS
     assert "text-overflow: clip" in css
     assert "word-break: normal" in css

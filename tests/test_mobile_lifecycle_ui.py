@@ -23,7 +23,10 @@ LOADING = (ROOT / "modules" / "dashboard_loading_state.py").read_text(encoding="
 
 
 def test_trade_strategy_selector_has_one_app_owner():
-    hub = APP[APP.index('if current_page == "trade_hub"') : APP.index("# TRADE ANALYZER")]
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    hub = TRADE_HUB[TRADE_HUB.index("def render_trade_hub_workspace(") :]
     assert hub.count("render_trade_strategy_selector(") == 1
     selector = TRADE_HUB.split("def render_trade_strategy_selector", 1)[1].split(
         "\ndef ", 1
@@ -43,7 +46,9 @@ def test_what_is_auto_is_claimed_once_per_run():
 
 
 def test_trade_hub_board_loading_has_one_caption_owner_without_spinner():
-    hub = APP[APP.index("def render_top_trade_opportunities()") : APP.index(
+    # render_top_trade_opportunities now lives in modules/trade_hub_ui.py's
+    # render_trade_hub_workspace, extracted out of app.py's route dispatch.
+    hub = TRADE_HUB[TRADE_HUB.index("def render_top_trade_opportunities()") : TRADE_HUB.index(
         "def render_search_around_player()"
     )]
     assert hub.count("LOADING_TRADE_IDEAS") == 1
@@ -87,7 +92,10 @@ def test_trade_dialog_flag_does_not_reset_startup_complete():
 
 
 def test_secondary_player_search_entry_point_is_unique():
-    hub = APP[APP.index('if current_page == "trade_hub"') : APP.index("# TRADE ANALYZER")]
+    # The Trade Hub route body (render_trade_hub_workspace) was extracted
+    # out of app.py's route dispatch into modules/trade_hub_ui.py; it is
+    # the last function defined there, so slice to end-of-file.
+    hub = TRADE_HUB[TRADE_HUB.index("def render_trade_hub_workspace(") :]
     assert hub.count("Search Around a Player") == 2  # expander + section header
     assert "Search return paths from one of your players" not in hub
     assert "OWNER_SECONDARY_SEARCH" in hub
