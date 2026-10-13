@@ -55,4 +55,21 @@ def test_waiver_mobile_css_separates_badge_and_score():
     assert "@media (max-width: 430px)" in WAIVERS_PRESENTATION_CSS
     assert "width: auto;" in WAIVERS_PRESENTATION_CSS
     assert "overflow-wrap: break-word" in FOOTBALL_ASSET_CSS
+
+
+def test_waiver_card_avatar_ring_matches_dashboard_primitive():
+    """Waivers page avatars share the Dashboard's exact circular vivid-green
+    ring primitive (modules.daily_gm_briefing_ui's ``.dg-game-plan-card
+    .dg-compact-asset-avatar.dg-tier-frame--ring`` rule) — same
+    --color-success token, same border-radius:50%, same box-shadow formula —
+    scoped to this page's own card classes (``.free-agent-card``/
+    ``.free-agent-summary-card``) instead of the Dashboard's, since every
+    other surface sharing football_assets.player_card_html's
+    dg-player-portrait/dg-tier-frame--ring markup (Live Draft, Trade
+    Analyzer, My Team, Trade Hub) must keep its existing per-tier ring."""
+
+    assert ".free-agent-card .dg-player-portrait.dg-tier-frame--ring" in WAIVERS_PRESENTATION_CSS
+    assert ".free-agent-summary-card .dg-player-portrait.dg-tier-frame--ring" in WAIVERS_PRESENTATION_CSS
+    assert "--dg-tier-a: var(--color-success)" in WAIVERS_PRESENTATION_CSS
+    assert "border-radius: 50% !important" in WAIVERS_PRESENTATION_CSS
     assert "word-break: normal" in FOOTBALL_ASSET_CSS
