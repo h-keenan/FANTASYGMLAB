@@ -133,23 +133,59 @@ div[class*="st-key-my_team_alerted_player_focus"] .player-support-chip-warning {
     font-size: var(--font-size-body);
 }
 .st-key-my_team_roster_decisions .compact-player-row,
-.st-key-my_team_roster_decisions .dg-football-asset--dense {
+.st-key-my_team_roster_decisions .dg-football-asset--dense,
+div[class*="st-key-my_team_roster_core"] .compact-player-row,
+div[class*="st-key-my_team_key_backups"] .compact-player-row {
     min-height: 0;
 }
+/* Roster Core/Depth previously rendered at football_asset_styles.py's
+   --size-roster-core-portrait (5.5rem/88px — "sized for full-width
+   contexts like My Team" per trade_analyzer_styles.py's own comment on
+   that token), noticeably larger than every other player-row section on
+   this exact page (Untouchables/Trade Candidates/Hold/Drop already compact
+   to 4.25rem below). coridian_, 2026-10-13: "you don't want to have like
+   two players taking up your whole screen whenever you want to see your
+   whole team" — this is that oversized avatar, not just extra text; same
+   4.25rem compacting as Roster Decisions, reused here rather than a third
+   size value, so every player row on My Team now shares one density. */
 div[class*="st-key-my_team_decisions_"] .dg-football-asset,
 .st-key-my_team_roster_decisions .dg-football-asset {
     align-items: start;
     grid-template-columns: 4.25rem minmax(0, 1fr);
 }
+div[class*="st-key-my_team_roster_core"] .dg-football-asset,
+div[class*="st-key-my_team_key_backups"] .dg-football-asset {
+    align-items: start !important;
+    grid-template-columns: 4.25rem minmax(0, 1fr) !important;
+}
+/* !important on Roster Core/Depth specifically — the pre-existing
+   --size-roster-core-portrait rule these two containers used to inherit
+   (football_asset_styles.py) is equal-specificity with the same
+   `div[class*="st-key-..."] .dg-player-portrait` shape, and empirically
+   keeps winning regardless of stylesheet order (Roster Decisions'
+   identical-looking rule below has never had this problem because nothing
+   upstream targets it at that specificity). Scoped to just these two new
+   selectors so Roster Decisions' existing cascade is untouched. */
 div[class*="st-key-my_team_decisions_"] .dg-player-portrait,
 div[class*="st-key-my_team_decisions_"] .dg-football-asset__avatar {
     height: 4.25rem;
     width: 4.25rem;
 }
-div[class*="st-key-my_team_decisions_"] .dg-player-portrait.dg-tier-frame {
+div[class*="st-key-my_team_roster_core"] .dg-player-portrait,
+div[class*="st-key-my_team_roster_core"] .dg-football-asset__avatar,
+div[class*="st-key-my_team_key_backups"] .dg-player-portrait,
+div[class*="st-key-my_team_key_backups"] .dg-football-asset__avatar {
+    height: 4.25rem !important;
+    width: 4.25rem !important;
+}
+div[class*="st-key-my_team_decisions_"] .dg-player-portrait.dg-tier-frame,
+div[class*="st-key-my_team_roster_core"] .dg-player-portrait.dg-tier-frame,
+div[class*="st-key-my_team_key_backups"] .dg-player-portrait.dg-tier-frame {
     box-shadow: 0 0 0 2px var(--dg-tier-a), 0 0 8px 1px color-mix(in srgb, var(--dg-tier-a) 48%, transparent);
 }
-div[class*="st-key-my_team_decisions_"] .dg-football-asset__value {
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__value,
+div[class*="st-key-my_team_roster_core"] .dg-football-asset__value,
+div[class*="st-key-my_team_key_backups"] .dg-football-asset__value {
     grid-column: 2;
     text-align: left;
 }
@@ -183,6 +219,35 @@ div[class*="st-key-my_team_decisions_"] .dg-football-asset__value {
 .st-key-my_team_roster_signals,
 .st-key-my_team_roster_decisions {
     margin: 0 0 var(--space-sm);
+}
+/* "NN OVR" pill — Roster Core/Depth's compact row (player_cards.
+   overall_rating_badge_html), same visual language as Waivers' own OVR
+   badge (waivers_presentation_styles.py's .waiver-ovr-badge): a continuous
+   red->gold->green tint via --dg-ovr-tint, not page-specific class names,
+   since this badge is a shared player_cards.py primitive any compact row
+   can opt into. */
+.dg-ovr-badge {
+    align-items: center;
+    background: color-mix(in srgb, var(--dg-ovr-tint) 18%, transparent);
+    border: var(--border-width-default) solid color-mix(in srgb, var(--dg-ovr-tint) 48%, transparent);
+    border-radius: var(--radius-pill);
+    color: var(--dg-ovr-tint);
+    display: inline-flex;
+    font: var(--type-supporting-metadata);
+    font-weight: 700;
+    letter-spacing: var(--letter-spacing-badge);
+    padding: 1px var(--space-xs);
+    white-space: nowrap;
+}
+.dg-ovr-badge--crowned {
+    align-items: center;
+    flex-direction: column;
+    gap: 1px;
+    padding-top: 2px;
+}
+.dg-ovr-badge-crown {
+    height: 10px;
+    width: 10px;
 }
 .st-key-my_team_strategy_panel .dg-ui-section-header,
 div[class*="st-key-my_team_"] .dg-ui-section-header {

@@ -1437,6 +1437,18 @@ def render_my_team_workspace(
                     quick_view_key_prefix=f"my_team_{group_label.lower().replace(' ', '_')}_starters_{selected_league_id}_{my_roster_id}",
                     show_header=False,
                     design_system=True,
+                    # Quick-view simplification pass (coridian_, 2026-10-13:
+                    # "for my team it should just be the quick view card of
+                    # the player ... name, ring, overall, position, that's
+                    # really it") — matches mobile's MyTeamScreen LineupRow,
+                    # which never renders age or a reason/"why" line on the
+                    # roster list and shows a real OVR badge instead of a
+                    # bare value-score number. The rank note (note_fn above)
+                    # still feeds the tap-through Player Quick View's context
+                    # header — nothing is lost, only kept off the compact row.
+                    show_age=False,
+                    show_reason=False,
+                    show_overall_rating=True,
                 )
 
         _canonical_header("Who Matters")
@@ -1528,7 +1540,11 @@ def render_my_team_workspace(
                 "No backup player is available in the current projected lineup.",
             )
         elif is_premium:
-            with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):
+            with st.expander(
+                f"Key backups | {len(key_backups_df)}",
+                expanded=False,
+                key="my_team_key_backups",
+            ):
                 render_player_scan_cards(
                     key_backups_df,
                     score_field=score_field,
@@ -1549,6 +1565,13 @@ def render_my_team_workspace(
                     quick_view_key_prefix=f"my_team_key_backups_{selected_league_id}_{my_roster_id}",
                     show_header=False,
                     design_system=True,
+                    # Same quick-view simplification as Roster Core above —
+                    # matches mobile's MyTeamScreen Bench rows (the same
+                    # LineupRow, `muted=True`), which show no age or reason
+                    # line either.
+                    show_age=False,
+                    show_reason=False,
+                    show_overall_rating=True,
                 )
         elif render_premium_lock is not None:
             render_premium_lock(

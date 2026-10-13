@@ -380,6 +380,19 @@ class TestMyTeamUI(unittest.TestCase):
             calls_by_title["Drop Candidates"]["quick_view_source_label"],
             "My Team - Drop Candidates",
         )
+        # My Team Roster Core/Depth quick-view trim (coridian_, 2026-10-13:
+        # "name, ring, overall, position, that's really it" — matches
+        # mobile's MyTeamScreen LineupRow). Only these two sections opt out
+        # of age/reason and opt into the OVR badge; every other decision
+        # section (Core Assets, Trade Candidates, Hold, Drop, Untouchables)
+        # keeps the prior always-on behavior untouched.
+        self.assertFalse(calls_by_title["WR"]["show_age"])
+        self.assertFalse(calls_by_title["WR"]["show_reason"])
+        self.assertTrue(calls_by_title["WR"]["show_overall_rating"])
+        self.assertFalse(calls_by_title["Key Backups"]["show_age"])
+        self.assertFalse(calls_by_title["Key Backups"]["show_reason"])
+        self.assertTrue(calls_by_title["Key Backups"]["show_overall_rating"])
+        self.assertNotIn("show_overall_rating", calls_by_title["Core Assets"])
         self.assertTrue(render_summary_tiles.called)
         posture_call = render_summary_tiles.call_args_list[0]
         self.assertTrue(posture_call.kwargs.get("compact"))
@@ -471,7 +484,13 @@ class TestMyTeamUI(unittest.TestCase):
 
         self.assertNotIn('with st.expander("Protected players and secondary decisions", expanded=False):', source)
         self.assertIn('st.container(key="my_team_roster_decisions")', source)
-        self.assertIn('with st.expander(f"Key backups | {len(key_backups_df)}", expanded=False):', source)
+        # Key Backups now opens with an explicit `key=` (My Team quick-view
+        # trim pass, coridian_, 2026-10-13) so my_team_decision_styles.py's
+        # avatar-compacting CSS can target this expander by its
+        # `st-key-my_team_key_backups` wrapper class, the same way every
+        # other player-row section on this page already does.
+        self.assertIn('f"Key backups | {len(key_backups_df)}"', source)
+        self.assertIn('key="my_team_key_backups"', source)
         self.assertIn('"Roster Signals"', source)
         self.assertIn('"Roster Actions"', source)
         self.assertIn('"Roster Core"', source)

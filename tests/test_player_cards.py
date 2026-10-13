@@ -624,6 +624,128 @@ class TestPlayerCards(unittest.TestCase):
         compact_builder.assert_called_once()
         scan_builder.assert_not_called()
 
+    def test_compact_row_can_suppress_age_and_reason_and_add_ovr_badge(self):
+        # My Team Roster Core/Depth quick-view trim (coridian_, 2026-10-13:
+        # "name, ring, overall, position, that's really it") — matches
+        # mobile's MyTeamScreen LineupRow, which never renders age or a
+        # reason/"why" line and pairs the tier ring with a real OVR badge.
+        # Every other compact-row caller is unaffected: these three flags
+        # default to the prior always-on behavior (see the test above,
+        # test_compact_player_row_renders_metadata_reason_and_tap, which
+        # still asserts "SEA · Age 23" with no flags passed).
+        html = player_cards.compact_player_row_html(
+            {
+                "player_id": "player-row",
+                "name": "Row Player",
+                "position": "WR",
+                "team": "SEA",
+                "age": 23,
+                "value_score": 74,
+                "player_tier": "Elite",
+                "_overall_rating_col": 91,
+                "canonical_position_rank": 2,
+                "opportunity_explanation": "Should stay off the compact row.",
+            },
+            score_field="value_score",
+            score_label="Value",
+            player_display_name=lambda row: row["name"],
+            format_age=lambda value: str(value),
+            format_score=lambda value: str(value),
+            cached_headshot_data_url=lambda _player_id: "",
+            avatar_html=lambda *_args, **_kwargs: "<div class='compact-player-avatar'></div>",
+            asset_initials=lambda _name: "RP",
+            is_injury_status=lambda _row: False,
+            interactive=True,
+            show_age=False,
+            show_reason=False,
+            show_overall_rating=True,
+        )
+
+        self.assertNotIn("Age 23", html)
+        self.assertNotIn("Why:", html)
+        self.assertNotIn("Should stay off the compact row.", html)
+        self.assertIn("SEA", html)
+        self.assertIn("Row Player", html)
+        self.assertIn("dg-ovr-badge", html)
+        self.assertIn("91 OVR", html)
+        # Top-2 league-wide position rank -> crowned silver variant.
+        self.assertIn("dg-ovr-badge--crowned", html)
+
+    def test_overall_rating_badge_renders_nothing_without_rating_column(self):
+        self.assertEqual(player_cards.overall_rating_badge_html({}), "")
+        self.assertEqual(
+            player_cards.overall_rating_badge_html({"_overall_rating_col": None}),
+            "",
+        )
+
+    def test_overall_rating_badge_only_crowns_top_five_position_rank(self):
+        uncrowned = player_cards.overall_rating_badge_html(
+            {"_overall_rating_col": 70, "canonical_position_rank": 12}
+        )
+        self.assertIn("dg-ovr-badge", uncrowned)
+        self.assertIn("70 OVR", uncrowned)
+        self.assertNotIn("dg-ovr-badge--crowned", uncrowned)
+
+        crowned = player_cards.overall_rating_badge_html(
+            {"_overall_rating_col": 95, "canonical_position_rank": 1}
+        )
+        self.assertIn("dg-ovr-badge--crowned", crowned)
+        self.assertIn("95 OVR", crowned)
+
+    def test_scan_cards_forward_my_team_quick_view_trim_flags_to_compact_builder(self):
+        source = pd.DataFrame(
+            [
+                {
+                    "player_id": "starter-1",
+                    "name": "Starter Player",
+                    "position": "RB",
+                    "team": "DET",
+                    "age": 24,
+                    "value_score": 82,
+                }
+            ]
+        )
+        compact_builder = Mock(return_value="<div class='compact-player-row'>Starter</div>")
+        with patch.object(player_cards.st, "markdown"):
+            player_cards.render_player_scan_cards(
+                source,
+                score_field="value_score",
+                title="Starters",
+                note="Projected starters.",
+                league_score_label=lambda _field: "Value",
+                player_display_name=lambda row: row["name"],
+                card_html_builder=Mock(),
+                compact_row_builder=compact_builder,
+                render_tappable_player_html_callback=lambda **_kwargs: "",
+                open_player_quick_view=lambda *_args, **_kwargs: None,
+                render_recommendation_feedback=lambda **_kwargs: None,
+                compact=True,
+                show_age=False,
+                show_reason=False,
+                show_overall_rating=True,
+            )
+
+        self.assertFalse(compact_builder.call_args.kwargs["show_age"])
+        self.assertFalse(compact_builder.call_args.kwargs["show_reason"])
+        self.assertTrue(compact_builder.call_args.kwargs["show_overall_rating"])
+
+    def test_app_scan_renderer_forwards_my_team_quick_view_trim_flags(self):
+        with patch.object(player_cards, "render_player_scan_cards") as renderer:
+            app.render_player_scan_cards(
+                pd.DataFrame([{"player_id": "player-1"}]),
+                score_field="value_score",
+                title="QB",
+                note="Projected starter group.",
+                compact=True,
+                show_age=False,
+                show_reason=False,
+                show_overall_rating=True,
+            )
+
+        self.assertFalse(renderer.call_args.kwargs["show_age"])
+        self.assertFalse(renderer.call_args.kwargs["show_reason"])
+        self.assertTrue(renderer.call_args.kwargs["show_overall_rating"])
+
     def test_injured_player_card_uses_badge_not_name_prefix(self):
         html = player_cards.player_scan_card_html(
             {
