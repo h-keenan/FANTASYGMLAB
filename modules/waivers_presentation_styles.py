@@ -82,6 +82,21 @@ WAIVERS_PRESENTATION_CSS = """
     flex: 0 0 auto;
 }
 
+/* The Dynasty Score pill now renders inline inside .waiver-compact-metrics
+   (see modules/waivers_ui.py's render_free_agent_cards) instead of through
+   football_assets.player_card_html's own value slot, which forces a
+   dedicated full-width row on mobile (the generic
+   `.dg-football-asset__value` override just below) — one more stacked row
+   this already-dense decision card didn't need. The value slot is passed
+   an empty (comment-only) string so it renders a genuinely empty div here,
+   which this rule collapses; every other player_card_html consumer still
+   passes real content, so their value slot is never :empty and this rule
+   never applies to them. */
+.free-agent-card .dg-football-asset__value:empty {
+    display: none;
+    margin-top: 0;
+}
+
 .waiver-decision-summary {
     background: var(--color-opportunity-soft);
     border-left: var(--border-width-semantic) solid var(--color-opportunity);
@@ -243,8 +258,8 @@ WAIVERS_PRESENTATION_CSS = """
    this compact row alongside the Add/Stash/Watch action pill — same ring
    markup Trade Hub uses, just a smaller footprint for a denser card. */
 .waiver-priority-confidence .tvl-conf-ring {
-    height: 1.75rem;
-    width: 1.75rem;
+    height: 1.5rem;
+    width: 1.5rem;
 }
 .waiver-priority-confidence .tvl-conf-ring-value {
     font-size: var(--font-size-caption);
@@ -404,6 +419,36 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
 
     .waiver-card-action {
         justify-content: center;
+    }
+
+    /* Mobile density: this card already stacks a status row, FAAB row,
+       reason paragraph, and this action caption below the identity block —
+       tighten the grid's own gaps and this row's touch-target padding
+       (the row is aria-hidden decorative text, not its own tap target; the
+       whole card already carries role='button') so the stack reads
+       tighter without dropping any row or any text. */
+    .waiver-card-decision-grid {
+        gap: var(--space-xs);
+    }
+
+    .waiver-recommendation-row,
+    .waiver-compact-metrics,
+    .waiver-decision-summary {
+        margin-top: var(--space-xs);
+    }
+
+    .waiver-card-action {
+        min-height: 0;
+        padding-top: var(--space-2xs);
+    }
+
+    /* The wrapper (card + Share) still reserves a full desktop-sized frame
+       (border + space-sm padding + space-sm margin-bottom) around an
+       already-tightened card on a 390-430px viewport — shave it down here
+       without touching the desktop rule above. */
+    div[class*="st-key-waiver_recommendation_"] {
+        margin-bottom: var(--space-xs);
+        padding: var(--space-xs);
     }
 
     .waiver-decision-why {

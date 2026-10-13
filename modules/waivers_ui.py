@@ -1193,6 +1193,22 @@ def render_free_agent_cards(
                 is_starter=recommendation_label == "Add",
             )
             faab_html = format_faab_block_html(faab_guidance, compact=True)
+            # Folded into the waiver-compact-metrics row below (alongside the
+            # confidence/wire-rank caption) instead of the shared
+            # football_assets.player_card_html value slot, which forces its
+            # own full-width row on mobile (see WAIVERS_PRESENTATION_CSS's
+            # `.dg-football-asset__value` mobile override) — on a
+            # decision/review card already stacking many rows, that
+            # dedicated row was pure overhead for a short pill. The
+            # player_card_html value slot below is left empty (and hidden
+            # via the `:empty` CSS rule) so the shared component's own
+            # rendering path is untouched for every other consumer.
+            score_pill_html = injury_adjusted_value_html(
+                score_label,
+                score,
+                row,
+                css_class="free-agent-score-pill",
+            )
             card_classes = ["free-agent-card", "dg-ui-card", "dg-ui-card--elevated"]
             if bool(row.get("stale_free_agent")):
                 card_classes.append("dg-card-reference")
@@ -1214,6 +1230,7 @@ def render_free_agent_cards(
                 + "<div class='waiver-compact-metrics'>"
                 + (f"<span>{escape(confidence)} confidence</span>" if confidence else "")
                 + (f"<span>Wire {escape(position)} #{position_rank}</span>" if position_rank else "")
+                + score_pill_html
                 + "</div></div>"
                 + faab_html
                 + "<div class='waiver-card-rationale'>"
@@ -1250,12 +1267,7 @@ def render_free_agent_cards(
                 tags_html=(
                     f"<span class='free-agent-tags'>{''.join(tags[:2])}</span>" if tags else ""
                 ),
-                value_html=injury_adjusted_value_html(
-                    score_label,
-                    score,
-                    row,
-                    css_class="free-agent-score-pill",
-                ),
+                value_html="<!-- dynasty score moved into waiver-compact-metrics -->",
                 details_html=details_html,
                 extra_classes=tuple(card_classes),
                 stacked=False,
