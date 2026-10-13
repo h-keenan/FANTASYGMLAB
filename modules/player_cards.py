@@ -701,6 +701,103 @@ def player_scan_card_html(
     )
 
 
+# Red -> gold -> green continuous tint for a 0-99 OVR rating, same semantics
+# as mobile/src/lib/percentile.ts's `percentileColor` and this app's own
+# waivers_ui._overall_rating_percentile_tint_css (OVR fed straight in as the
+# 0-100 input, not banded into 3 flat steps). Kept as its own small copy
+# here rather than importing waivers_ui — compact_player_row_html is a
+# shared primitive used well beyond Waivers, and pulling in a page-specific
+# module for one formula isn't worth the coupling; the color math itself is
+# the only thing duplicated, not the row/card layout.
+def _overall_rating_tint_css(rating: int) -> str:
+    clamped = max(0, min(100, int(rating)))
+    if clamped <= 50:
+        to_pct = round((clamped / 50.0) * 100)
+        return (
+            f"color-mix(in srgb, var(--color-premium) {to_pct}%, "
+            f"var(--color-danger) {100 - to_pct}%)"
+        )
+    to_pct = round(((clamped - 50) / 50.0) * 100)
+    return (
+        f"color-mix(in srgb, var(--color-success) {to_pct}%, "
+        f"var(--color-premium) {100 - to_pct}%)"
+    )
+
+
+# Top-5 league-wide positional rank -> (crown tier, design token) — same
+# mapping as mobile/src/lib/positionRankPrestige.ts and this app's own
+# waivers_ui._OVR_PRESTIGE_TIER_TOKEN (gold/silver/bronze reusing
+# player_quick_view_styles.py's existing accolade tokens, not a fourth
+# palette).
+_OVR_PRESTIGE_TIER_TOKEN = {
+    1: "--color-prestige-elite",
+    2: "--color-prestige-starter",
+    3: "--color-prestige-starter",
+    4: "--color-prestige-contributor",
+    5: "--color-prestige-contributor",
+}
+
+# Minimal inline crown mark — same glyph/idiom as waivers_ui's
+# _WAIVER_OVR_CROWN_SVG (inline SVG, currentColor, aria-hidden).
+_OVR_BADGE_CROWN_SVG = (
+    "<svg class='dg-ovr-badge-crown' viewBox='0 0 24 24' aria-hidden='true' "
+    "focusable='false'><path d='M3 18h18l-1.6-9-4.9 4.4-3-6.4-3 6.4-4.9-4.4z' "
+    "fill='currentColor'/></svg>"
+)
+
+
+def overall_rating_badge_html(row) -> str:
+    """Small "NN OVR" pill — web counterpart to mobile's
+    ``OverallRatingBadge.tsx`` (see ``PlayerIdentityRow.tsx``'s
+    ``overallRating`` prop doc comment: "the colored avatar ring only
+    conveys relative tier ... this is the number that answers [how two
+    similarly-tiered players actually compare]").
+
+    Fed by ``row['_overall_rating_col']`` — a 0-99 rating a caller must
+    already have computed against a real, league-wide ranked pool (see
+    ``modules.player_quick_view.overall_ratings_for_pool``; a roster alone is
+    far too small a sample per position to rank against). Renders nothing
+    when that column is absent or empty, same "no column -> no badge"
+    contract every other optional badge in this module already follows.
+
+    For a top-5 ``row['canonical_position_rank']`` (the same league-wide,
+    never roster-relative, rank My Team's compact-rank note already reads —
+    see ``canonical_player_ranking.CANONICAL_POSITION_COLUMN``), swaps the
+    usual percentile tint for a crowned gold/silver/bronze fill, matching
+    ``OverallRatingBadge.tsx``'s identical top-5 treatment.
+    """
+
+    rating = row.get("_overall_rating_col")
+    if rating in (None, "") or (hasattr(pd, "isna") and pd.isna(rating)):
+        return ""
+    try:
+        rating_i = int(rating)
+    except (TypeError, ValueError):
+        return ""
+    position_rank = row.get("canonical_position_rank", row.get("position_rank"))
+    try:
+        position_rank_i = (
+            int(position_rank)
+            if position_rank not in (None, "") and not pd.isna(position_rank)
+            else None
+        )
+    except (TypeError, ValueError):
+        position_rank_i = None
+    prestige_token = (
+        _OVR_PRESTIGE_TIER_TOKEN.get(position_rank_i) if position_rank_i else None
+    )
+    if prestige_token:
+        return (
+            f"<span class='dg-ovr-badge dg-ovr-badge--crowned' "
+            f"style='--dg-ovr-tint:var({prestige_token})' "
+            f"aria-label='League-wide number {position_rank_i} at position, "
+            f"{rating_i} overall rating'>"
+            f"{_OVR_BADGE_CROWN_SVG}<span>{rating_i} OVR</span></span>"
+        )
+    tint = _overall_rating_tint_css(rating_i)
+    return f"<span class='dg-ovr-badge' style='--dg-ovr-tint:{tint}'>{rating_i} OVR</span>"
+
+
 def compact_player_row_html(
     row,
     *,
@@ -722,6 +819,12 @@ def compact_player_row_html(
     design_system: bool = False,
     show_prestige: bool = True,
     reason_limit: int = 220,
+    # The three flags below default to the exact pre-existing behavior (age
+    # shown, reason shown, no OVR badge) so every caller besides My Team's
+    # Roster Core/Depth sections renders byte-identical to before.
+    show_age: bool = True,
+    show_reason: bool = True,
+    show_overall_rating: bool = False,
 ) -> str:
     player_id = _safe_text(row.get("player_id")).strip()
     raw_display_name = player_display_name(row)
@@ -748,13 +851,18 @@ def compact_player_row_html(
         extra_tags=extra_tags,
         is_injury_status=is_injury_status,
     )
-    note = recommendation_reason_text(
-        note_text
-        or _safe_text(row.get("opportunity_explanation"))
-        or _safe_text(row.get("injury_replacement_note"))
-        or _safe_text(row.get("manager_trade_implication")),
-        reason_limit,
+    note = (
+        recommendation_reason_text(
+            note_text
+            or _safe_text(row.get("opportunity_explanation"))
+            or _safe_text(row.get("injury_replacement_note"))
+            or _safe_text(row.get("manager_trade_implication")),
+            reason_limit,
+        )
+        if show_reason
+        else ""
     )
+    ovr_html = overall_rating_badge_html(row) if show_overall_rating else ""
     image_url = cached_headshot_data_url(player_id) if player_id else ""
     avatar = avatar_html(
         image_url,
@@ -786,7 +894,7 @@ def compact_player_row_html(
         value_label=score_label,
         value=score_value,
         insight=note,
-        age=f"Age {age_text}",
+        age=f"Age {age_text}" if show_age else "",
     )
     return football_assets.player_card_html(
         asset,
@@ -797,6 +905,7 @@ def compact_player_row_html(
         tags_html=(
             slot_chip
             + (f"<span class='compact-player-tags'>{tags}</span>" if tags else "")
+            + ovr_html
         ),
         value_html=injury_adjusted_value_html(
             score_label,
@@ -841,6 +950,14 @@ def render_player_scan_cards(
     show_prestige: bool = True,
     reason_limit: int = 220,
     quick_view_event_id: str = "",
+    # Compact-row-only trims (see player_cards.compact_player_row_html) — all
+    # default to the pre-existing always-on behavior, so only a caller that
+    # explicitly opts out (My Team's Roster Core/Depth, matching mobile's
+    # MyTeamScreen LineupRow, which shows neither age nor a reason line)
+    # changes anything.
+    show_age: bool = True,
+    show_reason: bool = True,
+    show_overall_rating: bool = False,
 ) -> None:
     if player_df is None or player_df.empty:
         return
@@ -874,6 +991,9 @@ def render_player_scan_cards(
                 design_system=design_system,
                 show_prestige=show_prestige,
                 reason_limit=reason_limit,
+                show_age=show_age,
+                show_reason=show_reason,
+                show_overall_rating=show_overall_rating,
             )
         else:
             card_html = card_html_builder(

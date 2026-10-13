@@ -2863,6 +2863,9 @@ def _compact_player_row_html(
     design_system: bool = True,
     show_prestige: bool = True,
     reason_limit: int = 220,
+    show_age: bool = True,
+    show_reason: bool = True,
+    show_overall_rating: bool = False,
 ) -> str:
     return player_cards.compact_player_row_html(
         row,
@@ -2884,6 +2887,9 @@ def _compact_player_row_html(
         design_system=design_system,
         show_prestige=show_prestige,
         reason_limit=reason_limit,
+        show_age=show_age,
+        show_reason=show_reason,
+        show_overall_rating=show_overall_rating,
     )
 
 
@@ -3210,6 +3216,9 @@ def render_player_scan_cards(
     show_prestige: bool = True,
     reason_limit: int = 220,
     quick_view_event_id: str = "",
+    show_age: bool = True,
+    show_reason: bool = True,
+    show_overall_rating: bool = False,
 ) -> None:
     from modules import warm_route_render as _wrr_cards
 
@@ -3250,6 +3259,9 @@ def render_player_scan_cards(
             show_prestige=show_prestige,
             reason_limit=reason_limit,
             quick_view_event_id=quick_view_event_id,
+            show_age=show_age,
+            show_reason=show_reason,
+            show_overall_rating=show_overall_rating,
         )
 
 
@@ -19899,6 +19911,24 @@ def main():
                 st.warning("This roster has no players yet. If the draft is still underway, check back after picks are made.")
             else:
                 my_team_df = df_players[df_players["player_id"].isin(player_ids)].copy()
+                # OVR for Roster Core/Depth's compact row (coridian_,
+                # 2026-10-13: "the overall, the position, and that's really
+                # it for my team" — matches mobile's MyTeamScreen LineupRow,
+                # which pairs the tier ring with OverallRatingBadge rather
+                # than a bare value-score number; see PR #1029's identical
+                # Waivers precedent, "I have no clue what the ... value
+                # score means"). Computed against the FULL league pool
+                # (`df_players`), never just this ~15-man roster — a real
+                # percentile needs a big enough same-position sample (see
+                # player_quick_view.overall_ratings_for_pool's
+                # PERCENTILE_MIN_POOL gate), the same "no column -> no
+                # badge" contract Waivers/Trade Hub already use.
+                if "position" in df_players.columns and score_field in df_players.columns:
+                    my_team_df["_overall_rating_col"] = (
+                        player_quick_view.overall_ratings_for_pool(
+                            df_players, score_column=score_field
+                        ).reindex(my_team_df.index)
+                    )
                 from modules import player_injury_attention
                 from modules import warm_route_render as _wrr
 
