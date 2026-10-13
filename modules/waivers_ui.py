@@ -5,17 +5,13 @@ from typing import Callable
 import pandas as pd
 import streamlit as st
 
-from modules import canonical_player_ranking
 from modules import canonical_recommendation_narrative
+from modules import compact_fantasy_assets
 from modules import deferred_rendering
 from modules import runtime_trace
 from modules import league_workspace_ui
 from modules import football_assets, ui_primitives
 from modules import warm_route_render as _wrr
-from modules.player_cards import (
-    injury_adjusted_value_html,
-    player_prestige_level,
-)
 from modules.player_tier_identity import resolve_player_tier_identity
 from modules import player_profile_ui
 from modules import player_eligibility
@@ -25,10 +21,9 @@ from modules import league_value_settings
 from modules import rankings
 from modules import redis_cache
 from modules import sleeper
-from modules.faab import format_faab_block_html, recommend_faab_guidance
+from modules.faab import faab_bid_range_label, recommend_faab_guidance
 from modules.html_rendering import inject_global_styles
 from modules.page_shell import page_body
-from modules.trade_visual_language import TRADE_VISUAL_LANGUAGE_CSS, confidence_indicator_html
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 
 
@@ -241,13 +236,19 @@ def annotate_sleeper_trending_add(
     return annotated
 
 
-def sleeper_trending_add_badge_html(row) -> str:
-    """Small badge for a free-agent row on Sleeper's global trending-add list.
+def sleeper_trending_add_sentence(row) -> str:
+    """Plain-text sentence for a free-agent row on Sleeper's global
+    trending-add list — empty for a row that isn't trending (the common
+    case). Never implies this is a league-specific popularity signal (see
+    annotate_sleeper_trending_add's docstring: it is explicitly
+    cross-league/platform-wide).
 
-    Empty string for a row that isn't trending (the common case) — rendered
-    inline with the other recommendation badges, never implying this is a
-    league-specific popularity signal (see annotate_sleeper_trending_add's
-    docstring: it is explicitly cross-league/platform-wide).
+    Folded into Player Quick View's recommendation narrative (see
+    _waiver_detail_note) rather than rendered as its own badge on the
+    Waivers compact row — the compact row shows only one inline stat
+    (the FAAB bid range); this signal is genuinely missing from Player
+    Quick View otherwise, so it travels as part of the "why" text instead
+    of new chrome duplicated onto that shared surface.
     """
 
     if not bool(row.get("sleeper_trending_add")):
@@ -257,16 +258,54 @@ def sleeper_trending_add_badge_html(row) -> str:
         count_i = int(count) if count is not None and str(count).strip() else None
     except (TypeError, ValueError):
         count_i = None
-    label = f"Trending across Sleeper (+{count_i:,})" if count_i else "Trending across Sleeper"
-    return ui_primitives.status_badge_html(label, variant="information")
+    return (
+        f"Trending across Sleeper (+{count_i:,} adds in the last 24h)."
+        if count_i
+        else "Trending across Sleeper over the last 24h."
+    )
+
+
+def _waiver_detail_note(
+    row,
+    reason_text: str,
+    faab_guidance,
+    *,
+    position: str = "",
+    position_rank: int = 0,
+) -> str:
+    """Full Player Quick View rationale for a waiver recommendation.
+
+    ``reason_text`` (the card-level why) leads. The wire rank, FAAB
+    guidance, and the Sleeper trending-add signal are appended because
+    none of them are otherwise explicit in Player Quick View: its own
+    canonical_position_rank is a different number (rank among ALL players,
+    rostered included), not "how this player ranks among the free agents
+    actually available on the wire right now" — the number
+    rank_priority_add_candidates itself ranked this row by. See
+    render_free_agent_cards' docstring for why these travel as narrative
+    text instead of new PQV chrome.
+    """
+
+    parts = [part for part in (reason_text,) if part]
+    if position_rank:
+        parts.append(f"Wire {position} #{position_rank} under the current lens.")
+    faab_sentence = f"FAAB guidance: {faab_guidance.as_label()}. {faab_guidance.rationale}".strip()
+    if faab_sentence:
+        parts.append(faab_sentence)
+    trending_sentence = sleeper_trending_add_sentence(row)
+    if trending_sentence:
+        parts.append(trending_sentence)
+    return " ".join(parts)
 
 
 def _inject_waivers_presentation_css() -> None:
     inject_global_styles(WAIVERS_PRESENTATION_CSS)
-    # Trade Ideas' confidence-ring visual language (modules.trade_visual_language)
-    # so Priority Adds' confidence badge (see waiver_confidence_label below)
-    # matches Trade Hub's existing pattern instead of a one-off style.
-    inject_global_styles(f"<style>{TRADE_VISUAL_LANGUAGE_CSS}</style>")
+    # modules.compact_fantasy_assets.compact_asset_html's own CSS (the
+    # compact row primitive render_free_agent_cards now renders with) — it
+    # already carries Trade Ideas' confidence-ring visual language
+    # (modules.trade_visual_language.TRADE_VISUAL_LANGUAGE_CSS), the same
+    # way Trade Hub/Live Draft/Trade Analyzer inject it.
+    inject_global_styles(compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS)
 
 
 def waiver_confidence_label(row, position_rank: int) -> tuple[str, str]:
@@ -1052,6 +1091,38 @@ def render_free_agent_cards(
     open_player_quick_view: Callable,
     render_recommendation_feedback: Callable,
 ):
+    """Compact decision row for a Waivers list section (Priority Adds,
+    Stash Candidates, Watchlist Depth, FAAB Shortlist — every section that
+    calls this function; Waiver Snapshot is a separate, already-compact
+    position grid handled by render_free_agent_summary_cards instead).
+
+    2026-10: replaced the old per-row full decision-card (avatar ring,
+    status pill, full FAAB block, reason paragraph, confidence ring,
+    trending pill, tag row, "Review add ->" link, Share row) with
+    modules.compact_fantasy_assets.compact_asset_html's established
+    small-card primitive (``avatar_ring``/``position_pill``, the same opt-in
+    flags the Dashboard's Top Priority/League Movement trade teasers
+    already use): a ring-framed avatar, bold name, colored position pill +
+    team, and ONE inline decision stat.
+
+    That one stat is the FAAB bid range. It is the one number a user needs
+    before deciding whether to actually place a claim, and — unlike an
+    Add/Stash/Watch label or the wire rank — it is not already implied by
+    the section the row sits in (every row here already sits inside a
+    section whose own header already names the recommendation type —
+    Priority Add, Stash Candidate, Watchlist Depth, or FAAB Shortlist).
+
+    Everything else that used to render inline now shows only after
+    tapping through to Player Quick View (the tap target is the row
+    itself — see render_tappable_player_html below). Player Quick View
+    already carries the full reason (as its recommendation narrative),
+    confidence, tier, and canonical rank; FAAB guidance and the Sleeper
+    trending-add signal are genuinely missing from it, so they are folded
+    into the narrative "reason" text handed to open_player_quick_view
+    (build_waiver_narrative) rather than new chrome duplicated onto that
+    shared surface — see _waiver_detail_note below.
+    """
+
     _inject_waivers_presentation_css()
     if free_agents.empty:
         ui_primitives.render_empty_state_panel(
@@ -1074,7 +1145,6 @@ def render_free_agent_cards(
         ):
             position = _safe_text(row.get("position"), "Player").upper()
             team = _safe_text(row.get("team")).strip() or "FA"
-            age = _format_age(row.get("age"))
             score = _format_score(
                 row.get(
                     score_field,
@@ -1086,76 +1156,8 @@ def render_free_agent_cards(
                 row,
                 _safe_positive_int(row.get("position_rank"), 99),
             )
-            image_url = (
-                cached_headshot_data_url(player_id) if player_id else ""
-            )
-
-            primary_status = badge_text
-            status_style = player_status_style(primary_status)
-            tags: list[str] = []
-            tier_label = _safe_text(row.get("player_tier")).strip()
-            if (
-                tier_label
-                and canonical_player_status(tier_label).lower()
-                != status_style["label"].lower()
-            ):
-                tags.append(tier_chip_html(tier_label))
-            position_rank = _safe_positive_int(
-                row.get("position_rank"),
-                0,
-            )
-            opportunity_label = _safe_text(
-                row.get("opportunity_label")
-            ).strip()
-            if opportunity_label in {
-                "Elite Opportunity",
-                "Strong Opportunity",
-                "Backup With Upside",
-            }:
-                tags.append(
-                    player_support_chip_html(opportunity_label, "success")
-                )
-            elif opportunity_label == "Starter At Risk":
-                tags.append(
-                    player_support_chip_html(opportunity_label, "warning")
-                )
-            try:
-                age_value = float(row.get("age") or 0)
-            except Exception:
-                age_value = 0
-            if (
-                age_value
-                and age_value <= 24
-                and not bool(row.get("stale_free_agent"))
-                and len(tags) < 3
-            ):
-                tags.append(player_support_chip_html("Young Stash", "hold"))
-            if (
-                bool(row.get("injury_replacement_fit"))
-                and primary_status != "Injury Replacement"
-                and len(tags) < 3
-            ):
-                tags.append(
-                    player_support_chip_html(
-                        "Injury Replacement",
-                        "warning",
-                    )
-                )
-            canonical_chip = canonical_player_ranking.format_compact_rank(
-                row.get("canonical_overall_rank"),
-                row.get("canonical_position_rank"),
-                position,
-                unavailable_reason=row.get("rank_unavailable_reason"),
-            )
-            if canonical_chip != "Rank unavailable" and len(tags) < 3:
-                tags.append(player_support_chip_html(canonical_chip, "neutral"))
-            elif position_rank > 0 and len(tags) < 3:
-                tags.append(
-                    player_support_chip_html(
-                        f"Wire {position} #{position_rank}",
-                        "neutral",
-                    )
-                )
+            position_rank = _safe_positive_int(row.get("position_rank"), 0)
+            opportunity_label = _safe_text(row.get("opportunity_label")).strip()
 
             reason_text = free_agent_reason_text(
                 row,
@@ -1164,121 +1166,48 @@ def render_free_agent_cards(
                 needed_positions=needed_positions,
                 recommendation_reason_text=recommendation_reason_text,
             )
-            recommendation_label, recommendation_variant = waiver_recommendation_label(
+            recommendation_label, _recommendation_variant = waiver_recommendation_label(
                 row,
                 position_rank or 99,
             )
-            confidence = _safe_text(row.get("opportunity_confidence")).strip()
-            recommendation_badge = ui_primitives.status_badge_html(
-                recommendation_label,
-                variant=recommendation_variant,
-            )
-            # Real need-fit/standout-value confidence for this recommendation
-            # (see waiver_confidence_label docstring) — empty, and so
-            # rendered as nothing, for rows that never went through the
-            # Priority Adds ranker (Stash/Watchlist/FAAB Shortlist).
-            priority_confidence_label, _priority_confidence_reason = waiver_confidence_label(
-                row, position_rank or 99
-            )
-            priority_confidence_html = (
-                confidence_indicator_html(priority_confidence_label, extra_class="waiver-priority-confidence")
-                if priority_confidence_label
-                else ""
-            )
-            trending_badge_html = sleeper_trending_add_badge_html(row)
             faab_guidance = waiver_faab_guidance_for_row(
                 row,
                 score_field=score_field,
                 needed_positions=needed_positions,
                 is_starter=recommendation_label == "Add",
             )
-            faab_html = format_faab_block_html(faab_guidance, compact=True)
-            # Folded into the waiver-compact-metrics row below (alongside the
-            # confidence/wire-rank caption) instead of the shared
-            # football_assets.player_card_html value slot, which forces its
-            # own full-width row on mobile (see WAIVERS_PRESENTATION_CSS's
-            # `.dg-football-asset__value` mobile override) — on a
-            # decision/review card already stacking many rows, that
-            # dedicated row was pure overhead for a short pill. The
-            # player_card_html value slot below is left empty (and hidden
-            # via the `:empty` CSS rule) so the shared component's own
-            # rendering path is untouched for every other consumer.
-            score_pill_html = injury_adjusted_value_html(
-                score_label,
-                score,
+            faab_inline_label = f"FAAB {faab_bid_range_label(faab_guidance)}"
+            detail_note = _waiver_detail_note(
                 row,
-                css_class="free-agent-score-pill",
+                reason_text,
+                faab_guidance,
+                position=position,
+                position_rank=position_rank,
             )
-            card_classes = ["free-agent-card", "dg-ui-card", "dg-ui-card--elevated"]
-            if bool(row.get("stale_free_agent")):
-                card_classes.append("dg-card-reference")
-            elif bool(row.get("injury_replacement_fit")) or position_rank <= 3:
-                card_classes.append("dg-card-primary")
-            else:
-                card_classes.append("dg-card-secondary")
-            card_classes.append(
-                f"free-agent-card-tone-{status_style['tone']}"
-            )
-            details_html = (
-                "<div class='waiver-card-decision-grid'>"
-                "<div class='waiver-card-status'>"
-                "<div class='waiver-recommendation-row'>"
-                + recommendation_badge
-                + priority_confidence_html
-                + trending_badge_html
-                + "</div>"
-                + "<div class='waiver-compact-metrics'>"
-                + (f"<span>{escape(confidence)} confidence</span>" if confidence else "")
-                + (f"<span>Wire {escape(position)} #{position_rank}</span>" if position_rank else "")
-                + score_pill_html
-                + "</div></div>"
-                + faab_html
-                + "<div class='waiver-card-rationale'>"
-                + "<div class='waiver-decision-summary'>"
-                + f"<p class='waiver-decision-why'>{escape(reason_text)}</p>"
-                + "</div>"
-                + "<div class='waiver-card-action' aria-hidden='true'>Review add →</div>"
-                + "</div></div>"
-            )
-            card_html = football_assets.player_card_html(
-                football_assets.FootballPlayerAsset(
-                    player_id=player_id,
-                    display_name=player_display_name(row),
-                    position=position,
-                    team=team,
-                    prestige_label=status_style["label"],
-                    prestige_level=player_prestige_level(status_style["label"]),
-                    status="",
-                    value_label=score_label,
-                    value=score,
-                    age=f"Age {age}" if age else "",
-                ),
-                density="compact",
-                mode="action-enabled" if player_id else "read-only",
-                identity=resolve_player_tier_identity(row),
-                avatar_html=player_profile_ui.avatar_html(
-                    image_url,
-                    asset_initials(_safe_text(row.get("name"), "Player")),
-                    css_class=(
-                        "free-agent-avatar "
-                        f"avatar-tone-{status_style['tone']}"
-                    ),
-                ),
-                tags_html=(
-                    f"<span class='free-agent-tags'>{''.join(tags[:2])}</span>" if tags else ""
-                ),
-                value_html="<!-- dynasty score moved into waiver-compact-metrics -->",
-                details_html=details_html,
-                extra_classes=tuple(card_classes),
-                stacked=False,
+
+            row_html = compact_fantasy_assets.compact_asset_html(
+                {
+                    "asset_type": "player",
+                    "player_id": player_id,
+                    "name": player_display_name(row),
+                    "position": position,
+                    "team": team,
+                    "score": faab_inline_label,
+                },
+                size="standard",
+                show_value=True,
+                show_role=False,
+                position_pill=True,
+                avatar_ring=True,
             )
             payloads.append(
                 {
                     "index": int(index),
                     "row": row,
                     "player_id": player_id,
-                    "card_html": card_html,
+                    "card_html": row_html,
                     "reason_text": reason_text,
+                    "detail_note": detail_note,
                     "recommendation_label": recommendation_label,
                     "position_rank": position_rank,
                     "badge_text": badge_text,
@@ -1294,6 +1223,7 @@ def render_free_agent_cards(
         row = payload["row"]
         player_id = payload["player_id"]
         reason_text = payload["reason_text"]
+        detail_note = payload["detail_note"]
         recommendation_label = payload["recommendation_label"]
         position_rank = payload["position_rank"]
         with st.container(key=f"waiver_recommendation_{player_id}_{index}"):
@@ -1314,7 +1244,7 @@ def render_free_agent_cards(
                     waiver_narrative = canonical_recommendation_narrative.build_waiver_narrative(
                         row,
                         action=recommendation_label,
-                        reason=reason_text,
+                        reason=detail_note,
                         league_id=_safe_text(st.session_state.get("selected_league_id")),
                         roster_id=_safe_text(st.session_state.get("my_roster_id")),
                         valuation_lens=_safe_text(score_field),
@@ -1323,7 +1253,7 @@ def render_free_agent_cards(
                     open_player_quick_view(
                         player_id,
                         source_label="Waivers",
-                        source_note=reason_text,
+                        source_note=detail_note,
                         status_label=recommendation_label,
                         recommendation_narrative=waiver_narrative.to_dict(),
                     )
@@ -1331,6 +1261,15 @@ def render_free_agent_cards(
                     from modules import share_recommendation_cards as share_cards
                     from modules import share_recommendation_ui
 
+                    # A small right-aligned icon-weight button, not a
+                    # full-width row of its own (st.columns was tried and
+                    # discarded: Streamlit auto-stacks columns on narrow
+                    # viewports, which turned a "small column" right back
+                    # into a full-width row on exactly the 390px target
+                    # this redesign is for — see WAIVERS_PRESENTATION_CSS's
+                    # div[data-testid="stButton"] flex/width:auto rule
+                    # instead, the same CSS-only approach the prior
+                    # full-decision-card already used for this button).
                     if share_cards.experiment_enabled() and index < 3:
                         overall_rank = row.get("canonical_overall_rank")
                         try:

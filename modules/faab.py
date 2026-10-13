@@ -87,19 +87,31 @@ def _range_span(confidence: str) -> float:
     return 0.25
 
 
+def faab_bid_range_label(guidance: FaabGuidance) -> str:
+    """Short headline bid figure only — "$low–$high" when a real budget is
+    known, else the percent-of-pool range. Same primary text
+    ``format_faab_block_html``'s ``<dd>`` renders, factored out so a caller
+    that only has room for one compact number (e.g. the Waivers compact
+    row's single inline stat) can show it standalone without the rest of
+    the FAAB block."""
+
+    if guidance.dollars_known and guidance.remaining is not None:
+        return f"${guidance.low_bid}–${guidance.high_bid}"
+    return f"{guidance.pct_low}–{guidance.pct_high}%"
+
+
 def format_faab_block_html(guidance: FaabGuidance, *, compact: bool = False) -> str:
     """User-facing FAAB block. Actionable dollars lead when authority exists."""
 
     from html import escape
 
+    primary = faab_bid_range_label(guidance)
     if guidance.dollars_known and guidance.remaining is not None:
-        primary = f"${guidance.low_bid}–${guidance.high_bid}"
         secondary = (
             f"{guidance.pct_low}–{guidance.pct_high}% of "
             f"${guidance.remaining} remaining"
         )
     else:
-        primary = f"{guidance.pct_low}–{guidance.pct_high}%"
         secondary = "Set remaining FAAB to see a dollar recommendation."
     compact_class = " waiver-faab-block--compact" if compact else ""
     extra = "" if compact else (

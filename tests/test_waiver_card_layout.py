@@ -53,7 +53,12 @@ def test_waiver_mobile_css_separates_badge_and_score():
     assert ".waiver-faab-block" in WAIVERS_PRESENTATION_CSS
     assert ".waiver-faab-block--compact" in WAIVERS_PRESENTATION_CSS
     assert "@media (max-width: 430px)" in WAIVERS_PRESENTATION_CSS
-    assert "width: auto;" in WAIVERS_PRESENTATION_CSS
+    # Compact row redesign: Share is a small button filling its own narrow
+    # st.columns slot (use_container_width=True in waivers_ui.py) beside
+    # the compact row, not a separately-positioned full-width button that
+    # needed a width:auto escape hatch — see div[data-testid="stButton"]
+    # button's touch-target rule instead.
+    assert 'div[data-testid="stButton"] button' in WAIVERS_PRESENTATION_CSS
     assert "overflow-wrap: break-word" in FOOTBALL_ASSET_CSS
 
 
@@ -61,15 +66,25 @@ def test_waiver_card_avatar_ring_matches_dashboard_primitive():
     """Waivers page avatars share the Dashboard's exact circular vivid-green
     ring primitive (modules.daily_gm_briefing_ui's ``.dg-game-plan-card
     .dg-compact-asset-avatar.dg-tier-frame--ring`` rule) — same
-    --color-success token, same border-radius:50%, same box-shadow formula —
-    scoped to this page's own card classes (``.free-agent-card``/
-    ``.free-agent-summary-card``) instead of the Dashboard's, since every
-    other surface sharing football_assets.player_card_html's
-    dg-player-portrait/dg-tier-frame--ring markup (Live Draft, Trade
-    Analyzer, My Team, Trade Hub) must keep its existing per-tier ring."""
+    --color-success token, same border-radius:50%, same box-shadow formula.
 
-    assert ".free-agent-card .dg-player-portrait.dg-tier-frame--ring" in WAIVERS_PRESENTATION_CSS
+    Waiver Snapshot still renders through football_assets.player_card_html
+    unchanged, so it keeps the retrofit onto `.dg-player-portrait` (every
+    other football_assets consumer — Live Draft, Trade Analyzer, My Team,
+    Trade Hub — keeps its own per-tier ring untouched). Priority Adds/
+    Stash/Watchlist/FAAB Shortlist render through the compact-row redesign
+    instead (modules.compact_fantasy_assets.compact_asset_html's own
+    avatar_ring=True flag — the same primitive the Dashboard's Game Plan/
+    Top Priority cards use), so their ring override targets
+    `.dg-compact-asset-avatar` directly — the exact selector the real
+    Dashboard rule uses, no `!important` escape hatch needed."""
+
     assert ".free-agent-summary-card .dg-player-portrait.dg-tier-frame--ring" in WAIVERS_PRESENTATION_CSS
+    assert (
+        'div[class*="st-key-waiver_recommendation_"] .dg-compact-asset-avatar.dg-tier-frame--ring'
+        in WAIVERS_PRESENTATION_CSS
+    )
     assert "--dg-tier-a: var(--color-success)" in WAIVERS_PRESENTATION_CSS
     assert "border-radius: 50% !important" in WAIVERS_PRESENTATION_CSS
+    assert "border-radius: 50%;" in WAIVERS_PRESENTATION_CSS
     assert "word-break: normal" in FOOTBALL_ASSET_CSS
