@@ -143,13 +143,17 @@ def test_trade_value_labels_share_one_canonical_threshold_owner():
 
 
 def test_priority_add_layout_and_share_are_owned_by_one_card_container():
+    # Compact row redesign: the row and its Share control still render
+    # inside the SAME st.container(key=...) as before, right-aligned and
+    # shrunk to content width by CSS (st.columns was tried and discarded —
+    # Streamlit auto-stacks columns on narrow viewports, which defeats a
+    # "small column" on exactly the 390px target this redesign is for).
     ui = Path("modules/waivers_ui.py").read_text(encoding="utf-8")
     css = Path("modules/waivers_presentation_styles.py").read_text(encoding="utf-8")
-    assert "waiver-card-decision-grid" in ui
     assert "waiver_recommendation_{player_id}_{index}" in ui
     assert 'button_label="Share"' in ui
-    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) auto" in css
-    assert '@media (max-width: 700px)' in css
+    assert 'div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"]' in css
+    assert "align-self: flex-end" in css
 
 
 def test_most_injured_card_defaults_to_summary_and_keeps_detail():

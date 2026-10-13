@@ -76,11 +76,15 @@ class TestWaiversUI(unittest.TestCase):
         )
 
         html = tap_renderer.call_args.kwargs["html"]
-        self.assertIn("DAL · Age 24", html)
-        self.assertIn("dg-football-asset--compact", html)
-        self.assertNotIn("dg-football-asset--stacked", html)
-        self.assertIn("waiver-faab-block", html)
-        self.assertIn("FAAB BID", html)
+        # Compact row redesign: avatar (ring) + bold name + colored
+        # position pill + team + ONE inline FAAB stat — see
+        # modules.waivers_ui.render_free_agent_cards' docstring.
+        self.assertIn("dg-compact-asset--standard", html)
+        self.assertIn("dg-tier-frame--ring", html)
+        self.assertIn("dg-football-position--rb", html)
+        self.assertIn("DAL", html)
+        self.assertIn("FAAB ", html)
+        self.assertNotIn("Age 24", html)
         self.assertNotIn("RB | DAL | Age 24", html)
         feedback.assert_called_once()
         self.assertEqual(
@@ -338,7 +342,7 @@ class TestWaiversUI(unittest.TestCase):
         self.assertNotIn("--avatar-size: 48px !important", css)
         self.assertIn("object-position: var(--dg-player-image-position) !important", css)
 
-    def test_recommendation_card_uses_canonical_decision_hierarchy(self):
+    def test_compact_row_shows_identity_and_inline_faab_stat_only(self):
         html, _, _ = self._render_card(
             {
                 "player_id": "player-1",
@@ -355,11 +359,18 @@ class TestWaiversUI(unittest.TestCase):
             }
         )
 
-        self.assertIn("dg-ui-card dg-ui-card--elevated", html)
-        self.assertIn(">Stash<", html)
-        self.assertIn("Role could expand after a depth-chart change.", html)
-        self.assertIn("Medium confidence", html)
-        self.assertIn("Review add →", html)
+        self.assertIn("dg-compact-asset--standard", html)
+        self.assertIn("dg-football-position--wr", html)
+        self.assertIn("A Very Long Waiver Target Name", html)
+        self.assertIn("FAAB ", html)
+        # Everything else (full reason, recommendation label, confidence,
+        # the old "Review add ->" link) now lives behind the tap, in
+        # Player Quick View — not inline on the compact row.
+        self.assertNotIn("dg-ui-card dg-ui-card--elevated", html)
+        self.assertNotIn(">Stash<", html)
+        self.assertNotIn("Role could expand after a depth-chart change.", html)
+        self.assertNotIn("Medium confidence", html)
+        self.assertNotIn("Review add →", html)
         self.assertNotIn("View Details", html)
         self.assertNotIn("Why now?", html)
         self.assertNotIn("Dynasty context", html)
@@ -410,8 +421,8 @@ class TestWaiversUI(unittest.TestCase):
 
         pd.testing.assert_frame_equal(frame, original)
         rendered = [call.kwargs["html"] for call in tap_renderer.call_args_list]
-        self.assertIn(">Add<", rendered[0])
-        self.assertIn(">Watch<", rendered[1])
+        self.assertIn("Add Player", rendered[0])
+        self.assertIn("Watch Player", rendered[1])
 
     def test_card_escapes_player_and_context_content(self):
         html, _, _ = self._render_card(
@@ -503,7 +514,12 @@ class TestWaiversUI(unittest.TestCase):
             ("", ""),
         )
 
-    def test_priority_confidence_badge_renders_for_real_priority_adds_rows(self):
+    def test_priority_confidence_no_longer_renders_inline_on_compact_row(self):
+        # Compact row redesign: the confidence ring moved off the row
+        # entirely (Player Quick View already surfaces its own confidence
+        # read) — see render_free_agent_cards' docstring. Still computed by
+        # waiver_confidence_label itself (see the dedicated tests for that
+        # pure function above); just never painted onto this row.
         html, _, _ = self._render_card(
             {
                 "player_id": "priority-1",
@@ -518,8 +534,7 @@ class TestWaiversUI(unittest.TestCase):
                 "priority_value_opportunity": False,
             }
         )
-        self.assertIn("tvl-conf--high", html)
-        self.assertIn("CONFIDENCE / High", html)
+        self.assertNotIn("tvl-conf", html)
 
     def test_priority_confidence_badge_absent_without_real_ranker_signals(self):
         # Stash/Watchlist/FAAB Shortlist rows never went through
@@ -539,7 +554,7 @@ class TestWaiversUI(unittest.TestCase):
         )
         self.assertNotIn("tvl-conf", html)
 
-    def test_trending_badge_renders_for_sleeper_global_trending_add(self):
+    def test_trending_badge_no_longer_renders_inline_on_compact_row(self):
         html, _, _ = self._render_card(
             {
                 "player_id": "trend-1",
@@ -554,8 +569,7 @@ class TestWaiversUI(unittest.TestCase):
                 "sleeper_trending_add_count": 1284,
             }
         )
-        self.assertIn("Trending across Sleeper", html)
-        self.assertIn("1,284", html)
+        self.assertNotIn("Trending across Sleeper", html)
 
     def test_trending_badge_absent_when_not_trending(self):
         html, _, _ = self._render_card(
@@ -572,6 +586,68 @@ class TestWaiversUI(unittest.TestCase):
             }
         )
         self.assertNotIn("Trending across Sleeper", html)
+
+    def test_sleeper_trending_add_sentence_plain_text(self):
+        self.assertEqual(
+            waivers_ui.sleeper_trending_add_sentence(
+                {"sleeper_trending_add": True, "sleeper_trending_add_count": 1284}
+            ),
+            "Trending across Sleeper (+1,284 adds in the last 24h).",
+        )
+        self.assertEqual(
+            waivers_ui.sleeper_trending_add_sentence({"sleeper_trending_add": False}),
+            "",
+        )
+
+    def test_tapping_the_compact_row_opens_detail_with_faab_and_trending_folded_in(self):
+        # The compact row only shows the FAAB figure inline; the full
+        # reason, FAAB rationale, and Sleeper trending-add signal — all
+        # genuinely missing from Player Quick View otherwise — travel as
+        # part of the recommendation narrative handed to
+        # open_player_quick_view when the row is tapped.
+        player_id = "trend-detail-1"
+        tap_renderer = Mock(return_value=player_id)
+        quick_view = Mock()
+        waivers_ui.render_free_agent_cards(
+            pd.DataFrame(
+                [
+                    {
+                        "player_id": player_id,
+                        "name": "Detail Player",
+                        "position": "WR",
+                        "team": "SEA",
+                        "age": 23,
+                        "value_score": 40,
+                        "position_rank": 5,
+                        "stale_free_agent": False,
+                        "sleeper_trending_add": True,
+                        "sleeper_trending_add_count": 1284,
+                    }
+                ]
+            ),
+            "value_score",
+            recommendation_reason_text=lambda value, _limit: str(value),
+            player_display_name=lambda value: value.get("name"),
+            cached_headshot_data_url=lambda _player_id: "",
+            asset_initials=lambda _name: "P",
+            player_status_style=lambda label: {"label": label, "tone": "neutral"},
+            canonical_player_status=lambda value: str(value),
+            tier_chip_html=lambda _value: "",
+            player_support_chip_html=lambda _value, _tone: "",
+            player_status_pill_html=lambda value: f"<span>{value}</span>",
+            render_tappable_player_html=tap_renderer,
+            open_player_quick_view=quick_view,
+            render_recommendation_feedback=Mock(),
+        )
+
+        quick_view.assert_called_once()
+        kwargs = quick_view.call_args.kwargs
+        self.assertIn("Wire WR #5", kwargs["source_note"])
+        self.assertIn("FAAB guidance:", kwargs["source_note"])
+        self.assertIn("Trending across Sleeper (+1,284 adds in the last 24h).", kwargs["source_note"])
+        narrative_reason = kwargs["recommendation_narrative"]["reason"]
+        self.assertIn("FAAB guidance:", narrative_reason)
+        self.assertIn("Trending across Sleeper", narrative_reason)
 
     def test_annotate_sleeper_trending_add_marks_only_mapped_players(self):
         free_agents = pd.DataFrame(

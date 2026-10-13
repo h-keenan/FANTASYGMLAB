@@ -5,302 +5,74 @@ WAIVERS_PRESENTATION_CSS = """
     margin-bottom: var(--space-md);
 }
 
-.free-agent-list {
-    display: grid;
-    gap: var(--space-sm);
-}
-
-.free-agent-card.dg-ui-card {
-    /* Every card reserves the same border-inline-start box (width/style) so
-       toggling the standout color below never changes a card's dimensions —
-       only .dg-card-primary gets a visible color, via border-inline-start-color. */
-    border-inline-start: var(--border-width-semantic) solid transparent;
-    border-radius: var(--radius-none) !important;
-    clip-path: none !important;
-    margin: 0 !important;
+/* Priority Adds / Stash Candidates / Watchlist Depth / FAAB Shortlist:
+   each row is modules.compact_fantasy_assets.compact_asset_html's compact
+   player row (avatar ring, bold name, colored position pill + team, one
+   inline FAAB stat) wrapped in its own Streamlit container so a per-row
+   Share control can sit beside it without becoming a full-width row of
+   its own. A thin divider replaces the old boxed decision-card so a dense
+   list of rows reads as a list, not a stack of cards. */
+div[class*="st-key-waiver_recommendation_"] {
+    border-bottom: var(--border-width-default) solid var(--color-border);
     min-height: var(--touch-target-min);
-    overflow: hidden;
-    padding: var(--space-md) !important;
+    padding: var(--space-xs) 0;
 }
 
-.free-agent-card.player-card-tappable:hover {
-    background: var(--color-surface-raised) !important;
-    border-color: var(--color-border-strong) !important;
+div[class*="st-key-waiver_recommendation_"]:last-child {
+    border-bottom: 0;
 }
 
-.free-agent-card.player-card-tappable:focus-visible {
-    box-shadow: var(--focus-ring) !important;
-    outline: none;
-}
-
-.free-agent-main {
-    align-items: start;
-    display: grid;
-    gap: var(--space-md);
-    grid-template-columns: var(--size-roster-core-portrait) minmax(0, 1fr);
-}
-
-.free-agent-copy,
-.free-agent-name-block {
-    min-width: 0;
-}
-
-.free-agent-top {
-    align-items: start;
-    display: flex;
-    gap: var(--space-md);
-    justify-content: space-between;
-}
-
-.free-agent-status-row,
-.free-agent-tags {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-}
-
-.free-agent-name {
-    color: var(--color-text-primary);
-    font: var(--font-card-title);
-    margin-top: var(--space-sm);
-    overflow-wrap: anywhere;
-}
-
-.free-agent-meta {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-caption);
-    line-height: var(--line-height-caption);
-    margin-top: var(--space-xs);
-}
-
-.free-agent-tags {
-    margin-top: var(--space-sm);
-}
-
-.free-agent-score-pill {
-    flex: 0 0 auto;
-}
-
-/* The Dynasty Score pill now renders inline inside .waiver-compact-metrics
-   (see modules/waivers_ui.py's render_free_agent_cards) instead of through
-   football_assets.player_card_html's own value slot, which forces a
-   dedicated full-width row on mobile (the generic
-   `.dg-football-asset__value` override just below) — one more stacked row
-   this already-dense decision card didn't need. The value slot is passed
-   an empty (comment-only) string so it renders a genuinely empty div here,
-   which this rule collapses; every other player_card_html consumer still
-   passes real content, so their value slot is never :empty and this rule
-   never applies to them. */
-.free-agent-card .dg-football-asset__value:empty {
-    display: none;
-    margin-top: 0;
-}
-
-.waiver-decision-summary {
-    background: var(--color-opportunity-soft);
-    border-left: var(--border-width-semantic) solid var(--color-opportunity);
-    border-radius: var(--radius-none);
-    margin-top: var(--space-sm);
-    padding: var(--space-xs) var(--space-sm);
-}
-
-.waiver-card-label {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-badge);
-    font-weight: var(--font-weight-title);
-    letter-spacing: var(--letter-spacing-badge);
-    line-height: var(--line-height-badge);
-    text-transform: uppercase;
-}
-
-.waiver-decision-summary p,
-.waiver-decision-why,
-.waiver-context-block p {
-    color: var(--color-text-primary);
-    font-size: var(--font-size-caption);
-    font-weight: var(--font-weight-metadata);
-    line-height: var(--line-height-caption);
-    margin: var(--space-2xs) 0 0;
-    overflow: visible;
-    overflow-wrap: anywhere;
-    white-space: normal;
-}
-
-.waiver-compact-metrics {
-    color: var(--color-text-muted);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs) var(--space-sm);
-    font-size: var(--font-size-caption);
-    margin-top: var(--space-sm);
-    opacity: 0.9;
-}
-
-.waiver-snapshot-avatar {
-    border-radius: var(--radius-none);
-    height: var(--size-roster-core-portrait);
-    width: var(--size-roster-core-portrait);
-}
-
-.waiver-snapshot-avatar img {
-    height: 100%;
-    object-fit: cover;
+/* compact_asset_html defaults to width:max-content outside its own narrow
+   chip/trade contexts; a Waivers list row should span the full row width
+   so the one inline FAAB stat sits flush with the row's right edge. */
+div[class*="st-key-waiver_recommendation_"] .dg-compact-asset {
     width: 100%;
-}
-
-.free-agent-avatar {
-    height: var(--size-roster-core-portrait);
-    width: var(--size-roster-core-portrait);
 }
 
 /* Same circular vivid-green avatar ring the Dashboard's Game Plan cards use
    (modules/daily_gm_briefing_ui.py's `.dg-game-plan-card .dg-compact-asset-
    avatar.dg-tier-frame--ring` rule) — identical token values
-   (--color-success, border-radius:50%, same box-shadow), just scoped to this
-   page's own card classes instead. football_assets.player_card_html already
-   frames every avatar with player_tier_identity's shared dg-tier-frame /
-   dg-tier-frame--ring box-shadow (Live Draft, Trade Analyzer, My Team, Trade
-   Hub, and the Dashboard's own non-opted-in avatars all share that exact
-   markup), tinted per-tier via --dg-tier-a — this override only applies
-   inside .free-agent-card (Priority Adds/Stash/Watchlist/FAAB Shortlist) and
-   .free-agent-summary-card (Waiver Snapshot), so every other surface keeps
-   its existing per-tier ring untouched.
-   overflow is forced back to hidden (the shared dg-tier-frame rule sets it
-   to visible so a tier's full-frame corner mark can poke out) so the square
-   headshot image actually clips to the circle instead of bleeding past its
-   corners, and the position-colored left accent border
-   (dg-player-portrait--pos-*) is zeroed — a flat edge reads as a visual
-   defect on a circular frame, and position is already shown by the colored
-   position pill next to the name. */
-.free-agent-card .dg-player-portrait.dg-tier-frame--ring,
-.free-agent-summary-card .dg-player-portrait.dg-tier-frame--ring {
+   (--color-success, border-radius:50%, same box-shadow), just scoped to
+   this page's own row wrapper instead. compact_asset_html's avatar_ring=True
+   flag already applies the shared dg-tier-frame/dg-tier-frame--ring
+   box-shadow (its own docstring: "the caller's route CSS is expected to pin
+   --dg-tier-a to a single accent color"); this override only makes it
+   circular and green instead of the default square/muted-depth look. */
+div[class*="st-key-waiver_recommendation_"] .dg-compact-asset-avatar.dg-tier-frame--ring {
     --dg-tier-a: var(--color-success);
-    border: var(--border-width-default) solid transparent !important;
-    border-radius: 50% !important;
-    box-shadow: 0 0 0 3px var(--dg-tier-a), 0 0 4px 0 color-mix(in srgb, var(--dg-tier-a) 30%, transparent) !important;
-    overflow: hidden !important;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--dg-tier-a), 0 0 4px 0 color-mix(in srgb, var(--dg-tier-a) 30%, transparent);
 }
 
-.waiver-context-grid {
-    display: grid;
-    gap: var(--space-sm);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: var(--space-sm);
+/* Defensive clamp — an unusually long player name still fits the compact
+   row's height budget instead of pushing it taller. */
+div[class*="st-key-waiver_recommendation_"] .dg-compact-asset-name {
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    display: -webkit-box;
+    overflow: hidden;
 }
 
-.waiver-context-block {
-    background: var(--color-surface-muted);
-    border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-none);
-    min-width: 0;
-    padding: var(--space-sm) var(--space-md);
-}
-
-.waiver-context-block strong {
-    color: var(--color-text-primary);
-    display: block;
-    font: var(--font-card-title);
-    margin-top: var(--space-xs);
-    overflow-wrap: anywhere;
-}
-
-.waiver-metric-row {
-    display: grid;
-    gap: var(--space-xs);
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: var(--space-sm) 0 0;
-}
-
-.waiver-metric-row > div {
-    background: var(--color-surface-muted);
-    border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-none);
-    min-width: 0;
-    padding: var(--space-sm);
-}
-
-.waiver-metric-row dt {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-badge);
-    line-height: var(--line-height-caption);
-}
-
-.waiver-metric-row dd {
-    color: var(--color-text-primary);
-    font: var(--font-card-title);
-    margin: var(--space-xs) 0 0;
-    overflow-wrap: anywhere;
-}
-
-.waiver-card-action {
-    align-items: center;
-    border-top: var(--border-width-default) solid var(--color-border);
-    color: var(--color-accent);
-    display: flex;
-    font-size: var(--font-size-caption);
-    font-weight: var(--font-weight-button);
-    justify-content: flex-end;
-    margin-top: var(--space-sm);
-    min-height: var(--touch-target-min);
-    padding-top: var(--space-xs);
-}
-
-.waiver-recommendation-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    margin-top: var(--space-sm);
-}
-
-/* Real, need-fit/standout-value confidence badge for a Priority Adds
-   recommendation (modules.waivers_ui.waiver_confidence_label), shrunk to fit
-   this compact row alongside the Add/Stash/Watch action pill — same ring
-   markup Trade Hub uses, just a smaller footprint for a denser card. */
-.waiver-priority-confidence .tvl-conf-ring {
-    height: 1.5rem;
-    width: 1.5rem;
-}
-.waiver-priority-confidence .tvl-conf-ring-value {
-    font-size: var(--font-size-caption);
-}
-
-.waiver-card-decision-grid {
-    display: grid;
-    gap: var(--space-sm);
-    min-width: 0;
-}
-
-div[class*="st-key-waiver_recommendation_"] {
-    border: var(--border-width-default) solid var(--color-border);
-    border-radius: var(--radius-none);
-    margin-bottom: var(--space-sm);
-    padding: var(--space-sm);
-}
-
-/* The card + Share button share one visible frame (this wrapper); the inner
-   card's own border/shadow are zeroed below to avoid a double frame. Reserve
-   the accent border for a genuine standout (top-need or injury-fit pick) so
-   Priority Adds read differently from Stash/Watchlist/FAAB Shortlist depth —
-   same color-mix formula as the sitewide .dg-card-primary treatment. */
-div[class*="st-key-waiver_recommendation_"]:has(.dg-card-primary) {
-    border-color: color-mix(in srgb, var(--color-accent-strong) 30%, transparent);
-}
-
-div[class*="st-key-waiver_recommendation_"] .free-agent-card.dg-ui-card {
-    border: 0 !important;
-    box-shadow: none !important;
-}
-
-div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
-    display: flex;
-    justify-content: flex-end;
+/* Share: a small, right-aligned button under the compact row, not a
+   full-width row of its own. st.columns was tried first and discarded —
+   Streamlit auto-stacks columns on narrow viewports, which turns a "small
+   column" right back into a full-width row on exactly the 390px target
+   this redesign is for — so this is CSS-only instead, the same approach
+   the prior full-decision-card already used for this exact button.
+   use_container_width=False already makes Streamlit size the Share
+   button's own element-container to width:fit-content (its
+   data-testid="stElementContainer" carries a matching width="fit-content"
+   attribute); the row's own container is a column flexbox
+   (.stVerticalBlock), so align-self:flex-end pushes that already-shrunk
+   box to the right edge without touching the tap-grid row's own
+   full-width element-container next to it. */
+div[class*="st-key-waiver_recommendation_"] div[data-testid="stElementContainer"][width="fit-content"] {
+    align-self: flex-end;
     margin-top: var(--space-2xs);
 }
 
 div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     min-height: var(--touch-target-min);
-    width: auto;
 }
 
 .waiver-faab-block dt {
@@ -336,6 +108,22 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     margin-top: var(--space-xs);
 }
 
+/* Waiver Snapshot: a separate, already-compact "Best Available by
+   position" grid (render_free_agent_summary_cards) — untouched by the
+   Priority Adds/Stash/Watchlist/FAAB Shortlist compact-row redesign
+   above, since it was never the repeating dense list the redesign targets. */
+.waiver-snapshot-avatar {
+    border-radius: var(--radius-none);
+    height: var(--size-roster-core-portrait);
+    width: var(--size-roster-core-portrait);
+}
+
+.waiver-snapshot-avatar img {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+}
+
 .free-agent-summary-card {
     border-color: var(--color-border) !important;
     border-radius: var(--radius-none) !important;
@@ -344,13 +132,24 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     opacity: 0.96;
 }
 
-/* Reserve the accent edge for genuine standouts (top-need or injury-fit picks).
-   Only the color changes here (width/style are already set above, identically,
-   for every card) so this never shifts layout — secondary/reference cards fall
-   back to the shared dg-card-secondary/dg-card-reference border-color so
-   priority and depth adds read differently without any dimension change. */
-.free-agent-card.dg-ui-card.dg-card-primary {
-    border-inline-start-color: var(--color-opportunity);
+/* Waiver Snapshot still renders through football_assets.player_card_html
+   unchanged (see the comment above), so it keeps the exact green-ring
+   override that card markup already had before this redesign — same
+   circular vivid-green ring the Dashboard's Game Plan cards use
+   (modules/daily_gm_briefing_ui.py's `.dg-game-plan-card .dg-compact-
+   asset-avatar.dg-tier-frame--ring` rule): same --color-success token,
+   same border-radius:50%, same box-shadow formula, just retargeted at
+   football_assets' own `.dg-player-portrait` avatar container (which
+   needs the !important/overflow/border overrides below to win against
+   that shared component's own styles — every other football_assets
+   consumer, e.g. Live Draft/Trade Analyzer/My Team/Trade Hub, keeps its
+   existing per-tier ring untouched). */
+.free-agent-summary-card .dg-player-portrait.dg-tier-frame--ring {
+    --dg-tier-a: var(--color-success);
+    border: var(--border-width-default) solid transparent !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 0 3px var(--dg-tier-a), 0 0 4px 0 color-mix(in srgb, var(--dg-tier-a) 30%, transparent) !important;
+    overflow: hidden !important;
 }
 
 .free-agent-summary-grid {
@@ -366,24 +165,6 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
            second column on the summary row. */
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     }
-
-    .free-agent-card .waiver-card-decision-grid {
-        align-items: start;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) auto;
-        margin-top: var(--space-md);
-    }
-
-    .free-agent-card .waiver-recommendation-row,
-    .free-agent-card .waiver-compact-metrics,
-    .free-agent-card .waiver-faab-block,
-    .free-agent-card .waiver-decision-summary,
-    .free-agent-card .waiver-card-action {
-        margin-top: 0;
-    }
-
-    .free-agent-card .waiver-card-action {
-        min-height: var(--touch-target-min);
-    }
 }
 
 @media (min-width: 90rem) {
@@ -395,88 +176,22 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
 }
 
 @media (max-width: 700px) {
-    .free-agent-card.dg-ui-card {
-        padding: var(--space-md) !important;
-    }
-
-    .free-agent-main {
-        grid-template-columns: var(--size-roster-core-portrait) minmax(0, 1fr);
-    }
-
-    .free-agent-top {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .free-agent-score-pill {
-        align-self: flex-start;
-    }
-
-    .waiver-context-grid,
-    .waiver-metric-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .waiver-card-action {
-        justify-content: center;
-    }
-
-    /* Mobile density: this card already stacks a status row, FAAB row,
-       reason paragraph, and this action caption below the identity block —
-       tighten the grid's own gaps and this row's touch-target padding
-       (the row is aria-hidden decorative text, not its own tap target; the
-       whole card already carries role='button') so the stack reads
-       tighter without dropping any row or any text. */
-    .waiver-card-decision-grid {
-        gap: var(--space-xs);
-    }
-
-    .waiver-recommendation-row,
-    .waiver-compact-metrics,
-    .waiver-decision-summary {
-        margin-top: var(--space-xs);
-    }
-
-    .waiver-card-action {
-        min-height: 0;
-        padding-top: var(--space-2xs);
-    }
-
-    /* The wrapper (card + Share) still reserves a full desktop-sized frame
-       (border + space-sm padding + space-sm margin-bottom) around an
-       already-tightened card on a 390-430px viewport — shave it down here
-       without touching the desktop rule above. */
-    div[class*="st-key-waiver_recommendation_"] {
-        margin-bottom: var(--space-xs);
-        padding: var(--space-xs);
-    }
-
-    .waiver-decision-why {
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        display: -webkit-box;
-        overflow: hidden;
-    }
-
     .free-agent-summary-grid {
         grid-template-columns: minmax(0, 1fr) !important;
     }
 
-    .dg-football-asset.free-agent-summary-card,
-    .dg-football-asset.free-agent-card {
+    .dg-football-asset.free-agent-summary-card {
         align-items: start;
         grid-template-columns: auto minmax(0, 1fr);
     }
 
-    .dg-football-asset.free-agent-summary-card .dg-football-asset__value,
-    .dg-football-asset.free-agent-card .dg-football-asset__value {
+    .dg-football-asset.free-agent-summary-card .dg-football-asset__value {
         grid-column: 1 / -1;
         margin-top: var(--space-sm);
         text-align: left;
     }
 
-    .dg-football-asset.free-agent-summary-card .dg-football-asset__name,
-    .dg-football-asset.free-agent-card .dg-football-asset__name {
+    .dg-football-asset.free-agent-summary-card .dg-football-asset__name {
         hyphens: none;
         overflow-wrap: break-word;
         word-break: normal;
@@ -485,30 +200,17 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     .waiver-faab-block {
         margin-top: var(--space-xs);
     }
-
-    div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] {
-        justify-content: flex-end;
-    }
-
-    div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
-        width: auto;
-    }
 }
 
 @media (max-width: 430px) {
-    .free-agent-card.dg-ui-card {
-        padding: var(--space-sm) var(--space-md) !important;
-    }
-
-    .waiver-decision-why {
-        -webkit-line-clamp: 2;
+    div[class*="st-key-waiver_recommendation_"] {
+        padding: var(--space-2xs) 0;
     }
 }
 
 @media (max-width: 390px) {
-    .waiver-context-grid,
-    .waiver-metric-row {
-        grid-template-columns: 1fr;
+    div[class*="st-key-waiver_recommendation_"] .dg-compact-asset-name {
+        -webkit-line-clamp: 1;
     }
 }
 """
