@@ -139,6 +139,34 @@ WAIVERS_PRESENTATION_CSS = """
     width: var(--size-roster-core-portrait);
 }
 
+/* Same circular vivid-green avatar ring the Dashboard's Game Plan cards use
+   (modules/daily_gm_briefing_ui.py's `.dg-game-plan-card .dg-compact-asset-
+   avatar.dg-tier-frame--ring` rule) — identical token values
+   (--color-success, border-radius:50%, same box-shadow), just scoped to this
+   page's own card classes instead. football_assets.player_card_html already
+   frames every avatar with player_tier_identity's shared dg-tier-frame /
+   dg-tier-frame--ring box-shadow (Live Draft, Trade Analyzer, My Team, Trade
+   Hub, and the Dashboard's own non-opted-in avatars all share that exact
+   markup), tinted per-tier via --dg-tier-a — this override only applies
+   inside .free-agent-card (Priority Adds/Stash/Watchlist/FAAB Shortlist) and
+   .free-agent-summary-card (Waiver Snapshot), so every other surface keeps
+   its existing per-tier ring untouched.
+   overflow is forced back to hidden (the shared dg-tier-frame rule sets it
+   to visible so a tier's full-frame corner mark can poke out) so the square
+   headshot image actually clips to the circle instead of bleeding past its
+   corners, and the position-colored left accent border
+   (dg-player-portrait--pos-*) is zeroed — a flat edge reads as a visual
+   defect on a circular frame, and position is already shown by the colored
+   position pill next to the name. */
+.free-agent-card .dg-player-portrait.dg-tier-frame--ring,
+.free-agent-summary-card .dg-player-portrait.dg-tier-frame--ring {
+    --dg-tier-a: var(--color-success);
+    border: var(--border-width-default) solid transparent !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 0 3px var(--dg-tier-a), 0 0 4px 0 color-mix(in srgb, var(--dg-tier-a) 30%, transparent) !important;
+    overflow: hidden !important;
+}
+
 .waiver-context-grid {
     display: grid;
     gap: var(--space-sm);
