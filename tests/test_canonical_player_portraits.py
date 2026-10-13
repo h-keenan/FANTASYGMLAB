@@ -115,10 +115,16 @@ def test_trade_idea_card_hierarchy_is_partner_then_value_then_exchange_then_why(
     # name), ahead of the send/receive package — matching the mobile Trade
     # Hub redesign's header order (recommendation type -> team + fairness
     # pill -> value-change number -> assets -> why -> quieter confidence).
-    # V2 architecture reset pass: rationale ("why") now precedes the quieter
-    # confidence block, matching Magna Carta's Trade Hub hierarchy (partner ->
-    # assets -> value -> reasoning -> confidence/realism), rather than the
-    # other way around.
+    #
+    # Quick-view simplification pass (coridian_, 2026-10-13: a quick view
+    # should show identity + headline verdict only — give/get assets,
+    # partner name, overall trade value/who's-winning — with full analysis
+    # (rationale, confidence, realism) behind the tap-through detail only):
+    # the "why" rationale and the confidence/realism gauges were removed
+    # from this summary card entirely (they still render in the detail
+    # dialog's own explanation block), so this test's hierarchy check now
+    # ends at the send/receive package instead of a "why" cue that no
+    # longer exists here.
     source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
     start = source.index('<div class="trade-summary-title">{partner}</div>')
     end = source.index("Review package</div>") + len("Review package")
@@ -126,8 +132,8 @@ def test_trade_idea_card_hierarchy_is_partner_then_value_then_exchange_then_why(
     assert card.index("trade-summary-title") < card.index(">Balance<")
     assert card.index(">Balance<") < card.index("You send")
     assert card.index("You send") < card.index("You get")
-    assert card.index("You get") < card.index("trade-summary-why")
-    assert card.index("trade-summary-why") < card.index("Review package")
+    assert card.index("You get") < card.index("Review package")
+    assert "trade-summary-why" not in card
     assert "Review package →" not in card
     assert "Sending" not in card
     assert "Receiving" not in card
