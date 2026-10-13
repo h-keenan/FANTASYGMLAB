@@ -25,8 +25,12 @@ class TestWaiversUI(unittest.TestCase):
                 "tone": "neutral",
             },
             canonical_player_status=lambda value: str(value),
-            tier_chip_html=lambda _value: "",
-            player_support_chip_html=lambda _value, _tone: "",
+            tier_chip_html=lambda value: f"<span class='dg-tier-chip'>{value}</span>" if value else "",
+            player_support_chip_html=(
+                lambda value, tone: f"<span class='player-support-chip player-support-chip-{tone}'>{value}</span>"
+                if value
+                else ""
+            ),
             player_status_pill_html=lambda value: f"<span>{value}</span>",
             render_tappable_player_html=tap_renderer,
             open_player_quick_view=quick_view,
@@ -342,7 +346,7 @@ class TestWaiversUI(unittest.TestCase):
         self.assertNotIn("--avatar-size: 48px !important", css)
         self.assertIn("object-position: var(--dg-player-image-position) !important", css)
 
-    def test_compact_row_shows_identity_and_inline_faab_stat_only(self):
+    def test_compact_row_shows_identity_recommendation_and_faab(self):
         html, _, _ = self._render_card(
             {
                 "player_id": "player-1",
@@ -363,11 +367,18 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn("dg-football-position--wr", html)
         self.assertIn("A Very Long Waiver Target Name", html)
         self.assertIn("FAAB ", html)
-        # Everything else (full reason, recommendation label, confidence,
-        # the old "Review add ->" link) now lives behind the tap, in
-        # Player Quick View — not inline on the compact row.
+        # App-parity pass (coridian_, 2026-10-13): restored row density —
+        # the real score number and the Add/Stash/Watch recommendation
+        # pill now render inline alongside the FAAB figure (via
+        # waiver_recommendation_label/player_support_chip_html), matching
+        # mobile's WaiverRecommendationCard compact branch. Still none of
+        # the full prose (reason sentence, "Review add ->" link, the old
+        # full decision-card chrome) — that stays behind the tap, in
+        # Player Quick View.
+        self.assertIn("waiver-compact-score", html)
+        self.assertIn("waiver-compact-row-trailing", html)
+        self.assertIn(">Stash<", html)
         self.assertNotIn("dg-ui-card dg-ui-card--elevated", html)
-        self.assertNotIn(">Stash<", html)
         self.assertNotIn("Role could expand after a depth-chart change.", html)
         self.assertNotIn("Medium confidence", html)
         self.assertNotIn("Review add →", html)
@@ -514,12 +525,12 @@ class TestWaiversUI(unittest.TestCase):
             ("", ""),
         )
 
-    def test_priority_confidence_no_longer_renders_inline_on_compact_row(self):
-        # Compact row redesign: the confidence ring moved off the row
-        # entirely (Player Quick View already surfaces its own confidence
-        # read) — see render_free_agent_cards' docstring. Still computed by
-        # waiver_confidence_label itself (see the dedicated tests for that
-        # pure function above); just never painted onto this row.
+    def test_priority_confidence_renders_inline_as_a_segmented_meter(self):
+        # App-parity pass: confidence is back on the row, but as the slim
+        # inline 3-segment meter mobile's ConfidenceMeter.tsx MeterRow uses
+        # (modules.trade_visual_language.confidence_segments_html's
+        # "tvl-seg-row"/"tvl-seg" classes) — never the bigger standalone
+        # radial "tvl-conf" ring Dashboard cards use elsewhere.
         html, _, _ = self._render_card(
             {
                 "player_id": "priority-1",
@@ -534,6 +545,8 @@ class TestWaiversUI(unittest.TestCase):
                 "priority_value_opportunity": False,
             }
         )
+        self.assertIn("tvl-seg-row", html)
+        self.assertIn("High confidence", html)
         self.assertNotIn("tvl-conf", html)
 
     def test_priority_confidence_badge_absent_without_real_ranker_signals(self):
@@ -553,8 +566,15 @@ class TestWaiversUI(unittest.TestCase):
             }
         )
         self.assertNotIn("tvl-conf", html)
+        self.assertNotIn("tvl-seg-row", html)
 
-    def test_trending_badge_no_longer_renders_inline_on_compact_row(self):
+    def test_trending_pill_renders_inline_on_compact_row(self):
+        # App-parity pass: the Sleeper global trending-add signal is back
+        # on the row as a short pill (waiver_trending_add_pill_html) —
+        # deliberately different copy from the longer Player Quick View
+        # narrative sentence below ("Trending across Sleeper over the last
+        # 24h."), so this inline chip and that narrative sentence can
+        # never be confused for each other in these assertions.
         html, _, _ = self._render_card(
             {
                 "player_id": "trend-1",
@@ -569,6 +589,8 @@ class TestWaiversUI(unittest.TestCase):
                 "sleeper_trending_add_count": 1284,
             }
         )
+        self.assertIn("waiver-trending-pill", html)
+        self.assertIn("Trending on Sleeper +1,284", html)
         self.assertNotIn("Trending across Sleeper", html)
 
     def test_trending_badge_absent_when_not_trending(self):

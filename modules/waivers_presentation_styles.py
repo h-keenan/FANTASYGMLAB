@@ -5,13 +5,33 @@ WAIVERS_PRESENTATION_CSS = """
     margin-bottom: var(--space-md);
 }
 
-/* Priority Adds / Stash Candidates / Watchlist Depth / FAAB Shortlist:
-   each row is modules.compact_fantasy_assets.compact_asset_html's compact
-   player row (avatar ring, bold name, colored position pill + team, one
-   inline FAAB stat) wrapped in its own Streamlit container so a per-row
-   Share control can sit beside it without becoming a full-width row of
-   its own. A thin divider replaces the old boxed decision-card so a dense
-   list of rows reads as a list, not a stack of cards. */
+/* Priority Adds / Stash Candidates / Watchlist Depth / FAAB Shortlist: one
+   shared bordered/padded group card (mobile parity: WaiversScreen's
+   AnimatedCard + styles.compactGroupCard) wraps every row in a section —
+   not a standalone card per row, but not zero boundary between rows either
+   (coridian_, 2026-10-13: "there isn't even a division between those two
+   pills or modules... it just looks like one flowing module instead of a
+   suggestion"). Same visual weight as this page's own
+   .free-agent-summary-card/dg-ui-card family (surface-1 + standard border +
+   panel radius), scoped to the group wrapper's own Streamlit container key
+   so it never collides with the per-row key below (the row key is a
+   substring of nothing here — "waiver_group_" vs "waiver_recommendation_"). */
+div[class*="st-key-waiver_group_"] {
+    background: var(--surface-1);
+    border: var(--border-width-default) solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: var(--space-2xs) var(--space-sm);
+}
+
+/* Each row is modules.compact_fantasy_assets.compact_asset_html's compact
+   player row (avatar ring, bold name, colored position pill + team) plus
+   this module's own tier badge / trending pill / confidence meter /
+   recommendation pill / score chrome (see waivers_ui.render_free_agent_cards),
+   wrapped in its own Streamlit container so a per-row Share control can sit
+   beside it without becoming a full-width row of its own. A hairline
+   divider between rows (none after the last) replaces the old boxed
+   decision-card so a dense list of rows reads as one grouped list, not a
+   stack of individually-bordered cards. */
 div[class*="st-key-waiver_recommendation_"] {
     border-bottom: var(--border-width-default) solid var(--color-border);
     min-height: var(--touch-target-min);
@@ -24,22 +44,86 @@ div[class*="st-key-waiver_recommendation_"]:last-child {
 
 /* compact_asset_html defaults to width:max-content outside its own narrow
    chip/trade contexts; a Waivers list row should span the full row width
-   so the one inline FAAB stat sits flush with the row's right edge. */
+   so the row's own trailing block sits flush with the row's right edge. */
 div[class*="st-key-waiver_recommendation_"] .dg-compact-asset {
     width: 100%;
 }
 
-/* Same circular vivid-green avatar ring the Dashboard's Game Plan cards use
-   (modules/daily_gm_briefing_ui.py's `.dg-game-plan-card .dg-compact-asset-
-   avatar.dg-tier-frame--ring` rule) — identical token values
-   (--color-success, border-radius:50%, same box-shadow), just scoped to
-   this page's own row wrapper instead. compact_asset_html's avatar_ring=True
-   flag already applies the shared dg-tier-frame/dg-tier-frame--ring
-   box-shadow (its own docstring: "the caller's route CSS is expected to pin
-   --dg-tier-a to a single accent color"); this override only makes it
-   circular and green instead of the default square/muted-depth look. */
+/* Mobile parity (WaiverRecommendationCard's compact branch): identity +
+   chips + confidence on the left, score/recommendation/FAAB stacked on the
+   right — see waivers_ui.render_free_agent_cards for the exact markup this
+   targets. */
+.waiver-compact-row {
+    align-items: flex-start;
+    display: flex;
+    gap: var(--space-sm);
+    width: 100%;
+}
+
+.waiver-compact-row-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    min-width: 0;
+}
+
+.waiver-compact-row-chips {
+    align-items: center;
+    column-gap: var(--space-2xs);
+    display: flex;
+    flex-wrap: wrap;
+    row-gap: 2px;
+}
+
+.waiver-compact-row-trailing {
+    align-items: flex-end;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.waiver-compact-row-score-line {
+    align-items: center;
+    display: flex;
+    gap: var(--space-2xs);
+}
+
+.waiver-compact-score {
+    color: var(--color-accent);
+    font: var(--font-card-title);
+    font-variant-numeric: tabular-nums;
+}
+
+.waiver-compact-faab {
+    color: var(--color-success);
+    font: var(--type-supporting-metadata);
+    white-space: nowrap;
+}
+
+/* Sleeper global trending-add pill — mobile parity with
+   PlayerIdentityRow's trendingPill (accent-muted fill, accent text). */
+.waiver-trending-pill {
+    background: var(--surface-selected);
+    border-radius: var(--radius-pill);
+    color: var(--color-accent);
+    font: var(--type-supporting-metadata);
+    letter-spacing: var(--letter-spacing-badge);
+    padding: 1px var(--space-xs);
+    white-space: nowrap;
+}
+
+/* Same circular ring the Dashboard's Game Plan cards use for shape
+   (border-radius:50%, matching box-shadow formula), but — unlike
+   Dashboard, which deliberately wants one uniform accent regardless of
+   player — Waivers now lets the real per-tier color show through:
+   compact_asset_html's avatar_ring=True already adds a
+   dg-tier-frame--{tier_id} class (resolved from the row's own player_tier),
+   so this override no longer pins --dg-tier-a to --color-success (coridian_,
+   2026-10-13: "I don't know what the green ring is behind the players...
+   what is that green?"). */
 div[class*="st-key-waiver_recommendation_"] .dg-compact-asset-avatar.dg-tier-frame--ring {
-    --dg-tier-a: var(--color-success);
     border-radius: 50%;
     box-shadow: 0 0 0 3px var(--dg-tier-a), 0 0 4px 0 color-mix(in srgb, var(--dg-tier-a) 30%, transparent);
 }

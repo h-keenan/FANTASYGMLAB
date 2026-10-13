@@ -194,6 +194,7 @@ div[data-testid="stDialog"] [role="dialog"]{
 .player-support-chip-premium{color:var(--color-premium)!important}
 .player-support-chip-hold{color:var(--color-text-secondary)!important}
 .player-support-chip-risk{color:var(--color-danger)!important}
+.player-support-chip-info{color:var(--color-accent)!important}
 
 /* Section hierarchy and dashboard density. */
 .dg-ui-eyebrow,
