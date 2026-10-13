@@ -368,16 +368,21 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn("A Very Long Waiver Target Name", html)
         self.assertIn("FAAB ", html)
         # App-parity pass (coridian_, 2026-10-13): restored row density —
-        # the real score number and the Add/Stash/Watch recommendation
-        # pill now render inline alongside the FAAB figure (via
-        # waiver_recommendation_label/player_support_chip_html), matching
-        # mobile's WaiverRecommendationCard compact branch. Still none of
-        # the full prose (reason sentence, "Review add ->" link, the old
-        # full decision-card chrome) — that stays behind the tap, in
-        # Player Quick View.
-        self.assertIn("waiver-compact-score", html)
+        # the Add/Stash/Watch recommendation pill renders inline alongside
+        # the FAAB figure (via waiver_recommendation_label/
+        # player_support_chip_html), matching mobile's WaiverRecommendationCard
+        # compact branch. Still none of the full prose (reason sentence,
+        # "Review add ->" link, the old full decision-card chrome) — that
+        # stays behind the tap, in Player Quick View.
+        #
+        # The raw value-score number was deliberately removed from this row
+        # (coridian_, 2026-10-13: "you can just remove that value score on
+        # there because [it doesn't] really make any sense") — asserted
+        # absent below, alongside the dead `waiver-compact-score` CSS class
+        # name it used to carry.
         self.assertIn("waiver-compact-row-trailing", html)
         self.assertIn(">Stash<", html)
+        self.assertNotIn("waiver-compact-score", html)
         self.assertNotIn("dg-ui-card dg-ui-card--elevated", html)
         self.assertNotIn("Role could expand after a depth-chart change.", html)
         self.assertNotIn("Medium confidence", html)

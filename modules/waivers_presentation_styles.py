@@ -110,12 +110,6 @@ div[class*="st-key-waiver_recommendation_"] .dg-compact-asset {
     gap: var(--space-2xs);
 }
 
-.waiver-compact-score {
-    color: var(--color-accent);
-    font: var(--font-card-title);
-    font-variant-numeric: tabular-nums;
-}
-
 .waiver-compact-faab {
     color: var(--color-success);
     font: var(--type-supporting-metadata);

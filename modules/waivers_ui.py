@@ -1375,10 +1375,12 @@ def render_free_agent_cards(
                 "<div class='waiver-compact-row'>"
                 f"<div class='waiver-compact-row-main'>{identity_html}{chips_html}{confidence_html}</div>"
                 "<div class='waiver-compact-row-trailing'>"
-                "<div class='waiver-compact-row-score-line'>"
-                f"<span class='waiver-compact-score'>{escape(str(score))}</span>"
-                f"{recommendation_pill_html}"
-                "</div>"
+                # Raw value-score number dropped from this inline row
+                # (coridian_, 2026-10-13: "you can just remove that value
+                # score on there because [it doesn't] really make any
+                # sense"). `score` itself is untouched below — it still
+                # feeds the Share card's value_label a few lines down.
+                f"<div class='waiver-compact-row-score-line'>{recommendation_pill_html}</div>"
                 f"<span class='waiver-compact-faab'>{escape(faab_inline_label)}</span>"
                 "</div>"
                 "</div>"
