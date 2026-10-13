@@ -36,10 +36,7 @@ from modules.player_cards import (
 )
 from modules.player_tier_identity import resolve_player_tier_identity
 from modules.trade_visual_language import (
-    confidence_indicator_html,
-    cue_html,
     exchange_marker_html,
-    realism_indicator_html,
     trade_value_band,
     value_edge_html,
     value_edge_lean_bar_html,
@@ -227,23 +224,6 @@ html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; b
 .dg-ui-badge--caution { background: var(--color-warning-soft); color: var(--color-warning); }
 .dg-ui-badge--danger { background: var(--color-danger-soft); color: var(--color-danger); }
 .dg-ui-badge--premium { background: var(--color-action-soft); color: var(--color-premium); }
-.trade-summary-executive {
-    display: grid;
-    gap: var(--space-xs);
-    max-width: 100%;
-    min-width: 0;
-    opacity: var(--opacity-secondary);
-    order: 5;
-}
-.trade-summary-executive .tvl-conf-ring { height: 2rem; width: 2rem; }
-.trade-summary-executive .tvl-conf-ring-value { font-size: var(--font-size-badge); }
-.trade-summary-why {
-    color: var(--color-text-secondary);
-    font: var(--type-supporting-metadata);
-    line-height: var(--line-height-body);
-    margin: 0;
-    order: 4;
-}
 .trade-summary-secondary {
     color: var(--color-text-muted);
     display: grid;
@@ -583,14 +563,6 @@ def _compact_copy(value: object, *, limit: int = 180, default: str = "") -> str:
     if len(text) <= limit:
         return text
     return textwrap.shorten(text, width=limit, placeholder="...")
-
-
-def _compact_summary_sentence(value: object, *, default: str) -> str:
-    """Return one scan-safe sentence without changing the detailed rationale."""
-
-    text = " ".join(_safe_text(value, default).split())
-    sentence = text.split(". ", 1)[0].rstrip(".!? ")
-    return _compact_copy(f"{sentence}.", limit=112, default=default)
 
 
 def resolve_trade_strategy_selection(
@@ -2015,15 +1987,6 @@ def render_trade_idea_card(
     else:
         delta_text = "Even"
 
-    confidence_html = confidence_indicator_html(confidence)
-    # Mobile's TradeIdeaCard footer always pairs a REALISM meter next to
-    # CONFIDENCE (TradeHubScreen.tsx's footerRow, both MeterRows unconditional)
-    # — this was previously only surfaced on web inside the tap-through detail
-    # dialog's "Supporting metrics" line, so the scannable card itself showed
-    # less information than mobile's equivalent. Same `market` value already
-    # computed below for that dialog; realism_indicator_html is empty for an
-    # unset label so this never fabricates a value the data didn't have.
-    realism_html = realism_indicator_html(market)
     edge_html = value_edge_html(delta_text)
     # send_score/receive_score (my_score/their_score) are the full,
     # untruncated per-side totals trade_gain is itself derived from — see
@@ -2047,15 +2010,6 @@ def render_trade_idea_card(
         health_context=injury_display_context(idea),
     )
     narrative_payload = narrative.to_dict()
-    why_raw = _compact_summary_sentence(
-        narrative.reason,
-        default="Addresses a current roster need under your current strategy focus.",
-    )
-    confidence_note_html = ""
-    if _safe_text(idea.get("trade_confidence_label")).strip().casefold() == "low":
-        confidence_note_html = (
-            f"<p class='trade-summary-confidence-note'>{escape(LOW_CONFIDENCE_USER_NOTE)}</p>"
-        )
     secondary_class = (
         " trade-idea-secondary"
         if _safe_text(idea.get("trade_surface_tier"), "primary").casefold() == "secondary"
@@ -2097,6 +2051,17 @@ def render_trade_idea_card(
     # block so a reader sees the reasoning before the confidence verdict,
     # matching partner -> assets -> value -> reasoning -> confidence -> action.
     fairness_pill_html = trade_fairness_pill_html(delta_text)
+    # Risk flag, not an analytics score — kept visible on the quick-view card
+    # even after the confidence/realism gauges and "why" rationale moved to
+    # the tap-through detail only (coridian_, 2026-10-13: quick views should
+    # show identity + headline verdict, full analysis behind the tap). A
+    # genuinely low-confidence trade still needs to read as risky at a
+    # glance; see test_low_confidence_note_is_on_cards_and_kept_on_mobile.
+    confidence_note_html = ""
+    if _safe_text(idea.get("trade_confidence_label")).strip().casefold() == "low":
+        confidence_note_html = (
+            f"<p class='trade-summary-confidence-note'>{escape(LOW_CONFIDENCE_USER_NOTE)}</p>"
+        )
     summary_html = textwrap.dedent(
         f"""
         <article class="trade-summary-card dg-ui-card dg-ui-card--elevated{tone_class}{secondary_class}{focused_class}" data-trade-summary-key="{summary_key}" data-recommendation-id="{escape(idea_rec_id, quote=True)}" aria-label="View trade details: {tag} with {partner}">
@@ -2117,8 +2082,6 @@ def render_trade_idea_card(
                 <div class="trade-summary-for" data-trade-chrome="1" aria-hidden="true">{exchange_marker_html()}</div>
                 <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You get</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
-            <div class="trade-summary-why">{cue_html("why", why_raw)}</div>
-            <div class="trade-summary-executive">{confidence_html}{realism_html}</div>
             {confidence_note_html}
             <div class="trade-summary-footer">
                 <div class="trade-summary-affordance" aria-hidden="true">Review package</div>

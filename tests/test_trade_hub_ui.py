@@ -463,7 +463,14 @@ class TestTradeHubUI(unittest.TestCase):
             status_label="Starter",
         )
 
-    def test_trade_card_keeps_strategy_context_compact_and_reasoning_disclosed(self):
+    def test_trade_card_keeps_strategy_context_compact_and_reasoning_off_card(self):
+        # Quick-view simplification pass (coridian_, 2026-10-13): the
+        # scannable card now shows identity + headline verdict only — partner
+        # name, give/get assets, the value delta, and the fairness pill —
+        # with all rationale/analysis (why this works, confidence, realism)
+        # moved to the tap-through detail dialog only. This test previously
+        # asserted the short fit-summary "why" blurb and the confidence ring
+        # WERE disclosed on the card; both are now intentionally absent here.
         idea = {
             "partner_team_name": "Partner",
             "tag": "Contender upgrade",
@@ -526,8 +533,6 @@ class TestTradeHubUI(unittest.TestCase):
 
         self.assertIn("trade-summary-card", captured["html"])
         self.assertIn("dg-ui-card dg-ui-card--elevated", captured["html"])
-        self.assertIn("Improves the weakest starting position", captured["html"])
-        self.assertIn("tvl-conf", captured["html"])
         self.assertIn("tvl-edge", captured["html"])
         # Shape-based reinforcement of the Balance number/fairness pill above
         # (web's counterpart to mobile's TradeValueBar, PR #784) — driven by
@@ -541,11 +546,9 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertIn("dg-ui-badge--neutral", captured["html"])
         self.assertIn("trade-summary-fairness-pill", captured["html"])
         self.assertIn(">Balance<", captured["html"])
-        self.assertIn("trade-summary-why", captured["html"])
         self.assertIn("Review package", captured["html"])
         self.assertEqual(captured["html"].count("trade-summary-value"), 1)
         self.assertNotIn("Estimated value difference", captured["html"])
-        self.assertNotIn("Acquire the stronger starter", captured["html"])
         self.assertNotIn("trade-matchup", captured["html"])
         self.assertNotIn("trade-avatar", captured["html"])
         self.assertNotIn("trade-card-value-strip", captured["html"])
@@ -553,6 +556,13 @@ class TestTradeHubUI(unittest.TestCase):
         self.assertNotIn("trade-detail-summary", captured["html"])
         self.assertNotIn("trade-explain-card", captured["html"])
         self.assertNotIn("enough immediate production", captured["html"])
+        # Rationale and confidence/realism are no longer on the quick-view
+        # card at all — neither the short fit-summary "why" blurb nor the
+        # full reasoning_summary, and no confidence ring markup.
+        self.assertNotIn("Improves the weakest starting position", captured["html"])
+        self.assertNotIn("Acquire the stronger starter", captured["html"])
+        self.assertNotIn("trade-summary-why", captured["html"])
+        self.assertNotIn("tvl-conf", captured["html"])
         disclosure.assert_not_called()
 
     def test_trade_hub_empty_states_use_canonical_condition_specific_panel(self):

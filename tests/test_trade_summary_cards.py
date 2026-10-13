@@ -247,7 +247,12 @@ def test_summary_identity_is_stable_across_cached_and_uncached_copies():
     ) == trade_hub_ui.trade_summary_key(dict(idea), page_context="trade_hub")
 
 
-def test_summary_uses_one_sentence_and_omits_repeated_section_kicker():
+def test_summary_omits_reasoning_text_entirely_and_repeated_section_kicker():
+    # Quick-view simplification pass (coridian_, 2026-10-13): reasoning text
+    # — even the old one-sentence "why" truncation — no longer renders on
+    # the quick-view card at all; it's full-detail-only now. Previously this
+    # test asserted the first sentence WAS shown (truncated) while the rest
+    # was hidden; now neither sentence appears on the summary card.
     idea = _idea("concise")
     idea["reasoning_summary"] = (
         "Adds a reliable weekly starter. Full partner and confidence reasoning stays in detail."
@@ -261,7 +266,7 @@ def test_summary_uses_one_sentence_and_omits_repeated_section_kicker():
     )
 
     html = summary.call_args.args[0]
-    assert "Adds a reliable weekly starter." in html
+    assert "Adds a reliable weekly starter." not in html
     assert "Full partner and confidence reasoning" not in html
     assert "trade-summary-kicker" not in html
 
