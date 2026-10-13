@@ -27,6 +27,7 @@ from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.page_shell import page_body
 
 from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS, compact_asset_stack_html
+from modules.football_asset_styles import FOOTBALL_ASSET_CSS
 from modules.player_cards import (
     injury_adjusted_value_html,
     player_prestige_level,
@@ -38,6 +39,7 @@ from modules.trade_visual_language import (
     confidence_indicator_html,
     cue_html,
     exchange_marker_html,
+    realism_indicator_html,
     trade_value_band,
     value_edge_html,
     value_edge_lean_bar_html,
@@ -47,7 +49,7 @@ from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
 from modules.portrait_normalization import card_focus_x
 from modules.semantic_glyphs import SEMANTIC_GLYPH_CSS, concept_for, glyph_html
 
-TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + SEMANTIC_GLYPH_CSS + """
+TRADE_SUMMARY_COMPONENT_CSS = DESIGN_TOKEN_CSS + COMPACT_FANTASY_ASSET_CSS + SEMANTIC_GLYPH_CSS + FOOTBALL_ASSET_CSS + """
 * { box-sizing: border-box; }
 html, body, #trade-summary-tap-root { margin: 0; width: 100%; max-width: 100%; background: transparent; color: var(--color-text-primary); font-family: var(--font-family-sans); --dg-headshot-focus-x: FOCUS_X; --dg-headshot-focus: 18%; }
 .trade-summary-card {
@@ -1453,9 +1455,29 @@ def trade_summary_key(
 def _trade_summary_assets_html(assets: list[dict]) -> str:
     if not assets:
         return "<div class='trade-summary-assets'><span class='trade-summary-asset-name'>No assets</span></div>"
+    # Mobile's TradeIdeaCard renders every send/receive asset through the
+    # shared, flippable `PlayerCard` (coridian_'s own spec for it: "incorporate
+    # the prestige around the border... put an overall in the top right
+    # corner") directly on the scannable feed card, not behind a tap — a
+    # tier-colored portrait ring plus a colored position pill, always visible.
+    # This summary card previously rendered its assets through the same
+    # `compact_asset_stack_html` primitive but without `avatar_ring`/
+    # `position_pill` (both already opt-in flags this exact function exposes,
+    # already used by game_plan_trade_visual_html/game_plan_top_priority_
+    # trade_html), so player identity read flatter here than it does in the
+    # app or in web's own tap-through detail dialog (whose full
+    # `football_assets.player_card_html` rows already resolve the real
+    # per-player tier color via `resolve_player_tier_identity`).
     return (
         "<div class='trade-summary-assets'>"
-        + compact_asset_stack_html(assets, size="standard", show_value=False, show_role=False)
+        + compact_asset_stack_html(
+            assets,
+            size="standard",
+            show_value=False,
+            show_role=False,
+            position_pill=True,
+            avatar_ring=True,
+        )
         + "</div>"
     )
 
@@ -1994,6 +2016,14 @@ def render_trade_idea_card(
         delta_text = "Even"
 
     confidence_html = confidence_indicator_html(confidence)
+    # Mobile's TradeIdeaCard footer always pairs a REALISM meter next to
+    # CONFIDENCE (TradeHubScreen.tsx's footerRow, both MeterRows unconditional)
+    # — this was previously only surfaced on web inside the tap-through detail
+    # dialog's "Supporting metrics" line, so the scannable card itself showed
+    # less information than mobile's equivalent. Same `market` value already
+    # computed below for that dialog; realism_indicator_html is empty for an
+    # unset label so this never fabricates a value the data didn't have.
+    realism_html = realism_indicator_html(market)
     edge_html = value_edge_html(delta_text)
     # send_score/receive_score (my_score/their_score) are the full,
     # untruncated per-side totals trade_gain is itself derived from — see
@@ -2088,7 +2118,7 @@ def render_trade_idea_card(
                 <div class="trade-summary-side" data-trade-chrome="1"><span class="trade-summary-side-label">You get</span>{_trade_summary_assets_html(receive_assets)}</div>
             </div>
             <div class="trade-summary-why">{cue_html("why", why_raw)}</div>
-            <div class="trade-summary-executive">{confidence_html}</div>
+            <div class="trade-summary-executive">{confidence_html}{realism_html}</div>
             {confidence_note_html}
             <div class="trade-summary-footer">
                 <div class="trade-summary-affordance" aria-hidden="true">Review package</div>
