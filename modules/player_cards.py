@@ -302,7 +302,11 @@ def player_status_pill_html(label: str) -> str:
 
 def player_support_chip_html(text: str, tone: str = "neutral") -> str:
     tone_key = _safe_text(tone, "neutral").strip().lower()
-    tone_key = tone_key if tone_key in {"neutral", "success", "warning", "premium", "hold", "risk"} else "neutral"
+    tone_key = (
+        tone_key
+        if tone_key in {"neutral", "success", "warning", "premium", "hold", "risk", "info"}
+        else "neutral"
+    )
     return f"<span class='player-support-chip player-support-chip-{tone_key}'>{escape(_safe_text(text))}</span>"
 
 

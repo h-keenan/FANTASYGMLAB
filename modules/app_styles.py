@@ -340,6 +340,11 @@ main h4 {
     border-color: rgba(148, 163, 184, 0.24);
     color: var(--color-text-secondary);
 }
+.player-support-chip-info {
+    background: rgba(34, 211, 238, 0.12);
+    border-color: rgba(103, 232, 249, 0.26);
+    color: var(--color-accent);
+}
 .player-support-chip-risk {
     background: rgba(127, 29, 29, 0.2);
     border-color: rgba(248, 113, 113, 0.28);

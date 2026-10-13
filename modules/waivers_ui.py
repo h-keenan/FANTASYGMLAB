@@ -24,6 +24,7 @@ from modules import sleeper
 from modules.faab import faab_bid_range_label, recommend_faab_guidance
 from modules.html_rendering import inject_global_styles
 from modules.page_shell import page_body
+from modules.trade_visual_language import confidence_segments_html
 from modules.waivers_presentation_styles import WAIVERS_PRESENTATION_CSS
 
 
@@ -263,6 +264,39 @@ def sleeper_trending_add_sentence(row) -> str:
         if count_i
         else "Trending across Sleeper over the last 24h."
     )
+
+
+def waiver_trending_add_pill_html(row) -> str:
+    """Small inline pill for Sleeper's global trending-add signal — web's
+    counterpart to mobile's PlayerIdentityRow ``trendingPill`` (same accent-
+    muted fill / accent text, same "Trending on Sleeper[+N]" copy via
+    WaiverRecommendationCard's ``waiverTrendingAddLabel``). Deliberately
+    different copy from ``sleeper_trending_add_sentence`` above ("Trending
+    across Sleeper over the last 24h.") — that's the longer Player Quick
+    View narrative sentence; this is the short compact-row chip restored
+    alongside it (coridian_, 2026-10-13: too little inline information).
+    """
+
+    if not bool(row.get("sleeper_trending_add")):
+        return ""
+    count = row.get("sleeper_trending_add_count")
+    try:
+        count_i = int(count) if count is not None and str(count).strip() else None
+    except (TypeError, ValueError):
+        count_i = None
+    label = f"Trending on Sleeper +{count_i:,}" if count_i else "Trending on Sleeper"
+    return f"<span class='waiver-trending-pill'>{escape(label)}</span>"
+
+
+# recommendation_label's tone -> player_support_chip_html's tone, same
+# semantic mapping WaiverRecommendationCard's recommendationToneColor uses
+# on mobile (opportunity=premium/amber "Add", information=accent/cyan
+# "Stash", neutral=slate "Watch").
+_RECOMMENDATION_TONE_TO_CHIP_TONE = {
+    "opportunity": "premium",
+    "information": "info",
+    "neutral": "hold",
+}
 
 
 def _waiver_detail_note(
@@ -1096,31 +1130,29 @@ def render_free_agent_cards(
     calls this function; Waiver Snapshot is a separate, already-compact
     position grid handled by render_free_agent_summary_cards instead).
 
-    2026-10: replaced the old per-row full decision-card (avatar ring,
-    status pill, full FAAB block, reason paragraph, confidence ring,
-    trending pill, tag row, "Review add ->" link, Share row) with
-    modules.compact_fantasy_assets.compact_asset_html's established
-    small-card primitive (``avatar_ring``/``position_pill``, the same opt-in
-    flags the Dashboard's Top Priority/League Movement trade teasers
-    already use): a ring-framed avatar, bold name, colored position pill +
-    team, and ONE inline decision stat.
+    2026-10 app-parity pass (coridian_, concrete critique against a real
+    mobile app screenshot, plus a direct read of
+    mobile/src/components/WaiverRecommendationCard.tsx's compact branch):
+    every section's rows render inside ONE shared bordered group container
+    (``waiver_group_<key_prefix>``, styled by WAIVERS_PRESENTATION_CSS to
+    mobile's AnimatedCard + ``compactGroupCard`` weight) with a hairline
+    divider between rows — not zero boundary (the prior redesign's flaw:
+    "it just looks like one flowing module"), and not a standalone card per
+    row either. Each row itself is
+    modules.compact_fantasy_assets.compact_asset_html's established small
+    identity primitive (``avatar_ring``/``position_pill`` — the ring now
+    carries a real per-tier color, not a flat pinned green, matching
+    ``PlayerAvatar.tsx``'s ``resolvePlayerTier``) plus this module's own
+    restored chrome mirroring the app's compact row: a tier badge chip +
+    Sleeper trending-add pill, a compact 3-segment confidence meter
+    (``ConfidenceMeter.tsx``'s ``MeterRow``), the real value/score number,
+    the Add/Stash/Watch recommendation pill, and the FAAB bid range — all of
+    it already-computed data this function re-surfaces inline instead of
+    only inside the Full Breakdown tap-through.
 
-    That one stat is the FAAB bid range. It is the one number a user needs
-    before deciding whether to actually place a claim, and — unlike an
-    Add/Stash/Watch label or the wire rank — it is not already implied by
-    the section the row sits in (every row here already sits inside a
-    section whose own header already names the recommendation type —
-    Priority Add, Stash Candidate, Watchlist Depth, or FAAB Shortlist).
-
-    Everything else that used to render inline now shows only after
-    tapping through to Player Quick View (the tap target is the row
-    itself — see render_tappable_player_html below). Player Quick View
-    already carries the full reason (as its recommendation narrative),
-    confidence, tier, and canonical rank; FAAB guidance and the Sleeper
-    trending-add signal are genuinely missing from it, so they are folded
-    into the narrative "reason" text handed to open_player_quick_view
-    (build_waiver_narrative) rather than new chrome duplicated onto that
-    shared surface — see _waiver_detail_note below.
+    Tapping the row still opens Player Quick View (the tap target is the
+    row itself — see render_tappable_player_html below), whose narrative
+    carries the longer prose version of the same signals (``_waiver_detail_note``).
     """
 
     _inject_waivers_presentation_css()
@@ -1166,7 +1198,7 @@ def render_free_agent_cards(
                 needed_positions=needed_positions,
                 recommendation_reason_text=recommendation_reason_text,
             )
-            recommendation_label, _recommendation_variant = waiver_recommendation_label(
+            recommendation_label, recommendation_variant = waiver_recommendation_label(
                 row,
                 position_rank or 99,
             )
@@ -1184,21 +1216,48 @@ def render_free_agent_cards(
                 position=position,
                 position_rank=position_rank,
             )
+            confidence_label, _confidence_reason = waiver_confidence_label(
+                row, position_rank or 99
+            )
 
-            row_html = compact_fantasy_assets.compact_asset_html(
+            identity_html = compact_fantasy_assets.compact_asset_html(
                 {
                     "asset_type": "player",
                     "player_id": player_id,
                     "name": player_display_name(row),
                     "position": position,
                     "team": team,
-                    "score": faab_inline_label,
+                    "player_tier": row.get("player_tier"),
                 },
                 size="standard",
-                show_value=True,
+                show_value=False,
                 show_role=False,
                 position_pill=True,
                 avatar_ring=True,
+            )
+            chip_parts = [
+                tier_chip_html(row.get("player_tier")),
+                waiver_trending_add_pill_html(row),
+            ]
+            chips_html = "".join(part for part in chip_parts if part)
+            if chips_html:
+                chips_html = f"<div class='waiver-compact-row-chips'>{chips_html}</div>"
+            confidence_html = confidence_segments_html(confidence_label)
+            recommendation_pill_html = player_support_chip_html(
+                recommendation_label,
+                _RECOMMENDATION_TONE_TO_CHIP_TONE.get(recommendation_variant, "hold"),
+            )
+            row_html = (
+                "<div class='waiver-compact-row'>"
+                f"<div class='waiver-compact-row-main'>{identity_html}{chips_html}{confidence_html}</div>"
+                "<div class='waiver-compact-row-trailing'>"
+                "<div class='waiver-compact-row-score-line'>"
+                f"<span class='waiver-compact-score'>{escape(str(score))}</span>"
+                f"{recommendation_pill_html}"
+                "</div>"
+                f"<span class='waiver-compact-faab'>{escape(faab_inline_label)}</span>"
+                "</div>"
+                "</div>"
             )
             payloads.append(
                 {
@@ -1218,102 +1277,103 @@ def render_free_agent_cards(
             )
 
     feedback_rows = []
-    for payload in payloads:
-        index = payload["index"]
-        row = payload["row"]
-        player_id = payload["player_id"]
-        reason_text = payload["reason_text"]
-        detail_note = payload["detail_note"]
-        recommendation_label = payload["recommendation_label"]
-        position_rank = payload["position_rank"]
-        with st.container(key=f"waiver_recommendation_{player_id}_{index}"):
-            with _waiver_hot_path(
-                "waiver_action_controls_emit",
-                "waivers_ui.review_add_share",
-                "emit",
-                exclusive=False,
-            ):
-                clicked_player_id = render_tappable_player_html(
-                    html=payload["card_html"],
-                    key_prefix=(
-                        f"{_safe_text(key_prefix, 'waiver')}_profile_"
-                        f"{player_id}_{index}"
-                    ),
-                )
-                if clicked_player_id == player_id and player_id:
-                    waiver_narrative = canonical_recommendation_narrative.build_waiver_narrative(
-                        row,
-                        action=recommendation_label,
-                        reason=detail_note,
-                        league_id=_safe_text(st.session_state.get("selected_league_id")),
-                        roster_id=_safe_text(st.session_state.get("my_roster_id")),
-                        valuation_lens=_safe_text(score_field),
-                        source_surface="waivers",
+    with st.container(key=f"waiver_group_{_safe_text(key_prefix, 'waiver')}"):
+        for payload in payloads:
+            index = payload["index"]
+            row = payload["row"]
+            player_id = payload["player_id"]
+            reason_text = payload["reason_text"]
+            detail_note = payload["detail_note"]
+            recommendation_label = payload["recommendation_label"]
+            position_rank = payload["position_rank"]
+            with st.container(key=f"waiver_recommendation_{player_id}_{index}"):
+                with _waiver_hot_path(
+                    "waiver_action_controls_emit",
+                    "waivers_ui.review_add_share",
+                    "emit",
+                    exclusive=False,
+                ):
+                    clicked_player_id = render_tappable_player_html(
+                        html=payload["card_html"],
+                        key_prefix=(
+                            f"{_safe_text(key_prefix, 'waiver')}_profile_"
+                            f"{player_id}_{index}"
+                        ),
                     )
-                    open_player_quick_view(
-                        player_id,
-                        source_label="Waivers",
-                        source_note=detail_note,
-                        status_label=recommendation_label,
-                        recommendation_narrative=waiver_narrative.to_dict(),
-                    )
-                try:
-                    from modules import share_recommendation_cards as share_cards
-                    from modules import share_recommendation_ui
-
-                    # A small right-aligned icon-weight button, not a
-                    # full-width row of its own (st.columns was tried and
-                    # discarded: Streamlit auto-stacks columns on narrow
-                    # viewports, which turned a "small column" right back
-                    # into a full-width row on exactly the 390px target
-                    # this redesign is for — see WAIVERS_PRESENTATION_CSS's
-                    # div[data-testid="stButton"] flex/width:auto rule
-                    # instead, the same CSS-only approach the prior
-                    # full-decision-card already used for this button).
-                    if share_cards.experiment_enabled() and index < 3:
-                        overall_rank = row.get("canonical_overall_rank")
-                        try:
-                            overall_rank_i = int(overall_rank) if overall_rank not in (None, "") else None
-                        except (TypeError, ValueError):
-                            overall_rank_i = None
-                        share_card = share_cards.build_waiver_share_card(
+                    if clicked_player_id == player_id and player_id:
+                        waiver_narrative = canonical_recommendation_narrative.build_waiver_narrative(
                             row,
                             action=recommendation_label,
-                            reason=reason_text,
-                            position_rank=position_rank or None,
-                            overall_rank=overall_rank_i,
+                            reason=detail_note,
+                            league_id=_safe_text(st.session_state.get("selected_league_id")),
+                            roster_id=_safe_text(st.session_state.get("my_roster_id")),
+                            valuation_lens=_safe_text(score_field),
                             source_surface="waivers",
-                            faab_label=payload["faab_guidance"].as_label(),
-                            value_label=f"{score_label} {payload['score']}".strip(),
                         )
-                        share_recommendation_ui.render_share_controls(
-                            share_card,
-                            key=f"{_safe_text(key_prefix, 'waiver')}_share_{player_id}_{index}",
-                            state=st.session_state,
-                            button_label="Share",
-                            use_container_width=False,
+                        open_player_quick_view(
+                            player_id,
+                            source_label="Waivers",
+                            source_note=detail_note,
+                            status_label=recommendation_label,
+                            recommendation_narrative=waiver_narrative.to_dict(),
                         )
-                except Exception:
-                    pass
-        if index < 5:
-            feedback_rows.append(
-                {
-                    "player_id": player_id,
-                    "player_name": player_display_name(row),
-                    "value_score": row.get(
-                        score_field,
-                        row.get("value_score"),
-                    ),
-                    "opportunity_score": row.get("opportunity_score"),
-                    "position_rank": position_rank,
-                    "opportunity_confidence": row.get(
-                        "opportunity_confidence"
-                    ),
-                    "priority_label": payload["badge_text"],
-                    "opportunity_label": payload["opportunity_label"],
-                    "reason": reason_text,
-                }
-            )
+                    try:
+                        from modules import share_recommendation_cards as share_cards
+                        from modules import share_recommendation_ui
+
+                        # A small right-aligned icon-weight button, not a
+                        # full-width row of its own (st.columns was tried and
+                        # discarded: Streamlit auto-stacks columns on narrow
+                        # viewports, which turned a "small column" right back
+                        # into a full-width row on exactly the 390px target
+                        # this redesign is for — see WAIVERS_PRESENTATION_CSS's
+                        # div[data-testid="stButton"] flex/width:auto rule
+                        # instead, the same CSS-only approach the prior
+                        # full-decision-card already used for this button).
+                        if share_cards.experiment_enabled() and index < 3:
+                            overall_rank = row.get("canonical_overall_rank")
+                            try:
+                                overall_rank_i = int(overall_rank) if overall_rank not in (None, "") else None
+                            except (TypeError, ValueError):
+                                overall_rank_i = None
+                            share_card = share_cards.build_waiver_share_card(
+                                row,
+                                action=recommendation_label,
+                                reason=reason_text,
+                                position_rank=position_rank or None,
+                                overall_rank=overall_rank_i,
+                                source_surface="waivers",
+                                faab_label=payload["faab_guidance"].as_label(),
+                                value_label=f"{score_label} {payload['score']}".strip(),
+                            )
+                            share_recommendation_ui.render_share_controls(
+                                share_card,
+                                key=f"{_safe_text(key_prefix, 'waiver')}_share_{player_id}_{index}",
+                                state=st.session_state,
+                                button_label="Share",
+                                use_container_width=False,
+                            )
+                    except Exception:
+                        pass
+            if index < 5:
+                feedback_rows.append(
+                    {
+                        "player_id": player_id,
+                        "player_name": player_display_name(row),
+                        "value_score": row.get(
+                            score_field,
+                            row.get("value_score"),
+                        ),
+                        "opportunity_score": row.get("opportunity_score"),
+                        "position_rank": position_rank,
+                        "opportunity_confidence": row.get(
+                            "opportunity_confidence"
+                        ),
+                        "priority_label": payload["badge_text"],
+                        "opportunity_label": payload["opportunity_label"],
+                        "reason": reason_text,
+                    }
+                )
     if feedback_rows:
         render_recommendation_feedback(
             page="waivers",

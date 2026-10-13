@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 from modules.football_assets import player_name_html, position_badge_html
 from modules.player_images import get_player_image_url
 from modules.player_profile_ui import avatar_html
+from modules.player_tier_identity import resolve_player_tier_identity
 from modules.portrait_normalization import card_focus_x
 from modules.trade_visual_language import (
     TRADE_VISUAL_LANGUAGE_CSS,
@@ -266,9 +267,16 @@ def compact_asset_html(
     position for ``football_assets.position_badge_html()``'s existing
     colored pill, and frames the avatar with ``player_tier_identity``'s
     existing ``dg-tier-frame``/``dg-tier-frame--ring`` box-shadow ring (same
-    mechanism My Team/Trade Hub use for tier-colored portrait rings) — the
-    caller's route CSS is expected to pin ``--dg-tier-a`` to a single accent
-    color where a uniform (not tier-derived) ring is wanted.
+    mechanism My Team/Trade Hub use for tier-colored portrait rings), now
+    also carrying the asset's own resolved ``dg-tier-frame--{tier_id}``
+    class (via ``resolve_player_tier_identity`` on the payload's ``tier``
+    string) so the ring reads the real per-player tier color by default —
+    the same primitive ``football_assets.player_card_html``'s
+    ``portrait_frame_classes`` already applies. A caller's route CSS can
+    still pin ``--dg-tier-a`` to a single accent color where a uniform (not
+    tier-derived) ring is wanted (e.g. Dashboard's Game Plan cards); that
+    pin's higher selector specificity wins over this class regardless of
+    which tier it resolves to.
     """
     payload = presentation_asset(asset)
     if not payload:
@@ -349,7 +357,8 @@ def compact_asset_html(
     if size == "chip":
         avatar_class += " dg-compact-asset-avatar--chip"
     if avatar_ring:
-        avatar_class += " dg-tier-frame dg-tier-frame--ring"
+        tier_identity = resolve_player_tier_identity(stored_tier=payload.get("tier"))
+        avatar_class += f" dg-tier-frame dg-tier-frame--{tier_identity.tier_id} dg-tier-frame--ring"
     avatar = avatar_html(image_url, _initials(name), css_class=avatar_class)
     # Role/injury line is independent of position_pill — swapping plain-text
     # position for the colored pill must not silently drop "Handcuff"/

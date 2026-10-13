@@ -45,6 +45,18 @@ def test_stacked_card_keeps_score_below_status_badge():
     assert "title='Garrett Nussmeier'" in html
 
 
+def test_waiver_compact_rows_share_one_grouped_card():
+    """App-parity pass (coridian_, 2026-10-13: "there isn't even a division
+    between those two pills or modules... it just looks like one flowing
+    module"): every section's compact rows now share one bordered/padded
+    group container (mobile parity: WaiversScreen's AnimatedCard +
+    compactGroupCard), not zero boundary and not a card per row."""
+
+    assert 'div[class*="st-key-waiver_group_"]' in WAIVERS_PRESENTATION_CSS
+    assert ".waiver-compact-row" in WAIVERS_PRESENTATION_CSS
+    assert ".waiver-compact-row-trailing" in WAIVERS_PRESENTATION_CSS
+
+
 def test_waiver_mobile_css_separates_badge_and_score():
     assert "dg-football-asset--stacked" in FOOTBALL_ASSET_CSS
     assert "grid-template-columns: minmax(0, 1fr) !important" in WAIVERS_PRESENTATION_CSS or (
@@ -62,29 +74,40 @@ def test_waiver_mobile_css_separates_badge_and_score():
     assert "overflow-wrap: break-word" in FOOTBALL_ASSET_CSS
 
 
-def test_waiver_card_avatar_ring_matches_dashboard_primitive():
-    """Waivers page avatars share the Dashboard's exact circular vivid-green
-    ring primitive (modules.daily_gm_briefing_ui's ``.dg-game-plan-card
-    .dg-compact-asset-avatar.dg-tier-frame--ring`` rule) — same
-    --color-success token, same border-radius:50%, same box-shadow formula.
+def test_waiver_card_avatar_ring_is_circular_and_tier_derived():
+    """Waiver Snapshot (football_assets.player_card_html, untouched by this
+    pass) keeps its own circular vivid-green ring pin — same --color-success
+    token, same border-radius:50%, same box-shadow formula the Dashboard's
+    `.dg-game-plan-card .dg-compact-asset-avatar.dg-tier-frame--ring` rule
+    uses, retrofit onto `.dg-player-portrait` (every other football_assets
+    consumer — Live Draft, Trade Analyzer, My Team, Trade Hub — keeps its
+    own per-tier ring untouched).
 
-    Waiver Snapshot still renders through football_assets.player_card_html
-    unchanged, so it keeps the retrofit onto `.dg-player-portrait` (every
-    other football_assets consumer — Live Draft, Trade Analyzer, My Team,
-    Trade Hub — keeps its own per-tier ring untouched). Priority Adds/
-    Stash/Watchlist/FAAB Shortlist render through the compact-row redesign
-    instead (modules.compact_fantasy_assets.compact_asset_html's own
-    avatar_ring=True flag — the same primitive the Dashboard's Game Plan/
-    Top Priority cards use), so their ring override targets
-    `.dg-compact-asset-avatar` directly — the exact selector the real
-    Dashboard rule uses, no `!important` escape hatch needed."""
+    Priority Adds/Stash/Watchlist/FAAB Shortlist render through the compact-
+    row primitive instead (modules.compact_fantasy_assets.compact_asset_html's
+    own avatar_ring=True flag). App-parity pass (coridian_, 2026-10-13: "I
+    don't know what the green ring is behind the players... what is that
+    green?"): that row's ring override no longer pins --dg-tier-a to a flat
+    --color-success — compact_asset_html now resolves a real
+    dg-tier-frame--{tier_id} class per player (matching mobile's
+    PlayerAvatar.tsx resolvePlayerTier ring), so this rule only keeps the
+    shape (circular) and box-shadow formula, not the color."""
 
     assert ".free-agent-summary-card .dg-player-portrait.dg-tier-frame--ring" in WAIVERS_PRESENTATION_CSS
     assert (
         'div[class*="st-key-waiver_recommendation_"] .dg-compact-asset-avatar.dg-tier-frame--ring'
         in WAIVERS_PRESENTATION_CSS
     )
+    # Waiver Snapshot's own pin is untouched.
     assert "--dg-tier-a: var(--color-success)" in WAIVERS_PRESENTATION_CSS
     assert "border-radius: 50% !important" in WAIVERS_PRESENTATION_CSS
     assert "border-radius: 50%;" in WAIVERS_PRESENTATION_CSS
+    # The compact-row rule itself (Priority Adds/Stash/Watchlist/FAAB
+    # Shortlist) no longer pins a color — only the free-agent-summary-card
+    # rule above still sets --dg-tier-a directly.
+    compact_row_rule = WAIVERS_PRESENTATION_CSS.split(
+        'div[class*="st-key-waiver_recommendation_"] .dg-compact-asset-avatar.dg-tier-frame--ring {'
+    )[1].split("}")[0]
+    assert "--dg-tier-a:" not in compact_row_rule
+    assert "var(--color-success)" not in compact_row_rule
     assert "word-break: normal" in FOOTBALL_ASSET_CSS
