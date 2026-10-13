@@ -36,10 +36,10 @@ IDEAS = (
         "trade_confidence_label": "Medium",
         "reasoning_summary": "Adds a younger weekly starter and future flexibility without sacrificing lineup stability.",
         "send_assets": [
-            {"asset_type": "player", "player_id": "6794", "name": "Synthetic Veteran RB"},
+            {"asset_type": "player", "player_id": "6794", "name": "Synthetic Veteran RB", "player_tier": "Starter", "position": "RB", "team": "SYN"},
         ],
         "receive_assets": [
-            {"asset_type": "player", "player_id": "8155", "name": "Synthetic Young WR"},
+            {"asset_type": "player", "player_id": "8155", "name": "Synthetic Young WR", "player_tier": "Elite", "position": "WR", "team": "SYN"},
             {"asset_type": "pick", "name": "2027 2nd"},
         ],
     },
@@ -55,11 +55,11 @@ IDEAS = (
         "trade_confidence_label": "Low",
         "reasoning_summary": "Consolidates depth into a premium quarterback while keeping the package inside a realistic range.",
         "send_assets": [
-            {"asset_type": "player", "player_id": "7564", "name": "Synthetic Receiver"},
+            {"asset_type": "player", "player_id": "7564", "name": "Synthetic Receiver", "player_tier": "Contributor", "position": "WR", "team": "SYN"},
             {"asset_type": "pick", "name": "2027 1st"},
         ],
         "receive_assets": [
-            {"asset_type": "player", "player_id": "4984", "name": "Synthetic Elite Quarterback"},
+            {"asset_type": "player", "player_id": "4984", "name": "Synthetic Elite Quarterback", "player_tier": "Elite", "position": "QB", "team": "SYN"},
         ],
     },
     {

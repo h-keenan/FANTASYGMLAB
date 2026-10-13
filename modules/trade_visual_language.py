@@ -172,6 +172,36 @@ def confidence_ring_percent(label: object) -> int:
     return 60
 
 
+# Mobile's Trade Hub (TradeHubScreen.tsx's REALISM_LEVELS + the card's
+# footerRow) always shows a second meter next to CONFIDENCE for
+# market_realism_label ("Realistic"/"Plausible"/"Thin"), ranked exactly like
+# confidence_level above ({realistic: 3, plausible: 2, thin: 1}). Web's
+# equivalent card previously surfaced this same label only inside the tap-
+# through detail dialog ("Supporting metrics: ... market"), so the scannable
+# card itself showed meaningfully less information than mobile's — this is
+# the same ring primitive, just keyed off realism wording instead of
+# confidence wording, so the two indicators can never disagree on which
+# level reads as strong vs. weak.
+def realism_level(label: object) -> str:
+    text = str(label or "").strip().casefold()
+    if text.startswith("realistic"):
+        return "high"
+    if text.startswith("thin"):
+        return "low"
+    return "medium"
+
+
+def realism_ring_percent(label: object) -> int:
+    """Ring fill for a market-realism label, same scale as ``confidence_ring_percent``."""
+
+    level = realism_level(label)
+    if level == "high":
+        return 90
+    if level == "low":
+        return 35
+    return 60
+
+
 def exchange_marker_html(*, extra_class: str = "") -> str:
     classes = "tvl-exchange"
     if extra_class:
@@ -227,6 +257,36 @@ def confidence_indicator_html(label: object, *, extra_class: str = "") -> str:
         f"<span class='tvl-conf-ring-value'>{percent}%</span>"
         "</span>"
         f"<span class='tvl-conf-label'>CONFIDENCE / {escape(visible)}</span>"
+        f"<span class='tvl-sr'>{escape(accessible)}</span>"
+        "</div>"
+    )
+
+
+# Mobile's Trade Hub card footer pairs a REALISM meter directly next to
+# CONFIDENCE (see realism_level's doc comment above) — this is that
+# counterpart. Deliberately reuses the exact ``tvl-conf``/``tvl-conf-ring``
+# markup and CSS confidence_indicator_html already renders (same radial
+# ring, same label typography) rather than inventing a second visual
+# language for "a ranked ring + a short word," just with the REALISM
+# caption and the realism-specific level/percent mapping so neither
+# indicator can borrow the other's wording.
+def realism_indicator_html(label: object, *, extra_class: str = "") -> str:
+    raw = str(label or "").strip()
+    if not raw:
+        return ""
+    level = realism_level(raw)
+    percent = realism_ring_percent(raw)
+    accessible = raw if "market" in raw.casefold() else f"{raw} market realism"
+    classes = f"tvl-conf tvl-conf--{level}"
+    if extra_class:
+        classes += f" {extra_class}"
+    return (
+        f"<div class='{classes}' data-tvl-realism='{level}' data-tvl-realism-pct='{percent}' "
+        f"style='--tvl-conf-pct:{percent}' title='{escape(accessible, quote=True)}'>"
+        f"<span class='tvl-conf-ring' aria-hidden='true'>"
+        f"<span class='tvl-conf-ring-value'>{percent}%</span>"
+        "</span>"
+        f"<span class='tvl-conf-label'>REALISM / {escape(raw)}</span>"
         f"<span class='tvl-sr'>{escape(accessible)}</span>"
         "</div>"
     )

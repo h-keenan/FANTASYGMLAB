@@ -98,7 +98,17 @@ def test_standard_trade_idea_portrait_meets_identity_row_contract():
     assert "dg-compact-asset--standard" in html
     assert "dg-compact-asset-copy" in html
     assert "Tyrone Tracy" in html
-    assert "RB · NYG" in html
+    # App-source parity pass: the trade summary card's own assets now render
+    # through compact_asset_stack_html's `position_pill=True`/`avatar_ring=True`
+    # (mobile's PlayerCard always shows a colored position badge + tier-colored
+    # portrait ring on this exact scannable row, not just in the tap-through
+    # detail dialog — see modules/trade_hub_ui.py's _trade_summary_assets_html),
+    # so position/team now render as football_assets.position_badge_html()'s
+    # colored pill + a separate team span instead of a plain "RB · NYG" string.
+    assert "player-position-badge dg-football-position--rb" in html
+    assert "aria-label='Position RB'" in html
+    assert "<span class='dg-compact-asset-team'>NYG</span>" in html
+    assert "dg-tier-frame" in html and "dg-tier-frame--ring" in html
     css = (COMPACT_FANTASY_ASSET_CSS + TRADE_SUMMARY_COMPONENT_CSS).replace(" ", "")
     assert "--size-asset-standard:2.75rem" in css
     assert ".dg-compact-asset--standard{grid-template-columns:var(--size-asset-standard)" in css
