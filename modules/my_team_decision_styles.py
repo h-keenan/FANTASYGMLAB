@@ -211,6 +211,17 @@ div[class*="st-key-my_team_roster_core"] .dg-football-asset__badges,
 div[class*="st-key-my_team_key_backups"] .dg-football-asset__badges {
     margin-top: var(--space-2xs) !important;
 }
+/* coridian_, 2026-10-13: name still too tall. football_assets.player_card_html
+   emits the name as a literal h3 tag, which Streamlit's own runtime
+   auto-enhances with its native heading-anchor-link behavior and its own
+   much larger default heading font-size, overriding the intended
+   font:var(--font-card-title) (14px) and wrapping a short player name onto
+   two lines. Forced back to the intended size here; every other
+   dg-football-asset__name context is untouched. */
+div[class*="st-key-my_team_roster_core"] .dg-football-asset__name,
+div[class*="st-key-my_team_key_backups"] .dg-football-asset__name {
+    font: var(--font-card-title) !important;
+}
 .st-key-my_team_decisions_hold .dg-football-asset__insight,
 .st-key-my_team_decisions_untouchables .dg-football-asset__insight {
     display: -webkit-box;
