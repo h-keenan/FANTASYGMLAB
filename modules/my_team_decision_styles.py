@@ -189,6 +189,28 @@ div[class*="st-key-my_team_key_backups"] .dg-football-asset__value {
     grid-column: 2;
     text-align: left;
 }
+/* coridian_, 2026-10-13 (after seeing the trimmed card): "the name takes
+   up too much space and everything underneath the name can be moved up so
+   that there's not so much space underneath the player picture." The name/
+   meta/badges/value stack below the avatar still used
+   football_asset_styles.py's default vertical rhythm
+   (name/meta margin-top: --space-xs/4px each, badges margin-top:
+   --space-sm/8px) — generous for a full decision-card with a reason
+   paragraph underneath, but this row has only 3 short lines now, so that
+   same rhythm reads as excess air beneath a ~4.25rem/68px avatar. Tightened
+   to --space-2xs/2px throughout, scoped to Roster Core/Depth only — every
+   other --dg-football-asset context (Live Draft, Trade Analyzer, Roster
+   Decisions, Waivers) keeps the original spacing untouched. */
+div[class*="st-key-my_team_roster_core"] .dg-football-asset__name,
+div[class*="st-key-my_team_roster_core"] .dg-football-asset__meta,
+div[class*="st-key-my_team_key_backups"] .dg-football-asset__name,
+div[class*="st-key-my_team_key_backups"] .dg-football-asset__meta {
+    margin-top: var(--space-2xs) !important;
+}
+div[class*="st-key-my_team_roster_core"] .dg-football-asset__badges,
+div[class*="st-key-my_team_key_backups"] .dg-football-asset__badges {
+    margin-top: var(--space-2xs) !important;
+}
 .st-key-my_team_decisions_hold .dg-football-asset__insight,
 .st-key-my_team_decisions_untouchables .dg-football-asset__insight {
     display: -webkit-box;
