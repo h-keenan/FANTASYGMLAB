@@ -35,8 +35,16 @@ FREE_AGENTS = pd.DataFrame(
             "position": "RB",
             "team": "GB",
             "age": 24,
-            "dynasty_score": 78,
-            "value_score": 78,
+            # Realistic dynasty/value-score magnitude (real players.db scale:
+            # top players run 7000-9700+, a realistic waiver-wire pickup
+            # like this one runs roughly 200-2500) — these previously used
+            # unrealistic 2-digit placeholders (78/71/55) that happened to
+            # fall in the same 0-99 range as an OVR rating, which is exactly
+            # why coridian_ mistook the value-score number for an overall
+            # rating (Discord, 2026-10-13: "that has to be their overall and
+            # not value, value is typically in the thousands").
+            "dynasty_score": 1820,
+            "value_score": 1820,
             "stale_free_agent": False,
             "injury_replacement_fit": True,
             "injury_replacement_note": "Healthy injury replacement at RB for a starter spot your roster is already sweating.",
@@ -65,8 +73,8 @@ FREE_AGENTS = pd.DataFrame(
             "position": "WR",
             "team": "DEN",
             "age": 22,
-            "dynasty_score": 71,
-            "value_score": 71,
+            "dynasty_score": 1540,
+            "value_score": 1540,
             "stale_free_agent": False,
             "injury_replacement_fit": False,
             "opportunity_label": "Backup With Upside",
@@ -92,8 +100,8 @@ FREE_AGENTS = pd.DataFrame(
             "position": "RB",
             "team": "NYG",
             "age": 26,
-            "dynasty_score": 55,
-            "value_score": 55,
+            "dynasty_score": 980,
+            "value_score": 980,
             "stale_free_agent": False,
             "injury_replacement_fit": False,
             "opportunity_label": "Starter At Risk",
