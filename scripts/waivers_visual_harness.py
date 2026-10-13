@@ -47,6 +47,9 @@ FREE_AGENTS = pd.DataFrame(
             "player_tier": "contributor",
             "canonical_overall_rank": 48,
             "canonical_position_rank": 9,
+            # Mid-range OVR, no top-5 prestige rank -> the plain
+            # percentile-tinted (not crowned) badge path.
+            "_overall_rating_col": 78,
             "opportunity_confidence": "Medium",
             "sleeper_trending_add": True,
             "sleeper_trending_add_count": 3200,
@@ -73,6 +76,9 @@ FREE_AGENTS = pd.DataFrame(
             "player_tier": "development",
             "canonical_overall_rank": 92,
             "canonical_position_rank": 21,
+            # Low OVR, no top-5 prestige rank -> the red/amber end of the
+            # same percentile-tinted badge path.
+            "_overall_rating_col": 41,
             "opportunity_confidence": "Medium",
             "sleeper_trending_add": False,
             "priority_need_fit": False,
@@ -96,7 +102,11 @@ FREE_AGENTS = pd.DataFrame(
             "overall_rank": 11,
             "player_tier": "starter",
             "canonical_overall_rank": 110,
-            "canonical_position_rank": 28,
+            # Top-5 league-wide positional rank (silver band, #2-3) so this
+            # fixture exercises OverallRatingBadge's crowned prestige path
+            # instead of the plain percentile tint.
+            "canonical_position_rank": 2,
+            "_overall_rating_col": 91,
             "opportunity_confidence": "Low",
             "sleeper_trending_add": False,
             "priority_need_fit": False,

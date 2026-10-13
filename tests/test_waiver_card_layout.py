@@ -111,3 +111,52 @@ def test_waiver_card_avatar_ring_is_circular_and_tier_derived():
     assert "--dg-tier-a:" not in compact_row_rule
     assert "var(--color-success)" not in compact_row_rule
     assert "word-break: normal" in FOOTBALL_ASSET_CSS
+
+
+def test_waiver_row_divider_uses_strong_border_token_for_contrast():
+    """coridian_, 2026-10-13: "there needs to be some sort of dividing
+    line in between those" — the hairline divider needs to clear the WCAG
+    non-text-contrast floor against the grouped card's own surface, which
+    --color-border alone does not (design_tokens.py's own comment on that
+    token)."""
+
+    row_rule = WAIVERS_PRESENTATION_CSS.split(
+        'div[class*="st-key-waiver_recommendation_"] {'
+    )[1].split("}")[0]
+    assert "border-bottom: var(--border-width-default) solid var(--border-strong)" in row_rule
+
+
+def test_waiver_row_divider_last_child_override_is_scoped_to_the_group():
+    """A bare `div[class*=...]:last-child` never matches the genuinely
+    last row: each row's own container renders as the ONLY child of its
+    individual Streamlit layout wrapper, so it is trivially ":last-child"
+    of that one-child parent on every row, zeroing the divider everywhere
+    instead of only on the actual last row. The override must instead key
+    off the shared group container's own children (true siblings)."""
+
+    assert (
+        'div[class*="st-key-waiver_group_"] > div:last-child '
+        'div[class*="st-key-waiver_recommendation_"] {'
+        in WAIVERS_PRESENTATION_CSS
+    )
+    # The old, broken bare selector must not still be present.
+    assert 'div[class*="st-key-waiver_recommendation_"]:last-child {' not in WAIVERS_PRESENTATION_CSS
+
+
+def test_waiver_share_button_overlays_row_bottom_right_instead_of_stacking_below():
+    """coridian_, 2026-10-13: "the share button could be moved up to be
+    level with the low confidence meter" — the Share button is taken out
+    of normal flow and pinned to the row's own bottom-right corner so it
+    lands over the same blank space the row's shorter trailing column
+    (score/FAAB) already leaves above the row's taller main column's last
+    line (the confidence meter), instead of stacking as a separate
+    flow element below the whole row."""
+
+    assert 'div[class*="st-key-waiver_recommendation_"] {\n    position: relative;\n}' in WAIVERS_PRESENTATION_CSS
+    share_rule = WAIVERS_PRESENTATION_CSS.split(
+        'div[class*="st-key-waiver_recommendation_"] div[data-testid="stElementContainer"][width="fit-content"] {'
+    )[1].split("}")[0]
+    assert "position: absolute" in share_rule
+    assert "right: 0" in share_rule
+    # No longer a flow sibling pushed down by align-self/margin-top.
+    assert "align-self" not in share_rule
