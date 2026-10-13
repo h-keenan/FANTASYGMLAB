@@ -288,6 +288,126 @@ def waiver_trending_add_pill_html(row) -> str:
     return f"<span class='waiver-trending-pill'>{escape(label)}</span>"
 
 
+# Top-5 league-wide positional rank -> gold/silver/bronze prestige tier,
+# matching mobile/src/lib/positionRankPrestige.ts exactly (#1 gold, #2-3
+# silver, #4-5 bronze, else no prestige). Reuses this app's own existing
+# gold/silver/bronze prestige tokens (player_quick_view_styles.py's
+# .pqv-accolade--gold/-silver/-bronze already key off these same three
+# design tokens for an award tier) rather than inventing a fourth palette.
+_OVR_PRESTIGE_TIER_TOKEN = {
+    1: ("gold", "--color-prestige-elite"),
+    2: ("silver", "--color-prestige-starter"),
+    3: ("silver", "--color-prestige-starter"),
+    4: ("bronze", "--color-prestige-contributor"),
+    5: ("bronze", "--color-prestige-contributor"),
+}
+
+
+def _overall_rating_prestige(position_rank: object) -> tuple[str, str] | None:
+    try:
+        rank_i = int(position_rank) if position_rank not in (None, "") and not pd.isna(position_rank) else None
+    except (TypeError, ValueError):
+        rank_i = None
+    if rank_i is None or rank_i < 1:
+        return None
+    return _OVR_PRESTIGE_TIER_TOKEN.get(rank_i)
+
+
+def _overall_rating_percentile_tint_css(rating: int) -> str:
+    """Red -> gold -> green continuous tint for a 0-99 OVR rating — same
+    semantics as mobile/src/lib/percentile.ts's ``percentileColor`` (danger
+    at 0, premium at 50, success at 100, linearly interpolated, not banded
+    into 3 flat steps), fed the OVR value itself as the 0-100 input exactly
+    like OverallRatingBadge.tsx does ("OVR is already a 0-99 scale, so it's
+    fed straight into percentileColor").
+
+    Written as a literal CSS ``color-mix()`` between this app's own design
+    tokens (--color-danger/-premium/-success) rather than precomputing a
+    fixed hex in Python (mobile's own ``mixHex`` approach) — the same
+    markup then resolves correctly in both the dark and light palettes
+    (design_tokens.py defines independent hex per theme) with no second,
+    light-mode copy of the math, matching the color-mix idiom this module's
+    own tier-ring CSS already uses (WAIVERS_PRESENTATION_CSS's
+    dg-tier-frame--ring box-shadow).
+    """
+
+    clamped = max(0, min(100, int(rating)))
+    if clamped <= 50:
+        to_pct = round((clamped / 50.0) * 100)
+        return (
+            f"color-mix(in srgb, var(--color-premium) {to_pct}%, "
+            f"var(--color-danger) {100 - to_pct}%)"
+        )
+    to_pct = round(((clamped - 50) / 50.0) * 100)
+    return (
+        f"color-mix(in srgb, var(--color-success) {to_pct}%, "
+        f"var(--color-premium) {100 - to_pct}%)"
+    )
+
+
+# Minimal inline crown mark (zigzag top, flat base) — this codebase's
+# semantic_glyphs.py inline-SVG system is scoped to GM Orb nav destinations
+# (home/roster/trade/... concepts), not awards, so this is a small
+# self-contained glyph in the same "inline SVG, currentColor, aria-hidden"
+# idiom player_quick_view.py's own accolade medals already use.
+_WAIVER_OVR_CROWN_SVG = (
+    "<svg class='waiver-ovr-badge-crown' viewBox='0 0 24 24' aria-hidden='true' "
+    "focusable='false'><path d='M3 18h18l-1.6-9-4.9 4.4-3-6.4-3 6.4-4.9-4.4z' "
+    "fill='currentColor'/></svg>"
+)
+
+
+def waiver_overall_rating_badge_html(row) -> str:
+    """Small "NN OVR" pill — web counterpart to mobile's
+    ``OverallRatingBadge.tsx``. Fed by ``_overall_rating_col`` (the same 0-99
+    headline rating ``modules.player_quick_view.overall_ratings_for_pool``
+    computes for every row of this pool — see
+    ``_build_waiver_free_agent_pool_cached`` above), never the plain
+    dynasty/value-score number already shown in this row's trailing block
+    (coridian_, 2026-10-13: "I have no clue what the 78/71 and 55 mean...
+    that should be [a labeled badge] like the app" — this pill is the
+    missing OVR context the score number lacked, not a replacement for it).
+
+    Tinted by the rating itself via the same continuous red->gold->green
+    ramp mobile's ``percentileColor`` uses
+    (``_overall_rating_percentile_tint_css``), unless this player's
+    league-wide position rank (``canonical_position_rank`` — confirmed
+    elsewhere in this module, see ``_waiver_detail_note``, as "rank among
+    ALL players, rostered included", i.e. the same league-wide/pool rank
+    mobile's ``positionRankPrestige`` keys off of, never the wire-relative
+    ``position_rank`` this row also carries) lands in the top 5 at the
+    position, in which case it swaps to a crowned gold/silver/bronze
+    prestige fill instead (mobile/src/lib/positionRankPrestige.ts).
+
+    Renders nothing when no rating is available — same "too thin a pool to
+    rank against" contract ``_overall_rating_col``/``overall_ratings_for_pool``
+    already carries.
+    """
+
+    rating = row.get("_overall_rating_col")
+    try:
+        rating_i = int(rating) if rating not in (None, "") and not pd.isna(rating) else None
+    except (TypeError, ValueError):
+        rating_i = None
+    if rating_i is None:
+        return ""
+
+    prestige = _overall_rating_prestige(row.get("canonical_position_rank"))
+    if prestige:
+        _tier, token = prestige
+        position_rank_i = int(row.get("canonical_position_rank"))
+        return (
+            "<span class='waiver-ovr-badge waiver-ovr-badge--crowned' "
+            f"style='--waiver-ovr-tint:var({token})' "
+            f"aria-label='League-wide number {position_rank_i} at position, "
+            f"{rating_i} overall rating'>"
+            f"{_WAIVER_OVR_CROWN_SVG}<span>{rating_i} OVR</span></span>"
+        )
+
+    tint = _overall_rating_percentile_tint_css(rating_i)
+    return f"<span class='waiver-ovr-badge' style='--waiver-ovr-tint:{tint}'>{rating_i} OVR</span>"
+
+
 # recommendation_label's tone -> player_support_chip_html's tone, same
 # semantic mapping WaiverRecommendationCard's recommendationToneColor uses
 # on mobile (opportunity=premium/amber "Add", information=accent/cyan
@@ -1238,6 +1358,10 @@ def render_free_agent_cards(
             chip_parts = [
                 tier_chip_html(row.get("player_tier")),
                 waiver_trending_add_pill_html(row),
+                # Last, same order as PlayerIdentityRow.tsx's meta-chip row
+                # (position badge, tier badge, team, trending pill, THEN the
+                # OVR badge).
+                waiver_overall_rating_badge_html(row),
             ]
             chips_html = "".join(part for part in chip_parts if part)
             if chips_html:

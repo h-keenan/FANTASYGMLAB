@@ -148,12 +148,20 @@ def test_priority_add_layout_and_share_are_owned_by_one_card_container():
     # shrunk to content width by CSS (st.columns was tried and discarded —
     # Streamlit auto-stacks columns on narrow viewports, which defeats a
     # "small column" on exactly the 390px target this redesign is for).
+    #
+    # coridian_, 2026-10-13: "the share button could be moved up to be
+    # level with the low confidence meter" — the button is no longer a
+    # flow sibling stacked below the row (align-self: flex-end + margin-
+    # top) but an out-of-flow overlay pinned to the row's own bottom-right
+    # corner (position: absolute), so it lands level with the row's own
+    # last line instead of trailing well below the whole row.
     ui = Path("modules/waivers_ui.py").read_text(encoding="utf-8")
     css = Path("modules/waivers_presentation_styles.py").read_text(encoding="utf-8")
     assert "waiver_recommendation_{player_id}_{index}" in ui
     assert 'button_label="Share"' in ui
     assert 'div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"]' in css
-    assert "align-self: flex-end" in css
+    assert "position: absolute" in css
+    assert "right: 0" in css
 
 
 def test_most_injured_card_defaults_to_summary_and_keeps_detail():

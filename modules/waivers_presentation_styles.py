@@ -31,14 +31,34 @@ div[class*="st-key-waiver_group_"] {
    beside it without becoming a full-width row of its own. A hairline
    divider between rows (none after the last) replaces the old boxed
    decision-card so a dense list of rows reads as one grouped list, not a
-   stack of individually-bordered cards. */
+   stack of individually-bordered cards. coridian_, 2026-10-13: "there needs
+   to be some sort of dividing line in between those" — --color-border (the
+   default hairline) barely clears 1.4:1 against this group card's own
+   --surface-1 background, well under the 3:1 WCAG non-text-contrast floor
+   design_tokens.py's own comment calls out for exactly this boundary role,
+   so it reads as almost invisible once the grouped card gives rows a
+   shared background instead of floating on page bg. --color-border-strong
+   (3.46-4.26:1 against raised/secondary/bg surfaces per that same token
+   comment) is the token this codebase already reserves for "an edge that
+   must read as intentional" — use it here via the --border-strong semantic
+   alias instead of inventing a one-off color. */
 div[class*="st-key-waiver_recommendation_"] {
-    border-bottom: var(--border-width-default) solid var(--color-border);
+    border-bottom: var(--border-width-default) solid var(--border-strong);
     min-height: var(--touch-target-min);
     padding: var(--space-xs) 0;
 }
 
-div[class*="st-key-waiver_recommendation_"]:last-child {
+/* coridian_, 2026-10-13: "there needs to be some sort of dividing line in
+   between those" — turned out not to be a contrast problem alone: this
+   plain `:last-child` selector never matched the actual last row. Each row
+   (st.container(key=f"waiver_recommendation_...")) renders as the ONLY
+   child of its own individual Streamlit stLayoutWrapper div, so the row's
+   own div is trivially ":last-child" of ITS one-child parent on every
+   single row — silently zeroing the divider for the whole list, not just
+   the last row. Scoping off the shared group container's own children
+   (each one of THOSE wrapper divs is a true sibling of every other row's
+   wrapper) is what correctly isolates the genuinely last row instead. */
+div[class*="st-key-waiver_group_"] > div:last-child div[class*="st-key-waiver_recommendation_"] {
     border-bottom: 0;
 }
 
@@ -114,6 +134,48 @@ div[class*="st-key-waiver_recommendation_"] .dg-compact-asset {
     white-space: nowrap;
 }
 
+/* "NN OVR" pill — web counterpart to mobile's OverallRatingBadge.tsx (see
+   waivers_ui.waiver_overall_rating_badge_html for the Python side that
+   builds this markup and picks --waiver-ovr-tint). coridian_, 2026-10-13:
+   "I have no clue what the 78/71 and 55 mean... that should be [a labeled
+   badge] like the app" — the bare value-score number this chip sits next
+   to stays as-is; this badge is the missing OVR context. --waiver-ovr-tint
+   is either a literal color-mix() between this app's own danger/premium/
+   success tokens (continuous ramp, not 3 flat bands — matches mobile's
+   percentileColor) or, for a top-5 league-wide positional rank, one of the
+   gold/silver/bronze prestige tokens player_quick_view_styles.py's own
+   .pqv-accolade--gold/-silver/-bronze chips already use. */
+.waiver-ovr-badge {
+    align-items: center;
+    background: color-mix(in srgb, var(--waiver-ovr-tint) 18%, transparent);
+    border: var(--border-width-default) solid color-mix(in srgb, var(--waiver-ovr-tint) 48%, transparent);
+    border-radius: var(--radius-pill);
+    color: var(--waiver-ovr-tint);
+    display: inline-flex;
+    font: var(--type-supporting-metadata);
+    font-weight: 700;
+    gap: 2px;
+    letter-spacing: var(--letter-spacing-badge);
+    padding: 1px var(--space-xs);
+    white-space: nowrap;
+}
+
+/* Crowned (top-5 league-wide positional rank) variant — mobile's
+   OverallRatingBadge swaps its usual beside-the-number crown for one
+   stacked above the rating so the whole module reads as a distinct
+   "league-wide rank" signal, not just a recolored ordinary pill. */
+.waiver-ovr-badge--crowned {
+    align-items: center;
+    flex-direction: column;
+    gap: 1px;
+    padding-top: 2px;
+}
+
+.waiver-ovr-badge-crown {
+    height: 10px;
+    width: 10px;
+}
+
 /* Same circular ring the Dashboard's Game Plan cards use for shape
    (border-radius:50%, matching box-shadow formula), but — unlike
    Dashboard, which deliberately wants one uniform accent regardless of
@@ -137,22 +199,40 @@ div[class*="st-key-waiver_recommendation_"] .dg-compact-asset-name {
     overflow: hidden;
 }
 
-/* Share: a small, right-aligned button under the compact row, not a
-   full-width row of its own. st.columns was tried first and discarded —
-   Streamlit auto-stacks columns on narrow viewports, which turns a "small
-   column" right back into a full-width row on exactly the 390px target
-   this redesign is for — so this is CSS-only instead, the same approach
-   the prior full-decision-card already used for this exact button.
-   use_container_width=False already makes Streamlit size the Share
-   button's own element-container to width:fit-content (its
+/* Share: a small, right-aligned button overlaid on the compact row's own
+   bottom-right corner, not a full-width row of its own. st.columns was
+   tried first and discarded — Streamlit auto-stacks columns on narrow
+   viewports, which turns a "small column" right back into a full-width row
+   on exactly the 390px target this redesign is for — so this is CSS-only
+   instead, the same approach the prior full-decision-card already used for
+   this exact button.
+
+   Originally a flow sibling stacked *below* the tap-grid row content
+   (align-self:flex-end + margin-top only), which — combined with
+   Streamlit's own ~16px inter-element gap inside this column flexbox, plus
+   the row's own trailing score/FAAB column being shorter than its 3-line
+   main column (identity/chips/confidence) and so leaving blank space of
+   its own above that gap — put the button noticeably below the whole row
+   instead of beside any part of it (coridian_, 2026-10-13: "the share
+   button could be moved up to be level with the low confidence meter").
+   Taking it out of flow entirely and pinning it to the row's own
+   bottom-right corner instead means it sits over the same "blank space
+   below a shorter trailing column" area the old flow approach left empty —
+   which is also where the main column's own last line (the confidence
+   meter) ends — so the two land level with each other by construction,
+   without hand-tuning a fixed offset that would only hold for one specific
+   row's line count. use_container_width=False still makes Streamlit size
+   the Share button's own element-container to width:fit-content (its
    data-testid="stElementContainer" carries a matching width="fit-content"
-   attribute); the row's own container is a column flexbox
-   (.stVerticalBlock), so align-self:flex-end pushes that already-shrunk
-   box to the right edge without touching the tap-grid row's own
-   full-width element-container next to it. */
+   attribute). */
+div[class*="st-key-waiver_recommendation_"] {
+    position: relative;
+}
+
 div[class*="st-key-waiver_recommendation_"] div[data-testid="stElementContainer"][width="fit-content"] {
-    align-self: flex-end;
-    margin-top: var(--space-2xs);
+    bottom: var(--space-xs);
+    position: absolute;
+    right: 0;
 }
 
 div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {

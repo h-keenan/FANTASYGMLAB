@@ -609,6 +609,110 @@ class TestWaiversUI(unittest.TestCase):
         )
         self.assertNotIn("Trending across Sleeper", html)
 
+    def test_overall_rating_badge_renders_plain_percentile_tint(self):
+        # coridian_, 2026-10-13: "I have no clue what the 78/71 and 55
+        # mean... that should be [a labeled badge] like the app" — the
+        # bare value-score number stays, this pill is the added OVR
+        # context, fed by _overall_rating_col (never the value score).
+        html, _, _ = self._render_card(
+            {
+                "player_id": "ovr-1",
+                "name": "Mid Rating Player",
+                "position": "RB",
+                "team": "SEA",
+                "age": 23,
+                "value_score": 71,
+                "position_rank": 5,
+                "stale_free_agent": False,
+                "_overall_rating_col": 78,
+                "canonical_position_rank": 9,
+            }
+        )
+        self.assertIn("waiver-ovr-badge", html)
+        self.assertIn("78 OVR", html)
+        self.assertNotIn("waiver-ovr-badge--crowned", html)
+
+    def test_overall_rating_badge_absent_when_rating_missing(self):
+        html, _, _ = self._render_card(
+            {
+                "player_id": "ovr-2",
+                "name": "No Rating Player",
+                "position": "RB",
+                "team": "SEA",
+                "age": 23,
+                "value_score": 40,
+                "position_rank": 11,
+                "stale_free_agent": False,
+            }
+        )
+        self.assertNotIn("waiver-ovr-badge", html)
+
+    def test_overall_rating_badge_crowns_top_five_league_wide_position_rank(self):
+        # Top-5 league-wide positional rank (canonical_position_rank, the
+        # same "rank among ALL players, rostered included" field
+        # _waiver_detail_note's own docstring distinguishes from the
+        # wire-relative position_rank) swaps the plain percentile tint for
+        # a crowned gold/silver/bronze prestige fill — mobile parity with
+        # lib/positionRankPrestige.ts.
+        html, _, _ = self._render_card(
+            {
+                "player_id": "ovr-3",
+                "name": "Elite Rank Player",
+                "position": "RB",
+                "team": "SEA",
+                "age": 23,
+                "value_score": 90,
+                "position_rank": 1,
+                "stale_free_agent": False,
+                "_overall_rating_col": 91,
+                "canonical_position_rank": 2,
+            }
+        )
+        self.assertIn("waiver-ovr-badge--crowned", html)
+        self.assertIn("waiver-ovr-badge-crown", html)
+        self.assertIn("91 OVR", html)
+
+    def test_overall_rating_badge_not_crowned_outside_top_five(self):
+        html, _, _ = self._render_card(
+            {
+                "player_id": "ovr-4",
+                "name": "Deep Rank Player",
+                "position": "RB",
+                "team": "SEA",
+                "age": 23,
+                "value_score": 60,
+                "position_rank": 9,
+                "stale_free_agent": False,
+                "_overall_rating_col": 65,
+                "canonical_position_rank": 6,
+            }
+        )
+        self.assertIn("waiver-ovr-badge", html)
+        self.assertNotIn("waiver-ovr-badge--crowned", html)
+
+    def test_overall_rating_prestige_tiers_match_mobile_banding(self):
+        self.assertEqual(waivers_ui._overall_rating_prestige(1), ("gold", "--color-prestige-elite"))
+        self.assertEqual(waivers_ui._overall_rating_prestige(2), ("silver", "--color-prestige-starter"))
+        self.assertEqual(waivers_ui._overall_rating_prestige(3), ("silver", "--color-prestige-starter"))
+        self.assertEqual(waivers_ui._overall_rating_prestige(4), ("bronze", "--color-prestige-contributor"))
+        self.assertEqual(waivers_ui._overall_rating_prestige(5), ("bronze", "--color-prestige-contributor"))
+        self.assertIsNone(waivers_ui._overall_rating_prestige(6))
+        self.assertIsNone(waivers_ui._overall_rating_prestige(None))
+        self.assertIsNone(waivers_ui._overall_rating_prestige(0))
+
+    def test_overall_rating_percentile_tint_is_continuous_not_banded(self):
+        # Same semantics as mobile's percentileColor: danger at 0, premium
+        # at 50, success at 100, linearly interpolated — not 3 flat bands.
+        low = waivers_ui._overall_rating_percentile_tint_css(10)
+        mid = waivers_ui._overall_rating_percentile_tint_css(50)
+        high = waivers_ui._overall_rating_percentile_tint_css(90)
+        self.assertIn("var(--color-danger)", low)
+        self.assertIn("var(--color-premium)", low)
+        self.assertIn("var(--color-premium)", mid)
+        self.assertIn("var(--color-success)", high)
+        self.assertIn("var(--color-premium)", high)
+        self.assertNotEqual(low, high)
+
     def test_sleeper_trending_add_sentence_plain_text(self):
         self.assertEqual(
             waivers_ui.sleeper_trending_add_sentence(
