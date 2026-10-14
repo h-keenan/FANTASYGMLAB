@@ -56,8 +56,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 .toa-tone-fair .toa-verdict { color: var(--color-text-secondary, #e5e7eb); }
 .toa-tone-decline .toa-verdict { color: var(--color-danger, #ef4444); }
 
-.toa-band,
-.toa-confidence {
+.toa-band {
   color: var(--color-text-secondary, #e5e7eb);
   font-size: var(--font-size-metadata, 0.75rem);
 }
