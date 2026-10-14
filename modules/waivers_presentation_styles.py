@@ -290,6 +290,19 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     opacity: 0.96;
 }
 
+/* The shared football_asset_styles.py rule for this literal h3
+   (.dg-football-asset__name{font:var(--font-card-title)}) loses to
+   Streamlit's own scoped heading rule whenever this grid falls back to a
+   plain st.markdown render (no resolvable player_id to drive the tappable
+   grid component), the same class-plus-h3-tag-outranks-a-single-class gap
+   already fixed on Live Draft (see live_draft_styles.py). Without this
+   module-scoped, equal-or-higher-specificity override the Waiver Snapshot
+   player name renders at Streamlit's native ~28px/600-weight h3 size
+   instead of the compact card-title size every other surface shows. */
+.free-agent-summary-card .dg-football-asset__name {
+    font: var(--font-card-title) !important;
+}
+
 /* Waiver Snapshot still renders through football_assets.player_card_html
    unchanged (see the comment above), so it keeps the exact green-ring
    override that card markup already had before this redesign — same

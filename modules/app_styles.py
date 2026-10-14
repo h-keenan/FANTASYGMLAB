@@ -1953,6 +1953,21 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
+/* The shared football_asset_styles.py rule for this literal h3
+   (.dg-football-asset__name{font:var(--font-card-title)}) loses to
+   Streamlit's own scoped heading rule (a class-plus-h3-tag selector
+   outranks the shared component's single class selector) whenever a
+   compact-player-row renders through a plain st.markdown call instead of
+   the tappable grid component - confirmed via Playwright getComputedStyle
+   on Player Compare (app.render_player_compare_content) and the Trade
+   Analyzer roster-browse search results (trade_analyzer_ui.py), both of
+   which render_html_fragment this card directly with no tap-grid wiring.
+   Without this module-scoped, equal-or-higher-specificity override the
+   player name renders at Streamlit's native ~28px/600-weight h3 size
+   instead of the compact card-title size every other surface shows. */
+.compact-player-row .dg-football-asset__name {
+    font: var(--font-card-title) !important;
+}
 .compact-player-row-tone-premium,
 .compact-player-row-tone-elite,
 .compact-player-row-tone-star,
