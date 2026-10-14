@@ -351,6 +351,23 @@ div[class*="st-key-dashboard_team_snapshot"] .dg-card-warning {
 }
 div[class*="st-key-dashboard_league_insights"] {
     min-width: 0;
+    /* compact_player_row_html always adds the shared compact-player-row
+       class, and football_asset_styles.py's unscoped
+       .dg-football-asset.compact-player-row .dg-player-portrait rule sizes
+       that portrait off --size-roster-core-portrait (5.5rem/88px) -- a
+       token meant for My Team's primary roster list, not a secondary
+       Dashboard insight tile. The home-command-player-card avatar rules in
+       app_styles.py only target the older .scan-card-avatar markup, so they
+       never catch this card and the roster-core size wins by default,
+       rendering a portrait about 2x every sibling compact row (GM Targets/
+       Trade Hub, scoped to 3.5rem; this card's own home-command siblings
+       expect 44px). Resetting the token back to the standard asset size
+       here (custom properties inherit, so both the grid column and the
+       portrait height/width that read it shrink together) restores the
+       intended compact density without touching the shared token or the
+       My Team roster-core surfaces that still want 88px.
+    */
+    --size-roster-core-portrait: var(--size-asset-standard);
 }
 div[class*="st-key-dashboard_league_insights"] .home-command-grid {
     grid-template-columns: minmax(0, 1fr);
