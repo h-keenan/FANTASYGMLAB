@@ -5683,6 +5683,7 @@ def render_player_compare_content(
     ports from mobile/src/screens/PlayerCompareScreen.tsx."""
 
     from modules.decision_surface_dialog_styles import DECISION_SURFACE_DIALOG_CSS
+    from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS
 
     inject_global_styles(DECISION_SURFACE_DIALOG_CSS + PLAYER_QUICK_VIEW_CSS + PLAYER_COMPARE_CSS)
 
@@ -5751,17 +5752,48 @@ def render_player_compare_content(
         on_click=_reset_player_b,
     )
 
-    identity_cols = st.columns([5, 1, 5], gap="small")
-    with identity_cols[0]:
-        render_html_fragment(
-            _compact_player_row_html(player_a_row, score_field=score_field, score_label=score_label)
-        )
-    with identity_cols[1]:
-        st.markdown("<div class='pqv-compare-vs'>VS</div>", unsafe_allow_html=True)
-    with identity_cols[2]:
-        render_html_fragment(
-            _compact_player_row_html(player_b_row, score_field=score_field, score_label=score_label)
-        )
+    # Keyed container: the identity cards reuse the general-purpose
+    # [portrait][1fr name][auto value] compact-player-row grid, which only
+    # has room for its auto value column because roster-list contexts give
+    # it full page width. Compare's two cards each get roughly half the
+    # dialog's width, so that same 3-column grid squeezed the 1fr name
+    # column down to single-character wrapping (confirmed via Playwright:
+    # 297px total, 88px avatar + 136px value left only ~14px for the name).
+    # div[class*="st-key-..."] is the established scoping mechanism this
+    # codebase already uses for container-specific card overrides (see
+    # modules/my_team_decision_styles.py's st-key-my_team_roster_core
+    # rules) — a plain CSS descendant selector off the dangling
+    # pqv-compare-shell div does not work, since each st.markdown/
+    # unsafe_allow_html call renders into its own isolated DOM node rather
+    # than nesting inside that div's unclosed tag.
+    with st.container(key="pqv_compare_identity"):
+        identity_cols = st.columns([5, 1, 5], gap="small")
+        with identity_cols[0]:
+            render_html_fragment(
+                _compact_player_row_html(
+                    player_a_row,
+                    score_field=score_field,
+                    score_label=score_label,
+                    # Identity + headline only (coridian_'s quick-view rule,
+                    # already applied to My Team/Trade Analyzer's compact
+                    # rows): mobile's IdentityHeader never shows this
+                    # player's opportunity_explanation here either — the
+                    # real "why" belongs to the dedicated Decision Fit
+                    # section this same dialog already renders below.
+                    show_reason=False,
+                )
+            )
+        with identity_cols[1]:
+            st.markdown("<div class='pqv-compare-vs'>VS</div>", unsafe_allow_html=True)
+        with identity_cols[2]:
+            render_html_fragment(
+                _compact_player_row_html(
+                    player_b_row,
+                    score_field=score_field,
+                    score_label=score_label,
+                    show_reason=False,
+                )
+            )
 
     value_rows = player_compare.build_value_rows(player_a_row, player_b_row, score_field=score_field)
     render_section_header("Value & Rank", kicker="Head-to-Head")

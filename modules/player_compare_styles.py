@@ -8,6 +8,8 @@ value below is an existing modules/design_tokens.py token.
 
 PLAYER_COMPARE_CSS = """
 .pqv-compare-shell{display:grid;gap:var(--space-md);max-width:44rem;min-width:0;width:100%}
+div[class*="st-key-pqv_compare_identity"] .dg-football-asset.compact-player-row{grid-template-columns:var(--size-roster-core-portrait) minmax(0, 1fr)}
+div[class*="st-key-pqv_compare_identity"] .dg-football-asset__value{grid-column:2;text-align:left}
 
 .pqv-compare-vs{align-items:center;color:var(--color-text-muted);display:flex;font-size:var(--font-size-badge);font-weight:700;justify-content:center;letter-spacing:var(--letter-spacing-badge);padding-top:var(--space-xl)}
 .pqv-compare-rows{display:grid;gap:0}

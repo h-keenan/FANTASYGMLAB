@@ -1,10 +1,12 @@
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import pandas as pd
 
 import app
 from modules import player_compare
+from modules.player_compare_styles import PLAYER_COMPARE_CSS
 
 
 def _row(**overrides) -> pd.Series:
@@ -185,6 +187,73 @@ class TestPlayerCompareNarrative(unittest.TestCase):
         self.assertIn("Player Two", html)
         self.assertIn("Real driver sentence.", html)
         self.assertIn("No decision-fit read available yet.", html)
+
+
+class TestPlayerCompareContentSourceWiring(unittest.TestCase):
+    """render_player_compare_content is heavy (st.dialog/st.columns/weekly
+    chart caching), so this follows the same source-text assertion idiom
+    tests/test_player_history.py's test_app_pqv_career_loader_call_uses_
+    keyword_only_player_id already uses for render_player_quick_view_content
+    — cheap, exact, and it does not require standing up a real Streamlit
+    script run."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+        start = source.index("def render_player_compare_content(")
+        end = source.index("def render_player_compare_modal(")
+        cls.renderer = source[start:end]
+
+    def test_player_quick_view_css_is_imported_before_use(self):
+        # Compare reuses PLAYER_QUICK_VIEW_CSS (it shares PQV's dialog
+        # family) but, unlike render_player_quick_view_content itself, never
+        # imported it — a bare NameError on every single open of Player
+        # Compare, since Python resolves the unqualified name against
+        # module globals (where it was never bound) rather than the
+        # sibling function's own local import.
+        self.assertIn(
+            "from modules.player_quick_view_styles import PLAYER_QUICK_VIEW_CSS",
+            self.renderer,
+        )
+
+    def test_identity_header_cards_are_identity_and_headline_only(self):
+        # coridian_'s quick-view rule ("we just need the pertinent
+        # information on it... that's all that needs to be on the quick
+        # view"), already applied to My Team's and Trade Analyzer's compact
+        # rows (PR #1055): the two head-to-head identity cards must not
+        # fall back to rendering a player's full opportunity_explanation
+        # paragraph — that belongs to the dedicated Decision Fit section
+        # this same dialog renders further down, not the identity header.
+        self.assertEqual(self.renderer.count("show_reason=False"), 2)
+
+    def test_identity_cards_render_inside_a_keyed_container(self):
+        # The identity cards' [portrait][1fr name][auto value] card grid
+        # only has room for its auto value column in full-width roster-list
+        # contexts; squeezed into one of Compare's two half-width columns,
+        # the 1fr name column collapsed to single-character wrapping.
+        # Fixing it needs a real, stable DOM scope — a bare
+        # st.markdown("<div class='...'>")/"</div>" pair does not nest
+        # around other Streamlit elements in the actual DOM (each
+        # unsafe_allow_html call renders into its own isolated node), so
+        # the fix uses this codebase's established st.container(key=...)
+        # scoping convention instead (see modules/my_team_decision_styles.py
+        # and its st-key-my_team_roster_core selectors).
+        self.assertIn('st.container(key="pqv_compare_identity")', self.renderer)
+
+
+class TestPlayerCompareIdentityWidthCSS(unittest.TestCase):
+    def test_identity_container_reflows_the_card_grid_to_two_columns(self):
+        css = PLAYER_COMPARE_CSS.replace(" ", "")
+        self.assertIn(
+            'div[class*="st-key-pqv_compare_identity"].dg-football-asset.compact-player-row'
+            "{grid-template-columns:var(--size-roster-core-portrait)minmax(0,1fr)}",
+            css,
+        )
+        self.assertIn(
+            'div[class*="st-key-pqv_compare_identity"].dg-football-asset__value'
+            "{grid-column:2;text-align:left}",
+            css,
+        )
 
 
 class TestPlayerCompareAppWiring(unittest.TestCase):
