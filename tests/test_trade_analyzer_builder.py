@@ -235,6 +235,78 @@ def test_result_row_uses_injected_compact_player_card_for_players_only():
     assert "dg-compact-asset" in legacy
 
 
+def test_result_row_html_interactive_flag_reaches_compact_player_row_html():
+    """Tappability audit follow-up (coridian_: "keep working on everything
+    that is unfinished"): roster-browse rows must be able to carry real
+    data-player-id/player-card-tappable markup, which football_assets.
+    player_card_html() only emits when mode="action-enabled" -- i.e. when
+    the injected compact_player_row_html callable is itself told
+    interactive=True. Before this fix, result_row_html() had no way to ask
+    for that at all."""
+
+    calls: list[dict] = []
+
+    def _fake_compact_player_row_html(row, **kwargs):
+        calls.append({"row": row, **kwargs})
+        return f"<div class='compact-player-row' data-player-id='{row.get('player_id')}'>{row.get('name')}</div>"
+
+    player = _player("p1", "Player A", owner="partner")
+    builder.result_row_html(
+        player,
+        compact_player_row_html=_fake_compact_player_row_html,
+        interactive=True,
+    )
+    assert calls[0]["interactive"] is True
+
+    calls.clear()
+    builder.result_row_html(
+        player,
+        compact_player_row_html=_fake_compact_player_row_html,
+    )
+    assert calls[0]["interactive"] is False
+
+
+def test_result_row_html_with_real_compact_player_row_html_emits_tap_markup():
+    """End-to-end through the real production compact_player_row_html (not a
+    fake), confirming interactive=True actually produces the
+    data-player-id/player-card-tappable attributes the site's tap
+    delegation (interaction_contract.TAP_DELEGATION_JS) binds to."""
+
+    from modules import player_cards
+
+    def _real_compact_player_row_html(row, *, score_field, score_label, interactive=False, **_kwargs):
+        return player_cards.compact_player_row_html(
+            row,
+            score_field=score_field,
+            score_label=score_label,
+            player_display_name=lambda r: r["name"],
+            format_age=lambda value: str(value),
+            format_score=lambda value: str(value),
+            cached_headshot_data_url=lambda _player_id: "",
+            avatar_html=lambda *_args, **_kwargs: "<div class='compact-player-avatar'></div>",
+            asset_initials=lambda _name: "PA",
+            is_injury_status=lambda _row: False,
+            interactive=interactive,
+        )
+
+    player = _player("p1", "Player A", owner="partner")
+
+    tappable_row = builder.result_row_html(
+        player,
+        compact_player_row_html=_real_compact_player_row_html,
+        interactive=True,
+    )
+    assert "data-player-id='p1'" in tappable_row
+    assert "player-card-tappable" in tappable_row
+
+    inert_row = builder.result_row_html(
+        player,
+        compact_player_row_html=_real_compact_player_row_html,
+    )
+    assert "data-player-id" not in inert_row
+    assert "player-card-tappable" not in inert_row
+
+
 def test_trade_analyzer_assembly_injects_compact_player_card():
     ui = UI_SRC
     assert "compact_player_row_html: Callable[..., str] | None = None" in ui

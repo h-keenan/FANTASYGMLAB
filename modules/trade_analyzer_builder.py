@@ -199,6 +199,7 @@ def result_row_html(
     selected: bool = False,
     format_score=None,
     compact_player_row_html: Callable[..., str] | None = None,
+    interactive: bool = False,
 ) -> str:
     from modules.compact_fantasy_assets import compact_asset_html
 
@@ -223,11 +224,22 @@ def result_row_html(
         # explanation (e.g. "Locked-in WR1 role in a top-5 scoring
         # offense...") inline instead of keeping it behind the player's own
         # detail view.
+        #
+        # `interactive` is the one flag the tappability audit found missing
+        # here: without it, football_assets.player_card_html() never emits
+        # the data-player-id / player-card-tappable markup the site's tap
+        # delegation (interaction_contract.TAP_DELEGATION_JS) binds to, so
+        # the identity chip rendered perfectly tappable-looking but nothing
+        # was actually listening. The caller wraps this row's own markup in
+        # its own single-row render_tappable_player_html() call (not the
+        # batched whole-list grid), so it can coexist with the adjacent
+        # native Add/Added st.button in the same st.columns row.
         inner = compact_player_row_html(
             asset,
             score_field="score",
             score_label="Score",
             show_reason=False,
+            interactive=interactive,
         )
     else:
         inner = compact_asset_html(

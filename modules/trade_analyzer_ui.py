@@ -32,6 +32,8 @@ def _render_selected_package(
     side: str,
     empty_text: str,
     format_score: Callable[[Any], str],
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     assets = list(st.session_state.get(package_key) or [])
     if not assets:
@@ -41,12 +43,37 @@ def _render_selected_package(
     for idx, asset in enumerate(assets):
         identity = analyzer_builder.asset_identity(asset)
         token = analyzer_builder.widget_key_token(identity or f"{side}_{idx}")
+        asset_type = str((asset or {}).get("asset_type") or "player").strip().lower()
+        player_id = str((asset or {}).get("player_id") or "").strip()
+        chip_html = analyzer_builder.chip_html(asset, format_score=format_score)
         chip_cols = st.columns([5, 1])
         with chip_cols[0]:
-            st.markdown(
-                analyzer_builder.chip_html(asset, format_score=format_score),
-                unsafe_allow_html=True,
-            )
+            # Queued-package chips (compact_asset_html under the hood)
+            # already carry data-player-id/role=button for players -- the
+            # audit's gap was never the markup, it was that this chip was
+            # only ever rendered with a plain st.markdown, never routed
+            # through the tap-grid component that actually listens for the
+            # click. One small per-chip tap-grid call (not the batched
+            # whole-list grid) sits next to the unchanged native "x" button
+            # below, same coexistence pattern as the roster-browse rows.
+            if (
+                asset_type == "player"
+                and player_id
+                and render_tappable_player_html is not None
+                and open_player_quick_view is not None
+            ):
+                clicked_player_id = render_tappable_player_html(
+                    html=chip_html,
+                    key_prefix=f"toa_chip_tap_{side}_{idx}_{token}",
+                )
+                if clicked_player_id:
+                    open_player_quick_view(
+                        clicked_player_id,
+                        source_label="Trade Analyzer",
+                        source_note="Inspect this player queued in your trade package.",
+                    )
+            else:
+                st.markdown(chip_html, unsafe_allow_html=True)
         with chip_cols[1]:
             st.button(
                 "×",
@@ -102,6 +129,8 @@ def _render_side_browser(
     disabled_reason: str,
     format_score: Callable[[Any], str],
     compact_player_row_html: Callable[..., str] | None = None,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     block_mod = "toa-block-receive" if side == "receive" else "toa-block-send"
     render_html_fragment(
@@ -116,6 +145,8 @@ def _render_side_browser(
         side=side,
         empty_text=empty_text,
         format_score=format_score,
+        render_tappable_player_html=render_tappable_player_html,
+        open_player_quick_view=open_player_quick_view,
     )
     if not enabled:
         st.caption(disabled_reason)
@@ -152,17 +183,48 @@ def _render_side_browser(
             identity = analyzer_builder.asset_identity(asset)
             selected = bool(identity and identity in this_selected)
             token = analyzer_builder.widget_key_token(identity)
+            asset_type = str((asset or {}).get("asset_type") or "player").strip().lower()
+            player_id = str((asset or {}).get("player_id") or "").strip()
+            row_html = analyzer_builder.result_row_html(
+                asset,
+                selected=selected,
+                format_score=format_score,
+                compact_player_row_html=compact_player_row_html,
+                interactive=bool(
+                    asset_type == "player"
+                    and player_id
+                    and render_tappable_player_html is not None
+                    and open_player_quick_view is not None
+                ),
+            )
             row_cols = st.columns([6, 1])
             with row_cols[0]:
-                st.markdown(
-                    analyzer_builder.result_row_html(
-                        asset,
-                        selected=selected,
-                        format_score=format_score,
-                        compact_player_row_html=compact_player_row_html,
-                    ),
-                    unsafe_allow_html=True,
-                )
+                # One small per-row tap-grid call (not a single batched grid
+                # for the whole 40+-row list) so it can sit next to this
+                # row's own native Add/Added st.button in the adjacent
+                # column -- the batched whole-list grid owns one HTML blob
+                # and can't have 40 individual native buttons embedded
+                # inside it, so each row gets its own tiny grid instead, same
+                # coexistence pattern GM Targets' card-level tap-through uses
+                # alongside its own native "Open player" button.
+                if (
+                    asset_type == "player"
+                    and player_id
+                    and render_tappable_player_html is not None
+                    and open_player_quick_view is not None
+                ):
+                    clicked_player_id = render_tappable_player_html(
+                        html=row_html,
+                        key_prefix=f"toa_row_tap_{side}_{token}",
+                    )
+                    if clicked_player_id:
+                        open_player_quick_view(
+                            clicked_player_id,
+                            source_label="Trade Analyzer",
+                            source_note="Inspect this player before adding them to the trade.",
+                        )
+                else:
+                    st.markdown(row_html, unsafe_allow_html=True)
             with row_cols[1]:
                 st.button(
                     "Added" if selected else "Add",
@@ -190,6 +252,8 @@ def render_trade_analyzer_assembly(
     league_ready: bool = True,
     format_score: Callable[[Any], str] | None = None,
     compact_player_row_html: Callable[..., str] | None = None,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     """You send ↔ You receive workspace under the page's canonical state owner."""
 
@@ -234,6 +298,8 @@ def render_trade_analyzer_assembly(
                 disabled_reason="Select a league and load your roster first.",
                 format_score=score_fn,
                 compact_player_row_html=compact_player_row_html,
+                render_tappable_player_html=render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
             )
         with receive_col:
             _render_side_browser(
@@ -252,6 +318,8 @@ def render_trade_analyzer_assembly(
                 ),
                 format_score=score_fn,
                 compact_player_row_html=compact_player_row_html,
+                render_tappable_player_html=render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
             )
         if notice:
             st.warning(notice)
