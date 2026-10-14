@@ -329,7 +329,7 @@ RECOMMENDATION_TRUST_CSS = """
     .st-key-dashboard_workflow .home-command-grid {
         gap: var(--space-md);
     }
-    
+
     .live-draft-rec-grid {
         gap: var(--space-md);
     }

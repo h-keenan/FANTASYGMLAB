@@ -119,7 +119,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         max-width: 100%;
     }
 
-    
+
     main:has(.dg-page-shell--waivers) .free-agent-list {
         max-width: 100%;
     }
