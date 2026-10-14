@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import Mock
 
 from modules import league_history as history
 from modules import league_storylines as storylines
@@ -172,6 +173,40 @@ def test_biggest_faab_and_no_faab_omitted():
         team_logo_html=_logo,
     )
     assert "Biggest FAAB" not in html_none
+
+
+def test_render_storylines_panel_player_chip_taps_open_quick_view():
+    # Tappable-modules audit (coridian_, 2026-10-14): Storylines' real player
+    # chips (_player_chip -> compact_asset_html, same data-player-id markup
+    # every other tappable card uses) rendered through a plain
+    # render_html_fragment with no tap-grid wiring at all. Same class of gap
+    # PR #1049 fixed for GM Plan's Trade Opportunities card.
+    with_faab = _normalized(
+        [
+            _tx(
+                transaction_id="w-high",
+                type="waiver",
+                roster_ids=[1],
+                adds={"p3": 1},
+                settings={"waiver_bid": 47},
+                _history_week=8,
+            ),
+        ]
+    )
+    tap_renderer = Mock(return_value="p3")
+    open_quick_view = Mock()
+    report = league_storylines_ui.render_storylines_panel(
+        with_faab,
+        profiles=PROFILES,
+        season="2026",
+        team_logo_html=_logo,
+        render_tappable_player_html=tap_renderer,
+        open_player_quick_view=open_quick_view,
+    )
+    assert report["biggest_faab"]["player"]["name"] == "Trey McBride"
+    tap_renderer.assert_called_once()
+    open_quick_view.assert_called_once()
+    assert open_quick_view.call_args.args[0] == "p3"
 
 
 def test_most_picks_acquired_is_historical_not_ownership():

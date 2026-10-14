@@ -139,7 +139,7 @@ def test_render_card_html_falls_back_to_plain_render_without_tap_callables():
     )
 
 
-def test_render_card_html_plain_render_for_non_trade_card():
+def test_render_card_html_routes_waiver_card_through_tap_grid_and_opens_quick_view():
     item = _waiver_item()
     tap_renderer = Mock(return_value="8134")
     open_quick_view = Mock()
@@ -150,7 +150,17 @@ def test_render_card_html_plain_render_for_non_trade_card():
         render_tappable_player_html=tap_renderer,
         open_player_quick_view=open_quick_view,
     )
-    # Waiver's own single-player chip isn't in scope for this fix (it has no
-    # give/get trade assets) — the tap grid must not be invoked for it here.
-    tap_renderer.assert_not_called()
-    open_quick_view.assert_not_called()
+    # Waiver's single-player chip has no give/get trade assets, but it IS a
+    # real tappable player chip (compact_asset_html, same data-player-id
+    # markup) — widened alongside Top Priority/League Movement so every
+    # Today's Game Plan card with a player chip taps through consistently.
+    tap_renderer.assert_called_once()
+    open_quick_view.assert_called_once()
+    assert open_quick_view.call_args.args[0] == "8134"
+
+
+def test_tap_assets_for_item_includes_single_waiver_player():
+    item = _waiver_item()
+    assets = daily_gm_briefing_ui._tap_assets_for_item(item)
+    player_ids = {asset.get("player_id") for asset in assets}
+    assert player_ids == {"8134"}

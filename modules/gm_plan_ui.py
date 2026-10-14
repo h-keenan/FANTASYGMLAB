@@ -256,6 +256,7 @@ def _render_focus_item_card(
     visual_html: str = "",
     trade_assets: list[dict[str, Any]] | None = None,
     key_prefix: str = "",
+    source_label: str = "GM Plan - Trade Opportunities",
     render_tappable_player_html: Callable[..., str] | None = None,
     open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
@@ -274,6 +275,14 @@ def _render_focus_item_card(
     actually respond to a tap (modules.interaction_contract.TAP_DELEGATION_JS
     delegates on `data-player-id`, not the card as a whole), so the headline/
     body text stays inert exactly as before.
+
+    Roster Construction's injury-exposure fact reuses this same routing —
+    its `_injury_item_visual_html` already renders real player chips via
+    modules.compact_fantasy_assets.watch_attention_html (compact_asset_html
+    under the hood, same data-player-id markup), so the only thing missing
+    was `trade_assets` for that item shape; `_render_focus_area` below now
+    builds it from `injured_players` the same way it already does from
+    `send_assets`/`receive_assets` for a trade idea.
     """
 
     tone = "warning" if is_risk else "elevated"
@@ -297,14 +306,18 @@ def _render_focus_item_card(
             card_html,
             trade_assets,
             key_prefix=key_prefix or "gm_plan_trade_card",
-            source_label="GM Plan - Trade Opportunities",
+            source_label=source_label,
             render_tappable_player_html=render_tappable_player_html,
         )
         if clicked_player_id:
             open_player_quick_view(
                 clicked_player_id,
-                source_label="GM Plan - Trade Opportunities",
-                source_note="Inspect this player from the trade idea.",
+                source_label=source_label,
+                source_note=(
+                    "Inspect this player's injury exposure."
+                    if source_label == "GM Plan - Roster Construction"
+                    else "Inspect this player from the trade idea."
+                ),
             )
         return
     render_html_fragment(card_html)
@@ -334,6 +347,7 @@ def _render_focus_area(
             continue
         headline, detail, is_risk = _item_presentation(item)
         trade_assets: list[dict[str, Any]] | None = None
+        source_label = "GM Plan - Trade Opportunities"
         if "partner_team_name" in item:
             trade_assets = [
                 asset
@@ -342,6 +356,13 @@ def _render_focus_area(
                 )
                 if isinstance(asset, dict)
             ] or None
+        elif "injury_need_positions" in item:
+            trade_assets = [
+                asset
+                for asset in (item.get("injured_players") or [])
+                if isinstance(asset, dict)
+            ] or None
+            source_label = "GM Plan - Roster Construction"
         _render_focus_item_card(
             headline,
             detail,
@@ -350,6 +371,7 @@ def _render_focus_area(
             visual_html=_item_visual_html(item),
             trade_assets=trade_assets,
             key_prefix=f"gm_plan_trade_card_{area_index}_{item_index}",
+            source_label=source_label,
             render_tappable_player_html=render_tappable_player_html,
             open_player_quick_view=open_player_quick_view,
         )

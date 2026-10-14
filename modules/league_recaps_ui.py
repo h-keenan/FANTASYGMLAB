@@ -320,6 +320,8 @@ def render_league_recaps_page(
     power_ranks: Mapping[int, int] | None = None,
     team_logo_html: Callable[..., str] | None = None,
     current_week: int = 0,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     inject_global_styles(LEAGUE_RECAPS_CSS)
     render_league_recaps_page_header(render_section_header)
@@ -376,6 +378,8 @@ def render_league_recaps_page(
             profiles=profiles,
             season=season,
             team_logo_html=team_logo_html,
+            render_tappable_player_html=render_tappable_player_html,
+            open_player_quick_view=open_player_quick_view,
         )
         if open_history is not None and isinstance(report, Mapping):
             largest = report.get("largest_trade") if isinstance(report.get("largest_trade"), Mapping) else None

@@ -22482,6 +22482,8 @@ def main():
                 open_history=_open_history_from_recap,
                 team_logo_html=team_logo_html,
                 current_week=league_recaps.last_scored_week(league_payload),
+                render_tappable_player_html=_render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
             )
 
     # WEEKLY LEAGUE REPORT
@@ -23304,7 +23306,10 @@ def main():
             title=trade_outcomes_page.NAV_LABEL,
             subtitle="Trades you've confirmed you made, and how they've worked out since.",
         )
-        trade_outcomes_page.render_trade_history_page()
+        trade_outcomes_page.render_trade_history_page(
+            render_tappable_player_html=_render_tappable_player_html,
+            open_player_quick_view=open_player_quick_view,
+        )
 
     if current_page == methodology_page.PAGE_KEY:
         methodology_page.render_methodology_page()

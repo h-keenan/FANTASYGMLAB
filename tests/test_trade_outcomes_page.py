@@ -12,7 +12,7 @@ never a fabricated "checking..." placeholder.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from modules import trade_outcomes_page as page
 from modules.ui_architecture import PLATFORM_DESTINATIONS
@@ -124,6 +124,33 @@ def test_ready_verdict_renders_badge_and_detail_text():
     # text string.
     assert "dg-trade-matchup" in rendered
     assert "dg-compact-asset--player" in rendered
+
+
+def test_trade_history_row_player_tap_opens_quick_view():
+    # Tappable-modules audit (coridian_, 2026-10-14): a real, confirmed
+    # trade's sent/received players already carried data-player-id markup
+    # (compact_matchup_html -> compact_asset_html) but were rendered through
+    # a plain render_html_fragment with no tap-grid wiring at all — same
+    # class of gap PR #1049 fixed for GM Plan's Trade Opportunities card.
+    row = _row()
+    tap_renderer = Mock(return_value="2")
+    open_quick_view = Mock()
+    with patch("modules.trade_outcomes_page.auth_supabase.current_user_id", return_value="user-1"):
+        with patch(
+            "modules.trade_outcomes_page.auth_supabase.current_access_token", return_value="tok"
+        ):
+            with patch(
+                "modules.trade_outcomes_page.account_store.fetch_rows",
+                return_value=([row], ""),
+            ):
+                page.render_trade_history_page(
+                    render_tappable_player_html=tap_renderer,
+                    open_player_quick_view=open_quick_view,
+                )
+    tap_renderer.assert_called_once()
+    open_quick_view.assert_called_once()
+    assert open_quick_view.call_args.args[0] == "2"
+    assert open_quick_view.call_args.kwargs.get("source_label") == "Trade History"
 
 
 def test_insufficient_data_shows_no_verdict_badge_or_body():
