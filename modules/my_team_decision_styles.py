@@ -148,28 +148,43 @@ div[class*="st-key-my_team_key_backups"] .compact-player-row {
    whole team" — this is that oversized avatar, not just extra text; same
    4.25rem compacting as Roster Decisions, reused here rather than a third
    size value, so every player row on My Team now shares one density. */
+/* coridian_, 2026-10-13, from a live production screenshot of Hold
+   Candidates: wasted space on the right side under and above the player
+   name — the generic <=700px collapse below (football_asset_styles.py's
+   `.dg-football-asset{grid-template-columns:...minmax(0,1fr)}` media rule)
+   folds the value chip under the name/badges, leaving the whole right
+   side of every card empty. Restored the un-collapsed 3-column layout
+   (avatar | identity | value) here specifically, matching mobile's own
+   RosterPlayerRow (mobile/src/screens/TeamRosterScreen.tsx) and LineupRow,
+   both of which keep a trailing right-aligned value column alongside
+   identity rather than stacking value below it. */
 div[class*="st-key-my_team_decisions_"] .dg-football-asset,
 .st-key-my_team_roster_decisions .dg-football-asset {
     align-items: start;
-    grid-template-columns: 4.25rem minmax(0, 1fr);
+    grid-template-columns: 4.25rem minmax(0, 1fr) auto;
 }
 div[class*="st-key-my_team_roster_core"] .dg-football-asset,
 div[class*="st-key-my_team_key_backups"] .dg-football-asset {
     align-items: start !important;
     grid-template-columns: 4.25rem minmax(0, 1fr) !important;
 }
-/* !important on Roster Core/Depth specifically — the pre-existing
-   --size-roster-core-portrait rule these two containers used to inherit
-   (football_asset_styles.py) is equal-specificity with the same
-   `div[class*="st-key-..."] .dg-player-portrait` shape, and empirically
-   keeps winning regardless of stylesheet order (Roster Decisions'
-   identical-looking rule below has never had this problem because nothing
-   upstream targets it at that specificity). Scoped to just these two new
-   selectors so Roster Decisions' existing cascade is untouched. */
+/* !important required here too — measured directly (getComputedStyle) on
+   coridian_'s 2026-10-13 Hold Candidates report: the un-scoped
+   `.dg-football-asset.compact-player-row .dg-player-portrait` rule in
+   football_asset_styles.py (3 class selectors, specificity 0-3-0) beats
+   this attribute+class selector (0-2-0) regardless of sheet order, so the
+   avatar rendered at the un-overridden --size-roster-core-portrait
+   (5.5rem/88px) instead of the intended 4.25rem/68px — 20px wider than its
+   reserved 4.25rem grid-template-columns track above, bleeding over the
+   name column and visually covering each name's first 1-2 characters
+   (Jalen Coker renders as alen Coker, Ty Simpson renders as y Simpson).
+   This is the exact same specificity fight the comment below already documents
+   for Roster Core/Depth — Roster Decisions just never got the matching
+   !important when those sections were compacted to 4.25rem. */
 div[class*="st-key-my_team_decisions_"] .dg-player-portrait,
 div[class*="st-key-my_team_decisions_"] .dg-football-asset__avatar {
-    height: 4.25rem;
-    width: 4.25rem;
+    height: 4.25rem !important;
+    width: 4.25rem !important;
 }
 div[class*="st-key-my_team_roster_core"] .dg-player-portrait,
 div[class*="st-key-my_team_roster_core"] .dg-football-asset__avatar,
@@ -183,11 +198,19 @@ div[class*="st-key-my_team_roster_core"] .dg-player-portrait.dg-tier-frame,
 div[class*="st-key-my_team_key_backups"] .dg-player-portrait.dg-tier-frame {
     box-shadow: 0 0 0 2px var(--dg-tier-a), 0 0 8px 1px color-mix(in srgb, var(--dg-tier-a) 48%, transparent);
 }
-div[class*="st-key-my_team_decisions_"] .dg-football-asset__value,
 div[class*="st-key-my_team_roster_core"] .dg-football-asset__value,
 div[class*="st-key-my_team_key_backups"] .dg-football-asset__value {
     grid-column: 2;
     text-align: left;
+}
+/* Roster Decisions keeps the value chip in its own 3rd grid column (see
+   the 3-column grid-template-columns above) instead of folding it under
+   the name like Roster Core/Depth do, so it fills the space that used to
+   sit empty on the right of every card. */
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__value {
+    align-self: start;
+    grid-column: 3;
+    text-align: right;
 }
 /* coridian_, 2026-10-13 (after seeing the trimmed card): "the name takes
    up too much space and everything underneath the name can be moved up so
@@ -220,6 +243,14 @@ div[class*="st-key-my_team_key_backups"] .dg-football-asset__badges {
    dg-football-asset__name context is untouched. */
 div[class*="st-key-my_team_roster_core"] .dg-football-asset__name,
 div[class*="st-key-my_team_key_backups"] .dg-football-asset__name {
+    font: var(--font-card-title) !important;
+}
+/* Same h3-auto-enhancement bug as Roster Core/Depth above, confirmed here
+   too via getComputedStyle (28px/33.6px instead of the intended 14px
+   --font-card-title) on coridian_'s 2026-10-13 Hold Candidates report —
+   PR #1034 scoped its fix to Roster Core/Depth only and never covered
+   Roster Decisions (Untouchables/Trade Candidates/Hold/Drop). */
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__name {
     font: var(--font-card-title) !important;
 }
 .st-key-my_team_decisions_hold .dg-football-asset__insight,
