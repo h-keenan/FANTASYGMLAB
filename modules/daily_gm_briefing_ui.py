@@ -232,6 +232,8 @@ def render_todays_game_plan(
     *,
     open_item: Callable[[briefing_mod.DailyBriefingItem], None],
     key_prefix: str = "daily_gm_briefing",
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     """Render the compact executive morning brief."""
 
@@ -376,7 +378,7 @@ def render_todays_game_plan(
             # confidence score; see modules.dashboard_engine.NEED_TIER_LABELS.
             tier_badge_html = priority_tier_html(item.tier_label)
             with st.container(key=f"{key_prefix}_card_{index}"):
-                render_html_fragment(
+                card_html = (
                     f"<div class='{card_class}'>"
                     "<div class='dg-daily-briefing-kicker-row'>"
                     f"<div class='dg-daily-briefing-kicker'>{kicker_html}</div>"
@@ -390,6 +392,13 @@ def render_todays_game_plan(
                     f"{rank_html}"
                     "</div>"
                 )
+                _render_card_html(
+                    card_html,
+                    item,
+                    key_prefix=f"{key_prefix}_card_{index}",
+                    render_tappable_player_html=render_tappable_player_html,
+                    open_player_quick_view=open_player_quick_view,
+                )
                 with st.container(key=f"dg_cta_{tier}_{key_prefix}_{index}"):
                     st.button(
                         cta,
@@ -398,6 +407,65 @@ def render_todays_game_plan(
                         on_click=open_item,
                         args=(item,),
                     )
+
+
+def _trade_assets_for_item(item: briefing_mod.DailyBriefingItem) -> list[dict]:
+    """Raw send_assets + receive_assets dicts for a trade-visual card.
+
+    Same shape Trade Hub's own trade-idea cards key their tap targets off
+    (modules.trade_hub_ui.render_trade_html_with_player_taps) — each dict
+    carries the real player_id the rendered give/get avatar's
+    data-player-id attribute already exposes (compact_fantasy_assets.
+    compact_asset_html), just not previously wired to anything that
+    listens for a click.
+    """
+
+    presentation = _presentation_dict(item)
+    send = presentation.get("send") or []
+    receive = presentation.get("receive") or []
+    return [asset for asset in (list(send) + list(receive)) if isinstance(asset, dict)]
+
+
+def _render_card_html(
+    card_html: str,
+    item: briefing_mod.DailyBriefingItem,
+    *,
+    key_prefix: str,
+    render_tappable_player_html: Callable[..., str] | None,
+    open_player_quick_view: Callable[..., None] | None,
+) -> None:
+    """Render one Today's Game Plan card, wiring its give/get player avatars
+    to Player Quick View on tap when it has any (Top Priority and League
+    Movement trade teasers — both built from game_plan_trade_visual_html/
+    game_plan_top_priority_trade_html, the same two visuals GM Plan's own
+    Trade Opportunities card now routes through modules.trade_hub_ui.
+    render_trade_html_with_player_taps for). Only the player chips inside
+    actually become tappable (TAP_DELEGATION_JS delegates on
+    data-player-id) — the headline/reason text around them stays inert,
+    same as every other tappable card on the site. Falls back to a plain,
+    non-tappable render when there's no trade visual on this card (Watch/
+    Waiver items) or the caller didn't wire the tap callables.
+    """
+
+    trade_assets = _trade_assets_for_item(item) if _has_trade_visual(item) else []
+    if trade_assets and render_tappable_player_html is not None and open_player_quick_view is not None:
+        from modules.trade_hub_ui import render_trade_html_with_player_taps
+
+        clicked_player_id = render_trade_html_with_player_taps(
+            card_html,
+            trade_assets,
+            key_prefix=f"{key_prefix}_assets",
+            source_label="Today's Game Plan",
+            render_tappable_player_html=render_tappable_player_html,
+        )
+        if clicked_player_id:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="Today's Game Plan",
+                source_note="Inspect this player from today's game plan.",
+            )
+        return
+    render_html_fragment(card_html)
 
 
 def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:

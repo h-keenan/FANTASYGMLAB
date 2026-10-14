@@ -19,7 +19,7 @@ math lives here; modules.gm_plan itself does only pure aggregation/framing.
 from __future__ import annotations
 
 from html import escape
-from typing import Any, MutableMapping
+from typing import Any, Callable, MutableMapping
 
 import pandas as pd
 import streamlit as st
@@ -115,6 +115,18 @@ def _trade_item_visual_html(item: dict[str, Any]) -> str:
     and Dashboard's Top Priority card already render, built from the same
     raw send_assets/receive_assets dicts those surfaces use (see
     modules.gm_plan._trade_focus_area), not re-derived here.
+
+    ``position_pill=True, avatar_ring=True`` — same opt-in flags Dashboard's
+    Today's Game Plan already passes to this exact function for its League
+    Movement give/get cards (modules.daily_gm_briefing_ui._card_visual_html)
+    and to game_plan_top_priority_trade_html for its Top Priority card. Site-
+    wide card audit (coridian_, 2026-10-14 "is it position and then team")
+    found this was the one card still defaulting to the plain-text
+    "POSITION · TEAM · Age" meta line while every other give/get trade
+    teaser built tonight from the same PR already uses the colored
+    football_assets.position_badge_html pill — this brings GM Plan's own
+    Trade Opportunities card to that same, now-established identity format
+    instead of leaving one outlier behind.
     """
 
     send_assets = item.get("send_assets") or []
@@ -137,7 +149,9 @@ def _trade_item_visual_html(item: dict[str, Any]) -> str:
         "value_edge": value_edge,
         "confidence": str(item.get("trade_confidence_label") or ""),
     }
-    return compact_fantasy_assets.game_plan_trade_visual_html(presentation)
+    return compact_fantasy_assets.game_plan_trade_visual_html(
+        presentation, position_pill=True, avatar_ring=True
+    )
 
 
 def _injury_item_visual_html(item: dict[str, Any]) -> str:
@@ -234,13 +248,32 @@ def _item_glyph_concept(item: dict[str, Any]) -> str:
 
 
 def _render_focus_item_card(
-    headline: str, detail: str, *, is_risk: bool, concept: str, visual_html: str = ""
+    headline: str,
+    detail: str,
+    *,
+    is_risk: bool,
+    concept: str,
+    visual_html: str = "",
+    trade_assets: list[dict[str, Any]] | None = None,
+    key_prefix: str = "",
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     """Same card shape/classes as ui_primitives.content_card_html, plus the
     per-item icon mobile's InsightRow always shows — content_card_html's
     `title` is escaped-text-only by design (no arbitrary child HTML), so
     this builds the equivalent markup directly rather than loosening that
     primitive for every other caller.
+
+    A trade-idea card's give/get avatars already carry a real `player_id`
+    (modules.compact_fantasy_assets.compact_asset_html — the same markup
+    Trade Hub's own tappable cards render), so when `trade_assets` is
+    supplied along with both tap callables, the whole card is routed through
+    the same tap-grid component Trade Hub/Waivers/GM Targets already use
+    instead of a plain render_html_fragment — only the player chips inside
+    actually respond to a tap (modules.interaction_contract.TAP_DELEGATION_JS
+    delegates on `data-player-id`, not the card as a whole), so the headline/
+    body text stays inert exactly as before.
     """
 
     tone = "warning" if is_risk else "elevated"
@@ -248,13 +281,42 @@ def _render_focus_item_card(
     title_html = f'<h3 class="dg-ui-card-title">{glyph}{escape(headline)}</h3>' if headline else ""
     visual_block_html = f'<div class="dg-ui-card-visual">{visual_html}</div>' if visual_html else ""
     body_html = f'<div class="dg-ui-card-body">{escape(detail)}</div>' if detail else ""
-    render_html_fragment(
+    card_html = (
         f'<article class="dg-ui-card dg-ui-card--{tone}">'
         f"{title_html}{visual_block_html}{body_html}</article>"
     )
+    if (
+        visual_html
+        and trade_assets
+        and render_tappable_player_html is not None
+        and open_player_quick_view is not None
+    ):
+        from modules.trade_hub_ui import render_trade_html_with_player_taps
+
+        clicked_player_id = render_trade_html_with_player_taps(
+            card_html,
+            trade_assets,
+            key_prefix=key_prefix or "gm_plan_trade_card",
+            source_label="GM Plan - Trade Opportunities",
+            render_tappable_player_html=render_tappable_player_html,
+        )
+        if clicked_player_id:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="GM Plan - Trade Opportunities",
+                source_note="Inspect this player from the trade idea.",
+            )
+        return
+    render_html_fragment(card_html)
 
 
-def _render_focus_area(focus_area: dict[str, Any]) -> None:
+def _render_focus_area(
+    focus_area: dict[str, Any],
+    *,
+    area_index: int = 0,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
+) -> None:
     ui_primitives.render_section_header(
         focus_area.get("title", ""),
         subtitle=focus_area.get("framing", ""),
@@ -267,16 +329,29 @@ def _render_focus_area(focus_area: dict[str, Any]) -> None:
             kind="no-data",
         )
         return
-    for item in focus_area.get("items", []):
+    for item_index, item in enumerate(focus_area.get("items", [])):
         if not isinstance(item, dict):
             continue
         headline, detail, is_risk = _item_presentation(item)
+        trade_assets: list[dict[str, Any]] | None = None
+        if "partner_team_name" in item:
+            trade_assets = [
+                asset
+                for asset in (
+                    list(item.get("send_assets") or []) + list(item.get("receive_assets") or [])
+                )
+                if isinstance(asset, dict)
+            ] or None
         _render_focus_item_card(
             headline,
             detail,
             is_risk=is_risk,
             concept=_item_glyph_concept(item),
             visual_html=_item_visual_html(item),
+            trade_assets=trade_assets,
+            key_prefix=f"gm_plan_trade_card_{area_index}_{item_index}",
+            render_tappable_player_html=render_tappable_player_html,
+            open_player_quick_view=open_player_quick_view,
         )
 
 
@@ -290,6 +365,8 @@ def render_gm_plan_workspace(
     league_value_settings: dict[str, Any] | None,
     team_strategy: str,
     players_db_path: str,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     with page_body("gm_plan_workspace", gap="md"):
         inject_global_styles(GM_PLAN_CSS)
@@ -431,6 +508,11 @@ def render_gm_plan_workspace(
             )
             return
 
-        for focus_area in focus_areas:
+        for area_index, focus_area in enumerate(focus_areas):
             if isinstance(focus_area, dict):
-                _render_focus_area(focus_area)
+                _render_focus_area(
+                    focus_area,
+                    area_index=area_index,
+                    render_tappable_player_html=render_tappable_player_html,
+                    open_player_quick_view=open_player_quick_view,
+                )

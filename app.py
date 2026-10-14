@@ -8523,6 +8523,8 @@ def render_home_dashboard(
                 todays_game_plan,
                 open_item=_open_daily_gm_briefing_item,
                 key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
+                render_tappable_player_html=_render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
             )
         _dash_vis.log_python_render_milestone(
             st.session_state,
@@ -19101,6 +19103,8 @@ def main():
                 league_value_settings=league_value_settings,
                 team_strategy=active_team_strategy,
                 players_db_path=DB_PATH,
+                render_tappable_player_html=_render_tappable_player_html,
+                open_player_quick_view=open_player_quick_view,
             )
 
     # COLLEGE SCOUTING — crowdsourced prospect grading, matching mobile's

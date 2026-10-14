@@ -10,6 +10,8 @@ carries, not a new design.
 
 from __future__ import annotations
 
+from unittest.mock import Mock
+
 from modules import gm_plan_ui
 
 
@@ -106,6 +108,106 @@ def test_trade_item_visual_html_shows_even_for_zero_gain():
 def test_trade_item_visual_html_empty_when_no_assets():
     html = gm_plan_ui._trade_item_visual_html(_trade_item(send_assets=[], receive_assets=[]))
     assert html == ""
+
+
+def test_trade_item_visual_html_uses_the_site_wide_position_then_team_identity():
+    """Site-wide card audit (coridian_, 2026-10-14): GM Plan's own Trade
+    Opportunities card was the one give/get trade teaser still defaulting to
+    the plain-text "POSITION · TEAM · Age" meta line while Dashboard's Top
+    Priority and League Movement cards (the SAME game_plan_trade_visual_html/
+    game_plan_top_priority_trade_html functions, same PR) already render a
+    colored position pill ahead of the team text (position_pill=True) with a
+    tier-colored avatar ring (avatar_ring=True) — the format mobile's own
+    PlayerIdentityRow.tsx established (colored PositionBadge, then team,
+    never a plain-text position). This card must match that now-canonical
+    treatment instead of staying the one outlier.
+    """
+
+    html = gm_plan_ui._trade_item_visual_html(_trade_item())
+    assert "dg-compact-asset-meta--pill" in html
+    assert "player-position-badge" in html
+    assert "dg-tier-frame--ring" in html
+
+
+# --- tap-through -------------------------------------------------------------
+
+
+def test_render_focus_item_card_routes_trade_card_through_tap_grid():
+    tap_renderer = Mock(return_value="their-1")
+    open_quick_view = Mock()
+    gm_plan_ui._render_focus_item_card(
+        "Trade idea: Epstein's List",
+        "Strong fit",
+        is_risk=False,
+        concept="trade",
+        visual_html="<div class='dg-gp-trade-visual'>visual</div>",
+        trade_assets=[
+            {"asset_type": "player", "player_id": "my-1", "name": "Cade Otton"},
+            {"asset_type": "player", "player_id": "their-1", "name": "Tony Pollard"},
+        ],
+        key_prefix="gm_plan_trade_card_0_0",
+        render_tappable_player_html=tap_renderer,
+        open_player_quick_view=open_quick_view,
+    )
+    tap_renderer.assert_called_once()
+    open_quick_view.assert_called_once()
+    assert open_quick_view.call_args.args[0] == "their-1"
+
+
+def test_render_focus_item_card_ignores_unrelated_click_results():
+    tap_renderer = Mock(return_value="")
+    open_quick_view = Mock()
+    gm_plan_ui._render_focus_item_card(
+        "Trade idea: Epstein's List",
+        "Strong fit",
+        is_risk=False,
+        concept="trade",
+        visual_html="<div class='dg-gp-trade-visual'>visual</div>",
+        trade_assets=[
+            {"asset_type": "player", "player_id": "my-1", "name": "Cade Otton"},
+        ],
+        key_prefix="gm_plan_trade_card_0_0",
+        render_tappable_player_html=tap_renderer,
+        open_player_quick_view=open_quick_view,
+    )
+    tap_renderer.assert_called_once()
+    open_quick_view.assert_not_called()
+
+
+def test_render_focus_item_card_falls_back_without_trade_assets():
+    # A non-trade card (e.g. Where You Stand's rank rows) has no trade_assets
+    # and must render without attempting a tap grid at all.
+    tap_renderer = Mock()
+    open_quick_view = Mock()
+    gm_plan_ui._render_focus_item_card(
+        "Roster Power: 3 of 10",
+        "",
+        is_risk=False,
+        concept="rankings",
+        visual_html="",
+        trade_assets=None,
+        key_prefix="gm_plan_trade_card_0_1",
+        render_tappable_player_html=tap_renderer,
+        open_player_quick_view=open_quick_view,
+    )
+    tap_renderer.assert_not_called()
+    open_quick_view.assert_not_called()
+
+
+def test_render_focus_item_card_falls_back_without_tap_callables():
+    # Trade assets present but caller hasn't wired the tap callables — must
+    # still render without raising and without fabricating a click.
+    gm_plan_ui._render_focus_item_card(
+        "Trade idea: Epstein's List",
+        "Strong fit",
+        is_risk=False,
+        concept="trade",
+        visual_html="<div class='dg-gp-trade-visual'>visual</div>",
+        trade_assets=[{"asset_type": "player", "player_id": "my-1", "name": "Cade Otton"}],
+        key_prefix="gm_plan_trade_card_0_0",
+        render_tappable_player_html=None,
+        open_player_quick_view=None,
+    )
 
 
 # --- _injury_item_visual_html -------------------------------------------------
