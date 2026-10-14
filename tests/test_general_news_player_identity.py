@@ -20,9 +20,12 @@ two of several are the real subject.
 from __future__ import annotations
 
 import pandas as pd
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
 from modules import general_news_ui
 from modules import news
+from modules.interaction_contract import TAP_DELEGATION_JS
 
 
 def _players_frame(rows):
@@ -250,3 +253,91 @@ def test_resolve_article_player_identities_handles_zero_one_two_and_three_plus()
         )
         == []
     )
+
+
+def _captured_card_html(item: dict, idx: int, monkeypatch) -> str:
+    captured: list[str] = []
+    monkeypatch.setattr(general_news_ui.st, "markdown", lambda html, **_kwargs: captured.append(html))
+    general_news_ui.render_news_item_card(item, idx)
+    return captured[0]
+
+
+def test_chip_tap_opens_player_quick_view_without_navigating_the_article_link(monkeypatch):
+    """Site-wide tappability audit follow-up (coridian_, 2026-10-14): the
+    player identity chip sits inside the card's own outer article
+    <a href target=_blank> (see render_news_item_card's docstring for why
+    no anchor-nesting restructure was needed). This proves, against the
+    real production card HTML and the real shared tap-delegation JS
+    (modules.interaction_contract.TAP_DELEGATION_JS -- the same contract
+    every other tappable card/row on the site uses), that a tap landing on
+    the chip is caught first and never reaches the native <a> (no
+    popup/navigation, just a player-click trigger), while a tap anywhere
+    else on the card still lets the real article link navigate."""
+
+    item = {
+        "title": "Justin Jefferson downgraded to out after practice report",
+        "link": "https://example.test/news/jefferson-out",
+        "matched_player_id": "6794",
+        "matched_player": "Justin Jefferson",
+        "matched_player_position": "WR",
+        "matched_player_team": "MIN",
+    }
+    card_html = _captured_card_html(item, 0, monkeypatch)
+    assert "data-player-id='6794'" in card_html
+    assert 'href="https://example.test/news/jefferson-out"' in card_html
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        context = browser.new_context()
+        # example.test is a reserved, intentionally non-resolving test
+        # domain (RFC 2606) -- stub it so a real popup navigation doesn't
+        # hit a live DNS lookup and surface as chrome-error instead of the
+        # requested URL.
+        context.route(
+            "https://example.test/**",
+            lambda route: route.fulfill(status=200, content_type="text/plain", body="ok"),
+        )
+        page = context.new_page()
+        page.set_content("<div id='player-scan-tap-root'></div>")
+        page.add_script_tag(
+            content=TAP_DELEGATION_JS.replace(
+                "export default function(component)",
+                "window.initGrid = function(component)",
+            )
+        )
+        page.evaluate(
+            """html => {
+                window.triggers = [];
+                window.initGrid({
+                    data: {html, rootId: 'player-scan-tap-root'},
+                    parentElement: document.body,
+                    setTriggerValue: (name, payload) => window.triggers.push([name, payload]),
+                })
+            }""",
+            card_html,
+        )
+
+        chip = page.locator("[data-player-id='6794']")
+        try:
+            with context.expect_event("page", timeout=600):
+                chip.click()
+            popped_up = True
+        except PlaywrightTimeoutError:
+            popped_up = False
+        assert not popped_up, "chip tap must not navigate the outer article link"
+        triggers = page.evaluate("window.triggers")
+        assert len(triggers) == 1
+        assert triggers[0][0] == "clicked"
+        assert triggers[0][1]["player_id"] == "6794"
+
+        title = page.locator(".news-card-title")
+        with context.expect_event("page", timeout=2000) as popup_info:
+            title.click()
+        popup = popup_info.value
+        assert "example.test/news/jefferson-out" in popup.url
+        popup.close()
+        # The outer-link click must not have also fired a player trigger.
+        assert page.evaluate("window.triggers.length") == 1
+
+        context.close()
+        browser.close()

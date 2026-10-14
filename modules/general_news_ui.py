@@ -20,6 +20,7 @@ from __future__ import annotations
 import time
 from datetime import datetime
 from html import escape
+from typing import Callable
 
 import streamlit as st
 
@@ -204,14 +205,38 @@ def _news_identity_html(item: dict) -> str:
     return _news_identity_chip_html(item)
 
 
-def render_news_item_card(item: dict, idx: int) -> None:
+def render_news_item_card(
+    item: dict,
+    idx: int,
+    *,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
+) -> None:
     """A single general-news card. A team-level story, or one naming three
     or more players, still carries no player association and renders as
     plain text, as before -- there is genuinely no single player (or pair)
     to show there. An item modules.news.general_news_feed resolved to
     exactly one player gets a single identity chip, and one resolved to
     exactly two (e.g. a two-player trade) gets both, stacked -- see
-    ``_news_identity_html``."""
+    ``_news_identity_html``.
+
+    Site-wide tappability audit follow-up (coridian_, 2026-10-14): the
+    identity chip sits inside this card's own outer article <a> (when the
+    item has a link) -- nested the same way League Intelligence's headline
+    <a> sits inside its own player-tappable row
+    (modules.league_intelligence_ui.intelligence_item_html). That shared
+    contract (modules.interaction_contract.TAP_DELEGATION_JS) already
+    resolves "does a tap on the chip override the card's link" without
+    ambiguity: a tap that lands on the chip's own data-player-id node is
+    caught first (event.preventDefault + stopPropagation) and opens Player
+    Quick View instead of navigating; a tap anywhere else on the card never
+    touches a player node, so the native <a> click proceeds untouched and
+    the article still opens. No anchor-nesting restructure was needed --
+    only wiring the existing render_tappable_player_html/
+    open_player_quick_view contract through, which this card never had.
+    Both callables are optional (and keyword-only) so existing callers
+    (tests, and any caller that hasn't wired Player Quick View) keep the
+    prior plain st.markdown render untouched."""
 
     title = escape(_text(item.get("title"), "NFL update"))
     link = _text(item.get("link"))
@@ -263,13 +288,44 @@ def render_news_item_card(item: dict, idx: int) -> None:
             {body_html}
         </div>
         """
+
+    if identity_html and render_tappable_player_html is not None and open_player_quick_view is not None:
+        clicked_player_id = render_tappable_player_html(
+            html=html,
+            key_prefix=f"general_news_card_{idx}",
+        )
+        if clicked_player_id:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="General News",
+                source_note=_text(item.get("title"), "NFL update"),
+                status_label=_event_type_label(item.get("event_type")),
+            )
+        return
+
     st.markdown(html, unsafe_allow_html=True)
 
 
-def render_general_news_feed(items: list, *, now_ts: float | None = None) -> None:
+def render_general_news_feed(
+    items: list,
+    *,
+    now_ts: float | None = None,
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
+) -> None:
     """General NFL news feed, grouped by day then event type. Not
     roster-scoped — a separate surface from Dashboard's 3-tile news digest
-    and the roster-scoped Alerts timeline."""
+    and the roster-scoped Alerts timeline.
+
+    render_tappable_player_html/open_player_quick_view are optional and
+    keyword-only (same injection contract as league_storylines_ui.
+    render_storylines_panel / league_intelligence_ui.
+    render_league_intelligence_feed): this module stays self-contained (no
+    app.py import, per the module docstring), so the caller supplies
+    app.py's session-state-owning open_player_quick_view, while
+    render_tappable_player_html (modules.player_cards) has no such app.py
+    dependency and can be imported directly by a caller. Omitting either
+    falls back to the prior plain-markdown render, unchanged."""
 
     with page_body("general_news_workspace", gap="md"):
         if not items:
@@ -304,5 +360,10 @@ def render_general_news_feed(items: list, *, now_ts: float | None = None) -> Non
                     unsafe_allow_html=True,
                 )
                 for item in group_items:
-                    render_news_item_card(item, card_idx)
+                    render_news_item_card(
+                        item,
+                        card_idx,
+                        render_tappable_player_html=render_tappable_player_html,
+                        open_player_quick_view=open_player_quick_view,
+                    )
                     card_idx += 1
