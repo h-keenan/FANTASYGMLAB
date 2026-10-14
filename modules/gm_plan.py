@@ -316,6 +316,9 @@ def _trade_focus_area(
         receive_assets = [
             asset for asset in (idea.get("receive_assets") or []) if isinstance(asset, Mapping)
         ]
+        send_assets = [
+            asset for asset in (idea.get("send_assets") or []) if isinstance(asset, Mapping)
+        ]
         their_player_asset = next(
             (asset for asset in receive_assets if asset.get("asset_type") == "player"), None
         )
@@ -340,6 +343,15 @@ def _trade_focus_area(
                 "rationale": idea.get("rationale") or "",
                 "trade_confidence_label": idea.get("trade_confidence_label") or "",
                 "priority": idea.get("priority"),
+                # Same raw asset dicts Trade Hub's own cards and Dashboard's
+                # Top Priority card already render via
+                # modules.compact_fantasy_assets (give/get player identity —
+                # photo, tier, position) — reused here rather than
+                # re-derived, so this page's Trade Opportunities list stops
+                # being pure reasoning text with zero player identity.
+                "send_assets": [dict(asset) for asset in send_assets],
+                "receive_assets": [dict(asset) for asset in receive_assets],
+                "trade_gain": idea.get("trade_gain"),
                 "source": "modules.trade_ideas / modules.trade_hub_engine.generate_trade_idea_records_cached",
             }
         )
@@ -396,11 +408,44 @@ def _injury_exposure_fact(injury_context: Mapping[str, Any] | None) -> dict[str,
         )
     ).strip()
 
+    # modules.rankings.summarize_team_injuries already attaches real player
+    # identity (player_id/name/position/team/injury_status) to every entry
+    # in top_injury_impact_players — the same list `summary` above is text-
+    # rendered from. Reused verbatim (capped to the players actually driving
+    # the uncovered-position bar above) so this fact can show real player
+    # photos instead of only naming players inside a prose sentence.
+    need_position_set = set(need_positions)
+    injured_players: list[dict[str, Any]] = []
+    for player in injury_context.get("top_injury_impact_players") or ():
+        if not isinstance(player, Mapping):
+            continue
+        player_id = str(player.get("player_id") or "").strip()
+        name = str(player.get("name") or "").strip()
+        if not player_id or not name:
+            continue
+        position = str(player.get("position") or "").strip().upper()
+        if need_position_set and position not in need_position_set:
+            continue
+        injured_players.append(
+            {
+                "asset_type": "player",
+                "player_id": player_id,
+                "name": name,
+                "position": position,
+                "team": str(player.get("team") or "").strip().upper(),
+                "injury_status": str(player.get("injury_status") or "").strip(),
+                "player_tier": str(player.get("player_tier") or "").strip(),
+            }
+        )
+        if len(injured_players) >= 3:
+            break
+
     return {
         "label": INJURY_EXPOSURE_LABEL,
         "health_flag": health_flag,
         "injured_starters": injured_starters,
         "injury_need_positions": need_positions,
+        "injured_players": injured_players,
         "summary": summary,
         "source": "modules.trade_analyzer_fit.roster_injury_context",
     }

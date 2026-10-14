@@ -24,6 +24,7 @@ from typing import Any, MutableMapping
 import pandas as pd
 import streamlit as st
 
+from modules import compact_fantasy_assets
 from modules import gm_plan
 from modules import gm_targets
 from modules import league_rankings
@@ -33,11 +34,25 @@ from modules import team_stance
 from modules import trade_analyzer_fit
 from modules import trade_hub_engine
 from modules import ui_primitives
-from modules.html_rendering import render_html_fragment
+from modules.canonical_recommendation_narrative import shorten_narrative_text
+from modules.html_rendering import inject_global_styles, render_html_fragment
 from modules.league_value_settings import VALUATION_LENS_TO_SCORE_FIELD
+from modules.league_workspace_ui import _format_score as format_score
 from modules.page_shell import page_body
 from modules.semantic_glyphs import glyph_html
 from modules.sleeper import get_league, get_rosters
+
+# Scoped to the GM Plan page — the compact player-identity visuals (avatar +
+# tier ring) Trade Opportunities/Roster Construction items below reuse from
+# modules.compact_fantasy_assets, sized to this page's card context rather
+# than falling through to that component's unscoped default (the same
+# avatar-sizing regression that hit other surfaces tonight).
+GM_PLAN_CSS = """
+<style>
+.dg-ui-card-visual{margin:var(--space-2xs) 0}
+.dg-ui-card .dg-compact-asset--standard{--size-asset-standard:2.75rem}
+</style>
+"""
 
 _LENS_FOR_SCORE_FIELD: dict[str, str] = {
     score_field: lens for lens, score_field in VALUATION_LENS_TO_SCORE_FIELD.items()
@@ -75,11 +90,74 @@ def _trade_item_text(item: dict[str, Any]) -> tuple[str, str, bool]:
     injury_display = str(item.get("their_player_injury_display") or "")
     their_player = str(item.get("their_player") or "")
     their_label = f"{their_player} ({injury_display})" if injury_display else their_player
-    headline = (
-        f"{item.get('my_player')} → {their_label} ({item.get('partner_team_name')})"
-    )
-    detail = str(item.get("rationale") or item.get("trade_confidence_label") or "")
+    partner = str(item.get("partner_team_name") or "")
+    if item.get("send_assets") or item.get("receive_assets"):
+        # The give/get players are already shown as real identity (photo,
+        # tier, position) via _trade_item_visual_html below — the headline
+        # names the trade partner only, matching Trade Hub's own cards
+        # (partner name as title, players read off the avatar row, not a
+        # second plain-text restatement of who's involved).
+        headline = f"Trade idea: {partner}" if partner else "Trade idea"
+    else:
+        headline = f"{item.get('my_player')} → {their_label} ({partner})"
+    # Trim the dense reasoning paragraph down to a Trade Hub-length headline
+    # verdict (modules.dashboard_engine's own Top Trade Opportunity tile
+    # trims the same `narrative.reason` field to 150 chars for the same
+    # reason) rather than a full paragraph block.
+    raw_detail = str(item.get("rationale") or item.get("trade_confidence_label") or "")
+    detail = shorten_narrative_text(raw_detail, limit=150)
     return headline, detail, bool(injury_display)
+
+
+def _trade_item_visual_html(item: dict[str, Any]) -> str:
+    """Give/get player identity for one Trade Opportunity card — the SAME
+    modules.compact_fantasy_assets visual Trade Hub's own trade-idea cards
+    and Dashboard's Top Priority card already render, built from the same
+    raw send_assets/receive_assets dicts those surfaces use (see
+    modules.gm_plan._trade_focus_area), not re-derived here.
+    """
+
+    send_assets = item.get("send_assets") or []
+    receive_assets = item.get("receive_assets") or []
+    if not send_assets and not receive_assets:
+        return ""
+    try:
+        gain = int(item.get("trade_gain") or 0)
+    except (TypeError, ValueError):
+        gain = 0
+    if gain > 0:
+        value_edge = f"+{format_score(gain)}"
+    elif gain < 0:
+        value_edge = f"-{format_score(abs(gain))}"
+    else:
+        value_edge = "Even"
+    presentation = {
+        "send": send_assets,
+        "receive": receive_assets,
+        "value_edge": value_edge,
+        "confidence": str(item.get("trade_confidence_label") or ""),
+    }
+    return compact_fantasy_assets.game_plan_trade_visual_html(presentation)
+
+
+def _injury_item_visual_html(item: dict[str, Any]) -> str:
+    """Real player identity for the Roster Construction injury-exposure
+    fact — same modules.compact_fantasy_assets.watch_attention_html the
+    Dashboard Game Plan Watch card already uses for this exact item shape
+    (a short list of real player dicts), instead of only naming players
+    inside the prose `summary` sentence.
+    """
+
+    players = item.get("injured_players") or []
+    return compact_fantasy_assets.watch_attention_html(players)
+
+
+def _item_visual_html(item: dict[str, Any]) -> str:
+    if "partner_team_name" in item:
+        return _trade_item_visual_html(item)
+    if "injury_need_positions" in item:
+        return _injury_item_visual_html(item)
+    return ""
 
 
 def _injury_item_text(item: dict[str, Any]) -> tuple[str, str, bool]:
@@ -155,7 +233,9 @@ def _item_glyph_concept(item: dict[str, Any]) -> str:
     return "insights"
 
 
-def _render_focus_item_card(headline: str, detail: str, *, is_risk: bool, concept: str) -> None:
+def _render_focus_item_card(
+    headline: str, detail: str, *, is_risk: bool, concept: str, visual_html: str = ""
+) -> None:
     """Same card shape/classes as ui_primitives.content_card_html, plus the
     per-item icon mobile's InsightRow always shows — content_card_html's
     `title` is escaped-text-only by design (no arbitrary child HTML), so
@@ -166,9 +246,11 @@ def _render_focus_item_card(headline: str, detail: str, *, is_risk: bool, concep
     tone = "warning" if is_risk else "elevated"
     glyph = glyph_html(concept, size="kicker")
     title_html = f'<h3 class="dg-ui-card-title">{glyph}{escape(headline)}</h3>' if headline else ""
+    visual_block_html = f'<div class="dg-ui-card-visual">{visual_html}</div>' if visual_html else ""
     body_html = f'<div class="dg-ui-card-body">{escape(detail)}</div>' if detail else ""
     render_html_fragment(
-        f'<article class="dg-ui-card dg-ui-card--{tone}">{title_html}{body_html}</article>'
+        f'<article class="dg-ui-card dg-ui-card--{tone}">'
+        f"{title_html}{visual_block_html}{body_html}</article>"
     )
 
 
@@ -194,6 +276,7 @@ def _render_focus_area(focus_area: dict[str, Any]) -> None:
             detail,
             is_risk=is_risk,
             concept=_item_glyph_concept(item),
+            visual_html=_item_visual_html(item),
         )
 
 
@@ -209,6 +292,8 @@ def render_gm_plan_workspace(
     players_db_path: str,
 ) -> None:
     with page_body("gm_plan_workspace", gap="md"):
+        inject_global_styles(GM_PLAN_CSS)
+        inject_global_styles(f"<style>{compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS}</style>")
         league_key = str(league_id or "").strip()
         if (
             not league_key

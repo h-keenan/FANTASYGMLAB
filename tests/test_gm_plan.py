@@ -191,6 +191,45 @@ def test_trade_focus_area_surfaces_receive_side_injury_display():
     assert item["their_player_injury_display"] == "Torn ACL"
 
 
+def test_trade_focus_area_carries_send_and_receive_assets_and_trade_gain():
+    # The visual-identity fix: Trade Opportunities previously discarded the
+    # SAME raw send_assets/receive_assets dicts Trade Hub's own cards and
+    # Dashboard's Top Priority card already render player avatars from
+    # (modules.compact_fantasy_assets) — reused verbatim here, not re-derived.
+    ideas = [
+        {
+            "partner_team_name": "Epstein's List",
+            "my_player": "Cade Otton",
+            "their_player": "Tony Pollard",
+            "trade_gain": 237,
+            "send_assets": [
+                {"asset_type": "player", "player_id": "my-1", "name": "Cade Otton", "position": "TE"}
+            ],
+            "receive_assets": [
+                {"asset_type": "player", "player_id": "their-1", "name": "Tony Pollard", "position": "RB"}
+            ],
+        }
+    ]
+    plan = gm_plan.build_gm_plan(
+        team_stance="rebuilding", season_phase=gm_plan.PHASE_EARLY_SEASON, trade_ideas=ideas
+    )
+    trade_area = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_TRADE)
+    item = trade_area["items"][0]
+    assert item["send_assets"][0]["name"] == "Cade Otton"
+    assert item["receive_assets"][0]["name"] == "Tony Pollard"
+    assert item["trade_gain"] == 237
+
+
+def test_trade_focus_area_defaults_to_empty_assets_when_idea_has_none():
+    ideas = [{"partner_team_name": "Team Foo"}]
+    plan = gm_plan.build_gm_plan(team_stance="", season_phase=gm_plan.PHASE_EARLY_SEASON, trade_ideas=ideas)
+    trade_area = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_TRADE)
+    item = trade_area["items"][0]
+    assert item["send_assets"] == []
+    assert item["receive_assets"] == []
+    assert item["trade_gain"] is None
+
+
 def test_trade_focus_area_respects_max_trade_ideas_cap():
     ideas = [{"partner_team_name": f"Team {i}"} for i in range(10)]
     plan = gm_plan.build_gm_plan(
@@ -340,6 +379,74 @@ def test_roster_focus_area_flags_an_uncovered_starter_injury():
     assert injury_item["injury_need_positions"] == ["TE"]
     assert "My Player 7" in injury_item["summary"]
     assert injury_item["source"] == "modules.trade_analyzer_fit.roster_injury_context"
+
+
+def test_roster_focus_area_injury_fact_carries_real_player_identity():
+    # Same visual-identity fix as Trade Opportunities: the injury-exposure
+    # fact previously named players only inside a prose `summary` sentence
+    # with zero player identity for an avatar. summarize_team_injuries
+    # already attaches player_id/name/position/team to every entry in
+    # top_injury_impact_players — reused verbatim, capped to the positions
+    # actually driving injury_need_positions.
+    injury_context = {
+        "injury_impact_flag": "Major Starter Absence",
+        "injured_starters": 1,
+        "injury_need_positions": {"te"},
+        "top_injury_impact_summary": "My Player 7 (TE, KC) - Out, value 2000, impact 50",
+        "key_injuries": ["My Player 7 (TE)"],
+        "top_injury_impact_players": [
+            {
+                "player_id": "7",
+                "name": "My Player 7",
+                "position": "TE",
+                "team": "KC",
+                "injury_status": "Out",
+                "player_tier": "Core",
+            },
+            {
+                # A different position's injury not in injury_need_positions
+                # must not be pulled in as a false "uncovered" player.
+                "player_id": "9",
+                "name": "Other Player",
+                "position": "RB",
+                "team": "KC",
+                "injury_status": "Questionable",
+            },
+        ],
+    }
+    plan = gm_plan.build_gm_plan(
+        team_stance="",
+        season_phase=gm_plan.PHASE_EARLY_SEASON,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+        injury_context=injury_context,
+    )
+    roster = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_ROSTER)
+    injury_item = next(item for item in roster["items"] if item["label"] == gm_plan.INJURY_EXPOSURE_LABEL)
+    assert len(injury_item["injured_players"]) == 1
+    player = injury_item["injured_players"][0]
+    assert player["asset_type"] == "player"
+    assert player["player_id"] == "7"
+    assert player["name"] == "My Player 7"
+    assert player["position"] == "TE"
+
+
+def test_roster_focus_area_injury_fact_without_player_detail_has_empty_player_list():
+    injury_context = {
+        "injury_impact_flag": "Health Watch",
+        "injured_starters": 1,
+        "injury_need_positions": {"rb"},
+    }
+    plan = gm_plan.build_gm_plan(
+        team_stance="",
+        season_phase=gm_plan.PHASE_EARLY_SEASON,
+        rankings_row=_rankings_row(),
+        total_teams=12,
+        injury_context=injury_context,
+    )
+    roster = next(fa for fa in plan["focus_areas"] if fa["key"] == gm_plan.FOCUS_ROSTER)
+    injury_item = next(item for item in roster["items"] if item["label"] == gm_plan.INJURY_EXPOSURE_LABEL)
+    assert injury_item["injured_players"] == []
 
 
 def test_roster_focus_area_with_no_injury_need_positions_adds_no_injury_item():
