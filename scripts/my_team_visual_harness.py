@@ -224,6 +224,11 @@ HOLD_CANDIDATES = pd.DataFrame(
             ),
             "canonical_overall_rank": 140,
             "canonical_position_rank": 54,
+            # Real data/players.db computation (player_quick_view.
+            # overall_ratings_for_pool against the full league pool,
+            # score_column="value_score"), not a placeholder — matches this
+            # file's existing real-magnitude rule for value_score above.
+            "_overall_rating_col": 80,
             "injury_level": "minor",
             "status": "",
             "injury_status": "Questionable",
@@ -244,6 +249,7 @@ HOLD_CANDIDATES = pd.DataFrame(
             ),
             "canonical_overall_rank": 158,
             "canonical_position_rank": 61,
+            "_overall_rating_col": 75,
             "injury_level": "healthy",
             "status": "",
             "injury_status": "",
@@ -264,6 +270,7 @@ HOLD_CANDIDATES = pd.DataFrame(
             ),
             "canonical_overall_rank": 240,
             "canonical_position_rank": 68,
+            "_overall_rating_col": 74,
             "injury_level": "healthy",
             "status": "",
             "injury_status": "",
@@ -343,6 +350,10 @@ def main() -> None:
             # compact card and should live behind the tap-through Player
             # Quick View instead, which this section already enables).
             show_reason=False,
+            # Matches modules/my_team_ui.py's real Hold Candidates call
+            # (coridian_, 2026-10-14: "just needs their overall ... to be on
+            # all four sides" — the OVR pill half of that ask).
+            show_overall_rating=True,
         )
 
 

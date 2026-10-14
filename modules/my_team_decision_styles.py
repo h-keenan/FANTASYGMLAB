@@ -226,6 +226,49 @@ div[class*="st-key-my_team_decisions_"] .dg-football-asset__value {
     right: var(--space-lg);
     text-align: right;
 }
+/* coridian_, 2026-10-14, reviewing Untouchables/Trade/Hold/Drop: the
+   prestige tier should read on all four sides, not just the left. The
+   shared football_assets.player_card_html() always emits a
+   .dg-football-asset__prestige-rail span (football_asset_styles.py), but
+   that primitive is a plain 3px left-edge bar everywhere it is used across
+   the app (Roster Core, Depth, Waivers, Trade Hub, GM Targets, Dashboard,
+   ...), not something unique to this section. Scoped to Roster Decisions
+   only rather than changed globally — this request was phrased while
+   looking at these four specific card sections, and AGENTS.md calls for
+   implementing only the requested scope. The left-only rail still renders
+   identically everywhere else on the app; see the PR description for the
+   follow-up decision coridian_ can make on a global pass. Border width
+   doubled (3px to match the original rail's visual weight, outset 2px
+   past the card's own border) rather than reusing `background`, since a
+   background can not trace an outline around all four edges of a box. */
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__prestige-rail {
+    inset: -2px !important;
+    width: auto !important;
+    height: auto !important;
+    background: transparent !important;
+    border: 3px solid var(--color-prestige-depth) !important;
+    pointer-events: none;
+}
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__prestige-rail--elite {
+    border-color: var(--color-prestige-elite) !important;
+    background: transparent !important;
+}
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__prestige-rail--starter {
+    border-color: var(--color-prestige-starter) !important;
+    background: transparent !important;
+}
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__prestige-rail--contributor {
+    border-color: var(--color-prestige-contributor) !important;
+    background: transparent !important;
+}
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__prestige-rail--development {
+    border-color: var(--color-prestige-development) !important;
+    background: transparent !important;
+}
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__prestige-rail--replacement {
+    border-color: var(--color-prestige-replacement) !important;
+    background: transparent !important;
+}
 /* Reserve room for the floating value chip on the name's own line(s) —
    stress-tested with an unusually long name ("Christian McCaffreyington-
    Worthington") that wraps to 2 lines: without this, the wrapped second
