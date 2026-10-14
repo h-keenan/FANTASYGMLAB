@@ -3062,13 +3062,15 @@ def _news() -> None:
             "speculative": True,
         },
         {
-            # Two named players, not one -> no identity chip by design.
-            # news_intelligence.resolve_article_player_identity fails
-            # closed (returns no match) once an article names more than
-            # one player, the same way it already does for Alerts/
-            # Dashboard, rather than guessing which one the story is
-            # "about". Davante Adams and DeAndre Hopkins are both real
-            # data/players.db rows; no matched_player_id is set here.
+            # Exactly two named players -> both get a stacked identity chip
+            # (news_intelligence.resolve_article_player_identities resolves
+            # this the same way against the real data/players.db rows for
+            # Davante Adams, player_id 2133, and DeAndre Hopkins, player_id
+            # 1426). Three or more named players would still fail closed to
+            # plain text; this fixture sets the already-resolved
+            # matched_players field directly since the harness renders a
+            # hardcoded item list rather than calling general_news_feed's
+            # live RSS/classification pipeline.
             "title": "Davante Adams and DeAndre Hopkins swap teams in deadline-day blockbuster",
             "link": "https://example.com/fixture/news-transaction-1",
             "source": "RotoWire",
@@ -3076,6 +3078,23 @@ def _news() -> None:
             "published_ts": now - 6 * 3600,
             "event_type": "transaction",
             "speculative": False,
+            "matched_players": [
+                {
+                    "matched_player": "Davante Adams",
+                    "matched_player_id": "2133",
+                    "matched_player_position": "WR",
+                    "matched_player_team": "LAR",
+                },
+                {
+                    # Real data/players.db row for this player_id carries no
+                    # current team (free agent in this dataset) -- left
+                    # unset here rather than fabricated, same as the
+                    # position/team lookup would resolve it live.
+                    "matched_player": "DeAndre Hopkins",
+                    "matched_player_id": "1426",
+                    "matched_player_position": "WR",
+                },
+            ],
         },
         {
             "title": "Rookie wideout to see expanded route share after bye week",
