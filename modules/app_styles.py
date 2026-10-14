@@ -3266,12 +3266,12 @@ button[data-testid="stBaseButton-primary"] {
     [data-testid="stPlotlyChart"] {
         min-height: 220px;
     }
-    
+
     .trade-detail-summary {
         margin: 0.5rem 0.68rem 0;
         padding: 0.5rem 0.54rem;
     }
-    
+
     .team-identity-card {
         align-items: flex-start;
         padding: 0.8rem;
@@ -3428,20 +3428,20 @@ button[data-testid="stBaseButton-primary"] {
     .free-agent-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    
-    
+
+
     .free-agent-avatar {
         --avatar-size: 46px;
         flex: 0 0 46px;
     }
-    
+
     .free-agent-card {
         padding: 0.38rem 0.44rem 0.42rem 0.54rem;
     }
-    
-    
-    
-    
+
+
+
+
     .scan-card-list {
         gap: 0.55rem;
         grid-template-columns: repeat(auto-fit, minmax(min(172px, 100%), 1fr));
@@ -3480,7 +3480,7 @@ button[data-testid="stBaseButton-primary"] {
         line-height: 1.12;
         margin-top: 0.1rem;
     }
-    
+
     .compact-player-value {
         font-size: 0.64rem;
         padding: 0.2rem 0.36rem;
@@ -3537,16 +3537,16 @@ button[data-testid="stBaseButton-primary"] {
     .scan-card-score{
         align-self: flex-start;
     }
-    
+
     .trade-asset-status-row {
         align-items: flex-start;
         flex-direction: column;
     }
-    
-    
-    
-    
-    
+
+
+
+
+
     .scan-card-score {
         font-size: 0.68rem;
         padding: 0.28rem 0.46rem;
@@ -3555,8 +3555,8 @@ button[data-testid="stBaseButton-primary"] {
         font-size: 0.62rem;
         padding: 0.18rem 0.34rem;
     }
-    
-    
+
+
     .scan-card-compact-reason {
         display: none;
     }
@@ -3594,8 +3594,8 @@ button[data-testid="stBaseButton-primary"] {
         min-height: 0;
         padding-left: 0;
     }
-    
-    
+
+
     .scan-card-tags {
         gap: 0.28rem;
         margin-top: 0.28rem;
@@ -3626,8 +3626,8 @@ button[data-testid="stBaseButton-primary"] {
         font-size: 0.56rem;
         padding: 0.16rem 0.28rem;
     }
-    
-    
+
+
     .scan-card-desktop-extras {
         display: none;
     }
@@ -3750,7 +3750,7 @@ button[data-testid="stBaseButton-primary"] {
         gap: 0.38rem;
         padding: 0.55rem 0.68rem 0.62rem;
     }
-    
+
     .trade-card-title {
         font-size: 1rem;
     }
@@ -3760,7 +3760,7 @@ button[data-testid="stBaseButton-primary"] {
         min-height: 0;
         padding: 0.28rem 0.34rem;
     }
-    
+
     .trade-avatar,
     .player-avatar {
         --avatar-size: 46px;
@@ -4025,9 +4025,9 @@ button[data-testid="stBaseButton-primary"] {
     .scan-card.scan-card-mobile-row .scan-card-copy::before {
         display: none !important;
     }
-    
-    
-    
+
+
+
     .home-command-player-card .scan-card-compact-reason,
     .scan-card.scan-card-mobile-row .scan-card-compact-reason,
     .scan-card-list.scan-card-list-compact .scan-card-compact-reason,
@@ -4066,10 +4066,10 @@ button[data-testid="stBaseButton-primary"] {
     .launch-league-team {
         font-size: 0.76rem;
     }
-    
-    
-    
-    
+
+
+
+
     .player-detail-hero {
         gap: 0.72rem;
         grid-template-columns: 72px minmax(0, 1fr);

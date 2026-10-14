@@ -290,7 +290,7 @@ div[data-testid="stExpander"] {
         grid-template-columns: 1fr !important;
     }
 
-    
+
 
     .dg-build-identity {
         text-align: left;
@@ -298,7 +298,7 @@ div[data-testid="stExpander"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    
+
 .home-command-shell *,
 .trade-idea-card *,
 .free-agent-card *,
