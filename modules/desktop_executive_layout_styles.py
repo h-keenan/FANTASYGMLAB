@@ -119,7 +119,7 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         max-width: 100%;
     }
 
-    main:has(.dg-page-shell--waivers) .waiver-board,
+    
     main:has(.dg-page-shell--waivers) .free-agent-list {
         max-width: 100%;
     }
@@ -145,15 +145,13 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 
     .dg-ui-section-header,
     .section-header,
-    .home-action-center-label,
-    .home-league-pulse-label {
+    .home-action-center-label{
         margin-block: var(--dg-exec-section-gap) var(--space-sm) !important;
     }
 
     .dg-ui-section-title,
     .section-title,
-    .home-action-center-label,
-    .home-league-pulse-label {
+    .home-action-center-label{
         color: var(--color-text-primary) !important;
         font-size: clamp(1.15rem, 1.4vw, 1.4rem) !important;
         font-weight: var(--font-weight-display) !important;
@@ -260,7 +258,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 .decision-panel,
 .analysis-card,
 .free-agent-card,
-.waiver-card,
 .dg-intelligence-item,
 .trade-summary-card,
 .home-command-card {

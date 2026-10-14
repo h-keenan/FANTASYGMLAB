@@ -55,7 +55,7 @@ div[data-testid="stPills"] button,[data-baseweb="button-group"] button{border-ra
 .stMarkdown a:hover,.stCaption a:hover,div[data-testid="stMarkdownContainer"] a:hover{color:var(--color-accent-strong)!important}
 .stMarkdown a:focus-visible,.stCaption a:focus-visible,div[data-testid="stMarkdownContainer"] a:focus-visible,[data-testid="stCheckbox"] label:focus-visible,[data-testid="stRadio"] label:focus-visible{box-shadow:var(--focus-ring)!important;outline:none!important}
 /* Badges */
-.dg-ui-badge,.home-status-pill,.free-agent-score-pill,.dg-glyph-chip,.trade-summary-asset-chip,.dg-status-badge{border-radius:0}
+.dg-ui-badge,.dg-glyph-chip,.trade-summary-asset-chip,.dg-status-badge{border-radius:0}
 /* Legal footer — subordinate nav family (not CTA pills) */
 .legal-footer-links{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);margin:var(--space-sm) 0 var(--space-md)}
 .legal-footer-link{align-items:center;background:transparent!important;border:var(--border-width-default) solid var(--border-subtle)!important;border-radius:var(--radius-control)!important;box-sizing:border-box;color:var(--text-muted)!important;display:inline-flex!important;font-size:var(--font-size-caption)!important;font-weight:var(--font-weight-metadata)!important;justify-content:center;letter-spacing:.02em;line-height:var(--line-height-caption)!important;min-height:var(--touch-target-min);padding-block:var(--space-xs)!important;padding-inline:var(--space-sm)!important;text-align:center;text-decoration:none!important;text-transform:none!important;white-space:nowrap;width:auto}
@@ -64,6 +64,6 @@ div[data-testid="stPills"] button,[data-baseweb="button-group"] button{border-ra
 .legal-footer-link-active{background:var(--color-information-soft)!important;border-color:var(--border-accent)!important;color:var(--text-accent)!important}
 /* Trade shell (preserve send/receive rails) */
 .trade-summary-card,.trade-detail-modal,.trade-idea-card{background:var(--surface-1)!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:var(--radius-panel)!important;box-shadow:var(--shadow-none)!important}
-.trade-detail-modal .trade-side:first-child,.trade-summary-side--send,.dg-trade-side--send,.toa-side-send{border-inline-start:var(--border-width-semantic) solid var(--color-danger)!important}
-.trade-detail-modal .trade-side:last-child,.trade-summary-side--receive,.dg-trade-side--receive,.toa-side-receive{border-inline-start:var(--border-width-semantic) solid var(--color-success)!important}
+.trade-detail-modal .trade-side:first-child,.dg-trade-side--send,.toa-side-send{border-inline-start:var(--border-width-semantic) solid var(--color-danger)!important}
+.trade-detail-modal .trade-side:last-child,.dg-trade-side--receive,.toa-side-receive{border-inline-start:var(--border-width-semantic) solid var(--color-success)!important}
 """

@@ -520,11 +520,7 @@ div[class*="st-key-_inbox_harness_open"] .dg-notification-panel {
     text-transform: uppercase;
 }
 
-.dg-notification-item__age {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-badge);
-    opacity: var(--opacity-metadata);
-}
+
 
 .dg-notification-item__title {
     color: var(--color-text-primary);

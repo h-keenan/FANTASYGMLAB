@@ -316,11 +316,8 @@ RECOMMENDATION_TRUST_CSS = """
     letter-spacing: var(--letter-spacing-badge);
     text-transform: uppercase;
 }
-.live-draft-rec-card .fa-player-insight,
-.live-draft-rec-card .football-player-insight {
-    color: var(--color-text-primary);
-    font-weight: var(--font-weight-metadata);
-}
+
+
 .live-draft-rec-analysis {
     opacity: 0.82;
 }
@@ -332,15 +329,15 @@ RECOMMENDATION_TRUST_CSS = """
     .st-key-dashboard_workflow .home-command-grid {
         gap: var(--space-md);
     }
-    .trade-board-grid,
+    
     .live-draft-rec-grid {
         gap: var(--space-md);
     }
 }
 
 .dg-info-weight-verdict{border-inline-start:var(--border-width-semantic) solid var(--color-opportunity);padding:var(--space-md);background:var(--color-surface-muted)}
-.dg-info-verdict-title{font:var(--type-card-title);margin:0}
-.dg-info-verdict-meta{display:flex;gap:var(--space-sm);flex-wrap:wrap}
+
+
 .trade-exec-verdict-compact{padding:var(--space-sm) var(--space-md)}
 .dg-info-verdict-line{align-items:baseline;display:flex;flex-wrap:wrap;font:var(--type-card-title);gap:var(--space-sm);margin:0}
 .dg-info-verdict-delta{color:var(--color-success);font-weight:var(--font-weight-display)}
