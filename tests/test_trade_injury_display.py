@@ -226,10 +226,6 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             ".dg-semantic-opportunity",
             ".dg-semantic-caution",
             ".dg-semantic-muted",
-            ".dg-semantic-grade-a",
-            ".dg-semantic-grade-b",
-            ".dg-semantic-grade-c",
-            ".dg-semantic-grade-d",
         ]:
             self.assertIn(selector, app.APP_CSS)
 
@@ -238,6 +234,10 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             ".dg-surface-primary",
             ".dg-surface-secondary",
             ".dg-semantic-diagnostic",
+            ".dg-semantic-grade-a",
+            ".dg-semantic-grade-b",
+            ".dg-semantic-grade-c",
+            ".dg-semantic-grade-d",
         ]:
             self.assertNotIn(selector, app.APP_CSS)
 
@@ -255,11 +255,21 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             ".decision-panel-risk",
             ".trade-idea-positive",
             ".trade-idea-negative",
-            ".free-agent-card-tone-core",
-            ".free-agent-card-tone-drop",
             ".app-degraded-state",
         ]:
             self.assertIn(selector, app.APP_CSS)
+
+        for selector in [
+            ".free-agent-card-tone-premium",
+            ".free-agent-card-tone-core",
+            ".free-agent-card-tone-rise",
+            ".free-agent-card-tone-hold",
+            ".free-agent-card-tone-neutral",
+            ".free-agent-card-tone-move",
+            ".free-agent-card-tone-drop",
+            ".free-agent-card-tone-risk",
+        ]:
+            self.assertNotIn(selector, app.APP_CSS)
 
         self.assertIn("border-color: rgba(239, 68, 68, 0.22)", app.APP_CSS)
         self.assertIn("border-left: 3px solid var(--dg-theme-opportunity)", app.APP_CSS)
@@ -339,11 +349,15 @@ class TestTradeInjuryDisplay(unittest.TestCase):
 
         for selector in [
             ".section-title",
+        ]:
+            self.assertIn(selector, app.APP_CSS)
+
+        for selector in [
             ".player-quick-view-detail-label",
             ".player-quick-view-detail-value",
             ".player-quick-view-detail-note",
         ]:
-            self.assertIn(selector, app.APP_CSS)
+            self.assertNotIn(selector, app.APP_CSS)
 
         self.assertIn("justify-content: flex-start !important", app.APP_CSS)
         self.assertIn('content: "›"', app.APP_CSS)

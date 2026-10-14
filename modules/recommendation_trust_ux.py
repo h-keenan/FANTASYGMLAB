@@ -272,17 +272,6 @@ RECOMMENDATION_TRUST_CSS = """
     font: var(--font-body);
     margin: 0;
 }
-.trade-summary-executive {
-    display: grid;
-    gap: var(--space-xs);
-    min-width: 0;
-}
-.trade-summary-why {
-    color: var(--color-text-primary);
-    font: var(--font-body);
-    font-weight: var(--font-weight-metadata);
-    margin: 0;
-}
 .trade-summary-impact-row {
     align-items: baseline;
     display: flex;

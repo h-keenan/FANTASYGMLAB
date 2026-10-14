@@ -459,8 +459,6 @@ SEMANTIC_GLYPH_CSS = """
 .home-command-card-trade .dg-semantic-icon,
 .home-command-card-waiver .dg-semantic-icon,
 .trade-idea-positive .dg-semantic-icon,
-.free-agent-card-tone-core .dg-semantic-icon,
-.free-agent-card-tone-rise .dg-semantic-icon,
 .summary-tile-opportunity .dg-semantic-icon,
 .decision-panel-strength .dg-semantic-icon{color:var(--color-success)}
 .home-command-card-draft .dg-semantic-icon,

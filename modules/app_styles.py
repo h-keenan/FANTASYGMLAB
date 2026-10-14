@@ -968,19 +968,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     font-weight: 800;
     margin-bottom: 0.55rem;
 }
-.section-header {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(11, 16, 32, 0.78));
-    border: 1px solid rgba(148, 163, 184, 0.1);
-    border-left: 3px solid var(--color-accent-strong);
-    border-radius: var(--radius-control);
-    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.14);
-    margin: 0.8rem 0 0.55rem;
-    padding: 0.7rem 0.8rem;
-}
-.section-header-compact {
-    margin-top: 0.55rem;
-    padding: 0.62rem 0.75rem;
-}
 .section-kicker {
     color: var(--color-accent);
     font-size: 0.72rem;
@@ -1001,7 +988,6 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     line-height: 1.32;
     margin-top: 0.24rem;
 }
-.section-header,
 .launch-section-intro,
 .team-section-card {
     min-width: 0;
@@ -1675,33 +1661,6 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .free-agent-card::after {
     display: none;
 }
-.free-agent-card-tone-premium {
-    --player-accent: linear-gradient(180deg, rgba(250, 204, 21, 0.96), rgba(217, 119, 6, 0.86));
-    --player-accent-soft: rgba(250, 204, 21, 0.12);
-}
-.free-agent-card-tone-core {
-    --player-accent: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 96%, transparent), color-mix(in srgb, var(--color-accent-strong) 84%, transparent));
-    --player-accent-soft: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
-}
-.free-agent-card-tone-rise {
-    --player-accent: linear-gradient(180deg, rgba(74, 222, 128, 0.96), rgba(16, 185, 129, 0.84));
-    --player-accent-soft: rgba(34, 197, 94, 0.12);
-}
-.free-agent-card-tone-hold,
-.free-agent-card-tone-neutral {
-    --player-accent: linear-gradient(180deg, rgba(148, 163, 184, 0.9), rgba(71, 85, 105, 0.82));
-    --player-accent-soft: rgba(100, 116, 139, 0.12);
-}
-.free-agent-card-tone-move {
-    --player-accent: linear-gradient(180deg, rgba(251, 146, 60, 0.96), rgba(234, 88, 12, 0.84));
-    --player-accent-soft: rgba(249, 115, 22, 0.12);
-}
-.free-agent-card-tone-drop,
-.free-agent-card-tone-risk {
-    --player-accent: linear-gradient(180deg, rgba(248, 113, 113, 0.96), rgba(220, 38, 38, 0.84));
-    --player-accent-soft: rgba(239, 68, 68, 0.12);
-}
-
 .free-agent-avatar {
     --avatar-size: 76px;
     align-self: flex-start;
@@ -3402,14 +3361,6 @@ button[data-testid="stBaseButton-primary"] {
         line-height: 1.24;
         margin-top: 0.2rem;
     }
-    .section-header {
-        margin: 0.52rem 0 0.34rem;
-        padding: 0.56rem 0.62rem;
-    }
-    .section-header-compact {
-        margin-top: 0.38rem;
-        padding: 0.5rem 0.58rem;
-    }
     .section-kicker {
         font-size: 0.66rem;
     }
@@ -4875,22 +4826,6 @@ div[data-testid="stExpander"] {
     --dg-semantic-color: var(--color-muted, rgba(229, 231, 235, 0.52));
     --dg-semantic-soft: var(--color-muted-soft, rgba(229, 231, 235, 0.06));
 }
-.dg-semantic-grade-a {
-    --dg-semantic-color: var(--dg-theme-success);
-    --dg-semantic-soft: var(--color-success-soft, rgba(34, 197, 94, 0.15));
-}
-.dg-semantic-grade-b {
-    --dg-semantic-color: var(--dg-theme-accent-silver);
-    --dg-semantic-soft: rgba(229, 231, 235, 0.1);
-}
-.dg-semantic-grade-c {
-    --dg-semantic-color: var(--dg-theme-caution);
-    --dg-semantic-soft: rgba(245, 158, 11, 0.15);
-}
-.dg-semantic-grade-d {
-    --dg-semantic-color: var(--dg-theme-danger);
-    --dg-semantic-soft: var(--color-danger-soft, rgba(239, 68, 68, 0.15));
-}
 .stApp,
 [data-testid="stAppViewContainer"] {
     background:
@@ -4904,9 +4839,7 @@ main,
 .roster-limit-stat-danger,
 .home-command-card-risk,
 .summary-tile-risk,
-.decision-panel-risk,
-.free-agent-card-tone-drop,
-.free-agent-card-tone-risk {
+.decision-panel-risk {
     background:
         linear-gradient(90deg, rgba(245, 158, 11, 0.095), rgba(7, 8, 12, 0.9) 34%) !important;
     border-left: 3px solid rgba(245, 158, 11, 0.74) !important;
@@ -4924,8 +4857,6 @@ main,
 .home-command-card-trade,
 .home-command-card-waiver,
 .trade-idea-positive,
-.free-agent-card-tone-core,
-.free-agent-card-tone-rise,
 .decision-panel-strength {
     background:
         linear-gradient(90deg, rgba(20, 184, 166, 0.13), rgba(7, 8, 12, 0.9) 38%) !important;
@@ -5018,11 +4949,7 @@ main,
     .decision-panel-strength,
     .decision-panel-risk,
     .trade-idea-positive,
-    .trade-idea-negative,
-    .free-agent-card-tone-core,
-    .free-agent-card-tone-rise,
-    .free-agent-card-tone-drop,
-    .free-agent-card-tone-risk {
+    .trade-idea-negative {
         border-left-width: 3px !important;
     }
 }
@@ -5106,58 +5033,6 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
     gap: 0.55rem;
     padding: 0.72rem 0.82rem 0.82rem;
 }
-.player-quick-view-recommendation-card {
-    background:
-        linear-gradient(135deg, rgba(34, 211, 238, 0.15), rgba(9, 10, 13, 0.96) 42%, rgba(2, 3, 5, 0.98)) !important;
-    border: 1px solid rgba(34, 211, 238, 0.22) !important;
-    border-left: 4px solid var(--dg-theme-accent-cyan) !important;
-    border-radius: 2px !important;
-    margin: 0.5rem 0 0.38rem !important;
-    padding: 0.56rem 0.68rem !important;
-}
-.player-quick-view-detail-list {
-    border: 1px solid rgba(229, 231, 235, 0.1);
-    border-radius: 2px;
-    display: grid;
-    overflow: hidden;
-}
-.player-quick-view-detail-row {
-    align-items: start;
-    background: rgba(8, 9, 12, 0.78);
-    border-bottom: 1px solid rgba(229, 231, 235, 0.08);
-    display: grid;
-    gap: 0.58rem;
-    grid-template-columns: minmax(5.6rem, 0.36fr) minmax(0, 1fr);
-    min-width: 0;
-    padding: 0.55rem 0.62rem;
-}
-.player-quick-view-detail-row:last-child {
-    border-bottom: 0;
-}
-.player-quick-view-detail-label {
-    color: rgba(248, 250, 252, 0.48);
-    font-size: 0.64rem;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    line-height: 1.15;
-    text-transform: uppercase;
-}
-
-.player-quick-view-detail-value {
-    color: #ffffff;
-    font-size: 0.82rem;
-    font-weight: 880;
-    line-height: 1.16;
-    overflow-wrap: anywhere;
-}
-.player-quick-view-detail-note {
-    color: rgba(248, 250, 252, 0.62);
-    font-size: 0.72rem;
-    line-height: 1.28;
-    margin-top: 0.14rem;
-    overflow-wrap: anywhere;
-}
-
 .player-quick-view-stat-section {
     background: rgba(229, 231, 235, 0.035);
     border: 1px solid rgba(229, 231, 235, 0.09);
@@ -5264,11 +5139,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
     .player-quick-view-panel-body {
         padding: 0.6rem 0.64rem 0.72rem;
-    }
-    .player-quick-view-detail-row {
-        gap: 0.42rem;
-        grid-template-columns: minmax(4.7rem, 0.34fr) minmax(0, 1fr);
-        padding: 0.5rem 0.52rem;
     }
 }
 :root {
@@ -5480,10 +5350,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .player-detail-name,
     .player-detail-meta,
     .player-quick-view-name,
-    .player-quick-view-meta,
-    .player-quick-view-detail-label,
-    .player-quick-view-detail-value,
-    .player-quick-view-detail-note {
+    .player-quick-view-meta {
         text-align: left !important;
     }
     .home-command-shell,
@@ -5544,10 +5411,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .player-quick-view-panel-body {
         gap: 0.44rem !important;
     }
-    .player-quick-view-detail-row {
-        align-items: start !important;
-        min-height: 0 !important;
-    }
     .home-command-card,
     .team-identity-card,
     .summary-tile,
@@ -5577,15 +5440,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
 }
 
 @media (max-width: 900px) {
-    .section-header {
-        background: transparent !important;
-        border-left: 3px solid rgba(229, 231, 235, 0.18);
-        margin: 1.08rem 0 0.34rem !important;
-        padding: 0.1rem 0 0.1rem 0.58rem !important;
-    }
-    .section-header-compact {
-        margin-top: 0.58rem !important;
-    }
     .section-kicker {
         color: rgba(248, 250, 252, 0.46) !important;
         font-size: 0.6rem !important;
@@ -5655,8 +5509,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .home-command-card-trade,
     .home-command-card-waiver,
     .trade-idea-positive,
-    .free-agent-card-tone-core,
-    .free-agent-card-tone-rise,
     .free-agent-summary-card {
         background:
             linear-gradient(90deg, rgba(34, 197, 94, 0.12), rgba(5, 6, 9, 0.78) 36%) !important;
@@ -5819,9 +5671,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .dg-preset-opportunity,
     .home-command-card-trade,
     .home-command-card-waiver,
-    .trade-idea-positive,
-    .free-agent-card-tone-core,
-    .free-agent-card-tone-rise {
+    .trade-idea-positive {
         background:
             linear-gradient(90deg, rgba(20, 184, 166, 0.115), rgba(5, 6, 9, 0.83) 32%) !important;
         border-left: 3px solid rgba(45, 212, 191, 0.74) !important;
@@ -5836,8 +5686,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         gap: 2px !important;
     }
     .decision-panel:not(:first-child),
-    .free-agent-card-tone-hold,
-    .free-agent-card-tone-neutral,
     .draft-review-pick-card {
         background:
             linear-gradient(180deg, rgba(229, 231, 235, 0.035), rgba(4, 5, 8, 0.58)) !important;
@@ -6266,8 +6114,6 @@ h3 .dg-semantic-icon {
 .home-command-card-trade .dg-semantic-icon,
 .home-command-card-waiver .dg-semantic-icon,
 .trade-idea-positive .dg-semantic-icon,
-.free-agent-card-tone-core .dg-semantic-icon,
-.free-agent-card-tone-rise .dg-semantic-icon,
 .summary-tile-opportunity .dg-semantic-icon,
 .decision-panel-strength .dg-semantic-icon {
     background: transparent;
@@ -6338,15 +6184,6 @@ h3 .dg-semantic-icon {
         overflow: visible !important;
         -webkit-line-clamp: unset !important;
     }
-}
-/* Compact 2K player detail panels: modal-only stat table treatment. */
-.player-detail-panel,
-.player-detail-header,
-.player-detail-identity,
-.player-detail-row,
-.player-detail-stat-table,
-.player-detail-section {
-    border-radius: 2px;
 }
 div[data-testid="stDialog"] .dg-quick-view-panel.player-quick-view-shell,
 div[data-testid="stDialog"] .player-detail-shell {
@@ -6645,7 +6482,6 @@ div[data-testid="stDialog"] .player-quick-view-season-context {
     line-height: var(--line-height-caption) !important;
     margin: var(--space-sm) 0 var(--space-xs) !important;
 }
-div[data-testid="stDialog"] .player-quick-view-detail-list,
 div[data-testid="stDialog"] .player-quick-view-stat-section,
 div[data-testid="stDialog"] .summary-tile-grid,
 div[data-testid="stDialog"] .player-detail-score-row {
@@ -6657,7 +6493,6 @@ div[data-testid="stDialog"] .player-detail-score-row {
     margin: 0.26rem 0 !important;
     overflow: hidden !important;
 }
-div[data-testid="stDialog"] .player-quick-view-detail-row,
 div[data-testid="stDialog"] .player-quick-view-stat-row,
 div[data-testid="stDialog"] .summary-tile,
 div[data-testid="stDialog"] .player-detail-score-pill {
@@ -6675,7 +6510,6 @@ div[data-testid="stDialog"] .player-detail-score-pill {
     min-height: 0 !important;
     padding: 0.34rem 0.44rem !important;
 }
-div[data-testid="stDialog"] .player-quick-view-detail-row:last-child,
 div[data-testid="stDialog"] .player-quick-view-stat-row:last-child,
 div[data-testid="stDialog"] .summary-tile:last-child,
 div[data-testid="stDialog"] .player-detail-score-pill:last-child {
@@ -6701,7 +6535,6 @@ div[data-testid="stDialog"] .player-detail-score-label {
 }
 div[data-testid="stDialog"] .summary-tile-label,
 div[data-testid="stDialog"] .player-detail-score-label,
-div[data-testid="stDialog"] .player-quick-view-detail-label,
 div[data-testid="stDialog"] .player-quick-view-stat-label {
     color: rgba(248, 250, 252, 0.5) !important;
     font-size: 0.58rem !important;
@@ -6715,7 +6548,6 @@ div[data-testid="stDialog"] .player-quick-view-stat-label {
 }
 div[data-testid="stDialog"] .summary-tile-value,
 div[data-testid="stDialog"] .player-detail-score-value,
-div[data-testid="stDialog"] .player-quick-view-detail-value,
 div[data-testid="stDialog"] .player-quick-view-stat-value {
     color: #ffffff !important;
     font-size: 0.78rem !important;
@@ -6726,17 +6558,12 @@ div[data-testid="stDialog"] .player-quick-view-stat-value {
 }
 div[data-testid="stDialog"] .summary-tile-note,
 div[data-testid="stDialog"] .player-detail-score-note,
-div[data-testid="stDialog"] .player-quick-view-detail-note,
 div[data-testid="stDialog"] .player-quick-view-stat-note {
     color: rgba(248, 250, 252, 0.58) !important;
     font-size: 0.68rem !important;
     grid-column: 2 !important;
     line-height: 1.22 !important;
     margin-top: 0.08rem !important;
-}
-div[data-testid="stDialog"] .player-quick-view-recommendation-card {
-    margin: 0.36rem 0 0.26rem !important;
-    padding: 0.46rem 0.56rem !important;
 }
 div[data-testid="stDialog"] .player-quick-view-stat-grid {
     grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)) !important;
@@ -6757,10 +6584,6 @@ div[data-testid="stDialog"] .player-quick-view-stat-value {
 }
 div[data-testid="stDialog"] .player-quick-view-stat-note {
     display: none !important;
-}
-div[data-testid="stDialog"] .section-header {
-    margin: 0.58rem 0 0.2rem !important;
-    padding-left: 0.44rem !important;
 }
 div[data-testid="stDialog"] .section-title {
     font-size: 0.78rem !important;
@@ -6806,7 +6629,6 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
         object-position: center var(--dg-headshot-focus, 18%) !important;
         width: 58px !important;
     }
-    div[data-testid="stDialog"] .player-quick-view-detail-row,
     div[data-testid="stDialog"] .player-quick-view-stat-row,
     div[data-testid="stDialog"] .summary-tile,
     div[data-testid="stDialog"] .player-detail-score-pill {
@@ -6819,9 +6641,6 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     div[data-testid="stDialog"] .player-detail-score-label,
     div[data-testid="stDialog"] .player-detail-score-value,
     div[data-testid="stDialog"] .player-detail-score-note,
-    div[data-testid="stDialog"] .player-quick-view-detail-label,
-    div[data-testid="stDialog"] .player-quick-view-detail-value,
-    div[data-testid="stDialog"] .player-quick-view-detail-note,
     div[data-testid="stDialog"] .player-quick-view-stat-label,
     div[data-testid="stDialog"] .player-quick-view-stat-value,
     div[data-testid="stDialog"] .player-quick-view-stat-note {
@@ -6829,7 +6648,6 @@ div[data-testid="stDialog"] .player-quick-view-actions-label {
     }
     div[data-testid="stDialog"] .summary-tile-label,
     div[data-testid="stDialog"] .player-detail-score-label,
-    div[data-testid="stDialog"] .player-quick-view-detail-label,
     div[data-testid="stDialog"] .player-quick-view-stat-label {
         line-height: 1.18 !important;
         max-width: 100% !important;

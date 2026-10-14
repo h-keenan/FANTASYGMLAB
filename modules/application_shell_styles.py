@@ -172,8 +172,7 @@ div[class*="st-key-executive_workspace_shell"] > div[data-testid="stElementConta
     white-space: nowrap;
 }
 
-.dg-ui-section-header,
-.section-header {
+.dg-ui-section-header {
     margin-block: var(--space-xl) var(--space-md) !important;
 }
 

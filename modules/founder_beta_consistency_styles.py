@@ -116,8 +116,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
     }
 
 
-    .dg-ui-section-header,
-    .section-header {
+    .dg-ui-section-header {
         display: block !important;
         margin-top: var(--space-lg) !important;
         width: 100% !important;
