@@ -446,8 +446,22 @@ def player_scan_tags(
     # (it re-derives from the raw status/injury_status fields rather than
     # trusting this precomputed column), so this default change is a
     # correctness/consistency fix, not a behavior change on its own.
+    #
+    # When is_injury_status(row) is true, the card already renders a raw
+    # status badge (Ques/Doubt/Out/IR/...) carrying that exact fact — see
+    # injury_status in compact_player_row_html / player_scan_card_html, which
+    # feeds football_assets.injury_badge_html. Stacking "Injury Risk" on top
+    # of that badge repeats the same underlying signal in two chips
+    # (coridian_, 2026-10-14: too many redundant tags on Roster Decisions
+    # cards). Only add the tone chip for the case it uniquely covers: a
+    # meaningfully elevated injury_level with no active practice-report
+    # status to show a badge for.
     injury_level = _safe_text(row.get("injury_level"), "unknown").strip().lower()
-    if (injury_level in {"major", "moderate"} or is_injury_status(row)) and primary_key != "injury risk":
+    if (
+        injury_level in {"major", "moderate"}
+        and not is_injury_status(row)
+        and primary_key != "injury risk"
+    ):
         add_tag("Injury Risk", "risk", "injury:risk")
 
     for tag in extra_tags or []:

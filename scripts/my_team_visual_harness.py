@@ -333,12 +333,16 @@ def main() -> None:
             max_items=len(HOLD_CANDIDATES),
             status_label="Hold",
             compact=True,
-            show_inline_reason=True,
-            enable_quick_view=False,
+            enable_quick_view=True,
             show_header=False,
             design_system=True,
             show_prestige=False,
             reason_limit=90,
+            # Matches modules/my_team_ui.py's real Hold Candidates call
+            # (coridian_, 2026-10-14: the Why line is a "jumble" on this
+            # compact card and should live behind the tap-through Player
+            # Quick View instead, which this section already enables).
+            show_reason=False,
         )
 
 

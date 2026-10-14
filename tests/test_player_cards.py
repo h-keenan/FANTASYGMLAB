@@ -776,7 +776,13 @@ class TestPlayerCards(unittest.TestCase):
 
         self.assertIn("Test Player", html)
         self.assertNotIn(">INJ Test Player<", html)
-        self.assertIn("Injury Risk", html)
+        # The raw status badge ("IR") already carries this player's injury
+        # fact; player_scan_tags no longer stacks a redundant "Injury Risk"
+        # tone chip on top of it when is_injury_status(row) is already true
+        # (coridian_, 2026-10-14: trim redundant Roster Decisions tags).
+        self.assertIn("dg-football-injury", html)
+        self.assertIn(">IR<", html)
+        self.assertNotIn("Injury Risk", html)
 
 
 if __name__ == "__main__":
