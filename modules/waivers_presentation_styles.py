@@ -266,16 +266,22 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     margin-top: var(--space-xs);
 }
 
-/* Waiver Snapshot: a separate, already-compact "Best Available by
-   position" grid (render_free_agent_summary_cards) — untouched by the
-   Priority Adds/Stash/Watchlist/FAAB Shortlist compact-row redesign
-   above, since it was never the repeating dense list the redesign targets. */
-.waiver-snapshot-avatar {
-    border-radius: var(--radius-none);
-    height: var(--size-roster-core-portrait);
-    width: var(--size-roster-core-portrait);
-}
-
+/* Waiver Snapshot: the Best Available by position wire-scan grid
+   (render_free_agent_summary_cards). coridian_, 2026-10-14: these cards
+   take up too much space and look bad -- brought down to the same
+   compact density the Priority Adds/Stash/Watchlist/FAAB Shortlist rows
+   already got in the prior redesign pass. No explicit height/width rule is set on
+   .waiver-snapshot-avatar on purpose: football_asset_styles.py's shared
+   .dg-player-portrait>.waiver-snapshot-avatar rule already forces this
+   inner element to fill its outer .dg-player-portrait container at
+   height/width:100% !important, so the real size is controlled entirely
+   by the outer portrait's own size -- which player_card_html's
+   density=compact call below now resolves to the shared
+   --size-asset-standard token (2.75rem/44px, the same avatar size the
+   compact Priority Adds rows already use), not the old density=standard
+   call's --size-roster-core-portrait (5.5rem/88px, the full-width hero
+   size My Team's roster-core card uses). Setting a competing size here
+   would just be dead weight the !important rule always wins over. */
 .waiver-snapshot-avatar img {
     height: 100%;
     object-fit: cover;
@@ -288,6 +294,28 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     box-shadow: var(--shadow-surface-inset) !important;
     clip-path: none !important;
     opacity: 0.96;
+}
+
+/* The trailing slot now holds a small NN OVR badge
+   (waiver_overall_rating_badge_html), not the old raw dynasty/value-score
+   number -- so it no longer needs its own reserved grid column (a
+   reserved trailing column is what clipped a trailing element on My Team
+   in an earlier regression, once a narrow viewport's grid ran out of room
+   for it). Two
+   columns only (avatar, body) at every width, with the badge floated via
+   position:absolute instead -- the same pattern this stylesheet's own
+   Share button already uses for a trailing element it doesn't want to
+   reserve column space for. */
+.dg-football-asset.free-agent-summary-card {
+    grid-template-columns: auto minmax(0, 1fr);
+}
+
+.dg-football-asset.free-agent-summary-card .dg-football-asset__value {
+    margin: 0;
+    position: absolute;
+    right: var(--space-sm);
+    text-align: right;
+    top: var(--space-sm);
 }
 
 /* The shared football_asset_styles.py rule for this literal h3
@@ -349,23 +377,6 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
 @media (max-width: 700px) {
     .free-agent-summary-grid {
         grid-template-columns: minmax(0, 1fr) !important;
-    }
-
-    .dg-football-asset.free-agent-summary-card {
-        align-items: start;
-        grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .dg-football-asset.free-agent-summary-card .dg-football-asset__value {
-        grid-column: 1 / -1;
-        margin-top: var(--space-sm);
-        text-align: left;
-    }
-
-    .dg-football-asset.free-agent-summary-card .dg-football-asset__name {
-        hyphens: none;
-        overflow-wrap: break-word;
-        word-break: normal;
     }
 
     .waiver-faab-block {

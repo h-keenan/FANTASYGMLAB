@@ -235,6 +235,8 @@ class TestWaiversUI(unittest.TestCase):
                     "age": 24,
                     "value_score": 75,
                     "stale_free_agent": False,
+                    "_overall_rating_col": 78,
+                    "canonical_position_rank": 21,
                 }
             ]
         )
@@ -248,12 +250,20 @@ class TestWaiversUI(unittest.TestCase):
         html = markdown.call_args.args[0]
         self.assertIn("free-agent-summary-grid", html)
         self.assertIn("Test Player", html)
-        self.assertIn("dg-football-asset--standard", html)
+        # Compact density now (matches the Priority Adds rows' avatar size),
+        # not the old full-width-hero "standard" density (88px avatar).
+        self.assertIn("dg-football-asset--compact", html)
+        self.assertNotIn("dg-football-asset--standard", html)
         self.assertNotIn("dg-football-asset--stacked", html)
         self.assertIn("Age 24", html)
         self.assertIn("WR", html)
         self.assertIn("Best Available", html)
-        self.assertIn("Value Score: 75", html)
+        # No inline Why: reasoning text and no raw value-score number on the
+        # compact card -- an OVR badge takes the trailing slot instead.
+        self.assertNotIn("Why:", html)
+        self.assertNotIn("Value Score: 75", html)
+        self.assertIn("waiver-ovr-badge", html)
+        self.assertIn("78", html)
         self.assertIn("waiver-snapshot-avatar", html)
         self.assertTrue(markdown.call_args.kwargs["unsafe_allow_html"])
 
