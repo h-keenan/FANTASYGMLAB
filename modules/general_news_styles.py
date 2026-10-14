@@ -10,7 +10,16 @@ chrome mobile's NewsScreen uses that the shared news card didn't need.
 
 from __future__ import annotations
 
-GENERAL_NEWS_CSS = """
+from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS
+
+# COMPACT_FANTASY_ASSET_CSS (avatar + name chip, no value/role) is the same
+# player-identity primitive Waivers/Trade Hub/My Team/GM Targets/Dashboard
+# League Insights already render with (compact_fantasy_assets.compact_asset_html)
+# -- reused here rather than invented, for a news item resolved to exactly
+# one player (modules.news.general_news_feed). It is its own class family
+# (.dg-compact-asset*), separate from .dg-football-asset / .player-avatar,
+# so it does not inherit either of those surfaces' size tokens.
+GENERAL_NEWS_CSS = COMPACT_FANTASY_ASSET_CSS + """
 .news-date-header{color:var(--color-text-secondary);font-size:.78rem;font-weight:800;letter-spacing:.04em;margin:1.1rem 0 .4rem;text-transform:uppercase}
 .news-date-header:first-of-type{margin-top:.2rem}
 /* Mobile's NewsRow wraps the whole row in a TouchableOpacity (full-card tap
@@ -36,4 +45,9 @@ GENERAL_NEWS_CSS = """
    row's own accent color, so this forces the icon to inherit the inline
    accent color set on news-group-label instead. */
 .news-group-header .dg-glyph{color:inherit!important;margin-right:0}
+/* The identity chip sits between the title row and the summary. Its own
+   component CSS already sizes the avatar off --size-asset-standard (not
+   the roster-core/.player-avatar tokens that leaked oversized elsewhere
+   tonight), so this only adds row spacing -- no size override needed. */
+.news-card-identity{margin:.4rem 0}
 """

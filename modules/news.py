@@ -256,7 +256,84 @@ def friendly_news_source(raw_source: str) -> str:
     return match.group(1) if match else str(raw_source or "")
 
 
-def general_news_feed(limit: int = 30) -> list:
+PLAYERS_DB_PATH = "data/players.db"
+
+
+def _general_feed_players_universe():
+    """The full data/players.db universe, loaded independently of any
+    session/league state.
+
+    scripts/audit_context_integrity.py's news_is_general_not_league_scoped
+    check exists precisely because this page must stay the same for every
+    reader — using a caller's session-specific, league-settings-dependent
+    valuation frame (app.py's df_players) here would quietly re-couple a
+    deliberately general, non-roster-scoped surface to whichever league a
+    given browser tab happens to have selected. modules.rankings.load_players
+    already process-caches by a source fingerprint, so repeat calls across
+    Streamlit reruns are cheap."""
+
+    try:
+        from modules import rankings
+
+        return rankings.load_players(PLAYERS_DB_PATH)
+    except Exception:
+        return None
+
+
+def _attach_general_news_player_identity(items: list, players_df) -> list:
+    """Best-effort, fail-closed player identity for the general feed.
+
+    The general feed is RSS-sourced and never carries a player_id — unlike
+    the roster-scoped surfaces (my_news.matched_player / Alerts'
+    matched_player_id), nothing upstream tells us which article is about
+    which player. This resolves it the same way Alerts/Dashboard already
+    do for roster-scoped articles: news_intelligence.resolve_article_player_
+    identity scans the whole player-name index and only returns a match
+    when exactly one player is named in the article text — a team-level
+    story ("Team X fires OC") or a two-player trade ("A traded for B")
+    yields zero or two candidates and is left alone rather than guessed.
+    Matches the matched_player / matched_player_id naming already used by
+    modules.my_news and mobile's AlertsScreen so this stays one convention,
+    not a second one.
+    """
+
+    if players_df is None or getattr(players_df, "empty", True):
+        return items
+
+    from modules import alert_presentation, news_intelligence
+
+    name_index = news_intelligence.canonical_player_name_index(players_df)
+    if not name_index:
+        return items
+
+    for item in items:
+        matched_name, matched_id = news_intelligence.resolve_article_player_identity(
+            item, player_name_to_id=name_index
+        )
+        if matched_id:
+            item["matched_player"] = matched_name
+            item["matched_player_id"] = matched_id
+
+    matched_indices = [idx for idx, item in enumerate(items) if item.get("matched_player_id")]
+    if not matched_indices:
+        return items
+
+    # Reuses Alerts' own position/team lookup (alert_presentation.
+    # attach_player_identity_fields) rather than a second subset-lookup —
+    # it keys off "player_id", so the matched id is passed under that name
+    # and the matched_player_position/matched_player_team fields it returns
+    # are copied back onto the real item by index.
+    lookup_rows = [{"player_id": items[idx]["matched_player_id"]} for idx in matched_indices]
+    enriched_rows = alert_presentation.attach_player_identity_fields(lookup_rows, players_df=players_df)
+    for idx, info in zip(matched_indices, enriched_rows):
+        if info.get("matched_player_position"):
+            items[idx]["matched_player_position"] = info["matched_player_position"]
+        if info.get("matched_player_team"):
+            items[idx]["matched_player_team"] = info["matched_player_team"]
+    return items
+
+
+def general_news_feed(limit: int = 30, *, players_df=None) -> list:
     """Curated general NFL fantasy news (injury/role/transaction/off-field
     signal only) — not roster-scoped, a league-wide feed for anyone, not
     "your team's" news. Deduplicated by link, newest first, capped at
@@ -267,6 +344,15 @@ def general_news_feed(limit: int = 30) -> list:
     services/mobile_api_service.py's GET /v1/news performs, so this is the
     web counterpart to mobile's NewsScreen (mobile/src/screens/NewsScreen.tsx)
     rather than a second, drifting implementation.
+
+    Each item also resolves ``matched_player`` / ``matched_player_id`` (+
+    position/team) when the article text names exactly one player, so
+    presentation can attach an identity chip — see
+    ``_attach_general_news_player_identity``. Resolved against the full,
+    session-independent players.db universe (``_general_feed_players_universe``),
+    never a caller's league-scoped valuation frame; pass ``players_df``
+    only to override that for a test. No match (ambiguous, or no player
+    named) leaves the item exactly as before: plain text only.
     """
 
     limit = max(1, min(int(limit or 1), MAX_GENERAL_NEWS_LIMIT))
@@ -293,7 +379,11 @@ def general_news_feed(limit: int = 30) -> list:
         items.append(projected)
         if len(items) >= limit:
             break
-    return items
+    if not items:
+        return items
+    if players_df is None:
+        players_df = _general_feed_players_universe()
+    return _attach_general_news_player_identity(items, players_df)
 
 
 def _load_roster_cache():

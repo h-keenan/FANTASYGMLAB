@@ -3033,13 +3033,24 @@ def _news() -> None:
     now = 1_787_600_000.0
     fixture_items = [
         {
-            "title": "Star RB downgraded to out after Friday's final practice report",
+            # Single, clear player -> an identity chip renders (modules.
+            # news.general_news_feed would resolve this the same way via
+            # news_intelligence.resolve_article_player_identity against the
+            # real data/players.db row for Justin Jefferson, player_id
+            # 6794). Fixture sets the already-resolved fields directly
+            # since this harness renders a hardcoded item list rather than
+            # calling general_news_feed's live RSS/classification pipeline.
+            "title": "Justin Jefferson downgraded to out after Friday's final practice report",
             "link": "https://example.com/fixture/news-injury-1",
             "source": "ESPN",
-            "summary": "The team ruled him out for Sunday's game with an ankle injury suffered in Wednesday's practice.",
+            "summary": "The Vikings ruled Jefferson out for Sunday's game with an ankle injury suffered in Wednesday's practice.",
             "published_ts": now - 2 * 3600,
             "event_type": "injury/status",
             "speculative": False,
+            "matched_player": "Justin Jefferson",
+            "matched_player_id": "6794",
+            "matched_player_position": "WR",
+            "matched_player_team": "MIN",
         },
         {
             "title": "Backup corner elevated after starter's late scratch",
@@ -3051,10 +3062,17 @@ def _news() -> None:
             "speculative": True,
         },
         {
-            "title": "Veteran receiver traded to contender ahead of the deadline",
+            # Two named players, not one -> no identity chip by design.
+            # news_intelligence.resolve_article_player_identity fails
+            # closed (returns no match) once an article names more than
+            # one player, the same way it already does for Alerts/
+            # Dashboard, rather than guessing which one the story is
+            # "about". Davante Adams and DeAndre Hopkins are both real
+            # data/players.db rows; no matched_player_id is set here.
+            "title": "Davante Adams and DeAndre Hopkins swap teams in deadline-day blockbuster",
             "link": "https://example.com/fixture/news-transaction-1",
             "source": "RotoWire",
-            "summary": "The move reshapes the receiver room on both sides of the deal.",
+            "summary": "The move reshapes both receiver rooms on either side of the trade.",
             "published_ts": now - 6 * 3600,
             "event_type": "transaction",
             "speculative": False,
