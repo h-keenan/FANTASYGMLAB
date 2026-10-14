@@ -64,8 +64,15 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
    .tvl-edge/.tvl-edge--pos/neg/even polarity rules, which it was
    unconditionally overriding to green for every polarity (pre-existing;
    surfaced once the Top Priority card turned the number into a pill, where
-   green text on a red "overpay" pill reads as a real bug). */
-.dg-gp-value-edge{font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin-top:var(--space-2xs);max-width:40rem}
+   green text on a red "overpay" pill reads as a real bug).
+   No `margin-top` here either (removed): the give/get row and the metrics
+   row are both direct children of .dg-game-plan-card, which already sets
+   `gap:var(--space-sm)` between every one of its children — this element's
+   own margin-top used to stack on top of that card-level gap (plus
+   .dg-gp-trade-metrics's own redundant margin-top below) and pushed this
+   specific transition to 12px while the rest of the card keeps an 8px
+   rhythm. */
+.dg-gp-value-edge{font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);max-width:40rem}
 .dg-compact-asset-meta--pill{align-items:center;column-gap:var(--space-2xs);display:inline-flex;flex-wrap:wrap}
 .dg-compact-asset-team{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 @media (min-width:700px){
@@ -602,7 +609,18 @@ def game_plan_top_priority_trade_html(presentation: Mapping[str, Any] | None) ->
     get_html = compact_asset_stack_html(
         receive, size="compact", show_value=False, position_pill=True, avatar_ring=True
     )
-    edge_html = value_edge_html(presentation.get("value_edge"), extra_class="dg-gp-value-edge")
+    # show_unit=True only here: this is the specific card the product owner
+    # flagged as showing a bare, unlabeled number ("-1028") with no visible
+    # unit — the route CSS also turns this number into a filled pill on
+    # `justify-content: space-between`, which can put real distance between
+    # it and the "TRADE VALUE / <band>" caption, so the unit travels with
+    # the digits themselves. game_plan_trade_visual_html below keeps the
+    # default (no visible unit) since its cap/number stay adjacent in a
+    # normal wrapping flex row and its own regression tests expect
+    # byte-identical output.
+    edge_html = value_edge_html(
+        presentation.get("value_edge"), extra_class="dg-gp-value-edge", show_unit=True
+    )
     conf_html = confidence_segments_html(presentation.get("confidence"))
     metrics = ""
     if edge_html or conf_html:

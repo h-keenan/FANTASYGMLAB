@@ -24,6 +24,7 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-edge--neg .tvl-edge-dir{border-color:currentColor transparent transparent transparent;border-width:.42rem .28rem 0 .28rem}
 .tvl-edge--even .tvl-edge-dir{background:currentColor;border:0;height:2px;width:.55rem}
 .tvl-edge-num{font:var(--type-card-title);font-weight:var(--font-weight-display);letter-spacing:-.02em;line-height:1}
+.tvl-edge-unit{color:var(--color-text-muted);font:var(--type-supporting-metadata);font-weight:var(--font-weight-body);letter-spacing:normal}
 .tvl-edge-cap{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 .tvl-edge-mark{background:var(--color-border);display:inline-flex;flex:1 1 7rem;height:4px;min-width:4rem;overflow:hidden}
 .tvl-edge-mark>span{background:currentColor;display:block;height:100%;width:var(--tvl-edge-magnitude,36%)}
@@ -77,7 +78,12 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-tier{background:var(--color-surface-secondary);border-radius:var(--radius-pill);color:var(--color-text-secondary);display:inline-flex;font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);padding:2px var(--space-xs);text-transform:uppercase;white-space:nowrap}
 .dg-gp-trade-side--give,.dg-trade-side--send,.toa-side-send{border-inline-start:var(--border-width-semantic) solid var(--color-danger);padding-inline-start:var(--space-xs)}
 .dg-gp-trade-side--get,.dg-trade-side--receive,.toa-side-receive{border-inline-start:var(--border-width-semantic) solid var(--color-success);padding-inline-start:var(--space-xs)}
-.dg-gp-trade-metrics{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-top:var(--space-2xs);max-width:40rem}
+/* No `margin-top` here (removed): this sits as a direct child of
+   .dg-game-plan-card, whose own `gap:var(--space-sm)` already spaces every
+   child 8px apart. This rule's own margin-top used to add on top of that
+   card-level gap, stretching the give/get-to-metrics transition past the
+   rest of the card's rhythm. */
+.dg-gp-trade-metrics{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-sm);max-width:40rem}
 /* Three-segment confidence bar (mobile NextMoveScreen parity) — a strict
    count of filled/unfilled blocks from confidence_filled_segments(), never a
    numeric percentage; deliberately one uniform fill color (not per-level,
@@ -214,7 +220,18 @@ def exchange_marker_html(*, extra_class: str = "") -> str:
     )
 
 
-def value_edge_html(value: object, *, extra_class: str = "") -> str:
+def value_edge_html(value: object, *, extra_class: str = "", show_unit: bool = False) -> str:
+    """``show_unit`` (opt-in, default off so every existing caller — Trade
+    Hub, Trade Analyzer, Live Draft, recommendation_trust_ux — renders
+    byte-identical to before) appends a small, visible "value" suffix inside
+    the number itself. The existing ``.tvl-edge-cap`` caption ("TRADE VALUE /
+    <band>") already names the metric, but it is a separate flex child that
+    can wrap away from the number (and, on the Dashboard Top Priority card,
+    sits on the opposite end of a `justify-content: space-between` row from
+    it) — this keeps a unit attached to the digits themselves for callers
+    whose number otherwise reads as an unexplained bare integer.
+    """
+
     label, polarity = parse_signed_edge(value)
     if not str(value or "").strip() and label == "Even":
         return ""
@@ -226,13 +243,14 @@ def value_edge_html(value: object, *, extra_class: str = "") -> str:
     magnitude_percent = 20 if polarity == "even" else round(min(100.0, 14.0 + (magnitude / 1500.0) * 86.0), 1)
     direction = "favorable" if polarity == "pos" else "unfavorable" if polarity == "neg" else "even"
     band = trade_value_band(value)
+    unit_html = "<span class='tvl-edge-unit'> value</span>" if show_unit and label != "Even" else ""
     return (
         f"<div class='{classes}' data-tvl-edge='{polarity}' "
         f"style='--tvl-edge-magnitude:{magnitude_percent}%' "
         f"aria-label='Value difference {escape(label)}, {direction}; trade value {escape(band)}'>"
         f"<span class='tvl-edge-cap'>TRADE VALUE / {escape(band.upper())}</span>"
         "<span class='tvl-edge-dir' aria-hidden='true'></span>"
-        f"<strong class='tvl-edge-num'>{escape(label)}</strong>"
+        f"<strong class='tvl-edge-num'>{escape(label)}{unit_html}</strong>"
         "<span class='tvl-edge-mark' aria-hidden='true'><span></span></span>"
         f"<span class='tvl-sr'>{escape(label)} VALUE EDGE; {escape(band)} trade value</span>"
         "</div>"
