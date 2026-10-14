@@ -1062,10 +1062,25 @@ def render_home_command_tiles(
         player_row = item.get("player_row")
         if player_row is not None and hasattr(player_row, "get"):
             player_id = _safe_text(player_row.get("player_id")).strip()
-            recommendation_label = _safe_text(
-                item.get("recommendation_label"),
-                label,
-            )
+            explicit_recommendation_label = _safe_text(item.get("recommendation_label"))
+            recommendation_label = explicit_recommendation_label or label
+            # The player card's own prestige chip reads the player's valuation
+            # tier (resolve_player_card_primary_status), which intentionally
+            # mutes aspirational action words (Priority Add, Trade Target, ...)
+            # down to a neutral Hold tone so compact rows never overstate
+            # confidence -- see player_cards.PLAYER_CARD_PRESTIGE_STATUSES.
+            # That leaves the actual GM verdict this card exists to surface
+            # with no color at all. Render it as its own badge instead, the
+            # same ui_primitives.status_badge_html chip Waivers' own
+            # recommendation row and Trade Hub's asset rows already use for
+            # an action verdict, so the word does not just sit as flat text.
+            verdict_badge_html = ""
+            if explicit_recommendation_label:
+                from modules import ui_primitives
+
+                verdict_badge_html = ui_primitives.status_badge_html(
+                    explicit_recommendation_label, variant="opportunity"
+                )
             row_builder = compact_player_row_html or player_scan_card_html
             if compact_player_row_html:
                 player_card = row_builder(
@@ -1109,6 +1124,11 @@ def render_home_command_tiles(
                     else ""
                 )
                 + "</div>"
+                + (
+                    f"<div class='home-command-card-verdict'>{verdict_badge_html}</div>"
+                    if verdict_badge_html
+                    else ""
+                )
                 + player_card
                 + "</div>"
             )
