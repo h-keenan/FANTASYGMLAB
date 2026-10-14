@@ -31,7 +31,6 @@ from modules.football_asset_styles import FOOTBALL_ASSET_CSS
 from modules.player_cards import (
     injury_adjusted_value_html,
     player_prestige_level,
-    player_position_badge_html,
     player_team_age_meta,
 )
 from modules.player_tier_identity import resolve_player_tier_identity
@@ -1002,7 +1001,10 @@ def trade_asset_html(
         owner_team = _safe_text(asset.get("owner_team_name")).strip()
         if owner_team:
             meta_parts.append(f"Roster {owner_team}")
-        position_badge = player_position_badge_html(position, css_class="player-position-badge trade-asset-position-badge")
+        # Colored position pill (mobile PlayerIdentityRow parity) — this is
+        # what now lands inline in player_card_html's meta row via
+        # position_html below, not a plain-text badge.
+        position_badge = football_assets.position_badge_html(position)
         if compact:
             chips = []
             if health_context["risk"]:

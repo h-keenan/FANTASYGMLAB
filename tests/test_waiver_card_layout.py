@@ -38,10 +38,17 @@ def test_stacked_card_keeps_score_below_status_badge():
     )
     assert "dg-football-asset--stacked" in html
     assert html.index("dg-football-asset__name") < html.index("dg-football-asset__meta")
-    assert "QB · NO · Age 23" in html
+    # Mobile parity (PlayerIdentityRow.tsx metaRow): colored position badge
+    # first, team as plain text, no inline age -- same rule for stacked and
+    # non-stacked cards alike, so the old plain-text "QB · NO · Age 23" meta
+    # string and the stacked-only text-position carve-out are both gone.
+    assert html.index("dg-football-position--qb") < html.index("dg-football-asset__meta-team")
+    assert "player-position-badge" in html
+    assert ">QB<" in html
+    assert ">NO<" in html
+    assert "Age 23" not in html
     assert html.index("dg-football-asset__badges") < html.index("dg-football-asset__value")
     assert html.index("Best Available") < html.index("dg-football-asset__value")
-    assert "player-position-badge" not in html
     assert "title='Garrett Nussmeier'" in html
 
 

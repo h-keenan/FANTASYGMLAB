@@ -30,6 +30,8 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-asset__badges{display:flex;align-items:center;gap:var(--space-xs);flex-wrap:wrap;margin-top:var(--space-sm)}
 .dg-football-asset__name{margin:var(--space-xs) 0 0;font:var(--font-card-title);overflow-wrap: break-word;word-break: normal;hyphens:none}
 .dg-football-asset__meta,.dg-football-asset__insight{margin:var(--space-xs) 0 0;color:var(--color-text-muted);font-size:var(--font-size-caption)}
+.dg-football-asset__meta--pill{align-items:center;column-gap:var(--space-2xs);display:inline-flex;flex-wrap:wrap}
+.dg-football-asset__meta-team{color:var(--color-text-muted);font-size:var(--font-size-caption)}
 .dg-football-asset__value{text-align:right;font-variant-numeric:tabular-nums}
 .dg-football-asset--stacked{align-items:start;grid-template-columns:auto minmax(0, 1fr)}
 .dg-football-asset--stacked .dg-football-asset__value{grid-column:auto;justify-self:stretch;margin-top:var(--space-sm);text-align:left}

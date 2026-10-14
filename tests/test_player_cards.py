@@ -234,7 +234,14 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn("Value 74", html)
         self.assertIn("player-position-badge", html)
         self.assertIn(">RB<", html)
-        self.assertIn("SEA · Age 23", html)
+        # Mobile parity (PlayerIdentityRow.tsx metaRow): colored position
+        # badge first, team as plain text immediately after, no inline age.
+        self.assertLess(
+            html.index("dg-football-position--rb"),
+            html.index("dg-football-asset__meta-team"),
+        )
+        self.assertIn(">SEA<", html)
+        self.assertNotIn("Age 23", html)
         self.assertNotIn("RB | SEA | Age 23", html)
         self.assertIn("Clear surplus player with market value.", html)
         self.assertIn("data-player-id='player-row'", html)
@@ -295,7 +302,12 @@ class TestPlayerCards(unittest.TestCase):
 
         self.assertIn("player-position-badge", html)
         self.assertIn(">WR<", html)
-        self.assertIn("CAR · Age 24", html)
+        self.assertLess(
+            html.index("dg-football-position--wr"),
+            html.index("dg-football-asset__meta-team"),
+        )
+        self.assertIn(">CAR<", html)
+        self.assertNotIn("Age 24", html)
         self.assertNotIn("WR/RB | WR | CAR", html)
         self.assertNotIn("WR | CAR | Age 24", html)
 
@@ -629,10 +641,13 @@ class TestPlayerCards(unittest.TestCase):
         # "name, ring, overall, position, that's really it") — matches
         # mobile's MyTeamScreen LineupRow, which never renders age or a
         # reason/"why" line and pairs the tier ring with a real OVR badge.
-        # Every other compact-row caller is unaffected: these three flags
-        # default to the prior always-on behavior (see the test above,
-        # test_compact_player_row_renders_metadata_reason_and_tap, which
-        # still asserts "SEA · Age 23" with no flags passed).
+        # `show_age`/`show_reason`/`show_overall_rating` still default to the
+        # prior always-on behavior for every other compact-row caller (see
+        # test_compact_player_row_renders_metadata_reason_and_tap above) --
+        # though `show_age` is now a no-op for the identity/meta line itself
+        # sitewide (age never renders there regardless; see
+        # football_assets.player_card_html's mobile-parity comment), so this
+        # test only still demonstrates the reason/OVR-badge half of the trim.
         html = player_cards.compact_player_row_html(
             {
                 "player_id": "player-row",
