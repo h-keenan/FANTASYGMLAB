@@ -54,8 +54,9 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-2xs);text-transform:uppercase}
 .dg-gp-identity-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);max-width:40rem;min-width:0}
 .dg-gp-watch-list{display:flex;flex-direction:column;gap:var(--space-xs);justify-content:start;max-width:40rem;min-width:0;width:max-content}
-.dg-gp-trade-visual{align-items:stretch;display:grid;gap:var(--space-xs);grid-template-columns:minmax(0,1fr);justify-content:start;max-width:40rem;min-width:0;width:max-content}
-.dg-gp-trade-side{display:grid;gap:var(--space-2xs);justify-items:start;min-width:0}
+.dg-gp-trade-visual{align-items:stretch;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);max-width:40rem;min-width:0;width:100%}
+.dg-gp-trade-side{display:grid;gap:var(--space-2xs);justify-items:start;min-width:0;width:100%}
+.dg-gp-trade-side .dg-compact-asset-stack,.dg-gp-trade-side .dg-compact-asset{width:100%}
 .dg-gp-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-transform:uppercase}
 .dg-gp-trade-for{align-self:center;color:var(--color-information);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0;text-align:center;text-transform:uppercase}
 /* No `color` here: this is only a layout hook (``value_edge_html``'s
@@ -70,7 +71,7 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 @media (min-width:700px){
 .dg-trade-matchup{align-items:start;grid-template-columns:minmax(0,max-content) 1.5rem minmax(0,max-content);justify-content:start}
 .dg-trade-matchup-vs{display:flex}
-.dg-gp-trade-visual{align-items:center;column-gap:var(--space-md);grid-template-columns:minmax(0,max-content) auto minmax(0,max-content);justify-content:start}
+.dg-gp-trade-visual{align-items:center;column-gap:var(--space-md);grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
 }
 @media (max-width:760px){
 .dg-compact-asset:not(.dg-compact-asset--chip):not(.dg-compact-asset--standard){grid-template-columns:var(--size-asset-compact) minmax(0,1fr) max-content;width:100%}

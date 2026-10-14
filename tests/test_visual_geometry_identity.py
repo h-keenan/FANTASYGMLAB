@@ -92,9 +92,14 @@ def test_game_plan_trade_visual_is_give_for_get_package():
     get_at = html.index("dg-gp-trade-side--get")
     assert give_at < for_at < get_at
     css = compact.COMPACT_FANTASY_ASSET_CSS.replace(" ", "")
-    assert "grid-template-columns:minmax(0,max-content)autominmax(0,max-content)" in css
+    # Give/get columns split the row evenly (1fr each) instead of shrinking
+    # to max-content — coridian_ 2026-10-14 flagged the old max-content
+    # columns leaving the give/get identity hugging the left edge while the
+    # rest of the (full-width, uncapped) card sat empty to its right at
+    # realistic phone widths. The whole module still caps at max-width:40rem
+    # so it never stretches unreasonably wide on desktop.
+    assert "grid-template-columns:minmax(0,1fr)autominmax(0,1fr)" in css
     assert "max-width:40rem" in css
-    assert "width:max-content" in css
     assert "justify-content:space-between" not in css
 
 
