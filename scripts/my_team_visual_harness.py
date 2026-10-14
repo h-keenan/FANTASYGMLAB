@@ -201,6 +201,76 @@ BENCH = pd.DataFrame(
     ]
 )
 
+# Real data/players.db rows (name + value_score + opportunity_explanation
+# verbatim) reproducing coridian_'s 2026-10-13 production screenshot of
+# Hold Candidates exactly — these three names ("Jalen Coker", "Jaylen
+# Wright", "Ty Simpson") are the ones he reported as clipped on their
+# first character ("alen Coker", "ylen Wright", "y Simpson").
+HOLD_CANDIDATES = pd.DataFrame(
+    [
+        {
+            "player_id": "11646",
+            "name": "Jalen Coker",
+            "position": "WR",
+            "team": "CAR",
+            "age": 24,
+            "slot": "WR",
+            "value_score": 2888,
+            "player_tier": "Development",
+            "opportunity_label": "Strong Opportunity",
+            "opportunity_explanation": (
+                "Player sits second on the depth chart without a locked "
+                "starting role. Usage corroboration: WR targets/g=7.3."
+            ),
+            "canonical_overall_rank": 140,
+            "canonical_position_rank": 54,
+            "injury_level": "minor",
+            "status": "",
+            "injury_status": "Questionable",
+        },
+        {
+            "player_id": "11643",
+            "name": "Jaylen Wright",
+            "position": "RB",
+            "team": "MIA",
+            "age": 23,
+            "slot": "RB",
+            "value_score": 2617,
+            "player_tier": "Development",
+            "opportunity_label": "Strong Opportunity",
+            "opportunity_explanation": (
+                "Player sits second on the depth chart — rotation/committee "
+                "access. Usage corroboration: RB touches/g=3.5."
+            ),
+            "canonical_overall_rank": 158,
+            "canonical_position_rank": 61,
+            "injury_level": "healthy",
+            "status": "",
+            "injury_status": "",
+        },
+        {
+            "player_id": "13275",
+            "name": "Ty Simpson",
+            "position": "QB",
+            "team": "LAR",
+            "age": 23,
+            "slot": "QB",
+            "value_score": 1131,
+            "player_tier": "Replacement",
+            "opportunity_label": "Backup With Upside",
+            "opportunity_explanation": (
+                "Player is buried on the current depth chart. Injury risk "
+                "is pulling down short-term workload confidence."
+            ),
+            "canonical_overall_rank": 240,
+            "canonical_position_rank": 68,
+            "injury_level": "healthy",
+            "status": "",
+            "injury_status": "",
+        },
+    ]
+)
+
 
 def main() -> None:
     st.set_page_config(
@@ -252,6 +322,23 @@ def main() -> None:
             show_age=False,
             show_reason=False,
             show_overall_rating=True,
+        )
+    st.markdown("#### Roster Decisions")
+    with st.container(key="my_team_decisions_hold"):
+        app.render_player_scan_cards(
+            HOLD_CANDIDATES,
+            score_field="value_score",
+            title="Hold Candidates",
+            note="Low-value players still worth protecting because of upside, need, or roster context.",
+            max_items=len(HOLD_CANDIDATES),
+            status_label="Hold",
+            compact=True,
+            show_inline_reason=True,
+            enable_quick_view=False,
+            show_header=False,
+            design_system=True,
+            show_prestige=False,
+            reason_limit=90,
         )
 
 
