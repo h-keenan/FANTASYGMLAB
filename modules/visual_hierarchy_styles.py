@@ -6,8 +6,7 @@ VISUAL_HIERARCHY_CSS = """
    Do not reintroduce shell padding/height/border here. */
 
 /* Section headers orient; they must not overpower primary decisions. */
-.dg-ui-section-header,
-.section-header {
+.dg-ui-section-header {
     margin-block: var(--space-lg) var(--space-sm) !important;
 }
 

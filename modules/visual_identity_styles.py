@@ -78,10 +78,6 @@ select {
 .summary-tile,
 .draft-team-card,
 .settings-card,
-.player-detail-panel,
-.player-detail-section,
-.player-quick-view-recommendation-card,
-.player-quick-view-detail-row,
 .player-quick-view-stat-row,
 [data-testid="stAlert"],
 div[data-testid="stExpander"]{
@@ -197,8 +193,7 @@ div[data-testid="stDialog"] [role="dialog"]{
     text-transform: uppercase;
 }
 
-.dg-ui-section-header,
-.section-header {
+.dg-ui-section-header {
     border-bottom: var(--border-width-default) solid var(--color-border);
     padding-bottom: var(--space-sm);
 }
@@ -241,7 +236,6 @@ div[data-testid="stDialog"] [role="dialog"] {
 }
 
 .dg-modal-header,
-.player-detail-header,
 .player-quick-view-header-band {
     background: var(--color-surface-secondary) !important;
     border-radius: var(--radius-none) !important;

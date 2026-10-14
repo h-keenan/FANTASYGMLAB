@@ -62,10 +62,12 @@ def test_dead_pqv_generations_are_gone_from_global_css():
         ".player-quick-view-headshot",
         ".player-quick-view-recommendation-copy",
         ".player-quick-view-recommendation-title",
+        # Never emitted by any real render path (CSS dead-rule audit pass 2,
+        # 2026-10); removed.
+        ".player-quick-view-recommendation-card",
     ):
         assert selector not in APP_CSS
     assert ".player-quick-view-shell" in APP_CSS
-    assert ".player-quick-view-recommendation-card" in APP_CSS
     assert ".player-quick-view-panel-body" in APP_CSS
 
 

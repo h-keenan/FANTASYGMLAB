@@ -51,12 +51,17 @@ def test_polish_module_loaded_before_overlay():
 def test_surface_levels_and_cta_tiers_present():
     polish = mobile_visual_polish_styles.MOBILE_VISUAL_POLISH_CSS
     for token in (
-        ".dg-surface-l0",
-        ".dg-surface-l1",
-        ".dg-surface-l2",
         "min-height:var(--touch-target-min)",
     ):
         assert token in polish.replace(" ", "")
+    # dg-surface-l0/l1/l2 were never emitted by any real render path (CSS
+    # dead-rule audit pass 2) and were removed; keep them out.
+    for token in (
+        ".dg-surface-l0",
+        ".dg-surface-l1",
+        ".dg-surface-l2",
+    ):
+        assert token not in polish.replace(" ", "")
     from modules.component_family_styles import COMPONENT_FAMILY_CSS
 
     family = COMPONENT_FAMILY_CSS.replace(" ", "")

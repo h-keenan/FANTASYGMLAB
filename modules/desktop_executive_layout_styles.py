@@ -144,7 +144,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     }
 
     .dg-ui-section-header,
-    .section-header,
     .home-action-center-label{
         margin-block: var(--dg-exec-section-gap) var(--space-sm) !important;
     }
@@ -245,14 +244,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     }
 }
 
-.section-header {
-    background: transparent !important;
-    border: 0 !important;
-    border-block-end: var(--border-width-default) solid var(--color-border) !important;
-    border-radius: var(--radius-none) !important;
-    box-shadow: none !important;
-    padding: 0 0 var(--space-sm) !important;
-}
 
 .summary-tile,
 .decision-panel,

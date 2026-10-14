@@ -405,13 +405,20 @@ class TestPlayerCards(unittest.TestCase):
         for selector in [
             ".dg-quick-view-panel.player-quick-view-shell",
             ".player-quick-view-header-band.player-quick-view-hero",
+            ".player-dossier-snapshot",
+        ]:
+            self.assertIn(selector, APP_CSS)
+
+        # player-quick-view-detail-list/row/label/value were never emitted by
+        # any real render path (CSS dead-rule audit pass 2, 2026-10) and were
+        # removed; keep them out.
+        for selector in [
             ".player-quick-view-detail-list",
             ".player-quick-view-detail-row",
             ".player-quick-view-detail-label",
             ".player-quick-view-detail-value",
-            ".player-dossier-snapshot",
         ]:
-            self.assertIn(selector, APP_CSS)
+            self.assertNotIn(selector, APP_CSS)
 
         # Streamlit renders the dialog landmark on a <section>, not a
         # <div> — the selector must stay tag-agnostic or it silently
@@ -420,9 +427,22 @@ class TestPlayerCards(unittest.TestCase):
         self.assertIn('div[data-testid="stDialog"] [role="dialog"]', APP_CSS)
         self.assertIn("border-radius: var(--radius-pill) !important", APP_CSS)
         self.assertIn("border-radius: 2px !important", APP_CSS)
-        self.assertIn("grid-template-columns: minmax(5.6rem, 0.36fr) minmax(0, 1fr)", APP_CSS)
 
     def test_quick_view_modal_uses_compact_2k_stat_table_rules(self):
+        for selector in [
+            ".player-quick-view-stat-section",
+            ".player-quick-view-stat-grid",
+            ".player-quick-view-stat-row",
+            'div[data-testid="stDialog"] .summary-tile-grid',
+            'div[data-testid="stDialog"] .player-detail-score-row',
+            'div[data-testid="stDialog"] .player-quick-view-stat-row',
+        ]:
+            self.assertIn(selector, APP_CSS)
+
+        # player-detail-panel/header/identity/row/stat-table/section and
+        # player-quick-view-recommendation-card were never emitted by any
+        # real render path (CSS dead-rule audit pass 2, 2026-10) and were
+        # removed, along with the comment that introduced them; keep them out.
         for selector in [
             ".player-detail-panel",
             ".player-detail-header",
@@ -430,18 +450,12 @@ class TestPlayerCards(unittest.TestCase):
             ".player-detail-row",
             ".player-detail-stat-table",
             ".player-detail-section",
-            ".player-quick-view-stat-section",
-            ".player-quick-view-stat-grid",
-            ".player-quick-view-stat-row",
             ".player-quick-view-recommendation-card",
-            'div[data-testid="stDialog"] .summary-tile-grid',
-            'div[data-testid="stDialog"] .player-detail-score-row',
             'div[data-testid="stDialog"] .player-quick-view-detail-row',
-            'div[data-testid="stDialog"] .player-quick-view-stat-row',
+            "Compact 2K player detail panels",
         ]:
-            self.assertIn(selector, APP_CSS)
+            self.assertNotIn(selector, APP_CSS)
 
-        self.assertIn("Compact 2K player detail panels", APP_CSS)
         self.assertIn("grid-template-columns: 1fr !important", APP_CSS)
         self.assertIn("grid-template-columns: minmax(5.25rem, 0.36fr) minmax(0, 1fr) !important", APP_CSS)
         self.assertIn("word-break: keep-all !important", APP_CSS)

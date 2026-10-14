@@ -23,7 +23,6 @@ INTERFACE_REIMAGINING_CSS = """
 }
 
 .dg-ui-section-header,
-.section-header,
 .waiver-section-header .dg-ui-section-header {
     align-items: end;
     border-bottom: var(--border-width-default) solid var(--color-border-strong) !important;

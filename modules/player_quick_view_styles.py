@@ -101,11 +101,6 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .pqv-bio-cell{display:grid;gap:2px;min-width:0}
 .pqv-bio-cell span{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .pqv-bio-cell strong{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
-.player-quick-view-detail-list{display:grid;gap:var(--space-sm);margin:0 0 var(--space-sm);max-width:48rem}
-.player-quick-view-detail-row{border-left:var(--border-width-semantic) solid var(--color-border-strong);display:grid;gap:2px;min-width:0;padding-left:var(--space-sm)}
-.player-quick-view-detail-label{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
-.player-quick-view-detail-value{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
-.player-quick-view-detail-note{color:var(--color-text-secondary);font-size:var(--font-size-caption);line-height:var(--line-height-caption);overflow-wrap:anywhere}
 .pqv-why-grid{display:grid;gap:var(--space-xs)}
 .pqv-why-factor{border-left:var(--border-width-semantic) solid var(--color-information);display:grid;gap:1px;min-width:0;padding-left:var(--space-sm)}
 .pqv-why-factor--fit{border-left-color:var(--color-opportunity)}
@@ -345,7 +340,7 @@ div[class*="st-key-pqv_actions_strip"]{max-width:54rem}
 .pqv-compact-model,.pqv-compact-career{display:grid;align-content:start;gap:var(--space-xs)}
 .pqv-model-summary-cell strong,.pqv-career-glance-cell strong{font-size:var(--font-size-card-title);line-height:var(--line-height-card)}
 .pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
-.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-summary,.pqv-model-summary,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
+.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-summary,.pqv-model-summary,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-model-matrix{max-width:none}
 .pqv-decision-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
 .pqv-glance-grid{grid-template-columns:repeat(6,minmax(4.5rem,6.5rem));justify-content:start}
 .pqv-model-matrix{grid-template-columns:repeat(5,minmax(0,1fr));max-width:56rem}

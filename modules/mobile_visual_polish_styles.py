@@ -1,9 +1,6 @@
 """Mobile visual hierarchy polish (#231/#236). Injected after APP_CSS (not concatenated into it)."""
 
 MOBILE_VISUAL_POLISH_CSS = """
-.dg-surface-l0{background:var(--color-bg)}
-.dg-surface-l1{background:var(--color-surface-primary);border:var(--border-width-default) solid var(--color-border)}
-.dg-surface-l2{background:var(--color-surface-raised);border:var(--border-width-default) solid var(--color-border-strong)}
 /* CTA / disclosure / deep-analysis geometry owned by component_family_styles */
 div[class*="st-key-decision_history"] [data-testid="stButton"] button{background:transparent!important;border:0!important;border-block-end:var(--border-width-default) solid var(--color-border)!important;border-radius:var(--radius-control)!important;color:var(--color-text-secondary)!important;min-height:var(--touch-target-min)!important;text-align:left!important}
 [class*="dashboard_deep_analysis_nav"]{height:auto!important;margin:0 0 var(--space-sm);min-height:0!important}

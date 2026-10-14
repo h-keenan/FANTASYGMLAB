@@ -85,8 +85,7 @@ div[data-testid="stDialog"] h2 {
 }
 /* stPopover triggers: executive command rail owned by EXECUTIVE_COMMAND_HEADER_CSS. */
 
-.dg-ui-section-header,
-.section-header {
+.dg-ui-section-header {
     margin: var(--space-lg) 0 var(--space-sm) !important;
 }
 
@@ -129,8 +128,7 @@ div[data-testid="stDialog"] h2 {
         max-height: calc(100dvh - (4 * var(--space-md))) !important;
     }
 
-    .dg-ui-section-header,
-    .section-header {
+    .dg-ui-section-header {
         margin-top: var(--space-md) !important;
     }
 
