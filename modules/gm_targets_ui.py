@@ -34,6 +34,16 @@ div[class*="st-key-dg_gm_targets_group_untouchable"]{border-inline-start:var(--b
 .dg-gm-target-card:last-of-type{border-block-end:0}
 .dg-gm-target-top{align-items:flex-start;display:flex;gap:var(--space-sm);justify-content:space-between}
 .dg-gm-target-identity{align-items:center;display:flex;flex:1 1 auto;gap:var(--space-sm);min-width:0}
+/* GM Targets is the one caller of player_profile_ui.avatar_html() that never
+   scoped its own --avatar-size, so above the 700px breakpoint (where the
+   shared app_styles.py mobile media query is not in effect) the row fell
+   through to the bare .player-avatar default of 116px — about 2.5x every
+   sibling compact row (Trade Hub's trade-asset-row at 3.5rem, Waivers'
+   snapshot avatar at the standard 2.75rem crop). Matches Trade Hub's
+   established compact-row size so this watchlist reads as the same density
+   class of card, not an oversized outlier. The existing sub-700px rule in
+   app_styles.py already handles the narrow-viewport case and is untouched. */
+@media (min-width:701px){.dg-gm-target-identity .player-avatar{--avatar-size:3.5rem}}
 .dg-gm-target-body{display:flex;flex-direction:column;gap:var(--space-2xs)}
 .dg-gm-target-meta{color:var(--color-text-muted);font:var(--type-supporting-metadata)}
 .dg-gm-target-name{color:var(--color-text-primary);font:var(--font-card-title)}
