@@ -247,8 +247,68 @@ def test_analyzer_result_reuses_trade_grammar_without_changing_verdict():
     send_at = html.index("You send")
     assert send_at < html.index(">FOR<") < html.index("You receive")
     assert "Why this works" in html
+    # Single value bar, not two: the badge's own inline magnitude mark used to
+    # render alongside the full lean bar, producing two separate,
+    # conflicting track+fill bars stacked on top of each other. The lean bar
+    # (tvl-lean-track, asserted above) is now the only bar; the badge's
+    # tvl-edge-mark must not also appear.
+    assert "tvl-edge-mark" not in html
+    assert html.count("tvl-lean-track") == 1
+    # Confidence reads as one consistent row in the Why/Confidence/Risk list
+    # (accent bar + bold caps kicker), not a bare ring wedged between two
+    # differently-treated cue rows.
+    assert "tvl-cue--confidence" in html
+    assert ">Confidence<" in html
+    assert "tvl-cue--risk" in html
+    why_at = html.index("Why this works")
+    confidence_at = html.index("tvl-cue--confidence")
+    risk_at = html.index("tvl-cue--risk")
+    assert why_at < confidence_at < risk_at
     ui = (ROOT / "modules" / "trade_analyzer_ui.py").read_text(encoding="utf-8")
     assert "st.columns(2)" in ui
+
+
+def test_trade_hub_idea_card_also_has_single_value_bar():
+    """Trade Hub's idea summary card shares value_edge_html + the lean bar
+    with Trade Analyzer's verdict card (same duplicate-bar bug), so the fix
+    there — suppressing the badge's own inline mark whenever the full lean
+    bar is also shown — applies here too.
+    """
+
+    edge = tvl.value_edge_html("+160", show_magnitude_mark=False)
+    assert "tvl-edge-mark" not in edge
+    assert "tvl-edge" in edge
+    # Default behavior is unchanged for every caller that has no lean bar.
+    default_edge = tvl.value_edge_html("+160")
+    assert "tvl-edge-mark" in default_edge
+    source = (ROOT / "modules" / "trade_hub_ui.py").read_text(encoding="utf-8")
+    assert "value_edge_html(delta_text, show_magnitude_mark=False)" in source
+
+
+def test_confidence_cue_matches_why_risk_treatment_without_breaking_other_callers():
+    cue = tvl.confidence_cue_html("High")
+    assert "tvl-cue tvl-cue--confidence tvl-cue--confidence-high" in cue
+    assert "tvl-cue-kicker" in cue
+    assert ">Confidence<" in cue
+    # The ring survives inside the new shell — this adds a heading/accent-bar
+    # wrapper, it does not drop the existing confidence semantics.
+    assert "tvl-conf-ring" in cue
+    assert "tvl-conf--high" in cue
+    # No "CONFIDENCE" stutter: the cue's own kicker already says it, so the
+    # ring's inline label drops its "CONFIDENCE / " prefix inside this shell.
+    assert "CONFIDENCE /" not in cue
+    assert ">High<" in cue
+    # Accessible text keeps the full phrase even though the visible label
+    # dropped the prefix.
+    assert "title=\"High confidence\"" in cue or "title='High confidence'" in cue
+    assert tvl.confidence_cue_html("") == ""
+    # Every other confidence_indicator_html call site (Trade Hub's standalone
+    # block, recommendation_trust_ux.py's inline verdict-line placement, GM
+    # Plan) is untouched — this is a new, additive function, not a change to
+    # confidence_indicator_html's own default rendering.
+    plain = tvl.confidence_indicator_html("High")
+    assert "tvl-cue" not in plain
+    assert "CONFIDENCE / High" in plain
 
 
 def test_share_card_v2_keeps_canonical_renderer_and_confidence_text():

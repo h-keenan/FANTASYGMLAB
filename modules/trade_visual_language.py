@@ -55,8 +55,15 @@ TRADE_VISUAL_LANGUAGE_CSS = """
 .tvl-cue--action .tvl-cue-mark{background:var(--color-action);border-radius:0}
 .tvl-cue--action .tvl-cue-kicker{color:var(--color-action)}
 .tvl-cue--fit .tvl-cue-mark{background:transparent;border:2px solid var(--color-information);border-radius:0;box-sizing:border-box}
+.tvl-cue--confidence-high{border-inline-start-color:var(--color-success)}
+.tvl-cue--confidence-high .tvl-cue-mark{background:var(--color-success);border-radius:0}
+.tvl-cue--confidence-high .tvl-cue-kicker{color:var(--color-success)}
+.tvl-cue--confidence-low{border-inline-start-color:var(--color-warning)}
+.tvl-cue--confidence-low .tvl-cue-mark{background:var(--color-warning);border-radius:0}
+.tvl-cue--confidence-low .tvl-cue-kicker{color:var(--color-warning)}
 .tvl-cue-kicker{color:var(--color-text-muted);font:var(--type-supporting-metadata);grid-column:2;letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .tvl-cue-body{color:var(--color-text-secondary);font:var(--type-supporting-metadata);grid-column:2;line-height:var(--line-height-body);margin:0}
+.tvl-cue-body--confidence{margin-top:var(--space-2xs)}
 .trade-exec-support-grid{display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);margin-top:var(--space-sm)}
 .tvl-count{display:inline-flex;gap:3px;margin-inline-start:var(--space-2xs);vertical-align:middle}
 .tvl-count>span{background:var(--color-text-muted);border-radius:50%;height:5px;width:5px}
@@ -220,7 +227,13 @@ def exchange_marker_html(*, extra_class: str = "") -> str:
     )
 
 
-def value_edge_html(value: object, *, extra_class: str = "", show_unit: bool = False) -> str:
+def value_edge_html(
+    value: object,
+    *,
+    extra_class: str = "",
+    show_unit: bool = False,
+    show_magnitude_mark: bool = True,
+) -> str:
     """``show_unit`` (opt-in, default off so every existing caller — Trade
     Hub, Trade Analyzer, Live Draft, recommendation_trust_ux — renders
     byte-identical to before) appends a small, visible "value" suffix inside
@@ -230,6 +243,18 @@ def value_edge_html(value: object, *, extra_class: str = "", show_unit: bool = F
     sits on the opposite end of a `justify-content: space-between` row from
     it) — this keeps a unit attached to the digits themselves for callers
     whose number otherwise reads as an unexplained bare integer.
+
+    ``show_magnitude_mark`` controls this badge's own inline ``.tvl-edge-mark``
+    bar. Pass ``False`` when the caller also renders
+    ``value_edge_lean_bar_html()`` right after this badge (Trade Hub's idea
+    cards, Trade Analyzer's verdict card): both bars encode the same
+    magnitude signal from the same number, and showing both produced two
+    separate, visually conflicting track+fill bars stacked on top of each
+    other — the inline mark wrapping onto its own line inside this flex-wrap
+    badge, and the full-width lean bar directly under it — instead of one
+    coherent meter. Callers with no lean bar (Live Draft's evaluator, GM
+    Plan's Top Priority card, the executive trade detail view) keep the
+    default: this inline mark is their only magnitude indicator.
     """
 
     label, polarity = parse_signed_edge(value)
@@ -244,6 +269,11 @@ def value_edge_html(value: object, *, extra_class: str = "", show_unit: bool = F
     direction = "favorable" if polarity == "pos" else "unfavorable" if polarity == "neg" else "even"
     band = trade_value_band(value)
     unit_html = "<span class='tvl-edge-unit'> value</span>" if show_unit and label != "Even" else ""
+    mark_html = (
+        "<span class='tvl-edge-mark' aria-hidden='true'><span></span></span>"
+        if show_magnitude_mark
+        else ""
+    )
     return (
         f"<div class='{classes}' data-tvl-edge='{polarity}' "
         f"style='--tvl-edge-magnitude:{magnitude_percent}%' "
@@ -251,13 +281,26 @@ def value_edge_html(value: object, *, extra_class: str = "", show_unit: bool = F
         f"<span class='tvl-edge-cap'>TRADE VALUE / {escape(band.upper())}</span>"
         "<span class='tvl-edge-dir' aria-hidden='true'></span>"
         f"<strong class='tvl-edge-num'>{escape(label)}{unit_html}</strong>"
-        "<span class='tvl-edge-mark' aria-hidden='true'><span></span></span>"
+        f"{mark_html}"
         f"<span class='tvl-sr'>{escape(label)} VALUE EDGE; {escape(band)} trade value</span>"
         "</div>"
     )
 
 
-def confidence_indicator_html(label: object, *, extra_class: str = "") -> str:
+def confidence_indicator_html(
+    label: object,
+    *,
+    extra_class: str = "",
+    show_caption_prefix: bool = True,
+) -> str:
+    """``show_caption_prefix`` (default on, unchanged for every existing
+    caller) controls the visible ``CONFIDENCE / `` prefix on the ring's own
+    label. ``confidence_cue_html`` below passes ``False``: it already
+    supplies a "Confidence" heading of its own, and repeating the word right
+    next to it read as stuttering ("CONFIDENCE" heading directly above
+    "CONFIDENCE / Moderate" body text).
+    """
+
     raw = str(label or "").strip()
     if not raw:
         return ""
@@ -268,14 +311,53 @@ def confidence_indicator_html(label: object, *, extra_class: str = "") -> str:
     if extra_class:
         classes += f" {extra_class}"
     visible = accessible.replace(" confidence", "").replace("Confidence", "").strip() or accessible
+    label_text = f"CONFIDENCE / {visible}" if show_caption_prefix else visible
     return (
         f"<div class='{classes}' data-tvl-conf='{level}' data-tvl-conf-pct='{percent}' "
         f"style='--tvl-conf-pct:{percent}' title='{escape(accessible, quote=True)}'>"
         f"<span class='tvl-conf-ring' aria-hidden='true'>"
         f"<span class='tvl-conf-ring-value'>{percent}%</span>"
         "</span>"
-        f"<span class='tvl-conf-label'>CONFIDENCE / {escape(visible)}</span>"
+        f"<span class='tvl-conf-label'>{escape(label_text)}</span>"
         f"<span class='tvl-sr'>{escape(accessible)}</span>"
+        "</div>"
+    )
+
+
+def confidence_cue_html(label: object, *, extra_class: str = "") -> str:
+    """Confidence, wrapped in the same accent-bar + caps-kicker shell as
+    ``cue_html``'s Why/Risk rows.
+
+    Trade Analyzer's verdict card renders Why, Confidence, and Risk back to
+    back as three conceptually-parallel explanations of the same verdict,
+    but Confidence used to be the bare ``confidence_indicator_html`` ring —
+    a different box model (inline-flex ring + label, no heading) wedged
+    between two bordered rows that each have a bold caps kicker. That read as
+    inconsistent hierarchy, not a clean grouped list. This keeps the ring
+    (it carries real information the other two rows' plain prose doesn't)
+    but gives it the same left accent bar and kicker heading as its
+    neighbors, so the three rows finally read as one list of three, not two
+    different widget types. Scoped to this one call site — every other
+    ``confidence_indicator_html`` caller (Trade Hub's standalone block,
+    recommendation_trust_ux.py's inline verdict-line placement, GM Plan) is
+    untouched and keeps its own established treatment.
+    """
+
+    raw = str(label or "").strip()
+    if not raw:
+        return ""
+    indicator = confidence_indicator_html(raw, show_caption_prefix=False)
+    if not indicator:
+        return ""
+    level = confidence_level(raw)
+    classes = f"tvl-cue tvl-cue--confidence tvl-cue--confidence-{level}"
+    if extra_class:
+        classes += f" {extra_class}"
+    return (
+        f"<div class='{classes}'>"
+        "<span class='tvl-cue-mark' aria-hidden='true'></span>"
+        "<span class='tvl-cue-kicker'>Confidence</span>"
+        f"<div class='tvl-cue-body tvl-cue-body--confidence'>{indicator}</div>"
         "</div>"
     )
 

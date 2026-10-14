@@ -1987,7 +1987,11 @@ def render_trade_idea_card(
     else:
         delta_text = "Even"
 
-    edge_html = value_edge_html(delta_text)
+    # show_magnitude_mark=False: the lean bar below already renders this same
+    # magnitude signal as a full track+fill bar directly under this badge, so
+    # the badge's own inline mark would be a second, visually conflicting bar
+    # stacked on top of it rather than one coherent meter.
+    edge_html = value_edge_html(delta_text, show_magnitude_mark=False)
     # send_score/receive_score (my_score/their_score) are the full,
     # untruncated per-side totals trade_gain is itself derived from — see
     # modules/trade_ideas.py's _make_idea. Web renders directly from this

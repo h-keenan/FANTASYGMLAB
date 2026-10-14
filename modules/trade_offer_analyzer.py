@@ -14,7 +14,7 @@ from modules import brand_identity
 from modules.compact_fantasy_assets import compact_matchup_html
 from modules.trade_analyzer_fit import score_asset_value
 from modules.trade_visual_language import (
-    confidence_indicator_html,
+    confidence_cue_html,
     cue_html,
     value_edge_html,
     value_edge_lean_bar_html,
@@ -820,12 +820,12 @@ def build_offer_result_card_html(
   <div class="toa-verdict" aria-label="Trade verdict {ui}">{ui}</div>
   {band_note}
   {matchup}
-  {value_edge_html(edge_label, extra_class="toa-value-edge")}
+  {value_edge_html(edge_label, extra_class="toa-value-edge", show_magnitude_mark=False)}
   {lean_bar_html}
   {why_cue}
   {action_cue}
   {alt_packages_html}
-  {confidence_indicator_html(verdict.confidence, extra_class="toa-confidence")}
+  {confidence_cue_html(verdict.confidence)}
   {risk_cue}
   <details class="toa-more">
     <summary>More detail</summary>
