@@ -386,6 +386,13 @@ div[class*="st-key-dashboard_league_insights"] .dg-football-asset,
 div[class*="st-key-dashboard_league_insights"] .scan-card-compact .scan-card-main {
     grid-template-columns: auto minmax(0, 1fr) auto;
 }
+/* The dg-ui-badge chip itself (color, border, padding) already comes from
+   the shared ui_primitive_styles.py bundle -- this only places it between
+   the card label and the player row so it reads as the GM verdict, not a
+   second label. */
+div[class*="st-key-dashboard_league_insights"] .home-command-card-verdict {
+    margin: 0 0 var(--space-2xs);
+}
 div[class*="st-key-dashboard_league_insights"] .dg-football-asset__name,
 div[class*="st-key-dashboard_league_insights"] .scan-card-name,
 div[class*="st-key-dashboard_league_insights"] .compact-player-name,
