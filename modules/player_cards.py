@@ -833,9 +833,15 @@ def compact_player_row_html(
     design_system: bool = False,
     show_prestige: bool = True,
     reason_limit: int = 220,
-    # The three flags below default to the exact pre-existing behavior (age
-    # shown, reason shown, no OVR badge) so every caller besides My Team's
-    # Roster Core/Depth sections renders byte-identical to before.
+    # The three flags below default to the exact pre-existing behavior
+    # (reason shown, no OVR badge) so every caller besides My Team's Roster
+    # Core/Depth sections renders byte-identical to before. `show_age` no
+    # longer has any visible effect on the identity/meta line itself --
+    # football_assets.player_card_html() dropped inline age from that row
+    # sitewide (mobile/src/components/PlayerIdentityRow.tsx's metaRow never
+    # shows age there either); it only still gates whether this row's
+    # FootballPlayerAsset carries an `age` value at all, kept for API
+    # stability / any future consumer that reads the asset object directly.
     show_age: bool = True,
     show_reason: bool = True,
     show_overall_rating: bool = False,

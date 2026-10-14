@@ -224,13 +224,18 @@ def player_card_html(
             " role='button' tabindex='0'"
             f" aria-label='Open Player Quick View for {escape(asset.display_name, quote=True)}'"
         )
-    identity_parts = []
-    if stacked and asset.position:
-        identity_parts.append(asset.position.upper())
-    identity_parts.append(asset.team.upper() or "FA")
-    if asset.age:
-        identity_parts.append(asset.age)
-    identity_meta = " · ".join(value for value in identity_parts if value)
+    # Mobile parity (mobile/src/components/PlayerIdentityRow.tsx's metaRow):
+    # colored PositionBadge first, team as plain text immediately after, no
+    # inline age — age never appears on this row on mobile either, so it is
+    # intentionally dropped here rather than relocated. This now applies to
+    # every density/stacked combination, not just an opt-in variant, so the
+    # separate plain-text position badge this module used to render lower in
+    # the badges row is gone too (it would otherwise duplicate the one now in
+    # the meta line).
+    position_chip_html = position_html or position_badge_html(asset.position)
+    team_label = asset.team.upper() or "FA"
+    team_meta_html = f"<span class='dg-football-asset__meta-team'>{escape(team_label)}</span>"
+    identity_meta_html = f"{position_chip_html}{team_meta_html}"
     resolved_value = value_html or value_display_html(asset.value_label, asset.value)
     injury_html = injury_badge_html(asset.status)
     if stacked and "dg-football-asset--stacked" not in classes:
@@ -265,10 +270,9 @@ def player_card_html(
             f"<h3 class='dg-football-asset__name compact-player-name' "
             f"title='{escape(asset.display_name, quote=True)}'>{name}</h3>"
         )
-        + f"<div class='dg-football-asset__meta compact-player-meta'>{escape(identity_meta)}</div>"
+        + f"<div class='dg-football-asset__meta compact-player-meta dg-football-asset__meta--pill'>{identity_meta_html}</div>"
         + "<div class='dg-football-asset__badges compact-player-badges'>"
         + (prestige_indicator_html(asset.prestige_label, asset.prestige_level) if show_prestige else "")
-        + ("" if stacked else (position_html or position_badge_html(asset.position)))
         + injury_html
         + ("" if stacked else tags_html)
         + "</div>"

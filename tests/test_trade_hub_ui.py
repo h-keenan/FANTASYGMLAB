@@ -385,14 +385,24 @@ class TestTradeHubUI(unittest.TestCase):
 
         self.assertIn("player-card-tappable", player_html)
         self.assertIn("data-player-id='player-1'", player_html)
-        self.assertIn("player-position-badge trade-asset-position-badge", player_html)
-        self.assertEqual(player_html.count("LV · Age 22"), 1)
+        # Mobile parity (PlayerIdentityRow.tsx metaRow): colored position
+        # badge first, team as plain text, no inline age -- this card now
+        # gets the real colored `dg-football-position--*` pill instead of
+        # the old plain-text "player-position-badge trade-asset-position-
+        # badge" chip, and the old "LV · Age 22" text is gone entirely.
+        self.assertIn("player-position-badge", player_html)
+        self.assertIn("dg-football-position--rb", player_html)
+        self.assertLess(
+            player_html.index("dg-football-position--rb"),
+            player_html.index("dg-football-asset__meta-team"),
+        )
+        self.assertIn(">LV<", player_html)
+        self.assertNotIn("Age 22", player_html)
         self.assertEqual(
             player_html.split(">", 1)[0].count("player-card-tappable"),
             1,
         )
         self.assertIn(">RB<", player_html)
-        self.assertIn("LV · Age 22", player_html)
         self.assertNotIn("RB | LV | Age 22", player_html)
         self.assertNotIn("player-card-tappable", pick_html)
         self.assertNotIn("data-player-id", pick_html)

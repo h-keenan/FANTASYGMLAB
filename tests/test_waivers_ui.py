@@ -255,7 +255,10 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn("dg-football-asset--compact", html)
         self.assertNotIn("dg-football-asset--standard", html)
         self.assertNotIn("dg-football-asset--stacked", html)
-        self.assertIn("Age 24", html)
+        # Mobile parity (PlayerIdentityRow.tsx metaRow): colored position
+        # badge first, team as plain text, no inline age.
+        self.assertNotIn("Age 24", html)
+        self.assertIn("dg-football-position--wr", html)
         self.assertIn("WR", html)
         self.assertIn("Best Available", html)
         # No inline Why: reasoning text and no raw value-score number on the
