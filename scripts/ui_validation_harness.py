@@ -3115,7 +3115,14 @@ def _news() -> None:
             "speculative": False,
         },
     ]
-    general_news_ui.render_general_news_feed(fixture_items, now_ts=now)
+    general_news_ui.render_general_news_feed(
+        fixture_items,
+        now_ts=now,
+        render_tappable_player_html=player_cards.render_tappable_player_html,
+        open_player_quick_view=lambda player_id, **_kwargs: st.session_state.__setitem__(
+            "fixture_news_pqv_player_id", str(player_id or "")
+        ),
+    )
 
 
 def main() -> None:

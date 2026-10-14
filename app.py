@@ -22556,7 +22556,11 @@ def main():
             st.caption(f"Showing {len(news_items)} items.")
         elif news_status.get("source") in {"empty", "roster_empty", "none"}:
             st.warning("Live news feeds could not be reached and no cached headlines are available yet.")
-        general_news_ui.render_general_news_feed(news_items)
+        general_news_ui.render_general_news_feed(
+            news_items,
+            render_tappable_player_html=player_cards.render_tappable_player_html,
+            open_player_quick_view=open_player_quick_view,
+        )
 
     # TRADE IDEAS
     if current_page == "trade_hub":
