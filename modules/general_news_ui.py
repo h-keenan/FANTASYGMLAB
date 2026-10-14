@@ -149,12 +149,69 @@ def _news_identity_chip_html(item: dict) -> str:
     return compact_asset_html(asset, size="standard", show_value=False, show_role=False)
 
 
+def _news_two_player_identity_html(item: dict) -> str:
+    """Stacked pair of compact player-identity chips (avatar + name, +
+    position/team when known) for a general-feed item resolved to exactly
+    two named players -- e.g. a two-player trade.
+
+    modules.news.general_news_feed only sets matched_players when
+    news_intelligence.resolve_article_player_identities found exactly two
+    distinct players in the article text (three or more is left alone as
+    too ambiguous). Reuses the same compact_fantasy_assets component as the
+    single-player case (_news_identity_chip_html) rather than a one-off, so
+    both chips get the same avatar/typography/tap-target contract as every
+    other player identity on this page.
+
+    Stacked (one chip per row) rather than side by side: compact_fantasy_
+    assets' own --standard chip switches to width:100% under its existing
+    max-width:760px breakpoint (modules/compact_fantasy_assets.py), so two
+    chips placed in a row would need their own width override to avoid
+    overflowing the card on a phone-width viewport. Stacking needs no such
+    override -- each row is exactly the same width the single-player case
+    already renders at, just twice.
+    """
+
+    pair = item.get("matched_players")
+    if not isinstance(pair, list) or len(pair) != 2:
+        return ""
+    chips = []
+    for entry in pair:
+        if not isinstance(entry, dict):
+            return ""
+        chip_html = _news_identity_chip_html(
+            {
+                "matched_player_id": entry.get("matched_player_id"),
+                "matched_player": entry.get("matched_player"),
+                "matched_player_position": entry.get("matched_player_position"),
+                "matched_player_team": entry.get("matched_player_team"),
+            }
+        )
+        if not chip_html:
+            return ""
+        chips.append(chip_html)
+    return f"<div class='news-card-identity-pair'>{''.join(chips)}</div>"
+
+
+def _news_identity_html(item: dict) -> str:
+    """Identity markup for one general-news card: a single chip when the
+    item resolved to exactly one named player, a stacked pair of chips when
+    it resolved to exactly two (see _news_two_player_identity_html), or
+    nothing when the article names no identifiable player at all (plain
+    text only -- there is genuinely no player to show there)."""
+
+    if item.get("matched_players"):
+        return _news_two_player_identity_html(item)
+    return _news_identity_chip_html(item)
+
+
 def render_news_item_card(item: dict, idx: int) -> None:
-    """A single general-news card. Most general-feed items still carry no
-    player association (team-level news, or a story naming more than one
-    player) and render as plain text, as before; an item
-    modules.news.general_news_feed resolved to exactly one player gets an
-    identity chip via ``_news_identity_chip_html``."""
+    """A single general-news card. A team-level story, or one naming three
+    or more players, still carries no player association and renders as
+    plain text, as before -- there is genuinely no single player (or pair)
+    to show there. An item modules.news.general_news_feed resolved to
+    exactly one player gets a single identity chip, and one resolved to
+    exactly two (e.g. a two-player trade) gets both, stacked -- see
+    ``_news_identity_html``."""
 
     title = escape(_text(item.get("title"), "NFL update"))
     link = _text(item.get("link"))
@@ -175,7 +232,7 @@ def render_news_item_card(item: dict, idx: int) -> None:
     # when one exists, not just the title text.
     title_html = f"<div class='news-card-title'>{title}</div>"
     badges_html = "".join(badge_parts)
-    identity_html = _news_identity_chip_html(item)
+    identity_html = _news_identity_html(item)
     identity_row_html = f"<div class='news-card-identity'>{identity_html}</div>" if identity_html else ""
 
     body_html = f"""

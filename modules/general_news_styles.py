@@ -50,4 +50,11 @@ GENERAL_NEWS_CSS = COMPACT_FANTASY_ASSET_CSS + """
    the roster-core/.player-avatar tokens that leaked oversized elsewhere
    tonight), so this only adds row spacing -- no size override needed. */
 .news-card-identity{margin:.4rem 0}
+/* A two-player story (e.g. a trade naming exactly two players) stacks both
+   chips in this same identity-row slot, one per line, rather than forcing
+   them side by side -- the standard chip size already switches to full
+   width under compact_fantasy_assets own phone-width breakpoint, so
+   stacking is the layout that never needs a second, competing width rule
+   to stay inside the card. */
+.news-card-identity-pair{display:flex;flex-direction:column;gap:.45rem}
 """

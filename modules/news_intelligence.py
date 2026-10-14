@@ -633,6 +633,55 @@ def resolve_article_player_identity(
     return normalized.title(), pid
 
 
+def resolve_article_player_identities(
+    item: Mapping[str, Any],
+    *,
+    player_name_to_id: Mapping[str, str] | None = None,
+    max_candidates: int = 2,
+) -> list[tuple[str, str]]:
+    """Free-text scan resolving an article to up to ``max_candidates``
+    distinct named players, failing closed (returning []) at zero matches
+    or more than ``max_candidates`` matches -- too ambiguous to guess which
+    ones the story is actually about.
+
+    Sibling of resolve_article_player_identity, which fails closed to a
+    single match only (and also special-cases an explicit upstream
+    matched_player_id/matched_player the roster-scoped surfaces set before
+    calling it). This function performs only the free-text scan half of
+    that logic, generalized to return every distinct player named rather
+    than bailing the moment more than one is found. It exists for
+    modules.news.general_news_feed (RSS-sourced, never carries an upstream
+    match) to additionally surface the two-named-player case -- e.g. "Davante
+    Adams and DeAndre Hopkins swap teams" -- that resolve_article_player_
+    identity intentionally discards as zero matches. Three or more named
+    players stays a hard fail-closed case (default max_candidates=2): too
+    uncertain to guess which two of several are the real subject.
+    """
+
+    index = dict(player_name_to_id or {})
+    if not index:
+        return []
+
+    text = news_signal.article_text(item)
+    matches: list[tuple[str, str]] = []
+    for normalized_name, player_id in index.items():
+        normalized = str(normalized_name or "").strip()
+        pid = str(player_id or "").strip()
+        if normalized and pid and news_signal.contains_phrase(text, normalized):
+            matches.append((normalized, pid))
+
+    order: list[str] = []
+    representative: dict[str, str] = {}
+    for normalized, pid in matches:
+        if pid not in representative:
+            representative[pid] = normalized
+            order.append(pid)
+
+    if not order or len(order) > max_candidates:
+        return []
+    return [(representative[pid].title(), pid) for pid in order]
+
+
 def contextual_news_alert_from_article(
     item: Mapping[str, Any],
     *,

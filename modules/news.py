@@ -287,14 +287,18 @@ def _attach_general_news_player_identity(items: list, players_df) -> list:
     the roster-scoped surfaces (my_news.matched_player / Alerts'
     matched_player_id), nothing upstream tells us which article is about
     which player. This resolves it the same way Alerts/Dashboard already
-    do for roster-scoped articles: news_intelligence.resolve_article_player_
-    identity scans the whole player-name index and only returns a match
-    when exactly one player is named in the article text — a team-level
-    story ("Team X fires OC") or a two-player trade ("A traded for B")
-    yields zero or two candidates and is left alone rather than guessed.
-    Matches the matched_player / matched_player_id naming already used by
-    modules.my_news and mobile's AlertsScreen so this stays one convention,
-    not a second one.
+    do for roster-scoped articles, generalized one step further:
+    news_intelligence.resolve_article_player_identities scans the whole
+    player-name index and returns every distinct player named, up to two —
+    a team-level story ("Team X fires OC") still yields zero candidates and
+    is left alone, but a two-player trade ("A traded for B") now yields both
+    rather than being discarded. Three or more named players stays a hard
+    fail-closed case (too uncertain to guess which two of several are the
+    real subject). A single match sets matched_player / matched_player_id,
+    matching the naming modules.my_news and mobile's AlertsScreen already
+    use; exactly two matches set matched_players (a list of two
+    {matched_player, matched_player_id} dicts) instead, so presentation can
+    tell the two cases apart without guessing which single player to show.
     """
 
     if players_df is None or getattr(players_df, "empty", True):
@@ -307,29 +311,43 @@ def _attach_general_news_player_identity(items: list, players_df) -> list:
         return items
 
     for item in items:
-        matched_name, matched_id = news_intelligence.resolve_article_player_identity(
-            item, player_name_to_id=name_index
+        matches = news_intelligence.resolve_article_player_identities(
+            item, player_name_to_id=name_index, max_candidates=2
         )
-        if matched_id:
-            item["matched_player"] = matched_name
-            item["matched_player_id"] = matched_id
-
-    matched_indices = [idx for idx, item in enumerate(items) if item.get("matched_player_id")]
-    if not matched_indices:
-        return items
+        if len(matches) == 1:
+            matched_name, matched_id = matches[0]
+            if matched_id:
+                item["matched_player"] = matched_name
+                item["matched_player_id"] = matched_id
+        elif len(matches) == 2:
+            pair = [
+                {"matched_player": matched_name, "matched_player_id": matched_id}
+                for matched_name, matched_id in matches
+                if matched_id
+            ]
+            if len(pair) == 2:
+                item["matched_players"] = pair
 
     # Reuses Alerts' own position/team lookup (alert_presentation.
     # attach_player_identity_fields) rather than a second subset-lookup —
-    # it keys off "player_id", so the matched id is passed under that name
+    # it keys off "player_id", so each matched id (the item's own single
+    # match, or each entry of a two-player match) is passed under that name
     # and the matched_player_position/matched_player_team fields it returns
-    # are copied back onto the real item by index.
-    lookup_rows = [{"player_id": items[idx]["matched_player_id"]} for idx in matched_indices]
+    # are copied back onto the same dict the id came from, whether that is
+    # the item itself or one of its matched_players entries.
+    lookup_targets = [item for item in items if item.get("matched_player_id")]
+    for item in items:
+        lookup_targets.extend(item.get("matched_players") or [])
+    if not lookup_targets:
+        return items
+
+    lookup_rows = [{"player_id": target["matched_player_id"]} for target in lookup_targets]
     enriched_rows = alert_presentation.attach_player_identity_fields(lookup_rows, players_df=players_df)
-    for idx, info in zip(matched_indices, enriched_rows):
+    for target, info in zip(lookup_targets, enriched_rows):
         if info.get("matched_player_position"):
-            items[idx]["matched_player_position"] = info["matched_player_position"]
+            target["matched_player_position"] = info["matched_player_position"]
         if info.get("matched_player_team"):
-            items[idx]["matched_player_team"] = info["matched_player_team"]
+            target["matched_player_team"] = info["matched_player_team"]
     return items
 
 
@@ -346,13 +364,16 @@ def general_news_feed(limit: int = 30, *, players_df=None) -> list:
     rather than a second, drifting implementation.
 
     Each item also resolves ``matched_player`` / ``matched_player_id`` (+
-    position/team) when the article text names exactly one player, so
-    presentation can attach an identity chip — see
-    ``_attach_general_news_player_identity``. Resolved against the full,
-    session-independent players.db universe (``_general_feed_players_universe``),
-    never a caller's league-scoped valuation frame; pass ``players_df``
-    only to override that for a test. No match (ambiguous, or no player
-    named) leaves the item exactly as before: plain text only.
+    position/team) when the article text names exactly one player, or
+    ``matched_players`` (a list of two ``{matched_player, matched_player_id,
+    matched_player_position, matched_player_team}`` dicts) when it names
+    exactly two (e.g. a two-player trade), so presentation can attach one or
+    two identity chips — see ``_attach_general_news_player_identity``.
+    Resolved against the full, session-independent players.db universe
+    (``_general_feed_players_universe``), never a caller's league-scoped
+    valuation frame; pass ``players_df`` only to override that for a test.
+    Three or more named players, or none at all, leaves the item exactly as
+    before: plain text only.
     """
 
     limit = max(1, min(int(limit or 1), MAX_GENERAL_NEWS_LIMIT))
