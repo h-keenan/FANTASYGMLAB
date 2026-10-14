@@ -122,6 +122,20 @@ LIVE_DRAFT_CSS = """
     text-align: left;
 }
 
+/* The shared football_asset_styles.py rule for this literal h3
+   (.dg-football-asset__name{font:var(--font-card-title)}) loses to
+   Streamlit's own scoped heading rule (a class-plus-h3-tag selector
+   outranks a single class selector), so without a module-scoped,
+   equal-or-higher-specificity override here the player name renders at
+   Streamlit's native ~28px/600-weight h3 size instead of the compact
+   card-title size every other surface shows. On the primary card this
+   wasted vertical space; on the narrow Also Consider cards it forced
+   names like Fixture Receiver to wrap almost one letter per line. */
+.live-draft-rec-card .dg-football-asset__name,
+.live-draft-rec-alt-card .dg-football-asset__name {
+    font: var(--font-card-title) !important;
+}
+
 .live-draft-rec-alt-label {
     color: var(--color-text-muted);
     font-size: var(--font-size-badge);
