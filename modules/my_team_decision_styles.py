@@ -153,15 +153,24 @@ div[class*="st-key-my_team_key_backups"] .compact-player-row {
    name — the generic <=700px collapse below (football_asset_styles.py's
    `.dg-football-asset{grid-template-columns:...minmax(0,1fr)}` media rule)
    folds the value chip under the name/badges, leaving the whole right
-   side of every card empty. Restored the un-collapsed 3-column layout
-   (avatar | identity | value) here specifically, matching mobile's own
-   RosterPlayerRow (mobile/src/screens/TeamRosterScreen.tsx) and LineupRow,
-   both of which keep a trailing right-aligned value column alongside
-   identity rather than stacking value below it. */
+   side of every card empty.
+
+   First attempt reserved a persistent 3rd grid column (avatar | identity
+   | value) for the chip, matching mobile's RosterPlayerRow trailing value
+   column. Measured regression (coridian_, same day, follow-up report):
+   that 3rd column's auto width (sized to fit "Value Score 2,888" etc,
+   roughly 100-110px of a ~365px mobile card) squeezed the identity column
+   down to ~150px, which made the "Why:" paragraph's existing
+   -webkit-line-clamp:2 cut off after only a few words instead of its
+   previous near-full-width allowance — reported as "the why is now
+   clipping." Reverted to the same 2-column template Roster Core/Depth use
+   (identity gets the full remaining width again) and moved the value chip
+   out of grid flow entirely below instead, so it floats over the identity
+   column's top-right corner rather than reserving width from it. */
 div[class*="st-key-my_team_decisions_"] .dg-football-asset,
 .st-key-my_team_roster_decisions .dg-football-asset {
     align-items: start;
-    grid-template-columns: 4.25rem minmax(0, 1fr) auto;
+    grid-template-columns: 4.25rem minmax(0, 1fr);
 }
 div[class*="st-key-my_team_roster_core"] .dg-football-asset,
 div[class*="st-key-my_team_key_backups"] .dg-football-asset {
@@ -203,14 +212,28 @@ div[class*="st-key-my_team_key_backups"] .dg-football-asset__value {
     grid-column: 2;
     text-align: left;
 }
-/* Roster Decisions keeps the value chip in its own 3rd grid column (see
-   the 3-column grid-template-columns above) instead of folding it under
-   the name like Roster Core/Depth do, so it fills the space that used to
-   sit empty on the right of every card. */
+/* Value chip floats in the card's top-right corner instead of taking a
+   reserved grid column (see the reverted-to-2-column comment above for
+   why a dedicated column squeezed the Why text). `.dg-football-asset`
+   already sets `position:relative` as a base style (football_asset_styles.
+   py), so this positions against the card's own padding box — matching
+   the Waivers Share-button fix (PR #1027) that used the same
+   flow-sibling-to-absolute technique to align a trailing element without
+   stealing width from the row next to it. */
 div[class*="st-key-my_team_decisions_"] .dg-football-asset__value {
-    align-self: start;
-    grid-column: 3;
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-lg);
     text-align: right;
+}
+/* Reserve room for the floating value chip on the name's own line(s) —
+   stress-tested with an unusually long name ("Christian McCaffreyington-
+   Worthington") that wraps to 2 lines: without this, the wrapped second
+   line runs directly under the chip. Scoped to the name only (meta/badges/
+   insight sit below the chip's ~2rem height on every real roster name, so
+   they don't need the reserve and keep their full width). */
+div[class*="st-key-my_team_decisions_"] .dg-football-asset__name {
+    padding-right: 7.5rem;
 }
 /* coridian_, 2026-10-13 (after seeing the trimmed card): "the name takes
    up too much space and everything underneath the name can be moved up so
