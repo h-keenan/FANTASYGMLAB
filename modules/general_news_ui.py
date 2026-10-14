@@ -23,6 +23,7 @@ from html import escape
 
 import streamlit as st
 
+from modules.compact_fantasy_assets import compact_asset_html, compact_player_chip
 from modules.my_news import build_quick_news_summary, relative_news_time
 from modules.page_shell import page_body
 from modules.semantic_glyphs import glyph_html
@@ -120,11 +121,40 @@ def _group_by_date(items: list, now_ts: float) -> list:
     ]
 
 
+def _news_identity_chip_html(item: dict) -> str:
+    """Compact player-identity chip (avatar + name, + position/team when
+    known) for a general-feed item resolved to exactly one player.
+
+    modules.news.general_news_feed only sets matched_player_id when
+    news_intelligence.resolve_article_player_identity found a single,
+    unambiguous player in the article text — a team-level story or a
+    multi-player trade resolves to nothing and simply gets no chip here,
+    rather than guessing. Reuses the same compact_fantasy_assets component
+    (and tap-target contract) Waivers/Trade Hub/My Team/GM Targets/
+    Dashboard League Insights already render player identity with, instead
+    of a one-off. show_value/show_role are both off — a news item is a
+    quick-view identity cue, not a valuation card (no score shown here)."""
+
+    player_id = _text(item.get("matched_player_id"))
+    if not player_id:
+        return ""
+    asset = compact_player_chip(
+        {
+            "player_id": player_id,
+            "name": item.get("matched_player"),
+            "position": item.get("matched_player_position"),
+            "team": item.get("matched_player_team"),
+        }
+    )
+    return compact_asset_html(asset, size="standard", show_value=False, show_role=False)
+
+
 def render_news_item_card(item: dict, idx: int) -> None:
-    """A single general-news card. General-feed items never carry the
-    roster-matched fields (matched_player / relevance_reason) app.py's
-    render_news_card also handles, so this stays purpose-built and simple
-    rather than depending on that app.py helper."""
+    """A single general-news card. Most general-feed items still carry no
+    player association (team-level news, or a story naming more than one
+    player) and render as plain text, as before; an item
+    modules.news.general_news_feed resolved to exactly one player gets an
+    identity chip via ``_news_identity_chip_html``."""
 
     title = escape(_text(item.get("title"), "NFL update"))
     link = _text(item.get("link"))
@@ -145,12 +175,15 @@ def render_news_item_card(item: dict, idx: int) -> None:
     # when one exists, not just the title text.
     title_html = f"<div class='news-card-title'>{title}</div>"
     badges_html = "".join(badge_parts)
+    identity_html = _news_identity_chip_html(item)
+    identity_row_html = f"<div class='news-card-identity'>{identity_html}</div>" if identity_html else ""
 
     body_html = f"""
         <div class="news-card-top">
             <div>{title_html}</div>
             <div class="news-badges">{badges_html}</div>
         </div>
+        {identity_row_html}
         <div class="news-summary">{summary}</div>
     """
 
