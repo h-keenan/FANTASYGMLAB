@@ -530,6 +530,24 @@ def test_ui_and_contract_docs_exist():
     )
 
 
+def test_target_card_identity_row_is_tappable_into_quick_view():
+    # Tappable-modules audit (coridian_, 2026-10-14): every other player
+    # card/row on the site opens Player Quick View on a tap of the card
+    # itself; GM Targets' identity row was the one still requiring a
+    # separate "Open player" button click instead. The identity block must
+    # carry the same player-card-tappable + data-player-id markup
+    # interaction_contract.py's TAP_DELEGATION_JS already delegates on, and
+    # the card must render through render_tappable_player_html (not a plain
+    # render_html_fragment) so a tap actually reaches open_player_quick_view.
+    ui = (ROOT / "modules" / "gm_targets_ui.py").read_text(encoding="utf-8")
+    assert "from modules.player_cards import player_support_chip_html, render_tappable_player_html" in ui
+    assert "dg-gm-target-identity player-card-tappable" in ui
+    assert "render_tappable_player_html(" in ui
+    # The explicit "Open player" button stays too, as a keyboard/no-JS
+    # fallback — this is additive, not a replacement for it.
+    assert "Open player" in ui
+
+
 def test_app_wires_pqv_and_destination_without_critical_path_fetch():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "gm_targets_ui.render_pqv_target_control" in app

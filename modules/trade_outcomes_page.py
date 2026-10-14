@@ -129,7 +129,12 @@ def _verdict_detail_text(result: Mapping[str, Any]) -> str:
     return " · ".join(parts)
 
 
-def _render_trade_history_row(row: Mapping[str, Any]) -> None:
+def _render_trade_history_row(
+    row: Mapping[str, Any],
+    *,
+    render_tappable_player_html: Any = None,
+    open_player_quick_view: Any = None,
+) -> None:
     summary = row.get("trade_summary") if isinstance(row.get("trade_summary"), Mapping) else {}
     partner = (
         _safe_text(row.get("partner_team_name"))
@@ -173,19 +178,40 @@ def _render_trade_history_row(row: Mapping[str, Any]) -> None:
     # closes that gap without inventing a new card shape.
     send_assets = summary.get("send") if isinstance(summary.get("send"), list) else []
     receive_assets = summary.get("receive") if isinstance(summary.get("receive"), list) else []
-    render_html_fragment(
-        compact_fantasy_assets.compact_matchup_html(
-            send_assets,
-            receive_assets,
-            send_label="You sent",
-            receive_label="You received",
-            size="standard",
-            show_value=True,
-        )
+    matchup_html = compact_fantasy_assets.compact_matchup_html(
+        send_assets,
+        receive_assets,
+        send_label="You sent",
+        receive_label="You received",
+        size="standard",
+        show_value=True,
     )
+    # Every sent/received player row above already carries a real
+    # data-player-id (compact_asset_html, same markup Trade Hub/Live Draft's
+    # own tappable cards render) — these are real, confirmed-trade league
+    # players, not hypothetical offers, so wiring them to Player Quick View
+    # closes the same class of gap PR #1049 fixed for GM Plan's Trade
+    # Opportunities card.
+    if render_tappable_player_html is not None and open_player_quick_view is not None:
+        clicked_player_id = render_tappable_player_html(
+            html=matchup_html,
+            key_prefix=f"trade_history_row_{_safe_text(row.get('id'), title)}",
+        )
+        if clicked_player_id:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="Trade History",
+                source_note="Inspect this player from a past confirmed trade.",
+            )
+    else:
+        render_html_fragment(matchup_html)
 
 
-def render_trade_history_page() -> None:
+def render_trade_history_page(
+    *,
+    render_tappable_player_html: Any = None,
+    open_player_quick_view: Any = None,
+) -> None:
     """Render the Trade History page. Free feature (no Premium gate here —
     mirrors the mobile screen and mobile_api_service endpoints, neither of
     which gate on entitlement), requires only a signed-in account since
@@ -244,4 +270,8 @@ def render_trade_history_page() -> None:
 
         for row in rows:
             if isinstance(row, Mapping):
-                _render_trade_history_row(row)
+                _render_trade_history_row(
+                    row,
+                    render_tappable_player_html=render_tappable_player_html,
+                    open_player_quick_view=open_player_quick_view,
+                )

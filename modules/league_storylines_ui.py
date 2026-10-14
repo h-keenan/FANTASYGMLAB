@@ -272,6 +272,8 @@ def render_storylines_panel(
     profiles: Mapping[str, Any] | None,
     season: str,
     team_logo_html: Callable[..., str],
+    render_tappable_player_html: Callable[..., str] | None = None,
+    open_player_quick_view: Callable[..., None] | None = None,
 ) -> None:
     inject_global_styles(LEAGUE_STORYLINES_CSS)
     report = storylines.build_league_storylines(
@@ -279,11 +281,29 @@ def render_storylines_panel(
         profiles=profiles,
         season=season,
     )
-    render_html_fragment(
-        storylines_panel_html(
-            report,
-            team_logo_html=team_logo_html,
-            season=season or _text(report.get("season")),
-        )
+    panel_html = storylines_panel_html(
+        report,
+        team_logo_html=team_logo_html,
+        season=season or _text(report.get("season")),
     )
+    # Storylines cards (_player_chip, above) already render real player
+    # identity through modules.compact_fantasy_assets.compact_asset_html —
+    # same data-player-id markup every other tappable card on the site uses
+    # — just never routed through the tap-grid component. Wires it the same
+    # way GM Plan's Trade Opportunities card does, with no per-card asset
+    # mapping needed since a clicked chip's data-player-id already IS the
+    # player_id.
+    if render_tappable_player_html is not None and open_player_quick_view is not None:
+        clicked_player_id = render_tappable_player_html(
+            html=panel_html,
+            key_prefix="league_storylines_panel",
+        )
+        if clicked_player_id:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="League Overview - Storylines",
+                source_note="Inspect this player from this season's storylines.",
+            )
+    else:
+        render_html_fragment(panel_html)
     return report

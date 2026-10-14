@@ -14,7 +14,7 @@ from modules import performance
 from modules import player_profile_ui
 from modules import ui_primitives
 from modules.page_shell import page_body
-from modules.player_cards import player_support_chip_html
+from modules.player_cards import player_support_chip_html, render_tappable_player_html
 
 
 GM_TARGETS_CSS = """
@@ -34,6 +34,9 @@ div[class*="st-key-dg_gm_targets_group_untouchable"]{border-inline-start:var(--b
 .dg-gm-target-card:last-of-type{border-block-end:0}
 .dg-gm-target-top{align-items:flex-start;display:flex;gap:var(--space-sm);justify-content:space-between}
 .dg-gm-target-identity{align-items:center;display:flex;flex:1 1 auto;gap:var(--space-sm);min-width:0}
+.dg-gm-target-identity.player-card-tappable{cursor:pointer}
+.dg-gm-target-identity.player-card-tappable:hover{background:var(--color-surface-raised)}
+.dg-gm-target-identity.player-card-tappable:focus-visible{box-shadow:var(--focus-ring);outline:none}
 /* GM Targets is the one caller of player_profile_ui.avatar_html() that never
    scoped its own --avatar-size, so above the 700px breakpoint (where the
    shared app_styles.py mobile media query is not in effect) the row fell
@@ -339,11 +342,19 @@ def render_gm_targets_workspace(
             # → what changed → reference ownership context, last. Rank is
             # reference metadata and lives in the top row next to identity, not
             # stacked ahead of the actual decision info.
-            html_rendering.render_html_fragment(
+            # The identity row (avatar + name) is the one part of this card a
+            # user expects to tap straight into Player Quick View, same as
+            # Waivers/Trade Hub/My Team's cards (the explicit "Open player"
+            # button below stays too, as a keyboard/no-JS fallback — this is
+            # additive, not a replacement for it).
+            card_html = (
                 "<article class='dg-gm-target-card' "
                 f"data-gm-target='1' data-gm-target-player-id='{escape(card.player_id)}'>"
                 "<div class='dg-gm-target-top'>"
-                "<div class='dg-gm-target-identity'>"
+                "<div class='dg-gm-target-identity player-card-tappable' "
+                f"data-player-id='{escape(card.player_id, quote=True)}' "
+                "role='button' tabindex='0' "
+                f"aria-label='Open {escape(card.name, quote=True)} in Player Quick View'>"
                 f"{avatar}"
                 "<div>"
                 f"<div class='dg-gm-target-name'>{escape(card.name)}</div>"
@@ -360,6 +371,15 @@ def render_gm_targets_workspace(
                 "</div>"
                 "</article>"
             )
+            if open_player_quick_view is not None:
+                clicked_player_id = render_tappable_player_html(
+                    html=card_html,
+                    key_prefix=f"gm_targets_card_{card.player_id}",
+                )
+                if clicked_player_id:
+                    open_player_quick_view(clicked_player_id)
+            else:
+                html_rendering.render_html_fragment(card_html)
 
             def _open_player_action() -> None:
                 if open_player_quick_view is None:

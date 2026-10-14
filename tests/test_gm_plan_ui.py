@@ -194,6 +194,46 @@ def test_render_focus_item_card_falls_back_without_trade_assets():
     open_quick_view.assert_not_called()
 
 
+def test_render_focus_area_routes_injury_card_through_tap_grid():
+    # Roster Construction's injury-exposure fact (real injured_players dicts,
+    # same shape a trade idea's send/receive assets carry) must get the same
+    # tap-grid routing as a Trade Opportunities card, not just a plain
+    # render — same class of gap PR #1049 fixed for the trade card above.
+    tap_renderer = Mock(return_value="inj-1")
+    open_quick_view = Mock()
+    focus_area = {
+        "title": "Roster Construction",
+        "framing": "",
+        "status": "signal_found",
+        "items": [
+            {
+                "label": "Injury Exposure",
+                "health_flag": "Banged up",
+                "injury_need_positions": ["TE"],
+                "injured_players": [
+                    {
+                        "asset_type": "player",
+                        "player_id": "inj-1",
+                        "name": "Cade Otton",
+                        "position": "TE",
+                        "team": "TB",
+                    }
+                ],
+                "summary": "No healthy bench cover at TE.",
+            }
+        ],
+    }
+    gm_plan_ui._render_focus_area(
+        focus_area,
+        render_tappable_player_html=tap_renderer,
+        open_player_quick_view=open_quick_view,
+    )
+    tap_renderer.assert_called_once()
+    open_quick_view.assert_called_once()
+    assert open_quick_view.call_args.args[0] == "inj-1"
+    assert open_quick_view.call_args.kwargs.get("source_label") == "GM Plan - Roster Construction"
+
+
 def test_render_focus_item_card_falls_back_without_tap_callables():
     # Trade assets present but caller hasn't wired the tap callables — must
     # still render without raising and without fabricating a click.

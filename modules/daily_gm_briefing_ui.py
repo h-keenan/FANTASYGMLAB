@@ -426,6 +426,31 @@ def _trade_assets_for_item(item: briefing_mod.DailyBriefingItem) -> list[dict]:
     return [asset for asset in (list(send) + list(receive)) if isinstance(asset, dict)]
 
 
+def _tap_assets_for_item(item: briefing_mod.DailyBriefingItem) -> list[dict]:
+    """Every real player dict this card's visual renders a tappable chip for.
+
+    Trade-shaped cards (Top Priority/League Movement) already route through
+    `_trade_assets_for_item` above. Watch (injury alert) and Waiver
+    (single-player) cards render the exact same compact_asset_html chip —
+    same data-player-id markup — via `_card_visual_html`'s watch/waiver
+    branches, just without a send/receive pair, so they were previously
+    excluded from `_render_card_html`'s tap-grid routing entirely. This
+    widens that to cover those two shapes too (coridian_, 2026-10-14: "a lot
+    of things need to be tappable like power ranking, stuff like that").
+    """
+
+    assets = list(_trade_assets_for_item(item))
+    presentation = _presentation_dict(item)
+    if item.category == briefing_mod.CATEGORY_WATCH:
+        players = presentation.get("players") or []
+        assets.extend(player for player in players if isinstance(player, dict))
+    else:
+        player = presentation.get("player")
+        if isinstance(player, dict) and player:
+            assets.append(player)
+    return assets
+
+
 def _render_card_html(
     card_html: str,
     item: briefing_mod.DailyBriefingItem,
@@ -442,18 +467,20 @@ def _render_card_html(
     render_trade_html_with_player_taps for). Only the player chips inside
     actually become tappable (TAP_DELEGATION_JS delegates on
     data-player-id) — the headline/reason text around them stays inert,
-    same as every other tappable card on the site. Falls back to a plain,
-    non-tappable render when there's no trade visual on this card (Watch/
-    Waiver items) or the caller didn't wire the tap callables.
+    same as every other tappable card on the site. Watch (injury alert) and
+    Waiver cards get the same tap-through for their single-player/player-list
+    chip (see `_tap_assets_for_item`). Falls back to a plain, non-tappable
+    render when this card has no player visual at all, or the caller didn't
+    wire the tap callables.
     """
 
-    trade_assets = _trade_assets_for_item(item) if _has_trade_visual(item) else []
-    if trade_assets and render_tappable_player_html is not None and open_player_quick_view is not None:
+    tap_assets = _tap_assets_for_item(item)
+    if tap_assets and render_tappable_player_html is not None and open_player_quick_view is not None:
         from modules.trade_hub_ui import render_trade_html_with_player_taps
 
         clicked_player_id = render_trade_html_with_player_taps(
             card_html,
-            trade_assets,
+            tap_assets,
             key_prefix=f"{key_prefix}_assets",
             source_label="Today's Game Plan",
             render_tappable_player_html=render_tappable_player_html,
