@@ -122,6 +122,34 @@ FREE_AGENTS = pd.DataFrame(
             "status": "Q",
             "injury_status": "Questionable",
         },
+        {
+            # Real players.db magnitude for a replacement-level kicker
+            # pickup -- fills the Waiver Snapshot grid's K slot alongside
+            # the RB/WR rows above.
+            "player_id": "11792",
+            "name": "Will Reichard",
+            "position": "K",
+            "team": "MIN",
+            "age": 23,
+            "dynasty_score": 310,
+            "value_score": 310,
+            "stale_free_agent": False,
+            "injury_replacement_fit": False,
+            "opportunity_label": "Streaming Option",
+            "opportunity_explanation": "Steady leg on a middling offense, streamable in deeper formats.",
+            "position_rank": 4,
+            "overall_rank": 180,
+            "player_tier": "depth",
+            "canonical_overall_rank": 310,
+            "canonical_position_rank": 14,
+            "_overall_rating_col": 52,
+            "opportunity_confidence": "Low",
+            "sleeper_trending_add": False,
+            "priority_need_fit": False,
+            "priority_value_opportunity": False,
+            "status": "",
+            "injury_status": "",
+        },
     ]
 )
 
@@ -146,6 +174,8 @@ def main() -> None:
         needed_positions=["RB", "WR"],
         key_prefix="visual_waiver_priority",
     )
+    st.subheader("Waiver Snapshot")
+    app.render_free_agent_summary_cards(FREE_AGENTS, "dynasty_score")
 
 
 if __name__ == "__main__":

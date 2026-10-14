@@ -1109,7 +1109,6 @@ def render_free_agent_summary_cards(
     if free_agents.empty:
         return
 
-    score_label = league_score_label(score_field)
     stale_series = (
         free_agents["stale_free_agent"].fillna(False)
         if "stale_free_agent" in free_agents.columns
@@ -1136,12 +1135,6 @@ def render_free_agent_summary_cards(
         group = group.sort_values(score_field, ascending=False)
         top_row = group.iloc[0]
         player_id = _safe_text(top_row.get("player_id")).strip()
-        score = _format_score(
-            top_row.get(
-                score_field,
-                top_row.get("value_score", 0),
-            )
-        )
         count = len(group)
         age = _format_age(top_row.get("age"))
         image_url = (
@@ -1157,6 +1150,26 @@ def render_free_agent_summary_cards(
             ),
             "",
         )
+        # Compact grid, not a full decision card (coridian_: these wire-scan
+        # tiles take up too much space and look bad) -- no inline Why
+        # reasoning text and no raw value-score number on the card itself,
+        # same trim the Priority Adds/Watchlist/FAAB Shortlist rows already
+        # got (coridian_, 2026-10-13, re that same raw number: you can just
+        # remove that... it doesn't really make any sense). The PPG/active-
+        # options detail isn't dropped outright -- it moves into the
+        # tap-through Player Quick View's source_note below, and the
+        # trailing slot gets the same labeled OVR badge
+        # (waiver_overall_rating_badge_html) the compact Priority Adds rows
+        # already show instead of a bare number.
+        detail_note = (
+            f"Top available {position} on the current wire -- {fantasy_ppg} PPG, "
+            f"{count} active option{'s' if count != 1 else ''}."
+            if fantasy_ppg
+            else (
+                f"Top available {position} on the current wire -- "
+                f"{count} active option{'s' if count != 1 else ''}."
+            )
+        )
         cards.append(
             football_assets.player_card_html(
                 football_assets.FootballPlayerAsset(
@@ -1166,16 +1179,9 @@ def render_free_agent_summary_cards(
                     team=_safe_text(top_row.get("team"), "FA"),
                     prestige_label="Best Available",
                     prestige_level="contributor",
-                    value_label=score_label,
-                    value=score,
-                    insight=(
-                        f"{fantasy_ppg} PPG · {count} active options"
-                        if fantasy_ppg
-                        else f"{count} active options"
-                    ),
                     age=f"Age {age}" if age else "",
                 ),
-                density="standard",
+                density="compact",
                 mode="action-enabled" if player_id else "read-only",
                 identity=resolve_player_tier_identity(top_row),
                 avatar_html=player_profile_ui.avatar_html(
@@ -1187,6 +1193,7 @@ def render_free_agent_summary_cards(
                     ),
                     css_class="waiver-snapshot-avatar",
                 ),
+                value_html=waiver_overall_rating_badge_html(top_row),
                 extra_classes=("free-agent-summary-card", "dg-card-secondary"),
                 stacked=False,
             )
@@ -1194,7 +1201,7 @@ def render_free_agent_summary_cards(
         if player_id:
             quick_view_meta[player_id] = {
                 "source_label": "Waivers - Wire Snapshot",
-                "source_note": f"Top available {position} on the current wire.",
+                "source_note": detail_note,
                 "status_label": "Best Available",
             }
 
