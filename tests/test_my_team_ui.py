@@ -382,16 +382,24 @@ class TestMyTeamUI(unittest.TestCase):
         )
         # My Team Roster Core/Depth quick-view trim (coridian_, 2026-10-13:
         # "name, ring, overall, position, that's really it" — matches
-        # mobile's MyTeamScreen LineupRow). Only these two sections opt out
-        # of age/reason and opt into the OVR badge; every other decision
-        # section (Core Assets, Trade Candidates, Hold, Drop, Untouchables)
-        # keeps the prior always-on behavior untouched.
+        # mobile's MyTeamScreen LineupRow). Only these two sections opt into
+        # the OVR badge; Core Assets keeps the prior always-on age/reason
+        # behavior untouched.
         self.assertFalse(calls_by_title["WR"]["show_age"])
         self.assertFalse(calls_by_title["WR"]["show_reason"])
         self.assertTrue(calls_by_title["WR"]["show_overall_rating"])
         self.assertFalse(calls_by_title["Key Backups"]["show_age"])
         self.assertFalse(calls_by_title["Key Backups"]["show_reason"])
         self.assertTrue(calls_by_title["Key Backups"]["show_overall_rating"])
+        # Roster Decisions quick-view trim (coridian_, 2026-10-14: the Why
+        # line is a "jumble" on the compact Untouchables/Trade/Hold/Drop
+        # cards and should live behind the tap-through Player Quick View
+        # instead — these sections all pass enable_quick_view=True, so the
+        # full reasoning is still reachable, just not inline).
+        self.assertFalse(calls_by_title["Untouchables"]["show_reason"])
+        self.assertFalse(calls_by_title["Trade Candidates"]["show_reason"])
+        self.assertFalse(calls_by_title["Hold Candidates"]["show_reason"])
+        self.assertFalse(calls_by_title["Drop Candidates"]["show_reason"])
         self.assertNotIn("show_overall_rating", calls_by_title["Core Assets"])
         self.assertTrue(render_summary_tiles.called)
         posture_call = render_summary_tiles.call_args_list[0]

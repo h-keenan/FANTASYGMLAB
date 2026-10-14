@@ -1076,6 +1076,12 @@ def render_my_team_workspace(
                         design_system=True,
                         show_prestige=False,
                         reason_limit=90,
+                        # Roster Decisions quick-view trim (coridian_,
+                        # 2026-10-14: the Why/reasoning line is low-value on
+                        # a compact card and should live behind the tap-
+                        # through Player Quick View instead, matching the
+                        # rule already applied to Roster Core/Depth).
+                        show_reason=False,
                     )
 
             if not is_premium:
@@ -1164,7 +1170,6 @@ def render_my_team_workspace(
                             or trade_note_map.get(_safe_text(row.get("name"))),
                             recommendation_narrative_fn=_trade_scan_narrative,
                             compact=True,
-                            show_inline_reason=True,
                             enable_quick_view=True,
                             quick_view_source_label="My Team - Trade Candidates",
                             quick_view_key_prefix=f"my_team_trade_candidates_{selected_league_id}_{my_roster_id}",
@@ -1174,6 +1179,16 @@ def render_my_team_workspace(
                             design_system=True,
                             show_prestige=False,
                             reason_limit=160,
+                            # Roster Decisions quick-view trim (coridian_,
+                            # 2026-10-14: the Why/reasoning line is low-value
+                            # on a compact card and should live behind the
+                            # tap-through Player Quick View instead, matching
+                            # the rule already applied to Roster Core/Depth).
+                            # show_inline_reason was a no-op here anyway: with
+                            # compact=True, render_player_scan_cards always
+                            # routes through compact_player_row_html, which
+                            # only reads show_reason.
+                            show_reason=False,
                         )
 
                 if hold_candidates_df.empty:
@@ -1201,7 +1216,6 @@ def render_my_team_workspace(
                             or hold_note_map.get(_safe_text(row.get("name"))),
                             recommendation_narrative_fn=_hold_scan_narrative,
                             compact=True,
-                            show_inline_reason=True,
                             enable_quick_view=True,
                             quick_view_source_label="My Team - Hold Candidates",
                             quick_view_key_prefix=f"my_team_hold_candidates_{selected_league_id}_{my_roster_id}",
@@ -1211,6 +1225,9 @@ def render_my_team_workspace(
                             design_system=True,
                             show_prestige=False,
                             reason_limit=90,
+                            # Roster Decisions quick-view trim — see Trade
+                            # Candidates above for the full rationale.
+                            show_reason=False,
                         )
 
                 if drop_candidates_df.empty:
@@ -1238,7 +1255,6 @@ def render_my_team_workspace(
                             or drop_note_map.get(_safe_text(row.get("name"))),
                             recommendation_narrative_fn=_drop_scan_narrative,
                             compact=True,
-                            show_inline_reason=True,
                             enable_quick_view=True,
                             quick_view_source_label="My Team - Drop Candidates",
                             quick_view_key_prefix=f"my_team_drop_candidates_{selected_league_id}_{my_roster_id}",
@@ -1248,6 +1264,9 @@ def render_my_team_workspace(
                             design_system=True,
                             show_prestige=False,
                             reason_limit=80,
+                            # Roster Decisions quick-view trim — see Trade
+                            # Candidates above for the full rationale.
+                            show_reason=False,
                         )
 
         _canonical_header("Roster Actions")
