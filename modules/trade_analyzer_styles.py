@@ -61,6 +61,22 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   font-size: var(--font-size-metadata, 0.75rem);
 }
 
+/* Elevated frame around the actual trade (both give/receive boxes) — the
+   one thing on this card that is the trade itself, versus the plain-card-
+   background analysis rows (value bar, why/confidence/risk, more detail)
+   that follow it. Lighter than both the card's own surface-1 background
+   and the individual .toa-side boxes it contains (surface-2), so depth
+   reads card -> frame -> boxed asset, not one flat gray-on-gray stack. */
+.toa-trade-zone {
+  background: var(--surface-raised, #1b1e23);
+  border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
+  border-radius: var(--radius-panel, 0);
+  box-shadow: var(--shadow-card, 0 3px 0 rgba(0, 0, 0, 0.34));
+  display: grid;
+  gap: var(--space-sm, 0.65rem);
+  padding: var(--space-sm, 0.65rem);
+}
+
 .toa-side {
   background: var(--surface-2, #15171b);
   border-left: 3px solid var(--border-standard, #2a2e35);
@@ -140,8 +156,13 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
   text-transform: none;
 }
 
+/* No boxed background here (unlike before): a filled .toa-more used to be
+   the exact same surface-2 shade as the give/receive boxes above, so the
+   analysis zone's one collapsed affordance visually matched "the trade"
+   instead of the plain-background rows it actually belongs with. A top
+   divider is enough — it is reference detail, not a second trade panel. */
 .toa-more {
-  background: var(--surface-2, #15171b);
+  border-top: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
   padding: var(--space-xs, 0.35rem) var(--space-sm, 0.55rem);
 }
 

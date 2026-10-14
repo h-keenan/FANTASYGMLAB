@@ -761,13 +761,27 @@ def build_offer_result_card_html(
     send_total = sum(score_asset_value(asset) for asset in send_assets)
     receive_total = sum(score_asset_value(asset) for asset in receive_assets)
     lean_bar_html = value_edge_lean_bar_html(send_total, receive_total, extra_class="toa-value-lean")
-    matchup = compact_matchup_html(
-        send_assets,
-        receive_assets,
-        send_label="You send",
-        receive_label="You receive",
-        size="standard",
-        show_value=True,
+    # Wrapped in its own elevated panel (.toa-trade-zone) so the actual trade
+    # — the two give/receive boxes — reads as visually separate from the
+    # analysis content below it (value bar, why/confidence/risk, more
+    # detail), which otherwise all shares this card's one flat background
+    # (coridian_: "everything is pretty much just on the gray or lighter
+    # gray background"). Scoped to this card only, not compact_matchup_html
+    # itself: Trade Hub's own idea cards and GM Plan/Dashboard's give/get
+    # teasers use a different renderer (game_plan_trade_visual_html /
+    # game_plan_top_priority_trade_html) and a different, already-dense
+    # compact-list context the product owner did not flag tonight.
+    matchup = (
+        "<div class='toa-trade-zone'>"
+        + compact_matchup_html(
+            send_assets,
+            receive_assets,
+            send_label="You send",
+            receive_label="You receive",
+            size="standard",
+            show_value=True,
+        )
+        + "</div>"
     )
     risk_cue = cue_html("risk", verdict.risk_summary)
     why_cue = cue_html("why", verdict.rationale)
