@@ -22908,6 +22908,8 @@ def main():
             league_ready=bool(selected_league_id and my_roster_id is not None),
             format_score=_format_score,
             compact_player_row_html=_compact_player_row_html,
+            render_tappable_player_html=_render_tappable_player_html,
+            open_player_quick_view=open_player_quick_view,
         )
 
         send_assets = st.session_state["trade_send_assets"]
