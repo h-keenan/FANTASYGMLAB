@@ -400,6 +400,14 @@ class TestMyTeamUI(unittest.TestCase):
         self.assertFalse(calls_by_title["Trade Candidates"]["show_reason"])
         self.assertFalse(calls_by_title["Hold Candidates"]["show_reason"])
         self.assertFalse(calls_by_title["Drop Candidates"]["show_reason"])
+        # Roster Decisions OVR badge (coridian_, 2026-10-14: "just needs
+        # their overall ... to be on all four sides" — the first of two
+        # asks reviewing Untouchables/Trade/Hold/Drop). Matches Roster
+        # Core/Depth's existing show_overall_rating=True.
+        self.assertTrue(calls_by_title["Untouchables"]["show_overall_rating"])
+        self.assertTrue(calls_by_title["Trade Candidates"]["show_overall_rating"])
+        self.assertTrue(calls_by_title["Hold Candidates"]["show_overall_rating"])
+        self.assertTrue(calls_by_title["Drop Candidates"]["show_overall_rating"])
         self.assertNotIn("show_overall_rating", calls_by_title["Core Assets"])
         self.assertTrue(render_summary_tiles.called)
         posture_call = render_summary_tiles.call_args_list[0]

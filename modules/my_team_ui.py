@@ -1082,6 +1082,11 @@ def render_my_team_workspace(
                         # through Player Quick View instead, matching the
                         # rule already applied to Roster Core/Depth).
                         show_reason=False,
+                        # Matches Roster Core/Depth's OVR badge (coridian_,
+                        # 2026-10-14: "just needs their overall ... to be on
+                        # all four sides" — this is the first of the two
+                        # asks, the "NN OVR" pill itself).
+                        show_overall_rating=True,
                     )
 
             if not is_premium:
@@ -1189,6 +1194,10 @@ def render_my_team_workspace(
                             # routes through compact_player_row_html, which
                             # only reads show_reason.
                             show_reason=False,
+                            # Matches Roster Core/Depth's OVR badge (coridian_,
+                            # 2026-10-14: "just needs their overall ... to be
+                            # on all four sides").
+                            show_overall_rating=True,
                         )
 
                 if hold_candidates_df.empty:
@@ -1228,6 +1237,10 @@ def render_my_team_workspace(
                             # Roster Decisions quick-view trim — see Trade
                             # Candidates above for the full rationale.
                             show_reason=False,
+                            # Matches Roster Core/Depth's OVR badge (coridian_,
+                            # 2026-10-14: "just needs their overall ... to be
+                            # on all four sides").
+                            show_overall_rating=True,
                         )
 
                 if drop_candidates_df.empty:
@@ -1267,6 +1280,10 @@ def render_my_team_workspace(
                             # Roster Decisions quick-view trim — see Trade
                             # Candidates above for the full rationale.
                             show_reason=False,
+                            # Matches Roster Core/Depth's OVR badge (coridian_,
+                            # 2026-10-14: "just needs their overall ... to be
+                            # on all four sides").
+                            show_overall_rating=True,
                         )
 
         _canonical_header("Roster Actions")
