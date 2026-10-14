@@ -42,7 +42,7 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-prestige--development{color:var(--color-prestige-development)}
 .dg-football-prestige--depth{color:var(--color-prestige-depth)}
 .dg-football-prestige--replacement{color:var(--color-prestige-replacement)}
-.dg-football-injury{width:30px;min-width:30px;padding:0;text-align:center}
+.dg-football-injury{min-width:30px;padding:0 var(--space-xs);text-align:center}
 .dg-football-injury--success{color:var(--color-success);border-color:var(--color-success)}
 .dg-football-injury--caution{color:var(--color-warning);border-color:var(--color-warning)}
 .dg-football-injury--danger{color:var(--color-danger);border-color:var(--color-danger)}
