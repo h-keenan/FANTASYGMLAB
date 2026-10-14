@@ -213,10 +213,21 @@ def result_row_html(
     # existing compact-asset rendering.
     asset_type = str(asset.get("asset_type") or "player").strip().lower()
     if compact_player_row_html is not None and asset_type == "player":
+        # Quick view = pertinent identity + value only, never the full "Why"
+        # rationale paragraph (coridian_: "for all of the quick views, we
+        # just need the pertinent information on it"). This roster-browse
+        # list can show 40+ rows at once; My Team's own compact list rows
+        # already suppress this same reason text with show_reason=False —
+        # Trade Analyzer's browse rows were the one caller still defaulting
+        # to show_reason=True, rendering each row's full opportunity
+        # explanation (e.g. "Locked-in WR1 role in a top-5 scoring
+        # offense...") inline instead of keeping it behind the player's own
+        # detail view.
         inner = compact_player_row_html(
             asset,
             score_field="score",
             score_label="Score",
+            show_reason=False,
         )
     else:
         inner = compact_asset_html(

@@ -51,6 +51,7 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-trade-matchup{align-items:stretch;display:grid;gap:var(--space-sm);grid-template-columns:minmax(0,1fr);max-width:42rem;min-width:0}
 .dg-trade-matchup-vs{align-items:center;color:var(--color-information);display:flex;font:var(--type-supporting-metadata);justify-content:center;letter-spacing:var(--letter-spacing-badge)}
 .dg-trade-side{background:var(--color-surface-muted);min-width:0;padding:var(--space-xs) var(--space-sm)}
+.dg-trade-side .dg-compact-asset-stack,.dg-trade-side .dg-compact-asset{width:100%}
 .dg-trade-side-label{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);margin:0 0 var(--space-2xs);text-transform:uppercase}
 .dg-gp-identity-row{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-xs);max-width:40rem;min-width:0}
 .dg-gp-watch-list{display:flex;flex-direction:column;gap:var(--space-xs);justify-content:start;max-width:40rem;min-width:0;width:max-content}
@@ -76,7 +77,16 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-compact-asset-meta--pill{align-items:center;column-gap:var(--space-2xs);display:inline-flex;flex-wrap:wrap}
 .dg-compact-asset-team{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
 @media (min-width:700px){
-.dg-trade-matchup{align-items:start;grid-template-columns:minmax(0,max-content) 1.5rem minmax(0,max-content);justify-content:start}
+/* Give/get columns split the row evenly (1fr each) instead of shrinking to
+   max-content — the same dead-space-on-the-right bug PR #1050 fixed for
+   .dg-gp-trade-visual (GM Plan/Dashboard), confirmed here too via Playwright
+   at 768/1200px: the matchup box measured 640px wide while the two
+   .dg-trade-side columns only filled ~521px combined (both tracks sized to
+   their own max-content), leaving ~119px dead on the right. This is Trade
+   Analyzer's actual verdict card (modules.trade_offer_analyzer.
+   build_offer_result_card_html -> compact_matchup_html), and the same
+   shared markup also backs Trade Outcomes and Live Draft's trade evaluator. */
+.dg-trade-matchup{align-items:start;grid-template-columns:minmax(0,1fr) 1.5rem minmax(0,1fr)}
 .dg-trade-matchup-vs{display:flex}
 .dg-gp-trade-visual{align-items:center;column-gap:var(--space-md);grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
 }
