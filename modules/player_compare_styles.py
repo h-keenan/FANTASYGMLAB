@@ -8,7 +8,7 @@ value below is an existing modules/design_tokens.py token.
 
 PLAYER_COMPARE_CSS = """
 .pqv-compare-shell{display:grid;gap:var(--space-md);max-width:44rem;min-width:0;width:100%}
-.pqv-compare-identity{align-items:start;display:grid;gap:var(--space-sm);grid-template-columns:1fr auto 1fr}
+
 .pqv-compare-vs{align-items:center;color:var(--color-text-muted);display:flex;font-size:var(--font-size-badge);font-weight:700;justify-content:center;letter-spacing:var(--letter-spacing-badge);padding-top:var(--space-xl)}
 .pqv-compare-rows{display:grid;gap:0}
 .pqv-compare-row{align-items:center;border-bottom:var(--border-width-default) solid var(--color-border);display:grid;gap:var(--space-xs);grid-template-columns:1fr auto 1fr;padding-block:var(--space-xs)}

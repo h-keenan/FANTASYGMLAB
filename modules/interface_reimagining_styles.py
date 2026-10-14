@@ -17,7 +17,7 @@ INTERFACE_REIMAGINING_CSS = """
     gap: var(--space-sm) !important;
 }
 
-.dg-page-shell :is(button, a, [tabindex]):focus-visible{
+ a, [tabindex]):focus-visible{
     box-shadow: var(--focus-ring) !important;
     outline: none !important;
 }
@@ -37,7 +37,6 @@ INTERFACE_REIMAGINING_CSS = """
 
 .dg-ui-eyebrow,
 .section-kicker,
-.waiver-card-label,
 .trade-card-kicker,
 .dg-intelligence-group {
     font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
@@ -78,9 +77,7 @@ INTERFACE_REIMAGINING_CSS = """
 }
 
 .summary-tile-value,
-.home-command-card-value,
-.trade-delta,
-.waiver-metric-row dd {
+.home-command-card-value{
     font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
     font-variant-numeric: tabular-nums;
 }
@@ -129,8 +126,7 @@ INTERFACE_REIMAGINING_CSS = """
     padding: var(--space-sm) var(--space-md) !important;
 }
 
-.home-action-center-label,
-.home-league-pulse-label {
+.home-action-center-label{
     border-bottom: var(--border-width-default) solid var(--color-border-strong) !important;
     color: var(--color-text-primary) !important;
     font-size: var(--font-size-section-title) !important;
@@ -183,19 +179,11 @@ main:has(.dg-page-shell--trade-hub) .trade-card-title {
     text-transform: uppercase;
 }
 
-main:has(.dg-page-shell--trade-hub) .trade-card-focus-row,
-main:has(.dg-page-shell--trade-hub) .trade-value-ledger {
-    gap: 0 !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-}
 
-main:has(.dg-page-shell--trade-hub) .trade-card-focus-item,
-main:has(.dg-page-shell--trade-hub) .trade-value-ledger > * {
-    background: var(--color-surface-muted) !important;
-    border: 0 !important;
-    border-right: var(--border-width-default) solid var(--color-border) !important;
-    padding: var(--space-md) !important;
-}
+
+
+
+
 
 main:has(.dg-page-shell--trade-hub) .trade-side {
     background: transparent !important;
@@ -210,35 +198,18 @@ main:has(.waiver-section-header) .free-agent-card {
     padding: var(--space-md) !important;
 }
 
-main:has(.waiver-section-header) .waiver-decision-summary {
-    background: var(--color-surface-muted) !important;
-    border: 0 !important;
-    border-left: var(--border-width-semantic) solid var(--color-opportunity) !important;
-    padding: var(--space-sm) var(--space-md) !important;
-}
+
 
 main:has(.waiver-section-header) .waiver-context-grid {
     gap: 0 !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
-main:has(.waiver-section-header) .waiver-context-block {
-    background: transparent !important;
-    border: 0 !important;
-    border-right: var(--border-width-default) solid var(--color-border) !important;
-    padding: var(--space-md) !important;
-}
 
-main:has(.waiver-section-header) .waiver-metric-row {
-    background: var(--color-bg) !important;
-    border: var(--border-width-default) solid var(--color-border) !important;
-    gap: 0 !important;
-}
 
-main:has(.waiver-section-header) .waiver-metric-row > div {
-    border-right: var(--border-width-default) solid var(--color-border);
-    padding: var(--space-sm);
-}
+
+
+
 
 main:has(.dg-page-shell--players) [data-testid="stTextInput"],
 main:has(.dg-page-shell--players) [data-testid="stSelectbox"],
@@ -319,10 +290,7 @@ div[data-testid="stExpander"] {
         grid-template-columns: 1fr !important;
     }
 
-    main:has(.waiver-section-header) .waiver-context-block {
-        border-bottom: var(--border-width-default) solid var(--color-border) !important;
-        border-right: 0 !important;
-    }
+    
 
     .dg-build-identity {
         text-align: left;
@@ -330,7 +298,7 @@ div[data-testid="stExpander"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .dg-page-shell *,
+    
 .home-command-shell *,
 .trade-idea-card *,
 .free-agent-card *,

@@ -430,47 +430,14 @@ main h4 {
     line-height: 1.24;
     margin-top: 0.14rem;
 }
-.home-status-strip {
-    display: grid;
-    gap: 0.46rem;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0.56rem 0 0.72rem;
-}
-.home-status-pill {
-    background: rgba(8, 15, 28, 0.78);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: var(--radius-panel);
-    min-width: 0;
-    padding: 0.56rem 0.62rem;
-}
-.home-status-pill-risk {
-    border-color: rgba(245, 158, 11, 0.24);
-}
-.home-status-pill-need {
-    border-color: rgba(239, 68, 68, 0.22);
-}
-.home-status-pill-draft {
-    border-color: rgba(99, 102, 241, 0.22);
-}
-.home-status-label {
-    color: #94a3b8;
-    font-size: 0.62rem;
-    font-weight: 820;
-    text-transform: uppercase;
-}
-.home-status-value {
-    color: var(--color-text-primary, #f8fafc);
-    font-size: 0.84rem;
-    font-weight: 860;
-    line-height: 1.14;
-    margin-top: 0.16rem;
-}
-.home-status-note {
-    color: #cbd5e1;
-    font-size: 0.72rem;
-    line-height: 1.25;
-    margin-top: 0.18rem;
-}
+
+
+
+
+
+
+
+
 .app-hero {
     background: linear-gradient(180deg, rgba(11, 18, 32, 0.92), rgba(9, 14, 26, 0.9));
     border: 1px solid rgba(148, 163, 184, 0.12);
@@ -497,15 +464,8 @@ main h4 {
 }
 /* removed dead midfile card accent (UNIFY/content:none cascade). */
 
-.team-identity-copy {
-    min-width: 0;
-}
-.team-identity-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.36rem;
-    margin-top: 0.42rem;
-}
+
+
 .home-command-shell {
     margin: 0.08rem 0 0.72rem;
 }
@@ -690,14 +650,7 @@ main h4 {
     line-height: 1.36;
     margin-top: 0.24rem;
 }
-.launch-league-label {
-    color: #94a3b8;
-    font-size: 0.68rem;
-    font-weight: 820;
-    line-height: 1.2;
-    margin: 0.08rem 0 0.42rem;
-    text-transform: uppercase;
-}
+
 .launch-league-card {
     /* Flat card family (same background/border/shadow language as
        .dg-ui-card/.home-command-card/.summary-tile) rather than a one-off
@@ -1300,18 +1253,14 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .summary-tile-risk {
     border-color: rgba(245, 158, 11, 0.26);
 }
-.analysis-card-strength {
-    border-color: rgba(20, 184, 166, 0.34);
-}
+
 .decision-panel-strength {
     border-color: rgba(20, 184, 166, 0.34);
 }
 .analysis-card-weakness {
     border-color: rgba(239, 68, 68, 0.34);
 }
-.analysis-card-risk {
-    border-color: rgba(245, 158, 11, 0.34);
-}
+
 /* removed dead midfile card accent (UNIFY/content:none cascade). */
 
 .summary-tile-top,
@@ -1414,9 +1363,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .player-support-chip,
 .dg-status-badge,
 .news-badge,
-.draft-review-chip,
-.home-status-pill,
-.account-status-chip {
+.draft-review-chip{
     line-height: 1.12;
     max-width: 100%;
     overflow-wrap: anywhere;
@@ -1530,12 +1477,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     line-height: 1.1;
     margin-top: 0.15rem;
 }
-.team-subtitle {
-    color: #94a3b8;
-    font-size: 0.76rem;
-    line-height: 1.32;
-    margin-top: 0.16rem;
-}
+
 .advice-grid,
 .prospect-grid {
     display: grid;
@@ -1691,25 +1633,9 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
-.free-agent-summary-label {
-    color: var(--color-accent-strong);
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-.free-agent-summary-name {
-    color: var(--color-text-primary, #f8fafc);
-    font-size: 0.98rem;
-    font-weight: 850;
-    line-height: 1.2;
-    margin-top: 0.24rem;
-}
-.free-agent-summary-meta {
-    color: #94a3b8;
-    font-size: 0.82rem;
-    line-height: 1.35;
-    margin-top: 0.24rem;
-}
+
+
+
 .free-agent-list {
     display: grid;
     gap: 0.72rem;
@@ -1775,89 +1701,25 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     --player-accent: linear-gradient(180deg, rgba(248, 113, 113, 0.96), rgba(220, 38, 38, 0.84));
     --player-accent-soft: rgba(239, 68, 68, 0.12);
 }
-.free-agent-main {
-    align-items: flex-start;
-    display: flex;
-    gap: 0.85rem;
-    min-width: 0;
-}
+
 .free-agent-avatar {
     --avatar-size: 76px;
     align-self: flex-start;
 }
-.free-agent-copy {
-    min-width: 0;
-    width: 100%;
-}
-.free-agent-top {
-    align-items: flex-start;
-    display: flex;
-    gap: 0.7rem;
-    justify-content: space-between;
-}
-.free-agent-name {
-    color: var(--color-text-primary, #f8fafc);
-    font-size: 1rem;
-    font-weight: 850;
-    line-height: 1.18;
-    overflow-wrap: anywhere;
-}
-.free-agent-score-pill {
-    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
-    border-radius: var(--radius-pill);
-    color: var(--color-accent);
-    flex: 0 0 auto;
-    font-size: 0.77rem;
-    font-weight: 800;
-    line-height: 1;
-    padding: 0.38rem 0.58rem;
-    white-space: nowrap;
-}
-.free-agent-card-tone-premium .free-agent-score-pill {
-    background: rgba(250, 204, 21, 0.12);
-    border-color: rgba(250, 204, 21, 0.26);
-    color: #fde68a;
-}
-.free-agent-card-tone-core .free-agent-score-pill {
-    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
-    border-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
-    color: #dbeafe;
-}
-.free-agent-card-tone-rise .free-agent-score-pill {
-    background: rgba(34, 197, 94, 0.12);
-    border-color: rgba(74, 222, 128, 0.26);
-    color: #bbf7d0;
-}
-.free-agent-card-tone-move .free-agent-score-pill {
-    background: rgba(249, 115, 22, 0.12);
-    border-color: rgba(251, 146, 60, 0.26);
-    color: #fdba74;
-}
-.free-agent-card-tone-hold .free-agent-score-pill,
-.free-agent-card-tone-neutral .free-agent-score-pill {
-    background: rgba(51, 65, 85, 0.7);
-    border-color: rgba(148, 163, 184, 0.2);
-    color: #cbd5e1;
-}
-.free-agent-card-tone-drop .free-agent-score-pill,
-.free-agent-card-tone-risk .free-agent-score-pill {
-    background: rgba(127, 29, 29, 0.16);
-    border-color: rgba(248, 113, 113, 0.28);
-    color: #fecaca;
-}
-.free-agent-meta {
-    color: #94a3b8;
-    font-size: 0.84rem;
-    line-height: 1.32;
-    margin-top: 0.22rem;
-}
-.free-agent-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.36rem;
-    margin-top: 0.45rem;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 .free-agent-tag {
     background: rgba(148, 163, 184, 0.12);
     border: 1px solid rgba(148, 163, 184, 0.2);
@@ -1880,12 +1742,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     border-color: rgba(239, 68, 68, 0.28);
     color: #fca5a5;
 }
-.free-agent-reason {
-    color: #cbd5e1;
-    font-size: 0.88rem;
-    line-height: 1.42;
-    margin-top: 0.5rem;
-}
+
 .scan-section-shell {
     margin: 0.75rem 0 1rem;
 }
@@ -2024,8 +1881,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .compact-player-body {
     min-width: 0;
 }
-.compact-player-badges,
-.compact-player-score-meta {
+.compact-player-badges{
     align-items: center;
     display: flex;
     flex-wrap: wrap;
@@ -2046,9 +1902,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     line-height: 1.14;
     margin-top: 0.2rem;
 }
-.compact-player-score-meta {
-    margin-top: 0.2rem;
-}
+
 .compact-player-value {
     background: rgba(15, 23, 42, 0.72);
     border: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
@@ -2239,8 +2093,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     gap: 0.74rem;
     grid-template-columns: 60px minmax(0, 1fr);
 }
-.scan-card-header-row,
-.free-agent-status-row,
+
 .trade-asset-status-row {
     align-items: center;
     display: flex;
@@ -2336,80 +2189,20 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     position: relative;
     z-index: 1;
 }
-.scan-card-topline {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.34rem;
-    min-width: 0;
-}
-.scan-card-compact .scan-card-topline {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.24rem;
-}
-.scan-card-topline .dg-status-badge {
-    flex: 0 0 auto;
-    max-width: 100%;
-}
-.scan-card-topline .scan-card-tags {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-.scan-card-compact .scan-card-topline .dg-status-badge,
-.scan-card-compact .scan-card-topline .scan-card-tags,
-.scan-card-compact .scan-card-info,
-.scan-card-compact .scan-card-score-meta {
-    min-width: 0;
-    width: 100%;
-}
-.scan-card-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.14rem;
-    min-width: 0;
-}
-.scan-card-score-meta {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.36rem;
-    min-width: 0;
-}
-.scan-card-compact .scan-card-score-meta {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.14rem;
-}
-.scan-card-score-meta .scan-card-meta {
-    flex: 1 1 88px;
-    margin-top: 0;
-    min-width: 0;
-}
-.scan-card-name-block,
-.free-agent-name-block,
-.trade-asset-name-block {
-    min-width: 0;
-    width: 100%;
-}
-.scan-card-name {
-    color: var(--color-text-primary, #f8fafc);
-    font-size: 1.02rem;
-    font-weight: 900;
-    line-height: 1.08;
-    margin-top: 0.34rem;
-    overflow-wrap: break-word;
-    word-break: normal;
-}
-.scan-card-compact .scan-card-name {
-    display: -webkit-box;
-    font-size: 0.94rem;
-    line-height: 1.06;
-    margin-top: 0;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 .scan-card-score {
     background: rgba(15, 23, 42, 0.86);
     border: 1px solid rgba(148, 163, 184, 0.18);
@@ -2465,17 +2258,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     border-color: rgba(248, 113, 113, 0.28);
     color: #fecaca;
 }
-.scan-card-meta {
-    color: #94a3b8;
-    font-size: 0.81rem;
-    line-height: 1.3;
-    margin-top: 0.2rem;
-}
-.scan-card-compact .scan-card-meta {
-    font-size: 0.74rem;
-    line-height: 1.18;
-    margin-top: 0;
-}
+
+
 .scan-card-compact-reason {
     color: #cbd5e1;
     display: -webkit-box;
@@ -2634,11 +2418,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     font-size: 0.78rem;
     line-height: 1.35;
 }
-.draft-review-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-}
+
 .draft-review-chip {
     border: 1px solid rgba(148, 163, 184, 0.18);
     border-radius: var(--radius-pill);
@@ -2777,11 +2557,7 @@ button[data-testid="stBaseButton-primary"] {
 [data-testid="stPlotlyChart"] > div {
     width: 100% !important;
 }
-.trade-meta {
-    color: #cbd5e1;
-    font-size: 0.92rem;
-    margin: 0.35rem 0 0.7rem;
-}
+
 .trade-idea-card {
     background:
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 34%),
@@ -2821,55 +2597,13 @@ button[data-testid="stBaseButton-primary"] {
     font-size: 0.8rem;
     margin-top: 0.22rem;
 }
-.trade-card-meta-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.36rem;
-    margin-top: 0.34rem;
-}
-.trade-card-focus-row {
-    display: grid;
-    gap: 0.5rem;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin-top: 0.58rem;
-}
-.trade-card-focus-item {
-    background: rgba(8, 15, 28, 0.62);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: var(--radius-control);
-    min-width: 0;
-    padding: 0.52rem 0.58rem;
-}
-.trade-card-focus-label {
-    color: #94a3b8;
-    font-size: 0.65rem;
-    font-weight: 820;
-    text-transform: uppercase;
-}
-.trade-card-focus-value {
-    color: var(--color-text-primary, #f8fafc);
-    font-size: 0.82rem;
-    font-weight: 820;
-    line-height: 1.2;
-    margin-top: 0.2rem;
-    word-break: break-word;
-}
-.trade-reason-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.45rem;
-}
-.trade-reason-tag {
-    background: color-mix(in srgb, var(--color-accent-strong) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
-    border-radius: var(--radius-pill);
-    color: var(--color-accent);
-    font-size: 0.68rem;
-    font-weight: 840;
-    padding: 0.22rem 0.48rem;
-    white-space: nowrap;
-}
+
+
+
+
+
+
+
 .trade-detail-summary {
     background: rgba(8, 15, 28, 0.62);
     border: 1px solid rgba(148, 163, 184, 0.12);
@@ -2877,13 +2611,7 @@ button[data-testid="stBaseButton-primary"] {
     margin: 0.68rem 1rem 0;
     padding: 0.62rem 0.7rem;
 }
-.trade-detail-title {
-    color: #e2e8f0;
-    font-size: 0.76rem;
-    font-weight: 860;
-    letter-spacing: 0;
-    margin-bottom: 0.45rem;
-}
+
 .trade-idea-secondary {
     border-color: rgba(245, 158, 11, 0.16);
     box-shadow: 0 16px 36px rgba(2, 6, 23, 0.2);
@@ -2891,14 +2619,7 @@ button[data-testid="stBaseButton-primary"] {
 .trade-idea-secondary .trade-card-top {
     background: linear-gradient(180deg, rgba(20, 22, 32, 0.96), rgba(11, 14, 24, 0.96));
 }
-.trade-secondary-banner {
-    color: #fbbf24;
-    font-size: 0.68rem;
-    font-weight: 840;
-    letter-spacing: 0;
-    margin-top: 0.3rem;
-    text-transform: uppercase;
-}
+
 .trade-delta-pill {
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-pill);
@@ -3218,32 +2939,9 @@ button[data-testid="stBaseButton-primary"] {
     line-height: 1.38;
     padding: 0.75rem 1rem 0.9rem;
 }
-.trade-rationale-compact {
-    font-size: 0.78rem;
-    line-height: 1.32;
-    padding: 0.58rem 1rem 0.7rem;
-}
-.trade-fit-grid {
-    border-top: 1px solid var(--color-border);
-    display: grid;
-    gap: 0.7rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 0.85rem 1rem 0.95rem;
-}
-.trade-fit-card {
-    background:
-        radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 40%),
-        linear-gradient(180deg, rgba(16, 25, 44, 0.94), rgba(8, 13, 24, 0.9));
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    border-radius: var(--radius-panel);
-    box-shadow:
-        0 14px 30px rgba(2, 6, 23, 0.18),
-        inset 0 1px 0 rgba(248, 250, 252, 0.04);
-    min-width: 0;
-    overflow: hidden;
-    padding: 0.72rem 0.78rem;
-    position: relative;
-}
+
+
+
 .trade-result-card {
     border-color: rgba(20, 184, 166, 0.36);
     box-shadow:
@@ -3263,30 +2961,11 @@ button[data-testid="stBaseButton-primary"] {
 .trade-idea-neutral::after {
     background: linear-gradient(90deg, rgba(148, 163, 184, 0.86), rgba(99, 102, 241, 0.72));
 }
-.trade-fit-card:first-child {
-    border-color: color-mix(in srgb, var(--color-accent-strong) 26%, transparent);
-}
-.trade-fit-card:last-child {
-    border-color: rgba(245, 158, 11, 0.24);
-}
-.trade-fit-label {
-    color: #94a3b8;
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-.trade-fit-value {
-    color: var(--color-text-primary, #f8fafc);
-    font-size: 1rem;
-    font-weight: 850;
-    margin-top: 0.22rem;
-}
-.trade-fit-note {
-    color: #cbd5e1;
-    font-size: 0.82rem;
-    line-height: 1.32;
-    margin-top: 0.24rem;
-}
+
+
+
+
+
 .dg-intel-grid {
     display: grid;
     gap: 0.45rem;
@@ -3538,9 +3217,7 @@ button[data-testid="stBaseButton-primary"] {
     .player-support-chip,
     .dg-status-badge,
     .news-badge,
-    .draft-review-chip,
-    .home-status-pill,
-    .account-status-chip {
+    .draft-review-chip{
         font-size: 0.64rem;
         line-height: 1.12;
         padding: 0.2rem 0.42rem;
@@ -3589,17 +3266,12 @@ button[data-testid="stBaseButton-primary"] {
     [data-testid="stPlotlyChart"] {
         min-height: 220px;
     }
-    .trade-card-focus-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+    
     .trade-detail-summary {
         margin: 0.5rem 0.68rem 0;
         padding: 0.5rem 0.54rem;
     }
-    .trade-detail-title {
-        font-size: 0.7rem;
-        margin-bottom: 0.34rem;
-    }
+    
     .team-identity-card {
         align-items: flex-start;
         padding: 0.8rem;
@@ -3756,47 +3428,20 @@ button[data-testid="stBaseButton-primary"] {
     .free-agent-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
-    .free-agent-main {
-        align-items: flex-start;
-        flex-direction: row;
-        gap: 0.44rem;
-    }
-    .free-agent-top {
-        align-items: flex-start;
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 0.36rem;
-    }
+    
+    
     .free-agent-avatar {
         --avatar-size: 46px;
         flex: 0 0 46px;
     }
-    .free-agent-score-pill {
-        align-self: flex-start;
-        font-size: 0.66rem;
-        padding: 0.24rem 0.4rem;
-    }
+    
     .free-agent-card {
         padding: 0.38rem 0.44rem 0.42rem 0.54rem;
     }
-    .free-agent-name {
-        font-size: 0.88rem;
-        line-height: 1.12;
-    }
-    .free-agent-meta {
-        font-size: 0.7rem;
-        line-height: 1.2;
-        margin-top: 0.12rem;
-    }
-    .free-agent-tags {
-        gap: 0.22rem;
-        margin-top: 0.18rem;
-    }
-    .free-agent-reason {
-        font-size: 0.74rem;
-        line-height: 1.28;
-        margin-top: 0.16rem;
-    }
+    
+    
+    
+    
     .scan-card-list {
         gap: 0.55rem;
         grid-template-columns: repeat(auto-fit, minmax(min(172px, 100%), 1fr));
@@ -3835,10 +3480,7 @@ button[data-testid="stBaseButton-primary"] {
         line-height: 1.12;
         margin-top: 0.1rem;
     }
-    .compact-player-score-meta {
-        gap: 0.22rem;
-        margin-top: 0.12rem;
-    }
+    
     .compact-player-value {
         font-size: 0.64rem;
         padding: 0.2rem 0.36rem;
@@ -3892,39 +3534,19 @@ button[data-testid="stBaseButton-primary"] {
         align-self: flex-start;
         flex: 0 0 48px;
     }
-    .scan-card-score,
-    .free-agent-score-pill {
+    .scan-card-score{
         align-self: flex-start;
     }
-    .free-agent-status-row,
+    
     .trade-asset-status-row {
         align-items: flex-start;
         flex-direction: column;
     }
-    .scan-card-header-row {
-        align-items: center;
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 0.35rem;
-    }
-    .scan-card-compact .scan-card-header-row {
-        align-items: flex-start;
-        gap: 0.24rem;
-        justify-content: flex-start;
-    }
-    .scan-card-compact .scan-card-header-row .scan-card-score {
-        margin-left: auto;
-    }
-    .scan-card-name {
-        font-size: 0.92rem;
-        line-height: 1.12;
-        margin-top: 0.08rem;
-    }
-    .scan-card-compact .scan-card-name {
-        font-size: 0.82rem;
-        line-height: 1.08;
-        margin-top: 0;
-    }
+    
+    
+    
+    
+    
     .scan-card-score {
         font-size: 0.68rem;
         padding: 0.28rem 0.46rem;
@@ -3933,16 +3555,8 @@ button[data-testid="stBaseButton-primary"] {
         font-size: 0.62rem;
         padding: 0.18rem 0.34rem;
     }
-    .scan-card-meta {
-        font-size: 0.72rem;
-        line-height: 1.22;
-        margin-top: 0.14rem;
-    }
-    .scan-card-compact .scan-card-meta {
-        font-size: 0.62rem;
-        line-height: 1.16;
-        margin-top: 0;
-    }
+    
+    
     .scan-card-compact-reason {
         display: none;
     }
@@ -3980,14 +3594,8 @@ button[data-testid="stBaseButton-primary"] {
         min-height: 0;
         padding-left: 0;
     }
-    .scan-card-compact.scan-card-recommendation .scan-card-topline {
-        align-items: center;
-        flex-direction: row;
-        gap: 0.2rem;
-    }
-    .scan-card-compact.scan-card-recommendation .scan-card-info {
-        gap: 0.06rem;
-    }
+    
+    
     .scan-card-tags {
         gap: 0.28rem;
         margin-top: 0.28rem;
@@ -4018,12 +3626,8 @@ button[data-testid="stBaseButton-primary"] {
         font-size: 0.56rem;
         padding: 0.16rem 0.28rem;
     }
-    .scan-card-topline {
-        gap: 0.24rem;
-    }
-    .scan-card-score-meta {
-        gap: 0.28rem;
-    }
+    
+    
     .scan-card-desktop-extras {
         display: none;
     }
@@ -4146,11 +3750,7 @@ button[data-testid="stBaseButton-primary"] {
         gap: 0.38rem;
         padding: 0.55rem 0.68rem 0.62rem;
     }
-    .trade-rationale-compact {
-        font-size: 0.72rem;
-        line-height: 1.26;
-        padding: 0.5rem 0.68rem 0.6rem;
-    }
+    
     .trade-card-title {
         font-size: 1rem;
     }
@@ -4160,10 +3760,7 @@ button[data-testid="stBaseButton-primary"] {
         min-height: 0;
         padding: 0.28rem 0.34rem;
     }
-    .trade-fit-grid {
-        grid-template-columns: 1fr;
-        padding: 0.62rem 0.68rem;
-    }
+    
     .trade-avatar,
     .player-avatar {
         --avatar-size: 46px;
@@ -4428,24 +4025,9 @@ button[data-testid="stBaseButton-primary"] {
     .scan-card.scan-card-mobile-row .scan-card-copy::before {
         display: none !important;
     }
-    .scan-card.scan-card-mobile-row .scan-card-topline {
-        align-items: center !important;
-        flex-direction: row !important;
-        gap: 0.2rem !important;
-        margin: 0 0 0.08rem !important;
-    }
-    .scan-card.scan-card-mobile-row .scan-card-info {
-        display: block !important;
-        height: auto !important;
-        min-height: 0 !important;
-    }
-    .scan-card.scan-card-mobile-row .scan-card-score-meta {
-        align-items: center !important;
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 0.22rem !important;
-        margin-top: 0.08rem !important;
-    }
+    
+    
+    
     .home-command-player-card .scan-card-compact-reason,
     .scan-card.scan-card-mobile-row .scan-card-compact-reason,
     .scan-card-list.scan-card-list-compact .scan-card-compact-reason,
@@ -4484,21 +4066,10 @@ button[data-testid="stBaseButton-primary"] {
     .launch-league-team {
         font-size: 0.76rem;
     }
-    .home-status-strip {
-        gap: 0.42rem;
-        grid-template-columns: 1fr;
-        margin: 0.5rem 0 0.66rem;
-    }
-    .home-status-pill {
-        border-radius: var(--radius-control);
-        padding: 0.52rem 0.58rem;
-    }
-    .home-status-value {
-        font-size: 0.8rem;
-    }
-    .home-status-note {
-        font-size: 0.7rem;
-    }
+    
+    
+    
+    
     .player-detail-hero {
         gap: 0.72rem;
         grid-template-columns: 72px minmax(0, 1fr);
@@ -4573,9 +4144,7 @@ div[data-testid="stExpander"],
 .draft-team-card,
 .draft-review-pick-card,
 .trade-idea-card,
-.trade-fit-card,
 .trade-card-top,
-.trade-card-focus-item,
 .trade-detail-summary,
 .free-agent-summary-card,
 .free-agent-card,
@@ -4615,9 +4184,7 @@ div[data-testid="stExpander"],
 .advice-card-need,
 .advice-card-health,
 .advice-card-opportunity,
-.analysis-card-strength,
 .analysis-card-weakness,
-.analysis-card-risk,
 .trade-idea-secondary {
     border-color: rgba(226, 232, 240, 0.1) !important;
     box-shadow:
@@ -4630,7 +4197,6 @@ div[data-testid="stExpander"],
 .summary-tile-weakness,
 .home-command-card-risk,
 .home-command-card-need,
-.analysis-card-risk,
 .analysis-card-weakness,
 .advice-card-health,
 .advice-card-need {
@@ -4642,8 +4208,7 @@ div[data-testid="stExpander"],
 .summary-tile-grid,
 .team-score-grid,
 .free-agent-summary-grid,
-.draft-review-round-grid,
-.trade-card-focus-row {
+.draft-review-round-grid{
     justify-items: stretch !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
@@ -4653,30 +4218,24 @@ div[data-testid="stExpander"],
 .analysis-card-label,
 .trade-card-kicker,
 .draft-review-pick-slot,
-.free-agent-summary-label,
 .team-owner-meta,
 .summary-tile-note,
 .analysis-card-label,
-.trade-card-subtitle,
-.free-agent-summary-meta {
+.trade-card-subtitle{
     color: rgba(203, 213, 225, 0.72) !important;
 }
 .home-command-badge,
 .launch-league-chip,
-.trade-reason-tag,
-.free-agent-score-pill,
 .free-agent-tag,
 .draft-review-chip,
 .dg-glyph-chip,
 .dg-tier-chip,
 .player-support-chip,
-.account-status-chip,
 .dg-status-badge {
     border-radius: var(--radius-pill) !important;
     box-shadow: none !important;
 }
-.trade-reason-tag,
-.free-agent-score-pill,
+
 .home-command-badge,
 .launch-league-chip {
     background: rgba(16, 20, 30, 0.76) !important;
@@ -4750,7 +4309,6 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 .dg-card-reference,
 .dg-card-warning,
 .platform-sidebar-card,
-.launch-card,
 .draft-review-pick-card,
 .trade-card,
 .trade-asset-row,
@@ -4786,7 +4344,6 @@ div[data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="prim
 .dg-tier-chip,
 .player-support-chip,
 .draft-review-chip,
-.account-status-chip,
 .launch-league-chip,
 .compact-player-value,
 .dg-status-badge,
@@ -4898,9 +4455,7 @@ div[data-testid="stExpander"] {
 .draft-team-card,
 .draft-review-pick-card,
 .trade-idea-card,
-.trade-fit-card,
 .trade-card-top,
-.trade-card-focus-item,
 .trade-detail-summary,
 .free-agent-summary-card,
 .free-agent-card,
@@ -4919,7 +4474,6 @@ div[data-testid="stExpander"] {
 .summary-tile-weakness,
 .home-command-card-risk,
 .home-command-card-need,
-.analysis-card-risk,
 .analysis-card-weakness,
 .advice-card-health,
 .advice-card-need,
@@ -4955,7 +4509,6 @@ div[data-testid="stExpander"] {
 .team-section-card,
 .decision-panel,
 .trade-idea-card,
-.trade-fit-card,
 .trade-detail-summary,
 .free-agent-summary-card,
 .draft-review-pick-card {
@@ -4970,7 +4523,6 @@ div[data-testid="stExpander"] {
 .summary-tile-opportunity,
 .summary-tile-franchise,
 .summary-tile-strategy,
-.analysis-card-strength,
 .advice-card-primary,
 .advice-card-opportunity,
 .trade-idea-positive {
@@ -4980,7 +4532,6 @@ div[data-testid="stExpander"] {
 .home-command-card-need,
 .summary-tile-risk,
 .summary-tile-weakness,
-.analysis-card-risk,
 .analysis-card-weakness,
 .advice-card-health,
 .advice-card-need,
@@ -5094,9 +4645,7 @@ div[data-testid="stExpander"] {
     .draft-team-card,
     .draft-review-pick-card,
     .trade-idea-card,
-    .trade-fit-card,
     .trade-card-top,
-    .trade-card-focus-item,
     .trade-detail-summary,
     .free-agent-summary-card,
     .free-agent-card {
@@ -5125,8 +4674,7 @@ div[data-testid="stExpander"] {
 .decision-panel-grid,
 .decision-panel-grid-alert,
 .free-agent-summary-grid,
-.draft-review-round-grid,
-.trade-card-focus-row {
+.draft-review-round-grid{
         gap: 0.44rem !important;
         justify-items: stretch !important;
         margin-left: 0 !important;
@@ -5154,14 +4702,11 @@ div[data-testid="stExpander"] {
     }
     .home-command-badge,
     .launch-league-chip,
-    .trade-reason-tag,
-    .free-agent-score-pill,
     .free-agent-tag,
     .draft-review-chip,
     .dg-glyph-chip,
     .dg-tier-chip,
     .player-support-chip,
-    .account-status-chip,
     .dg-status-badge {
         border-radius: var(--radius-pill) !important;
     }
@@ -5202,8 +4747,7 @@ div[data-testid="stExpander"] {
     .decision-panel-grid-alert,
     .free-agent-summary-grid,
     .free-agent-list,
-    .draft-review-round-grid,
-    .trade-card-focus-row {
+    .draft-review-round-grid{
         display: flex !important;
         flex-direction: column !important;
         gap: 2px !important;
@@ -5215,7 +4759,6 @@ div[data-testid="stExpander"] {
     .decision-panel,
     .free-agent-summary-card,
     .draft-review-pick-card,
-    .trade-card-focus-item,
     .roster-limit-stat {
         border-radius: 0 !important;
         border-width: 0 0 1px 0 !important;
@@ -5281,8 +4824,7 @@ div[data-testid="stExpander"] {
     .draft-review-player-name,
     .draft-review-meta,
     .draft-review-value,
-    .draft-review-reason,
-    .draft-review-chips {
+    .draft-review-reason{
         grid-column: 2;
     }
     [data-testid="stButton"] > button,
@@ -5362,7 +4904,6 @@ main,
 .roster-limit-stat-danger,
 .home-command-card-risk,
 .summary-tile-risk,
-.analysis-card-risk,
 .decision-panel-risk,
 .free-agent-card-tone-drop,
 .free-agent-card-tone-risk {
@@ -5401,20 +4942,16 @@ main,
 }
 .home-command-card-cta,
 .home-command-card-label,
-.trade-card-kicker,
-.free-agent-summary-label {
+.trade-card-kicker{
     color: var(--dg-theme-accent-silver) !important;
 }
 .home-command-card-trade .home-command-card-label,
 .home-command-card-waiver .home-command-card-label,
-.trade-idea-positive .trade-card-kicker,
-.free-agent-card-tone-core .free-agent-score-pill,
-.free-agent-card-tone-rise .free-agent-score-pill {
+.trade-idea-positive .trade-card-kicker{
     color: #99f6e4 !important;
 }
 .home-command-card-risk .home-command-card-label,
 .summary-tile-risk .summary-tile-label,
-.analysis-card-risk .analysis-card-label,
 .decision-panel-risk .decision-panel-label {
     color: #fecaca !important;
 }
@@ -5433,7 +4970,7 @@ main,
         linear-gradient(90deg, rgba(229, 231, 235, 0.08), rgba(7, 8, 12, 0.9) 38%) !important;
     border-left: 3px solid rgba(229, 231, 235, 0.36) !important;
 }
-.trade-reason-tag,
+
 .free-agent-tag,
 .draft-review-chip {
     background: rgba(229, 231, 235, 0.07) !important;
@@ -5605,9 +5142,7 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
     line-height: 1.15;
     text-transform: uppercase;
 }
-.player-quick-view-detail-copy {
-    min-width: 0;
-}
+
 .player-quick-view-detail-value {
     color: #ffffff;
     font-size: 0.82rem;
@@ -5622,7 +5157,7 @@ div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
     margin-top: 0.14rem;
     overflow-wrap: anywhere;
 }
-.player-quick-view-context-section,
+
 .player-quick-view-stat-section {
     background: rgba(229, 231, 235, 0.035);
     border: 1px solid rgba(229, 231, 235, 0.09);
@@ -5779,8 +5314,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .player-detail-avatar img,
 .scan-card-avatar img,
 .compact-player-avatar img,
-.free-agent-avatar img,
-.trade-asset-avatar img {
+.free-agent-avatar img{
     display: block !important;
     height: 100% !important;
     inset: 0 !important;
@@ -5796,8 +5330,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .player-quick-view-avatar,
 .scan-card-avatar,
 .compact-player-avatar,
-.free-agent-avatar,
-.trade-asset-avatar {
+.free-agent-avatar{
     align-items: center !important;
     display: flex !important;
     justify-content: center !important;
@@ -5916,8 +5449,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .player-detail-avatar img,
 .scan-card-avatar img,
 .compact-player-avatar img,
-.free-agent-avatar img,
-.trade-asset-avatar img {
+.free-agent-avatar img{
     object-fit: cover !important;
     object-position: var(--dg-player-image-position) !important;
 }
@@ -5933,7 +5465,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
 .scan-card-avatar,
 .compact-player-avatar,
 .free-agent-avatar,
-.trade-asset-avatar,
 .team-logo-wrap,
 .league-team-avatar,
 .team-card-avatar {
@@ -5946,8 +5477,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .home-command-meta,
     .team-section-title,
     .trade-card-title,
-    .free-agent-summary-label,
-    .draft-review-round-title,
     .player-detail-name,
     .player-detail-meta,
     .player-quick-view-name,
@@ -6099,7 +5628,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .free-agent-summary-grid,
     .free-agent-list,
     .draft-review-round-grid,
-    .trade-card-focus-row,
     .summary-tile-grid {
         gap: 3px !important;
         margin-top: 0.38rem !important;
@@ -6110,7 +5638,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .roster-limit-strip,
     .roster-limit-stat-danger,
     .summary-tile-risk,
-    .analysis-card-risk,
     .decision-panel-risk {
         background:
             linear-gradient(90deg, rgba(245, 158, 11, 0.12), rgba(5, 6, 9, 0.86) 40%) !important;
@@ -6197,15 +5724,12 @@ div[data-testid="stDialog"] .stButton > button:hover {
     }
     .decision-panel-top,
     .home-command-card-top,
-    .free-agent-top,
-    .trade-card-header,
     .draft-review-pick-top {
         align-items: flex-start !important;
         gap: 0.38rem !important;
     }
     .decision-panel-title,
     .home-command-card-value,
-    .free-agent-name,
     .trade-card-title,
     .draft-review-player-name {
         font-size: 0.88rem !important;
@@ -6273,7 +5797,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         padding-block: 0.64rem !important;
     }
     .dg-preset-command .section-title,
-    .home-command-title,
     .team-name {
         letter-spacing: 0.01em !important;
     }
@@ -6478,8 +6001,7 @@ div[class*="st-key-premium_plan_purchase"] [data-testid="stColumn"] > [data-test
     line-height: var(--line-height-title);
     margin-top: var(--space-xs);
 }
-.premium-checkout-support,
-.premium-status-context {
+.premium-checkout-support{
     color: var(--color-text-secondary);
     font-size: var(--font-size-body);
     line-height: var(--line-height-body);
@@ -7124,7 +6646,6 @@ div[data-testid="stDialog"] .player-quick-view-season-context {
     margin: var(--space-sm) 0 var(--space-xs) !important;
 }
 div[data-testid="stDialog"] .player-quick-view-detail-list,
-div[data-testid="stDialog"] .player-quick-view-context-section,
 div[data-testid="stDialog"] .player-quick-view-stat-section,
 div[data-testid="stDialog"] .summary-tile-grid,
 div[data-testid="stDialog"] .player-detail-score-row {
@@ -7469,32 +6990,10 @@ and authoritative. */
     line-height: var(--line-height-title);
     margin-top: var(--space-sm);
 }
-.trade-card-summary {
-    color: var(--color-text-secondary);
-    font: var(--font-body);
-    margin-top: var(--space-md);
-    overflow-wrap: anywhere;
-}
-.trade-card-opportunity {
-    background: var(--color-information-soft);
-    border-left: var(--border-width-semantic) solid var(--color-information);
-    border-radius: var(--radius-md);
-    margin-top: var(--space-md);
-    padding: var(--space-sm) var(--space-md);
-}
-.trade-card-opportunity-label {
-    color: var(--color-information);
-    font-size: var(--font-size-badge);
-    font-weight: var(--font-weight-title);
-    letter-spacing: var(--letter-spacing-badge);
-    text-transform: uppercase;
-}
-.trade-card-opportunity p {
-    color: var(--color-text-secondary);
-    font: var(--font-body);
-    margin: var(--space-xs) 0 0;
-    overflow-wrap: anywhere;
-}
+
+
+
+
 .trade-card-partner {
     color: var(--color-text-muted);
     font-size: var(--font-size-caption);
@@ -7504,12 +7003,7 @@ and authoritative. */
 .trade-card-partner strong {
     color: var(--color-text-secondary);
 }
-.trade-card-top-compact .trade-card-meta-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-    margin-top: var(--space-md);
-}
+
 .trade-matchup-compact {
     align-items: stretch;
     display: grid;
@@ -7782,9 +7276,7 @@ div[class*="st-key-trade_hub_"] [data-testid="stExpander"] {
     line-height: var(--line-height-card);
     overflow-wrap: break-word;
 }
-.trade-summary-separator {
-    color: var(--color-text-muted);
-}
+
 .trade-summary-value {
     align-items: center;
     color: var(--color-text-muted);

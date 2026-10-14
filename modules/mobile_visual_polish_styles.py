@@ -10,7 +10,7 @@ div[class*="st-key-decision_history"] [data-testid="stButton"] button{background
 [class*="dashboard_deep_analysis_nav"] :is([data-testid="stVerticalBlock"],[data-testid="stHorizontalBlock"],[data-testid="stColumn"],[data-testid="stElementContainer"],[data-testid="stButton"]){height:auto!important;margin:0!important;min-height:0!important}
 [class*="dashboard_deep_analysis_nav"] :is([data-testid="stHorizontalBlock"],[data-testid="stVerticalBlock"]){gap:var(--space-xs)!important}
 [class*="dashboard_deep_analysis_nav"] [data-testid="stColumn"]{flex:1 1 calc(50% - .5rem)!important;max-width:calc(50% - .25rem)!important;min-width:0!important;width:auto!important}
-.home-quick-actions-shell,.home-quick-nav-label,.home-quick-action-note{display:none!important}
+.home-quick-actions-shell,.home-quick-nav-label{display:none!important}
 @media (max-width:430px){[class*="dashboard_deep_analysis_nav"] [data-testid="stButton"] button{font-size:var(--font-size-caption,.68rem)!important;padding:var(--space-2xs) var(--space-xs)!important}}
 /* Expander/CTA touch targets owned by COMPONENT_FAMILY_CSS. */
 /* Shared quiet status surface — What Changed / Game Plan quiet / clear-state */

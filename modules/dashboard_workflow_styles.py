@@ -394,7 +394,6 @@ div[class*="st-key-dashboard_league_insights"] .home-command-card-verdict {
     margin: 0 0 var(--space-2xs);
 }
 div[class*="st-key-dashboard_league_insights"] .dg-football-asset__name,
-div[class*="st-key-dashboard_league_insights"] .scan-card-name,
 div[class*="st-key-dashboard_league_insights"] .compact-player-name,
 div[class*="st-key-dashboard_league_insights"] .home-command-card-value,
 div[class*="st-key-dashboard_league_insights"] .dg-football-prestige {

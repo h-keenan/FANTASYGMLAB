@@ -56,7 +56,6 @@ div[data-testid="stDialog"] h2 {
 
 :is(
     .dg-ui-card,
-    .dg-ui-callout,
     .dg-ui-empty-state,
     .summary-tile,
     .dg-intelligence-item,

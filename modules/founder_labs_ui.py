@@ -30,7 +30,7 @@ FOUNDER_LABS_CSS = """
 }
 .founder-labs-status { font-weight:var(--font-weight-title); letter-spacing:var(--letter-spacing-badge); }
 .founder-labs-warn { color:var(--color-warning, #f59e0b); }
-.founder-labs-note { color:var(--color-text-muted); margin-top:var(--space-md); }
+
 </style>
 """
 

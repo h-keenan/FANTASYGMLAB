@@ -29,9 +29,7 @@ FOUNDER_BETA_CONSISTENCY_CSS = """
 }
 
 .summary-tile-value,
-.team-rank-value,
-.trade-summary-value strong,
-.waiver-metric-row dd {
+.trade-summary-value strong{
     font: var(--type-primary-metric) !important;
 }
 

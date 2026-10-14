@@ -66,8 +66,7 @@ FOUNDER_BETA_UX_CSS = """
     margin-top: var(--space-xs);
 }
 
-.league-switch-card-badge,
-.injury-adjustment-badge {
+.league-switch-card-badge{
     align-items: center;
     border: var(--border-width-default) solid var(--color-border-strong);
     border-radius: var(--radius-pill);
@@ -92,13 +91,7 @@ FOUNDER_BETA_UX_CSS = """
     color: var(--color-text-secondary);
 }
 
-.injury-adjustment-badge {
-    background: var(--color-warning-soft);
-    border-color: var(--color-warning);
-    color: var(--color-text-primary);
-    margin-left: var(--space-xs);
-    vertical-align: middle;
-}
+
 
 .home-command-card-dot,
 .summary-tile-dot {
@@ -203,7 +196,6 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
     .trade-card-subtitle,
     .trade-side-header,
     .trade-asset-meta,
-    .trade-delta-label,
     .trade-card-value-strip,
     .live-rank-meta,
     .live-rank-score small,

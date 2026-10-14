@@ -209,7 +209,7 @@ div[class*="st-key-pqv_detail_nav_rail"] [data-testid="stButton"] button,div[cla
 div[class*="st-key-pqv_detail_nav_rail"] button[kind="primary"],div[class*="st-key-pqv_detail_nav_rail"] button[data-testid="stBaseButton-primary"]{background:var(--color-information)!important;border-color:var(--color-information)!important;color:var(--color-text-primary)!important}
 div[class*="st-key-pqv_actions_tertiary"]{margin:0}
 div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[class*="st-key-pqv_actions_tertiary"] button[data-testid^="stBaseButton"]{background:transparent!important;background-image:none!important;border:0!important;border-block-end:var(--border-width-default) solid var(--color-danger)!important;border-left:0!important;color:var(--color-danger)!important;font-size:var(--font-size-caption)!important;min-height:auto!important;padding-inline:0!important;text-transform:none!important}
-.pqv-decision-grid,.pqv-context-grid{display:grid;gap:var(--space-md);margin:0 0 var(--space-sm);max-width:48rem}
+.pqv-decision-grid{display:grid;gap:var(--space-md);margin:0 0 var(--space-sm);max-width:48rem}
 .pqv-decision-primary,.pqv-decision-secondary{display:grid;gap:var(--space-sm);min-width:0}
 .pqv-fantasy-evidence{margin:0}
 .player-dossier-context-action{margin:0;padding:0}
@@ -345,8 +345,8 @@ div[class*="st-key-pqv_actions_strip"]{max-width:54rem}
 .pqv-compact-model,.pqv-compact-career{display:grid;align-content:start;gap:var(--space-xs)}
 .pqv-model-summary-cell strong,.pqv-career-glance-cell strong{font-size:var(--font-size-card-title);line-height:var(--line-height-card)}
 .pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr)}
-.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-summary,.pqv-model-summary,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.pqv-context-grid,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
-.pqv-decision-grid,.pqv-context-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
+.pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-summary,.pqv-model-summary,.pqv-career-dossier,.pqv-bio,.pqv-decision-grid,.player-quick-view-detail-list,.pqv-model-matrix{max-width:none}
+.pqv-decision-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,0.85fr);align-items:start}
 .pqv-glance-grid{grid-template-columns:repeat(6,minmax(4.5rem,6.5rem));justify-content:start}
 .pqv-model-matrix{grid-template-columns:repeat(5,minmax(0,1fr));max-width:56rem}
 .pqv-model-cell:last-child:nth-child(odd){grid-column:auto}

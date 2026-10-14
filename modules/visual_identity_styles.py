@@ -73,14 +73,10 @@ select {
 .dg-ui-card,
 .dg-ui-empty-state,
 .trade-idea-card,
-.waiver-recommendation-card,
 .scan-card,
 .compact-player-row,
 .summary-tile,
-.team-card,
-.league-team-card,
 .draft-team-card,
-.premium-card,
 .settings-card,
 .player-detail-panel,
 .player-detail-section,
@@ -134,13 +130,13 @@ div[data-testid="stDialog"] [role="dialog"]{
     border-radius: var(--radius-none) !important;
 }
 
-.scan-card-name,
+
 .compact-player-name{
     color: var(--color-text-primary) !important;
     font-weight: var(--font-weight-title) !important;
 }
 
-.scan-card-meta,
+
 .compact-player-meta,
 .scan-card-kpi-label{
     color: var(--color-text-muted) !important;
@@ -166,11 +162,7 @@ div[data-testid="stDialog"] [role="dialog"]{
 .player-prestige-replacement { color: var(--color-prestige-replacement) !important; }
 
 .player-position-badge,
-.scan-card-position,
-.compact-player-position,
-.player-support-chip,
-.trade-player-chip,
-.waiver-player-chip {
+.player-support-chip{
     background: var(--color-surface-muted) !important;
     border: var(--border-width-default) solid var(--color-border-strong) !important;
     border-radius: var(--radius-none) !important;
@@ -199,7 +191,6 @@ div[data-testid="stDialog"] [role="dialog"]{
 /* Section hierarchy and dashboard density. */
 .dg-ui-eyebrow,
 .section-kicker,
-.card-kicker,
 .metric-label{
     color: var(--color-text-muted) !important;
     letter-spacing: var(--letter-spacing-badge);

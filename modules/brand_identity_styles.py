@@ -115,7 +115,6 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
 .trade-detail-brand__mark,
 .trade-summary-brand__mark-img,
 .trade-detail-brand__mark-img,
-.dg-decision-brand__mark-img,
 .dg-compact-mark-img {
     display: inline-block;
     height: 1.75rem;
@@ -136,8 +135,7 @@ div[class*="st-key-mobile_sheet_nav_"][class*="news"] [data-testid="stButton"] >
     white-space: nowrap;
 }
 
-.trade-summary-brand__badge,
-.trade-detail-brand__badge {
+.trade-summary-brand__badge{
     font-size: 0.48rem;
     font-weight: 800;
     letter-spacing: 0.06em;
