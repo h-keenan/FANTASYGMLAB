@@ -742,6 +742,11 @@ main h4 {
     outline: 2px solid color-mix(in srgb, var(--color-accent-strong) 72%, transparent);
     outline-offset: 2px;
 }
+.dg-workspace-handoff-caption {
+    color: var(--color-text-muted);
+    font: var(--type-supporting-metadata);
+    padding: 0.2rem 0;
+}
 .home-command-card-wide {
     grid-column: 1 / -1;
 }

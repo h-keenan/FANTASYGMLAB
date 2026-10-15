@@ -6,6 +6,7 @@ from html import escape
 from typing import Any, Callable, Mapping
 
 from modules import compact_fantasy_assets
+from modules import league_history
 from modules import league_history_ui
 from modules import league_storylines as storylines
 from modules import metric_graphic_primitives as mgp
@@ -53,11 +54,30 @@ def _player_chip(asset: Mapping[str, Any] | None) -> str:
     )
 
 
-def _card_html(*, kicker: str, question: str, body: str, wide: bool = False, transaction_id: str = "") -> str:
+def _card_html(
+    *,
+    kicker: str,
+    question: str,
+    body: str,
+    wide: bool = False,
+    transaction_id: str = "",
+    route: str = "",
+) -> str:
     wide_class = " dg-ls-card--wide" if wide else ""
     tx_attr = f" data-history-tx='{escape(transaction_id, quote=True)}'" if transaction_id else ""
+    # Whole-card tap-through (coridian_, 2026-10-14): a story card that maps
+    # to a real History filter is itself the tap target into History — same
+    # home-command-route-card + TAP_DELEGATION_JS contract every other
+    # whole-card "Open ..." destination on the site uses, no separate button.
+    route_class = " home-command-route-card" if route else ""
+    route_attr = (
+        f" data-route='{escape(route, quote=True)}' role='button' tabindex='0' "
+        f"aria-label='Open {escape(kicker, quote=True)} in History'"
+        if route
+        else ""
+    )
     return (
-        f"<article class='dg-ls-card{wide_class}'{tx_attr}>"
+        f"<article class='dg-ls-card{wide_class}{route_class}'{tx_attr}{route_attr}>"
         f"<div class='dg-ls-kicker'>{escape(kicker)}</div>"
         f"<div class='dg-ls-question'>{escape(question)}</div>"
         f"{body}"
@@ -139,6 +159,7 @@ def storylines_panel_html(
                 body=body,
                 wide=True,
                 transaction_id=_text(biggest.get("transaction_id")),
+                route=league_history.FILTER_TRADES,
             )
         )
 
@@ -158,6 +179,7 @@ def storylines_panel_html(
                 question="Who spent the most on a single claim?",
                 body=body,
                 transaction_id=_text(faab.get("transaction_id")),
+                route=league_history.FILTER_WIRE,
             )
         )
 
@@ -274,6 +296,8 @@ def render_storylines_panel(
     team_logo_html: Callable[..., str],
     render_tappable_player_html: Callable[..., str] | None = None,
     open_player_quick_view: Callable[..., None] | None = None,
+    render_interactive_html: Callable[..., dict] | None = None,
+    open_history: Callable[[str], None] | None = None,
 ) -> None:
     inject_global_styles(LEAGUE_STORYLINES_CSS)
     report = storylines.build_league_storylines(
@@ -293,7 +317,35 @@ def render_storylines_panel(
     # way GM Plan's Trade Opportunities card does, with no per-card asset
     # mapping needed since a clicked chip's data-player-id already IS the
     # player_id.
-    if render_tappable_player_html is not None and open_player_quick_view is not None:
+    #
+    # Whole-card tap-through (coridian_, 2026-10-14): Biggest Trade/Biggest
+    # FAAB already carry a real History filter (_card_html's route=) — when
+    # render_interactive_html/open_history are wired those two cards become
+    # their own tap target into History, replacing the two standalone
+    # "Open biggest ... in History" buttons league_recaps_ui.py used to
+    # render below this whole panel.
+    if render_interactive_html is not None and (
+        open_player_quick_view is not None or open_history is not None
+    ):
+        clicked = render_interactive_html(
+            html=panel_html,
+            key_prefix="league_storylines_panel",
+        )
+        clicked_player_id = (
+            str(clicked.get("player_id") or "").strip() if isinstance(clicked, dict) else ""
+        )
+        clicked_route = (
+            str(clicked.get("route") or "").strip() if isinstance(clicked, dict) else ""
+        )
+        if clicked_player_id and open_player_quick_view is not None:
+            open_player_quick_view(
+                clicked_player_id,
+                source_label="League Overview - Storylines",
+                source_note="Inspect this player from this season's storylines.",
+            )
+        elif clicked_route and open_history is not None:
+            open_history(clicked_route)
+    elif render_tappable_player_html is not None and open_player_quick_view is not None:
         clicked_player_id = render_tappable_player_html(
             html=panel_html,
             key_prefix="league_storylines_panel",

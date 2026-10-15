@@ -204,6 +204,7 @@ def render_gm_targets_workspace(
     open_destination: Callable[[str], None] | None = None,
     cached_headshot_data_url: Callable[[str], str] | None = None,
     render_premium_lock: Callable[..., None] | None = None,
+    render_interactive_html: Callable[..., dict] | None = None,
     title: str = "GM Targets",
 ) -> None:
     """Compact GM Targets surface — answers who/status/change/next."""
@@ -244,12 +245,37 @@ def render_gm_targets_workspace(
             targets = gm_targets.fetch_targets_for_league(session, league_id=league_key)
 
         if not targets:
-            html_rendering.render_html_fragment(
+            quiet_html = (
                 "<div class='dg-gm-targets-quiet' role='status'>"
                 "<strong>No GM Targets yet</strong>"
                 "<span>Add players you're considering from Player Quick View.</span>"
                 "</div>"
             )
+            # Whole-card tap-through (coridian_, 2026-10-14): the empty-state
+            # note used to be inert HTML with the only real click target on a
+            # separate "Open Players" st.button below it. Reuses the same
+            # home-command-route-card + TAP_DELEGATION_JS contract every other
+            # whole-card "Open ..." destination on the site uses.
+            if render_interactive_html is not None and open_destination is not None:
+                wrapped_html = (
+                    "<div class='home-command-route-card' data-route='players' "
+                    "role='button' tabindex='0' aria-label='Open Players'>"
+                    f"{quiet_html}"
+                    "</div>"
+                )
+                clicked = render_interactive_html(
+                    html=wrapped_html,
+                    key_prefix="gm_targets_empty_open_players",
+                )
+                clicked_route = (
+                    str(clicked.get("route") or "").strip()
+                    if isinstance(clicked, dict)
+                    else ""
+                )
+                if clicked_route:
+                    open_destination("players")
+                return
+            html_rendering.render_html_fragment(quiet_html)
             if open_destination is not None:
                 if st.button(
                     "Open Players",
@@ -347,8 +373,26 @@ def render_gm_targets_workspace(
             # Waivers/Trade Hub/My Team's cards (the explicit "Open player"
             # button below stays too, as a keyboard/no-JS fallback — this is
             # additive, not a replacement for it).
+            # Whole-card tap-through (coridian_, 2026-10-14): when this card
+            # has a real waivers/trade-hub handoff, the whole article becomes
+            # that destination's tap target too (home-command-route-card +
+            # data-route, same TAP_DELEGATION_JS contract as the identity
+            # row's player tap, just one level up). The player tap zone
+            # nested inside still wins on its own clicks — TAP_DELEGATION_JS
+            # matches the closest player node before falling back to the
+            # route card, same as workspace_ui's home-command-player-card.
+            handoff = _workflow_handoff_destination(card.ownership)
+            card_route_class = ""
+            card_route_attrs = ""
+            if handoff is not None and open_destination is not None:
+                handoff_key, handoff_label = handoff
+                card_route_class = " home-command-route-card"
+                card_route_attrs = (
+                    f" data-route='{escape(handoff_key, quote=True)}' role='button' "
+                    f"tabindex='0' aria-label='{escape(handoff_label, quote=True)}'"
+                )
             card_html = (
-                "<article class='dg-gm-target-card' "
+                f"<article class='dg-gm-target-card{card_route_class}'{card_route_attrs} "
                 f"data-gm-target='1' data-gm-target-player-id='{escape(card.player_id)}'>"
                 "<div class='dg-gm-target-top'>"
                 "<div class='dg-gm-target-identity player-card-tappable' "
@@ -371,7 +415,27 @@ def render_gm_targets_workspace(
                 "</div>"
                 "</article>"
             )
-            if open_player_quick_view is not None:
+            clicked_route = ""
+            if render_interactive_html is not None and (
+                open_player_quick_view is not None or card_route_attrs
+            ):
+                clicked = render_interactive_html(
+                    html=card_html,
+                    key_prefix=f"gm_targets_card_{card.player_id}",
+                )
+                clicked_player_id = (
+                    str(clicked.get("player_id") or "").strip()
+                    if isinstance(clicked, dict)
+                    else ""
+                )
+                clicked_route = (
+                    str(clicked.get("route") or "").strip()
+                    if isinstance(clicked, dict)
+                    else ""
+                )
+                if clicked_player_id and open_player_quick_view is not None:
+                    open_player_quick_view(clicked_player_id)
+            elif open_player_quick_view is not None:
                 clicked_player_id = render_tappable_player_html(
                     html=card_html,
                     key_prefix=f"gm_targets_card_{card.player_id}",
@@ -451,10 +515,12 @@ def render_gm_targets_workspace(
                     primary_first=True,
                     horizontal_alignment="distribute",
                 )
-            handoff = _workflow_handoff_destination(card.ownership)
             if handoff is not None and open_destination is not None:
                 dest_key, dest_label = handoff
-                if st.button(
+                if render_interactive_html is not None:
+                    if clicked_route == dest_key:
+                        open_destination(dest_key)
+                elif st.button(
                     dest_label,
                     key=f"gm_targets_handoff_{dest_key}_{card.player_id}",
                     use_container_width=True,

@@ -1780,8 +1780,18 @@ def _render_inbox_panel(
     on_open_destination: Callable[[str], None] | None,
     empty_copy: str,
     ready: bool = True,
+    render_interactive_html: Callable[..., dict] | None = None,
 ) -> None:
-    """Render inbox body with each card immediately followed by its real CTA."""
+    """Render inbox body with each card immediately followed by its real CTA.
+
+    Whole-card tap-through (coridian_, 2026-10-14): when ``render_interactive_html``
+    is wired (the real app.py bridge to modules.interaction_contract.
+    TAP_DELEGATION_JS), each item's own card becomes the tap target itself —
+    the separate "{cta} ->" st.button underneath it is dropped. Falls back to
+    the original card-then-button layout when no interactive renderer is
+    supplied, so any caller that hasn't wired the bridge still gets a real,
+    reachable control.
+    """
 
     unread = unread_count(resolved)
     active = sum(1 for item in resolved if item.source_kind != "product" and not item.stale)
@@ -1798,33 +1808,82 @@ def _render_inbox_panel(
             f"<p class='dg-notification-panel__empty'>{escape(empty_copy)}</p>"
         )
     for item in resolved:
-        render_html_fragment(notification_item_html(item))
+        item_html = notification_item_html(item)
         if item.stale:
+            render_html_fragment(item_html)
             continue
         hint = str(item.href_hint or "").strip()
         cta = destination_label(hint)
         if not hint or not cta:
+            render_html_fragment(item_html)
             continue
+
+        def _handle_item_open(
+            _item: NotificationItem = item,
+            _prefix: str = key_prefix,
+            _callback=on_open_item,
+        ) -> None:
+            _close_inbox(_prefix)
+            if _callback is not None:
+                _callback(_item)
+
+        def _handle_destination_open(
+            _destination: str = hint,
+            _prefix: str = key_prefix,
+            _callback=on_open_destination,
+        ) -> None:
+            _close_inbox(_prefix)
+            if _callback is not None:
+                _callback(_destination)
+
+        if key_prefix.startswith("fixture") and on_open_destination is not None:
+            # Synthetic Playwright harness only (scripts/ui_validation_harness.py)
+            # -- a real href keeps scripts/validate_mobile_ui.py's deterministic
+            # role=link click-path assertions working without any app
+            # session-state plumbing. Real product traffic never uses this
+            # key_prefix; see the whole-card branch below for that.
+            render_html_fragment(item_html)
+            with st.container(key=f"dg_notify_action_{action_key_prefix}_{item.id}"):
+                st.link_button(
+                    f"{cta} →",
+                    url=(
+                        f"?surface=dashboard&notify=populated&inbox=open"
+                        f"&fixture_nav={hint}"
+                    ),
+                    use_container_width=True,
+                    key=f"{action_key_prefix}_go_{item.id}",
+                )
+            continue
+
+        if render_interactive_html is not None and (
+            on_open_item is not None or on_open_destination is not None
+        ):
+            with st.container(key=f"dg_notify_action_{action_key_prefix}_{item.id}"):
+                wrapped_item_html = (
+                    "<div class='home-command-route-card dg-notification-item-tap' "
+                    f"data-route='{escape(item.id, quote=True)}' role='button' "
+                    f"tabindex='0' aria-label='Open {escape(cta, quote=True)}'>"
+                    f"{item_html}"
+                    "</div>"
+                )
+                clicked = render_interactive_html(
+                    html=wrapped_item_html,
+                    key_prefix=f"{action_key_prefix}_tap_{item.id}",
+                )
+                clicked_route = (
+                    str(clicked.get("route") or "").strip()
+                    if isinstance(clicked, dict)
+                    else ""
+                )
+                if clicked_route == item.id:
+                    if on_open_item is not None:
+                        _handle_item_open()
+                    elif on_open_destination is not None:
+                        _handle_destination_open()
+            continue
+
+        render_html_fragment(item_html)
         with st.container(key=f"dg_notify_action_{action_key_prefix}_{item.id}"):
-
-            def _handle_item_open(
-                _item: NotificationItem = item,
-                _prefix: str = key_prefix,
-                _callback=on_open_item,
-            ) -> None:
-                _close_inbox(_prefix)
-                if _callback is not None:
-                    _callback(_item)
-
-            def _handle_destination_open(
-                _destination: str = hint,
-                _prefix: str = key_prefix,
-                _callback=on_open_destination,
-            ) -> None:
-                _close_inbox(_prefix)
-                if _callback is not None:
-                    _callback(_destination)
-
             if on_open_item is not None:
                 st.button(
                     f"{cta} →",
@@ -1833,23 +1892,12 @@ def _render_inbox_panel(
                     on_click=_handle_item_open,
                 )
             elif on_open_destination is not None:
-                if key_prefix.startswith("fixture"):
-                    st.link_button(
-                        f"{cta} →",
-                        url=(
-                            f"?surface=dashboard&notify=populated&inbox=open"
-                            f"&fixture_nav={hint}"
-                        ),
-                        use_container_width=True,
-                        key=f"{action_key_prefix}_go_{item.id}",
-                    )
-                else:
-                    st.button(
-                        f"{cta} →",
-                        key=f"{action_key_prefix}_go_{item.id}",
-                        use_container_width=True,
-                        on_click=_handle_destination_open,
-                    )
+                st.button(
+                    f"{cta} →",
+                    key=f"{action_key_prefix}_go_{item.id}",
+                    use_container_width=True,
+                    on_click=_handle_destination_open,
+                )
     with st.container(key=f"dg_notify_see_all_{action_key_prefix}"):
 
         def _handle_see_all(
@@ -1891,12 +1939,17 @@ def render_notification_center(
     on_open_item: Callable[[NotificationItem], None] | None = None,
     on_open_destination: Callable[[str], None] | None = None,
     key_prefix: str = "executive_notifications",
+    render_interactive_html: Callable[..., dict] | None = None,
 ) -> None:
     """Render Alerts as an anchored command-bar dropdown (not a centered modal).
 
-    Interaction integrity from #150 is preserved: every actionable card is
-    immediately followed by its real Streamlit CTA control. Decorative HTML
-    never acts as the click target.
+    Interaction integrity from #150 is preserved: every actionable card is a
+    real, reachable control. It used to be an inert HTML card immediately
+    followed by its own separate Streamlit CTA button; the whole card is now
+    the control (2026-10-14, coridian_: "make the whole card tappable and
+    remove the button") via the same TAP_DELEGATION_JS route-card contract
+    workspace_ui.render_home_command_tiles uses, when ``render_interactive_html``
+    is supplied. Decorative HTML never acts as the click target.
     """
 
     resolved = (
@@ -1938,6 +1991,7 @@ def render_notification_center(
                     on_open_destination=on_open_destination,
                     empty_copy=empty_copy,
                     ready=ready,
+                    render_interactive_html=render_interactive_html,
                 )
 
         # Deterministic harness open path when ?inbox=open — same body/CTA
@@ -1956,6 +2010,7 @@ def render_notification_center(
                     on_open_destination=on_open_destination,
                     empty_copy=empty_copy,
                     ready=ready,
+                    render_interactive_html=render_interactive_html,
                 )
 def activity_inventory_ready(
     session: Mapping[str, Any] | None,

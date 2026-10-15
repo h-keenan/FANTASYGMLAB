@@ -36,7 +36,7 @@ def test_workspace_and_premium_handoffs_use_commit_callbacks():
         )
     ]
     assert "_commit_platform_destination(route_key, source=\"workspace_handoff\")" in handoff
-    assert "on_click=_handoff_with_return" in handoff
+    assert "_handoff_with_return()" in handoff
     assert "st.rerun()" not in handoff
     assert "st.rerun()" not in trade
 

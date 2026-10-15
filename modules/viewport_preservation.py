@@ -131,7 +131,6 @@ VIEWPORT_PRESERVE_JS = """
         "executive_notifications_",
       ]
       const INTENTIONAL_NAV_KEY_SUFFIXES = [
-        "_handoff",
         "_open_trade_hub",
         "_open_trade_analyzer",
         "_my_team",
@@ -185,6 +184,14 @@ VIEWPORT_PRESERVE_JS = """
         // re-anchor the new page to the old card's on-screen offset,
         // producing the "jumps me around like I'm scrolling" / tap
         // "doesn't always register" reports on mobile.
+        //
+        // app.py's render_workspace_handoff() (the Dashboard/Teams "Open
+        // Trade Hub"/"Open My Team" handoff card) used to be a plain
+        // st.button with its own pinned "_handoff" key suffix here; it is
+        // now a whole-card data-route tap (coridian_, 2026-10-14: "make the
+        // whole card tappable and remove the button") covered by this same
+        // generic data-route check, so that suffix was removed below as
+        // dead weight rather than left to silently stop matching anything.
         if (el.closest("[data-route]")) return true
         return false
       }
