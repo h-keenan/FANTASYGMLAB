@@ -52,7 +52,7 @@ const FIXTURE: DashboardResponse = {
 
 describe("DashboardContent", () => {
   it("renders the league name, Game Plan cards, and Team Snapshot tiles from real fixture data", () => {
-    render(<DashboardContent leagueName="Dynasty Overlords" data={FIXTURE} />);
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
 
     expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
     expect(screen.getByText("Today's Game Plan")).toBeInTheDocument();
@@ -74,7 +74,7 @@ describe("DashboardContent", () => {
       items: [],
       entitlement: { is_premium: true, visible_count: 0, hidden_count: 0 },
     };
-    render(<DashboardContent leagueName="Dynasty Overlords" data={quietFixture} />);
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={quietFixture} />);
 
     expect(screen.getByText("No urgent roster issues right now.")).toBeInTheDocument();
   });

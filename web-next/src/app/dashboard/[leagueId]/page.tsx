@@ -57,5 +57,5 @@ export default function DashboardPage() {
     );
   }
 
-  return <DashboardContent leagueName={leagueName} data={data} />;
+  return <DashboardContent leagueId={leagueId} leagueName={leagueName} data={data} />;
 }

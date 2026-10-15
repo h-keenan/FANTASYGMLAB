@@ -51,6 +51,28 @@ def lead_with_franchise_construction(settings: Mapping[str, Any] | None) -> bool
     return competition_format(settings) in {KEEPER, DYNASTY}
 
 
+def is_superflex(settings: Mapping[str, Any] | None) -> bool:
+    """True for 2QB/Superflex leagues — single source of truth for the
+    `QB` position-group context chip (My Team's Position Groups tile and
+    GET .../my-team-needs' identical `superflex` flag previously each
+    hand-kept their own copy of this exact three-way check)."""
+
+    payload = settings if isinstance(settings, Mapping) else {}
+    if int(payload.get("superflex_count") or 0) > 0:
+        return True
+    if int(payload.get("qb_count") or 1) >= 2:
+        return True
+    return str(payload.get("qb_format") or "").strip().casefold() in {"2qb", "superflex"}
+
+
+def is_te_premium(settings: Mapping[str, Any] | None) -> bool:
+    """True when the league scores a TE premium — same `te_premium` flag
+    My Team's Position Groups tile and .../my-team-needs both read."""
+
+    payload = settings if isinstance(settings, Mapping) else {}
+    return bool(payload.get("te_premium"))
+
+
 def valuation_lens_label(archetype_badge: str | None, archetype_display_name: str | None = "") -> str:
     badge = str(archetype_badge or "").strip()
     if badge:

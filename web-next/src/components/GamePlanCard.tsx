@@ -1,15 +1,6 @@
 import type { BriefingItem } from "@/lib/api";
 import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
-
-const POSITION_COLOR_VAR: Record<string, string> = {
-  QB: "--color-position-qb",
-  RB: "--color-position-rb",
-  WR: "--color-position-wr",
-  TE: "--color-position-te",
-  K: "--color-position-k",
-  DEF: "--color-position-dst",
-  DST: "--color-position-dst",
-};
+import { positionColorVar } from "@/lib/playerPresentation";
 
 /**
  * Ports modules/daily_gm_briefing_ui.py's Today's Game Plan card: kicker
@@ -31,9 +22,7 @@ function formatCategory(category: string): string {
 }
 
 export function GamePlanCard({ item }: { item: BriefingItem }) {
-  const positionVar = item.route_player_position
-    ? POSITION_COLOR_VAR[item.route_player_position.toUpperCase()]
-    : undefined;
+  const positionVar = positionColorVar(item.route_player_position);
 
   return (
     <article

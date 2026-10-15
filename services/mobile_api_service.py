@@ -17,6 +17,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
   - GET  /v1/leagues/{id}/draft-picks    — every draft pick asset + its full valuation breakdown
   - GET  /v1/leagues/{id}/my-team        — your own roster's suggested starters vs. bench
+  - GET  /v1/leagues/{id}/my-team-needs  — Strength & Pressure / Position Groups / Biggest Need detail
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
   - GET  /v1/players?ids=1,2,3           — minimal Sleeper player info by id
   - GET  /v1/leagues/{id}/rankings       — league-adjusted player rankings
@@ -115,6 +116,7 @@ from modules import (
     gm_plan,
     gm_targets,
     injury_ui,
+    league_format_context,
     league_history,
     league_glance,
     league_rankings,
@@ -140,6 +142,7 @@ from modules import (
     push_triggers,
     rankings,
     redis_cache,
+    roster_needs,
     saved_leagues,
     sleeper,
     sleeper_leagues,
@@ -154,7 +157,12 @@ from modules import (
     trade_offer_analyzer,
     waivers_ui,
 )
-from modules.team_eval import refine_team_directions, suggest_optimal_lineup
+from modules.team_eval import (
+    build_league_summary,
+    get_team_vs_league,
+    refine_team_directions,
+    suggest_optimal_lineup,
+)
 from modules.trade_analyzer_assembly import pick_asset_from_mapping, player_asset_from_mapping
 
 
@@ -5353,6 +5361,146 @@ def get_league_my_team(
         "bench": bench,
         "reason": "",
         "roster_id": str(my_roster.get("roster_id") or ""),
+    }
+
+
+def _empty_my_team_needs_response(settings: dict[str, Any], *, reason: str) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "reason": reason,
+        "show_franchise_construction": league_format_context.lead_with_franchise_construction(settings),
+        "superflex": league_format_context.is_superflex(settings),
+        "te_premium": league_format_context.is_te_premium(settings),
+        "strengths": [],
+        "weaknesses": [],
+        "biggest_need": None,
+        "position_groups": [],
+    }
+
+
+@app.get("/v1/leagues/{league_id}/my-team-needs")
+def get_league_my_team_needs(
+    league_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Roster-needs detail for My Team's Strength & Pressure / Position
+    Groups / Biggest Need tiles — the pieces of the web app's My Team page
+    (modules.my_team_ui.render_my_team_workspace) that GET .../my-team
+    deliberately left out as "lineup view only" (see that endpoint's own
+    docstring).
+
+    Thin wrapper only: every field below comes from calling the exact same
+    pure engines app.py's My Team route already calls for these sections —
+    modules.team_eval.build_league_summary + get_team_vs_league for the
+    league-relative position-strength list, modules.trade_analyzer_fit.
+    build_team_needs_assessment (the same call GET .../waivers already
+    makes for its own needed_positions) for per-position classification,
+    and modules.roster_needs.select_need_headline for the Biggest Need
+    headline — no new valuation or need-classification logic is introduced
+    here, and the weaknesses filter below mirrors app.py's My Team route
+    (short_term_need rooms that are not merely a temporary injury blip)
+    byte-for-byte.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        return _empty_my_team_needs_response({}, reason=reason)
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if valued.empty:
+        return _empty_my_team_needs_response(settings, reason="no_player_data")
+
+    score_field = league_value_settings.valuation_score_field(lens)
+    roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+    roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
+    if roster_df.empty:
+        return _empty_my_team_needs_response(settings, reason="empty_roster")
+
+    lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
+
+    # League-relative room strength (QB/RB/WR/TE meaningfully above the
+    # league's starter-weighted average) — same per-team summary frame
+    # GET .../team-rankings' archetype column is refined from, read
+    # directly here for the single list My Team's Strength & Pressure
+    # "Strength" card needs. Best-effort: a Sleeper hiccup building the
+    # league-wide summary degrades to an empty strengths list rather than
+    # failing this endpoint's actual roster-needs data below.
+    team_metrics: dict[str, Any] | None = None
+    try:
+        df_summary = build_league_summary(
+            valued,
+            league_id,
+            score_field=score_field,
+            current_score_field=score_field,
+            lineup_settings=settings,
+        )
+        if not df_summary.empty:
+            team_metrics = get_team_vs_league(df_summary, my_roster.get("roster_id"))
+    except Exception:
+        team_metrics = None
+    strengths = [str(pos) for pos in ((team_metrics or {}).get("strengths") or [])]
+
+    assessment = trade_analyzer_fit.build_team_needs_assessment(
+        roster_df, team_metrics, settings, lineup_df=lineup_df, score_field=score_field
+    )
+    major_needed_positions = trade_analyzer_fit.get_needed_positions(
+        roster_df, team_metrics, settings, include_fallback=False, assessment=assessment
+    )
+    weaknesses = [
+        position
+        for position in major_needed_positions
+        if (
+            assessment.for_position(position) is not None
+            and assessment.for_position(position).classification == "short_term_need"
+            and not assessment.for_position(position).temporary_injury_pressure
+        )
+    ]
+
+    need_display = roster_needs.select_need_headline(assessment)
+    biggest_need = {
+        "label": str(need_display.get("label") or "").replace("Biggest Team Need", "Biggest Need"),
+        "value": need_display.get("value"),
+        "note": need_display.get("note"),
+    }
+
+    position_groups = [
+        {
+            "position": item.position,
+            "classification": item.classification,
+            "reasons": list(item.reasons),
+            "upgrade_opportunity": bool(item.upgrade_opportunity),
+            "temporary_injury_pressure": bool(item.temporary_injury_pressure),
+        }
+        for item in assessment.positions
+    ]
+
+    return {
+        "ok": True,
+        "reason": "",
+        "show_franchise_construction": league_format_context.lead_with_franchise_construction(settings),
+        "superflex": league_format_context.is_superflex(settings),
+        "te_premium": league_format_context.is_te_premium(settings),
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "biggest_need": biggest_need,
+        "position_groups": position_groups,
     }
 
 
