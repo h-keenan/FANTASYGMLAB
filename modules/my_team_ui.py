@@ -418,13 +418,8 @@ def _position_groups_items(
     league_settings: dict | None,
 ) -> list[dict[str, str]]:
     settings = league_settings or {}
-    superflex = (
-        int(settings.get("superflex_count") or 0) > 0
-        or int(settings.get("qb_count") or 1) >= 2
-        or str(settings.get("qb_format") or "").strip().lower()
-        in {"2qb", "superflex"}
-    )
-    te_premium = bool(settings.get("te_premium"))
+    superflex = league_format_context.is_superflex(settings)
+    te_premium = league_format_context.is_te_premium(settings)
     items: list[dict[str, str]] = []
     positions = getattr(team_needs_assessment, "positions", ()) or ()
     for assessment in positions:

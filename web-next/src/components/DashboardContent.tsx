@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { DashboardResponse } from "@/lib/api";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
@@ -20,9 +22,12 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
  * a fixture, without needing to mock Supabase auth/fetch.
  */
 
+// "My Team" now has a real Next.js page (see app/my-team/[leagueId]) and is
+// rendered separately below as an internal <Link> instead of a Streamlit
+// deep link — every other destination here is still Streamlit-only for
+// this revision.
 const QUICK_ACTIONS: { label: string; destination: string }[] = [
   { label: "League Overview", destination: "rankings" },
-  { label: "My Team", destination: "my_team" },
   { label: "Trade Hub", destination: "trade_hub" },
   { label: "Waivers", destination: "waivers" },
   { label: "Draft Center", destination: "draft_summary" },
@@ -31,7 +36,15 @@ const QUICK_ACTIONS: { label: string; destination: string }[] = [
   { label: "College Scouting", destination: "college_scouting" },
 ];
 
-export function DashboardContent({ leagueName, data }: { leagueName: string; data: DashboardResponse }) {
+export function DashboardContent({
+  leagueId,
+  leagueName,
+  data,
+}: {
+  leagueId: string;
+  leagueName: string;
+  data: DashboardResponse;
+}) {
   const snapshot = data.team_snapshot;
 
   return (
@@ -110,6 +123,18 @@ export function DashboardContent({ leagueName, data }: { leagueName: string; dat
           Still in Streamlit for this release — opens in the existing app.
         </p>
         <div className="grid grid-cols-2 gap-3">
+          <Link
+            href={`/my-team/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
+            className="px-4 py-3 text-sm font-bold flex items-center justify-between"
+            style={{
+              background: "var(--color-surface-secondary)",
+              border: "var(--border-width-default) solid var(--color-border)",
+              color: "var(--color-text-primary)",
+            }}
+          >
+            My Team
+            <span style={{ color: "var(--color-accent)" }}>→</span>
+          </Link>
           {QUICK_ACTIONS.map((action) => (
             <a
               key={action.destination}

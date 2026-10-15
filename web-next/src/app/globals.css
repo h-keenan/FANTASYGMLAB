@@ -302,3 +302,182 @@ a {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+
+/* ---------------------------------------------------------------------- */
+/* Circular "OVR" gauge — ports modules/player_cards.py's                 */
+/* overall_rating_gauge_html: a conic-gradient ring with the punched-out  */
+/* center technique already established sitewide (see that module's      */
+/* docstring — "the overall ALWAYS needs to be a circular gauge           */
+/* throughout the site", coridian_, 2026-10-14), not the old rectangular  */
+/* pill. --ovr-tint/--ovr-pct are set inline per player (see              */
+/* lib/playerPresentation.ts's overallRatingTint, which mirrors           */
+/* player_cards._overall_rating_tint_css's red->gold->green color-mix).   */
+/* ---------------------------------------------------------------------- */
+.ovr-gauge {
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--ovr-tint, var(--color-action)) calc(var(--ovr-pct, 0) * 1%), var(--color-border) 0);
+}
+.ovr-gauge::after {
+  content: "";
+  position: absolute;
+  inset: 0.3rem;
+  border-radius: 50%;
+  background: var(--color-surface-primary);
+}
+.ovr-gauge-value {
+  position: relative;
+  z-index: 1;
+  color: var(--ovr-tint, var(--color-action));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.ovr-gauge--sm {
+  width: 1.65rem;
+  height: 1.65rem;
+}
+.ovr-gauge--sm::after {
+  inset: 0.22rem;
+}
+.ovr-gauge--sm .ovr-gauge-value {
+  font-size: 0.56rem;
+}
+.ovr-gauge--md {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.ovr-gauge--md .ovr-gauge-value {
+  font-size: 0.75rem;
+}
+.ovr-gauge--lg {
+  width: 3.25rem;
+  height: 3.25rem;
+}
+.ovr-gauge--lg .ovr-gauge-value {
+  font-size: 1rem;
+}
+
+/* Team Value ring — ports modules/my_team_ui.py's team_snapshot_html
+   (.mt-value-ring): same conic-gradient + punched-out-center ring
+   mechanism as .ovr-gauge above, a team-level percentile metric instead
+   of a per-player rating, banded red/gold/green the same way
+   modules/league_workspace_ui.py._metric_tone_band bands every other
+   ranked-row metric in this app. */
+.value-ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  background: conic-gradient(var(--value-ring-tone) calc(var(--value-ring-pct, 0) * 1%), var(--color-border) 0);
+}
+.value-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0.45rem;
+  border-radius: 50%;
+  background: var(--color-surface-primary);
+}
+.value-ring-value {
+  position: relative;
+  z-index: 1;
+  color: var(--value-ring-tone);
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.value-ring--low {
+  --value-ring-tone: var(--color-danger);
+}
+.value-ring--mid {
+  --value-ring-tone: var(--color-action);
+}
+.value-ring--high {
+  --value-ring-tone: var(--color-success);
+}
+
+/* Tone-colored tiles/cards for Roster Signals, Strength and Pressure, and
+   Position Groups all use this one small tone vocabulary (reuses the same
+   semantic tokens every other page uses for its tone system; see
+   modules/card_hierarchy_styles.py's summary-tile and advice-card rules
+   for the Streamlit source of truth this consolidates down to a handful
+   of CSS variables instead of that much larger border-color cascade).
+   Note: power is the cyan information lane, not success or green (only
+   strength is success), and franchise is the gold premium lane, not
+   diagnostic or purple; strategy is plain accent cyan, same as power,
+   just a different concept (ranking lens versus roster-power metric). */
+.tone-strength {
+  border-left: var(--border-width-semantic) solid var(--color-success);
+}
+.tone-power,
+.tone-strategy {
+  border-left: var(--border-width-semantic) solid var(--color-information);
+}
+.tone-franchise {
+  border-left: var(--border-width-semantic) solid var(--color-premium);
+}
+.tone-need,
+.tone-health,
+.tone-risk,
+.tone-warning {
+  border-left: var(--border-width-semantic) solid var(--color-warning);
+}
+.tone-opportunity {
+  border-left: var(--border-width-semantic) solid var(--color-opportunity);
+}
+.tone-neutral {
+  border-left: var(--border-width-semantic) solid var(--color-border);
+}
+
+/* Same tone vocabulary applied to a title/value's text color — ports
+   .summary-tile-*'s/.advice-card-*'s own `.summary-tile-value`/
+   `.advice-title` color rules (card_hierarchy_styles.py), for a tile whose
+   headline number or observation title should carry the tone color, not
+   just the left rail. */
+.tone-strength .tone-value {
+  color: var(--color-success);
+}
+.tone-power .tone-value,
+.tone-strategy .tone-value {
+  color: var(--color-information);
+}
+.tone-franchise .tone-value {
+  color: var(--color-premium);
+}
+.tone-need .tone-value,
+.tone-health .tone-value,
+.tone-risk .tone-value,
+.tone-warning .tone-value {
+  color: var(--color-warning);
+}
+.tone-opportunity .tone-value {
+  color: var(--color-opportunity);
+}
+
+/* Position-colored plain text (e.g. "Biggest Need: Running Back") — ports
+   modules/football_assets.py's position_text_html, reusing the exact
+   --color-position-* tokens above instead of flat white (coridian_: "that
+   should be the font color of our running back color"). */
+.position-text-qb {
+  color: var(--color-position-qb);
+}
+.position-text-rb {
+  color: var(--color-position-rb);
+}
+.position-text-wr {
+  color: var(--color-position-wr);
+}
+.position-text-te {
+  color: var(--color-position-te);
+}
+.position-text-k {
+  color: var(--color-position-k);
+}
+.position-text-dst {
+  color: var(--color-position-dst);
+}

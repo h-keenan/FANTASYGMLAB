@@ -165,6 +165,103 @@ export interface DashboardResponse {
   entitlement: { is_premium: boolean; visible_count: number; hidden_count: number };
 }
 
+/** One roster slot on My Team's Roster Core/Depth — mirrors mobile's
+ * LineupPlayer (mobile/src/lib/api.ts), the reference implementation for
+ * GET .../my-team. `overall_rating` is the 0-99 "OVR" badge, percentiled
+ * against the full league-eligible pool at this position (see that
+ * endpoint's docstring) — null when that position's pool was too thin to
+ * rank against, in which case the circular gauge must not render at all,
+ * never a fabricated value. */
+export interface LineupPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  status: string | null;
+  injury_status: string | null;
+  injury_label: string;
+  ruled_out: boolean;
+  tier: string | null;
+  score: number | null;
+  slot: string | null;
+  suggested_starter: boolean;
+  roster_slot?: "starter" | "bench" | "ir" | "taxi";
+  opportunity_label: string | null;
+  overall_rating: number | null;
+}
+
+export interface MyTeamResponse {
+  ok: boolean;
+  starters: LineupPlayer[];
+  bench: LineupPlayer[];
+  reason: string;
+  roster_id?: string;
+}
+
+/** One position room's need classification — GET .../my-team-needs'
+ * `position_groups`, straight off modules.trade_analyzer_fit.
+ * build_team_needs_assessment (see that endpoint's docstring). */
+export interface PositionNeedGroup {
+  position: string;
+  classification: "covered" | "short_term_need" | "future_risk" | string;
+  reasons: string[];
+  upgrade_opportunity: boolean;
+  temporary_injury_pressure: boolean;
+}
+
+export interface BiggestNeed {
+  label: string;
+  value: string;
+  note: string;
+}
+
+export interface MyTeamNeedsResponse {
+  ok: boolean;
+  reason: string;
+  show_franchise_construction: boolean;
+  superflex: boolean;
+  te_premium: boolean;
+  /** League-relative position rooms (QB/RB/WR/TE) — My Team's Strength &
+   * Pressure "Strength" card. */
+  strengths: string[];
+  /** Short-term-need rooms not already explained by a temporary injury —
+   * the same "Pressure point" card. */
+  weaknesses: string[];
+  biggest_need: BiggestNeed | null;
+  position_groups: PositionNeedGroup[];
+}
+
+export interface TeamRanking {
+  roster_id: string;
+  team_name: string | null;
+  owner_name: string | null;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  power_rank: number | null;
+  power_rank_tied: boolean;
+  franchise_rank: number | null;
+  franchise_rank_tied: boolean;
+  draft_capital_rank: number | null;
+  draft_capital_rank_tied: boolean;
+  starter_rank: number | null;
+  starter_rank_tied: boolean;
+  bench_rank: number | null;
+  bench_rank_tied: boolean;
+  age_rank: number | null;
+  age_rank_tied: boolean;
+  average_age: number | null;
+  archetype_label: string | null;
+  archetype_strengths: string[];
+}
+
+export interface TeamRankingsResponse {
+  ok: boolean;
+  teams: TeamRanking[];
+  reason: string;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -196,5 +293,20 @@ export const api = {
   getDashboard: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<DashboardResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/dashboard?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getMyTeam: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<MyTeamResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/my-team?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getMyTeamNeeds: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<MyTeamNeedsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/my-team-needs?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getTeamRankings: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<TeamRankingsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/team-rankings?lens=${encodeURIComponent(lens)}`,
     ),
 };
