@@ -676,6 +676,78 @@ export interface AlertsResponse {
   reason: AlertsReason;
 }
 
+/** The single highest-value-score player on a saved league's roster —
+ * mirrors mobile's PortfolioTopAsset (mobile/src/lib/api.ts). Lean on
+ * purpose: just enough for a "standout asset" line, no new valuation math. */
+export interface PortfolioTopAsset {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  tier: string | null;
+  score: number | null;
+}
+
+/**
+ * One saved league's row on the cross-league Portfolio screen — the exact
+ * same per-league summary GET .../dashboard already builds
+ * (modules.dashboard_engine.build_league_summary), condensed to what a
+ * compact card needs. `top_items` is the already-ranked/deduped "Next
+ * Move" signal list (PORTFOLIO_MAX_SIGNALS = 3 — a roster player's value
+ * trending down, an injury, a live news story, actionable waiver info,
+ * whichever are genuinely true for this team right now), the same
+ * BriefingItem shape Today's Game Plan's GamePlanCard already renders.
+ * `top_item` is just that list's first entry, kept for callers that only
+ * need the single headline. Mirrors mobile's PortfolioLeague exactly.
+ */
+export interface PortfolioLeague {
+  league_id: string;
+  league_name: string;
+  team_name: string;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  health_flag: string;
+  power_rank: number | null;
+  power_rank_tied: boolean;
+  franchise_rank: number | null;
+  franchise_rank_tied: boolean;
+  roster_value_rank: number | null;
+  roster_value_rank_tied: boolean;
+  archetype: string | null;
+  archetype_label: string | null;
+  top_asset: PortfolioTopAsset | null;
+  top_item: BriefingItem | null;
+  top_items: BriefingItem[];
+}
+
+/** A saved league whose summary couldn't be built this time — Portfolio
+ * shows every league that DID succeed rather than blanking the whole
+ * screen over one broken league. */
+export interface PortfolioFailedLeague {
+  league_id: string;
+  league_name: string;
+  reason: string;
+}
+
+export interface PortfolioUpsell {
+  title: string;
+  body: string;
+}
+
+export interface PortfolioResponse {
+  ok: boolean;
+  is_premium: boolean;
+  lens: string;
+  leagues: PortfolioLeague[];
+  failed_leagues: PortfolioFailedLeague[];
+  /** Present only for a Free caller — Portfolio needs more than the one
+   * league Free accounts can save, so Free gets this honest upsell instead
+   * of an empty or broken screen. */
+  upsell: PortfolioUpsell | null;
+  reason?: string;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -757,4 +829,10 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,
       { method: "POST", jsonBody: { alert_key: alertKey } },
     ),
+
+  // Cross-league "Portfolio" — one row per saved league, Premium-gated
+  // (see PortfolioResponse's own docstring). No leagueId param: this spans
+  // every saved league at once, unlike every other call above.
+  getPortfolio: (lens: string = "Dynasty") =>
+    authorizedRequest<PortfolioResponse>(`/v1/portfolio?lens=${encodeURIComponent(lens)}`),
 };

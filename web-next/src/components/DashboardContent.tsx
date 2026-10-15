@@ -45,6 +45,10 @@ const BUILT_PAGES: { label: string; path: string }[] = [
   { label: "Alerts", path: "alerts" },
 ];
 
+// Portfolio (Revision 8) spans every saved league at once — unlike every
+// entry above, its route (app/portfolio/page.tsx) takes no leagueId/name,
+// so it isn't part of the per-league BUILT_PAGES loop below.
+
 // One shared card style instead of six byte-identical inline style objects
 // (Revision 7 CSS-cleanup pass — the five Explore cards this revision's
 // Alerts card would otherwise have copied a sixth time).
@@ -165,6 +169,7 @@ export function DashboardContent({
           Workflows ported to this app open here; everything else still opens in Streamlit.
         </p>
         <div className="grid grid-cols-2 gap-3">
+          <ExploreCard href="/portfolio" label="Portfolio" />
           {BUILT_PAGES.map((page) => (
             <ExploreCard
               key={page.path}
