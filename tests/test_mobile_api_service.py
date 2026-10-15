@@ -5091,6 +5091,10 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monk
     assert league["top_asset"]["score"] == 95.5
     assert league["top_item"]["headline"] == "Add RB2 depth"
     assert league["top_item"]["category"] == "need"
+    # A summary from before `top_items` existed (this fixture only sets
+    # `top_item`) still gets a one-item `top_items` list, never an empty one.
+    assert len(league["top_items"]) == 1
+    assert league["top_items"][0]["headline"] == "Add RB2 depth"
 
     failed_by_id = {row["league_id"]: row for row in body["failed_leagues"]}
     assert set(failed_by_id) == {"league-skip", "league-boom"}
@@ -5098,6 +5102,68 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monk
     # An unexpected raise never leaks internals — it's reported as a plain
     # "unavailable", same bucket any other genuine failure falls into.
     assert failed_by_id["league-boom"]["reason"] == "unavailable"
+
+
+def test_portfolio_carries_the_full_quick_glance_signal_list(monkeypatch):
+    """coridian_'s ask: a league row surfaces a few quick-glance signals
+    (value trending down / injury / news story / waiver info), not only the
+    single highest-priority headline. GET /v1/portfolio must project the
+    full `top_items` list modules.dashboard_engine.build_league_summary now
+    returns, not just truncate to `top_item`."""
+
+    from services import mobile_api_service
+
+    saved_rows = [{"league_id": "league-ok", "league_name": "The Ok League"}]
+    monkeypatch.setattr(
+        mobile_api_service.account_store, "fetch_saved_leagues", lambda *a, **k: (saved_rows, "")
+    )
+    monkeypatch.setattr(mobile_api_service, "_fetch_team_stance", lambda *a, **k: "")
+    monkeypatch.setattr(mobile_api_service, "_fetch_gm_target_player_ids", lambda *a, **k: ((), ()))
+
+    top_items = [
+        {"category": "watch", "headline": "2 injured starters", "reason": "Starters out"},
+        {"category": "watch", "headline": "Star Back trending down", "reason": "Usage down 24%"},
+        {"category": "waiver_opportunity", "headline": "Add Waiver WR", "reason": "Best live add"},
+    ]
+
+    def _fake_build_league_summary(*, league_id, **_kwargs):
+        return {
+            "ok": True,
+            "reason": "",
+            "roster_id": "1",
+            "team_name": "Ok Team",
+            "wins": 7,
+            "losses": 3,
+            "ties": 0,
+            "health_flag": "Stable",
+            "power_rank": 2,
+            "power_rank_tied": False,
+            "top_item": top_items[0],
+            "top_items": top_items,
+        }
+
+    monkeypatch.setattr(
+        mobile_api_service.dashboard_engine, "build_league_summary", _fake_build_league_summary
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get("/v1/portfolio", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    league = response.json()["leagues"][0]
+    assert [item["headline"] for item in league["top_items"]] == [
+        "2 injured starters",
+        "Star Back trending down",
+        "Add Waiver WR",
+    ]
+    assert league["top_items"][1]["category"] == "watch"
+    assert league["top_items"][2]["category"] == "waiver_opportunity"
 
 
 def test_project_portfolio_top_asset_degrades_without_a_player_id():

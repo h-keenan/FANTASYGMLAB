@@ -1612,12 +1612,17 @@ export interface PortfolioTopAsset {
  * (modules.dashboard_engine.build_league_summary), condensed to what a
  * compact row needs. `top_item` is that league's single highest-priority
  * Next Move tile (same shape as DashboardItem) — "the one thing to do in
- * this league right now." `franchise_rank`/`roster_value_rank` and
- * `archetype`/`archetype_label` come from the same cached
- * modules.league_rankings rankings frame `power_rank` already reads, run
- * through modules.team_eval.refine_team_directions — the identical,
- * already-cached pass GET /v1/leagues/{id}/team-rankings uses for its own
- * archetype column.
+ * this league right now." `top_items` is the same already-ranked/deduped
+ * signal list `top_item` is just the first entry of (a few short lines at
+ * most — a roster player's value trending down, an injury, a live news
+ * story, actionable waiver info — whichever of those are genuinely true for
+ * this team right now, never padded to a fixed count), for the quick-glance
+ * multi-line card coridian_ asked for instead of a single headline.
+ * `franchise_rank`/`roster_value_rank` and `archetype`/`archetype_label`
+ * come from the same cached modules.league_rankings rankings frame
+ * `power_rank` already reads, run through
+ * modules.team_eval.refine_team_directions — the identical, already-cached
+ * pass GET /v1/leagues/{id}/team-rankings uses for its own archetype column.
  */
 export interface PortfolioLeague {
   league_id: string;
@@ -1637,6 +1642,7 @@ export interface PortfolioLeague {
   archetype_label: string | null;
   top_asset: PortfolioTopAsset | null;
   top_item: DashboardItem | null;
+  top_items: DashboardItem[];
 }
 
 /** A saved league whose summary couldn't be built this time — Portfolio
