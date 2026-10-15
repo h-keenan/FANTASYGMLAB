@@ -1,6 +1,6 @@
 # Founder Beta UI hierarchy
 
-This pass standardizes Dashboard, League Overview, Trade Hub, My Team,
+This pass standardizes Dashboard, League Rankings, Trade Hub, My Team,
 Waivers, Player Explorer, and Premium without changing their workflows or
 football outputs.
 
@@ -32,12 +32,12 @@ but now share one scale and normal word wrapping.
   canonical mobile section-title token.
 - Page-specific card padding, border, radius, and mobile width differences are
   normalized at the final shared layer.
-- League Overview's duplicate “Teams Snapshot” introduction is omitted on the
+- League Rankings's duplicate “Teams Snapshot” introduction is omitted on the
   Rankings surface.
 - Repeated Power Rank and Franchise Rank captions are removed after the
   definitions have already appeared in the concept band.
 
-## League Overview terms
+## League Rankings terms
 
 - **Power Rank:** current starter strength, usable depth, and present roster value.
 - **Franchise Rank:** total player value plus owned draft capital.

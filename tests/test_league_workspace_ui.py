@@ -310,7 +310,7 @@ class TestLeagueWorkspaceUI(unittest.TestCase):
         )
         self.assertEqual(
             calls_by_title["Bench and Depth"]["quick_view_source_label"],
-            "League Overview - Team Bench",
+            "League Rankings - Team Bench",
         )
         self.assertEqual(
             calls_by_title["Roster Scan"]["quick_view_key_prefix"],

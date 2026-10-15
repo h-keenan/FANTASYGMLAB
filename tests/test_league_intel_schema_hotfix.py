@@ -1,4 +1,4 @@
-"""Regression: League Overview must not KeyError when summary frames lack archetype_label."""
+"""Regression: League Rankings must not KeyError when summary frames lack archetype_label."""
 
 from unittest.mock import patch
 

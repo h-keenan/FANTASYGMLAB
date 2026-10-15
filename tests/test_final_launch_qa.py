@@ -60,7 +60,7 @@ def test_startup_and_espn_quick_actions_exclude_dead_routes():
     ]
     assert '("Startup Draft Center", "startup_draft_center")' in startup_block
     assert '("Dashboard", "dashboard")' in startup_block
-    assert '("League Overview", "rankings")' in startup_block
+    assert '("League Rankings", "rankings")' in startup_block
     espn_block = app[
         app.index("ESPN limited review mode") : app.index(
             "if not username or not selected_league_id:"

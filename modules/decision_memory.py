@@ -566,7 +566,7 @@ def cta_label_for_event(event: history.DecisionChangeEvent) -> str:
     if "player" in destination or _safe_text(event.player_id):
         return "View current recommendation →"
     if "league" in destination:
-        return "Open in League Overview →"
+        return "Open in League Rankings →"
     return "View current recommendation →"
 
 

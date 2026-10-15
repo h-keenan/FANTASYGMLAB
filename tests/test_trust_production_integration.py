@@ -374,8 +374,10 @@ def test_all_production_cached_trade_retrievals_enforce_before_enrichment():
     assert (
         source.count("enforce_cached_trade_ideas(")
         + trade_hub_ui_source.count("enforce_cached_trade_ideas(")
-        == 8
-    )  # helper plus seven production boundaries
+        == 9
+    )  # helper plus eight production boundaries — Trade Finder
+    # (modules.trade_hub_ui.render_trade_finder_workspace) is the newest one,
+    # same Trust enforcement as every other production trade-idea surface.
 
 
 def test_trade_trust_context_is_not_stored_in_public_player_cache():

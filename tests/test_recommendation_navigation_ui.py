@@ -112,13 +112,13 @@ class TestRecommendationNavigationUI(unittest.TestCase):
                 title="Roster Scan",
                 note="Another team's roster.",
                 enable_quick_view=True,
-                quick_view_source_label="League Overview - Team Roster",
+                quick_view_source_label="League Rankings - Team Roster",
                 quick_view_key_prefix="other_team_roster",
             )
 
         open_quick_view.assert_called_once_with(
             "player-3",
-            source_label="League Overview - Team Roster",
+            source_label="League Rankings - Team Roster",
             source_note="",
             status_label="",
             recommendation_narrative=None,

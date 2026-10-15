@@ -643,19 +643,19 @@ def _capture_command_bar_interactions(page, output: Path, width: int, *, base_ur
         timeout=30_000,
     )
 
-    # League Overview deep link must also be an actual control inside Alerts.
+    # League Rankings deep link must also be an actual control inside Alerts.
     _open_alerts_inbox(page, origin)
     panel = _inbox_panel(page)
     panel.wait_for(state="visible", timeout=30_000)
-    league_cta = panel.get_by_role("link", name=re.compile(r"Open League Overview", re.I))
+    league_cta = panel.get_by_role("link", name=re.compile(r"Open League Rankings", re.I))
     if league_cta.count() == 0:
-        league_cta = panel.get_by_role("button", name=re.compile(r"Open League Overview", re.I))
+        league_cta = panel.get_by_role("button", name=re.compile(r"Open League Rankings", re.I))
     if league_cta.count() == 0:
-        raise AssertionError("Open League Overview CTA missing from Alerts dropdown")
+        raise AssertionError("Open League Rankings CTA missing from Alerts dropdown")
     results["leagueOverview"] = _assert_tap_target(
         page,
         league_cta,
-        "Open League Overview",
+        "Open League Rankings",
         origin=origin,
     )
     page.wait_for_selector(
@@ -1519,7 +1519,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
     if surface == "league":
         league_text = page.inner_text("body")
         if "dg-lh-item" in page.content():
-            failures.append("League History feed rendered on League Overview")
+            failures.append("League History feed rendered on League Rankings")
     if width >= 1440:
         desktop = page.evaluate(
             """({surface}) => {
@@ -1632,7 +1632,7 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
                 failures.append("waiver copy still implies a full pickup performance grade")
         if surface == "league":
             if "dg-lh-item" in page.content():
-                failures.append("League History feed rendered on League Overview")
+                failures.append("League History feed rendered on League Rankings")
         if surface == "recaps":
             recap = desktop.get("recap") or {}
             if not recap.get("width"):

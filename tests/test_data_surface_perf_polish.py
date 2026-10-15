@@ -173,7 +173,7 @@ def test_draft_center_detailed_table_is_deferred():
 
 
 def test_league_overview_playoff_odds_is_deferred():
-    """League Overview's Playoff Odds board must never render automatically.
+    """League Rankings's Playoff Odds board must never render automatically.
 
     playoff_simulator.build_league_playoff_odds_cached is Redis-cached with a
     3-hour TTL bucket, but the *first* navigation into a cold bucket (or a
@@ -181,7 +181,7 @@ def test_league_overview_playoff_odds_is_deferred():
     multi-week modules.sleeper.get_matchups fetch loop plus its own
     league_rankings.build_league_rankings_frame_cached build, both inline on
     this render path. The GM-menu nav sheet (app.py's
-    render_mobile_destination_sheet) reaches League Overview automatically on
+    render_mobile_destination_sheet) reaches League Rankings automatically on
     every tap, and its overlay only dismisses once the full Streamlit rerun
     finishes, so a cold bucket here showed up as the GM menu looking frozen
     for several seconds — the same uncached-expensive-call-on-the-render-path

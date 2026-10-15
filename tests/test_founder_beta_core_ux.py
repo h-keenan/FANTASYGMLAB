@@ -25,7 +25,7 @@ def test_product_copy_matches_platform_destination_labels():
     for key, label in (
         ("players", "Players"),
         ("trade_hub", "Trade Hub"),
-        ("rankings", "League Overview"),
+        ("rankings", "League Rankings"),
         ("dashboard", "Dashboard"),
         ("my_team", "My Team"),
         ("waivers", "Waivers"),

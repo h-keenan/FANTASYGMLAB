@@ -166,7 +166,7 @@ def _cta_label(item: briefing_mod.DailyBriefingItem, *, is_primary: bool) -> str
     if item.destination == "my_team":
         return "Open My Team"
     if item.destination == "rankings":
-        return "Open League Overview"
+        return "Open League Rankings"
     return "Open workflow"
 
 

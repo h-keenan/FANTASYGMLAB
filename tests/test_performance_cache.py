@@ -47,7 +47,7 @@ class TestPerformanceCache(unittest.TestCase):
         self.assertIn("faab_targets = free_agents_ranked.iloc[0:0].copy()", waiver_branch)
 
     def test_player_detail_news_section_never_blocks_render_on_live_rss(self):
-        # Player Detail is reachable from League Overview, My Team, Trade Hub,
+        # Player Detail is reachable from League Rankings, My Team, Trade Hub,
         # Trade Analyzer, Waivers, and Draft Center. The News/Alerts surfaces
         # already use a non-blocking contract for a stale on-disk cache:
         # render whatever is cached and let a background thread

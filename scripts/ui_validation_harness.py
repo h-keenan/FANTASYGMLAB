@@ -538,7 +538,7 @@ def _navigation() -> None:
             type="primary",
         )
         _fixture_route_row("My Team", "my_team")
-        _fixture_route_row("League Overview", "rankings")
+        _fixture_route_row("League Rankings", "rankings")
         _fixture_route_row("League Recaps / History", "league_recaps")
         _fixture_route_row("Players", "players")
         st.caption("GM Tools")
@@ -1094,7 +1094,7 @@ def _league() -> None:
             "League Insights",
         ),
     )
-    _workspace("League Overview", "Competitive context across the current league.")
+    _workspace("League Rankings", "Competitive context across the current league.")
     ui_primitives.render_section_header(
         "2026 Standings",
         eyebrow="Where you stand",
@@ -2324,7 +2324,7 @@ def _design_system() -> None:
     ui_primitives.render_section_header("Deep Analysis", weight="support")
     workspace_ui.render_home_quick_actions(
         [
-            ("League Overview", "rankings"),
+            ("League Rankings", "rankings"),
             ("My Team", "my_team"),
             ("Trade Hub", "trade_hub"),
             ("Draft Center", "draft_summary"),

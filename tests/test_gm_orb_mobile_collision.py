@@ -104,7 +104,7 @@ html, body, .stApp, [data-testid="stAppViewContainer"] {{
       <div class="stMainBlockContainer block-container" data-testid="stMainBlockContainer">
         <div class="spacer"></div>
         <button type="button" id="cta">Open My Team</button>
-        <a id="link" href="#rankings">League Overview</a>
+        <a id="link" href="#rankings">League Rankings</a>
         <details id="expander"><summary>More</summary><p>Body</p></details>
       </div>
       <div data-testid="stVerticalBlock">

@@ -366,7 +366,7 @@ DEFAULT_TRIALS = 3000
 # Same live-time-bucket idiom as league_rankings.LEAGUE_RANKINGS_FRAME_TTL_SECONDS
 # and modules.sleeper's own caches, but a much longer window: this is a
 # rest-of-season outlook, not a live score, so re-running a few-thousand-trial
-# simulation on every page load (every Dashboard/League Overview open within
+# simulation on every page load (every Dashboard/League Rankings open within
 # the same hour) would be wasted work for a number that can only change when
 # new real games get played — which happens at most once a week. Three hours
 # keeps it fresh across a single viewing session while still collapsing many

@@ -134,7 +134,7 @@ def test_hierarchy_document_contains_before_after_table_and_all_surfaces():
     assert "| Level | Role | Token | Before | Founder Beta |" in document
     for surface in (
         "Dashboard",
-        "League Overview",
+        "League Rankings",
         "Trade Hub",
         "My Team",
         "Waivers",

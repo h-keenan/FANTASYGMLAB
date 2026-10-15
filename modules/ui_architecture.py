@@ -107,6 +107,12 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         beta_visible=True,
         domain="LEAGUE",
     ),
+    # Waivers lives in the LEAGUE domain, matching mobile's GmOrb.tsx (it
+    # sits in the LEAGUE group alongside Matchup/My Team, not the GM Tools
+    # group) — moved out of the Trade Hub/Trade Finder/Trade Analyzer
+    # tri-tab's former GM_TOOLS slot, where it had been inconsistent with
+    # mobile's own standalone top-level Waivers screen.
+    PageDefinition("waivers", "Waivers", "TRANSACTIONS", "Find available upgrades, injury replacements, and FAAB guidance.", category="CORE", beta_visible=True, domain="LEAGUE"),
     PageDefinition(
         "gm_targets",
         "GM Targets",
@@ -131,7 +137,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         category="ARCHIVED",
         domain="LEAGUE",
     ),
-    PageDefinition("rankings", "League Overview", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True, domain="LEAGUE"),
+    PageDefinition("rankings", "League Rankings", "LEAGUE", "League-wide power, franchise value, pressure signals, and team context.", category="CORE", beta_visible=True, domain="LEAGUE"),
     # GM Orb visible sections are page.domain (League / GM Tools / General),
     # not group. Recaps stays CORE so it's visible by default; group=LEAGUE
     # is sidebar-caption-legacy only, domain=LEAGUE drives the shared taxonomy.
@@ -148,7 +154,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "teams",
         "Teams",
         "LEAGUE",
-        "Archived — League Overview owns the Teams section.",
+        "Archived — League Rankings owns the Teams section.",
         category="ARCHIVED",
         domain="LEAGUE",
     ),
@@ -162,6 +168,15 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
     ),
     PageDefinition("trade_hub", "Trade Hub", "TRANSACTIONS", "Find realistic trades for your roster — ranked by fit and fairness.", category="CORE", beta_visible=True, domain="GM_TOOLS"),
     PageDefinition(
+        "trade_finder",
+        "Trade Finder",
+        "TRANSACTIONS",
+        "Select specific players from your roster and search for realistic packages the league would trade for them.",
+        category="CORE",
+        beta_visible=True,
+        domain="GM_TOOLS",
+    ),
+    PageDefinition(
         "trade_analyzer",
         "Trade Analyzer",
         "TRANSACTIONS",
@@ -170,7 +185,6 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         beta_visible=True,
         domain="GM_TOOLS",
     ),
-    PageDefinition("waivers", "Waivers", "TRANSACTIONS", "Find available upgrades, injury replacements, and FAAB guidance.", category="CORE", beta_visible=True, domain="GM_TOOLS"),
     PageDefinition(
         "trade_history",
         "Trade History",
@@ -216,7 +230,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "archetypes",
         "Archetypes",
         "INTELLIGENCE",
-        "Archived standalone archetypes route — League Overview owns franchise context.",
+        "Archived standalone archetypes route — League Rankings owns franchise context.",
         category="ARCHIVED",
         domain="LEAGUE",
     ),
@@ -224,7 +238,7 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         "manager_tendencies",
         "Manager Tendencies",
         "INTELLIGENCE",
-        "Archived standalone route — Trade Hub and League Overview own tendencies context.",
+        "Archived standalone route — Trade Hub and League Rankings own tendencies context.",
         category="ARCHIVED",
         domain="GM_TOOLS",
     ),

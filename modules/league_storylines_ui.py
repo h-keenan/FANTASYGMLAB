@@ -1,4 +1,4 @@
-"""League Overview Storylines — synthesized activity from cached History."""
+"""League Rankings Storylines — synthesized activity from cached History."""
 
 from __future__ import annotations
 
@@ -340,7 +340,7 @@ def render_storylines_panel(
         if clicked_player_id and open_player_quick_view is not None:
             open_player_quick_view(
                 clicked_player_id,
-                source_label="League Overview - Storylines",
+                source_label="League Rankings - Storylines",
                 source_note="Inspect this player from this season's storylines.",
             )
         elif clicked_route and open_history is not None:
@@ -353,7 +353,7 @@ def render_storylines_panel(
         if clicked_player_id:
             open_player_quick_view(
                 clicked_player_id,
-                source_label="League Overview - Storylines",
+                source_label="League Rankings - Storylines",
                 source_note="Inspect this player from this season's storylines.",
             )
     else:
