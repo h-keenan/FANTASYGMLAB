@@ -428,6 +428,11 @@ def concept_items_as_summary_tiles(items: list[dict] | None) -> list[dict]:
                 "value": item.get("title")
                 if item.get("title") is not None
                 else item.get("value"),
+                # Pre-escaped HTML override (e.g. a canonically-colored
+                # position-name span) — see summary_tiles_html's value_html.
+                "value_html": item.get("title_html")
+                if item.get("title_html") is not None
+                else item.get("value_html"),
                 "note": item.get("body")
                 if item.get("body") is not None
                 else item.get("note"),
@@ -491,7 +496,7 @@ def summary_tiles_html(items: list[dict], *, compact: bool = False) -> str:
                 else semantic_icon_html(tone or label, label=label)
             )
             + f"{escape(label)}</div></div>"
-            + f"<div class='summary-tile-value'>{escape(value)}</div>"
+            + f"<div class='summary-tile-value'>{str(item.get('value_html') or '').strip() or escape(value)}</div>"
             + (str(item.get("graphic") or "").strip())
             + f"<div class='summary-tile-note'>{escape(note)}</div>"
             + (
@@ -1168,7 +1173,7 @@ def render_home_command_tiles(
                 else ""
             )
             + "</div>"
-            + f"<div class='home-command-card-value'>{escape(value)}</div>"
+            + f"<div class='home-command-card-value'>{str(item.get('value_html') or '').strip() or escape(value)}</div>"
             + f"<div class='home-command-card-note' title='{escape(full_note, quote=True)}'>{escape(note)}</div>"
             + "</div>"
         )

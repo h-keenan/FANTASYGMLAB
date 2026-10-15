@@ -25,6 +25,7 @@ def test_concept_items_map_to_summary_tiles():
         {
             "label": "Outlook",
             "value": "Contender",
+            "value_html": None,
             "note": "Strong current roster.",
             "tone": "franchise",
             "comparison": None,
