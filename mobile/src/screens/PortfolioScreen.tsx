@@ -221,7 +221,12 @@ function PortfolioLeagueCard({
   const rankColor = isChampion ? colors.premium : colors.accent;
   const record = recordLabel(league);
   const showHealthFlag = Boolean(league.health_flag) && league.health_flag !== 'Stable';
-  const meta = league.top_item ? categoryMeta(colors)[league.top_item.category] ?? categoryMeta(colors).watch : null;
+  // Quick-glance signals for this league — value trending down, an injury,
+  // a live news story, actionable waiver info, whichever are genuinely true
+  // right now (never padded to a fixed count). Falls back to the single
+  // top_item for a response that predates top_items.
+  const signals = league.top_items?.length ? league.top_items : league.top_item ? [league.top_item] : [];
+  const meta = categoryMeta(colors);
 
   return (
     <TouchableOpacity
@@ -266,16 +271,20 @@ function PortfolioLeagueCard({
           </View>
         ) : null}
       </View>
-      {league.top_item && meta ? (
-        <InsightRow
-          icon={meta.icon}
-          color={meta.color}
-          label={meta.label}
-          headline={league.top_item.headline}
-          detail={league.top_item.reason}
-          last
-        />
-      ) : null}
+      {signals.map((item, index) => {
+        const itemMeta = meta[item.category] ?? meta.watch;
+        return (
+          <InsightRow
+            key={item.recommendation_id || `${item.category}-${index}`}
+            icon={itemMeta.icon}
+            color={itemMeta.color}
+            label={itemMeta.label}
+            headline={item.headline}
+            detail={item.reason}
+            last={index === signals.length - 1}
+          />
+        );
+      })}
     </TouchableOpacity>
   );
 }

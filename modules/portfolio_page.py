@@ -74,7 +74,10 @@ _CATEGORY_GLYPH_CONCEPT = {
 PORTFOLIO_CSS = """
 .dg-portfolio-card-top{align-items:flex-start;display:flex;gap:var(--space-sm);justify-content:space-between}
 .dg-portfolio-badges{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-2xs);margin-top:var(--space-2xs)}
-.dg-portfolio-item{align-items:center;display:flex;gap:var(--space-2xs);margin-top:var(--space-2xs)}
+.dg-portfolio-item{align-items:flex-start;display:flex;gap:var(--space-2xs);margin-top:var(--space-2xs)}
+.dg-portfolio-item .dg-ui-badge,
+.dg-portfolio-item .dg-glyph{flex-shrink:0;white-space:nowrap}
+.dg-portfolio-item-text{flex:1 1 auto;min-width:0}
 """
 
 PAGE_KEY = "portfolio"
@@ -356,7 +359,19 @@ def render_portfolio_page() -> dict[str, Any]:
 
     for entry in leagues:
         summary = entry["summary"]
-        top_item = summary.get("top_item") or {}
+        # `top_items` is the same already-ranked/deduped signal list
+        # `top_item` is just the first entry of (modules.dashboard_engine.
+        # build_league_summary) — a few short lines at most (a roster
+        # player's value trending down, an injury, a live news story,
+        # actionable waiver info), whichever are genuinely true for this
+        # team right now, never padded to a fixed count. Falls back to a
+        # one-item list built from `top_item` for a cached/mocked summary
+        # from before this field existed.
+        top_items = summary.get("top_items")
+        if not top_items:
+            single = summary.get("top_item")
+            top_items = [single] if single else []
+        top_item = top_items[0] if top_items else {}
         category = _safe_text(top_item.get("category"))
         headline = _safe_text(top_item.get("headline"), "Open this league to see your Next Move.")
         reason = _safe_text(top_item.get("reason"))
@@ -403,10 +418,32 @@ def render_portfolio_page() -> dict[str, Any]:
         body_text = reason or headline
         footer_text = headline if reason else ""
         footer_html = (
-            f"<div class='dg-portfolio-item'>{category_badge}<span>{escape(footer_text)}</span></div>"
+            "<div class='dg-portfolio-item'>"
+            f"{category_badge}<span class='dg-portfolio-item-text'>{escape(footer_text)}</span></div>"
             if category_badge and footer_text
             else (f"<div class='dg-ui-card-footer'>{escape(footer_text)}</div>" if footer_text else "")
         )
+
+        # Remaining quick-glance signals beyond the headline above — same
+        # icon + color-coded category badge row the headline's own footer
+        # already uses (mirrors mobile's InsightRow list), just one row per
+        # additional signal instead of a single footer line.
+        extra_signal_html = ""
+        for extra_item in top_items[1:]:
+            extra_category = _safe_text(extra_item.get("category"))
+            extra_text = _safe_text(extra_item.get("reason")) or _safe_text(extra_item.get("headline"))
+            if not extra_text:
+                continue
+            extra_concept = _CATEGORY_GLYPH_CONCEPT.get(extra_category, "insights")
+            extra_variant = _CATEGORY_BADGE_VARIANT.get(extra_category, "neutral")
+            extra_label = CATEGORY_LABELS.get(extra_category, "Next Move")
+            extra_badge = glyph_html(extra_concept, size="row") + status_badge_html(
+                extra_label, variant=extra_variant
+            )
+            extra_signal_html += (
+                "<div class='dg-portfolio-item'>"
+                f"{extra_badge}<span class='dg-portfolio-item-text'>{escape(extra_text)}</span></div>"
+            )
 
         card_html = (
             "<article class='dg-ui-card dg-ui-card--default'>"
@@ -418,6 +455,7 @@ def render_portfolio_page() -> dict[str, Any]:
             + (f"<div class='dg-portfolio-badges'>{health_badge}</div>" if health_badge else "")
             + (f"<div class='dg-ui-card-body'>{escape(body_text)}</div>" if body_text else "")
             + footer_html
+            + extra_signal_html
             + "</article>"
         )
         render_html_fragment(card_html)

@@ -38,6 +38,13 @@ _WATCH_LABELS = frozenset(
         "Roster Quality",
         "Lineup Construction",
         "Startup Observation",
+        # Quick-glance Portfolio signals (modules.dashboard_engine's
+        # build_value_trend_tile/build_news_tiles) — a roster player's value
+        # trending down, or a live news story about one. Both tiles are only
+        # ever built when genuinely true (omitted entirely otherwise, never a
+        # "stable" placeholder), same convention as the other watch labels.
+        "Value Trend",
+        "News Alert",
     }
 )
 

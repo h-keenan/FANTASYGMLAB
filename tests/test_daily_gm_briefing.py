@@ -123,6 +123,30 @@ def test_roster_decision_only_watch_state():
     assert plan.items[0].destination == "my_team"
 
 
+def test_value_trend_and_news_alert_tiles_surface_as_watch_items():
+    """Portfolio's two new quick-glance signals
+    (modules.dashboard_engine.build_value_trend_tile/build_news_tiles) must
+    make it through compose_daily_gm_briefing's label-based categorization
+    as real CATEGORY_WATCH items, same as Injury Alert/Roster Pressure —
+    not silently dropped the way an unrecognized label would be once it
+    lands outside `primary`/`intelligence`."""
+
+    need = _tile("Biggest Team Need", "RB", rec_id="need-1")
+    value_trend = _tile(
+        "Value Trend", "Star RB trending down", rec_id="value-trend-1", route_key="my_team"
+    )
+    news_alert = _tile(
+        "News Alert", "Star RB listed questionable", rec_id="news-alert-1", route_key="my_team"
+    )
+    briefing = dashboard_workflow.organize_dashboard_items([need, value_trend, news_alert])
+    plan = dgb.compose_daily_gm_briefing(briefing)
+    by_rec_id = {item.recommendation_id: item for item in plan.items}
+    assert by_rec_id["value-trend-1"].category == dgb.CATEGORY_WATCH
+    assert by_rec_id["value-trend-1"].destination == "my_team"
+    assert by_rec_id["news-alert-1"].category == dgb.CATEGORY_WATCH
+    assert by_rec_id["news-alert-1"].destination == "my_team"
+
+
 def test_quiet_no_action_state():
     briefing = dashboard_workflow.organize_dashboard_items([])
     plan = dgb.compose_daily_gm_briefing(briefing)

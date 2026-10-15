@@ -122,6 +122,76 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure():
     assert "Couldn&#x27;t load 2 leagues" in rendered_html
 
 
+def test_portfolio_renders_every_quick_glance_signal_not_just_the_first():
+    """coridian_'s ask: a league row should show a few quick-glance signals
+    (value trending down / injury / news story / waiver info), whichever are
+    genuinely true right now — not only the single highest-priority
+    headline. modules.dashboard_engine.build_league_summary now returns
+    `top_items` (the same already-ranked list `top_item` is just the first
+    entry of); this pins that the web Portfolio card renders ALL of them."""
+
+    saved_rows = [{"league_id": "league-multi", "league_name": "The Multi-Signal League"}]
+
+    def _fake_build_league_summary(*, league_id, **_kwargs):
+        top_items = [
+            {
+                "category": "watch",
+                "headline": "2 injured starters",
+                "reason": "Starting RB and WR both out this week.",
+            },
+            {
+                "category": "watch",
+                "headline": "Star Back trending down",
+                "reason": "Usage down 24% vs its earlier-season baseline.",
+            },
+            {
+                "category": "waiver_opportunity",
+                "headline": "Add Waiver WR",
+                "reason": "Best live add on the wire right now.",
+            },
+        ]
+        return {
+            "ok": True,
+            "reason": "",
+            "roster_id": "1",
+            "team_name": "Multi Team",
+            "wins": 5,
+            "losses": 5,
+            "ties": 0,
+            "health_flag": "Stable",
+            "power_rank": 4,
+            "power_rank_tied": False,
+            "top_item": top_items[0],
+            "top_items": top_items,
+        }
+
+    with patch("modules.portfolio_page.premium.get_user_entitlement", return_value=premium.PREMIUM):
+        with patch("modules.portfolio_page.auth_supabase.current_user_id", return_value="user-123"):
+            with patch("modules.portfolio_page.auth_supabase.current_access_token", return_value="tok"):
+                with patch(
+                    "modules.portfolio_page.account_store.fetch_saved_leagues",
+                    return_value=(saved_rows, ""),
+                ):
+                    with patch(
+                        "modules.portfolio_page.team_stance.fetch_stance_for_league", return_value=""
+                    ):
+                        with patch(
+                            "modules.portfolio_page.gm_targets.fetch_targets_for_league", return_value=()
+                        ):
+                            with patch(
+                                "modules.portfolio_page.dashboard_engine.build_league_summary",
+                                side_effect=_fake_build_league_summary,
+                            ):
+                                with patch("modules.portfolio_page.render_html_fragment") as mock_render:
+                                    with patch("modules.portfolio_page.st.button", return_value=False):
+                                        portfolio_page.render_portfolio_page()
+
+    rendered_html = "\n".join(call.args[0] for call in mock_render.call_args_list)
+    assert "Starting RB and WR both out this week." in rendered_html
+    assert "Usage down 24% vs its earlier-season baseline." in rendered_html
+    assert "Add Waiver WR" in rendered_html or "Best live add on the wire right now." in rendered_html
+
+
 def test_portfolio_fanout_preserves_saved_league_order_despite_uneven_completion():
     """render_portfolio_page parallelizes the per-league fan-out (stance +
     GM Targets + build_league_summary) across a thread pool instead of the

@@ -44,6 +44,8 @@ from modules import (
     injury_ui,
     league_rankings,
     league_value_settings,
+    news as news_cache,
+    news_intelligence,
     player_eligibility,
     rankings,
     sleeper,
@@ -194,6 +196,95 @@ def build_waiver_tile(
         "recommendation_narrative": narrative.to_dict() if narrative else None,
         "recommendation_id": narrative.recommendation_id if narrative else "",
     }
+
+
+def build_value_trend_tile(roster_df: pd.DataFrame, score_field: str) -> dict[str, Any] | None:
+    """The single highest-value roster asset whose usage is trending down
+    enough to narrate — the exact same gated read Live Draft/Player Compare
+    already surface per player (``rankings.recency_trend_display``, see its
+    docstring for the confidence/sample-size gate), just picking the one
+    roster player it is most worth flagging at a glance instead of narrating
+    whichever player a user already has open. No new valuation: the
+    ``recency_trend``/``recency_confidence`` columns this reads are already
+    on the same valued ``roster_df`` every other tile here reads from.
+
+    Returns ``None`` when no roster player clears the display gate with a
+    downward read — never fabricates a decline that isn't there.
+    """
+
+    if roster_df is None or roster_df.empty or score_field not in roster_df.columns:
+        return None
+    ordered = roster_df.sort_values(score_field, ascending=False)
+    for _, row in ordered.iterrows():
+        trend = rankings.recency_trend_display(row)
+        if not trend or trend.get("direction") != "down":
+            continue
+        name = _text(row.get("name"), "A roster player")
+        magnitude = trend.get("magnitude_pct")
+        confidence_label = _text(trend.get("confidence_label"))
+        note = (
+            f"Usage down {magnitude}%"
+            + (f" ({confidence_label})" if confidence_label else "")
+            + " vs its earlier-season baseline."
+            if magnitude is not None
+            else "Usage trending down vs its earlier-season baseline."
+        )
+        return {
+            "label": "Value Trend",
+            "value": f"{name} trending down",
+            "note": note,
+            "tone": "risk",
+            "route_key": "my_team",
+            "route_player_id": _text(row.get("player_id")),
+            "route_player_name": name,
+            "route_player_position": _text(row.get("position")),
+            "route_player_team": _text(row.get("team")),
+            "route_player_tier": _text(row.get("player_tier")),
+            "route_player_score": row.get(score_field),
+        }
+    return None
+
+
+def build_news_tiles(
+    *,
+    league_id: str,
+    league_settings: Mapping[str, Any] | None,
+    roster_df: pd.DataFrame,
+    lineup_df: pd.DataFrame,
+    free_agents_df: pd.DataFrame,
+    players_df: pd.DataFrame,
+    max_tiles: int = 1,
+) -> list[dict[str, Any]]:
+    """Up to ``max_tiles`` "News Alert" tiles for players on THIS roster —
+    the exact same roster-aware article matching/severity gate app.py's
+    single-league Dashboard already runs
+    (``news_intelligence.build_roster_news_alert_tiles``), reading only the
+    disk-cached article pool (``modules.news.load_cached_news_pool`` — no
+    live RSS fetch) so a many-league Portfolio fan-out never blocks on a
+    network call. A plain throwaway ``session`` dict (never Streamlit's
+    session state, which this session-independent module never touches) is
+    enough for the dedupe/escalation bookkeeping that function expects — a
+    quick-glance read of "is there a live story on one of my players right
+    now" has no need for across-rerun escalation memory the way the
+    single-league Dashboard's persistent session does.
+    """
+
+    try:
+        articles = news_cache.load_cached_news_pool()
+    except Exception:
+        return []
+    return news_intelligence.build_roster_news_alert_tiles(
+        articles,
+        session={},
+        league_id=league_id,
+        league_settings=league_settings or {},
+        my_team_df=roster_df,
+        starters_df=lineup_df,
+        free_agents_df=free_agents_df,
+        players_df=players_df,
+        max_tiles=max_tiles,
+        presentation=True,
+    )
 
 
 _trade_asset_injury_context = partial(trade_hub_ui.trade_asset_injury_context, injury_level=injury_level)
@@ -416,13 +507,30 @@ def compose_next_move_briefing(
         )
 
     # Order matches app.py's default dashboard-phase branch (roster_pressure,
-    # trade, waiver, need, injury) — see module docstring.
+    # trade, waiver, need, injury) — see module docstring. Value Trend/News
+    # Alert are appended last: quick-glance "watch" signals (see
+    # daily_gm_briefing._WATCH_LABELS), never competing with an existing
+    # trade/waiver/need tile for the single Top Priority headline.
     items = [roster_pressure_tile]
     if trade_tile is not None:
         items.append(trade_tile)
     if waiver_tile is not None:
         items.append(waiver_tile)
     items.extend([need_tile, injury_tile])
+
+    value_trend_tile = build_value_trend_tile(roster_df, score_field)
+    if value_trend_tile is not None:
+        items.append(value_trend_tile)
+    items.extend(
+        build_news_tiles(
+            league_id=league_id,
+            league_settings=league_settings,
+            roster_df=roster_df,
+            lineup_df=lineup_df,
+            free_agents_df=free_agents_df,
+            players_df=players_df,
+        )
+    )
 
     immediate_labels = frozenset(
         label
@@ -446,6 +554,10 @@ def compose_next_move_briefing(
 # as "nothing to show for this one" rather than a bug — the same reasons
 # _resolve_my_roster/get_league_dashboard (services/mobile_api_service.py)
 # already surface for a single league.
+# A Portfolio card is a quick glance across many leagues, not a second
+# Dashboard — capped well under daily_gm_briefing.MAX_BRIEFING_ITEMS (5).
+PORTFOLIO_MAX_SIGNALS = 3
+
 LEAGUE_SUMMARY_SKIP_REASONS = frozenset(
     {
         "no_sleeper_username_linked",
@@ -662,6 +774,15 @@ def build_league_summary(
         "top_asset": top_asset,
         # Priority-ordered by organize_dashboard_items/compose_daily_gm_briefing
         # above — items[0] is already "the one thing to do in this league",
-        # the same headline the single-league Dashboard leads with.
+        # the same headline the single-league Dashboard leads with. Portfolio
+        # wants more than that single headline at a glance (coridian_: "a
+        # quick synopsis of the whole team situation" — a player's value
+        # trending down, an injury, a news story, actionable waiver info),
+        # so `top_items` carries the next few already-ranked/deduped signals
+        # too, capped well under compose_daily_gm_briefing's own
+        # MAX_BRIEFING_ITEMS so a Portfolio card stays a quick glance, not a
+        # second Dashboard. `top_item` stays exactly as it was (its own first
+        # entry) for every existing caller.
         "top_item": briefing.items[0].to_dict() if briefing.items else None,
+        "top_items": [item.to_dict() for item in briefing.items[:PORTFOLIO_MAX_SIGNALS]],
     }

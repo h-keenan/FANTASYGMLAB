@@ -366,6 +366,116 @@ def test_build_waiver_tile_leaves_tier_empty_without_tier_data():
     assert tile["route_player_tier"] == ""
 
 
+def _declining_recency_row(**overrides) -> dict:
+    row = {
+        "player_id": "p1",
+        "name": "Player",
+        "position": "RB",
+        "team": "SEA",
+        "player_tier": "Starter",
+        "dynasty_score": 50,
+        # Clears rankings.recency_trend_display's own gate (RECENCY_MIN_SAMPLE
+        # = 3, RECENCY_DISPLAY_MIN_CONFIDENCE = 0.66, |trend| >= 0.05) — see
+        # that function's docstring for why.
+        "recency_sample_n": 4,
+        "recency_trend": -0.30,
+        "recency_confidence": 0.9,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_build_value_trend_tile_flags_the_highest_value_declining_roster_player():
+    """Reuses rankings.recency_trend_display (the same gated read Live
+    Draft/Player Compare already narrate per player) to pick the single
+    most valuable roster asset currently trending down — never the whole
+    roster, never a player who isn't actually declining."""
+
+    roster_df = pd.DataFrame(
+        [
+            _declining_recency_row(
+                player_id="bench-decliner", name="Bench Guy", dynasty_score=40, recency_trend=-0.30
+            ),
+            _declining_recency_row(
+                player_id="star-decliner", name="Star Back", dynasty_score=90, recency_trend=-0.20
+            ),
+            _declining_recency_row(
+                player_id="steady", name="Steady Guy", dynasty_score=60, recency_trend=0.10
+            ),
+        ]
+    )
+    tile = dashboard_engine.build_value_trend_tile(roster_df, "dynasty_score")
+    assert tile is not None
+    assert tile["label"] == "Value Trend"
+    assert "Star Back" in tile["value"]
+    assert tile["route_player_id"] == "star-decliner"
+    assert tile["tone"] == "risk"
+    assert tile["route_key"] == "my_team"
+    assert "down" in tile["note"].lower()
+
+
+def test_build_value_trend_tile_returns_none_without_a_qualifying_decline():
+    roster_df = pd.DataFrame(
+        [_declining_recency_row(player_id="steady", name="Steady Guy", recency_trend=0.01)]
+    )
+    assert dashboard_engine.build_value_trend_tile(roster_df, "dynasty_score") is None
+
+
+def test_build_value_trend_tile_returns_none_for_an_empty_roster():
+    assert dashboard_engine.build_value_trend_tile(pd.DataFrame(), "dynasty_score") is None
+
+
+def test_build_news_tiles_reads_only_the_disk_cached_pool():
+    """build_news_tiles must never hit live RSS — only the disk-cached pool
+    (modules.news.load_cached_news_pool), same as app.py's single-league
+    Dashboard — so a many-league Portfolio fan-out never blocks on network
+    I/O. The dedupe/escalation `session` passed to news_intelligence is a
+    plain throwaway dict, never Streamlit's session state."""
+
+    fake_tile = {
+        "label": "News Alert",
+        "value": "Star Back listed questionable",
+        "note": "Questionable with a knee injury.",
+        "route_player_id": "star-decliner",
+    }
+    with patch(
+        "modules.dashboard_engine.news_cache.load_cached_news_pool",
+        return_value=[{"title": "Star Back listed questionable (Q)"}],
+    ) as mock_pool:
+        with patch(
+            "modules.dashboard_engine.news_intelligence.build_roster_news_alert_tiles",
+            return_value=[fake_tile],
+        ) as mock_tiles:
+            tiles = dashboard_engine.build_news_tiles(
+                league_id="league-1",
+                league_settings={},
+                roster_df=pd.DataFrame([{"player_id": "star-decliner", "name": "Star Back"}]),
+                lineup_df=pd.DataFrame(),
+                free_agents_df=pd.DataFrame(),
+                players_df=pd.DataFrame(),
+            )
+    assert tiles == [fake_tile]
+    mock_pool.assert_called_once_with()
+    assert mock_tiles.call_args.kwargs["session"] == {}
+    assert mock_tiles.call_args.kwargs["max_tiles"] == 1
+
+
+def test_build_news_tiles_fails_soft_when_the_cache_read_errors():
+    with patch(
+        "modules.dashboard_engine.news_cache.load_cached_news_pool",
+        side_effect=RuntimeError("disk read failed"),
+    ):
+        tiles = dashboard_engine.build_news_tiles(
+            league_id="league-1",
+            league_settings={},
+            roster_df=pd.DataFrame(),
+            lineup_df=pd.DataFrame(),
+            free_agents_df=pd.DataFrame(),
+            players_df=pd.DataFrame(),
+        )
+    assert tiles == []
+
+
 def test_compose_next_move_briefing_includes_trade_tile_when_rosters_given():
     league_id = "dashboard-engine-test-league-2"
     roster_id = "1"

@@ -4613,6 +4613,16 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
 
         summary = result["summary"]
         top_item = summary.get("top_item")
+        # `top_items` is the same already-ranked/deduped signal list `top_item`
+        # draws its first entry from (modules.dashboard_engine.build_league_summary),
+        # just not truncated to one — a saved league's quick-glance card wants
+        # a few short lines (value trending down / injury / news story /
+        # waiver info), not only the single highest-priority headline. Falls
+        # back to a one-item list built from `top_item` for any caller whose
+        # `summary` predates this field, so nothing regresses to an empty list.
+        top_items = summary.get("top_items")
+        if top_items is None:
+            top_items = [top_item] if top_item else []
         leagues.append(
             {
                 "league_id": result["league_id"],
@@ -4632,6 +4642,9 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
                 "archetype_label": _clean_json_value(summary.get("archetype_label")),
                 "top_asset": _project_portfolio_top_asset(summary.get("top_asset")),
                 "top_item": _project_briefing_item_payload(top_item) if top_item else None,
+                "top_items": [
+                    _project_briefing_item_payload(item) for item in top_items if item
+                ],
             }
         )
 
