@@ -240,6 +240,35 @@ def test_pick_summary_uses_visual_pick_marker_without_detail_fields():
     assert "dg-compact-asset--pick" in html
 
 
+def test_player_summary_shows_overall_rating_badge_on_the_player_card():
+    # coridian_, Trade Ideas feedback: "I would like the overall to be on
+    # the player card." The 0-99 OVR rating already flows through every
+    # send/receive asset (trade_hub_engine -> trade_ideas._player_asset ->
+    # compact_fantasy_assets.presentation_asset) -- this asserts it now
+    # actually renders on the Trade Ideas give/get card.
+    html = trade_hub_ui._trade_summary_assets_html(
+        [
+            {
+                "asset_type": "player",
+                "player_id": "abc",
+                "name": "Test Player",
+                "position": "WR",
+                "team": "KC",
+                "overall_rating": 91,
+            }
+        ]
+    )
+    assert "dg-ovr-badge" in html
+    assert "91 OVR" in html
+
+
+def test_pick_summary_never_shows_an_overall_rating_badge():
+    html = trade_hub_ui._trade_summary_assets_html(
+        [{"asset_type": "pick", "name": "2027 1st", "round": 1}]
+    )
+    assert "dg-ovr-badge" not in html
+
+
 def test_summary_identity_is_stable_across_cached_and_uncached_copies():
     idea = _idea("stable", send_count=2, receive_count=2)
     assert trade_hub_ui.trade_summary_key(
