@@ -123,7 +123,6 @@ def test_intentional_nav_detection_covers_real_navigation_call_sites():
         assert f'"{pattern}"' in VIEWPORT_PRESERVE_JS, f"missing intentional-nav key pattern: {pattern!r}"
 
     suffix_cases = [
-        (APP, 'key=f"{key_prefix}_{route_key}_handoff"', "_handoff"),
         (APP, 'key=f"{key_prefix}_open_trade_hub"', "_open_trade_hub"),
         (APP, 'key=f"{key_prefix}_open_trade_analyzer"', "_open_trade_analyzer"),
         (dashboard_orientation_src, 'key=f"{scope_key}_my_team"', "_my_team"),
@@ -156,6 +155,15 @@ def test_intentional_nav_detection_covers_real_navigation_call_sites():
     ).read_text(encoding="utf-8")
     assert "data-route" in workspace_ui_src
     assert ".home-command-route-card[data-route]" in interaction_contract_src
+
+    # render_workspace_handoff() (coridian_, 2026-10-14: whole-card tap
+    # instead of a separate "Open ..." st.button) moved onto this same
+    # generic data-route check rather than its own pinned key suffix — the
+    # "_handoff" suffix case above was removed because no real key= site
+    # produces it anymore; this pins the replacement contract instead.
+    assert "data-route=" in APP.split("def render_workspace_handoff(", 1)[1].split(
+        "def render_trade_workflow_handoff(", 1
+    )[0]
 
     # Exact-match call sites added by later PRs (dead "Read recap" button
     # wired live, the player-detail Back button, header League management,

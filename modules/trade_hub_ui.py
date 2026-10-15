@@ -743,7 +743,22 @@ def render_trade_html_with_player_taps(
     recommendation_narrative: Mapping | None = None,
     bridge_player_opens: bool = False,
     trade_key: str = "",
+    render_interactive_html: Callable[..., dict] | None = None,
+    route: str = "",
+    route_label: str = "",
+    on_route: Callable[[str], None] | None = None,
 ) -> str:
+    """Render trade/visual HTML with player chips tappable into Quick View.
+
+    ``render_interactive_html`` + ``route`` (coridian_, 2026-10-14) let a
+    caller additionally make the WHOLE rendered block a single whole-card
+    tap target (home-command-route-card contract) — e.g. Today's Game
+    Plan's "Open Trade Hub"/"Open Waivers" cards — in the same render pass
+    that already wires the player chips inside it, instead of a separate
+    inert-HTML-plus-button pair. Falls back to the original player-chip-only
+    behavior when ``render_interactive_html``/``route`` aren't supplied.
+    """
+
     player_meta = {
         _safe_text(asset.get("player_id")).strip(): {
             "name": _safe_text(asset.get("name"), _safe_text(asset.get("label"), "Player")),
@@ -754,6 +769,56 @@ def render_trade_html_with_player_taps(
         and _safe_text(asset.get("player_id")).strip()
     }
     normalized_html = normalize_trade_html(html)
+
+    if render_interactive_html is not None and route:
+        wrapped_html = (
+            "<div class='home-command-route-card' "
+            f"data-route='{escape(route, quote=True)}' role='button' tabindex='0' "
+            f"aria-label='{escape(route_label or route, quote=True)}'>"
+            f"{normalized_html}"
+            "</div>"
+        )
+        clicked = render_interactive_html(
+            html=wrapped_html,
+            key_prefix=key_prefix,
+            bridge_player_opens=bridge_player_opens,
+            trade_key=trade_key,
+            source_label=source_label,
+        )
+        clicked_player_id = (
+            str(clicked.get("player_id") or "").strip() if isinstance(clicked, dict) else ""
+        )
+        clicked_route = (
+            str(clicked.get("route") or "").strip() if isinstance(clicked, dict) else ""
+        )
+        if clicked_player_id in player_meta and open_player_quick_view is not None:
+            meta = player_meta[clicked_player_id]
+            open_kwargs = {
+                "source_label": source_label,
+                "source_note": (
+                    canonical_recommendation_narrative.shorten_narrative_text(
+                        (recommendation_narrative or {}).get("reason")
+                        if isinstance(recommendation_narrative, Mapping)
+                        else "",
+                        160,
+                    )
+                    or f"Inspect {meta['name']} from this trade package."
+                ),
+                "status_label": (
+                    _safe_text((recommendation_narrative or {}).get("action"))
+                    if isinstance(recommendation_narrative, Mapping)
+                    else ""
+                )
+                or meta["status"],
+            }
+            if recommendation_narrative is not None:
+                open_kwargs["recommendation_narrative"] = recommendation_narrative
+            open_player_quick_view(clicked_player_id, **open_kwargs)
+            return clicked_player_id
+        if clicked_route == route and on_route is not None:
+            on_route(route)
+        return ""
+
     if (
         not player_meta
         or render_tappable_player_html is None

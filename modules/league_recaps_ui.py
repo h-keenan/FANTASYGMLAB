@@ -151,8 +151,21 @@ def recap_story_html(
     classes = f"dg-recap-story dg-recap-story--{escape(_text(story.get('story_type'), 'story'))}"
     if lead:
         classes += " dg-recap-story--lead"
+    # Whole-card tap-through (coridian_, 2026-10-14): a story with a real
+    # History deep link is itself the tap target — same home-command-route-
+    # card + TAP_DELEGATION_JS contract every other whole-card "Open ..."
+    # destination on the site uses, replacing the standalone deep-link
+    # button league_recaps_ui.py's render loop used to render below it.
+    route_attr = ""
+    if deep_link_label:
+        classes += " home-command-route-card"
+        route_value = _text(story.get("history_filter")) or league_history.FILTER_ALL
+        route_attr = (
+            f" data-route='{escape(route_value, quote=True)}' role='button' "
+            f"tabindex='0' aria-label='{escape(deep_link_label, quote=True)}'"
+        )
     return (
-        f"<article class='{classes}'>"
+        f"<article class='{classes}'{route_attr}>"
         "<div class='dg-recap-story-kicker'>"
         + glyph_html(glyph, size="kicker")
         + f"<h3>{title}</h3></div>"
@@ -322,6 +335,7 @@ def render_league_recaps_page(
     current_week: int = 0,
     render_tappable_player_html: Callable[..., str] | None = None,
     open_player_quick_view: Callable[..., None] | None = None,
+    render_interactive_html: Callable[..., dict] | None = None,
 ) -> None:
     inject_global_styles(LEAGUE_RECAPS_CSS)
     render_league_recaps_page_header(render_section_header)
@@ -380,8 +394,19 @@ def render_league_recaps_page(
             team_logo_html=team_logo_html,
             render_tappable_player_html=render_tappable_player_html,
             open_player_quick_view=open_player_quick_view,
+            render_interactive_html=render_interactive_html,
+            open_history=open_history,
         )
-        if open_history is not None and isinstance(report, Mapping):
+        # Whole-card tap-through (coridian_, 2026-10-14): Biggest Trade/
+        # Biggest FAAB are themselves the tap target into History now (see
+        # render_storylines_panel), so the standalone "Open biggest ... in
+        # History" buttons only remain as a fallback when the interactive
+        # bridge isn't wired.
+        if (
+            render_interactive_html is None
+            and open_history is not None
+            and isinstance(report, Mapping)
+        ):
             largest = report.get("largest_trade") if isinstance(report.get("largest_trade"), Mapping) else None
             faab = report.get("biggest_faab") if isinstance(report.get("biggest_faab"), Mapping) else None
             if largest and _text(largest.get("transaction_id")):
@@ -530,6 +555,12 @@ def render_league_recaps_page(
     # and its action together. Mirrors the established per-row pattern in
     # alerts_activity_ui (render a row, then render that row's actions,
     # inside the same loop iteration) rather than inventing a new one.
+    #
+    # Whole-card tap-through (coridian_, 2026-10-14): each deep-linkable
+    # story's own card now carries data-route (recap_story_html), so when
+    # render_interactive_html is wired the section render below IS the deep
+    # link — _render_story_actions' standalone per-story buttons only remain
+    # as the fallback for a caller that hasn't wired the bridge.
     story_index = 0
 
     def _render_story_actions(items: Sequence[Mapping[str, Any]]) -> None:
@@ -553,19 +584,34 @@ def render_league_recaps_page(
                 ):
                     open_history(_text(story.get("history_filter")) or league_history.FILTER_ALL)
 
+    def _render_board_section(section_html: str, *, key_prefix: str) -> None:
+        if render_interactive_html is not None and open_history is not None:
+            clicked = render_interactive_html(html=section_html, key_prefix=key_prefix)
+            clicked_route = (
+                str(clicked.get("route") or "").strip() if isinstance(clicked, dict) else ""
+            )
+            if clicked_route:
+                open_history(clicked_route)
+            return
+        render_html_fragment(section_html)
+
     lead = stories[0]
     with st.container(key=f"league_recap_lead_{home_league_id}_{selected_week}"):
-        render_html_fragment(
+        _render_board_section(
             f"<div class='dg-recap-section dg-recap-board'>"
             f"{recap_story_html(lead, lead=True, team_logo_html=team_logo_html, team_avatars=team_avatars)}"
-            "</div>"
+            "</div>",
+            key_prefix=f"league_recap_lead_tap_{home_league_id}_{selected_week}",
         )
-    _render_story_actions([lead])
+    if render_interactive_html is None:
+        _render_story_actions([lead])
     for group_index, group in enumerate(_story_groups(stories[1:]), start=1):
         with st.container(key=f"league_recap_group_{home_league_id}_{selected_week}_{group_index}"):
-            render_html_fragment(
+            _render_board_section(
                 f"<div class='dg-recap-section dg-recap-board'>"
                 f"{_group_html(group, team_logo_html=team_logo_html, team_avatars=team_avatars)}"
-                "</div>"
+                "</div>",
+                key_prefix=f"league_recap_group_tap_{home_league_id}_{selected_week}_{group_index}",
             )
-        _render_story_actions(group["stories"])
+        if render_interactive_html is None:
+            _render_story_actions(group["stories"])

@@ -234,6 +234,7 @@ def render_todays_game_plan(
     key_prefix: str = "daily_gm_briefing",
     render_tappable_player_html: Callable[..., str] | None = None,
     open_player_quick_view: Callable[..., None] | None = None,
+    render_interactive_html: Callable[..., dict] | None = None,
 ) -> None:
     """Render the compact executive morning brief."""
 
@@ -392,21 +393,28 @@ def render_todays_game_plan(
                     f"{rank_html}"
                     "</div>"
                 )
-                _render_card_html(
+                handled_whole_card = _render_card_html(
                     card_html,
                     item,
                     key_prefix=f"{key_prefix}_card_{index}",
                     render_tappable_player_html=render_tappable_player_html,
                     open_player_quick_view=open_player_quick_view,
+                    render_interactive_html=render_interactive_html,
+                    open_item=open_item,
                 )
-                with st.container(key=f"dg_cta_{tier}_{key_prefix}_{index}"):
-                    st.button(
-                        cta,
-                        key=f"{key_prefix}_open_{index}_{item.category}_{item.source_id[:24]}",
-                        use_container_width=True,
-                        on_click=open_item,
-                        args=(item,),
-                    )
+                if not handled_whole_card:
+                    # Fallback only — real traffic always wires
+                    # render_interactive_html from app.py, so the card itself
+                    # is the tap target (see _render_card_html above) and
+                    # this separate CTA never renders.
+                    with st.container(key=f"dg_cta_{tier}_{key_prefix}_{index}"):
+                        st.button(
+                            cta,
+                            key=f"{key_prefix}_open_{index}_{item.category}_{item.source_id[:24]}",
+                            use_container_width=True,
+                            on_click=open_item,
+                            args=(item,),
+                        )
 
 
 def _trade_assets_for_item(item: briefing_mod.DailyBriefingItem) -> list[dict]:
@@ -458,7 +466,9 @@ def _render_card_html(
     key_prefix: str,
     render_tappable_player_html: Callable[..., str] | None,
     open_player_quick_view: Callable[..., None] | None,
-) -> None:
+    render_interactive_html: Callable[..., dict] | None = None,
+    open_item: Callable[[briefing_mod.DailyBriefingItem], None] | None = None,
+) -> bool:
     """Render one Today's Game Plan card, wiring its give/get player avatars
     to Player Quick View on tap when it has any (Top Priority and League
     Movement trade teasers — both built from game_plan_trade_visual_html/
@@ -472,9 +482,32 @@ def _render_card_html(
     chip (see `_tap_assets_for_item`). Falls back to a plain, non-tappable
     render when this card has no player visual at all, or the caller didn't
     wire the tap callables.
+
+    Whole-card tap-through (coridian_, 2026-10-14): when ``render_interactive_html``
+    and ``open_item`` are wired, the ENTIRE card (not just its player chips)
+    also becomes a route tap target for the card's own CTA destination, same
+    render pass — the caller's separate "{cta} ->" st.button underneath it is
+    then dropped. Returns True when this whole-card route handling applied
+    (the caller should skip its own fallback button), False otherwise.
     """
 
     tap_assets = _tap_assets_for_item(item)
+    if render_interactive_html is not None and open_item is not None:
+        from modules.trade_hub_ui import render_trade_html_with_player_taps
+
+        render_trade_html_with_player_taps(
+            card_html,
+            tap_assets,
+            key_prefix=f"{key_prefix}_assets",
+            source_label="Today's Game Plan",
+            render_tappable_player_html=render_tappable_player_html,
+            open_player_quick_view=open_player_quick_view,
+            render_interactive_html=render_interactive_html,
+            route=f"open_{item.source_id or key_prefix}",
+            route_label=f"Open {item.destination or 'workflow'}".replace("_", " ").title(),
+            on_route=lambda _route, _item=item: open_item(_item),
+        )
+        return True
     if tap_assets and render_tappable_player_html is not None and open_player_quick_view is not None:
         from modules.trade_hub_ui import render_trade_html_with_player_taps
 
@@ -491,8 +524,9 @@ def _render_card_html(
                 source_label="Today's Game Plan",
                 source_note="Inspect this player from today's game plan.",
             )
-        return
+        return False
     render_html_fragment(card_html)
+    return False
 
 
 def _card_visual_html(item: briefing_mod.DailyBriefingItem) -> str:

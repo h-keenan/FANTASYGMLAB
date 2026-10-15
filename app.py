@@ -6573,23 +6573,32 @@ def render_workspace_handoff(
     note: str,
     tone: str = "info",
 ):
+    # Whole-card tap-through (coridian_, 2026-10-14): this used to render an
+    # inert note panel with the only real click target on a separate
+    # st.button below it. Reuses the exact same whole-card route mechanism
+    # workspace_ui.render_home_command_tiles already ships (.home-command-
+    # route-card[data-route] + TAP_DELEGATION_JS's "route" emit), so tapping
+    # anywhere on the card — not just where the button used to be — commits
+    # the same handoff the button used to.
     note_text = _safe_text(note)
     tone_key = _safe_text(tone, "info").strip().lower()
     if note_text:
         if tone_key == "caption":
-            st.caption(note_text)
+            card_html = f"<div class='dg-workspace-handoff-caption'>{escape(note_text)}</div>"
         elif tone_key == "warning":
-            workspace_notices.render_workspace_note(
+            card_html = ui_primitives.empty_state_panel_html(
                 "Check this next",
                 note_text,
                 kind="unavailable",
             )
         else:
-            workspace_notices.render_workspace_note(
+            card_html = ui_primitives.empty_state_panel_html(
                 "What to do next",
                 note_text,
                 kind="no-data",
             )
+    else:
+        card_html = f"<div class='dg-workspace-handoff-caption'>{escape(button_label)}</div>"
 
     def _handoff_with_return() -> None:
         _capture_workflow_handoff(
@@ -6604,12 +6613,20 @@ def render_workspace_handoff(
         )
         _commit_platform_destination(route_key, source="workspace_handoff")
 
-    st.button(
-        button_label,
-        key=f"{key_prefix}_{route_key}_handoff",
-        use_container_width=True,
-        on_click=_handoff_with_return,
+    wrapped_html = (
+        "<div class='dg-workspace-handoff home-command-route-card' "
+        f"data-route='{escape(route_key, quote=True)}' role='button' tabindex='0' "
+        f"aria-label='{escape(button_label, quote=True)}'>"
+        f"{card_html}"
+        "</div>"
     )
+    clicked = _render_player_interaction_grid(
+        html=wrapped_html,
+        key_prefix=f"{key_prefix}_{route_key}_handoff",
+    )
+    clicked_route = _safe_text(clicked.get("route")).strip() if isinstance(clicked, dict) else ""
+    if clicked_route:
+        _handoff_with_return()
 
 
 def render_trade_workflow_handoff(*, key_prefix: str, note: str):
@@ -8557,6 +8574,7 @@ def render_home_dashboard(
                 key_prefix=f"daily_gm_{_safe_text(selected_league_id) or 'none'}",
                 render_tappable_player_html=_render_tappable_player_html,
                 open_player_quick_view=open_player_quick_view,
+                render_interactive_html=_render_player_interaction_grid,
             )
         _dash_vis.log_python_render_milestone(
             st.session_state,
@@ -12537,6 +12555,7 @@ def render_platform_topbar(
                     items=notifications,
                     on_open_item=_open_notification_item,
                     key_prefix=f"executive_notifications_{current_page or 'home'}",
+                    render_interactive_html=_render_player_interaction_grid,
                 )
             with profile_col:
                 render_executive_profile_control(
@@ -19025,6 +19044,7 @@ def main():
             ),
             cached_headshot_data_url=cached_headshot_data_url,
             render_premium_lock=render_premium_lock,
+            render_interactive_html=_render_player_interaction_grid,
         )
 
     # TEAM SITUATION (Decision Memory v1 gap, #232) — standalone, not embedded
@@ -22484,6 +22504,7 @@ def main():
                 current_week=league_recaps.last_scored_week(league_payload),
                 render_tappable_player_html=_render_tappable_player_html,
                 open_player_quick_view=open_player_quick_view,
+                render_interactive_html=_render_player_interaction_grid,
             )
 
     # WEEKLY LEAGUE REPORT
