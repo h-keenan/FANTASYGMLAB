@@ -175,6 +175,36 @@ def test_health_root_and_ready(monkeypatch):
     assert ready.json()["status"] == "ready"
 
 
+def test_cors_allows_local_nextjs_dev_origin(monkeypatch):
+    # web-next/ (the Next.js frontend) calls this API directly from a
+    # browser, which the Expo/React Native client never needed — RN
+    # requests aren't subject to CORS, so this is new coverage rather than
+    # a pre-existing gap being closed. localhost:3000 is Next.js's dev
+    # default and must always be allowed regardless of WEB_APP_ORIGINS.
+    client = _client(monkeypatch)
+
+    preflight = client.options(
+        "/v1/me",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+    response = client.get("/health", headers={"Origin": "http://localhost:3000"})
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_cors_rejects_unconfigured_origin(monkeypatch):
+    client = _client(monkeypatch)
+
+    response = client.get("/health", headers={"Origin": "https://not-allowed.example.com"})
+    assert "access-control-allow-origin" not in response.headers
+
+
 def test_gzip_middleware_compresses_large_responses(monkeypatch):
     # Full-league JSON payloads (rankings, draft-picks, trade-hub) are
     # pandas-derived and can run into the hundreds of KB uncompressed, all
@@ -443,6 +473,80 @@ def test_export_my_data_reports_a_per_table_error_instead_of_failing_the_whole_r
     body = response.json()
     assert "error" in body["tables"]["profiles"]
     assert body["tables"]["user_settings"] == []
+
+
+def test_link_sleeper_username_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.post("/v1/me/link-sleeper", json={"sleeper_username": "gm_dynasty"})
+    assert response.status_code == 401
+
+
+def test_link_sleeper_username_rejects_empty_value(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/me/link-sleeper",
+            json={"sleeper_username": "   "},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 422
+
+
+def test_link_sleeper_username_upserts_the_profile(monkeypatch):
+    # web-next (and any other caller without the web app's own
+    # account_ui.save_current_context) needs this endpoint so
+    # _resolve_my_roster (GET .../my-roster, GET .../dashboard) can match a
+    # Sleeper roster by owner_id — see this endpoint's docstring for why
+    # POST /v1/leagues/save alone never links profiles.sleeper_username.
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    write_response = Mock(status_code=201)
+    write_response.json.return_value = [{"user_id": "user-123", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=write_response) as mock_post:
+            response = client.post(
+                "/v1/me/link-sleeper",
+                json={"sleeper_username": "gm_dynasty"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {"ok": True, "sleeper_username": "gm_dynasty"}
+    sent_payload = mock_post.call_args.kwargs["json"]
+    assert sent_payload["user_id"] == "user-123"
+    assert sent_payload["sleeper_username"] == "gm_dynasty"
+    assert "on_conflict=user_id" in mock_post.call_args.args[0]
+
+
+def test_link_sleeper_username_fails_closed_when_supabase_rejects_the_write(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    failing_response = Mock(status_code=500)
+    failing_response.json.return_value = {"error": "boom"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=failing_response):
+            response = client.post(
+                "/v1/me/link-sleeper",
+                json={"sleeper_username": "gm_dynasty"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert body["reason"] == "not_available"
 
 
 def test_league_endpoints_wrap_sleeper_module(monkeypatch):
@@ -4794,6 +4898,14 @@ def test_dashboard_includes_team_snapshot(monkeypatch):
     # modules.league_rankings computation get_league_team_rankings uses.
     assert snapshot["power_rank"] == 1
     assert snapshot["franchise_rank"] == 1
+    # Starter/Bench Strength (web's Team Snapshot tiles 4-5) — same
+    # rankings_frame computation get_league_team_rankings exposes as
+    # starter_rank/bench_rank, now forwarded here too (web-next Dashboard
+    # revision 1 needs this without a second round trip to team-rankings).
+    assert snapshot["starter_rank"] == 1
+    assert isinstance(snapshot["starter_rank_tied"], bool)
+    assert snapshot["bench_rank"] == 1
+    assert isinstance(snapshot["bench_rank_tied"], bool)
     # The "why" fields ride along with the flag even on a clean roster — this
     # frame carries no injury_status values, so they're simply empty.
     assert snapshot["key_injuries_summary"] == ""
