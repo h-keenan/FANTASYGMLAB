@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { api } from "@/lib/api";
 import type { HistoryResponse, HistorySide, HistoryTransaction, RecapResponse, RecapStory } from "@/lib/api";
+import { PillRow } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { streamlitPageUrl } from "@/lib/streamlitLink";
 import {
@@ -72,43 +73,6 @@ function TabBar({ active, onChange }: { active: MemoryView; onChange: (view: Mem
             }}
           >
             {view}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function PillRow({
-  options,
-  active,
-  onSelect,
-}: {
-  options: { label: string; value: string }[];
-  active: string;
-  onSelect: (value: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-0" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
-      {options.map((option) => {
-        const isActive = option.value === active;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onSelect(option.value)}
-            aria-pressed={isActive}
-            className="px-3 py-2 text-xs font-bold uppercase"
-            style={{
-              letterSpacing: "0.03em",
-              background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
-              color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-              boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
-              border: "var(--border-width-default) solid var(--color-border)",
-              marginLeft: "-1px",
-            }}
-          >
-            {option.label}
           </button>
         );
       })}

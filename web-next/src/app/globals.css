@@ -474,16 +474,21 @@ a {
   background: var(--color-danger);
 }
 
-/* Tone-colored tiles/cards for Roster Signals, Strength and Pressure, and
-   Position Groups all use this one small tone vocabulary (reuses the same
-   semantic tokens every other page uses for its tone system; see
+/* Tone-colored tiles/cards for Roster Signals, Strength and Pressure,
+   Position Groups, and Draft Center's posture/decision/partner cards all
+   use this one small tone vocabulary (reuses the same semantic tokens
+   every other page uses for its tone system; see
    modules/card_hierarchy_styles.py's summary-tile and advice-card rules
    for the Streamlit source of truth this consolidates down to a handful
    of CSS variables instead of that much larger border-color cascade).
    Note: power is the cyan information lane, not success or green (only
    strength is success), and franchise is the gold premium lane, not
    diagnostic or purple; strategy is plain accent cyan, same as power,
-   just a different concept (ranking lens versus roster-power metric). */
+   just a different concept (ranking lens versus roster-power metric);
+   weakness groups with need/health/risk/warning (same warning-amber lane)
+   per card_hierarchy_styles.py's own .summary-tile-weakness rule — added
+   here for Draft Center's "Capital-Constrained Contender" posture tone,
+   the first caller this file had for it. */
 .tone-strength {
   border-left: var(--border-width-semantic) solid var(--color-success);
 }
@@ -497,7 +502,8 @@ a {
 .tone-need,
 .tone-health,
 .tone-risk,
-.tone-warning {
+.tone-warning,
+.tone-weakness {
   border-left: var(--border-width-semantic) solid var(--color-warning);
 }
 .tone-opportunity {
@@ -525,7 +531,8 @@ a {
 .tone-need .tone-value,
 .tone-health .tone-value,
 .tone-risk .tone-value,
-.tone-warning .tone-value {
+.tone-warning .tone-value,
+.tone-weakness .tone-value {
   color: var(--color-warning);
 }
 .tone-opportunity .tone-value {
