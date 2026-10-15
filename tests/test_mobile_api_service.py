@@ -7152,6 +7152,29 @@ def test_team_rankings_returns_power_and_franchise_ranks(monkeypatch):
     # this test has no business predicting.
     assert isinstance(by_roster["1"]["draft_capital_rank"], int)
     assert isinstance(by_roster["2"]["draft_capital_rank"], int)
+    # Revision 6 (League Rankings web page) additions: the raw scores
+    # backing each rank above, plus pick-count/firsts context for the
+    # Draft Capital board's secondary line — all already computed on
+    # rankings_frame by modules.league_rankings.build_league_rankings_frame,
+    # just newly exposed on the wire rather than recomputed.
+    for team in teams:
+        assert isinstance(team["power_score"], (int, float))
+        assert isinstance(team["franchise_score"], (int, float))
+        assert isinstance(team["draft_capital_score"], (int, float))
+        assert isinstance(team["starter_score"], (int, float))
+        assert isinstance(team["bench_score"], (int, float))
+        assert isinstance(team["pick_count"], int)
+        assert isinstance(team["first_rounders"], int)
+    # Roster 1's starter-weighted score comfortably outscores roster 2's.
+    assert by_roster["1"]["power_score"] > by_roster["2"]["power_score"]
+    # Standings presentation fields (modules.league_standings.
+    # build_league_standings_bundle) are exposed as-is — roster 1's 7-6
+    # record outranks roster 2's 3-10 record under Sleeper's own
+    # wins/win_pct/points_for tie-break order.
+    assert body["standings_available"] is True
+    assert by_roster["1"]["standing_rank"] == 1
+    assert by_roster["2"]["standing_rank"] == 2
+    assert isinstance(by_roster["1"]["win_pct_label"], str) and by_roster["1"]["win_pct_label"]
     # Archetype/strategy classification (modules.team_eval.refine_team_directions)
     # runs on real strength inputs here (starter/bench/age/draft-capital ranks
     # all come from the fixture, not neutral fallbacks) — asserting the fields

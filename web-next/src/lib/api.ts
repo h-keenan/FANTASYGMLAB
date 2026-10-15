@@ -236,30 +236,108 @@ export interface TeamRanking {
   roster_id: string;
   team_name: string | null;
   owner_name: string | null;
+  owner_username: string | null;
+  avatar_url: string | null;
   wins: number | null;
   losses: number | null;
   ties: number | null;
+  record_label: string | null;
+  points_for: number | null;
+  points_against: number | null;
+  // Already-computed Standings-board presentation fields (modules.
+  // league_standings.build_league_standings_bundle, via GET
+  // .../team-rankings) — null until standings_available (see
+  // LeagueTeamRankingsResponse.standings_available below).
+  standing_rank: number | null;
+  win_pct_label: string | null;
+  points_for_label: string | null;
+  points_against_label: string | null;
+  playoff_status: string | null;
+  on_playoff_line: boolean;
   power_rank: number | null;
   power_rank_tied: boolean;
+  power_score: number | null;
   franchise_rank: number | null;
   franchise_rank_tied: boolean;
+  franchise_score: number | null;
   draft_capital_rank: number | null;
   draft_capital_rank_tied: boolean;
+  draft_capital_score: number | null;
+  pick_count: number | null;
+  first_rounders: number | null;
   starter_rank: number | null;
   starter_rank_tied: boolean;
+  starter_score: number | null;
   bench_rank: number | null;
   bench_rank_tied: boolean;
+  bench_score: number | null;
   age_rank: number | null;
   age_rank_tied: boolean;
   average_age: number | null;
+  strategy: string | null;
+  strategy_label: string | null;
+  archetype: string | null;
   archetype_label: string | null;
+  archetype_explanation: string | null;
   archetype_strengths: string[];
+  archetype_risks: string[];
+  archetype_recommendations: string[];
+  trade_tendency: string;
+  transaction_activity_count: number;
+  firsts_acquired: number;
+  firsts_sent: number;
+  current_streak: number;
+  team_badges: string[];
+  injured_starters: number | null;
+  /** Real, server-computed injury-impact label ("Stable" when nothing is
+   * meaningfully affecting this roster) — modules.league_rankings.
+   * build_roster_health_metrics_frame, the same source My Team's Team
+   * Snapshot and Dashboard's Team Snapshot tile read. */
+  health_flag: string | null;
 }
 
-export interface TeamRankingsResponse {
+export interface LeagueTeamRankingsResponse {
   ok: boolean;
   teams: TeamRanking[];
   reason: string;
+  standings_available: boolean;
+  standings_message: string;
+  season: string;
+  week_label: string;
+  playoff_teams: number | null;
+}
+
+/** Real Monte-Carlo rest-of-season simulation result for one team —
+ * mirrors mobile's PlayoffOddsTeam (mobile/src/lib/api.ts), the reference
+ * client for GET .../playoff-odds. `clinched`/`eliminated` are only ever
+ * true at exactly 100/0 — a structural property of the simulation. */
+export interface PlayoffOddsTeam {
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  record_label: string | null;
+  playoff_probability: number;
+  median_final_wins: number;
+  median_final_losses: number;
+  median_seed: number;
+  remaining_games: number;
+  clinched: boolean;
+  eliminated: boolean;
+}
+
+export interface PlayoffOddsResponse {
+  ok: boolean;
+  reason: string;
+  teams: PlayoffOddsTeam[];
+  playoff_teams?: number;
+  current_week?: number;
+  regular_season_end?: number;
+  weeks_remaining?: number;
+  trials?: number;
+  slope_fitted?: boolean;
+  games_used_for_fit?: number;
+  season?: string;
 }
 
 /** One give/get asset inside a trade idea's package — mirrors mobile's
@@ -595,8 +673,13 @@ export const api = {
     ),
 
   getTeamRankings: (leagueId: string, lens: string = "Dynasty") =>
-    authorizedRequest<TeamRankingsResponse>(
+    authorizedRequest<LeagueTeamRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-rankings?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getLeaguePlayoffOdds: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<PlayoffOddsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/playoff-odds?lens=${encodeURIComponent(lens)}`,
     ),
 
   // strategy/lens default to the same "retool"/"Dynasty" GET .../trade-hub
