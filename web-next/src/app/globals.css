@@ -1,0 +1,304 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------- */
+/* DynastyGM design tokens, ported verbatim from                          */
+/* modules/design_tokens.py (DESIGN_TOKEN_CSS / LIGHT_MODE_TOKENS).       */
+/* This is the single source of truth shared with the Streamlit app and  */
+/* the mobile app (mobile/src/theme.ts). Do not hand-edit hex values here */
+/* without updating modules/design_tokens.py first — re-derive, don't    */
+/* drift. Dark is the default/launch-time theme; light overrides via     */
+/* prefers-color-scheme, matching the Python app's server-resolved mode. */
+/* ---------------------------------------------------------------------- */
+
+:root {
+  /* Foundation */
+  --color-bg: #050607;
+  --color-shell: #090a0c;
+  --color-surface-primary: #0f1114;
+  --color-surface-secondary: #15171b;
+  --color-surface-raised: #1b1e23;
+  --color-surface-muted: #0b0c0f;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #e5e7eb;
+  --color-text-muted: #a8adb7;
+  --color-border: #2a2e35;
+  --color-border-strong: #64748b;
+  --border-width-default: 1px;
+  --border-width-semantic: 3px;
+
+  /* Semantic surface / text / border aliases */
+  --surface-page: var(--color-bg);
+  --surface-1: var(--color-surface-primary);
+  --surface-2: var(--color-surface-secondary);
+  --surface-raised: var(--color-surface-raised);
+  --surface-interactive: var(--color-surface-raised);
+  --surface-selected: var(--color-accent-soft);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --text-disabled: var(--color-muted);
+  --text-accent: var(--color-accent);
+  --text-positive: var(--color-success);
+  --text-warning: var(--color-warning);
+  --text-negative: var(--color-danger);
+  --border-subtle: var(--color-border);
+  --border-standard: var(--color-border);
+  --border-strong: var(--color-border-strong);
+  --border-accent: var(--color-accent);
+
+  /* Brand accent (fixed, not themed) */
+  --color-brand-accent: #22d3ee;
+  --color-brand-bg: #050607;
+  --color-brand-surface: #0f1114;
+  --color-brand-mark-ink: #0b1220;
+
+  /* Interaction and meaning */
+  --color-accent: #67e8f9;
+  --color-accent-strong: #22d3ee;
+  --color-accent-soft: rgba(103, 232, 249, 0.14);
+  --color-success: #22c55e;
+  --color-opportunity: #14b8a6;
+  --color-action: #facc15;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-diagnostic: #8b93ff;
+  --color-muted: rgba(229, 231, 235, 0.52);
+  /* information/experimental/premium are the same brand hue as
+     accent/diagnostic/action respectively in BOTH themes (verified against
+     modules/design_tokens.py — DESIGN_TOKEN_HEX and its light-mode
+     counterpart resolve these to byte-identical values; the Python source's
+     own comments call this out as intentional, e.g. "--color-information
+     mirrors --color-accent"). Aliased here instead of restating the same
+     literal twice, so this file has one source of truth per actual color
+     rather than two names that must be kept in sync by hand. */
+  --color-information: var(--color-accent);
+  --color-premium: var(--color-action);
+  --color-experimental: var(--color-diagnostic);
+
+  /* Player prestige */
+  --color-prestige-elite: #d8b85a;
+  --color-prestige-starter: #d7dbe2;
+  --color-prestige-contributor: #9da4ae;
+  --color-prestige-development: #79818c;
+  --color-prestige-depth: #626a75;
+  --color-prestige-replacement: #ef6a6a;
+
+  /* Position identity */
+  --color-position-qb: #fb7185;
+  --color-position-rb: #4ade80;
+  --color-position-wr: #38bdf8;
+  --color-position-te: #fb923c;
+  --color-position-k: #a78bfa;
+  --color-position-dst: #d4d4d8;
+
+  /* Semantic soft surfaces */
+  --color-success-soft: rgba(34, 197, 94, 0.15);
+  --color-opportunity-soft: rgba(20, 184, 166, 0.14);
+  --color-action-soft: rgba(250, 204, 21, 0.14);
+  --color-warning-soft: rgba(245, 158, 11, 0.14);
+  --color-danger-soft: rgba(239, 68, 68, 0.15);
+  --color-information-soft: rgba(103, 232, 249, 0.12);
+  --color-diagnostic-soft: rgba(139, 147, 255, 0.12);
+  --color-muted-soft: rgba(229, 231, 235, 0.06);
+
+  /* Spacing */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 64px;
+
+  /* Canonical asset portrait sizes */
+  --size-asset-chip: 1.5rem;
+  --size-asset-compact: 2.25rem;
+  --size-asset-standard: 2.75rem;
+  --size-roster-core-portrait: 5.5rem;
+  --size-roster-core-portrait-lg: 6rem;
+
+  /* Geometry: intentionally square/sharp, not rounded. The named scale
+     (square/sm/md/lg/control/panel) collapsed to the same value (0) when
+     this app adopted a flat, cornerless identity — rather than restate "0"
+     six more times, every name aliases the one canonical --radius-none, so
+     a future deliberate divergence only has to change one literal instead
+     of grepping for which zeros still need to match. */
+  --radius-none: 0;
+  --radius-square: var(--radius-none);
+  --radius-sm: var(--radius-none);
+  --radius-md: var(--radius-none);
+  --radius-lg: var(--radius-none);
+  --radius-control: var(--radius-none);
+  --radius-panel: var(--radius-none);
+  --radius-pill: 2px;
+  --radius-segment: 999px;
+
+  /* Elevation */
+  --shadow-none: none;
+  --shadow-control: 0 2px 0 rgba(0, 0, 0, 0.32);
+  --shadow-card: 0 3px 0 rgba(0, 0, 0, 0.34);
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.46);
+  --shadow-surface-inset: inset 0 1px 0 rgba(248, 250, 252, 0.025);
+
+  /* Opacity */
+  --opacity-primary: 1;
+  --opacity-secondary: 0.82;
+  --opacity-metadata: 0.68;
+  --opacity-disabled: 0.5;
+  --opacity-divider: 0.12;
+
+  /* Typography */
+  --font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size-display: 2rem;
+  --font-size-page-title: 1.5rem;
+  --font-size-section-title: 1.125rem;
+  --font-size-card-title: 0.875rem;
+  --font-size-body: 0.875rem;
+  --font-size-caption: 0.75rem;
+  --font-size-badge: 0.6875rem;
+  --font-size-numeric: 1.375rem;
+  --font-weight-body: 500;
+  --font-weight-metadata: 650;
+  --font-weight-button: 750;
+  --font-weight-title: 800;
+  --font-weight-display: 900;
+  --line-height-display: 1.05;
+  --line-height-title: 1.1;
+  --line-height-card: 1.2;
+  --line-height-body: 1.45;
+  --line-height-caption: 1.35;
+  --line-height-badge: 1;
+  --letter-spacing-badge: 0.085em;
+
+  /* Founder Beta information hierarchy */
+  --type-page-eyebrow-size: var(--font-size-badge);
+  --type-page-title-size: clamp(1.85rem, 4.5vw, 2.75rem);
+  --type-page-description-size: var(--font-size-body);
+  --type-section-eyebrow-size: var(--font-size-badge);
+  --type-section-title-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  --type-card-title-size: 1rem;
+  --type-primary-metric-size: clamp(1.5rem, 2vw, 1.85rem);
+  --type-supporting-metadata-size: 0.6875rem;
+  --type-body-explanation-size: var(--font-size-body);
+  --type-badge-size: var(--font-size-badge);
+
+  /* Focus, controls, motion */
+  --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
+  --control-min-height: 44px;
+  --touch-target-min: 44px;
+  --motion-fast: 120ms;
+  --motion-standard: 180ms;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg: #eef3f6;
+    --color-shell: #e5ecf1;
+    --color-surface-primary: #ffffff;
+    --color-surface-secondary: #f5f9fb;
+    --color-surface-raised: #ffffff;
+    --color-surface-muted: #e6edf1;
+    --color-text-primary: #101820;
+    --color-text-secondary: #3b4a56;
+    --color-text-muted: #57646f;
+    --color-border: #c7d3da;
+    --color-border-strong: #5d6b77;
+
+    --color-accent: #056e7c;
+    --color-accent-strong: #08616e;
+    --color-accent-soft: rgba(6, 110, 124, 0.16);
+    --color-success: #147337;
+    --color-opportunity: #0c7065;
+    --color-action: #796103;
+    --color-warning: #8a5906;
+    --color-danger: #c81111;
+    --color-diagnostic: #5f52c8;
+    --color-muted: rgba(16, 24, 32, 0.45);
+    --color-information: var(--color-accent);
+    --color-premium: var(--color-action);
+    --color-experimental: var(--color-diagnostic);
+
+    --color-prestige-elite: #7d5b07;
+    --color-prestige-starter: #34404c;
+    --color-prestige-contributor: #48545f;
+    --color-prestige-development: #56626e;
+    --color-prestige-depth: #5c6874;
+    --color-prestige-replacement: #b0393d;
+
+    --color-position-qb: #be123c;
+    --color-position-rb: #15803d;
+    --color-position-wr: #0369a1;
+    --color-position-te: #c2410c;
+    --color-position-k: #6d28d9;
+    --color-position-dst: #3f3f46;
+
+    --color-success-soft: rgba(34, 197, 94, 0.16);
+    --color-opportunity-soft: rgba(20, 184, 166, 0.16);
+    --color-action-soft: rgba(250, 204, 21, 0.18);
+    --color-warning-soft: rgba(245, 158, 11, 0.16);
+    --color-danger-soft: rgba(239, 68, 68, 0.16);
+    --color-information-soft: rgba(103, 232, 249, 0.2);
+    --color-diagnostic-soft: rgba(139, 147, 255, 0.16);
+    --color-muted-soft: rgba(16, 24, 32, 0.06);
+
+    --focus-ring: 0 0 0 3px rgba(6, 110, 124, 0.45);
+    --shadow-surface-inset: inset 0 1px 0 rgba(10, 30, 45, 0.05);
+
+    color-scheme: light;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface-primary: var(--color-surface-primary);
+  --color-surface-secondary: var(--color-surface-secondary);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+  --color-border: var(--color-border);
+  --color-accent: var(--color-accent);
+  --color-accent-strong: var(--color-accent-strong);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-opportunity: var(--color-opportunity);
+  --color-position-qb: var(--color-position-qb);
+  --color-position-rb: var(--color-position-rb);
+  --color-position-wr: var(--color-position-wr);
+  --color-position-te: var(--color-position-te);
+  --color-position-k: var(--color-position-k);
+  --color-position-dst: var(--color-position-dst);
+  --font-sans: var(--font-family-sans);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-body);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

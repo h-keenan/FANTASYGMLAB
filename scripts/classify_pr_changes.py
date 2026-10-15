@@ -19,6 +19,7 @@ UI_PATH_RULES = (
 )
 
 MOBILE_APP_PATH_RULES = (re.compile(r"^mobile/"),)
+WEB_NEXT_PATH_RULES = (re.compile(r"^web-next/"),)
 
 
 def is_ui_path(path: str) -> bool:
@@ -33,6 +34,13 @@ def is_mobile_app_path(path: str) -> bool:
     if normalized.startswith("./"):
         normalized = normalized[2:]
     return any(rule.search(normalized) for rule in MOBILE_APP_PATH_RULES)
+
+
+def is_web_next_path(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    return any(rule.search(normalized) for rule in WEB_NEXT_PATH_RULES)
 
 
 def changed_paths(base: str, head: str) -> tuple[str, ...]:
@@ -54,17 +62,22 @@ def main() -> int:
     paths = changed_paths(args.base, args.head)
     ui_paths = tuple(path for path in paths if is_ui_path(path))
     mobile_app_paths = tuple(path for path in paths if is_mobile_app_path(path))
+    web_next_paths = tuple(path for path in paths if is_web_next_path(path))
     ui_value = "true" if ui_paths else "false"
     mobile_app_value = "true" if mobile_app_paths else "false"
+    web_next_value = "true" if web_next_paths else "false"
     print(f"ui_changed={ui_value}")
     print(f"mobile_app_changed={mobile_app_value}")
+    print(f"web_next_changed={web_next_value}")
     print("changed_paths=" + ",".join(paths))
     print("ui_paths=" + ",".join(ui_paths))
     print("mobile_app_paths=" + ",".join(mobile_app_paths))
+    print("web_next_paths=" + ",".join(web_next_paths))
     if args.github_output:
         with Path(args.github_output).open("a", encoding="utf-8") as output:
             output.write(f"ui_changed={ui_value}\n")
             output.write(f"mobile_app_changed={mobile_app_value}\n")
+            output.write(f"web_next_changed={web_next_value}\n")
     return 0
 
 

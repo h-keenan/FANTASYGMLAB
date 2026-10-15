@@ -6,6 +6,7 @@ Deployment topology (Render):
   - GET  /health              — process liveness (no Supabase dependency)
   - GET  /ready               — Supabase config readiness (no secret values)
   - GET  /v1/me               — authenticated user + entitlement + saved-league cap
+  - POST /v1/me/link-sleeper  — link a Sleeper username onto the caller's profile (roster resolution)
   - GET  /v1/sleeper/leagues?username=x  — the Sleeper leagues behind a username (add-league picker)
   - POST /v1/leagues/save                — save a Sleeper league to the account (cap-enforced)
   - GET  /v1/leagues/{id}                — Sleeper league metadata
@@ -92,6 +93,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
@@ -446,6 +448,25 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 # (including gzip'ing a response nobody should have gotten) on a throttled
 # request.
 app.add_middleware(_RateLimitMiddleware)
+# The Next.js web frontend (web-next/) calls this API directly from the
+# browser, which the Expo/React Native client never needed — RN requests
+# aren't subject to CORS. Local dev always needs http://localhost:3000;
+# WEB_APP_ORIGINS adds the deployed web app's real origin(s) (comma
+# separated) without hardcoding a production hostname here. No origins
+# configured beyond localhost is still safe: every route stays behind its
+# existing auth/rate-limit middleware regardless of Origin.
+_WEB_APP_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("WEB_APP_ORIGINS", "").split(",")
+    if origin.strip()
+] + ["http://localhost:3000"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_WEB_APP_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 
 @app.exception_handler(HTTPException)
@@ -803,6 +824,56 @@ def export_my_data(user: dict[str, Any] = Depends(require_user)) -> dict[str, An
         "user": {"id": user_id, "email": user.get("email") or ""},
         "tables": tables,
     }
+
+
+class LinkSleeperUsernameRequest(BaseModel):
+    sleeper_username: str
+
+
+@app.post("/v1/me/link-sleeper")
+def link_sleeper_username(
+    body: LinkSleeperUsernameRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Link a Sleeper username onto the caller's `profiles` row.
+
+    This is the one piece of onboarding the web app's launch flow already
+    does (modules.account_ui.save_current_context -> account_store.
+    upsert_profile) that neither this service's POST /v1/leagues/save nor
+    any other existing endpoint performs: /v1/leagues/save only resolves a
+    `roster_id` for the league row being saved, it never writes
+    `profiles.sleeper_username` itself. Every roster-resolution helper in
+    this file (`_resolve_my_roster`, used by GET .../my-roster and GET
+    .../dashboard) reads that profile column, so without this endpoint a
+    web-next user who signs in (including as an anonymous Supabase guest,
+    the same path mobile's `signInAnonymously` uses) and imports a Sleeper
+    username has no way to make Dashboard/My Team resolve "my roster" at
+    all. Thin wrapper only — same `account_store.build_profile_payload` /
+    `upsert_profile` call web already makes, no new business logic.
+    """
+
+    username = str(body.sleeper_username or "").strip()
+    if not username:
+        raise HTTPException(status_code=422, detail="sleeper_username is required.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    ok, error = account_store.upsert_profile(
+        config,
+        access_token,
+        account_store.build_profile_payload(
+            user_id=user_id,
+            email=str(user.get("email") or ""),
+            sleeper_username=username,
+        ),
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available", "error": error}
+    return {"ok": True, "sleeper_username": username}
 
 
 @app.get("/v1/sleeper/leagues")
@@ -4357,6 +4428,10 @@ def get_league_dashboard(
     power_rank_tied = False
     franchise_rank = None
     franchise_rank_tied = False
+    starter_rank = None
+    starter_rank_tied = False
+    bench_rank = None
+    bench_rank_tied = False
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
@@ -4368,6 +4443,15 @@ def get_league_dashboard(
             power_rank_tied = bool(match.iloc[0].get("power_rank_tied"))
             franchise_rank = _clean_json_value(match.iloc[0].get("franchise_rank"))
             franchise_rank_tied = bool(match.iloc[0].get("franchise_rank_tied"))
+            # Starter/Bench Strength (web's Team Snapshot tiles 4-5) — same
+            # rankings_frame already computes both columns (see
+            # modules.league_rankings, shared with GET .../team-rankings'
+            # identical starter_rank/bench_rank projection); reading them
+            # here is free, no second engine call.
+            starter_rank = _clean_json_value(match.iloc[0].get("starter_rank"))
+            starter_rank_tied = bool(match.iloc[0].get("starter_rank_tied"))
+            bench_rank = _clean_json_value(match.iloc[0].get("bench_rank"))
+            bench_rank_tied = bool(match.iloc[0].get("bench_rank_tied"))
 
     roster_settings = my_roster.get("settings") or {}
     team_snapshot = {
@@ -4391,6 +4475,10 @@ def get_league_dashboard(
         "power_rank_tied": power_rank_tied,
         "franchise_rank": franchise_rank,
         "franchise_rank_tied": franchise_rank_tied,
+        "starter_rank": starter_rank,
+        "starter_rank_tied": starter_rank_tied,
+        "bench_rank": bench_rank,
+        "bench_rank_tied": bench_rank_tied,
     }
 
     # Free-tier cap matches the web app's own gate (app.py:

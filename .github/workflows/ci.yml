@@ -14,6 +14,7 @@ jobs:
     outputs:
       ui_changed: ${{ steps.classify.outputs.ui_changed }}
       mobile_app_changed: ${{ steps.classify.outputs.mobile_app_changed }}
+      web_next_changed: ${{ steps.classify.outputs.web_next_changed }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -96,6 +97,36 @@ jobs:
             exit 0
           fi
           exit "$status"
+
+  web-next:
+    needs: [classify]
+    if: needs.classify.outputs.web_next_changed == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-next
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web-next/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        # NEXT_PUBLIC_* only need to be set (not valid) for a CI build —
+        # nothing calls Supabase/the API at build time, only at runtime.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+        run: npm run build
 
   mobile-ui:
     needs: [classify, test]
