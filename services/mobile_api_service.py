@@ -2108,6 +2108,43 @@ def _project_news_item(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _project_general_news_item(item: dict[str, Any]) -> dict[str, Any]:
+    """Projects one modules.news.general_news_feed() item to GET /v1/news's
+    response shape. That function already owns event_type/speculative/
+    friendly-source projection and, when resolved, single- or two-player
+    identity (matched_player* / matched_players — see its own docstring and
+    modules.news._attach_general_news_player_identity) — this only adds the
+    JSON field selection, never a second copy of that classification.
+    """
+
+    projected: dict[str, Any] = {
+        "title": _clean_json_value(item.get("title")),
+        "link": _clean_json_value(item.get("link")),
+        "source": _clean_json_value(item.get("source")),
+        "summary": _clean_json_value(my_news.build_quick_news_summary(item)),
+        "published_ts": _clean_json_value(item.get("published_ts")),
+        "event_type": _clean_json_value(item.get("event_type")),
+        "speculative": bool(item.get("speculative")),
+    }
+    if item.get("matched_player_id"):
+        projected["matched_player"] = _clean_json_value(item.get("matched_player"))
+        projected["matched_player_id"] = _clean_json_value(item.get("matched_player_id"))
+        projected["matched_player_position"] = _clean_json_value(item.get("matched_player_position"))
+        projected["matched_player_team"] = _clean_json_value(item.get("matched_player_team"))
+    matched_players = item.get("matched_players")
+    if isinstance(matched_players, list) and len(matched_players) == 2:
+        projected["matched_players"] = [
+            {
+                "matched_player": _clean_json_value(entry.get("matched_player")),
+                "matched_player_id": _clean_json_value(entry.get("matched_player_id")),
+                "matched_player_position": _clean_json_value(entry.get("matched_player_position")),
+                "matched_player_team": _clean_json_value(entry.get("matched_player_team")),
+            }
+            for entry in matched_players
+        ]
+    return projected
+
+
 @app.get("/v1/news")
 def get_news(
     limit: int = 30,
@@ -2117,9 +2154,14 @@ def get_news(
     signal only — a generic headline is dropped). Not roster-scoped: this is
     a league-wide feed for anyone, not "your team's" news.
 
-    Shares the same disk-cached pool and classification the web app uses
-    (modules.news, modules.news_signal) and never triggers a live RSS fetch
-    on this request path — schedule_news_cache_refresh only starts a
+    Delegates the whole pipeline — disk-cached pool, actionable filtering,
+    dedupe, sort, friendly source names, and single/two-player identity
+    resolution — to modules.news.general_news_feed, the exact function the
+    web app's own "News" route (app.py / modules.general_news_ui) calls, so
+    this endpoint and that page share one curation implementation instead
+    of two that can drift (this route previously re-implemented the pool/
+    filter/dedupe/sort steps by hand). Never triggers a live RSS fetch on
+    this request path — schedule_news_cache_refresh only starts a
     background refresh when the on-disk cache is already stale.
     """
 
@@ -2127,24 +2169,8 @@ def get_news(
         raise HTTPException(status_code=422, detail=f"limit must be between 1 and {MAX_NEWS_LIMIT}.")
 
     news_cache.schedule_news_cache_refresh()
-    enriched = news_cache.enriched_news_pool()
-
-    actionable = [item for item in enriched if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS]
-    actionable.sort(key=my_news.news_timestamp, reverse=True)
-
-    seen_links: set[str] = set()
-    items: list[dict[str, Any]] = []
-    for item in actionable:
-        link = str(item.get("link") or "").strip().lower()
-        if link and link in seen_links:
-            continue
-        if link:
-            seen_links.add(link)
-        items.append(_project_news_item(item))
-        if len(items) >= limit:
-            break
-
-    return {"ok": True, "items": items}
+    items = news_cache.general_news_feed(limit)
+    return {"ok": True, "items": [_project_general_news_item(item) for item in items]}
 
 
 MAX_PLAYER_NEWS_LIMIT = 10

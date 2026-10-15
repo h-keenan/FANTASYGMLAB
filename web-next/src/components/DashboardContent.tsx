@@ -170,6 +170,7 @@ export function DashboardContent({
         </p>
         <div className="grid grid-cols-2 gap-3">
           <ExploreCard href="/portfolio" label="Portfolio" />
+          <ExploreCard href="/news" label="News" />
           {BUILT_PAGES.map((page) => (
             <ExploreCard
               key={page.path}

@@ -631,6 +631,48 @@ export interface MatchupResponse {
 
 export type RosterRelationship = "starter" | "bench" | "taxi" | "ir" | null;
 
+/** A second named player on a general-News item that resolved to exactly
+ * two distinct players (e.g. a two-player trade) — modules.news.
+ * _attach_general_news_player_identity's `matched_players` shape. Position/
+ * team are omitted from the JSON entirely (not sent as null) whenever that
+ * player's row carries no value, so both stay optional here. */
+export interface NewsPlayerIdentity {
+  matched_player: string | null;
+  matched_player_id: string | null;
+  matched_player_position?: string | null;
+  matched_player_team?: string | null;
+}
+
+/** One curated NFL news item — base shape shared by GET /v1/news (the
+ * general, non-roster-scoped feed, Revision 10) and GET .../alerts (the
+ * roster-scoped feed below, via AlertItem extends NewsItem) rather than two
+ * independently drifting copies of the same seven fields. Mirrors mobile's
+ * NewsItem (mobile/src/lib/api.ts).
+ *
+ * matched_player/_id/_position/_team describe the single player an item
+ * resolved to; matched_players carries both when it resolved to exactly
+ * two instead (see NewsPlayerIdentity) — the general feed can set either,
+ * Alerts' roster-scoped feed only ever sets the single-player fields. */
+export interface NewsItem {
+  title: string | null;
+  link: string | null;
+  source: string | null;
+  summary: string | null;
+  published_ts: number | null;
+  event_type: string | null;
+  speculative: boolean;
+  matched_player?: string | null;
+  matched_player_id?: string | null;
+  matched_player_position?: string | null;
+  matched_player_team?: string | null;
+  matched_players?: [NewsPlayerIdentity, NewsPlayerIdentity];
+}
+
+export interface NewsResponse {
+  ok: boolean;
+  items: NewsItem[];
+}
+
 /** One roster-relevant news item — mirrors mobile's AlertItem (mobile/src/
  * lib/api.ts), the reference implementation for GET .../alerts. That
  * endpoint's own docstring is explicit that this is "one league's feed,
@@ -640,14 +682,7 @@ export type RosterRelationship = "starter" | "bench" | "taxi" | "ir" | null;
  * destinations) — read state here is real, but there is no destination
  * routing to port: every item's only two CTAs are the source article link
  * and the matched player's identity, same as mobile's screen. */
-export interface AlertItem {
-  title: string | null;
-  link: string | null;
-  source: string | null;
-  summary: string | null;
-  published_ts: number | null;
-  event_type: string | null;
-  speculative: boolean;
+export interface AlertItem extends NewsItem {
   alert_key: string;
   read: boolean;
   matched_player: string | null;
@@ -970,4 +1005,10 @@ export const api = {
     authorizedRequest<GmPlanResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-plan?lens=${encodeURIComponent(lens)}`,
     ),
+
+  // General, non-roster-scoped NFL news (Revision 10) — same GET /v1/news
+  // mobile's NewsScreen reads, and league-independent like getPortfolio
+  // above: no leagueId param.
+  getNews: (limit: number = 30) =>
+    authorizedRequest<NewsResponse>(`/v1/news?limit=${limit}`),
 };
