@@ -27,6 +27,12 @@ export const DESTINATION_LABELS: Record<string, string> = {
   // own docstring) — its empty state sends a user to add a first target the
   // same place Streamlit's does, Players, which has no Next.js page yet.
   players: "Open Players",
+  // Trade Analyzer (Revision 15) has a real Next.js page now — see
+  // GamePlanCard.tsx's INTERNAL_ROUTES, which routes this destination there
+  // instead of here. Trade Finder (mobile's player-focused trade-block
+  // search) stays Streamlit-only, same tri-tab split TradesTabBar.tsx draws.
+  trade_analyzer: "Open Trade Analyzer",
+  trade_finder: "Open Trade Finder",
 };
 
 export function destinationCtaLabel(destination: string): string {

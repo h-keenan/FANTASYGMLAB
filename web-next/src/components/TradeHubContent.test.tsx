@@ -55,7 +55,7 @@ const RESPONSE: TradeHubResponse = {
 
 describe("TradeHubContent", () => {
   it("renders a trade idea card with partner, fairness pill, value edge, and give/get assets", () => {
-    render(<TradeHubContent leagueName="Dynasty Overlords" data={RESPONSE} />);
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
 
     expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
@@ -69,14 +69,14 @@ describe("TradeHubContent", () => {
 
   it("shows the low-confidence note on the card face without opening details", () => {
     const lowConfidence: TradeHubResponse = { ...RESPONSE, ideas: [idea({ confidence_label: "Low" })] };
-    render(<TradeHubContent leagueName="Dynasty Overlords" data={lowConfidence} />);
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={lowConfidence} />);
 
     expect(screen.getByText("More dependent on partner preference and market fit.")).toBeInTheDocument();
     expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
   });
 
   it("reveals rationale and confidence/realism rings only after Review package is clicked", () => {
-    render(<TradeHubContent leagueName="Dynasty Overlords" data={RESPONSE} />);
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
 
     expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Review package/ }));
@@ -90,21 +90,21 @@ describe("TradeHubContent", () => {
       ...RESPONSE,
       entitlement: { is_premium: false, approved_count: 5, visible_count: 2, hidden_count: 3, free_limit: 2 },
     };
-    render(<TradeHubContent leagueName="Dynasty Overlords" data={gated} />);
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={gated} />);
 
     expect(screen.getByText("3 more trade ideas available on Premium.")).toBeInTheDocument();
   });
 
   it("shows the roster-not-ready message instead of an empty board when `reason` is set", () => {
     const notReady: TradeHubResponse = { ok: true, reason: "empty_roster", ideas: [], entitlement: null };
-    render(<TradeHubContent leagueName="Dynasty Overlords" data={notReady} />);
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={notReady} />);
 
     expect(screen.getByText(/Your roster in this league looks empty/)).toBeInTheDocument();
   });
 
   it("shows a no-ideas message when the board is empty for a real reason-less roster", () => {
     const empty: TradeHubResponse = { ok: true, reason: "", ideas: [], entitlement: null };
-    render(<TradeHubContent leagueName="Dynasty Overlords" data={empty} />);
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={empty} />);
 
     expect(screen.getByText(/No trade ideas right now/)).toBeInTheDocument();
   });

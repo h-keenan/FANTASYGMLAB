@@ -1217,6 +1217,103 @@ export interface DraftPicksResponse {
   reason: string;
 }
 
+// Trade Analyzer (Revision 15) — raw Sleeper passthrough rosters/users and
+// the derived team-profile map, mirroring mobile/src/lib/api.ts's
+// LeagueUsersResponse/LeagueRostersResponse/TeamProfile exactly. These three
+// already back mobile's own Trade Analyzer roster-browse (who's on which
+// team, whose roster to search for the receive side) — no new backend logic,
+// only wiring the same GET /users, /rosters, /team-profiles this web app's
+// Next.js client had never called before.
+export interface LeagueUsersResponse {
+  ok: boolean;
+  users: Array<Record<string, unknown>>;
+}
+
+export interface LeagueRostersResponse {
+  ok: boolean;
+  rosters: Array<Record<string, unknown>>;
+}
+
+export interface TeamProfile {
+  team_name: string;
+  owner_name: string;
+  username: string;
+  avatar_id: string;
+  avatar_url: string;
+  roster_id: number | string;
+  owner_id: string;
+}
+
+export interface LeagueTeamProfilesResponse {
+  ok: boolean;
+  profiles: Record<string, TeamProfile>;
+}
+
+/** The one specific asset a verdict's counter_guidance identified (never a
+ * generic suggestion) — modules.trade_offer_analyzer.build_counter_guidance's
+ * `action` dict, verbatim. Lets "Build the counter" apply it directly to the
+ * package instead of the user re-reading the sentence and hunting for the
+ * player themselves. */
+export interface TradeCounterAction {
+  action: "remove_from_send" | "add_to_receive";
+  player_id: string;
+  asset_type: string;
+  label: string;
+}
+
+/** A real alternate package ("Try this instead") the server actually
+ * regraded as Fair/Accept — modules.trade_offer_analyzer.build_counter_offer_packages's
+ * `_package_entry`, verbatim. Empty on the verdict whenever no clean
+ * rebalancing was found; never fabricated client-side. */
+export interface TradeAlternatePackage {
+  label: string;
+  send_assets: TradeAsset[];
+  receive_assets: TradeAsset[];
+  band: string;
+  ui_verdict: string;
+  confidence: string;
+  value_delta: number;
+}
+
+/** modules/trade_offer_analyzer.py's OfferVerdict.to_public_dict(), verbatim
+ * — the real accept/decline/counter verdict for a manually-built trade
+ * package. Mirrors mobile's TradeVerdict (mobile/src/lib/api.ts) plus
+ * `alternate_packages`, which mobile's screen doesn't render but the
+ * Streamlit card does (see build_offer_result_card_html's "Try this
+ * instead" section) — included here for parity with the page this ports. */
+export interface TradeVerdict {
+  band: string;
+  ui_verdict: "ACCEPT" | "DECLINE" | "COUNTER" | "FAIR";
+  confidence: string;
+  rationale: string;
+  value_summary: string;
+  roster_summary: string;
+  strategy_summary: string;
+  risk_summary: string;
+  counter_guidance: string;
+  fit_total: number;
+  value_delta: number;
+  tone: "accept" | "counter" | "decline" | "fair";
+  counter_action?: TradeCounterAction | null;
+  alternate_packages?: TradeAlternatePackage[];
+}
+
+export type TradeAnalyzerReason =
+  | ""
+  | "no_sleeper_username_linked"
+  | "sleeper_user_not_found"
+  | "not_a_member_of_league"
+  | "no_player_data"
+  | "empty_roster"
+  | "assets_not_found"
+  | "fit_unavailable";
+
+export interface TradeAnalyzerResponse {
+  ok: boolean;
+  verdict: TradeVerdict | null;
+  reason: TradeAnalyzerReason;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1373,5 +1470,50 @@ export const api = {
   getLeagueDraftPicks: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<DraftPicksResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/draft-picks?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  // Trade Analyzer (Revision 15) — roster-browse identity data, same three
+  // endpoints mobile's TradeAnalyzerScreen.tsx calls alongside getMyRoster/
+  // getLeagueRankings/getLeagueDraftPicks to build its "which team am I
+  // browsing" picker.
+  getLeagueUsers: (leagueId: string) =>
+    authorizedRequest<LeagueUsersResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/users`),
+  getLeagueRosters: (leagueId: string) =>
+    authorizedRequest<LeagueRostersResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/rosters`),
+  getLeagueTeamProfiles: (leagueId: string) =>
+    authorizedRequest<LeagueTeamProfilesResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/team-profiles`,
+    ),
+
+  // The real accept/decline/counter verdict for a manually-built trade
+  // package — same POST .../trade-analyzer mobile's "Analyze Trade" button
+  // calls (modules.trade_analyzer_fit + modules.trade_offer_analyzer; no
+  // valuation logic duplicated here).
+  postTradeAnalyzer: (
+    leagueId: string,
+    body: {
+      sendPlayerIds: string[];
+      receivePlayerIds: string[];
+      sendPickIds?: string[];
+      receivePickIds?: string[];
+      strategy?: string;
+      lens?: string;
+      partnerRosterId?: string;
+    },
+  ) =>
+    authorizedRequest<TradeAnalyzerResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-analyzer`,
+      {
+        method: "POST",
+        jsonBody: {
+          send_player_ids: body.sendPlayerIds,
+          receive_player_ids: body.receivePlayerIds,
+          send_pick_ids: body.sendPickIds ?? [],
+          receive_pick_ids: body.receivePickIds ?? [],
+          strategy: body.strategy ?? "retool",
+          lens: body.lens ?? "Dynasty",
+          partner_roster_id: body.partnerRosterId ?? "",
+        },
+      },
     ),
 };

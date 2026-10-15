@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { TradeHubResponse, TradeIdea } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
+import { LeanBarMeter } from "@/components/LeanBarMeter";
+import { TradesTabBar } from "@/components/TradesTabBar";
 import { ValueRing } from "@/components/ValueRing";
 import { streamlitPageUrl } from "@/lib/streamlitLink";
 import {
@@ -11,7 +13,6 @@ import {
   fairnessBandColor,
   formatTradeGain,
   impactTagConfig,
-  leanBar,
   levelToRingTone,
   realismLevel,
   realismRingPercent,
@@ -34,31 +35,6 @@ import {
  * to), and the share-to-propose / Trade Outcomes flow (there's no in-app
  * trade-submission API; that's a PNG-export feature, not core page parity).
  */
-
-function LeanBarMeter({ sendScore, receiveScore }: { sendScore: number; receiveScore: number }) {
-  const { polarity, halfTrackPercent } = leanBar(sendScore, receiveScore);
-  const conclusion =
-    polarity === "pos"
-      ? "You have the edge in this trade"
-      : polarity === "neg"
-        ? "Your opponent has the edge in this trade"
-        : "Neither side has a clear value edge";
-  const label = `Value lean: you send ${Math.round(sendScore).toLocaleString()}, you receive ${Math.round(
-    receiveScore,
-  ).toLocaleString()}. ${conclusion}.`;
-  return (
-    <div className="lean-bar-track" role="img" aria-label={label}>
-      <span className="lean-bar-tick" aria-hidden="true" />
-      {halfTrackPercent > 0 ? (
-        <span
-          className={`lean-bar-fill lean-bar-fill--${polarity}`}
-          style={{ width: `${halfTrackPercent}%` }}
-          aria-hidden="true"
-        />
-      ) : null}
-    </div>
-  );
-}
 
 function ReasoningTags({ tags }: { tags: string[] }) {
   if (tags.length === 0) return null;
@@ -240,16 +216,19 @@ function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
 }
 
 export function TradeHubContent({
+  leagueId,
   leagueName,
   data,
 }: {
+  leagueId: string;
   leagueName: string;
   data: TradeHubResponse;
 }) {
   const notice = data.reason ? tradeHubReasonMessage(data.reason) : null;
   if (notice) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
+      <main className="flex-1 flex flex-col gap-4 items-center justify-center px-4">
+        <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
         <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
           {notice}
         </p>
@@ -261,6 +240,7 @@ export function TradeHubContent({
 
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+      <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
       <header className="flex flex-col gap-1">
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           Trade Hub
