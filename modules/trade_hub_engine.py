@@ -287,6 +287,17 @@ class TradeIdeaCard:
     value_edge_band: str
     impact_tag: str = ""
     landed_gm_target_player_ids: tuple[str, ...] = ()
+    # Full, untruncated per-side totals the idea's own trade_gain is derived
+    # from (modules.trade_ideas' my_score/their_score) — added for web-next's
+    # Trade Hub port (Revision 3), which renders modules.trade_visual_language.
+    # value_edge_lean_bar_html's "who has the edge" bar from these same two
+    # numbers, exactly like the Streamlit page does. `package["send"/"receive"]`
+    # is truncated to MAX_SIDE_ASSETS and can't be re-summed for this: a trade
+    # with more assets than that per side would silently misrepresent the
+    # lean. Additive-only field; existing mobile/web consumers that don't
+    # read it are unaffected.
+    send_score: int = 0
+    receive_score: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -301,6 +312,8 @@ class TradeIdeaCard:
             "value_edge_band": self.value_edge_band,
             "impact_tag": self.impact_tag,
             "landed_gm_target_player_ids": list(self.landed_gm_target_player_ids),
+            "send_score": self.send_score,
+            "receive_score": self.receive_score,
         }
 
 
@@ -335,6 +348,8 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         landed_gm_target_player_ids=tuple(
             str(pid) for pid in (idea.get("landed_gm_target_player_ids") or ())
         ),
+        send_score=int(idea.get("my_score") or 0),
+        receive_score=int(idea.get("their_score") or 0),
     )
 
 

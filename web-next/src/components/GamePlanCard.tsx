@@ -1,6 +1,8 @@
+import Link from "next/link";
+
 import type { BriefingItem } from "@/lib/api";
+import { PositionBadge } from "@/components/PositionBadge";
 import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
-import { positionColorVar } from "@/lib/playerPresentation";
 
 /**
  * Ports modules/daily_gm_briefing_ui.py's Today's Game Plan card: kicker
@@ -21,9 +23,20 @@ function formatCategory(category: string): string {
     .join(" ");
 }
 
-export function GamePlanCard({ item }: { item: BriefingItem }) {
-  const positionVar = positionColorVar(item.route_player_position);
-
+export function GamePlanCard({
+  item,
+  leagueId,
+  leagueName,
+}: {
+  item: BriefingItem;
+  /** Trade Hub now has a real Next.js page (see app/trade-hub/[leagueId]) —
+   * a card whose destination is "trade_hub" links there internally instead
+   * of Streamlit's `?page=` router. Every other destination is still
+   * Streamlit-only for this revision. */
+  leagueId: string;
+  leagueName: string;
+}) {
+  const isTradeHub = item.destination === "trade_hub";
   return (
     <article
       className="flex flex-col gap-2 p-4"
@@ -49,25 +62,28 @@ export function GamePlanCard({ item }: { item: BriefingItem }) {
       </p>
       {item.route_player_name ? (
         <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {positionVar ? (
-            <span
-              className="px-1.5 py-0.5 font-bold"
-              style={{ background: `var(${positionVar})`, color: "var(--color-brand-mark-ink)" }}
-            >
-              {item.route_player_position}
-            </span>
-          ) : null}
+          <PositionBadge position={item.route_player_position} />
           <span>{item.route_player_name}</span>
           {item.route_player_team ? <span>· {item.route_player_team}</span> : null}
         </div>
       ) : null}
-      <a
-        href={streamlitPageUrl(item.destination)}
-        className="self-start text-sm font-bold mt-1"
-        style={{ color: "var(--color-accent)" }}
-      >
-        {destinationCtaLabel(item.destination)} →
-      </a>
+      {isTradeHub ? (
+        <Link
+          href={`/trade-hub/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
+          className="self-start text-sm font-bold mt-1"
+          style={{ color: "var(--color-accent)" }}
+        >
+          {destinationCtaLabel(item.destination)} →
+        </Link>
+      ) : (
+        <a
+          href={streamlitPageUrl(item.destination)}
+          className="self-start text-sm font-bold mt-1"
+          style={{ color: "var(--color-accent)" }}
+        >
+          {destinationCtaLabel(item.destination)} →
+        </a>
+      )}
     </article>
   );
 }

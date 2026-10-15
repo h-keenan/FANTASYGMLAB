@@ -475,6 +475,24 @@ def test_project_trade_idea_card_leaves_impact_tag_empty_with_no_matching_signal
     assert card.to_dict()["impact_tag"] == ""
 
 
+def test_project_trade_idea_card_forwards_full_untruncated_side_totals():
+    # web-next's Trade Hub lean bar (value_edge_lean_bar_html) needs the real
+    # my_score/their_score the idea's trade_gain is derived from, not a
+    # re-sum of the (possibly truncated) package assets.
+    idea = _fake_idea(my_score=1200, their_score=1800)
+    card = trade_hub_engine.project_trade_idea_card(idea)
+    payload = card.to_dict()
+    assert payload["send_score"] == 1200
+    assert payload["receive_score"] == 1800
+
+
+def test_project_trade_idea_card_defaults_side_totals_to_zero_when_absent():
+    card = trade_hub_engine.project_trade_idea_card(_fake_idea())
+    payload = card.to_dict()
+    assert payload["send_score"] == 0
+    assert payload["receive_score"] == 0
+
+
 def test_concurrent_requests_for_same_key_single_flight(monkeypatch):
     """Two concurrent cache misses for the same (league, roster, strategy,
     lens, ...) key must run the expensive search exactly once, not once per

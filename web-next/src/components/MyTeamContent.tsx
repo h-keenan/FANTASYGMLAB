@@ -1,7 +1,9 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PositionBadge } from "@/components/PositionBadge";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
+import { ValueRing } from "@/components/ValueRing";
 import {
   buildConstructionObservations,
   buildPositionGroupItems,
@@ -10,7 +12,7 @@ import {
   myTeamReasonMessage,
   sumScore,
 } from "@/lib/myTeamPresentation";
-import { metricToneBand, percentileFromRank, positionColorVar, positionTextClass } from "@/lib/playerPresentation";
+import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
 
 /**
  * Ports modules/my_team_ui.py's render_my_team_workspace for Revision 2 —
@@ -45,22 +47,6 @@ function joinRooms(rooms: string[]): ReactNode {
       {positionRoomText(room)}
     </span>
   ));
-}
-
-function PositionBadge({ position }: { position: string | null }) {
-  if (!position) return null;
-  const colorVar = positionColorVar(position);
-  return (
-    <span
-      className="px-1.5 py-0.5 text-xs font-bold"
-      style={{
-        background: colorVar ? `var(${colorVar})` : "var(--color-surface-raised)",
-        color: colorVar ? "var(--color-brand-mark-ink)" : "var(--color-text-secondary)",
-      }}
-    >
-      {position}
-    </span>
-  );
 }
 
 function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: boolean }) {
@@ -109,21 +95,6 @@ function SectionHeading({ children }: { children: ReactNode }) {
     <h2 className="uppercase" style={{ font: "var(--type-section-title)", letterSpacing: "0.02em" }}>
       {children}
     </h2>
-  );
-}
-
-function TeamValueRing({ percentile }: { percentile: number | null }) {
-  const band = metricToneBand(percentile);
-  const toneClass = band ? `value-ring--${band}` : "value-ring--mid";
-  return (
-    <div
-      className={`value-ring ${toneClass}`}
-      style={{ "--value-ring-pct": percentile ?? 0 } as CSSProperties}
-      role="img"
-      aria-label={percentile !== null ? `Team value ${Math.round(percentile)}th percentile` : "Team value unavailable"}
-    >
-      <span className="value-ring-value">{percentile !== null ? Math.round(percentile) : "—"}</span>
-    </div>
   );
 }
 
@@ -206,7 +177,16 @@ export function MyTeamContent({
         </SectionHeading>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex flex-col items-center gap-1">
-            <TeamValueRing percentile={valuePercentile} />
+            <ValueRing
+              percent={valuePercentile}
+              tone={metricToneBand(valuePercentile) || "mid"}
+              display={valuePercentile !== null ? String(Math.round(valuePercentile)) : "—"}
+              ariaLabel={
+                valuePercentile !== null
+                  ? `Team value ${Math.round(valuePercentile)}th percentile`
+                  : "Team value unavailable"
+              }
+            />
             <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
               Team Value
             </span>
