@@ -300,11 +300,16 @@ def _render_pick_board(state: dict[str, Any]) -> None:
 
 
 def _movement_label(value: Any) -> str:
+    # Triangle glyph, not a straight arrow — matches the one canonical
+    # rank-movement indicator used everywhere else this app shows "value is
+    # trending up/down" (rankings.recency_trend_display's "arrow", consumed
+    # by player_compare.py, and weekly_report_ui._movement_direction_badge_html's
+    # &#9650;/&#9660;). Keep this in sync with those, not re-invented per page.
     movement = live_draft.safe_int(value, 0)
     if movement >= 2:
-        return f"↑ {movement}"
+        return f"▲ {movement}"
     if movement <= -2:
-        return f"↓ {abs(movement)}"
+        return f"▼ {abs(movement)}"
     return "—"
 
 

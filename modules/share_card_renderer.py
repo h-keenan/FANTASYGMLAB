@@ -44,7 +44,11 @@ TIER_DENSE = "dense"
 _FONT_CACHE: dict[tuple[int, bool], object] = {}
 
 # Keep common punctuation; drop emoji / pictographs that rasterize as tofu.
-_KEEP_SYMBOLS = frozenset("•·→←—–★☆+±×÷")
+# ↔ is the canonical trade-exchange glyph (share_recommendation_cards.py's
+# context_line, matching league_history_ui.py / trade_analyzer_ui.py) — same
+# Arrows block as the already-allowed → / ←, so it's covered by the same
+# font fallback chain (Inter/Noto Sans/Segoe UI/Arial/DejaVu Sans).
+_KEEP_SYMBOLS = frozenset("•·→←↔—–★☆+±×÷")
 _EMOJI_RANGES = (
     (0x1F000, 0x1FAFF),
     (0x1F1E6, 0x1F1FF),
