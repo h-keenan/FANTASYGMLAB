@@ -33,9 +33,14 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
 // rendered separately below as internal <Link>s instead of Streamlit deep
 // links — every other destination here (including Trade Finder) is still
 // Streamlit-only for this revision.
-const QUICK_ACTIONS: { label: string; destination: string }[] = [
-  { label: "College Scouting", destination: "college_scouting" },
-];
+//
+// College Scouting (Revision 20) moved out of this Streamlit-deep-link
+// quick-actions list and down into the Portfolio/News/Trade History group
+// below: like those three, it has no [leagueId] segment (the shared
+// prospect pool is identical regardless of which league is selected), so it
+// isn't part of the per-league BUILT_PAGES loop either. No more quick
+// actions remain, so the Streamlit-external-link rendering path they used
+// is removed below too — everything in Explore is now a real page.
 
 const BUILT_PAGES: { label: string; path: string }[] = [
   { label: "My Team", path: "my-team" },
@@ -66,20 +71,11 @@ const EXPLORE_CARD_STYLE = {
 } as const;
 const EXPLORE_CARD_CLASS = "px-4 py-3 text-sm font-bold flex items-center justify-between";
 
-function ExploreCard({ href, label, external = false }: { href: string; label: string; external?: boolean }) {
-  const arrow = <span style={{ color: "var(--color-accent)" }}>→</span>;
-  if (external) {
-    return (
-      <a href={href} className={EXPLORE_CARD_CLASS} style={EXPLORE_CARD_STYLE}>
-        {label}
-        {arrow}
-      </a>
-    );
-  }
+function ExploreCard({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} className={EXPLORE_CARD_CLASS} style={EXPLORE_CARD_STYLE}>
       {label}
-      {arrow}
+      <span style={{ color: "var(--color-accent)" }}>→</span>
     </Link>
   );
 }
@@ -179,15 +175,13 @@ export function DashboardContent({
           <ExploreCard href="/portfolio" label="Portfolio" />
           <ExploreCard href="/news" label="News" />
           <ExploreCard href="/trade-history" label="Trade History" />
+          <ExploreCard href="/college-scouting" label="College Scouting" />
           {BUILT_PAGES.map((page) => (
             <ExploreCard
               key={page.path}
               href={`/${page.path}/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
               label={page.label}
             />
-          ))}
-          {QUICK_ACTIONS.map((action) => (
-            <ExploreCard key={action.destination} href={streamlitPageUrl(action.destination)} label={action.label} external />
           ))}
         </div>
       </section>

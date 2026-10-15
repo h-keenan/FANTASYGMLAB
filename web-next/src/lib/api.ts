@@ -1405,6 +1405,62 @@ export interface TradeOutcomeHistoryResponse {
   outcomes: PastTradeOutcome[];
 }
 
+// College Scouting (Revision 20) — the shared, crowdsourced college prospect
+// catalog (modules/college_scouting.py / GET /v1/scouting/prospects). Every
+// signed-in user grades the same prospect pool; the pooled aggregate (never
+// any single grade) is what can influence draft-class strength. Types mirror
+// mobile/src/lib/api.ts's CollegeProspect/CollegeProspectsResponse exactly —
+// same shared backend, same shape, no new fields invented here.
+export interface ProspectScoutingAggregate {
+  /** null when nobody has scouted this prospect yet — never a fabricated 0. */
+  avg_grade: number | null;
+  scout_count: number;
+  avg_round_projection: number | null;
+}
+
+export interface MyScoutingReport {
+  grade: number | null;
+  round_projection: number | null;
+  note: string;
+}
+
+export interface CollegeProspect {
+  id: string;
+  name: string;
+  position: string;
+  school: string;
+  draft_year: number | null;
+  aggregate: ProspectScoutingAggregate;
+  my_report: MyScoutingReport | null;
+  on_watchlist: boolean;
+}
+
+export interface CollegeProspectsResponse {
+  ok: boolean;
+  prospects: CollegeProspect[];
+  // False when the real Supabase catalog isn't configured/migrated/
+  // reachable yet. There is no fabricated-data fallback — `prospects` is
+  // simply empty in that case (modules.college_scouting's "NO FABRICATED
+  // DATA" policy), and the page's own empty state covers it.
+  catalog_available: boolean;
+  reason: string;
+}
+
+export interface ScoutingMutationResponse {
+  ok: boolean;
+  reason: string;
+}
+
+// Mirrors modules/college_scouting.py's MIN_GRADE/MAX_GRADE/
+// MIN_ROUND_PROJECTION/MAX_ROUND_PROJECTION exactly (same constants
+// mobile/src/lib/api.ts exports) — the server is the real source of truth
+// (422s outside this range), these just keep the grading UI's picker
+// options in sync without a round trip.
+export const MIN_GRADE = 1;
+export const MAX_GRADE = 5;
+export const MIN_ROUND_PROJECTION = 1;
+export const MAX_ROUND_PROJECTION = 7;
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1648,4 +1704,34 @@ export const api = {
   // League-independent like getPortfolio/getNews above: no leagueId param.
   getTradeOutcomeHistory: () =>
     authorizedRequest<TradeOutcomeHistoryResponse>("/v1/trade-outcomes/history"),
+
+  // College Scouting (Revision 20) — league-independent like getPortfolio/
+  // getNews/getTradeOutcomeHistory above: the shared prospect pool is the
+  // same regardless of which league is selected. Same five /v1/scouting/*
+  // endpoints mobile's CollegeProspectsScreen.tsx / ProspectScoutingDetail
+  // Screen.tsx already call; no new backend logic for this page.
+  getCollegeProspects: () => authorizedRequest<CollegeProspectsResponse>("/v1/scouting/prospects"),
+  submitScoutingReport: (
+    prospectId: string,
+    body: { grade: number; round_projection: number | null; note: string },
+  ) =>
+    authorizedRequest<ScoutingMutationResponse>(
+      `/v1/scouting/prospects/${encodeURIComponent(prospectId)}/report`,
+      { method: "POST", jsonBody: body },
+    ),
+  deleteScoutingReport: (prospectId: string) =>
+    authorizedRequest<ScoutingMutationResponse>(
+      `/v1/scouting/prospects/${encodeURIComponent(prospectId)}/report`,
+      { method: "DELETE" },
+    ),
+  addProspectToWatchlist: (prospectId: string) =>
+    authorizedRequest<ScoutingMutationResponse>(
+      `/v1/scouting/watchlist/${encodeURIComponent(prospectId)}`,
+      { method: "POST" },
+    ),
+  removeProspectFromWatchlist: (prospectId: string) =>
+    authorizedRequest<ScoutingMutationResponse>(
+      `/v1/scouting/watchlist/${encodeURIComponent(prospectId)}`,
+      { method: "DELETE" },
+    ),
 };
