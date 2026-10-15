@@ -59,5 +59,5 @@ export default function TradeHubPage() {
     );
   }
 
-  return <TradeHubContent leagueName={leagueName} data={tradeHub} />;
+  return <TradeHubContent leagueId={leagueId} leagueName={leagueName} data={tradeHub} />;
 }

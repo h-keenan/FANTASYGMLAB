@@ -23,13 +23,16 @@ import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
  * here ahead of time the same way "rankings" already was, so a future
  * tile pointed at GM Plan routes internally without a second edit here.
  * "gm_targets" (Revision 11) is listed the same way, ahead of any tile
- * actually emitting it. */
+ * actually emitting it. "trade_analyzer" (Revision 15) is too — Today's
+ * Game Plan doesn't emit it today either, same as "gm_plan"/"gm_targets"
+ * above. */
 const INTERNAL_ROUTES: Record<string, string> = {
   trade_hub: "trade-hub",
   waivers: "waivers",
   rankings: "league-rankings",
   gm_plan: "gm-plan",
   gm_targets: "gm-targets",
+  trade_analyzer: "trade-analyzer",
 };
 /** Backend categories are snake_case tokens (e.g. "top_priority") — title-case
  * them for display, matching Streamlit's kicker labels (Top Priority / Watch /
