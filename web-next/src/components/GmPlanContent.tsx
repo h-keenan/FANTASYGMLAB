@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import type {
   GmPlanFocusArea,
@@ -233,7 +234,18 @@ function FocusAreaSection({ area }: { area: GmPlanFocusArea }) {
   );
 }
 
-export function GmPlanContent({ leagueName, data }: { leagueName: string; data: GmPlanResponse }) {
+export function GmPlanContent({
+  leagueId,
+  leagueName,
+  data,
+}: {
+  /** Optional only so this component's existing unit tests (which predate
+   * Team Situation's Revision 19 link below) don't all need updating —
+   * app/gm-plan/[leagueId]/page.tsx always has a real one to pass. */
+  leagueId?: string;
+  leagueName: string;
+  data: GmPlanResponse;
+}) {
   const notice = data.reason ? gmPlanReasonMessage(data.reason) : null;
   if (notice) {
     return (
@@ -304,6 +316,15 @@ export function GmPlanContent({ leagueName, data }: { leagueName: string; data: 
               <p className="text-base font-bold" style={{ color: "var(--color-text-primary)" }}>
                 {data.headline}
               </p>
+            ) : null}
+            {leagueId ? (
+              <Link
+                href={`/team-situation/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
+                className="text-xs font-bold self-start"
+                style={{ color: "var(--color-accent)" }}
+              >
+                {data.team_stance_label ? "Change your Team Situation" : "Declare your Team Situation"} →
+              </Link>
             ) : null}
           </section>
 

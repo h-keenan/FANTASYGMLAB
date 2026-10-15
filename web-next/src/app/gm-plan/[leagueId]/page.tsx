@@ -59,5 +59,5 @@ export default function GmPlanPage() {
     );
   }
 
-  return <GmPlanContent leagueName={leagueName} data={gmPlan} />;
+  return <GmPlanContent leagueId={leagueId} leagueName={leagueName} data={gmPlan} />;
 }

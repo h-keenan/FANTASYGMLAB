@@ -106,6 +106,24 @@ describe("GmPlanContent", () => {
     expect(screen.getByText("The trade market is most active right now.")).toBeInTheDocument();
   });
 
+  it("links to Team Situation, labeled by whether a stance is already declared", () => {
+    render(<GmPlanContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+
+    expect(screen.getByRole("link", { name: /Change your Team Situation/ })).toHaveAttribute(
+      "href",
+      "/team-situation/league-1?name=Dynasty%20Overlords",
+    );
+
+    const undeclared: GmPlanResponse = { ...BASE_RESPONSE, team_stance: "", team_stance_label: "" };
+    render(<GmPlanContent leagueId="league-1" leagueName="Dynasty Overlords" data={undeclared} />);
+    expect(screen.getByRole("link", { name: /Declare your Team Situation/ })).toBeInTheDocument();
+  });
+
+  it("omits the Team Situation link when no leagueId is passed", () => {
+    render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    expect(screen.queryByRole("link", { name: /Team Situation/ })).not.toBeInTheDocument();
+  });
+
   it("renders Where You Stand facts including a flagged weak spot", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
