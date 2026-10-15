@@ -66,7 +66,7 @@ actions = [
     ("My Team", "my_team"),
     ("Trade Hub", "trade_hub"),
     ("Waivers", "waivers"),
-    ("League Overview", "rankings"),
+    ("League Rankings", "rankings"),
 ]
 
 if MODE == "legacy":

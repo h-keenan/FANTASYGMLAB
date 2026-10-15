@@ -25,7 +25,7 @@ def test_render_owner_is_workspace_quick_actions_from_dashboard_workflow():
     source = (ROOT / "modules" / "dashboard_workflow.py").read_text(encoding="utf-8")
     assert 'render_section_header(\n                "Explore"' in source or 'render_section_header(\n                "Explore",' in source
     assert "Explore" in source
-    assert "League Overview" in source and "Draft Center" in source
+    assert "League Rankings" in source and "Draft Center" in source
     assert "render_quick_actions(" in source
     assert "def render_home_quick_actions" in WORKSPACE
 
@@ -104,7 +104,7 @@ def test_harness_renders_real_deep_analysis_dom_not_synthetic_stub():
 
 def test_dashboard_workflow_destinations_unchanged():
     actions = [
-        ("League Overview", "rankings"),
+        ("League Rankings", "rankings"),
         ("My Team", "my_team"),
         ("Trade Hub", "trade_hub"),
         ("Draft Center", "draft_summary"),
@@ -122,7 +122,7 @@ def test_apptest_renders_four_deep_analysis_controls():
     app.run()
     assert not app.exception
     labels = [btn.label for btn in app.button]
-    for expected in ("League Overview", "My Team", "Trade Hub", "Draft Center"):
+    for expected in ("League Rankings", "My Team", "Trade Hub", "Draft Center"):
         assert expected in labels, f"missing {expected} in {labels}"
 
 

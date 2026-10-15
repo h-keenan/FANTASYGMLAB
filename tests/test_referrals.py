@@ -464,7 +464,7 @@ class TestEffectiveEntitlementReferralComp(unittest.TestCase):
 
 
 class TestInviteCtaRenders(unittest.TestCase):
-    """Smoke test: the League Overview CTA actually renders and its button
+    """Smoke test: the League Rankings CTA actually renders and its button
     click fires without raising (modules.referral_ui is otherwise untested
     by the pure-logic cases above, which only exercise modules.referrals)."""
 

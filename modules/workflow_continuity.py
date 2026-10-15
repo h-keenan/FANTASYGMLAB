@@ -15,6 +15,7 @@ WORKFLOW_RETURN_KEY = "executive_workflow_return"
 CONTINUITY_SURFACES: tuple[str, ...] = (
     "dashboard",
     "trade_hub",
+    "trade_finder",
     "trade_analyzer",
     "waivers",
     "my_team",
@@ -110,12 +111,13 @@ def _default_page_label(page: str) -> str:
     labels = {
         "dashboard": "Dashboard",
         "trade_hub": "Trade Hub",
+        "trade_finder": "Trade Finder",
         "trade_analyzer": "Trade Analyzer",
         "waivers": "Waivers",
         "my_team": "My Team",
         "live_draft": "Live Draft",
         "player_detail": "Player Profile",
-        "rankings": "League Overview",
+        "rankings": "League Rankings",
         "teams": "Teams",
         "news": "News",
         "startup_draft_center": "Startup Draft Center",

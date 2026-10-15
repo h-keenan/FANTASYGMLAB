@@ -25,7 +25,7 @@ Two card types:
 
 - Power rankings card (``render_power_rankings_card_png``): the league name
   and the full Roster Power Rankings board (modules.league_rankings /
-  the "Roster Power Rankings" board on League Overview), top to bottom.
+  the "Roster Power Rankings" board on League Rankings), top to bottom.
 
 Both reuse the brand tokens, font loader, and text-wrapping helpers already
 proven in modules/share_card_renderer.py, and the Web Share API / download

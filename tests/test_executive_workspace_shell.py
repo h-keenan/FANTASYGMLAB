@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.mark.parametrize(
     "page_title",
     (
-        "Dashboard", "My Team", "Trade Hub", "League Overview", "Waivers",
+        "Dashboard", "My Team", "Trade Hub", "League Rankings", "Waivers",
         "Draft Center", "Live Draft", "Premium", "Labs [EXPERIMENTAL]",
     ),
 )

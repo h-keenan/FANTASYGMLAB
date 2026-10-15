@@ -3599,3 +3599,215 @@ def render_trade_hub_workspace(
             else:
                 player_search.note_skip("trade_dialog_open")
             trade_hub_first_useful.mark_trade_hub_milestone("trade_hub_route_complete")
+
+
+def render_trade_finder_workspace(
+    *,
+    _safe_text,
+    _render_player_search_empty_state,
+    _render_player_search_founder_diagnostics,
+    _render_player_search_grouped_cards,
+    _route_body,
+    cached_trade_finder_ideas,
+    current_user_is_premium,
+    df_players,
+    draft_pick_valuation_settings_items,
+    enforce_cached_trade_ideas,
+    enrich_trade_ideas_with_manager_tendencies,
+    get_shared_league_context,
+    get_team_vs_league,
+    league_value_settings,
+    load_profile_key,
+    my_roster_id,
+    partial,
+    pick_score_multiplier,
+    player_trade_hub_option_label,
+    render_onboarding_handoff,
+    render_player_detail_button_grid,
+    render_premium_lock,
+    render_trade_player_dossier_content,
+    render_workflow_continuity_bar,
+    resolve_team_strategy,
+    route_body_container,
+    score_field,
+    selected_league_id,
+    selected_league_name,
+    startup_mode,
+    strategy_adjusted_pick_score_multiplier,
+    username,
+    workspace_notices,
+) -> None:
+    """Trade Finder: "select these specific players, find who'd want them" —
+    mobile's TradesScreen 'Search' tab (mobile/src/screens/
+    TradeFinderScreen.tsx), previously missing on web even though the
+    underlying trade-block-restricted search already existed here (see
+    cached_trade_finder_ideas / modules.trade_ideas.build_trade_ideas'
+    trade_block_names) — it just had no page of its own. Reuses the same
+    card rendering, Trust enforcement, and premium gate as Trade Hub's own
+    player-focused search tool rather than inventing new presentation.
+    """
+
+    with page_body("trade_finder_workspace", gap="md"):
+        render_workflow_continuity_bar(
+            "trade_finder",
+            selected_league_id=_safe_text(selected_league_id),
+        )
+
+        if startup_mode and selected_league_id:
+            workspace_notices.render_startup_blocked_notice(
+                "Trade discovery unlocks after the startup draft completes."
+            )
+            return
+        if not username or not selected_league_id:
+            render_onboarding_handoff(
+                username=username,
+                selected_league_id=selected_league_id,
+                note="Import your Sleeper league to search trades for specific players.",
+            )
+            _route_body.exit_route_body(route_body_container, st.session_state)
+            st.stop()
+        if my_roster_id is None:
+            workspace_notices.render_roster_mismatch_notice()
+            return
+
+        render_trade_hub_section_header(
+            "Trade Finder",
+            eyebrow="GM Tools",
+            subtitle="Choose players from your roster and search for realistic packages the league would accept for them.",
+        )
+
+        if not current_user_is_premium():
+            render_premium_lock(
+                "Trade Finder",
+                "Select players from your roster and see realistic packages "
+                "the league would realistically trade for them.",
+                feature="Premium Trade Finder",
+            )
+            return
+
+        trade_finder_context = get_shared_league_context(include_intelligence=False)
+        df_summary = trade_finder_context.get("team_direction_summary", pd.DataFrame())
+        roster_player_map = trade_finder_context.get("roster_player_map", {})
+        profile = load_profile_key(username, selected_league_id)
+        untouchables = tuple(
+            sorted(str(name) for name in profile.get("untouchables", []))
+        )
+        role_map = {
+            str(pid): str(role)
+            for pid, role in st.session_state.get("role_map", {}).items()
+        }
+        metrics = get_team_vs_league(df_summary, my_roster_id)
+        _, team_strategy, _ = resolve_team_strategy(metrics, profile)
+        team_archetype = _safe_text(
+            (metrics or {}).get("archetype_label") or (metrics or {}).get("archetype")
+        )
+        pick_multiplier = strategy_adjusted_pick_score_multiplier(
+            pick_score_multiplier, team_strategy
+        )
+
+        my_player_ids = {
+            str(pid)
+            for pid in roster_player_map.get(str(my_roster_id), ())
+            if pid is not None
+        }
+        my_trade_pool = df_players[
+            df_players["player_id"].astype(str).isin(my_player_ids)
+        ].copy()
+        if my_trade_pool.empty:
+            st.info("No eligible roster players are available for Trade Finder right now.")
+            return
+        my_trade_pool = my_trade_pool.sort_values(score_field, ascending=False)
+        option_map = {
+            player_trade_hub_option_label(row, score_field): str(row["player_id"])
+            for _, row in my_trade_pool.iterrows()
+        }
+        select_key = f"trade_finder_player_select_{selected_league_id}_{my_roster_id}"
+        selected_labels = st.multiselect(
+            "Players you'd trade away",
+            list(option_map.keys()),
+            key=select_key,
+        )
+        if not selected_labels:
+            st.caption(
+                "Select one or more of your players, then search for realistic trade packages built around them."
+            )
+            return
+
+        selected_player_ids = tuple(option_map[label] for label in selected_labels)
+        selected_names = tuple(
+            _safe_text(
+                my_trade_pool.loc[
+                    my_trade_pool["player_id"].astype(str) == pid, "name"
+                ].iloc[0]
+            )
+            for pid in selected_player_ids
+        )
+
+        find_clicked = st.button(
+            "Find Realistic Trades",
+            key=f"trade_finder_find_{selected_league_id}_{my_roster_id}",
+            type="primary",
+            use_container_width=False,
+        )
+        if not find_clicked:
+            return
+
+        raw_ideas = cached_trade_finder_ideas(
+            df_players=df_players,
+            league_id=selected_league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            trade_block_names=selected_names,
+            untouchables=untouchables,
+            role_items=tuple(sorted((pid, role) for pid, role in role_map.items())),
+            score_field=score_field,
+            pick_score_multiplier=pick_multiplier,
+            team_strategy=team_strategy,
+            team_archetype=team_archetype,
+            league_settings_items=draft_pick_valuation_settings_items(league_value_settings),
+            max_ideas=8,
+        )
+        ideas = enforce_cached_trade_ideas(
+            raw_ideas,
+            df_players=df_players,
+            league_id=selected_league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            untouchables=untouchables,
+            explicit_player_focus=True,
+            focused_player_ids=selected_player_ids,
+        )
+        ideas = enrich_trade_ideas_with_manager_tendencies(ideas, df_summary)
+        ordered_ideas = order_trade_hub_visible_ideas(ideas)
+        presentation = present_player_search_ideas(ordered_ideas)
+
+        render_player_detail_button_grid(
+            my_trade_pool[my_trade_pool["player_id"].astype(str).isin(selected_player_ids)],
+            key_prefix=f"trade_finder_selected_{selected_league_id}_{my_roster_id}",
+            return_page="trade_finder",
+            source_label="Trade Finder",
+            title="Quick view a selected player",
+            max_buttons=6,
+            open_mode="quick_view",
+        )
+
+        if presentation["show_empty"]:
+            _render_player_search_empty_state({"ideas": ideas})
+        else:
+            dossier_renderer = partial(
+                render_trade_player_dossier_content,
+                df_players=df_players,
+                username=username,
+                selected_league_id=selected_league_id,
+                my_roster_id=my_roster_id,
+                league_settings=league_value_settings,
+                score_field=score_field,
+                active_team_strategy=team_strategy,
+                pick_score_multiplier=pick_multiplier,
+            )
+            _render_player_search_grouped_cards(
+                ordered_ideas,
+                card_key_prefix=f"trade_finder_cards_{selected_league_id}_{my_roster_id}",
+                render_player_dossier=dossier_renderer,
+            )
+        _render_player_search_founder_diagnostics({"ideas": ideas}, key_prefix="trade_finder")

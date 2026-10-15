@@ -14,7 +14,7 @@ DEFAULT_LEAGUE_IMPORT_PLATFORM = "Sleeper"
 ESPN_LIMITED_FEATURES = {
     "enabled": ["Import review", "Roster mapping review"],
     "degraded": [
-        "Dashboard/My Team/League Overview remain gated until ESPN page wiring is validated.",
+        "Dashboard/My Team/League Rankings remain gated until ESPN page wiring is validated.",
         "Trade Hub and Waivers remain Sleeper-first until ESPN free-agent and transaction paths are validated.",
         "Draft Assistant live support and traded-pick features are unavailable for ESPN early access.",
     ],

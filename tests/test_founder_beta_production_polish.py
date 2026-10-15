@@ -97,7 +97,7 @@ def test_polish_roadmap_covers_every_requested_destination_and_severity():
     for destination in (
         "Dashboard",
         "My Team",
-        "League Overview",
+        "League Rankings",
         "Rankings",
         "Trade Hub",
         "Waivers",

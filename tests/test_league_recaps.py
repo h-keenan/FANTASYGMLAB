@@ -741,7 +741,7 @@ def test_gm_orb_lists_league_recaps_under_league_domain():
     sheet groups customer-visible routes by `page.domain` (League / GM
     Tools / General), the same scheme the desktop sidebar now uses, rather
     than the old mobile-only `page.category` (Core/Active now/Support)
-    sectioning. League Recaps still sits right after League Overview, now
+    sectioning. League Recaps still sits right after League Rankings, now
     under the "League" domain heading instead of "Core"."""
 
     from modules.ui_architecture import current_platform_destinations
@@ -764,8 +764,8 @@ def test_gm_orb_lists_league_recaps_under_league_domain():
     nav = harness.split("def _navigation()", 1)[1].split("def _header_geometry()", 1)[0]
     league = nav.split('st.caption("League")', 1)[1].split('st.caption("GM Tools")', 1)[0]
     assert '"League Recaps / History"' in league
-    assert '"League Overview"' in league
-    assert league.index("League Overview") < league.index("League Recaps / History")
+    assert '"League Rankings"' in league
+    assert league.index("League Rankings") < league.index("League Recaps / History")
 
 
 def test_recaps_story_grading_reuses_cached_transaction_grades():

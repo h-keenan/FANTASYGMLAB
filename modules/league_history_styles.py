@@ -1,4 +1,4 @@
-"""League Overview History styles — injected on the History route only."""
+"""League Rankings History styles — injected on the History route only."""
 
 LEAGUE_HISTORY_CSS = """
 .dg-lh-feed{display:grid;gap:var(--space-sm);margin:0 0 var(--space-lg);max-width:min(68rem,100%);min-width:0;width:100%}

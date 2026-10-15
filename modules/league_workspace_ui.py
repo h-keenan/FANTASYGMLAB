@@ -1318,7 +1318,7 @@ def render_team_comparison_board(
     current_roster_id: object = None,
     league_id: str = "",
 ) -> None:
-    """Primary League Overview comparison — dense rows, no spreadsheet scroll."""
+    """Primary League Rankings comparison — dense rows, no spreadsheet scroll."""
 
     if df_display is None or df_display.empty:
         return
@@ -2170,7 +2170,7 @@ def render_league_team_workspace(
             status_label="Starter",
             extra_tags_fn=lambda row: ["Starter"],
             enable_quick_view=True,
-            quick_view_source_label="League Overview - Team Starters",
+            quick_view_source_label="League Rankings - Team Starters",
             quick_view_key_prefix=f"league_team_starters_{selected_league_id}_{selected_roster_id}",
         )
         with st.expander("Full detail table", expanded=False):
@@ -2198,7 +2198,7 @@ def render_league_team_workspace(
             status_label="Depth",
             extra_tags_fn=lambda row: ["Bench"] if _safe_text(row.get("player_tier")) in {"Depth", "Developmental"} else [],
             enable_quick_view=True,
-            quick_view_source_label="League Overview - Team Bench",
+            quick_view_source_label="League Rankings - Team Bench",
             quick_view_key_prefix=f"league_team_bench_{selected_league_id}_{selected_roster_id}",
         )
         with st.expander("Full detail table", expanded=False):
@@ -2243,7 +2243,7 @@ def render_league_team_workspace(
         note="Best mobile view for full-roster value, opportunity, and injury context.",
         max_items=min(len(team_players), 14),
         enable_quick_view=True,
-        quick_view_source_label="League Overview - Team Roster",
+        quick_view_source_label="League Rankings - Team Roster",
         quick_view_key_prefix=f"league_team_roster_{selected_league_id}_{selected_roster_id}",
     )
     with st.expander("Full detail table", expanded=False):

@@ -1,4 +1,4 @@
-"""League Overview invite CTA: "Send rankings to your league" — surfaces the
+"""League Rankings invite CTA: "Send rankings to your league" — surfaces the
 signed-in user's referral link with a one-tap copy action.
 
 Copy-to-clipboard: this app's only existing clipboard pattern
@@ -73,7 +73,7 @@ def _copy_link_markup(link: str) -> str:
 
 
 def render_invite_cta(*, session_state: MutableMapping[str, Any]) -> None:
-    """Render the League Overview invite CTA. No-op when signed out — a
+    """Render the League Rankings invite CTA. No-op when signed out — a
     referral link only exists for an authenticated Supabase user_id."""
 
     user_id = auth_supabase.current_user_id(session_state)

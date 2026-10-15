@@ -163,10 +163,16 @@ def test_reduced_context_is_used_only_by_routes_that_do_not_consume_deep_analysi
     # league/roster context at all — its one include_intelligence=False
     # call site (news_context = get_shared_league_context(...)) is gone,
     # so the budget drops by exactly one from its #232-follow-up value.
+    #
+    # Trade Finder (the Trade Hub / Trade Finder / Trade Analyzer tri-tab's
+    # new middle tab, modules.trade_hub_ui.render_trade_finder_workspace)
+    # is another new lightweight, non-deep-analysis route — same reduced
+    # context shape as Trade Hub's own board, so the budget grows by one
+    # more, to 8.
     assert (
         source.count("include_intelligence=False")
         + trade_hub_ui_source.count("include_intelligence=False")
-        == 7
+        == 8
     )
     assert "league_context = get_shared_league_context(include_trust=False)" in source
     assert "trade_hub_context = get_shared_league_context(" in trade_hub_ui_source

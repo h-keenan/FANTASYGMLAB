@@ -1,4 +1,4 @@
-"""League Overview → History timeline. Lazy, cached, no trade grades."""
+"""League Rankings → History timeline. Lazy, cached, no trade grades."""
 
 from __future__ import annotations
 

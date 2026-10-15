@@ -511,7 +511,7 @@ def _draft_capital_html(
         rank_caption = (
             f"<p class='dg-client-disclosure-body'>Draft capital rank "
             f"{escape(format_rank(draft_capital_rank, tied=draft_capital_rank_tied))} in the league. "
-            "Full board comparison lives on League Overview.</p>"
+            "Full board comparison lives on League Rankings.</p>"
         )
     return "<div class='advice-grid'>" + "".join(rows_html) + "</div>" + rank_caption
 

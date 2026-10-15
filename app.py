@@ -2267,18 +2267,24 @@ def _team_initials(name: str) -> str:
     return "".join(part[0] for part in parts[:2]).upper() or "GM"
 
 
-# Trade Hub / Trade Analyzer / Waivers share one tabbed page (consolidation
-# requested by coridian_, mirroring mobile/src/screens/TradesScreen.tsx). The
-# three PLATFORM_DESTINATIONS keys stay independent so every existing nav call
-# site keeps routing correctly; TRADES_TAB_RADIO_KEY is only which of the three
+# Trade Hub / Trade Finder / Trade Analyzer share one tabbed page, actually
+# mirroring mobile/src/screens/TradesScreen.tsx's tri-tab order (Trade Block /
+# Search / Make a Trade) — a prior version of this consolidation drifted to
+# Trade Hub / Trade Analyzer / Waivers despite a comment here claiming mobile
+# parity; corrected so Waivers (mobile's own separate top-level LEAGUE-domain
+# screen) lives at its own PLATFORM_DESTINATIONS entry instead of inside this
+# tab group, and Trade Finder (mobile's player-focused trade-block search,
+# previously web-only as an unused engine function) gets its own tab here.
+# The PLATFORM_DESTINATIONS keys stay independent so every existing nav call
+# site keeps routing correctly; TRADES_TAB_RADIO_KEY is only which of the
 # tabs is currently showing. See the routing-resolution comment above
 # `current_page_definition = destination_lookup.get(...)` for why this is a
 # session-state-backed st.radio rather than st.tabs().
-TRADES_TAB_ROUTE_ORDER: tuple = ("trade_hub", "trade_analyzer", "waivers")
+TRADES_TAB_ROUTE_ORDER: tuple = ("trade_hub", "trade_finder", "trade_analyzer")
 TRADES_TAB_LABELS: dict = {
     "trade_hub": "Trade Hub",
+    "trade_finder": "Trade Finder",
     "trade_analyzer": "Trade Analyzer",
-    "waivers": "Waivers",
 }
 TRADES_TAB_RADIO_KEY = "trades_hub_active_tab"
 
@@ -2292,6 +2298,7 @@ PAGE_GLYPHS = {
     "players": "PL",
     "rankings": "RK",
     "trade_hub": "TH",
+    "trade_finder": "TF",
     "trade_analyzer": "TA",
     "waivers": "WV",
     "trade_history": "TO",
@@ -5543,7 +5550,7 @@ def render_player_detail_page(
             st.caption(f"Opened from {source_label}.")
 
     if not player_id or df_players.empty:
-        st.info("Open a player from League Overview, My Team, Trade Hub, Trade Analyzer, Waivers, or Draft Center to load the profile here.")
+        st.info("Open a player from League Rankings, My Team, Trade Hub, Trade Analyzer, Waivers, or Draft Center to load the profile here.")
         return
 
     row = _player_detail_row(df_players, player_id)
@@ -6897,7 +6904,7 @@ def render_home_dashboard(
                 {
                     "label": "Draft Surface",
                     "value": "Primary",
-                    "note": "Use Startup Draft Center and League Overview while the draft board is still forming.",
+                    "note": "Use Startup Draft Center and League Rankings while the draft board is still forming.",
                     "tone": "waiver",
                 },
             ]
@@ -6906,7 +6913,7 @@ def render_home_dashboard(
             [
                 ("Startup Draft Center", "startup_draft_center"),
                 ("Dashboard", "dashboard"),
-                ("League Overview", "rankings"),
+                ("League Rankings", "rankings"),
             ]
         )
         return
@@ -11600,6 +11607,63 @@ def cached_trade_ideas(
 
 
 @st.cache_data(ttl=5 * 60, show_spinner=False)
+def cached_trade_finder_ideas(
+    df_players: pd.DataFrame,
+    league_id: str,
+    df_summary: pd.DataFrame,
+    my_roster_id: int,
+    trade_block_names: tuple[str, ...],
+    untouchables: tuple[str, ...],
+    role_items: tuple[tuple[str, str], ...],
+    score_field: str,
+    pick_score_multiplier: float,
+    team_strategy: str,
+    team_archetype: str = "",
+    league_settings_items: tuple[tuple[str, object], ...] = (),
+    draft_status_items: tuple[tuple[str, object], ...] = (),
+    max_ideas: int = 8,
+) -> list[dict]:
+    """Trade Finder: same board-generation engine as cached_trade_ideas, just
+    restricted to the caller's own chosen trade-block names instead of the
+    passive board's normal "anything not protected" pool.
+
+    `allow_protected_focus=True` mirrors cached_player_trade_hub_ideas'
+    explicit-focus search — a player the user deliberately put on their own
+    trade block is evaluated even if they'd previously marked them
+    untouchable or the engine would otherwise treat them as a protected
+    starter; Trust enforcement (enforce_cached_trade_ideas) still applies
+    downstream.
+    """
+    with performance.time_block("trade_finder_generation", category="analysis"):
+        status_items = draft_status_items
+        if not status_items and league_id:
+            status_items = rookie_draft_status_items(
+                cached_rookie_draft_context(
+                    league_id,
+                    league_settings_items=league_settings_items,
+                )
+            )
+        runtime_trace.count("build_trade_ideas_calls")
+        return build_trade_ideas(
+            df_players=df_players,
+            league_id=league_id,
+            df_summary=df_summary,
+            my_roster_id=my_roster_id,
+            trade_block_names=list(trade_block_names),
+            untouchable_names=list(untouchables),
+            role_map=dict(role_items),
+            max_ideas=max_ideas,
+            score_field=score_field,
+            pick_score_multiplier=pick_score_multiplier,
+            team_strategy=team_strategy,
+            team_archetype=team_archetype,
+            league_settings=dict(league_settings_items or ()),
+            draft_status=dict(status_items or ()),
+            allow_protected_focus=True,
+        )
+
+
+@st.cache_data(ttl=5 * 60, show_spinner=False)
 def cached_dashboard_trade_headline(
     df_players: pd.DataFrame,
     league_id: str,
@@ -14007,7 +14071,7 @@ def render_mobile_destination_sheet(
         return
 
     button_labels = {
-        "rankings": "League Overview",
+        "rankings": "League Rankings",
         "league_recaps": "League Recaps / History",
         "teams": "Teams",
         "weekly_report": "Weekly Report",
@@ -18012,10 +18076,11 @@ def main():
         "players": "Canonical player rankings, scanning, and player explanation tools.",
         "gm_targets": "Keep an eye on players you're considering — current rank, ownership, and advice.",
         "player_detail": "Player profile with fit, market, trade, and news context.",
-        "rankings": "League Overview for standings, power, franchise value, draft capital, and league insights.",
+        "rankings": "League Rankings for standings, power, franchise value, draft capital, and league insights.",
         "teams": "League team pages for roster comparison, partner context, and league positioning. My Team owns your daily roster decisions.",
         "weekly_report": "Weekly scoreboard, movement, trends, and transaction recap.",
         "trade_hub": "Find realistic trades for your roster — ranked by fit and fairness.",
+        "trade_finder": "Select specific players from your roster and search for realistic packages the league would trade for them.",
         "trade_analyzer": "Evaluate an incoming offer — accept, decline, or counter.",
         "waivers": "Wire scanning, injury replacements, and lightweight FAAB recommendations.",
         "startup_draft_center": "Draft-first workflow for leagues that are still building rosters.",
@@ -18023,8 +18088,8 @@ def main():
         "live_draft": "Read-only Sleeper live draft assistant for active draft rooms.",
         "news": "General NFL news — injury, role, transaction, and off-field signal. Not filtered to your rosters.",
         "alerts": "Priority signals and a deeper activity timeline.",
-        "archetypes": "Supporting franchise identity context for League Overview and Teams.",
-        "manager_tendencies": "Supporting manager-behavior context for League Overview and Teams.",
+        "archetypes": "Supporting franchise identity context for League Rankings and Teams.",
+        "manager_tendencies": "Supporting manager-behavior context for League Rankings and Teams.",
         "premium": "Free and Premium plan preview for FantasyGM Lab.",
         "founder_ops": "Founder-only operational health and read-only diagnostics.",
         "founder_labs": "Founder/dev inventory of dormant and hidden product surfaces.",
@@ -21348,7 +21413,7 @@ def main():
                 ],
             )
             workspace_notices.render_startup_blocked_notice(
-                "League Overview, team pages, and supporting league views unlock after the startup draft is complete."
+                "League Rankings, team pages, and supporting league views unlock after the startup draft is complete."
             )
         else:
             render_page_shell(
@@ -21486,7 +21551,7 @@ def main():
                     if render_deferred_section_gate(
                         playoff_odds_section_id,
                         button_label="Calculate playoff odds",
-                        note="Runs a real Monte Carlo simulation against your real schedule — loaded on demand so League Overview opens instantly.",
+                        note="Runs a real Monte Carlo simulation against your real schedule — loaded on demand so League Rankings opens instantly.",
                     ):
                         with _wrr_league.block(
                             st.session_state,
@@ -21677,7 +21742,7 @@ def main():
                         kicker="League Behavior",
                         note="Read how each manager tends to trade, build, and use picks before you decide how to approach them.",
                     )
-                    st.caption("Supporting context only. Use League Overview for the league-wide state and Teams when you want this behavior applied to one specific roster.")
+                    st.caption("Supporting context only. Use League Rankings for the league-wide state and Teams when you want this behavior applied to one specific roster.")
                     tendencies_table = select_league_frame_columns(
                         league_intelligence_df,
                         [
@@ -21750,7 +21815,7 @@ def main():
                         kicker="Franchise Identity",
                         note="This view groups every roster into a more specific dynasty subtype without changing the underlying strategy labels.",
                     )
-                    st.caption("Supporting context only. Use League Overview for the league state and Teams when you want archetype context attached to a specific roster.")
+                    st.caption("Supporting context only. Use League Rankings for the league state and Teams when you want archetype context attached to a specific roster.")
                     if not intelligence_ready:
                         st.info(
                             "League archetype detail requires the refined League Insights frame "
@@ -22649,6 +22714,44 @@ def main():
             trade_hub_first_useful=trade_hub_first_useful,
             username=username,
             valuation_archetype_ui=valuation_archetype_ui,
+            workspace_notices=workspace_notices,
+        )
+
+    # TRADE FINDER
+    if current_page == "trade_finder":
+        trade_hub_ui.render_trade_finder_workspace(
+            _safe_text=_safe_text,
+            _render_player_search_empty_state=_render_player_search_empty_state,
+            _render_player_search_founder_diagnostics=_render_player_search_founder_diagnostics,
+            _render_player_search_grouped_cards=_render_player_search_grouped_cards,
+            _route_body=_route_body,
+            cached_trade_finder_ideas=cached_trade_finder_ideas,
+            current_user_is_premium=current_user_is_premium,
+            df_players=df_players,
+            draft_pick_valuation_settings_items=draft_pick_valuation_settings_items,
+            enforce_cached_trade_ideas=enforce_cached_trade_ideas,
+            enrich_trade_ideas_with_manager_tendencies=enrich_trade_ideas_with_manager_tendencies,
+            get_shared_league_context=get_shared_league_context,
+            get_team_vs_league=get_team_vs_league,
+            league_value_settings=league_value_settings,
+            load_profile_key=load_profile_key,
+            my_roster_id=my_roster_id,
+            partial=partial,
+            pick_score_multiplier=pick_score_multiplier,
+            player_trade_hub_option_label=player_trade_hub_option_label,
+            render_onboarding_handoff=render_onboarding_handoff,
+            render_player_detail_button_grid=render_player_detail_button_grid,
+            render_premium_lock=render_premium_lock,
+            render_trade_player_dossier_content=render_trade_player_dossier_content,
+            render_workflow_continuity_bar=render_workflow_continuity_bar,
+            resolve_team_strategy=resolve_team_strategy,
+            route_body_container=route_body_container,
+            score_field=score_field,
+            selected_league_id=selected_league_id,
+            selected_league_name=selected_league_name,
+            startup_mode=startup_mode,
+            strategy_adjusted_pick_score_multiplier=strategy_adjusted_pick_score_multiplier,
+            username=username,
             workspace_notices=workspace_notices,
         )
 

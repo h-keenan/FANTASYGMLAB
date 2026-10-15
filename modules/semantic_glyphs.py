@@ -41,6 +41,7 @@ DESTINATION_CONCEPT = {
     "league_recaps": "history",
     "news": "alerts",
     "trade_hub": "trade",
+    "trade_finder": "trade",
     "trade_analyzer": "trade",
     "waivers": "waiver",
     "trade_history": "history",

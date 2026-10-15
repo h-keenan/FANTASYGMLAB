@@ -25,7 +25,7 @@ No source-verifiable Critical UX dead ends were found. Authentication, entitleme
 | --- | --- | --- |
 | Dashboard | Clear command-center hierarchy already prioritizes next moves and condenses explanations. | Medium: validate opportunity ordering with production founder accounts before changing presentation. |
 | My Team | Shared player cards, explicit injury badges, and consolidated Roster Pressure are in place. | Low: review long-team-name wrapping with real imported leagues. |
-| League Overview | Team cards and draft-capital cards use the shared shell. | Medium: detailed DataFrame views remain horizontally scrollable inside optional expanders. |
+| League Rankings | Team cards and draft-capital cards use the shared shell. | Medium: detailed DataFrame views remain horizontally scrollable inside optional expanders. |
 | Rankings | Warm navigation and shared player-data cache protections remain intact. | Low: add a browser-level dynamic-type visual snapshot later. |
 | Trade Hub | Unified ranked feed with per-card category badges, compact comparisons, shared headshots, value delta chips, and collapsed explanations are present. Category pills were removed. | Medium: production visual regression snapshots should cover unusually long multi-asset packages. |
 | Waivers | Shared player presentation and explicit injury status are present. | Medium: confirm the densest FAAB explanations at 320px with live league data. |

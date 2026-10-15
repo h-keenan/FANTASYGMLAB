@@ -312,7 +312,7 @@ def render_dashboard_workflow(
             )
             render_quick_actions(
                 [
-                    ("League Overview", "rankings"),
+                    ("League Rankings", "rankings"),
                     ("My Team", "my_team"),
                     ("Trade Hub", "trade_hub"),
                     ("Waivers", "waivers"),

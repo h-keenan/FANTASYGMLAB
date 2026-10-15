@@ -1,4 +1,4 @@
-"""League Overview product clarity — presentation only."""
+"""League Rankings product clarity — presentation only."""
 
 from __future__ import annotations
 
