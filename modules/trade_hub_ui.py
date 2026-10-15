@@ -1442,6 +1442,17 @@ def _trade_summary_assets_html(assets: list[dict]) -> str:
     # app or in web's own tap-through detail dialog (whose full
     # `football_assets.player_card_html` rows already resolve the real
     # per-player tier color via `resolve_player_tier_identity`).
+    #
+    # `show_overall_rating=True` closes the last gap with mobile's spec above:
+    # each player asset already carries an `overall_rating` field all the way
+    # from trade_hub_engine.generate_trade_idea_records (coridian_'s OVR
+    # comment there) through trade_ideas._player_asset and
+    # compact_fantasy_assets.presentation_asset — it just was not rendered
+    # here yet. Picks never carry this field, so they render unchanged.
+    # coridian_ 2026-10-14 (Trade Ideas feedback): "for trade ideas, I would
+    # like the overall to be on the player card" — the pick-value half of
+    # that same feedback ("the value of pics... I don't know how we wanna do
+    # that") is a deliberately open product question, not implemented here.
     return (
         "<div class='trade-summary-assets'>"
         + compact_asset_stack_html(
@@ -1451,6 +1462,7 @@ def _trade_summary_assets_html(assets: list[dict]) -> str:
             show_role=False,
             position_pill=True,
             avatar_ring=True,
+            show_overall_rating=True,
         )
         + "</div>"
     )
