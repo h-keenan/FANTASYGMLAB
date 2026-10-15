@@ -8,6 +8,13 @@ import Link from "next/link";
  * three tabs now have a real Next.js page (Trade Finder joined Trade Hub
  * and Trade Analyzer in Revision 17) — none of them deep-link out to
  * Streamlit anymore.
+ *
+ * Trade History (Revision 18) is a genuinely separate GM_TOOLS destination,
+ * not a fourth tab in this segmented control — it isn't part of
+ * TRADES_TAB_ROUTE_ORDER on Streamlit, and mobile's TradesScreen.tsx reaches
+ * it via a small header icon beside the tabs (navigation.navigate to a
+ * screen outside this tab group), not a fourth tab. The trailing link below
+ * mirrors that same "beside, not inside" placement.
  */
 export function TradesTabBar({
   leagueId,
@@ -26,35 +33,40 @@ export function TradesTabBar({
   ];
 
   return (
-    <div
-      role="tablist"
-      aria-label="Trades section"
-      className="flex flex-wrap gap-0"
-      style={{ border: "var(--border-width-default) solid var(--color-border)" }}
-    >
-      {tabs.map((tab) => {
-        const isActive = tab.key === active;
-        const style = {
-          letterSpacing: "0.03em",
-          background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
-          color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-          boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
-          border: "var(--border-width-default) solid var(--color-border)",
-          marginLeft: "-1px",
-        } as const;
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            role="tab"
-            aria-selected={isActive}
-            className="px-3 py-2 text-xs font-bold uppercase"
-            style={style}
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div
+        role="tablist"
+        aria-label="Trades section"
+        className="flex flex-wrap gap-0"
+        style={{ border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        {tabs.map((tab) => {
+          const isActive = tab.key === active;
+          const style = {
+            letterSpacing: "0.03em",
+            background: isActive ? "var(--color-information-soft)" : "var(--color-surface-muted)",
+            color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+            boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
+            border: "var(--border-width-default) solid var(--color-border)",
+            marginLeft: "-1px",
+          } as const;
+          return (
+            <Link
+              key={tab.key}
+              href={tab.href}
+              role="tab"
+              aria-selected={isActive}
+              className="px-3 py-2 text-xs font-bold uppercase"
+              style={style}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </div>
+      <Link href="/trade-history" className="text-xs font-bold uppercase" style={{ color: "var(--color-accent)" }}>
+        Trade History →
+      </Link>
     </div>
   );
 }

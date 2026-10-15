@@ -34,7 +34,6 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
 // links — every other destination here (including Trade Finder) is still
 // Streamlit-only for this revision.
 const QUICK_ACTIONS: { label: string; destination: string }[] = [
-  { label: "Trade History", destination: "trade_history" },
   { label: "College Scouting", destination: "college_scouting" },
 ];
 
@@ -179,6 +178,7 @@ export function DashboardContent({
         <div className="grid grid-cols-2 gap-3">
           <ExploreCard href="/portfolio" label="Portfolio" />
           <ExploreCard href="/news" label="News" />
+          <ExploreCard href="/trade-history" label="Trade History" />
           {BUILT_PAGES.map((page) => (
             <ExploreCard
               key={page.path}

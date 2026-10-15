@@ -1328,6 +1328,57 @@ export interface TradeAnalyzerResponse {
   reason: TradeAnalyzerReason;
 }
 
+/** Trade History (Revision 18) — modules/trade_outcome_results.py's quiet
+ * "did it work out?" follow-up, mirrored verbatim from mobile/src/lib/api.ts
+ * (TradeOutcomeAssetSummary/TradeOutcomeSummary/TradeOutcomeResultSummary/
+ * PastTradeOutcome/TradeOutcomeHistoryResponse). Distinct taxonomy from
+ * League Recaps/History's letter grades (modules.transaction_grades) — this
+ * only covers trades the user confirmed actually happened, graded by real
+ * before/after production + value trend, never a provisional in-flight
+ * letter grade. */
+export interface TradeOutcomeAssetSummary {
+  name: string;
+  position: string;
+  player_id?: string;
+  value_score?: number | null;
+}
+
+export interface TradeOutcomeSummary {
+  partner_team_name: string;
+  send: TradeOutcomeAssetSummary[];
+  receive: TradeOutcomeAssetSummary[];
+  value_edge_label: string;
+  valuation_lens?: string;
+}
+
+export interface TradeOutcomeResultSummary {
+  status: "ready" | "insufficient_data";
+  reason: string;
+  verdict: "worked_out" | "didnt_pan_out" | "mixed" | "neutral" | null;
+  verdict_label?: string;
+  confidence?: "low" | "medium" | "high";
+  days_since_trade: number | null;
+  production?: { net_points_ppr: number; avg_net_per_week: number; weeks_counted: number } | null;
+  value?: { sent_delta_pct: number; received_delta_pct: number; net_delta_pct: number } | null;
+}
+
+export interface PastTradeOutcome {
+  id: string;
+  league_id: string;
+  partner_team_name: string;
+  trade_summary: TradeOutcomeSummary;
+  outcome: "yes" | "no" | "didnt_send";
+  shared_at: string;
+  outcome_recorded_at: string | null;
+  result_summary: TradeOutcomeResultSummary | null;
+  result_computed_at: string | null;
+}
+
+export interface TradeOutcomeHistoryResponse {
+  ok: boolean;
+  outcomes: PastTradeOutcome[];
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1546,4 +1597,11 @@ export const api = {
         },
       },
     ),
+
+  // Trade History (Revision 18) — every confirmed ('yes'/'no'/'didnt_send')
+  // trade_outcomes row for the signed-in user across ALL their leagues, same
+  // GET /v1/trade-outcomes/history mobile's TradeHistoryScreen.tsx calls.
+  // League-independent like getPortfolio/getNews above: no leagueId param.
+  getTradeOutcomeHistory: () =>
+    authorizedRequest<TradeOutcomeHistoryResponse>("/v1/trade-outcomes/history"),
 };
