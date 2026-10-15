@@ -12,6 +12,14 @@ import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
  * navigation is simpler and was explicitly called out as the reason to do
  * this natively rather than port the mechanism.
  */
+/** destination -> this app's own internal Next.js route path, for every
+ * destination that now has a real page (app/trade-hub/[leagueId],
+ * app/waivers/[leagueId] as of Revision 4) instead of Streamlit's
+ * `?page=` router. Every other destination is still Streamlit-only. */
+const INTERNAL_ROUTES: Record<string, string> = {
+  trade_hub: "trade-hub",
+  waivers: "waivers",
+};
 /** Backend categories are snake_case tokens (e.g. "top_priority") — title-case
  * them for display, matching Streamlit's kicker labels (Top Priority / Watch /
  * Waiver Opportunity / League Movement). */
@@ -36,7 +44,7 @@ export function GamePlanCard({
   leagueId: string;
   leagueName: string;
 }) {
-  const isTradeHub = item.destination === "trade_hub";
+  const internalRoute = INTERNAL_ROUTES[item.destination];
   return (
     <article
       className="flex flex-col gap-2 p-4"
@@ -67,9 +75,9 @@ export function GamePlanCard({
           {item.route_player_team ? <span>· {item.route_player_team}</span> : null}
         </div>
       ) : null}
-      {isTradeHub ? (
+      {internalRoute ? (
         <Link
-          href={`/trade-hub/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
+          href={`/${internalRoute}/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
           className="self-start text-sm font-bold mt-1"
           style={{ color: "var(--color-accent)" }}
         >

@@ -11,6 +11,7 @@
  */
 
 import type { PositionNeedGroup } from "./api";
+import { notReadyReasonMessage } from "./notReadyMessages";
 
 export type ObservationTone = "strength" | "need" | "health" | "opportunity";
 
@@ -221,23 +222,13 @@ export function formatScore(value: number): string {
 
 /** Same not-ready `reason` values GET .../my-team (and .../dashboard)
  * return, and the same plain-language copy mobile's MyTeamScreen.tsx
- * already shows for each — one source of truth for the empty-state
- * copy instead of a third hand-kept copy here. */
-const NO_LEAGUE_REASONS = new Set([
-  "no_sleeper_username_linked",
-  "sleeper_user_not_found",
-  "not_a_member_of_league",
-]);
-
+ * already shows for each. The classification itself (which reasons mean
+ * "link your account" vs. "empty roster" vs. "no player data") is shared
+ * with Trade Hub's and Waivers' own reason messages — see
+ * lib/notReadyMessages.ts. */
 export function myTeamReasonMessage(reason: string): string | null {
-  if (NO_LEAGUE_REASONS.has(reason)) {
-    return "Link your Sleeper account and join this league from Home to see your lineup.";
-  }
-  if (reason === "empty_roster") {
-    return "Your roster in this league looks empty.";
-  }
-  if (reason === "no_player_data") {
-    return "Player data isn't available right now — try again in a bit.";
-  }
-  return null;
+  return notReadyReasonMessage(reason, {
+    linkAccount: "Link your Sleeper account and join this league from Home to see your lineup.",
+    emptyRoster: "Your roster in this league looks empty.",
+  });
 }
