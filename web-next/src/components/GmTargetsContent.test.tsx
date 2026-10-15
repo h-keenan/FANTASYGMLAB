@@ -61,6 +61,15 @@ describe("GmTargetsContent", () => {
     expect(screen.getByText(/Added from Player Quick View/)).toBeInTheDocument();
   });
 
+  it("links each target to Player Compare with the right player and league", () => {
+    render(<GmTargetsContent leagueId="league-1" leagueName="Dynasty Overlords" targets={TARGETS} rankings={RANKINGS} />);
+
+    expect(screen.getByRole("link", { name: "Compare" })).toHaveAttribute(
+      "href",
+      "/player-compare/league-1?a=p1&name=Dynasty%20Overlords",
+    );
+  });
+
   it("groups untouchable targets separately from watching targets", () => {
     const data: GmTargetsResponse = {
       ok: true,

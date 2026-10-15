@@ -966,6 +966,46 @@ export interface GmTargetMutationResponse {
   cap?: number;
 }
 
+/** The weekly-recency usage read (modules.rankings.recency_trend_display,
+ * mirrored by mobile's UsageTrend) — only the fields Player Compare
+ * (Revision 12) renders; null whenever the sample is too thin to narrate,
+ * same gate every other surface already honors. */
+export interface UsageTrend {
+  direction: "up" | "down";
+  trend_pct: number;
+  confidence_label: string;
+  arrow: string;
+  tone: "positive" | "negative";
+}
+
+/** GET /v1/players/{id}/quick-view's `model` field — the same composite
+ * Market/Opportunity/Scarcity/Role/Age/Confidence breakdown mobile's
+ * PlayerDetailScreen ModelSection and app.py's Player Quick View dialog both
+ * render for one player, reused (never recomputed) for Player Compare's
+ * head-to-head rows. `stats`/`bio` are left untyped: Player Compare only
+ * reads `model`, the same scoping mobile's own Compare screen uses (it
+ * never fetches season stats/bio for its two sides either). */
+export interface QuickViewModel {
+  market_score: number | null;
+  opportunity_score: number | null;
+  scarcity_score: number | null;
+  role_score: number | null;
+  age_score: number | null;
+  age_score_label: string;
+  opportunity_confidence: number | null;
+  workload_trend: string | null;
+  usage_trend: UsageTrend | null;
+  decision_fit_narrative: string | null;
+}
+
+export interface QuickViewResponse {
+  ok: boolean;
+  stats: unknown;
+  bio: unknown;
+  model: QuickViewModel | null;
+  reason: "" | "not_found";
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1088,4 +1128,9 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}/untouchable`,
       { method: "PATCH", jsonBody: { untouchable } },
     ),
+
+  // Player Compare (Revision 12) — league-independent, same endpoint mobile's
+  // PlayerCompareScreen calls twice (once per side) via getPlayerQuickView.
+  getPlayerQuickView: (playerId: string) =>
+    authorizedRequest<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
 };

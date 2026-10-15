@@ -34,10 +34,14 @@ import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTa
 
 function TargetRowView({
   row,
+  leagueId,
+  leagueName,
   onToggleUntouchable,
   onRemove,
 }: {
   row: GmTargetRow;
+  leagueId: string;
+  leagueName: string;
   onToggleUntouchable: (playerId: string, next: boolean) => void;
   onRemove: (playerId: string) => void;
 }) {
@@ -97,6 +101,13 @@ function TargetRowView({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <a
+          href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(target.player_id)}&name=${encodeURIComponent(leagueName)}`}
+          className="px-2 py-1 text-xs font-bold"
+          style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+        >
+          Compare
+        </a>
         <button
           type="button"
           onClick={() => onToggleUntouchable(target.player_id, !target.untouchable)}
@@ -126,12 +137,16 @@ function TargetGroup({
   title,
   caption,
   rows,
+  leagueId,
+  leagueName,
   onToggleUntouchable,
   onRemove,
 }: {
   title: string;
   caption: string;
   rows: GmTargetRow[];
+  leagueId: string;
+  leagueName: string;
   onToggleUntouchable: (playerId: string, next: boolean) => void;
   onRemove: (playerId: string) => void;
 }) {
@@ -147,7 +162,14 @@ function TargetGroup({
         style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
       >
         {rows.map((row) => (
-          <TargetRowView key={row.target.player_id} row={row} onToggleUntouchable={onToggleUntouchable} onRemove={onRemove} />
+          <TargetRowView
+            key={row.target.player_id}
+            row={row}
+            leagueId={leagueId}
+            leagueName={leagueName}
+            onToggleUntouchable={onToggleUntouchable}
+            onRemove={onRemove}
+          />
         ))}
       </div>
     </section>
@@ -227,6 +249,8 @@ export function GmTargetsContent({
             title="Untouchable"
             caption="Kept out of auto-generated trade suggestions."
             rows={untouchable}
+            leagueId={leagueId}
+            leagueName={leagueName}
             onToggleUntouchable={toggleUntouchable}
             onRemove={removeTarget}
           />
@@ -234,6 +258,8 @@ export function GmTargetsContent({
             title="Watching"
             caption="Tracked here — no trade protection applied."
             rows={watching}
+            leagueId={leagueId}
+            leagueName={leagueName}
             onToggleUntouchable={toggleUntouchable}
             onRemove={removeTarget}
           />
