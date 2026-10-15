@@ -629,6 +629,53 @@ export interface MatchupResponse {
   reason: string;
 }
 
+export type RosterRelationship = "starter" | "bench" | "taxi" | "ir" | null;
+
+/** One roster-relevant news item — mirrors mobile's AlertItem (mobile/src/
+ * lib/api.ts), the reference implementation for GET .../alerts. That
+ * endpoint's own docstring is explicit that this is "one league's feed,
+ * not the web app's full Alerts notification system" (Streamlit's
+ * modules/alerts_activity.py timeline, which also folds in the Dashboard-
+ * style action-item inbox with its own trade_hub/waivers/my_team/rankings
+ * destinations) — read state here is real, but there is no destination
+ * routing to port: every item's only two CTAs are the source article link
+ * and the matched player's identity, same as mobile's screen. */
+export interface AlertItem {
+  title: string | null;
+  link: string | null;
+  source: string | null;
+  summary: string | null;
+  published_ts: number | null;
+  event_type: string | null;
+  speculative: boolean;
+  alert_key: string;
+  read: boolean;
+  matched_player: string | null;
+  matched_player_id: string | null;
+  // Sourced from the same roster slice matched_player_id resolves against —
+  // null whenever the matched name isn't resolvable against the current
+  // roster (e.g. a name-matched player no longer rostered), never guessed.
+  matched_player_position: string | null;
+  matched_player_team: string | null;
+  matched_player_tier: string | null;
+  relevance_reason: string | null;
+  roster_relationship: RosterRelationship;
+}
+
+export type AlertsReason =
+  | ""
+  | "no_sleeper_username_linked"
+  | "sleeper_user_not_found"
+  | "not_a_member_of_league"
+  | "empty_roster"
+  | "no_player_data";
+
+export interface AlertsResponse {
+  ok: boolean;
+  items: AlertItem[];
+  reason: AlertsReason;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -698,5 +745,16 @@ export const api = {
   getLeagueMatchup: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<MatchupResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/matchup?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getLeagueAlerts: (leagueId: string, limit: number = 12) =>
+    authorizedRequest<AlertsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/alerts?limit=${limit}`,
+    ),
+
+  markAlertRead: (leagueId: string, alertKey: string) =>
+    authorizedRequest<{ ok: boolean }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/alerts/read`,
+      { method: "POST", jsonBody: { alert_key: alertKey } },
     ),
 };

@@ -22,18 +22,56 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
  * a fixture, without needing to mock Supabase auth/fetch.
  */
 
-// "My Team", "Matchup", "Trade Hub", "Waivers", and now "League Rankings"
-// have real Next.js pages (see app/my-team/[leagueId], app/matchup/[leagueId],
-// app/trade-hub/[leagueId], app/waivers/[leagueId], and
-// app/league-rankings/[leagueId]) and are rendered separately below as
-// internal <Link>s instead of Streamlit deep links — every other
-// destination here is still Streamlit-only for this revision.
+// "My Team", "Matchup", "Trade Hub", "Waivers", "League Rankings", and now
+// "Alerts" have real Next.js pages (see app/my-team/[leagueId],
+// app/matchup/[leagueId], app/trade-hub/[leagueId], app/waivers/[leagueId],
+// app/league-rankings/[leagueId], and app/alerts/[leagueId]) and are
+// rendered separately below as internal <Link>s instead of Streamlit deep
+// links — every other destination here is still Streamlit-only for this
+// revision.
 const QUICK_ACTIONS: { label: string; destination: string }[] = [
   { label: "Draft Center", destination: "draft_summary" },
   { label: "GM Plan", destination: "gm_plan" },
   { label: "Trade History", destination: "trade_history" },
   { label: "College Scouting", destination: "college_scouting" },
 ];
+
+const BUILT_PAGES: { label: string; path: string }[] = [
+  { label: "My Team", path: "my-team" },
+  { label: "Matchup", path: "matchup" },
+  { label: "Trade Hub", path: "trade-hub" },
+  { label: "Waivers", path: "waivers" },
+  { label: "League Rankings", path: "league-rankings" },
+  { label: "Alerts", path: "alerts" },
+];
+
+// One shared card style instead of six byte-identical inline style objects
+// (Revision 7 CSS-cleanup pass — the five Explore cards this revision's
+// Alerts card would otherwise have copied a sixth time).
+const EXPLORE_CARD_STYLE = {
+  background: "var(--color-surface-secondary)",
+  border: "var(--border-width-default) solid var(--color-border)",
+  color: "var(--color-text-primary)",
+} as const;
+const EXPLORE_CARD_CLASS = "px-4 py-3 text-sm font-bold flex items-center justify-between";
+
+function ExploreCard({ href, label, external = false }: { href: string; label: string; external?: boolean }) {
+  const arrow = <span style={{ color: "var(--color-accent)" }}>→</span>;
+  if (external) {
+    return (
+      <a href={href} className={EXPLORE_CARD_CLASS} style={EXPLORE_CARD_STYLE}>
+        {label}
+        {arrow}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} className={EXPLORE_CARD_CLASS} style={EXPLORE_CARD_STYLE}>
+      {label}
+      {arrow}
+    </Link>
+  );
+}
 
 export function DashboardContent({
   leagueId,
@@ -124,83 +162,18 @@ export function DashboardContent({
           Explore
         </h2>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Still in Streamlit for this release — opens in the existing app.
+          Workflows ported to this app open here; everything else still opens in Streamlit.
         </p>
         <div className="grid grid-cols-2 gap-3">
-          <Link
-            href={`/my-team/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
-            className="px-4 py-3 text-sm font-bold flex items-center justify-between"
-            style={{
-              background: "var(--color-surface-secondary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
-          >
-            My Team
-            <span style={{ color: "var(--color-accent)" }}>→</span>
-          </Link>
-          <Link
-            href={`/matchup/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
-            className="px-4 py-3 text-sm font-bold flex items-center justify-between"
-            style={{
-              background: "var(--color-surface-secondary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
-          >
-            Matchup
-            <span style={{ color: "var(--color-accent)" }}>→</span>
-          </Link>
-          <Link
-            href={`/trade-hub/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
-            className="px-4 py-3 text-sm font-bold flex items-center justify-between"
-            style={{
-              background: "var(--color-surface-secondary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
-          >
-            Trade Hub
-            <span style={{ color: "var(--color-accent)" }}>→</span>
-          </Link>
-          <Link
-            href={`/waivers/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
-            className="px-4 py-3 text-sm font-bold flex items-center justify-between"
-            style={{
-              background: "var(--color-surface-secondary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
-          >
-            Waivers
-            <span style={{ color: "var(--color-accent)" }}>→</span>
-          </Link>
-          <Link
-            href={`/league-rankings/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
-            className="px-4 py-3 text-sm font-bold flex items-center justify-between"
-            style={{
-              background: "var(--color-surface-secondary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
-          >
-            League Rankings
-            <span style={{ color: "var(--color-accent)" }}>→</span>
-          </Link>
+          {BUILT_PAGES.map((page) => (
+            <ExploreCard
+              key={page.path}
+              href={`/${page.path}/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
+              label={page.label}
+            />
+          ))}
           {QUICK_ACTIONS.map((action) => (
-            <a
-              key={action.destination}
-              href={streamlitPageUrl(action.destination)}
-              className="px-4 py-3 text-sm font-bold flex items-center justify-between"
-              style={{
-                background: "var(--color-surface-secondary)",
-                border: "var(--border-width-default) solid var(--color-border)",
-                color: "var(--color-text-primary)",
-              }}
-            >
-              {action.label}
-              <span style={{ color: "var(--color-accent)" }}>→</span>
-            </a>
+            <ExploreCard key={action.destination} href={streamlitPageUrl(action.destination)} label={action.label} external />
           ))}
         </div>
       </section>

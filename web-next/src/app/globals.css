@@ -196,6 +196,15 @@
      --type-supporting-metadata use. */
   --type-primary-metric: var(--font-weight-display) var(--type-primary-metric-size) / var(--line-height-title) var(--font-family-sans);
   --type-supporting-metadata: var(--font-weight-metadata) var(--type-supporting-metadata-size) / var(--line-height-caption) var(--font-family-sans);
+  /* Same recurring gap PR #1077 fixed (a composite shorthand's own
+     sub-tokens existed here but the `font: var(--...)` shorthand callers
+     actually use did not) found again while porting Alerts:
+     modules/design_tokens.py defines --type-caption-emphasis as a real
+     composite (font-weight-metadata/font-size-caption/line-height-
+     caption), but only its sub-tokens existed here. Added verbatim rather
+     than invented — used by AlertsContent's context line, same role as
+     modules/alerts_activity_styles.py's `.dg-alerts-context`. */
+  --type-caption-emphasis: var(--font-weight-metadata) var(--font-size-caption) / var(--line-height-caption) var(--font-family-sans);
 
   /* Focus, controls, motion */
   --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
