@@ -29,12 +29,20 @@ def test_reimagining_uses_tokens_and_no_literal_color_values():
 def test_reimagining_covers_the_primary_operational_rooms():
     for selector in (
         ".home-command-shell",
-        ".dg-page-shell--trade-hub",
         ".waiver-section-header",
         ".dg-page-shell--players",
         ".dg-intelligence-group",
     ):
         assert selector in INTERFACE_REIMAGINING_CSS
+
+
+def test_reimagining_has_no_dead_trade_hub_page_shell_rules():
+    # Trade Hub was migrated onto the shared page_shell.py layout component
+    # (#1011/#1012) and no longer renders through
+    # render_page_shell(page_key="trade_hub"), so main:has(.dg-page-shell--
+    # trade-hub) rules can never match and were removed as dead CSS (round 3
+    # dead-CSS audit). Regression guard against reintroducing them.
+    assert ".dg-page-shell--trade-hub" not in INTERFACE_REIMAGINING_CSS
     assert ".dg-application-workspace" not in INTERFACE_REIMAGINING_CSS
 
 

@@ -153,41 +153,12 @@ INTERFACE_REIMAGINING_CSS = """
     font-size: clamp(1.15rem, 2vw, 1.7rem) !important;
 }
 
-main:has(.dg-page-shell--trade-hub) .trade-idea-card {
-    background: var(--ops-panel-deep) !important;
-    border: var(--border-width-default) solid var(--color-border-strong) !important;
-    border-left: var(--border-width-semantic) solid var(--color-information) !important;
-    margin: 0 0 var(--space-sm) !important;
-    padding: var(--space-lg) !important;
-}
-
-main:has(.dg-page-shell--trade-hub) .trade-card-top {
-    align-items: end !important;
-    border-bottom: var(--border-width-default) solid var(--color-border);
-    display: grid !important;
-    gap: var(--space-md) !important;
-    grid-template-columns: minmax(0, 1.45fr) minmax(12rem, 0.55fr) !important;
-    padding-bottom: var(--space-md) !important;
-}
-
-main:has(.dg-page-shell--trade-hub) .trade-card-title {
-    font-size: clamp(1.35rem, 2.7vw, 2.3rem) !important;
-    font-weight: var(--font-weight-display) !important;
-    letter-spacing: -0.04em !important;
-    line-height: 0.96 !important;
-    text-transform: uppercase;
-}
-
-
-
-
-
-
-
-main:has(.dg-page-shell--trade-hub) .trade-side {
-    background: transparent !important;
-    border: 0 !important;
-}
+/* The main:has() rules keyed off Trade Hub's old page-shell ancestor class
+   that used to style Trade Hub's card chrome from here are gone -- Trade Hub
+   was migrated onto the shared page_shell.py layout component (see git log,
+   "Migrate Trade Hub onto the shared page_shell layout component") and no
+   longer renders through render_page_shell(page_key="trade_hub"), so that
+   ancestor class never ships and the :has() guard could never match. */
 
 main:has(.waiver-section-header) .free-agent-card {
     background: var(--ops-panel-deep) !important;
@@ -279,10 +250,6 @@ div[data-testid="stExpander"] {
     .home-command-card:first-child,
     .home-command-card-wide {
         grid-column: 1 !important;
-    }
-
-    main:has(.dg-page-shell--trade-hub) .trade-card-top {
-        grid-template-columns: 1fr !important;
     }
 
     main:has(.waiver-section-header) .waiver-context-grid {

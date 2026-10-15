@@ -367,8 +367,6 @@ class TestTradeInjuryDisplay(unittest.TestCase):
 
     def test_mobile_section_hierarchy_classes_and_mappings_exist(self):
         for selector in [
-            ".dg-section-command",
-            ".dg-section-alert",
             ".dg-section-primary-action",
             ".dg-section-opportunity-list",
             ".dg-section-metrics",
@@ -377,6 +375,14 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         ]:
             self.assertIn(selector, app.APP_CSS)
 
+        # waiver_section_header_html's only caller never passes
+        # preset="command"/"alert" (just secondary/opportunity-list/
+        # player-list/primary-action/metrics), so these two were confirmed
+        # dead (round 3 dead-CSS audit) and dropped from the shared
+        # .dg-section-* rule group alongside .dg-section-diagnostic, which
+        # was never a real preset either.
+        self.assertNotIn(".dg-section-command", app.APP_CSS)
+        self.assertNotIn(".dg-section-alert", app.APP_CSS)
         self.assertNotIn(".dg-section-diagnostic", app.APP_CSS)
         self.assertNotIn(".dg-command-row", app.APP_CSS)
 
@@ -402,14 +408,24 @@ class TestTradeInjuryDisplay(unittest.TestCase):
         self.assertIn(".dg-preset-command", app.APP_CSS)
         for selector in [
             ".dg-preset-command",
-            ".dg-preset-alert",
             ".dg-preset-primary-action",
-            ".dg-preset-opportunity",
-            ".dg-preset-player-list",
-            ".dg-preset-metrics",
             ".dg-preset-secondary",
         ]:
             self.assertIn(selector, app.APP_CSS)
+
+        # .dg-preset-alert/-opportunity/-player-list/-metrics never had any
+        # real emitter (methodology_page.py/premium_page.py/premium.py only
+        # ever construct "dg-preset-command"/"-primary-action"/"-secondary"
+        # literally, and nothing builds a dg-preset-{x} string dynamically),
+        # so these four were confirmed dead (round 3 dead-CSS audit) and
+        # dropped from the shared .dg-preset-* rule groups.
+        for dead_selector in [
+            ".dg-preset-alert",
+            ".dg-preset-opportunity",
+            ".dg-preset-player-list",
+            ".dg-preset-metrics",
+        ]:
+            self.assertNotIn(dead_selector, app.APP_CSS)
 
         for visible_mapping in [
             ".home-command-shell",
