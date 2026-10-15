@@ -6,7 +6,7 @@ import type { GmTarget, GmTargetsResponse, LeagueRankingsResponse } from "@/lib/
 import { api } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PositionBadge } from "@/components/PositionBadge";
-import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
+import { destinationCtaLabel } from "@/lib/streamlitLink";
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTargetsPresentation";
 
@@ -236,7 +236,7 @@ export function GmTargetsContent({
             No GM Targets yet. Add players you&apos;re considering from a player&apos;s profile to start watching them.
           </p>
           <a
-            href={streamlitPageUrl("players")}
+            href={`/players/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
             className="text-sm font-bold"
             style={{ color: "var(--color-accent)" }}
           >
