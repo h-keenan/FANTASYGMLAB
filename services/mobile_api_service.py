@@ -6265,6 +6265,13 @@ def get_league_waivers(
 
     needed_positions: list[str] = []
     injury_positions: set[str] = set()
+    # Surfaced in the response below (injured_starters/injury_positions) —
+    # already computed here for injury_replacement_fit's own filter, just
+    # not previously exposed past this function. Mirrors app.py's own
+    # free_agent_injured_starters, the exact count the web Waivers route's
+    # "Injury replacement watch is active for ..." caption reads
+    # (modules/waivers_ui.py's render_waiver_workspace_sections).
+    injured_starters = 0
     if not roster_df.empty:
         lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
         team_needs = trade_analyzer_fit.build_team_needs_assessment(
@@ -6279,6 +6286,7 @@ def get_league_waivers(
             for pos in (injury_context.get("injury_need_positions") or set())
             if str(pos).upper() in {"QB", "RB", "WR", "TE", "K"}
         }
+        injured_starters = int(injury_context.get("injured_starters") or 0)
 
     if injury_positions:
         positions_upper = free_agents["position"].fillna("").astype(str).str.upper()
@@ -6428,6 +6436,13 @@ def get_league_waivers(
         "needed_positions": needed_positions,
         "available_count": int(len(free_agents)),
         "avg_wire_score": avg_wire_score,
+        # Additive (web-next Waivers, Revision 4): already computed above
+        # for injury_replacement_fit's own filter, now exposed so a caller
+        # can show the same "Injury replacement watch is active for ...,
+        # carrying N injured starters" framing web's Streamlit route shows,
+        # without re-deriving roster_injury_context client-side.
+        "injured_starters": injured_starters,
+        "injury_positions": sorted(injury_positions),
         "stash_candidates": stash_candidates,
         "watchlist_candidates": watchlist_candidates,
         "faab_targets": faab_targets,

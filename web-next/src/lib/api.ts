@@ -335,6 +335,90 @@ export interface TradeHubResponse {
   entitlement: TradeHubEntitlement | null;
 }
 
+// player_id/name/position/team/age/status/injury_status/tier/score mirror
+// RankedPlayer, but position_rank/overall_rank here are wire-relative (rank
+// among available free agents), not the league-global canonical_* rank
+// /rankings returns — deliberately separate, matching
+// services/mobile_api_service.py's get_league_waivers and mobile's own
+// WaiverPlayer (mobile/src/lib/api.ts), the reference implementation for
+// this endpoint.
+export interface WaiverPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  status: string | null;
+  injury_status: string | null;
+  tier: string | null;
+  opportunity_label: string | null;
+  score: number | null;
+  position_rank: number | null;
+  overall_rank: number | null;
+  stale_free_agent: boolean;
+  injury_replacement_fit: boolean;
+  injury_replacement_note: string;
+  // Sleeper's GLOBAL trending-add signal — cross-league, last-24h add
+  // velocity across every league on Sleeper, NOT scoped to this league. See
+  // modules.waivers_ui.annotate_sleeper_trending_add.
+  sleeper_trending_add: boolean;
+  sleeper_trending_add_count: number | null;
+  sleeper_trending_add_rank: number | null;
+  // This week's real NFL opponent (context only — never factored into
+  // score/position_rank/overall_rank). Null in the offseason/draft.
+  opponent: string | null;
+  opponent_is_home: boolean | null;
+  opponent_defense_tier: "tough" | "average" | "weak" | null;
+  /** 0-99 "OVR" badge, percentiled against the full league-eligible pool at
+   * this position (rostered players included) — same curve/gate as
+   * MyTeamResponse's LineupPlayer.overall_rating; null when that position's
+   * pool was too thin to rank against. */
+  overall_rating: number | null;
+}
+
+export interface WaiverFaabGuidance {
+  low_bid: number;
+  high_bid: number;
+  pct_low: number;
+  pct_high: number;
+  remaining: number | null;
+  dollars_known: boolean;
+  label: string;
+}
+
+export interface WaiverPriorityAdd extends WaiverPlayer {
+  recommendation_label: string;
+  recommendation_tone: string;
+  faab: WaiverFaabGuidance;
+  /** Real need-fit/standout-value confidence for this recommendation
+   * (High/Medium/Low — modules.waivers_ui.waiver_confidence_label), the
+   * same already-computed signals that ranked it into Priority Adds. */
+  confidence_label: string;
+  confidence_reason: string;
+}
+
+export interface WaiversResponse {
+  ok: boolean;
+  players: WaiverPlayer[];
+  priority_adds: WaiverPriorityAdd[];
+  needed_positions: string[];
+  available_count?: number;
+  avg_wire_score?: number;
+  /** Already computed server-side for injury_replacement_fit's own filter
+   * — see GET .../waivers' docstring. Optional: absent on the two early
+   * "nothing to show" return paths (no player data / no free agents). */
+  injured_starters?: number;
+  injury_positions?: string[];
+  // Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
+  // Shortlist) — empty for Free, populated for Premium. Matches web's
+  // modules/waivers_ui.py Premium-only gate.
+  stash_candidates: WaiverPlayer[];
+  watchlist_candidates: WaiverPlayer[];
+  faab_targets: WaiverPlayer[];
+  entitlement: { is_premium: boolean };
+  reason: string;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -389,5 +473,10 @@ export const api = {
   getTradeHub: (leagueId: string, strategy: string = "retool", lens: string = "Dynasty") =>
     authorizedRequest<TradeHubResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
+    ),
+
+  getLeagueWaivers: (leagueId: string, lens: string = "Dynasty", limit: number = 150) =>
+    authorizedRequest<WaiversResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/waivers?lens=${encodeURIComponent(lens)}&limit=${limit}`,
     ),
 };

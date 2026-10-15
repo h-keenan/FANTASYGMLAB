@@ -9,6 +9,8 @@
  * myTeamPresentation.ts already is for My Team.
  */
 
+import { notReadyReasonMessage } from "./notReadyMessages";
+
 /** Byte-for-byte port of modules/trade_visual_language.py's confidence_level. */
 export function confidenceLevel(label: string | null | undefined): "high" | "medium" | "low" {
   const text = (label || "").trim().toLowerCase();
@@ -143,24 +145,14 @@ export function impactTagConfig(tag: string | null | undefined): ImpactTagConfig
 /** Same not-ready `reason` values GET .../trade-hub (and .../my-team) can
  * return (modules.mobile_api_service._resolve_my_roster plus "empty_roster"),
  * reworded for this page's own "no trade ideas yet" framing instead of
- * myTeamPresentation.ts's "see your lineup" copy. */
-const NO_LEAGUE_REASONS = new Set([
-  "no_sleeper_username_linked",
-  "sleeper_user_not_found",
-  "not_a_member_of_league",
-]);
-
+ * myTeamPresentation.ts's "see your lineup" copy. The shared classification
+ * lives in lib/notReadyMessages.ts (consolidated there in Revision 4 out of
+ * three byte-identical reason sets — see that file's own comment). */
 export function tradeHubReasonMessage(reason: string): string | null {
-  if (NO_LEAGUE_REASONS.has(reason)) {
-    return "Link your Sleeper account and join this league from Home to see trade ideas for your roster.";
-  }
-  if (reason === "empty_roster") {
-    return "Your roster in this league looks empty, so there's nothing to build trade ideas around yet.";
-  }
-  if (reason === "no_player_data") {
-    return "Player data isn't available right now — try again in a bit.";
-  }
-  return null;
+  return notReadyReasonMessage(reason, {
+    linkAccount: "Link your Sleeper account and join this league from Home to see trade ideas for your roster.",
+    emptyRoster: "Your roster in this league looks empty, so there's nothing to build trade ideas around yet.",
+  });
 }
 
 /** modules/trade_hub_ui.py's LOW_CONFIDENCE_USER_NOTE, shown on the
