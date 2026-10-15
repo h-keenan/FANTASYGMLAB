@@ -2019,6 +2019,67 @@ def test_recap_rejects_a_week_outside_the_completed_range(monkeypatch):
     assert response.status_code == 422
 
 
+def test_history_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/history")
+    assert response.status_code == 401
+
+
+def test_history_returns_404_for_missing_league(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={}):
+            response = client.get("/v1/leagues/missing/history", headers={"Authorization": "Bearer good-token"})
+    assert response.status_code == 404
+
+
+def test_history_returns_real_transaction_timeline(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_profiles = {
+        "1": {"team_name": "Home Team", "owner_name": "Alice", "username": "alice"},
+        "2": {"team_name": "Away Team", "owner_name": "Bob", "username": "bob"},
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_RECAP_LEAGUE):
+            with patch("modules.sleeper.get_transactions", side_effect=_recap_transactions):
+                with patch("modules.sleeper.get_league_roster_profiles", return_value=fake_profiles):
+                    with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            response = client.get(
+                                "/v1/leagues/abc/history",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    # Real season chain (modules.league_history.walk_season_chain) off the
+    # mocked single-season league above — one entry, not an empty list.
+    assert len(body["seasons"]) == 1
+    assert body["selected_league_id"] == "abc"
+    # Real normalization + grading (modules.league_history /
+    # modules.transaction_grades), not a mocked result — a wiring mistake
+    # would leave this empty or missing the grade key.
+    assert body["transactions"]
+    waiver = next(tx for tx in body["transactions"] if tx["type"] == "waiver")
+    assert waiver["transaction_id"] == "tx1"
+    assert waiver["grade"] is not None
+    assert waiver["grade"]["kind"] == "waiver"
+
+
 def test_roster_relationship_map_classifies_every_slot():
     from services.mobile_api_service import _roster_relationship_map
 
