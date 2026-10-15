@@ -41,7 +41,7 @@ def test_presentation_asset_tier_is_empty_string_when_missing():
     assert payload["tier"] == ""
 
 
-def test_compact_asset_html_renders_ovr_badge_when_opted_in():
+def test_compact_asset_html_renders_ovr_gauge_when_opted_in():
     html = compact_asset_html(
         {
             "asset_type": "player",
@@ -54,11 +54,11 @@ def test_compact_asset_html_renders_ovr_badge_when_opted_in():
         show_overall_rating=True,
     )
 
-    assert "dg-ovr-badge" in html
-    assert "82 OVR" in html
+    assert "dg-ovr-gauge" in html
+    assert "82" in html
 
 
-def test_compact_asset_html_omits_ovr_badge_by_default():
+def test_compact_asset_html_omits_ovr_gauge_by_default():
     html = compact_asset_html(
         {
             "asset_type": "player",
@@ -68,10 +68,10 @@ def test_compact_asset_html_omits_ovr_badge_by_default():
         }
     )
 
-    assert "dg-ovr-badge" not in html
+    assert "dg-ovr-gauge" not in html
 
 
-def test_compact_asset_html_omits_ovr_badge_when_rating_missing():
+def test_compact_asset_html_omits_ovr_gauge_when_rating_missing():
     html = compact_asset_html(
         {
             "asset_type": "player",
@@ -81,7 +81,7 @@ def test_compact_asset_html_omits_ovr_badge_when_rating_missing():
         show_overall_rating=True,
     )
 
-    assert "dg-ovr-badge" not in html
+    assert "dg-ovr-gauge" not in html
 
 
 def test_compact_asset_html_pick_ignores_overall_rating_flag():
@@ -94,4 +94,4 @@ def test_compact_asset_html_pick_ignores_overall_rating_flag():
         show_overall_rating=True,
     )
 
-    assert "dg-ovr-badge" not in html
+    assert "dg-ovr-gauge" not in html

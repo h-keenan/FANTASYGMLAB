@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pandas as pd
 
 import app
-from modules import waivers_ui
+from modules import player_cards, waivers_ui
 
 
 class TestWaiversUI(unittest.TestCase):
@@ -262,10 +262,10 @@ class TestWaiversUI(unittest.TestCase):
         self.assertIn("WR", html)
         self.assertIn("Best Available", html)
         # No inline Why: reasoning text and no raw value-score number on the
-        # compact card -- an OVR badge takes the trailing slot instead.
+        # compact card -- an OVR gauge takes the trailing slot instead.
         self.assertNotIn("Why:", html)
         self.assertNotIn("Value Score: 75", html)
-        self.assertIn("waiver-ovr-badge", html)
+        self.assertIn("dg-ovr-gauge", html)
         self.assertIn("78", html)
         self.assertIn("waiver-snapshot-avatar", html)
         self.assertTrue(markdown.call_args.kwargs["unsafe_allow_html"])
@@ -627,11 +627,14 @@ class TestWaiversUI(unittest.TestCase):
         )
         self.assertNotIn("Trending across Sleeper", html)
 
-    def test_overall_rating_badge_renders_plain_percentile_tint(self):
+    def test_overall_rating_gauge_renders_plain_percentile_tint(self):
         # coridian_, 2026-10-13: "I have no clue what the 78/71 and 55
         # mean... that should be [a labeled badge] like the app" — the
-        # bare value-score number stays, this pill is the added OVR
+        # bare value-score number stays, this gauge is the added OVR
         # context, fed by _overall_rating_col (never the value score).
+        # Then, 2026-10-14, on the pill this shipped as elsewhere in the
+        # app: "the overall ALWAYS needs to be a circular gauge throughout
+        # the site" — so this renders the shared circular gauge, not a pill.
         html, _, _ = self._render_card(
             {
                 "player_id": "ovr-1",
@@ -646,11 +649,11 @@ class TestWaiversUI(unittest.TestCase):
                 "canonical_position_rank": 9,
             }
         )
-        self.assertIn("waiver-ovr-badge", html)
-        self.assertIn("78 OVR", html)
-        self.assertNotIn("waiver-ovr-badge--crowned", html)
+        self.assertIn("dg-ovr-gauge", html)
+        self.assertIn("78", html)
+        self.assertNotIn("dg-ovr-gauge--crowned", html)
 
-    def test_overall_rating_badge_absent_when_rating_missing(self):
+    def test_overall_rating_gauge_absent_when_rating_missing(self):
         html, _, _ = self._render_card(
             {
                 "player_id": "ovr-2",
@@ -663,9 +666,9 @@ class TestWaiversUI(unittest.TestCase):
                 "stale_free_agent": False,
             }
         )
-        self.assertNotIn("waiver-ovr-badge", html)
+        self.assertNotIn("dg-ovr-gauge", html)
 
-    def test_overall_rating_badge_crowns_top_five_league_wide_position_rank(self):
+    def test_overall_rating_gauge_crowns_top_five_league_wide_position_rank(self):
         # Top-5 league-wide positional rank (canonical_position_rank, the
         # same "rank among ALL players, rostered included" field
         # _waiver_detail_note's own docstring distinguishes from the
@@ -686,11 +689,11 @@ class TestWaiversUI(unittest.TestCase):
                 "canonical_position_rank": 2,
             }
         )
-        self.assertIn("waiver-ovr-badge--crowned", html)
-        self.assertIn("waiver-ovr-badge-crown", html)
-        self.assertIn("91 OVR", html)
+        self.assertIn("dg-ovr-gauge--crowned", html)
+        self.assertIn("dg-ovr-gauge-crown", html)
+        self.assertIn("91", html)
 
-    def test_overall_rating_badge_not_crowned_outside_top_five(self):
+    def test_overall_rating_gauge_not_crowned_outside_top_five(self):
         html, _, _ = self._render_card(
             {
                 "player_id": "ovr-4",
@@ -705,31 +708,17 @@ class TestWaiversUI(unittest.TestCase):
                 "canonical_position_rank": 6,
             }
         )
-        self.assertIn("waiver-ovr-badge", html)
-        self.assertNotIn("waiver-ovr-badge--crowned", html)
+        self.assertIn("dg-ovr-gauge", html)
+        self.assertNotIn("dg-ovr-gauge--crowned", html)
 
-    def test_overall_rating_prestige_tiers_match_mobile_banding(self):
-        self.assertEqual(waivers_ui._overall_rating_prestige(1), ("gold", "--color-prestige-elite"))
-        self.assertEqual(waivers_ui._overall_rating_prestige(2), ("silver", "--color-prestige-starter"))
-        self.assertEqual(waivers_ui._overall_rating_prestige(3), ("silver", "--color-prestige-starter"))
-        self.assertEqual(waivers_ui._overall_rating_prestige(4), ("bronze", "--color-prestige-contributor"))
-        self.assertEqual(waivers_ui._overall_rating_prestige(5), ("bronze", "--color-prestige-contributor"))
-        self.assertIsNone(waivers_ui._overall_rating_prestige(6))
-        self.assertIsNone(waivers_ui._overall_rating_prestige(None))
-        self.assertIsNone(waivers_ui._overall_rating_prestige(0))
-
-    def test_overall_rating_percentile_tint_is_continuous_not_banded(self):
-        # Same semantics as mobile's percentileColor: danger at 0, premium
-        # at 50, success at 100, linearly interpolated — not 3 flat bands.
-        low = waivers_ui._overall_rating_percentile_tint_css(10)
-        mid = waivers_ui._overall_rating_percentile_tint_css(50)
-        high = waivers_ui._overall_rating_percentile_tint_css(90)
-        self.assertIn("var(--color-danger)", low)
-        self.assertIn("var(--color-premium)", low)
-        self.assertIn("var(--color-premium)", mid)
-        self.assertIn("var(--color-success)", high)
-        self.assertIn("var(--color-premium)", high)
-        self.assertNotEqual(low, high)
+    def test_overall_rating_gauge_delegates_to_shared_player_cards_gauge(self):
+        # Waivers no longer keeps its own prestige/tint formula copy — it
+        # delegates straight to the one shared, canonical gauge builder.
+        row = {"_overall_rating_col": 78, "canonical_position_rank": 9}
+        self.assertEqual(
+            waivers_ui.waiver_overall_rating_gauge_html(row),
+            player_cards.overall_rating_gauge_html(row, size="sm"),
+        )
 
     def test_sleeper_trending_add_sentence_plain_text(self):
         self.assertEqual(

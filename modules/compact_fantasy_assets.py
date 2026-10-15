@@ -10,7 +10,7 @@ from html import escape
 from typing import Any, Mapping, Sequence
 
 from modules.football_assets import player_name_html, position_badge_html
-from modules.player_cards import overall_rating_badge_html
+from modules.player_cards import overall_rating_gauge_html
 from modules.player_images import get_player_image_url
 from modules.player_profile_ui import avatar_html
 from modules.player_tier_identity import resolve_player_tier_identity
@@ -77,15 +77,23 @@ COMPACT_FANTASY_ASSET_CSS = TRADE_VISUAL_LANGUAGE_CSS + """
 .dg-gp-value-edge{font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge);max-width:40rem}
 .dg-compact-asset-meta--pill{align-items:center;column-gap:var(--space-2xs);display:inline-flex;flex-wrap:wrap}
 .dg-compact-asset-team{color:var(--color-text-muted);font:var(--type-supporting-metadata);letter-spacing:var(--letter-spacing-badge)}
-/* NN OVR pill, opt-in via compact_asset_html's show_overall_rating flag.
-   Same dg-ovr-badge visual language player_cards.overall_rating_badge_html
-   already renders on My Team (my_team_decision_styles.MY_TEAM_DECISION_CSS)
-   and the same continuous red-to-gold-to-green tint formula Waivers'
-   waiver-ovr-badge uses, reused here rather than invented fresh so a
-   player's badge reads the same regardless which surface rendered it. */
-.dg-ovr-badge{align-items:center;background:color-mix(in srgb, var(--dg-ovr-tint) 18%, transparent);border:var(--border-width-default) solid color-mix(in srgb, var(--dg-ovr-tint) 48%, transparent);border-radius:var(--radius-pill);color:var(--dg-ovr-tint);display:inline-flex;font:var(--type-supporting-metadata);font-weight:700;letter-spacing:var(--letter-spacing-badge);padding:1px var(--space-xs);white-space:nowrap}
-.dg-ovr-badge--crowned{align-items:center;flex-direction:column;gap:1px;padding-top:2px}
-.dg-ovr-badge-crown{height:10px;width:10px}
+/* Circular NN OVR gauge, opt-in via compact_asset_html's
+   show_overall_rating flag. Same dg-ovr-gauge visual language
+   player_cards.overall_rating_gauge_html already renders on My Team
+   (my_team_decision_styles.MY_TEAM_DECISION_CSS) and Waivers, reused here
+   rather than invented fresh so a player's rating reads the same
+   regardless which surface rendered it (coridian_, 2026-10-14: the
+   overall always needs to be a circular gauge throughout the site). */
+.dg-ovr-gauge{align-items:center;background:conic-gradient(var(--dg-ovr-tint) calc(var(--dg-ovr-pct, 0) * 1%), var(--color-border) 0);border-radius:50%;display:inline-grid;flex:0 0 auto;place-items:center;position:relative}
+.dg-ovr-gauge::after{background:var(--surface-1);border-radius:50%;content:'';position:absolute}
+.dg-ovr-gauge-value{color:var(--dg-ovr-tint);font-variant-numeric:tabular-nums;font-weight:700;line-height:1;position:relative;z-index:1}
+.dg-ovr-gauge--sm{height:1.65rem;width:1.65rem}
+.dg-ovr-gauge--sm::after{inset:.22rem}
+.dg-ovr-gauge--sm .dg-ovr-gauge-value{font-size:.56rem}
+.dg-ovr-gauge--md{height:2.25rem;width:2.25rem}
+.dg-ovr-gauge--md::after{inset:.3rem}
+.dg-ovr-gauge--md .dg-ovr-gauge-value{font-size:.7rem}
+.dg-ovr-gauge-crown{color:var(--dg-ovr-tint);height:.55rem;left:50%;position:absolute;top:-.6rem;transform:translateX(-50%);width:.55rem;z-index:2}
 @media (min-width:700px){
 /* Give/get columns split the row evenly (1fr each) instead of shrinking to
    max-content — the same dead-space-on-the-right bug PR #1050 fixed for
@@ -308,16 +316,18 @@ def compact_asset_html(
     pin's higher selector specificity wins over this class regardless of
     which tier it resolves to.
 
-    ``show_overall_rating`` renders ``player_cards.overall_rating_badge_html``'s
-    existing "NN OVR" pill for a player chip (coridian_, Trade Ideas: "I
-    would like the overall to be on the player card"), fed from the
-    payload's own ``overall_rating`` field (``presentation_asset`` already
-    carries this through from any caller whose pool computed one via
+    ``show_overall_rating`` renders ``player_cards.overall_rating_gauge_html``'s
+    circular "NN OVR" gauge for a player chip (coridian_, Trade Ideas: "I
+    would like the overall to be on the player card"; then, 2026-10-14, on
+    the pill this shipped as: "the overall ALWAYS needs to be a circular
+    gauge throughout the site"), fed from the payload's own
+    ``overall_rating`` field (``presentation_asset`` already carries this
+    through from any caller whose pool computed one via
     ``player_quick_view.overall_ratings_for_pool`` — trade_hub_engine's
-    give/get assets among them). No crown/prestige tier here: that badge
+    give/get assets among them). No crown/prestige tier here: that gauge
     variant needs a league-wide position rank this compact payload does not
-    carry, so a top-ranked player still gets the plain tint pill, never a
-    missing badge. Renders nothing when the field is absent, same
+    carry, so a top-ranked player still gets the plain tint ring, never a
+    missing gauge. Renders nothing when the field is absent, same
     "no column -> no badge" contract every other optional badge here follows.
     """
     payload = presentation_asset(asset)
@@ -454,14 +464,18 @@ def compact_asset_html(
                 pass
         meta = " · ".join(identity_bits) if identity_bits else "Player"
         meta_html = f"<div class='dg-compact-asset-meta toa-chip-meta'>{escape(meta)}</div>"
-    # Same "NN OVR" pill player_cards.overall_rating_badge_html already
-    # renders on My Team/Waivers — reshaped into that function's expected
-    # `_overall_rating_col` key rather than a second copy of its tint/crown
-    # logic. Lands in this chip's trailing (value) slot, matching mobile's
-    # PlayerIdentityRow spec of an overall badge in the card's top-right
-    # corner; callers that also pass show_value keep both, value first.
+    # Same circular "NN OVR" gauge player_cards.overall_rating_gauge_html
+    # already renders on My Team/Waivers — reshaped into that function's
+    # expected `_overall_rating_col` key rather than a second copy of its
+    # tint/crown logic. "md" matches this chip's own avatar roughly
+    # (--size-asset-compact/--size-asset-standard), landing in the chip's
+    # trailing (value) slot, matching mobile's PlayerIdentityRow spec of an
+    # overall badge in the card's top-right corner; callers that also pass
+    # show_value keep both, value first.
     ovr_html = (
-        overall_rating_badge_html({"_overall_rating_col": payload.get("overall_rating")})
+        overall_rating_gauge_html(
+            {"_overall_rating_col": payload.get("overall_rating")}, size="md"
+        )
         if show_overall_rating
         else ""
     )

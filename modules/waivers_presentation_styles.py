@@ -128,47 +128,13 @@ div[class*="st-key-waiver_recommendation_"] .dg-compact-asset {
     white-space: nowrap;
 }
 
-/* "NN OVR" pill — web counterpart to mobile's OverallRatingBadge.tsx (see
-   waivers_ui.waiver_overall_rating_badge_html for the Python side that
-   builds this markup and picks --waiver-ovr-tint). coridian_, 2026-10-13:
-   "I have no clue what the 78/71 and 55 mean... that should be [a labeled
-   badge] like the app" — the bare value-score number this chip sits next
-   to stays as-is; this badge is the missing OVR context. --waiver-ovr-tint
-   is either a literal color-mix() between this app's own danger/premium/
-   success tokens (continuous ramp, not 3 flat bands — matches mobile's
-   percentileColor) or, for a top-5 league-wide positional rank, one of the
-   gold/silver/bronze prestige tokens player_quick_view_styles.py's own
-   .pqv-accolade--gold/-silver/-bronze chips already use. */
-.waiver-ovr-badge {
-    align-items: center;
-    background: color-mix(in srgb, var(--waiver-ovr-tint) 18%, transparent);
-    border: var(--border-width-default) solid color-mix(in srgb, var(--waiver-ovr-tint) 48%, transparent);
-    border-radius: var(--radius-pill);
-    color: var(--waiver-ovr-tint);
-    display: inline-flex;
-    font: var(--type-supporting-metadata);
-    font-weight: 700;
-    gap: 2px;
-    letter-spacing: var(--letter-spacing-badge);
-    padding: 1px var(--space-xs);
-    white-space: nowrap;
-}
-
-/* Crowned (top-5 league-wide positional rank) variant — mobile's
-   OverallRatingBadge swaps its usual beside-the-number crown for one
-   stacked above the rating so the whole module reads as a distinct
-   "league-wide rank" signal, not just a recolored ordinary pill. */
-.waiver-ovr-badge--crowned {
-    align-items: center;
-    flex-direction: column;
-    gap: 1px;
-    padding-top: 2px;
-}
-
-.waiver-ovr-badge-crown {
-    height: 10px;
-    width: 10px;
-}
+/* The old "NN OVR" rectangular pill (.waiver-ovr-badge) that used to live
+   here is gone — Waivers now renders the shared circular gauge instead
+   (player_cards.overall_rating_gauge_html's .dg-ovr-gauge, styled in
+   compact_fantasy_assets.COMPACT_FANTASY_ASSET_CSS, already injected
+   alongside this file by _inject_waivers_presentation_css; see
+   waivers_ui.py's call sites, coridian_ 2026-10-14: the overall always
+   needs to be a circular gauge throughout the site). */
 
 /* Same circular ring the Dashboard's Game Plan cards use for shape
    (border-radius:50%, matching box-shadow formula), but — unlike
@@ -296,8 +262,8 @@ div[class*="st-key-waiver_recommendation_"] div[data-testid="stButton"] button {
     opacity: 0.96;
 }
 
-/* The trailing slot now holds a small NN OVR badge
-   (waiver_overall_rating_badge_html), not the old raw dynasty/value-score
+/* The trailing slot now holds a small circular NN OVR gauge
+   (waiver_overall_rating_gauge_html), not the old raw dynasty/value-score
    number -- so it no longer needs its own reserved grid column (a
    reserved trailing column is what clipped a trailing element on My Team
    in an earlier regression, once a narrow viewport's grid ran out of room

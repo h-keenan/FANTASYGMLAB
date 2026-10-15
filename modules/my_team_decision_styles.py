@@ -350,34 +350,67 @@ div[class*="st-key-my_team_decisions_"] .dg-football-asset__name {
 .st-key-my_team_roster_decisions {
     margin: 0 0 var(--space-sm);
 }
-/* "NN OVR" pill — Roster Core/Depth's compact row (player_cards.
-   overall_rating_badge_html), same visual language as Waivers' own OVR
-   badge (waivers_presentation_styles.py's .waiver-ovr-badge): a continuous
-   red->gold->green tint via --dg-ovr-tint, not page-specific class names,
-   since this badge is a shared player_cards.py primitive any compact row
-   can opt into. */
-.dg-ovr-badge {
+/* Circular "NN OVR" gauge — Roster Core/Depth's compact row (player_cards.
+   overall_rating_gauge_html), the one shared ring rendering every overall-
+   rating surface uses (coridian_, 2026-10-14: "the overall ALWAYS needs to
+   be a circular gauge throughout the site"). Same conic-gradient +
+   punched-out-center ring technique this file's own .mt-value-ring already
+   uses above (and player_quick_view_styles.py's .pqv-ovr-ring /
+   trade_visual_language.py's .tvl-conf-ring), continuous red->gold->green
+   tint via --dg-ovr-tint, not page-specific class names, since this gauge
+   is a shared player_cards.py primitive any compact row/card can opt into. */
+.dg-ovr-gauge {
     align-items: center;
-    background: color-mix(in srgb, var(--dg-ovr-tint) 18%, transparent);
-    border: var(--border-width-default) solid color-mix(in srgb, var(--dg-ovr-tint) 48%, transparent);
-    border-radius: var(--radius-pill);
+    background: conic-gradient(var(--dg-ovr-tint) calc(var(--dg-ovr-pct, 0) * 1%), var(--color-border) 0);
+    border-radius: 50%;
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    position: relative;
+}
+.dg-ovr-gauge::after {
+    background: var(--surface-1);
+    border-radius: 50%;
+    content: '';
+    position: absolute;
+}
+.dg-ovr-gauge-value {
     color: var(--dg-ovr-tint);
-    display: inline-flex;
-    font: var(--type-supporting-metadata);
+    font-variant-numeric: tabular-nums;
     font-weight: 700;
-    letter-spacing: var(--letter-spacing-badge);
-    padding: 1px var(--space-xs);
-    white-space: nowrap;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
 }
-.dg-ovr-badge--crowned {
-    align-items: center;
-    flex-direction: column;
-    gap: 1px;
-    padding-top: 2px;
+.dg-ovr-gauge--sm {
+    height: 1.65rem;
+    width: 1.65rem;
 }
-.dg-ovr-badge-crown {
-    height: 10px;
-    width: 10px;
+.dg-ovr-gauge--sm::after {
+    inset: 0.22rem;
+}
+.dg-ovr-gauge--sm .dg-ovr-gauge-value {
+    font-size: 0.56rem;
+}
+.dg-ovr-gauge--md {
+    height: 2.25rem;
+    width: 2.25rem;
+}
+.dg-ovr-gauge--md::after {
+    inset: 0.3rem;
+}
+.dg-ovr-gauge--md .dg-ovr-gauge-value {
+    font-size: 0.7rem;
+}
+.dg-ovr-gauge-crown {
+    color: var(--dg-ovr-tint);
+    height: 0.55rem;
+    left: 50%;
+    position: absolute;
+    top: -0.6rem;
+    transform: translateX(-50%);
+    width: 0.55rem;
+    z-index: 2;
 }
 .st-key-my_team_strategy_panel .dg-ui-section-header,
 div[class*="st-key-my_team_"] .dg-ui-section-header {

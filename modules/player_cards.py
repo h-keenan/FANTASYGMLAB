@@ -753,19 +753,27 @@ _OVR_PRESTIGE_TIER_TOKEN = {
 
 # Minimal inline crown mark — same glyph/idiom as waivers_ui's
 # _WAIVER_OVR_CROWN_SVG (inline SVG, currentColor, aria-hidden).
-_OVR_BADGE_CROWN_SVG = (
-    "<svg class='dg-ovr-badge-crown' viewBox='0 0 24 24' aria-hidden='true' "
+_OVR_GAUGE_CROWN_SVG = (
+    "<svg class='dg-ovr-gauge-crown' viewBox='0 0 24 24' aria-hidden='true' "
     "focusable='false'><path d='M3 18h18l-1.6-9-4.9 4.4-3-6.4-3 6.4-4.9-4.4z' "
     "fill='currentColor'/></svg>"
 )
 
 
-def overall_rating_badge_html(row) -> str:
-    """Small "NN OVR" pill — web counterpart to mobile's
-    ``OverallRatingBadge.tsx`` (see ``PlayerIdentityRow.tsx``'s
-    ``overallRating`` prop doc comment: "the colored avatar ring only
-    conveys relative tier ... this is the number that answers [how two
-    similarly-tiered players actually compare]").
+def overall_rating_gauge_html(row, *, size: str = "sm") -> str:
+    """Circular "NN OVR" gauge — the one canonical, shared rendering of a
+    player's overall rating sitewide (coridian_, Trade Ideas screenshot
+    feedback: "the overall ALWAYS needs to be a circular gauge throughout
+    the site", 2026-10-14). Supersedes the old rectangular
+    ``overall_rating_badge_html`` pill everywhere it rendered (My Team
+    roster rows, Waivers, Trade Hub/Trade Ideas give-get cards): same 0-99
+    rating, same continuous red->gold->green tint, now drawn as a
+    conic-gradient ring with the number punched through the center —
+    the same "conic-gradient + punched-out-center" ring technique already
+    established in this codebase for a radial metric (see
+    ``player_quick_view_styles.PLAYER_QUICK_VIEW_CSS``'s ``.pqv-ovr-ring``
+    hero gauge and ``trade_visual_language.TRADE_VISUAL_LANGUAGE_CSS``'s
+    ``.tvl-conf-ring`` confidence ring), not a one-off SVG/JS chart.
 
     Fed by ``row['_overall_rating_col']`` — a 0-99 rating a caller must
     already have computed against a real, league-wide ranked pool (see
@@ -778,7 +786,13 @@ def overall_rating_badge_html(row) -> str:
     never roster-relative, rank My Team's compact-rank note already reads —
     see ``canonical_player_ranking.CANONICAL_POSITION_COLUMN``), swaps the
     usual percentile tint for a crowned gold/silver/bronze fill, matching
-    ``OverallRatingBadge.tsx``'s identical top-5 treatment.
+    the old pill's identical top-5 treatment.
+
+    ``size`` picks a pre-set diameter so this one gauge still fits the
+    range of contexts the old pill did: ``"sm"`` (1.65rem) for inline chip
+    rows (My Team compact rows, Waivers chip rows), ``"md"`` (2.25rem) for
+    a card's standalone trailing/value slot (Trade Hub/Trade Ideas give-get
+    cards, Waivers' wire-snapshot card).
     """
 
     rating = row.get("_overall_rating_col")
@@ -800,16 +814,25 @@ def overall_rating_badge_html(row) -> str:
     prestige_token = (
         _OVR_PRESTIGE_TIER_TOKEN.get(position_rank_i) if position_rank_i else None
     )
+    size_class = f"dg-ovr-gauge--{size}" if size else "dg-ovr-gauge--sm"
+    pct = max(0, min(99, rating_i))
     if prestige_token:
         return (
-            f"<span class='dg-ovr-badge dg-ovr-badge--crowned' "
-            f"style='--dg-ovr-tint:var({prestige_token})' "
+            f"<span class='dg-ovr-gauge {size_class} dg-ovr-gauge--crowned' "
+            f"style='--dg-ovr-tint:var({prestige_token});--dg-ovr-pct:{pct}' "
+            "role='img' "
             f"aria-label='League-wide number {position_rank_i} at position, "
             f"{rating_i} overall rating'>"
-            f"{_OVR_BADGE_CROWN_SVG}<span>{rating_i} OVR</span></span>"
+            f"{_OVR_GAUGE_CROWN_SVG}"
+            f"<span class='dg-ovr-gauge-value'>{rating_i}</span></span>"
         )
     tint = _overall_rating_tint_css(rating_i)
-    return f"<span class='dg-ovr-badge' style='--dg-ovr-tint:{tint}'>{rating_i} OVR</span>"
+    return (
+        f"<span class='dg-ovr-gauge {size_class}' "
+        f"style='--dg-ovr-tint:{tint};--dg-ovr-pct:{pct}' "
+        f"role='img' aria-label='{rating_i} overall rating'>"
+        f"<span class='dg-ovr-gauge-value'>{rating_i}</span></span>"
+    )
 
 
 def compact_player_row_html(
@@ -882,7 +905,7 @@ def compact_player_row_html(
         if show_reason
         else ""
     )
-    ovr_html = overall_rating_badge_html(row) if show_overall_rating else ""
+    ovr_html = overall_rating_gauge_html(row, size="sm") if show_overall_rating else ""
     image_url = cached_headshot_data_url(player_id) if player_id else ""
     avatar = avatar_html(
         image_url,

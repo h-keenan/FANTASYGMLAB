@@ -695,31 +695,43 @@ class TestPlayerCards(unittest.TestCase):
         self.assertNotIn("Should stay off the compact row.", html)
         self.assertIn("SEA", html)
         self.assertIn("Row Player", html)
-        self.assertIn("dg-ovr-badge", html)
-        self.assertIn("91 OVR", html)
+        self.assertIn("dg-ovr-gauge", html)
+        self.assertIn("91", html)
         # Top-2 league-wide position rank -> crowned silver variant.
-        self.assertIn("dg-ovr-badge--crowned", html)
+        self.assertIn("dg-ovr-gauge--crowned", html)
 
-    def test_overall_rating_badge_renders_nothing_without_rating_column(self):
-        self.assertEqual(player_cards.overall_rating_badge_html({}), "")
+    def test_overall_rating_gauge_renders_nothing_without_rating_column(self):
+        self.assertEqual(player_cards.overall_rating_gauge_html({}), "")
         self.assertEqual(
-            player_cards.overall_rating_badge_html({"_overall_rating_col": None}),
+            player_cards.overall_rating_gauge_html({"_overall_rating_col": None}),
             "",
         )
 
-    def test_overall_rating_badge_only_crowns_top_five_position_rank(self):
-        uncrowned = player_cards.overall_rating_badge_html(
+    def test_overall_rating_gauge_only_crowns_top_five_position_rank(self):
+        uncrowned = player_cards.overall_rating_gauge_html(
             {"_overall_rating_col": 70, "canonical_position_rank": 12}
         )
-        self.assertIn("dg-ovr-badge", uncrowned)
-        self.assertIn("70 OVR", uncrowned)
-        self.assertNotIn("dg-ovr-badge--crowned", uncrowned)
+        self.assertIn("dg-ovr-gauge", uncrowned)
+        self.assertIn("70", uncrowned)
+        self.assertNotIn("dg-ovr-gauge--crowned", uncrowned)
 
-        crowned = player_cards.overall_rating_badge_html(
+        crowned = player_cards.overall_rating_gauge_html(
             {"_overall_rating_col": 95, "canonical_position_rank": 1}
         )
-        self.assertIn("dg-ovr-badge--crowned", crowned)
-        self.assertIn("95 OVR", crowned)
+        self.assertIn("dg-ovr-gauge--crowned", crowned)
+        self.assertIn("95", crowned)
+
+    def test_overall_rating_gauge_size_variants(self):
+        sm = player_cards.overall_rating_gauge_html(
+            {"_overall_rating_col": 60}, size="sm"
+        )
+        md = player_cards.overall_rating_gauge_html(
+            {"_overall_rating_col": 60}, size="md"
+        )
+        self.assertIn("dg-ovr-gauge--sm", sm)
+        self.assertNotIn("dg-ovr-gauge--md", sm)
+        self.assertIn("dg-ovr-gauge--md", md)
+        self.assertNotIn("dg-ovr-gauge--sm", md)
 
     def test_scan_cards_forward_my_team_quick_view_trim_flags_to_compact_builder(self):
         source = pd.DataFrame(
