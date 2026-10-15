@@ -26,6 +26,7 @@ Deployment topology (Render):
   - GET  /v1/players/{id}/news           — recent news items matched to one player
   - POST /v1/leagues/{id}/trade-analyzer — real accept/decline/counter verdict for a proposed trade
   - GET  /v1/leagues/{id}/recap          — latest completed-week league recap
+  - GET  /v1/leagues/{id}/history        — season transaction timeline (trades/waivers/picks) with retrospective grades
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
@@ -155,6 +156,7 @@ from modules import (
     trade_hub_ui,
     trade_ideas,
     trade_offer_analyzer,
+    transaction_grades,
     waivers_ui,
 )
 from modules.team_eval import (
@@ -2539,6 +2541,106 @@ def get_league_recap(
         power_ranks=None,
     )
     return {"ok": True, "recap": recap, "reason": "", "max_completed_week": completed_week}
+
+
+@app.get("/v1/leagues/{league_id}/history")
+def get_league_history(
+    league_id: str,
+    season_league_id: str | None = None,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """League transaction timeline — completed trades, waiver claims,
+    free-agent adds, and pick changes, each with the same retrospective
+    letter grade the web app's League Recaps -> History tab shows (shares
+    modules.league_history's normalization and modules.transaction_grades'
+    grading verbatim; no scoring math lives here).
+
+    `season_league_id` selects one entry from the Sleeper
+    previous_league_id chain (defaults to `league_id`, the current season).
+    `seasons` is always returned so the client can build a season picker
+    without a second round trip.
+    """
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    chain = league_history.walk_season_chain(league_id, sleeper.get_league)
+    if not chain:
+        return {
+            "ok": True,
+            "seasons": [],
+            "selected_league_id": league_id,
+            "transactions": [],
+            "reason": "no_history",
+        }
+
+    chain_ids = {str(item.get("league_id")) for item in chain}
+    selected_league_id = (
+        str(season_league_id)
+        if season_league_id and str(season_league_id) in chain_ids
+        else league_id
+    )
+
+    history_payload = league_history.collect_season_transactions(
+        selected_league_id,
+        fetch_league=sleeper.get_league,
+        fetch_transactions=sleeper.get_transactions,
+    )
+    profiles = sleeper.get_league_roster_profiles(selected_league_id) or {}
+
+    # Same (league_id, lens)-scoped valuation cache /recap and /rankings
+    # already share — see league_value_settings.build_valued_players_frame_cached.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=selected_league_id, lens="Dynasty", players_db_path=PLAYERS_DB_PATH
+    )
+    lookup_rows: list[dict[str, Any]] = []
+    if not valued.empty:
+        cols = [c for c in ("player_id", "name", "position", "team", "value_score") if c in valued.columns]
+        if cols:
+            lookup_rows = valued[cols].to_dict("records")
+    player_lookup = league_history.player_lookup_from_rows(lookup_rows)
+
+    normalized = league_history.normalize_season_payload(
+        history_payload, profiles=profiles, player_lookup=player_lookup
+    )
+
+    # Same current_week the web route passes into cached_transaction_grades
+    # (league_recaps.last_scored_week of the home/current league), kept
+    # constant across a season switch — grading "how recent is this" is
+    # always relative to now, not to whichever past season is being browsed.
+    current_week = league_recaps.last_scored_week(league)
+    for item in normalized:
+        event_id = item.get("transaction_id")
+        later_events = [
+            other
+            for other in normalized
+            if other.get("transaction_id") != event_id
+            and int(other.get("timestamp") or 0) > int(item.get("timestamp") or 0)
+        ]
+        item["grade"] = transaction_grades.grade_transaction(
+            item,
+            player_lookup=player_lookup,
+            current_week=current_week,
+            later_events=later_events,
+        )
+
+    seasons = [
+        {
+            "league_id": item.get("league_id"),
+            "season": item.get("season"),
+            "name": item.get("name"),
+        }
+        for item in chain
+    ]
+
+    return {
+        "ok": True,
+        "seasons": seasons,
+        "selected_league_id": selected_league_id,
+        "transactions": normalized,
+        "reason": "",
+    }
 
 
 def _alert_key_for_link(link: str) -> str:

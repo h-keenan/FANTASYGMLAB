@@ -23,13 +23,14 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
  */
 
 // "My Team", "Matchup", "Trade Hub", "Waivers", "League Rankings",
-// "Alerts", "GM Plan", and now "GM Targets" have real Next.js pages (see
-// app/my-team/[leagueId], app/matchup/[leagueId], app/trade-hub/[leagueId],
-// app/waivers/[leagueId], app/league-rankings/[leagueId],
-// app/alerts/[leagueId], app/gm-plan/[leagueId], and
-// app/gm-targets/[leagueId]) and are rendered separately below as internal
-// <Link>s instead of Streamlit deep links — every other destination here is
-// still Streamlit-only for this revision.
+// "Alerts", "GM Plan", "GM Targets", and now "League Recaps / History" have
+// real Next.js pages (see app/my-team/[leagueId], app/matchup/[leagueId],
+// app/trade-hub/[leagueId], app/waivers/[leagueId],
+// app/league-rankings/[leagueId], app/alerts/[leagueId],
+// app/gm-plan/[leagueId], app/gm-targets/[leagueId], and
+// app/league-recaps/[leagueId]) and are rendered separately below as
+// internal <Link>s instead of Streamlit deep links — every other
+// destination here is still Streamlit-only for this revision.
 const QUICK_ACTIONS: { label: string; destination: string }[] = [
   { label: "Draft Center", destination: "draft_summary" },
   { label: "Trade History", destination: "trade_history" },
@@ -45,6 +46,7 @@ const BUILT_PAGES: { label: string; path: string }[] = [
   { label: "Alerts", path: "alerts" },
   { label: "GM Plan", path: "gm-plan" },
   { label: "GM Targets", path: "gm-targets" },
+  { label: "League Recaps / History", path: "league-recaps" },
 ];
 
 // Portfolio (Revision 8) spans every saved league at once — unlike every

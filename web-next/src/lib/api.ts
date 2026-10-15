@@ -1006,6 +1006,134 @@ export interface QuickViewResponse {
   reason: "" | "not_found";
 }
 
+/**
+ * League Recaps / History (Revision 13) — mirrors mobile's RecapStory/
+ * WeeklyRecap/RecapResponse types (mobile/src/lib/api.ts) exactly; both
+ * clients read the identical GET /v1/leagues/{id}/recap response built by
+ * modules.league_recaps.build_weekly_recap. `history_filter` is this web
+ * app's own addition on top of the mobile shape (modules/league_recaps.py's
+ * story payload already carries it) so the History deep-link affordance
+ * (recap_story_html's data-route) has something to route with.
+ */
+export interface RecapStory {
+  story_type: string;
+  title: string;
+  summary: string;
+  glyph: string;
+  primary_team: string;
+  secondary_team: string;
+  primary_roster_id: string;
+  secondary_roster_id: string;
+  players: string[];
+  metric_label: string;
+  metric_value: string;
+  history_week: number;
+  confidence: string;
+  editorial_label?: string;
+  history_filter?: string;
+}
+
+export interface WeeklyRecap {
+  recap_id: string;
+  league_id: string;
+  season: string;
+  week: number;
+  headline: string;
+  stories: RecapStory[];
+  incomplete: boolean;
+  empty_reason: string;
+}
+
+export interface RecapResponse {
+  ok: boolean;
+  recap: WeeklyRecap | null;
+  reason: "" | "no_completed_week";
+  max_completed_week: number;
+}
+
+/** One side of a History transaction — modules.league_history.normalize_transaction's
+ * `sides[]` shape, verbatim. */
+export interface HistoryAsset {
+  kind: "player" | "pick";
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  label: string;
+  known: boolean;
+  season?: string;
+  round?: number | null;
+}
+
+export interface HistorySide {
+  roster_id: string;
+  team_name: string;
+  owner_handle: string;
+  avatar_url: string;
+  receives: HistoryAsset[];
+  drops: HistoryAsset[];
+  faab_spent: number | null;
+  faab_received: number | null;
+}
+
+/** Retrospective grade — modules.transaction_grades.grade_transaction's
+ * output, verbatim (grade_trade for `kind === "trade"`, grade_waiver
+ * otherwise). No scoring math on this side; this type only names the
+ * fields transaction_grades_ui.py's HTML renderers already read. */
+export interface HistoryGradeSide {
+  team: string;
+  letter: string;
+  tone: string;
+  confidence: string;
+  why: string;
+  watch?: string;
+}
+
+export interface HistoryGrade {
+  kind: string;
+  pending: boolean;
+  partial_evidence?: boolean;
+  provisional?: boolean;
+  sides?: HistoryGradeSide[];
+  // Waiver/free-agent shape — flat, not a `sides[]` list.
+  player?: string;
+  team?: string;
+  letter?: string;
+  tone?: string;
+  confidence?: string;
+  why?: string;
+  watch?: string;
+  grade_model_label?: string;
+}
+
+export interface HistoryTransaction {
+  transaction_id: string;
+  season: string;
+  league_id: string;
+  week: number;
+  timestamp: number;
+  type: "trade" | "waiver" | "free_agent";
+  draft_picks: HistoryAsset[];
+  sides: HistorySide[];
+  grade: HistoryGrade | null;
+}
+
+export interface HistorySeason {
+  league_id: string;
+  season: string;
+  name: string;
+}
+
+export type HistoryReason = "" | "no_history";
+
+export interface HistoryResponse {
+  ok: boolean;
+  seasons: HistorySeason[];
+  selected_league_id: string;
+  transactions: HistoryTransaction[];
+  reason: HistoryReason;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1133,4 +1261,21 @@ export const api = {
   // PlayerCompareScreen calls twice (once per side) via getPlayerQuickView.
   getPlayerQuickView: (playerId: string) =>
     authorizedRequest<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
+
+  // League Recaps / History (Revision 13) — Recaps tab shares mobile's
+  // RecapScreen endpoint exactly (see RecapResponse's docstring); History
+  // is a new thin wrapper (GET .../history) over the same
+  // modules.league_history / modules.transaction_grades the web app's
+  // Streamlit History tab already used.
+  getLeagueRecap: (leagueId: string, week?: number) =>
+    authorizedRequest<RecapResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/recap${week ? `?week=${week}` : ""}`,
+    ),
+
+  getLeagueHistory: (leagueId: string, seasonLeagueId?: string) =>
+    authorizedRequest<HistoryResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/history${
+        seasonLeagueId ? `?season_league_id=${encodeURIComponent(seasonLeagueId)}` : ""
+      }`,
+    ),
 };
