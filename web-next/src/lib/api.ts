@@ -413,6 +413,20 @@ export interface TradeHubResponse {
   entitlement: TradeHubEntitlement | null;
 }
 
+/** GET .../trade-finder's response — the same TradeIdea card shape as
+ * Trade Hub (both serialize through modules.trade_hub_engine's shared card
+ * projection), restricted to whatever player_ids the caller selected.
+ * Deliberately a narrower type than TradeHubResponse rather than reusing it:
+ * this endpoint never returns an `entitlement` key at all (see that
+ * endpoint's own docstring — Trade Finder isn't free-tier-limited the way
+ * Trade Hub's board is), so typing it as TradeHubResponse the way mobile's
+ * api.ts does would claim a field that's never actually on the wire. */
+export interface TradeFinderResponse {
+  ok: boolean;
+  ideas: TradeIdea[];
+  reason: string;
+}
+
 // player_id/name/position/team/age/status/injury_status/tier/score mirror
 // RankedPlayer, but position_rank/overall_rank here are wire-relative (rank
 // among available free agents), not the league-global canonical_* rank
@@ -1373,6 +1387,22 @@ export const api = {
   getTradeHub: (leagueId: string, strategy: string = "retool", lens: string = "Dynasty") =>
     authorizedRequest<TradeHubResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
+    ),
+
+  // "Select these specific players, find who'd want them" — same engine/
+  // Trust enforcement/card shape as getTradeHub, restricted to playerIds.
+  // An empty playerIds list is a legitimate call (the endpoint itself
+  // returns `reason: "no_players_selected"` rather than erroring), but the
+  // UI never actually calls this with an empty selection — see
+  // TradeFinderContent's disabled-button gate.
+  getTradeFinderIdeas: (
+    leagueId: string,
+    playerIds: string[],
+    strategy: string = "retool",
+    lens: string = "Dynasty",
+  ) =>
+    authorizedRequest<TradeFinderResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-finder?player_ids=${encodeURIComponent(playerIds.join(","))}&strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}`,
     ),
 
   getLeagueWaivers: (leagueId: string, lens: string = "Dynasty", limit: number = 150) =>
