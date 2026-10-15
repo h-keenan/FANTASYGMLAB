@@ -1134,6 +1134,89 @@ export interface HistoryResponse {
   reason: HistoryReason;
 }
 
+// Draft Center (Revision 14) — GET .../draft-center's Overview pane only
+// (your own draft posture + league-wide decision/partner cards); see that
+// endpoint's own docstring for why Current Draft/History (live draft board)
+// and Scouting are real, separate surfaces not covered here or by mobile's
+// DraftCenterScreen.tsx, which this page mirrors exactly.
+export interface DraftPosture {
+  label: string;
+  note: string;
+  tone: string;
+  draft_capital_rank: number | null;
+  draft_capital_rank_tied: boolean;
+  draft_capital: number | null;
+  future_draft_capital_rank: number | null;
+  future_draft_capital_rank_tied: boolean;
+  future_draft_capital: number | null;
+  strategy_display: string | null;
+  power_rank: number | null;
+  power_rank_tied: boolean;
+  franchise_rank: number | null;
+  franchise_rank_tied: boolean;
+  first_rounders: number | null;
+  pick_count: number | null;
+}
+
+export interface DraftCard {
+  label: string;
+  title: string;
+  tone: string;
+  items: string[];
+}
+
+export interface DraftCenterResponse {
+  ok: true;
+  reason: string;
+  posture: DraftPosture | null;
+  posture_reason: string;
+  decision_cards: DraftCard[];
+  partner_cards: DraftCard[];
+}
+
+// Every draft pick asset in the league, with its full PQV-style valuation
+// breakdown — shared verbatim with mobile's Pick Detail screen and the
+// mobile Trade Analyzer's Players/Picks roster browser (see GET
+// .../draft-picks's own docstring). This page only reads the identity/
+// value fields (score, round, tier, projected range, confidence); the rest
+// of the breakdown is forwarded but unused here, same restraint mobile's
+// DraftCenterScreen.tsx (as opposed to its PickDetailScreen) takes.
+export interface DraftPickAsset {
+  pick_id: string;
+  label: string | null;
+  score: number | null;
+  season: number | null;
+  round: number | null;
+  original_roster_id: string;
+  owner_roster_id: string;
+  original_team_name: string | null;
+  owner_team_name: string | null;
+  pick_tier: string | null;
+  projected_pick_range: string | null;
+  tier_bucket?: string | null;
+  base_score?: number | null;
+  years_out?: number | null;
+  future_discount?: number | null;
+  team_modifier?: number | null;
+  format_multiplier?: number | null;
+  class_strength_multiplier?: number | null;
+  prospect_strength_multiplier?: number | null;
+  slot_percentile?: number | null;
+  projected_slot_percentile?: number | null;
+  early_probability?: number | null;
+  mid_probability?: number | null;
+  late_probability?: number | null;
+  projection_confidence?: number | null;
+  projection_source?: string | null;
+  is_current_year_pick?: boolean | null;
+}
+
+export interface DraftPicksResponse {
+  ok: true;
+  picks: DraftPickAsset[];
+  reason: string;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1277,5 +1360,18 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/history${
         seasonLeagueId ? `?season_league_id=${encodeURIComponent(seasonLeagueId)}` : ""
       }`,
+    ),
+
+  // Draft Center (Revision 14) — same two endpoints mobile's
+  // DraftCenterScreen.tsx calls (Overview pane + pick assets); no new
+  // backend logic for this page.
+  getLeagueDraftCenter: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<DraftCenterResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/draft-center?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  getLeagueDraftPicks: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<DraftPicksResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/draft-picks?lens=${encodeURIComponent(lens)}`,
     ),
 };
