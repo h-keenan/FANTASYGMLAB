@@ -99,6 +99,28 @@
 	file_server
 }
 
+# --- fantasygm-lab-web-next (Next.js frontend, test-subdomain preview) ------
+# Additive only — a separate, non-production subdomain so the already-
+# merged, already-tested web-next frontend can be smoke-tested against the
+# real production mobile-api before any cutover decision. Does NOT replace
+# or modify the {$APP_DOMAIN} block above, which keeps routing to `web`
+# (Streamlit) exactly as before. Making web-next the thing {$APP_DOMAIN}
+# points to is a separate, deliberate, later decision — see
+# docs/SELF_HOSTED_MIGRATION.md's "web-next test-subdomain preview"
+# section.
+#
+# IMPORTANT: production's actual, live Caddy config is generated
+# server-side by /usr/local/bin/fantasygmlab-sync-caddy (Cloudflare-Tunnel-
+# adapted — see docs/SELF_HOSTED_MIGRATION.md section 5.7), not this
+# checked-in file directly. Whether that generator mirrors every block in
+# this file automatically, or needs its own update to pick up this new
+# route, is a production-box detail outside this repo — confirm on the box
+# before assuming this change alone exposes the new subdomain.
+{$WEB_NEXT_DOMAIN} {
+	import encode_responses
+	reverse_proxy web-next:8080
+}
+
 # --- fantasygm-lab-mobile-api ------------------------------------------------
 {$MOBILE_API_DOMAIN} {
 	import encode_responses

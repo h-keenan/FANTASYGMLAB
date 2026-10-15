@@ -51,12 +51,19 @@ def _service_block(text: str, name: str, all_names: list[str]) -> str:
 def test_every_app_proxy_and_state_service_has_memory_and_cpu_limits():
     text = _compose_text()
     # One (name, mem_limit, cpus) triple per service, in file order.
+    # web-next (added after this file's original resource-isolation pass —
+    # see docs/SELF_HOSTED_MIGRATION.md section 9) is additive/test-
+    # subdomain-only and deliberately NOT counted in
+    # test_resource_limits_leave_headroom_on_target_box's production-box
+    # budget below, but it still needs its own explicit ceiling like every
+    # other service here.
     expected = [
         ("web", "5g", "3.0"),
         ("mobile-api", "7g", "4.0"),
         ("redis", "256m", "0.25"),
         ("stripe-webhook", "512m", "0.5"),
         ("revenuecat-webhook", "512m", "0.5"),
+        ("web-next", "1g", "1.0"),
         ("caddy", "256m", "0.5"),
     ]
     names = [name for name, _, _ in expected]
@@ -184,6 +191,9 @@ def test_caddy_waits_for_healthy_app_services_before_proxying():
     # an app service that isn't actually ready yet.
     text = _compose_text()
     depends_on_block = text[text.index("depends_on:", text.index("\n  caddy:")) :]
-    for name in ("web", "mobile-api", "stripe-webhook", "revenuecat-webhook"):
+    # web-next (additive test-subdomain preview — docs/SELF_HOSTED_MIGRATION.md
+    # section 9) is included here too: Caddy waits on its healthcheck before
+    # proxying, same as every other app service.
+    for name in ("web", "mobile-api", "stripe-webhook", "revenuecat-webhook", "web-next"):
         assert f"{name}:\n" in depends_on_block
-    assert depends_on_block.count("condition: service_healthy") == 4
+    assert depends_on_block.count("condition: service_healthy") == 5
