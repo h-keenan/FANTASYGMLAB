@@ -21,6 +21,7 @@ export const DESTINATION_LABELS: Record<string, string> = {
   waivers: "Open Waivers",
   my_team: "Open My Team",
   rankings: "Open League Rankings",
+  gm_plan: "Open GM Plan",
   dashboard: "Open workflow",
 };
 
