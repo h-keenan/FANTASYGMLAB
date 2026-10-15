@@ -22,11 +22,11 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
  * a fixture, without needing to mock Supabase auth/fetch.
  */
 
-// "My Team", "Trade Hub", and now "Waivers" have real Next.js pages (see
-// app/my-team/[leagueId], app/trade-hub/[leagueId], and
-// app/waivers/[leagueId]) and are rendered separately below as internal
-// <Link>s instead of Streamlit deep links — every other destination here
-// is still Streamlit-only for this revision.
+// "My Team", "Matchup", "Trade Hub", and now "Waivers" have real Next.js
+// pages (see app/my-team/[leagueId], app/matchup/[leagueId],
+// app/trade-hub/[leagueId], and app/waivers/[leagueId]) and are rendered
+// separately below as internal <Link>s instead of Streamlit deep links —
+// every other destination here is still Streamlit-only for this revision.
 const QUICK_ACTIONS: { label: string; destination: string }[] = [
   { label: "League Overview", destination: "rankings" },
   { label: "Draft Center", destination: "draft_summary" },
@@ -137,6 +137,18 @@ export function DashboardContent({
             }}
           >
             My Team
+            <span style={{ color: "var(--color-accent)" }}>→</span>
+          </Link>
+          <Link
+            href={`/matchup/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
+            className="px-4 py-3 text-sm font-bold flex items-center justify-between"
+            style={{
+              background: "var(--color-surface-secondary)",
+              border: "var(--border-width-default) solid var(--color-border)",
+              color: "var(--color-text-primary)",
+            }}
+          >
+            Matchup
             <span style={{ color: "var(--color-accent)" }}>→</span>
           </Link>
           <Link
