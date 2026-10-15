@@ -1461,6 +1461,130 @@ export const MAX_GRADE = 5;
 export const MIN_ROUND_PROJECTION = 1;
 export const MAX_ROUND_PROJECTION = 7;
 
+// Live Draft (Revision 21) — the last page on the original migration punch
+// list. Unlike every earlier revision, there is no mobile reference
+// screen to port: Live Draft only ever existed in Streamlit
+// (modules/live_draft_ui.py's render_live_draft_page), a read-only Sleeper
+// draft-room mirror that polls every LIVE_DRAFT_POLL_INTERVAL_SECONDS
+// (12s). GET .../live-draft and GET .../live-draft/{draft_id} are brand
+// new backend endpoints (services/mobile_api_service.py) wrapping
+// modules/live_draft.py's discover_live_drafts/build_live_draft_state
+// verbatim — no new scoring/ranking logic duplicated in this client.
+export interface LiveDraftSummary {
+  draft_id: string;
+  season: string;
+  status: "drafting" | "paused" | "pre_draft" | "complete" | string;
+  rounds: number;
+  name: string;
+}
+
+export interface LiveDraftDiscoveryResponse {
+  ok: boolean;
+  error: string;
+  drafts: LiveDraftSummary[];
+  active_draft_id: string;
+}
+
+export interface LiveDraftPickRow {
+  pick_no: number;
+  round: number;
+  round_pick: string;
+  player_id: string;
+  player_name: string;
+  position: string;
+  team: string;
+  fantasy_team: string;
+  is_mine: boolean;
+}
+
+export interface LiveDraftRecommendation {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  age: number | null;
+  tier: string;
+  league_adjusted_draft_score: number | null;
+  overall_rating: number | null;
+  recommendation_role: string;
+  recommendation_reason: string;
+  position_need_impact: string;
+  immediate_roster_impact: string;
+  confidence: string;
+  adp_delta: number | null;
+}
+
+export interface LiveDraftRankingRow {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  age: number | null;
+  tier: string;
+  is_rookie: boolean;
+  overall_rank: number | null;
+  position_rank: number | null;
+  canonical_overall_rank: number | null;
+  canonical_position_rank: number | null;
+  rank_scoring_format: string;
+  rank_unavailable_reason: string;
+  base_value: number | null;
+  league_adjusted_draft_score: number | null;
+  overall_rating: number | null;
+  // Always 0 straight off this endpoint — there's no server session to
+  // diff against a previous poll. The client computes the real delta
+  // itself from two consecutive polls (see lib/liveDraftPresentation.ts).
+  movement: number;
+  recommendation_label: string;
+  recommendation_reason: string;
+}
+
+export interface LiveDraftTeamRow {
+  roster_id: number;
+  team_name: string;
+  is_mine: boolean;
+  team_rank: number;
+  movement: number;
+  trend_label: string;
+  live_team_score: number;
+  roster_count: number;
+  pick_count: number;
+  positions: string;
+  top_player: string;
+  starter_value: number;
+  total_value: number;
+}
+
+export interface LiveDraftStateResponse {
+  ok: boolean;
+  reason: string;
+  pick_data_stale: boolean;
+  status: "drafting" | "paused" | "pre_draft" | "complete" | string;
+  rounds: number;
+  teams: number;
+  picks_made: number;
+  current_pick: number;
+  current_round: number;
+  current_team_name: string;
+  current_manager_name: string;
+  my_slot: number;
+  is_my_pick: boolean;
+  picks_until_mine: number | null;
+  my_upcoming_picks: number[];
+  positional_run: string;
+  last_updated: string;
+  score_label: string;
+  league_settings: {
+    qb_format: string;
+    scoring_format: string;
+    league_format: string;
+  };
+  recommendations: LiveDraftRecommendation[];
+  pick_rows: LiveDraftPickRow[];
+  rankings: LiveDraftRankingRow[];
+  team_rankings: LiveDraftTeamRow[];
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1733,5 +1857,13 @@ export const api = {
     authorizedRequest<ScoutingMutationResponse>(
       `/v1/scouting/watchlist/${encodeURIComponent(prospectId)}`,
       { method: "DELETE" },
+    ),
+
+  // Live Draft (Revision 21) — see LiveDraftStateResponse's own comment.
+  getLiveDraftDiscovery: (leagueId: string) =>
+    authorizedRequest<LiveDraftDiscoveryResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/live-draft`),
+  getLiveDraftState: (leagueId: string, draftId: string, lens: string = "Dynasty") =>
+    authorizedRequest<LiveDraftStateResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/live-draft/${encodeURIComponent(draftId)}?lens=${encodeURIComponent(lens)}`,
     ),
 };

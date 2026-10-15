@@ -681,6 +681,252 @@ def test_my_roster_returns_matching_roster(monkeypatch):
     assert body["roster"]["players"] == ["p1", "p2"]
 
 
+def test_live_draft_discovery_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/live-draft")
+    assert response.status_code == 401
+
+
+def test_live_draft_discovery_returns_404_for_unknown_league(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={}):
+            response = client.get(
+                "/v1/leagues/abc/live-draft", headers={"Authorization": "Bearer good-token"}
+            )
+
+    assert response.status_code == 404
+
+
+def test_live_draft_discovery_lists_supported_drafts_and_flags_the_active_one(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {"league_id": "abc"}
+    draft_stubs = [
+        {"draft_id": "draft-complete", "status": "complete", "season": "2025"},
+        {"draft_id": "draft-live", "status": "drafting", "season": "2026"},
+    ]
+    draft_details = {
+        "draft-complete": {"status": "complete", "season": "2025", "settings": {"rounds": 15}},
+        "draft-live": {
+            "status": "drafting",
+            "season": "2026",
+            "settings": {"rounds": 15},
+            "metadata": {"name": "Startup Draft"},
+        },
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.sleeper.get_league_drafts", return_value=draft_stubs):
+                with patch("modules.sleeper.get_draft", side_effect=lambda draft_id: draft_details[draft_id]):
+                    response = client.get(
+                        "/v1/leagues/abc/live-draft", headers={"Authorization": "Bearer good-token"}
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["active_draft_id"] == "draft-live"
+    statuses = {draft["draft_id"]: draft["status"] for draft in body["drafts"]}
+    assert statuses == {"draft-complete": "complete", "draft-live": "drafting"}
+    live_entry = next(draft for draft in body["drafts"] if draft["draft_id"] == "draft-live")
+    assert live_entry["rounds"] == 15
+    assert live_entry["name"] == "Startup Draft"
+
+
+def _fake_live_draft(*, status: str = "drafting") -> dict:
+    return {
+        "draft_id": "draft-live",
+        "status": status,
+        "season": "2026",
+        "type": "snake",
+        "settings": {"rounds": 2},
+        "metadata": {"name": "Startup Draft"},
+        "draft_order": {"sleeper-user-1": 1, "someone-else": 2},
+    }
+
+
+def _fake_live_draft_player_pool() -> pd.DataFrame:
+    """A pool with >= PERCENTILE_MIN_POOL (10) players at a single position
+    — modules.player_quick_view.overall_ratings_for_pool only rates a
+    position group once it clears that floor, so the 2-player
+    _fake_players_frame() fixture (one WR, one RB) always reports a null
+    OVR by design; this fixture exercises the real non-null path."""
+
+    rows = []
+    for i in range(12):
+        rows.append(
+            {
+                "player_id": f"wr{i}",
+                "name": f"Wideout {i}",
+                "position": "WR",
+                "team": "KC",
+                "age": 24,
+                "years_exp": 3,
+                "status": "Active",
+                "injury_status": None,
+                "search_rank": 10 + i,
+                "score": 8000 - i * 100,
+                "dynasty_score": 8000 - i * 100,
+                "value_score": 7000 - i * 100,
+                "market_score": 8000 - i * 100,
+                "role_score": 7500,
+                "opportunity_score": 7500,
+                "scarcity_score": 7000,
+                "risk_multiplier": 1.0,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def test_live_draft_state_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/live-draft/draft-live")
+    assert response.status_code == 401
+
+
+def test_live_draft_state_rejects_unknown_lens(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get(
+            "/v1/leagues/abc/live-draft/draft-live?lens=Nonsense",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 422
+
+
+def test_live_draft_state_404s_when_the_draft_is_not_found(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "abc"}):
+            with patch("modules.sleeper.get_draft", return_value={}):
+                response = client.get(
+                    "/v1/leagues/abc/live-draft/draft-live",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 404
+
+
+def test_live_draft_state_409s_for_an_unsupported_draft_status(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "abc"}):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft(status="cancelled")):
+                response = client.get(
+                    "/v1/leagues/abc/live-draft/draft-live",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 409
+
+
+def test_live_draft_state_returns_a_real_built_snapshot(monkeypatch):
+    """Exercises the real modules.live_draft.build_live_draft_state engine
+    end to end through the new thin FastAPI wrapper: on-the-clock status,
+    recommendations, the reranked available board, and the live team board
+    all come back non-empty and internally consistent for a simple 2-team
+    snake draft with no picks logged yet (so roster 1 — the caller's own
+    roster, slot 1 — is on the clock for pick #1)."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    fake_league = {
+        "league_id": "abc",
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 2,
+    }
+    fake_rosters = [
+        {"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["wr0"]},
+        {"roster_id": 2, "owner_id": "someone-else", "players": ["wr1"]},
+    ]
+    fake_profiles = {
+        "1": {"team_name": "My Dynasty", "owner_name": "GM One"},
+        "2": {"team_name": "Rival Squad", "owner_name": "GM Two"},
+    }
+    fake_pool = _fake_live_draft_player_pool()
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                with patch("modules.live_draft.fetch_sleeper_draft_picks", return_value=([], "")):
+                    with patch("modules.sleeper.get_rosters", return_value=fake_rosters):
+                        with patch(
+                            "modules.sleeper.get_league_roster_profiles", return_value=fake_profiles
+                        ):
+                            with patch(
+                                "modules.sleeper_leagues.resolve_sleeper_user_id",
+                                return_value="sleeper-user-1",
+                            ):
+                                with patch(
+                                    "modules.rankings.load_players", return_value=fake_pool
+                                ):
+                                    with patch(
+                                        "modules.player_eligibility.filter_current_fantasy_players",
+                                        side_effect=lambda df, **kwargs: df,
+                                    ):
+                                        # modules/live_draft.py imports this
+                                        # eligibility filter by name (`from
+                                        # modules.player_eligibility import
+                                        # filter_current_fantasy_players`)
+                                        # rather than through the module
+                                        # object, so the patch above alone
+                                        # doesn't reach live_draft's own
+                                        # available_player_pool/rankings
+                                        # calls — patch its bound reference
+                                        # too, same identity passthrough.
+                                        with patch(
+                                            "modules.live_draft.filter_current_fantasy_players",
+                                            side_effect=lambda df, **kwargs: df,
+                                        ):
+                                            response = client.get(
+                                                "/v1/leagues/abc/live-draft/draft-live?lens=Dynasty",
+                                                headers={"Authorization": "Bearer good-token"},
+                                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["status"] == "drafting"
+    assert body["pick_data_stale"] is False
+    assert body["current_pick"] == 1
+    assert body["my_slot"] == 1
+    assert body["is_my_pick"] is True
+    assert body["score_label"] == "Dynasty Score"
+    assert len(body["recommendations"]) >= 1
+    assert body["recommendations"][0]["recommendation_role"] == "Recommended pick"
+    assert body["recommendations"][0]["overall_rating"] is not None
+    assert {row["player_id"] for row in body["rankings"]} == set(fake_pool["player_id"])
+    assert all(row["overall_rating"] is not None for row in body["rankings"])
+    assert {row["roster_id"] for row in body["team_rankings"]} == {1, 2}
+    assert body["pick_rows"] == []
+
+
 def _fake_roster_frame():
     positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "RB", "WR"]
     rows = []

@@ -16,6 +16,8 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
   - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
   - GET  /v1/leagues/{id}/draft-picks    — every draft pick asset + its full valuation breakdown
+  - GET  /v1/leagues/{id}/live-draft           — discover this league's Sleeper drafts (status/season/rounds)
+  - GET  /v1/leagues/{id}/live-draft/{draft_id} — polled read-only live draft board snapshot
   - GET  /v1/leagues/{id}/my-team        — your own roster's suggested starters vs. bench
   - GET  /v1/leagues/{id}/my-team-needs  — Strength & Pressure / Position Groups / Biggest Need detail
   - GET  /v1/leagues/{id}/my-roster      — the signed-in user's own roster in this league
@@ -124,6 +126,8 @@ from modules import (
     league_recaps,
     league_standings,
     league_value_settings,
+    league_workspace_ui,
+    live_draft,
     manager_activity,
     my_news,
     news as news_cache,
@@ -1729,6 +1733,300 @@ def _resolve_my_roster(
             return roster, ""
 
     return None, "not_a_member_of_league"
+
+
+@app.get("/v1/leagues/{league_id}/live-draft")
+def get_league_live_draft_discovery(
+    league_id: str,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Discover this league's Sleeper drafts so the client can gate the
+    read-only live draft assistant the same way modules.live_draft_ui's
+    Streamlit route does: only show it while a draft is in progress or
+    paused, and offer a selector when more than one draft qualifies.
+
+    Wraps modules.live_draft.discover_live_drafts verbatim (no new
+    discovery logic here) — this is the first integration of
+    modules/live_draft.py outside Streamlit; it has no mobile reference
+    screen (see Live Draft's own revision notes), so this endpoint and its
+    sibling below are new, not a port of an existing mobile endpoint.
+    """
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    discovery = live_draft.discover_live_drafts(
+        league_id,
+        fetch_league_drafts=sleeper.get_league_drafts,
+        fetch_draft=sleeper.get_draft,
+    )
+    drafts = [
+        {
+            "draft_id": live_draft.safe_text(draft.get("draft_id")),
+            "season": live_draft.safe_text(draft.get("season")),
+            "status": live_draft.normalize_draft_status(draft.get("status")),
+            "rounds": live_draft.draft_round_count(draft),
+            "name": live_draft.safe_text(
+                (draft.get("metadata") or {}).get("name")
+                if isinstance(draft.get("metadata"), dict)
+                else ""
+            ),
+        }
+        for draft in (discovery.get("drafts") or [])
+        if live_draft.normalize_draft_status(draft.get("status")) in live_draft.LIVE_DRAFT_SUPPORTED_STATUSES
+    ]
+    active = discovery.get("active_draft") or {}
+    return {
+        "ok": True,
+        "error": discovery.get("error") or "",
+        "drafts": drafts,
+        "active_draft_id": live_draft.safe_text(active.get("draft_id")),
+    }
+
+
+def _project_live_draft_pick_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "pick_no": _clean_json_value(row.get("pick_no")),
+        "round": _clean_json_value(row.get("round")),
+        "round_pick": _clean_json_value(row.get("round_pick")),
+        "player_id": _clean_json_value(row.get("player_id")),
+        "player_name": _clean_json_value(row.get("player_name")),
+        "position": _clean_json_value(row.get("position")),
+        "team": _clean_json_value(row.get("team")),
+        "fantasy_team": _clean_json_value(row.get("fantasy_team")),
+        "is_mine": bool(row.get("is_mine")),
+    }
+
+
+def _project_live_draft_recommendation(
+    rec: dict[str, Any], rating_by_player_id: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    player_id = _clean_json_value(rec.get("player_id"))
+    return {
+        "player_id": player_id,
+        "name": _clean_json_value(rec.get("name")),
+        "position": _clean_json_value(rec.get("position")),
+        "team": _clean_json_value(rec.get("team")),
+        "age": _clean_json_value(rec.get("age")),
+        "tier": _clean_json_value(rec.get("tier")),
+        "league_adjusted_draft_score": _clean_json_value(rec.get("league_adjusted_draft_score")),
+        "overall_rating": _clean_json_value((rating_by_player_id or {}).get(str(player_id or ""))),
+        "recommendation_role": _clean_json_value(rec.get("recommendation_role")),
+        "recommendation_reason": _clean_json_value(rec.get("recommendation_reason")),
+        "position_need_impact": _clean_json_value(rec.get("position_need_impact")),
+        "immediate_roster_impact": _clean_json_value(rec.get("immediate_roster_impact")),
+        "confidence": _clean_json_value(rec.get("confidence")),
+        "adp_delta": _clean_json_value(rec.get("adp_delta")),
+    }
+
+
+def _project_live_draft_ranking_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "player_id": _clean_json_value(row.get("player_id")),
+        "name": _clean_json_value(row.get("name")),
+        "position": _clean_json_value(row.get("position")),
+        "team": _clean_json_value(row.get("team")),
+        "age": _clean_json_value(row.get("age")),
+        "tier": _clean_json_value(row.get("tier")),
+        "is_rookie": bool(row.get("is_rookie")),
+        "overall_rank": _clean_json_value(row.get("overall_rank")),
+        "position_rank": _clean_json_value(row.get("position_rank")),
+        "canonical_overall_rank": _clean_json_value(row.get("canonical_overall_rank")),
+        "canonical_position_rank": _clean_json_value(row.get("canonical_position_rank")),
+        "rank_scoring_format": _clean_json_value(row.get("rank_scoring_format")),
+        "rank_unavailable_reason": _clean_json_value(row.get("rank_unavailable_reason")),
+        "base_value": _clean_json_value(row.get("base_value")),
+        "league_adjusted_draft_score": _clean_json_value(row.get("league_adjusted_draft_score")),
+        "overall_rating": _clean_json_value(row.get("overall_rating")),
+        "movement": _clean_json_value(row.get("movement")),
+        "recommendation_label": _clean_json_value(row.get("recommendation_label")),
+        "recommendation_reason": _clean_json_value(row.get("recommendation_reason")),
+    }
+
+
+def _project_live_draft_team_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "roster_id": _clean_json_value(row.get("roster_id")),
+        "team_name": _clean_json_value(row.get("team_name")),
+        "is_mine": bool(row.get("is_mine")),
+        "team_rank": _clean_json_value(row.get("team_rank")),
+        "movement": _clean_json_value(row.get("movement")),
+        "trend_label": _clean_json_value(row.get("trend_label")),
+        "live_team_score": _clean_json_value(row.get("live_team_score")),
+        "roster_count": _clean_json_value(row.get("roster_count")),
+        "pick_count": _clean_json_value(row.get("pick_count")),
+        "positions": _clean_json_value(row.get("positions")),
+        "top_player": _clean_json_value(row.get("top_player")),
+        "starter_value": _clean_json_value(row.get("starter_value")),
+        "total_value": _clean_json_value(row.get("total_value")),
+    }
+
+
+LIVE_DRAFT_MAX_RANKING_ROWS = 150
+LIVE_DRAFT_MAX_PICK_ROWS = 60
+
+
+@app.get("/v1/leagues/{league_id}/live-draft/{draft_id}")
+def get_league_live_draft_state(
+    league_id: str,
+    draft_id: str,
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Polled read-only live draft board snapshot: on-the-clock status, the
+    Best Available / Best Fit / Safe / Upside / Position Need recommendation
+    briefings, the full available-player board reranked live for this
+    league and roster, a live roster-strength team board, and recent pick
+    history.
+
+    Wraps modules.live_draft.build_live_draft_state verbatim — the exact
+    engine modules/live_draft_ui.py's Streamlit route already polls every
+    LIVE_DRAFT_POLL_INTERVAL_SECONDS, so this is a thin transport layer,
+    never a second scoring/ranking implementation.
+
+    No server-side rank-movement tracking: Streamlit keeps the previous
+    poll's ranks in st.session_state and diffs them into `movement`; this
+    endpoint has no session, so it always returns `movement=0` and the
+    client instead diffs two consecutive polls' overall_rank itself (see
+    web-next's lib/liveDraftPresentation.ts) — trivial arithmetic over
+    numbers this endpoint already computed, not a re-derivation of the
+    valuation itself. Keeps this endpoint stateless like every sibling
+    endpoint in this file.
+
+    Hypothetical mid-draft Trade Evaluator and the detailed per-field score
+    breakdown table are NOT covered by this endpoint — those stay on the
+    classic Streamlit page for now (deep-linked from the Next.js page),
+    same "not every pane has a thin-wrapper endpoint yet" scope Draft
+    Center's own docstring already notes for Current Draft/History and
+    Scouting.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    draft = sleeper.get_draft(draft_id)
+    if not draft:
+        raise HTTPException(status_code=404, detail="Draft not found.")
+    status = live_draft.normalize_draft_status(draft.get("status"))
+    if status not in live_draft.LIVE_DRAFT_SUPPORTED_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="This draft isn't in a status the live draft assistant supports.",
+        )
+
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(lens)
+
+    # Same (league_id, lens)-scoped cached valuation pass /rankings and
+    # /draft-picks already share — never a second players.db load/value
+    # pass for this endpoint.
+    players_df = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    if players_df.empty:
+        return {"ok": True, "reason": "no_player_data", "state": None}
+
+    picks, pick_error = live_draft.fetch_sleeper_draft_picks(draft_id)
+    rosters = sleeper.get_rosters(league_id)
+    roster_profiles = sleeper.get_league_roster_profiles(league_id)
+    my_roster, _roster_reason = _resolve_my_roster(user, league_id)
+    my_roster_id = my_roster.get("roster_id") if my_roster else None
+    my_roster_player_ids = {
+        str(player_id) for player_id in ((my_roster or {}).get("players") or []) if player_id is not None
+    }
+    roster_df = (
+        players_df[players_df["player_id"].astype(str).isin(my_roster_player_ids)].copy()
+        if my_roster_player_ids and "player_id" in players_df.columns
+        else players_df.iloc[0:0].copy()
+    )
+
+    state = live_draft.build_live_draft_state(
+        draft=draft,
+        picks=picks,
+        df_players=players_df,
+        roster_df=roster_df,
+        roster_profiles=roster_profiles,
+        rosters=rosters,
+        my_roster_id=my_roster_id,
+        league_settings=settings,
+        score_field=score_field,
+    )
+
+    rankings_df = state.get("rankings")
+    team_rankings_df = state.get("team_rankings")
+    pick_rows = state.get("pick_rows") or []
+
+    # 0-99 "OVR" badge — same player_quick_view.overall_ratings_for_pool
+    # /rankings already uses, computed over this board's full available
+    # pool (same "before any limit truncation" contract that endpoint's own
+    # comment documents) so Best Available / recommendations / the ranking
+    # list all show the one consistent OVR, never a second gauge formula
+    # invented for this page. Looked up by player_id for recommendations
+    # (already-materialized dicts from a rankings snapshot taken before this
+    # column existed) rather than recomputed a second time.
+    rating_by_player_id: dict[str, Any] = {}
+    if rankings_df is not None and not rankings_df.empty and score_field in rankings_df.columns:
+        rankings_df = rankings_df.copy()
+        rankings_df["overall_rating"] = player_quick_view.overall_ratings_for_pool(
+            rankings_df, score_column=score_field
+        )
+        rating_by_player_id = {
+            str(row.get("player_id")): row.get("overall_rating")
+            for row in rankings_df.to_dict("records")
+            if row.get("player_id")
+        }
+
+    return {
+        "ok": True,
+        "reason": "",
+        "pick_data_stale": bool(pick_error),
+        "status": state.get("status"),
+        "rounds": _clean_json_value(state.get("rounds")),
+        "teams": _clean_json_value(state.get("teams")),
+        "picks_made": _clean_json_value(state.get("picks_made")),
+        "current_pick": _clean_json_value(state.get("current_pick")),
+        "current_round": _clean_json_value(state.get("current_round")),
+        "current_team_name": state.get("current_team_name"),
+        "current_manager_name": state.get("current_manager_name"),
+        "my_slot": _clean_json_value(state.get("my_slot")),
+        "is_my_pick": bool(state.get("is_my_pick")),
+        "picks_until_mine": _clean_json_value(state.get("picks_until_mine")),
+        "my_upcoming_picks": [_clean_json_value(pick) for pick in (state.get("my_upcoming_picks") or [])],
+        "positional_run": state.get("positional_run"),
+        "last_updated": state.get("last_updated"),
+        "score_label": league_workspace_ui.league_score_label(score_field),
+        "league_settings": {
+            "qb_format": settings.get("qb_format"),
+            "scoring_format": settings.get("scoring_format"),
+            "league_format": settings.get("league_format"),
+        },
+        "recommendations": [
+            _project_live_draft_recommendation(rec, rating_by_player_id)
+            for rec in (state.get("recommendations") or [])
+        ],
+        "pick_rows": [_project_live_draft_pick_row(row) for row in pick_rows[-LIVE_DRAFT_MAX_PICK_ROWS:]],
+        "rankings": (
+            [
+                _project_live_draft_ranking_row(row)
+                for row in rankings_df.head(LIVE_DRAFT_MAX_RANKING_ROWS).to_dict("records")
+            ]
+            if rankings_df is not None and not rankings_df.empty
+            else []
+        ),
+        "team_rankings": (
+            [_project_live_draft_team_row(row) for row in team_rankings_df.to_dict("records")]
+            if team_rankings_df is not None and not team_rankings_df.empty
+            else []
+        ),
+    }
 
 
 @app.get("/v1/leagues/{league_id}/my-roster")

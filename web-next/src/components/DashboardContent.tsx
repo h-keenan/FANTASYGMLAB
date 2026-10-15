@@ -24,15 +24,16 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
 
 // "My Team", "Matchup", "Trade Hub", "Waivers", "League Rankings",
 // "Alerts", "GM Plan", "GM Targets", "League Recaps / History", "Draft
-// Center", "Trade Analyzer", and now "Players" have real Next.js pages (see
-// app/my-team/[leagueId], app/matchup/[leagueId], app/trade-hub/[leagueId],
-// app/waivers/[leagueId], app/league-rankings/[leagueId],
-// app/alerts/[leagueId], app/gm-plan/[leagueId], app/gm-targets/[leagueId],
+// Center", "Trade Analyzer", "Players", and now "Live Draft" have real
+// Next.js pages (see app/my-team/[leagueId], app/matchup/[leagueId],
+// app/trade-hub/[leagueId], app/waivers/[leagueId],
+// app/league-rankings/[leagueId], app/alerts/[leagueId],
+// app/gm-plan/[leagueId], app/gm-targets/[leagueId],
 // app/league-recaps/[leagueId], app/draft-center/[leagueId],
-// app/trade-analyzer/[leagueId], and app/players/[leagueId]) and are
-// rendered separately below as internal <Link>s instead of Streamlit deep
-// links — every other destination here (including Trade Finder) is still
-// Streamlit-only for this revision.
+// app/trade-analyzer/[leagueId], app/players/[leagueId], and
+// app/live-draft/[leagueId]) and are rendered separately below as internal
+// <Link>s instead of Streamlit deep links — every other destination here
+// (including Trade Finder) is still Streamlit-only for this revision.
 //
 // College Scouting (Revision 20) moved out of this Streamlit-deep-link
 // quick-actions list and down into the Portfolio/News/Trade History group
@@ -41,6 +42,12 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
 // isn't part of the per-league BUILT_PAGES loop either. No more quick
 // actions remain, so the Streamlit-external-link rendering path they used
 // is removed below too — everything in Explore is now a real page.
+//
+// Live Draft (Revision 21) is the last page on the original migration
+// punch list — unlike every page above, it has no mobile reference screen
+// (a real feature-parity gap, not an IA one; see LiveDraftContent.tsx's own
+// docstring), so its two backing endpoints are new, not ports of an
+// existing mobile endpoint.
 
 const BUILT_PAGES: { label: string; path: string }[] = [
   { label: "My Team", path: "my-team" },
@@ -55,6 +62,11 @@ const BUILT_PAGES: { label: string; path: string }[] = [
   { label: "Draft Center", path: "draft-center" },
   { label: "Trade Analyzer", path: "trade-analyzer" },
   { label: "Players", path: "players" },
+  // Live Draft (Revision 21) — closes out the original migration punch
+  // list. Shown unconditionally like every other entry here; the page
+  // itself (not this nav) is what gates on an actual in-progress/paused
+  // Sleeper draft, same as Streamlit's own route.
+  { label: "Live Draft", path: "live-draft" },
 ];
 
 // Portfolio (Revision 8) spans every saved league at once — unlike every
