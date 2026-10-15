@@ -748,6 +748,136 @@ export interface PortfolioResponse {
   reason?: string;
 }
 
+/** GM Plan — a season-arc roadmap: where the caller stands, their best
+ * trade paths, and their roster construction, framed by their declared
+ * Team Situation stance (modules.team_stance — Rebuilding/Competing/
+ * Balanced; NOT the separate GM Stance/team-strategy system). Every item
+ * traces to an already-computed signal server-side (see modules.gm_plan);
+ * when a focus area has no real signal it says so honestly via
+ * `watch_for` instead of inventing advice. Mirrors mobile's GmPlanResponse
+ * (mobile/src/lib/api.ts) but declared fresh here rather than imported,
+ * since this app's TradeAsset (below) already covers the give/get asset
+ * shape GET .../gm-plan's trade items carry on send_assets/receive_assets
+ * (modules.gm_plan's visual-identity fix, PR #1047) — mobile's own type
+ * hasn't been updated to declare those fields yet, but the wire payload
+ * already has them. */
+export type GmPlanSeasonPhase =
+  | "early_season"
+  | "trade_deadline_approach"
+  | "playoff_push"
+  | "offseason_adjacent";
+
+export type GmPlanFocusStatus = "signal_found" | "no_signal";
+
+export interface GmPlanRankItem {
+  label: string;
+  rank: number;
+  total_teams: number | null;
+  tied: boolean;
+  source: string;
+  relative_weak_spot?: boolean;
+}
+
+export interface GmPlanRecordItem {
+  label: "Record";
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  source: string;
+}
+
+/** Same already-cached rest-of-season Monte Carlo simulation the standalone
+ * Playoff Odds screen renders (see PlayoffOddsTeam) — looked up for the
+ * caller's own roster and surfaced as a "Where You Stand" fact. Omitted
+ * entirely (not sent) when that simulation isn't ready yet for this league. */
+export interface GmPlanPlayoffOddsItem {
+  label: "Playoff Odds";
+  playoff_probability: number;
+  median_seed: number | null;
+  clinched: boolean;
+  eliminated: boolean;
+  source: string;
+}
+
+/** modules.gm_plan._trade_focus_area's trade-opportunity item.
+ * send_assets/receive_assets are the SAME raw TradeAsset dicts Trade Hub's
+ * own cards render (modules.compact_fantasy_assets) — reused here rather
+ * than re-derived, so this page can show real give/get player identity
+ * (OvrGauge/PositionBadge) instead of name-only text. Both are empty
+ * arrays (never missing) when the underlying idea carried no asset detail. */
+export interface GmPlanTradeItem {
+  partner_team_name: string;
+  my_player: string;
+  their_player: string;
+  my_player_id: string;
+  their_player_id: string;
+  /** The receive-side player's injury tag (modules.rankings.
+   * injury_display_label), '' when healthy or unknown. Never fabricated. */
+  their_player_injury_display: string;
+  rationale: string;
+  trade_confidence_label: string;
+  priority: number | null;
+  send_assets: TradeAsset[];
+  receive_assets: TradeAsset[];
+  trade_gain: number | null;
+  source: string;
+}
+
+/** One already-identified player inside a GmPlanInjuryItem —
+ * modules.rankings.summarize_team_injuries' top_injury_impact_players,
+ * capped to the positions actually driving injury_need_positions. */
+export interface GmPlanInjuredPlayer {
+  asset_type: "player";
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  injury_status: string;
+  player_tier: string;
+}
+
+/** The connectivity-audit fix's one new "Roster Construction" fact: a
+ * significant injury at an active/starting roster spot with no healthy
+ * bench cover. Only ever present when modules.gm_plan found real
+ * uncovered exposure — never a fabricated "all clear". */
+export interface GmPlanInjuryItem {
+  label: "Injury Exposure";
+  health_flag: string;
+  injured_starters: number;
+  injury_need_positions: string[];
+  injured_players: GmPlanInjuredPlayer[];
+  summary: string;
+  source: string;
+}
+
+export type GmPlanFocusItem =
+  | GmPlanRankItem
+  | GmPlanRecordItem
+  | GmPlanPlayoffOddsItem
+  | GmPlanTradeItem
+  | GmPlanInjuryItem;
+
+export interface GmPlanFocusArea {
+  key: "standing" | "trade_opportunities" | "roster_construction";
+  title: string;
+  framing?: string;
+  status: GmPlanFocusStatus;
+  items: GmPlanFocusItem[];
+  watch_for: string;
+}
+
+export interface GmPlanResponse {
+  ok: boolean;
+  quiet: boolean;
+  reason: string;
+  season_phase?: GmPlanSeasonPhase;
+  season_phase_label?: string;
+  team_stance?: string;
+  team_stance_label?: string;
+  headline?: string;
+  focus_areas: GmPlanFocusArea[];
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -835,4 +965,9 @@ export const api = {
   // every saved league at once, unlike every other call above.
   getPortfolio: (lens: string = "Dynasty") =>
     authorizedRequest<PortfolioResponse>(`/v1/portfolio?lens=${encodeURIComponent(lens)}`),
+
+  getGmPlan: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<GmPlanResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/gm-plan?lens=${encodeURIComponent(lens)}`,
+    ),
 };

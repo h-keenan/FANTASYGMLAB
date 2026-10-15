@@ -14,12 +14,19 @@ import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
  */
 /** destination -> this app's own internal Next.js route path, for every
  * destination that now has a real page (app/trade-hub/[leagueId],
- * app/waivers/[leagueId] as of Revision 4) instead of Streamlit's
- * `?page=` router. Every other destination is still Streamlit-only. */
+ * app/waivers/[leagueId] as of Revision 4, app/gm-plan/[leagueId] as of
+ * Revision 9) instead of Streamlit's `?page=` router. Every other
+ * destination is still Streamlit-only. "gm_plan" isn't actually emitted
+ * by modules.daily_gm_briefing's `_tile_destination` today (checked: it
+ * only ever returns waivers/my_team/trade_hub/dashboard, or an explicit
+ * tile route_key — no caller sets that to "gm_plan" yet), but is listed
+ * here ahead of time the same way "rankings" already was, so a future
+ * tile pointed at GM Plan routes internally without a second edit here. */
 const INTERNAL_ROUTES: Record<string, string> = {
   trade_hub: "trade-hub",
   waivers: "waivers",
   rankings: "league-rankings",
+  gm_plan: "gm-plan",
 };
 /** Backend categories are snake_case tokens (e.g. "top_priority") — title-case
  * them for display, matching Streamlit's kicker labels (Top Priority / Watch /
