@@ -6,6 +6,7 @@ import streamlit as st
 
 from modules import canonical_player_ranking
 from modules import canonical_recommendation_narrative
+from modules import football_assets
 from modules import league_format_context
 from modules import league_workspace_ui
 from modules import workspace_ui
@@ -317,12 +318,24 @@ def build_construction_observations(
 
     if strength_rooms:
         rooms = " / ".join(strength_rooms[:2])
+        # Canonical position color on the room abbreviation(s) themselves
+        # (coridian_: "somewhere where it says running back, that should be
+        # the font color of our running back color") — same
+        # --color-position-* tokens the position badge chip uses elsewhere.
+        rooms_html = " / ".join(
+            football_assets.position_text_html(room) for room in strength_rooms[:2]
+        )
         observations.append(
             {
                 "label": "Strength",
                 "title": f"{rooms} can absorb a send",
+                "title_html": f"{rooms_html} can absorb a send",
                 "body": (
                     f"Existing metrics mark {rooms} as a relative strength, so this room "
+                    "can support an outgoing trade without becoming the next roster hole."
+                ),
+                "body_html": (
+                    f"Existing metrics mark {rooms_html} as a relative strength, so this room "
                     "can support an outgoing trade without becoming the next roster hole."
                 ),
                 "tone": "strength",
@@ -343,12 +356,20 @@ def build_construction_observations(
 
     if pressure_rooms:
         rooms = " / ".join(pressure_rooms[:2])
+        rooms_html = " / ".join(
+            football_assets.position_text_html(room) for room in pressure_rooms[:2]
+        )
         observations.append(
             {
                 "label": "Pressure point",
                 "title": f"Address {rooms} next",
+                "title_html": f"Address {rooms_html} next",
                 "body": (
                     f"Coverage is thin at {rooms}. Treat this as the next waiver add or "
+                    "trade-in posture before it becomes a weekly starter problem."
+                ),
+                "body_html": (
+                    f"Coverage is thin at {rooms_html}. Treat this as the next waiver add or "
                     "trade-in posture before it becomes a weekly starter problem."
                 ),
                 "tone": "need",
@@ -429,6 +450,14 @@ def _position_groups_items(
         if position == "TE" and te_premium:
             context_bits.append("TE Premium")
         title = position if not context_bits else f"{position} · {' · '.join(context_bits)}"
+        # Position Groups' tile value IS the position itself — color it with
+        # the same canonical --color-position-* token the position badge
+        # chip uses everywhere else (football_assets.position_badge_html),
+        # instead of flat white (coridian_: "we need to think of this in a
+        # canon way so that everything is canonically the same").
+        title_html = football_assets.position_text_html(position)
+        if context_bits:
+            title_html += " · " + " · ".join(escape(bit) for bit in context_bits)
         tone = {
             "Strength": "strength",
             "Thin": "need",
@@ -440,6 +469,7 @@ def _position_groups_items(
             {
                 "label": label,
                 "title": title,
+                "title_html": title_html,
                 "body": body,
                 "tone": tone,
             }
@@ -698,17 +728,25 @@ def render_advice_cards(advice_items: list[dict]) -> None:
             tone = " advice-card-health"
         elif "strength" in label:
             tone = " advice-card-strength"
-        elif label in {"depth", "leverage", "window"}:
+        elif label in {"depth", "leverage", "window", "future flexibility", "opportunity"}:
             tone = " advice-card-opportunity"
         glyph = workspace_ui.semantic_icon_html(label, label=item.get("label"))
+        # Position-colored room mentions (e.g. "RB / WR can absorb a send")
+        # are built by the caller as pre-escaped HTML — title_html/body_html
+        # override the plain escaped text when present so the canonical
+        # --color-position-* token shows through instead of flat white.
+        title_html = item.get("title_html")
+        title_content = title_html if title_html else escape(_safe_text(item.get("title")))
+        body_html = item.get("body_html")
+        body_content = body_html if body_html else escape(_safe_text(item.get("body")))
         cards.append(
             "<div class='advice-card dg-ui-card"
             + primary
             + tone
             + "'>"
             + f"<div class='advice-label'>{glyph}{escape(_safe_text(item.get('label')))}</div>"
-            + f"<div class='advice-title'>{escape(_safe_text(item.get('title')))}</div>"
-            + f"<div class='advice-body'>{escape(_safe_text(item.get('body')))}</div>"
+            + f"<div class='advice-title'>{title_content}</div>"
+            + f"<div class='advice-body'>{body_content}</div>"
             + "</div>"
         )
     st.markdown("<div class='advice-grid'>" + "".join(cards) + "</div>", unsafe_allow_html=True)
@@ -1027,15 +1065,24 @@ def render_my_team_workspace(
         )
         if observations:
             _canonical_header("Strength & Pressure")
+            # No forced "primary" (first-card) highlight here — these three
+            # observation types (Strength / Pressure point / Future
+            # flexibility) each carry their own semantic tone (success /
+            # warning / opportunity below), and flattening whichever one
+            # happens to land first into one generic "priority" teal would
+            # undo exactly the per-signal color differentiation this section
+            # needs (coridian_: "nothing stands out... we need to think of
+            # this in a canon way").
             render_advice_cards(
                 [
                     {
                         "label": item["label"],
                         "title": item["title"],
+                        "title_html": item.get("title_html"),
                         "body": item["body"],
-                        "primary": index == 0,
+                        "body_html": item.get("body_html"),
                     }
-                    for index, item in enumerate(observations)
+                    for item in observations
                 ]
             )
 
@@ -1358,6 +1405,12 @@ def render_my_team_workspace(
             {
                 "label": biggest_need_label,
                 "value": biggest_need_value,
+                # Canonical position color on the need itself (coridian_:
+                # "somewhere where it says running back, that should be the
+                # font color of our running back color") — falls back to
+                # plain escaped text for a non-position value like "No
+                # urgent need".
+                "value_html": football_assets.position_text_html(biggest_need_value),
                 "note": biggest_need_note,
                 "tone": "need",
             },

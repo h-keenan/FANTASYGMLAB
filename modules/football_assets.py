@@ -87,6 +87,52 @@ def position_badge_html(position: str) -> str:
     )
 
 
+# Full-name -> slug lookup for plain-text position mentions (e.g. "Biggest
+# Need: Running Back", "Address RB next"), in addition to position_slug's
+# abbreviation-only mapping used by the badge chip above. Kept separate from
+# position_slug itself so badge behavior (abbreviations only) is unchanged.
+_POSITION_TEXT_SLUGS: dict[str, str] = {
+    "QB": "qb",
+    "QUARTERBACK": "qb",
+    "RB": "rb",
+    "RUNNINGBACK": "rb",
+    "WR": "wr",
+    "WIDERECEIVER": "wr",
+    "TE": "te",
+    "TIGHTEND": "te",
+    "K": "k",
+    "KICKER": "k",
+    "DEF": "dst",
+    "DST": "dst",
+    "D/ST": "dst",
+    "DEFENSE": "dst",
+}
+
+
+def _position_text_slug(position: str) -> str:
+    label = _text(position).upper()
+    compact = label.replace(" ", "").replace("/", "")
+    return _POSITION_TEXT_SLUGS.get(label) or _POSITION_TEXT_SLUGS.get(compact, "")
+
+
+def position_text_html(position: str) -> str:
+    """Escaped, canonically colored span for a position NAME appearing as
+    plain body/headline text (not inside its own badge chip) — e.g. the
+    "Biggest Need" tile's value, or a room mention inside an advice-card
+    sentence such as "RB / WR can absorb a send". Reuses the exact same
+    --color-position-* tokens position_badge_html's badge uses. Falls back
+    to plain escaped text for anything that isn't a recognized position
+    (e.g. "No urgent need")."""
+
+    label = _text(position)
+    if not label:
+        return ""
+    slug = _position_text_slug(label)
+    if not slug:
+        return escape(label)
+    return f"<span class='dg-position-text dg-position-text--{slug}'>{escape(label)}</span>"
+
+
 def team_chip_html(team: str) -> str:
     label = _text(team).upper() or "FA"
     return (

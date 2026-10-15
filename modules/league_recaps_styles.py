@@ -115,6 +115,23 @@ LEAGUE_RECAPS_CSS = """
 .dg-recap-group--activity{color:var(--color-warning)}
 .dg-recap-group--roster{color:var(--color-accent)}
 .dg-recap-group--other{color:var(--color-text-muted)}
+/* Real per-category color on the story's own title + headline number, not
+   just the thin left border and the category label above it — coridian_
+   called the page all white or gray with nothing standing out. Reuses the
+   exact same category to token mapping the lead-story border and group
+   label above already use, not a new palette. */
+.dg-recap-story--performance .dg-recap-story-kicker h3,.dg-recap-story--performance_low .dg-recap-story-kicker h3{color:var(--color-prestige-elite)}
+.dg-recap-story--matchup .dg-recap-story-kicker h3,.dg-recap-story--matchup_close .dg-recap-story-kicker h3{color:var(--color-danger)}
+.dg-recap-story--waiver .dg-recap-story-kicker h3,.dg-recap-story--waiver_low .dg-recap-story-kicker h3{color:var(--color-success)}
+.dg-recap-story--trade .dg-recap-story-kicker h3{color:var(--color-accent)}
+.dg-recap-story--activity .dg-recap-story-kicker h3,.dg-recap-story--activity_low .dg-recap-story-kicker h3{color:var(--color-warning)}
+.dg-recap-story--roster_riser .dg-recap-story-kicker h3{color:var(--color-accent)}
+.dg-recap-story--performance .dg-recap-metric strong,.dg-recap-story--performance_low .dg-recap-metric strong{color:var(--color-prestige-elite)}
+.dg-recap-story--matchup .dg-recap-metric strong,.dg-recap-story--matchup_close .dg-recap-metric strong{color:var(--color-danger)}
+.dg-recap-story--waiver .dg-recap-metric strong,.dg-recap-story--waiver_low .dg-recap-metric strong{color:var(--color-success)}
+.dg-recap-story--trade .dg-recap-metric strong{color:var(--color-accent)}
+.dg-recap-story--activity .dg-recap-metric strong,.dg-recap-story--activity_low .dg-recap-metric strong{color:var(--color-warning)}
+.dg-recap-story--roster_riser .dg-recap-metric strong{color:var(--color-accent)}
 .dg-recap-affordance{
     color:var(--color-accent);
     font:var(--type-supporting-metadata);

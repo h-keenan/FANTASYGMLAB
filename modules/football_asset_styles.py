@@ -82,6 +82,17 @@ FOOTBALL_ASSET_CSS = """
 .dg-football-position--te{color:var(--color-position-te);border-color:color-mix(in srgb,var(--color-position-te) 58%,var(--color-border-strong))}
 .dg-football-position--k{color:var(--color-position-k);border-color:color-mix(in srgb,var(--color-position-k) 58%,var(--color-border-strong))}
 .dg-football-position--dst{color:var(--color-position-dst);border-color:color-mix(in srgb,var(--color-position-dst) 58%,var(--color-border-strong))}
+/* Plain-text position mentions (football_assets.position_text_html) — same
+   canonical --color-position-* tokens as the badge above, for a position
+   NAME surfacing as body/headline copy instead of its own badge chip
+   (e.g. My Team's Biggest Need: RB, or RB / WR can absorb a send). */
+.dg-position-text{font-weight:inherit}
+.dg-position-text--qb{color:var(--color-position-qb)}
+.dg-position-text--rb{color:var(--color-position-rb)}
+.dg-position-text--wr{color:var(--color-position-wr)}
+.dg-position-text--te{color:var(--color-position-te)}
+.dg-position-text--k{color:var(--color-position-k)}
+.dg-position-text--dst{color:var(--color-position-dst)}
 .dg-player-portrait--pos-qb,.dg-player-portrait--pos-rb,.dg-player-portrait--pos-wr,.dg-player-portrait--pos-te,.dg-player-portrait--pos-k,.dg-player-portrait--pos-dst{border-left:2px solid var(--color-border-strong)}
 .dg-player-portrait--pos-qb{border-left-color:var(--color-position-qb)}
 .dg-player-portrait--pos-rb{border-left-color:var(--color-position-rb)}
