@@ -21,12 +21,15 @@ import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
  * only ever returns waivers/my_team/trade_hub/dashboard, or an explicit
  * tile route_key — no caller sets that to "gm_plan" yet), but is listed
  * here ahead of time the same way "rankings" already was, so a future
- * tile pointed at GM Plan routes internally without a second edit here. */
+ * tile pointed at GM Plan routes internally without a second edit here.
+ * "gm_targets" (Revision 11) is listed the same way, ahead of any tile
+ * actually emitting it. */
 const INTERNAL_ROUTES: Record<string, string> = {
   trade_hub: "trade-hub",
   waivers: "waivers",
   rankings: "league-rankings",
   gm_plan: "gm-plan",
+  gm_targets: "gm-targets",
 };
 /** Backend categories are snake_case tokens (e.g. "top_priority") — title-case
  * them for display, matching Streamlit's kicker labels (Top Priority / Watch /

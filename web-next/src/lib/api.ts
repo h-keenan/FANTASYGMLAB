@@ -913,6 +913,59 @@ export interface GmPlanResponse {
   focus_areas: GmPlanFocusArea[];
 }
 
+/** League-adjusted player rankings (GET .../rankings) — mirrors mobile's
+ * RankedPlayer (mobile/src/lib/api.ts) exactly, the reference shape for
+ * this endpoint. GM Targets (Revision 11) is this app's first caller; a
+ * future Players/Player Detail page should reuse this same type rather
+ * than hand-rolling a second one. */
+export interface RankedPlayer {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  status: string | null;
+  injury_status: string | null;
+  tier: string | null;
+  score: number | null;
+  overall_rank: number | null;
+  position_rank: number | null;
+  rank_unavailable_reason: string | null;
+  opportunity_label: string | null;
+  overall_rating?: number | null;
+}
+
+export interface LeagueRankingsResponse {
+  ok: boolean;
+  players: RankedPlayer[];
+}
+
+/** A saved GM Targets watchlist row (GET/POST/DELETE/PATCH .../gm-targets) —
+ * preference data only (identity + the one user-set `untouchable` flag);
+ * name/position/team/rank are joined client-side from LeagueRankingsResponse,
+ * the same client-side-join contract mobile's GmTargetsScreen.tsx already
+ * uses against this exact pair of endpoints (no duplicate enrichment logic
+ * written here — see modules/gm_targets.py for the real source of truth). */
+export interface GmTarget {
+  player_id: string;
+  source_surface: string;
+  created_at: string | null;
+  untouchable: boolean;
+}
+
+export interface GmTargetsResponse {
+  ok: boolean;
+  targets: GmTarget[];
+}
+
+export type GmTargetMutationReason = "" | "at_cap" | "not_available" | "not_found";
+
+export interface GmTargetMutationResponse {
+  ok: boolean;
+  reason: GmTargetMutationReason;
+  cap?: number;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1011,4 +1064,28 @@ export const api = {
   // above: no leagueId param.
   getNews: (limit: number = 30) =>
     authorizedRequest<NewsResponse>(`/v1/news?limit=${limit}`),
+
+  // League-adjusted player rankings — GM Targets (Revision 11) joins this
+  // against getGmTargets' bare preference rows for name/position/team/rank/
+  // injury, the same client-side join mobile's GmTargetsScreen.tsx does.
+  getLeagueRankings: (leagueId: string, lens: string = "Dynasty", limit: number = 300) =>
+    authorizedRequest<LeagueRankingsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?lens=${encodeURIComponent(lens)}&limit=${limit}`,
+    ),
+
+  // GM Targets (Revision 11) — the GM_TOOLS watchlist. Reads/writes the
+  // exact same durable table (modules/gm_targets.py) and endpoints mobile's
+  // GmTargetsScreen.tsx already calls; no new backend logic for this page.
+  getGmTargets: (leagueId: string) =>
+    authorizedRequest<GmTargetsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`),
+  removeGmTarget: (leagueId: string, playerId: string) =>
+    authorizedRequest<GmTargetMutationResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}`,
+      { method: "DELETE" },
+    ),
+  setGmTargetUntouchable: (leagueId: string, playerId: string, untouchable: boolean) =>
+    authorizedRequest<GmTargetMutationResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}/untouchable`,
+      { method: "PATCH", jsonBody: { untouchable } },
+    ),
 };
