@@ -565,7 +565,10 @@ def build_trade_share_card(
         acquire_lines=tuple(_asset_line(asset) for asset in receive_assets),
         send_lines=tuple(_asset_line(asset) for asset in send_assets),
         context_line=(
-            f"{mine} ⇄ {partner}" if mine and partner else (f"vs {partner}" if partner else "")
+            # ↔ (not ⇄) — the canonical two-sides-of-a-trade glyph this app
+            # already uses in league_history_ui.py's dg-lh-exchange marker
+            # and trade_analyzer_ui.py's "You send ↔ You receive" label.
+            f"{mine} ↔ {partner}" if mine and partner else (f"vs {partner}" if partner else "")
         ),
         partner_name=partner,
         my_team_name=mine,
