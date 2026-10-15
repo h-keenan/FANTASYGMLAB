@@ -980,6 +980,32 @@ export interface GmTargetMutationResponse {
   cap?: number;
 }
 
+/** Team Situation (Revision 19) — a durable, user-declared GM stance:
+ * Rebuilding/Competing/Balanced (modules/team_stance.py, GET/POST
+ * .../team-stance). Mirrors mobile's TeamStance/TEAM_STANCE_OPTIONS
+ * (mobile/src/lib/api.ts) exactly, including the option copy. Unlike
+ * Streamlit's own route (app.py's "team_stance" page, which can't feed this
+ * value into its separate, pre-existing valuation override), this FastAPI
+ * endpoint's `strategy` field IS the same real input that already drives
+ * Trade Hub/GM Plan/Dashboard's age-curve and pick-value math on this data
+ * path (see _fetch_gm_stance_with_set_flag's callers in
+ * services/mobile_api_service.py) — so declaring a stance here has the same
+ * real effect it does on mobile. */
+export type TeamStance = "rebuilding" | "competing" | "balanced";
+
+export const TEAM_STANCE_OPTIONS: Array<{ value: TeamStance; label: string; description: string }> = [
+  { value: "rebuilding", label: "Rebuilding", description: "Prioritize youth and future draft capital" },
+  { value: "competing", label: "Competing", description: "Prioritize immediate roster impact" },
+  { value: "balanced", label: "Balanced", description: "Keep both current value and future flexibility" },
+];
+
+export interface TeamStanceResponse {
+  ok: boolean;
+  stance: TeamStance | "";
+  options?: TeamStance[];
+  strategy?: string;
+}
+
 /** The weekly-recency usage read (modules.rankings.recency_trend_display,
  * mirrored by mobile's UsageTrend) — only the fields Player Compare
  * (Revision 12) renders; null whenever the sample is too thin to narrate,
@@ -1507,6 +1533,15 @@ export const api = {
   // GmTargetsScreen.tsx already calls; no new backend logic for this page.
   getGmTargets: (leagueId: string) =>
     authorizedRequest<GmTargetsResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`),
+  // Team Situation (Revision 19) is the one other caller of this add path —
+  // protecting a player not yet watched adds it first (source_surface
+  // "team_stance"), same as mobile's TeamStanceScreen.tsx. GM Targets' own
+  // page still has no in-page add flow (see GmTargetsContent's docstring).
+  addGmTarget: (leagueId: string, playerId: string, sourceSurface = "gm_targets") =>
+    authorizedRequest<GmTargetMutationResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets`, {
+      method: "POST",
+      jsonBody: { player_id: playerId, source_surface: sourceSurface },
+    }),
   removeGmTarget: (leagueId: string, playerId: string) =>
     authorizedRequest<GmTargetMutationResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}`,
@@ -1517,6 +1552,15 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}/untouchable`,
       { method: "PATCH", jsonBody: { untouchable } },
     ),
+  // Team Situation (Revision 19) — GET/POST .../team-stance, the same
+  // endpoints mobile's GmStanceContext/TeamStanceScreen already call.
+  getTeamStance: (leagueId: string) =>
+    authorizedRequest<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`),
+  setTeamStance: (leagueId: string, stance: TeamStance) =>
+    authorizedRequest<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`, {
+      method: "POST",
+      jsonBody: { stance },
+    }),
 
   // Player Compare (Revision 12) — league-independent, same endpoint mobile's
   // PlayerCompareScreen calls twice (once per side) via getPlayerQuickView.
