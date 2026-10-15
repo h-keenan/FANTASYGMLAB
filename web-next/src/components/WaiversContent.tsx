@@ -446,14 +446,12 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search free agents"
-            className="px-3 py-2 text-sm flex-1 min-w-[10rem]"
-            style={{ background: "var(--color-surface-primary)", border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-primary)" }}
+            className="filter-input px-3 py-2 text-sm flex-1 min-w-[10rem]"
           />
           <select
             value={position}
             onChange={(event) => setPosition(event.target.value)}
-            className="px-3 py-2 text-sm"
-            style={{ background: "var(--color-surface-primary)", border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-primary)" }}
+            className="filter-select px-3 py-2 text-sm"
           >
             {FILTER_POSITIONS.map((pos) => (
               <option key={pos} value={pos}>

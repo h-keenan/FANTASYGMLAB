@@ -24,8 +24,10 @@ export const DESTINATION_LABELS: Record<string, string> = {
   gm_plan: "Open GM Plan",
   dashboard: "Open workflow",
   // GM Targets (Revision 11) has no in-page add flow (see GmTargetsContent's
-  // own docstring) — its empty state sends a user to add a first target the
-  // same place Streamlit's does, Players, which has no Next.js page yet.
+  // own docstring) — its empty state sends a user to add a first target.
+  // Players now has a real Next.js page (Revision 16) — see
+  // GamePlanCard.tsx's INTERNAL_ROUTES, which routes this destination there
+  // instead of here.
   players: "Open Players",
   // Trade Analyzer (Revision 15) has a real Next.js page now — see
   // GamePlanCard.tsx's INTERNAL_ROUTES, which routes this destination there

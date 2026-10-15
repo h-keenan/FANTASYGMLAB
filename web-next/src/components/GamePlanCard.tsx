@@ -25,7 +25,9 @@ import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
  * "gm_targets" (Revision 11) is listed the same way, ahead of any tile
  * actually emitting it. "trade_analyzer" (Revision 15) is too — Today's
  * Game Plan doesn't emit it today either, same as "gm_plan"/"gm_targets"
- * above. */
+ * above. "players" (Revision 16) is the same again — modules.
+ * daily_gm_briefing's `_tile_destination` doesn't emit it, but Players now
+ * has a real page too (app/players/[leagueId]). */
 const INTERNAL_ROUTES: Record<string, string> = {
   trade_hub: "trade-hub",
   waivers: "waivers",
@@ -33,6 +35,7 @@ const INTERNAL_ROUTES: Record<string, string> = {
   gm_plan: "gm-plan",
   gm_targets: "gm-targets",
   trade_analyzer: "trade-analyzer",
+  players: "players",
 };
 /** Backend categories are snake_case tokens (e.g. "top_priority") — title-case
  * them for display, matching Streamlit's kicker labels (Top Priority / Watch /
