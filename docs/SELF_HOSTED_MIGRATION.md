@@ -630,15 +630,137 @@ health checks provided, without needing to build anything custom. This is
 a reasonable follow-up once the box is live, not a blocker for the
 migration prep itself.
 
+## 9. `web-next` test-subdomain preview (additive, not a cutover)
+
+**Status: additive prep only**, same spirit as this whole document. This
+section documents a new, separate `web-next` container (the Next.js
+frontend, `web-next/`) reachable at its own brand-new test subdomain —
+`{$WEB_NEXT_DOMAIN}` (default `next.fantasygmlab.com`, see `.env.example`).
+It does **not** change what `{$APP_DOMAIN}` (production, Streamlit)
+serves. Making web-next the thing `APP_DOMAIN` actually points to is a
+separate, deliberate, later decision — not part of this change, and not
+something this section's manual steps accomplish.
+
+Why this exists: `web-next/` is already fully built and tested (21
+revisions merged, CI green) but has never been reachable anywhere except a
+contributor's own `npm run dev` — this gives it a real, public,
+TLS-covered URL to smoke-test against the real production `mobile-api`,
+without touching anything already live.
+
+### What changed in this repo
+
+- `web-next/Dockerfile` — new, Node 22 multi-stage build (deps → builder →
+  prod-deps → runtime), mirroring the root `Dockerfile`'s builder/runtime
+  split. See its own header comment for the full reasoning, especially the
+  **NEXT_PUBLIC_* build-time vs. runtime** distinction below.
+- `docker-compose.yml` — new `web-next` service, built from
+  `web-next/Dockerfile` with `context: .` (repo root, so the Dockerfile can
+  `COPY web-next/...`), `mem_limit: 1g` / `cpus: 1.0` (see the service's
+  own comment for sizing reasoning), healthcheck on `/`, and `caddy` now
+  also waits on `web-next`'s healthcheck before proxying (added to
+  `caddy`'s `depends_on`).
+- `Caddyfile` — new `{$WEB_NEXT_DOMAIN} { reverse_proxy web-next:8080 }`
+  block. The existing `{$APP_DOMAIN}` block is untouched.
+- `.env.example` — new `WEB_NEXT_DOMAIN` (domain section) and a new
+  `web-next (Next.js frontend)` section with the four `NEXT_PUBLIC_*`
+  placeholders.
+
+### IMPORTANT: `NEXT_PUBLIC_*` is build-time, not runtime
+
+Unlike every other service in this stack, `web-next`'s four
+`NEXT_PUBLIC_*` variables are **not** read by the running container at
+all — Next.js statically inlines `process.env.NEXT_PUBLIC_*` into the
+client JS bundle during `next build` (see `web-next/src/lib/env.ts`).
+`docker-compose.yml` wires them in as Dockerfile **build args**
+(`build.args`, interpolated by Compose from `.env` — the same mechanism
+already used for `DYNASTYGM_BUILD`/`DYNASTYGM_DEPLOYED_AT` on the `web`/
+`mobile-api` services), not as `environment:`/`env_file:` runtime values.
+**Changing one of these four values requires `docker compose build
+web-next` (or a full rebuild), not just a container restart or an `.env`
+edit** — a plain `docker compose up -d` after only editing `.env` will
+keep serving the old baked-in value.
+
+`NEXT_PUBLIC_API_BASE_URL` specifically must be the real public
+`https://api.fantasygmlab.com` (i.e. `MOBILE_API_DOMAIN`'s value), **not**
+an internal Docker hostname like `http://mobile-api:8080`: every page in
+`web-next` is a client component (`"use client"`) that calls the API from
+a `useEffect` in the end user's own browser (`src/lib/api.ts`'s
+`authorizedRequest`), never from inside this container — confirmed by
+reading every `src/app/**/page.tsx`, all of which are `"use client"` and
+call `api.*` after mount. An internal service name would not resolve from
+a browser outside the Docker network even if it were set. This is also
+why `web-next` has no `depends_on: mobile-api` in `docker-compose.yml`:
+there is no runtime dependency between the two containers, only a
+build-time value baked into the bundle.
+
+### Known gap: the real production Caddyfile is generated, not this file
+
+Section 5.7 above is the important caveat here: production's actual,
+authoritative Caddy config is regenerated server-side by
+`/usr/local/bin/fantasygmlab-sync-caddy` (Cloudflare-Tunnel-adapted;
+written to `/opt/fantasygmlab/.runtime/Caddyfile`), **not** a direct copy
+of this repo's checked-in `Caddyfile`. Whether that generator picks up a
+brand-new route block like this one automatically, or needs its own
+update (a change to a script that lives on the box, not in this repo), is
+unverified from here — flagged explicitly in the manual steps below.
+
+### Manual steps required (human with SSH access to the box)
+
+None of the following can be done from this repo/PR — no secrets, DNS
+credentials, or box access are available here:
+
+1. **Fill in the four real `NEXT_PUBLIC_*` values** (and `WEB_NEXT_DOMAIN`
+   if the default `next.fantasygmlab.com` isn't wanted) in the box's real
+   `/opt/fantasygmlab/.env`, copying `.env.example`'s new section.
+2. **Confirm Cloudflare DNS** has an A/CNAME record for `WEB_NEXT_DOMAIN`
+   (e.g. `next.fantasygmlab.com`) pointed at this box, the same way
+   `APP_DOMAIN`/`MOBILE_API_DOMAIN`/etc. already are — this repo/PR has no
+   Cloudflare credentials and makes no DNS change.
+3. **Confirm whether `fantasygmlab-sync-caddy` needs its own update** to
+   emit a route for `WEB_NEXT_DOMAIN` — read that script on the box before
+   assuming this PR's `Caddyfile` change alone is sufficient; it may need
+   a matching edit there too (see "Known gap" above).
+4. **Rebuild the image with the new build args actually populated**:
+   `docker compose build web-next` (a plain `docker compose up -d` without
+   a preceding build will not pick up real `NEXT_PUBLIC_*` values the
+   first time this service exists).
+5. **Bring the service up and verify health**: `docker compose up -d` /
+   `docker compose ps --format 'table {{.Name}}\t{{.Status}}'` — confirm
+   `web-next` and `caddy` both report healthy.
+6. **Confirm autopull actually applies this**: either wait for
+   `fantasygmlab-autopull.timer`'s next ~2-minute cycle after this PR
+   merges to `main` (`systemctl status fantasygmlab-autopull.timer` to
+   confirm it's active), or manually run section 5.5's redeploy steps —
+   either way, step 1-3 above (the real `.env` values, DNS, and the
+   sync-caddy question) must already be done, or the new container/route
+   will come up with placeholder/empty build args and no way to actually
+   resolve.
+7. **Verify from outside**: `curl -I https://next.fantasygmlab.com/` (or
+   whatever `WEB_NEXT_DOMAIN` was set to) once DNS has propagated —
+   expect a valid cert and a 200 from the Next.js app's landing page.
+
+### Explicitly out of scope here
+
+- The actual `{$APP_DOMAIN}` cutover — making web-next the thing
+  production's real domain points to instead of Streamlit's `web` — is a
+  separate, deliberate, later decision. Nothing in this section performs
+  or prepares for that cutover beyond proving web-next can run
+  successfully on this box.
+- No Render changes (this box's deploy is independent of `render.yaml`,
+  which remains legacy/historical per this repo's current state).
+- No DNS or secret changes were made by this PR — see the manual steps
+  above.
+
 ## Appendix: file inventory
 
 | File | Purpose |
 |---|---|
 | `Dockerfile` | Multi-stage build (builder installs deps into a venv; runtime stage is a slim Python image + app code). One shared image for all four real services — see the Dockerfile's own header comment for the reasoning. |
 | `.dockerignore` | Keeps the build context to only what the Python services need (excludes `mobile/`, `tests/`, `docs/`, dev/editor state, secrets). |
-| `docker-compose.yml` | Orchestrates `web`, `mobile-api`, `redis`, `stripe-webhook`, `revenuecat-webhook`, and `caddy`; healthchecks on each app service's existing `/health`/`/_stcore/health` endpoint (and `redis-cli ping` for `redis`); `mobile-api` depends on `redis` reporting healthy before it starts, and `caddy` waits on all four app services' healthchecks (`depends_on: condition: service_healthy`) before proxying; `restart: unless-stopped` everywhere; secrets only via `.env`; sets `DYNASTYGM_SELF_HOSTED=1` on every app service (see section 3). |
-| `Caddyfile` | Reverse proxy + automatic HTTPS routing per placeholder subdomain, plus static `file_server` for the marketing site. Also handles response compression (`encode zstd gzip` on `web`/`mobile-api`/the marketing site, skipped on the two webhook endpoints) and `Cache-Control` headers on the marketing site's static assets (images/fonts get `max-age=86400`, CSS/JS get `max-age=3600`, both `must-revalidate` since those files aren't content-hashed; HTML/`robots.txt`/`sitemap.xml` get no explicit cache header). |
+| `docker-compose.yml` | Orchestrates `web`, `mobile-api`, `redis`, `stripe-webhook`, `revenuecat-webhook`, `web-next` (additive test-subdomain preview — section 9), and `caddy`; healthchecks on each app service's existing `/health`/`/_stcore/health`/`/` endpoint (and `redis-cli ping` for `redis`); `mobile-api` depends on `redis` reporting healthy before it starts, and `caddy` waits on all five app services' healthchecks (`depends_on: condition: service_healthy`) before proxying; `restart: unless-stopped` everywhere; secrets only via `.env`; sets `DYNASTYGM_SELF_HOSTED=1` on every Python app service (see section 3). |
+| `Caddyfile` | Reverse proxy + automatic HTTPS routing per placeholder subdomain (including `web-next`'s additive `{$WEB_NEXT_DOMAIN}` test subdomain — section 9), plus static `file_server` for the marketing site. Also handles response compression (`encode zstd gzip` on `web`/`mobile-api`/`web-next`/the marketing site, skipped on the two webhook endpoints) and `Cache-Control` headers on the marketing site's static assets (images/fonts get `max-age=86400`, CSS/JS get `max-age=3600`, both `must-revalidate` since those files aren't content-hashed; HTML/`robots.txt`/`sitemap.xml` get no explicit cache header). |
 | `.env.example` | Every required secret/variable name, matching `render.yaml`'s names exactly, with a comment on which Render service/dashboard it comes from. Copy to `.env` (gitignored) and fill in real values. |
 | `deploy/systemd/fantasygmlab.service` | systemd unit so the stack starts on boot and stops cleanly on `systemctl stop`. |
 | `deploy/release_deploy.sh` | Forced-command redeploy script for the scoped second-operator SSH key — see section 5.6. Legacy/manual-only: `fantasygmlab-autopull.timer` (section 5.7) is the real auto-deploy path now. |
+| `web-next/Dockerfile` | Separate Node 22 multi-stage build for the Next.js frontend (deps → builder → prod-deps → runtime) — see section 9. |
 | `docs/SELF_HOSTED_MIGRATION.md` | This runbook. |

@@ -78,6 +78,14 @@
 # ships to the actual box, even though the values themselves are
 # deliberately conservative (safe headroom, not tight enough to cause
 # normal-load throttling) given the stated 6c/12t spec.
+#
+# `web-next` (below, added after the above budget was last signed off) is
+# NOT counted in that ~13.5GB/~8.75-CPU total — it's an additive,
+# test-subdomain-only preview service, not part of the production traffic
+# path (see its own service comment and docs/SELF_HOSTED_MIGRATION.md).
+# Its 1g/1.0 is sized independently against the box's existing headroom
+# (~2.5GB/~3.25 threads); re-run the whole-stack sizing math above if/when
+# web-next becomes the real production frontend.
 
 services:
   web:
@@ -327,6 +335,71 @@ services:
     networks:
       - internal
 
+  # web-next: additive, test-subdomain-only preview of the Next.js frontend
+  # (see docs/SELF_HOSTED_MIGRATION.md's "web-next test-subdomain preview"
+  # section). Routed from a brand-new {$WEB_NEXT_DOMAIN} in the Caddyfile,
+  # NOT from {$APP_DOMAIN} — Streamlit's `web` service keeps serving the
+  # real production domain untouched. This is purely a parallel, reachable
+  # preview so the already-merged, already-tested web-next frontend can be
+  # smoke-tested against the real production mobile-api before any actual
+  # cutover decision is made.
+  web-next:
+    build:
+      context: .
+      dockerfile: web-next/Dockerfile
+      # Baked into the client JS bundle at build time, not read at runtime
+      # — see web-next/Dockerfile's header comment. Compose interpolates
+      # these ${VAR} references from `.env` the same way it already does
+      # for DYNASTYGM_BUILD/DYNASTYGM_DEPLOYED_AT above, and forwards them
+      # as Dockerfile ARGs into the image build.
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+        NEXT_PUBLIC_STREAMLIT_BASE_URL: ${NEXT_PUBLIC_STREAMLIT_BASE_URL:-}
+    image: fantasygmlab-web-next:latest
+    # No "sh -c"/doubled "$$PORT" trick needed here (unlike the Python
+    # services above) — `next start` reads PORT directly from its process
+    # environment, it isn't passed as a shell-expanded CLI flag.
+    command: ["npm", "run", "start"]
+    environment:
+      PORT: "8080"
+    env_file:
+      - .env
+    # web-next calls services/mobile_api_service.py entirely from the
+    # USER'S BROWSER, not from this container: every page is a client
+    # component (`"use client"`) that calls src/lib/api.ts's
+    # authorizedRequest from a useEffect, reading NEXT_PUBLIC_API_BASE_URL
+    # — which is itself baked into the browser bundle at build time (see
+    # build.args above), not resolved at request time. So this container
+    # never makes a server-side call to `mobile-api`, and an internal
+    # Docker-network hostname (e.g. http://mobile-api:8080) would not be
+    # reachable from the browser anyway — NEXT_PUBLIC_API_BASE_URL must be
+    # the real public https://api.fantasygmlab.com, same as any other
+    # browser client of that API. That's also why there's no
+    # `depends_on: mobile-api` below: this service has no runtime
+    # dependency on it, only a build-time one baked into the bundle.
+    #
+    # A Next.js SSR server for this app is much lighter than the Python
+    # services: no pandas/Monte Carlo work, no warmed player-table cache,
+    # and a single `next start` process serves every request statelessly
+    # (no per-session in-process state the way Streamlit's `st.session_state`
+    # has — auth session state lives in the browser via Supabase, not here).
+    # 1g/1.0 is deliberately modest headroom for Node's baseline footprint
+    # plus concurrent SSR request handling, not sized against any real
+    # measured load yet (there is none — this is a test-subdomain preview).
+    mem_limit: 1g
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - internal
+
   caddy:
     image: caddy:2-alpine
     env_file:
@@ -363,6 +436,8 @@ services:
       stripe-webhook:
         condition: service_healthy
       revenuecat-webhook:
+        condition: service_healthy
+      web-next:
         condition: service_healthy
     networks:
       - internal
