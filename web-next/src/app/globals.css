@@ -186,6 +186,16 @@
   --type-body-explanation-size: var(--font-size-body);
   --type-badge-size: var(--font-size-badge);
   --type-section-title: var(--font-weight-display) var(--type-section-title-size) / var(--line-height-title) var(--font-family-sans);
+  /* Composite shorthands for --type-primary-metric-size/--type-supporting-
+     metadata-size, ported verbatim from modules/design_tokens.py (the same
+     fix PR #1077 applied to --font-page-title/--font-card-title/
+     --type-section-title: the size-only token existed but the `font:
+     var(--...)` shorthand callers actually use did not, so it silently fell
+     back to default styling). SnapshotTile.tsx references
+     --type-primary-metric already; this page's hero adds the first
+     --type-supporting-metadata use. */
+  --type-primary-metric: var(--font-weight-display) var(--type-primary-metric-size) / var(--line-height-title) var(--font-family-sans);
+  --type-supporting-metadata: var(--font-weight-metadata) var(--type-supporting-metadata-size) / var(--line-height-caption) var(--font-family-sans);
 
   /* Focus, controls, motion */
   --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);

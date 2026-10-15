@@ -419,6 +419,138 @@ export interface WaiversResponse {
   reason: string;
 }
 
+/** This week's per-game projection (modules.player_projections.
+ * project_player_week, trimmed server-side by _projection_summary_dict) —
+ * mirrors mobile's PlayerWeekProjection (mobile/src/lib/api.ts), the
+ * reference implementation for every endpoint that surfaces one. The
+ * server deliberately omits `basis` (recency-weighted internals) before
+ * this ever reaches a client, so this type only declares the fields that
+ * are actually ever present on the wire. */
+export interface PlayerWeekProjection {
+  status:
+    | "ok"
+    | "bye_week"
+    | "no_opponent"
+    | "no_schedule_data"
+    | "insufficient_player_data"
+    | "unsupported_position"
+    | "unknown_player"
+    | "no_team";
+  point_estimate: number | null;
+  low: number | null;
+  high: number | null;
+  confidence: "low" | "medium" | "high" | null;
+  opponent: string | null;
+}
+
+/**
+ * A suggested starter on the weekly Matchup page — mirrors mobile's
+ * MatchupStarter (mobile/src/lib/api.ts). `score` is the same season-long
+ * value/opportunity signal the rest of the app uses, deliberately NOT a
+ * weekly points projection (see SEASON_VALUE_BASIS_LABEL in
+ * services/mobile_api_service.py) — `why` explains the suggestion in those
+ * same season-form terms only.
+ */
+export interface MatchupStarter extends LineupPlayer {
+  why: string;
+}
+
+/**
+ * A player Sleeper reports as ACTUALLY starting this week for this roster —
+ * real data, not a recommendation. Mirrors mobile's MatchupRealStarter.
+ * `score` is still the season-value signal (identity/context only);
+ * `actual_points` is this starter's real point total scored so far this
+ * week (live during in-progress games, final once the week completes).
+ */
+export interface MatchupRealStarter {
+  player_id: string;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  status: string | null;
+  injury_status: string | null;
+  injury_label: string;
+  tier: string | null;
+  score: number | null;
+  opportunity_label: string | null;
+  overall_rating: number | null;
+  actual_points: number | null;
+  projection: PlayerWeekProjection | null;
+  /** Whether THIS player's own NFL game has actually kicked off this week —
+   * distinct from `MatchupSide.has_live_data`, which only means Sleeper has
+   * locked the week's starters. A starter whose game hasn't started yet
+   * still reports `actual_points === 0`, which is NOT a real score — gate
+   * on this, never on `actual_points`, before treating 0 as genuine. Null
+   * when the signal isn't available (no resolvable team, bye, schedule
+   * fetch hiccup) — treat as unknown, never as "started". */
+  game_started: boolean | null;
+}
+
+export interface MatchupSide {
+  roster_id: string;
+  team_name: string;
+  owner_name: string | null;
+  avatar_url: string | null;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  starters: MatchupStarter[];
+  /** Sum of this side's suggested starters' season-value scores. Not points. */
+  season_value_total: number;
+  starters_basis: "suggested_optimal_lineup";
+  /** This roster's ACTUAL current-week lineup, straight from Sleeper's own
+   * matchup payload — may differ from `starters` above. Empty when
+   * `has_live_data` is false. */
+  real_starters: MatchupRealStarter[];
+  /** This roster's real point total for the week. Null when `has_live_data`
+   * is false. */
+  real_points: number | null;
+  /** False when Sleeper hasn't populated a real lineup for this roster yet
+   * this week (matchup not started / not locked). Render `real_starters`/
+   * `real_points` ONLY when this is true — otherwise they're empty/null by
+   * design, not a real 0. */
+  has_live_data: boolean;
+  real_starters_basis: "sleeper_actual_lineup";
+}
+
+export interface MatchupComparison {
+  my_season_value: number;
+  opponent_season_value: number;
+  margin: number;
+  edge: "you" | "opponent" | "even";
+  headline: string;
+  basis: "season_value";
+  basis_label: string;
+}
+
+/** This week's REAL score comparison, from Sleeper's own live points. Null
+ * until both sides have `has_live_data`. */
+export interface MatchupRealComparison {
+  my_points: number;
+  opponent_points: number;
+  margin: number;
+  edge: "you" | "opponent" | "even";
+  basis: "sleeper_actual_lineup";
+  basis_label: string;
+}
+
+export interface MatchupResponse {
+  ok: boolean;
+  /** Sleeper's current week (league settings.leg) — null when the league
+   * hasn't started one. */
+  week: number | null;
+  my_team: MatchupSide | null;
+  opponent: MatchupSide | null;
+  comparison: MatchupComparison | null;
+  /** Real current-week score comparison — null when either side lacks live
+   * data yet. */
+  real_comparison: MatchupRealComparison | null;
+  basis: "season_value";
+  basis_label: string;
+  reason: string;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -478,5 +610,10 @@ export const api = {
   getLeagueWaivers: (leagueId: string, lens: string = "Dynasty", limit: number = 150) =>
     authorizedRequest<WaiversResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/waivers?lens=${encodeURIComponent(lens)}&limit=${limit}`,
+    ),
+
+  getLeagueMatchup: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<MatchupResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/matchup?lens=${encodeURIComponent(lens)}`,
     ),
 };
