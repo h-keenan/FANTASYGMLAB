@@ -262,6 +262,79 @@ export interface TeamRankingsResponse {
   reason: string;
 }
 
+/** One give/get asset inside a trade idea's package — mirrors mobile's
+ * PresentationAsset (mobile/src/lib/api.ts), the same
+ * modules.compact_fantasy_assets.presentation_asset shape GET .../trade-hub
+ * already serializes. Only the fields the Trade Hub card actually renders
+ * are declared here; the picker/valuation-detail fields mobile's
+ * PickDetailScreen reads are left off since web-next has no pick-detail
+ * screen yet. */
+export interface TradeAsset {
+  asset_type: "player" | "pick";
+  player_id?: string;
+  name?: string;
+  position?: string;
+  team?: string;
+  age?: number | null;
+  score?: number | null;
+  role?: string;
+  injury_status?: string;
+  tier?: string;
+  overall_rating?: number | null;
+  label?: string;
+  season?: string;
+  round?: string;
+  pick_no?: number;
+  projected_range?: string;
+  owner_team_name?: string;
+}
+
+export interface TradePackage {
+  send: TradeAsset[];
+  receive: TradeAsset[];
+  value_edge: string;
+  confidence: string;
+}
+
+/** One trade-idea card — mirrors mobile's TradeIdea (mobile/src/lib/api.ts),
+ * the same modules.trade_hub_engine.TradeIdeaCard.to_dict() shape
+ * GET .../trade-hub returns for both mobile and web. `send_score`/
+ * `receive_score` are the real, untruncated per-side totals (added in
+ * Revision 3 for this page's lean bar — see that endpoint's docstring). */
+export interface TradeIdea {
+  partner_team_name: string;
+  partner_team_avatar_url?: string | null;
+  partner_team_archetype_label?: string;
+  partner_trade_tendency?: string;
+  rationale: string;
+  trade_gain: number;
+  confidence_label: string;
+  market_realism_label: string;
+  reasoning_tags: string[];
+  package: TradePackage;
+  category: string;
+  value_edge_band: string;
+  impact_tag: string;
+  landed_gm_target_player_ids: string[];
+  send_score: number;
+  receive_score: number;
+}
+
+export interface TradeHubEntitlement {
+  is_premium: boolean;
+  approved_count: number;
+  visible_count: number;
+  hidden_count: number;
+  free_limit: number;
+}
+
+export interface TradeHubResponse {
+  ok: boolean;
+  ideas: TradeIdea[];
+  reason: string;
+  entitlement: TradeHubEntitlement | null;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -308,5 +381,13 @@ export const api = {
   getTeamRankings: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<TeamRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-rankings?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  // strategy/lens default to the same "retool"/"Dynasty" GET .../trade-hub
+  // itself defaults to. `ad_unlocks` is a mobile-only reward mechanic (see
+  // that endpoint's docstring) — web always passes 0.
+  getTradeHub: (leagueId: string, strategy: string = "retool", lens: string = "Dynasty") =>
+    authorizedRequest<TradeHubResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
     ),
 };

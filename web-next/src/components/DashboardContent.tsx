@@ -22,13 +22,12 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
  * a fixture, without needing to mock Supabase auth/fetch.
  */
 
-// "My Team" now has a real Next.js page (see app/my-team/[leagueId]) and is
-// rendered separately below as an internal <Link> instead of a Streamlit
-// deep link — every other destination here is still Streamlit-only for
-// this revision.
+// "My Team" and "Trade Hub" now have real Next.js pages (see
+// app/my-team/[leagueId] and app/trade-hub/[leagueId]) and are rendered
+// separately below as internal <Link>s instead of Streamlit deep links —
+// every other destination here is still Streamlit-only for this revision.
 const QUICK_ACTIONS: { label: string; destination: string }[] = [
   { label: "League Overview", destination: "rankings" },
-  { label: "Trade Hub", destination: "trade_hub" },
   { label: "Waivers", destination: "waivers" },
   { label: "Draft Center", destination: "draft_summary" },
   { label: "GM Plan", destination: "gm_plan" },
@@ -71,7 +70,12 @@ export function DashboardContent({
         ) : (
           <div className="flex flex-col gap-3">
             {data.items.map((item) => (
-              <GamePlanCard key={item.recommendation_id || item.headline} item={item} />
+              <GamePlanCard
+                key={item.recommendation_id || item.headline}
+                item={item}
+                leagueId={leagueId}
+                leagueName={leagueName}
+              />
             ))}
           </div>
         )}
@@ -133,6 +137,18 @@ export function DashboardContent({
             }}
           >
             My Team
+            <span style={{ color: "var(--color-accent)" }}>→</span>
+          </Link>
+          <Link
+            href={`/trade-hub/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
+            className="px-4 py-3 text-sm font-bold flex items-center justify-between"
+            style={{
+              background: "var(--color-surface-secondary)",
+              border: "var(--border-width-default) solid var(--color-border)",
+              color: "var(--color-text-primary)",
+            }}
+          >
+            Trade Hub
             <span style={{ color: "var(--color-accent)" }}>→</span>
           </Link>
           {QUICK_ACTIONS.map((action) => (

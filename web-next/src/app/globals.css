@@ -400,6 +400,57 @@ a {
 .value-ring--high {
   --value-ring-tone: var(--color-success);
 }
+/* Smaller variant — Trade Hub's confidence/realism rings sit inline next to
+   each other on a trade card, not alone in a Team Snapshot header. */
+.value-ring--sm {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+.value-ring--sm::after {
+  inset: 0.3rem;
+}
+.value-ring--sm .value-ring-value {
+  font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Trade Hub lean bar — ports modules/trade_visual_language.py's           */
+/* value_edge_lean_bar_html: a center-anchored "who has the edge" bar,     */
+/* fill growing outward from the midpoint tick toward whichever side has   */
+/* the value edge. Shape reinforcement of the value-change number directly */
+/* above it, same polarity/color story, never a competing signal.          */
+/* ---------------------------------------------------------------------- */
+.lean-bar-track {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+  overflow: hidden;
+}
+.lean-bar-tick {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 1;
+  width: 2px;
+  height: 100%;
+  background: var(--color-text-muted);
+  transform: translateX(-50%);
+}
+.lean-bar-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+.lean-bar-fill--pos {
+  left: 50%;
+  background: var(--color-success);
+}
+.lean-bar-fill--neg {
+  right: 50%;
+  background: var(--color-danger);
+}
 
 /* Tone-colored tiles/cards for Roster Signals, Strength and Pressure, and
    Position Groups all use this one small tone vocabulary (reuses the same
