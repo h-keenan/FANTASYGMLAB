@@ -62,12 +62,20 @@ def test_floating_controls_yield_to_every_blocking_mobile_surface():
 
 
 def test_reduced_motion_is_application_wide_without_disabling_zoom():
-    styles = source("modules/ux_polish_styles.py")
+    # The reduced-motion block used to be duplicated byte-for-byte in both
+    # ux_polish_styles.py (FOUNDER_BETA_UX_CSS) and visual_identity_styles.py
+    # (COMMAND_CENTER_CSS) — every real injection site loads both files
+    # together (app.py, scripts/dashboard_visual_harness.py,
+    # scripts/post_367_header_harness.py), so the copy was pure dead weight
+    # and was removed from ux_polish_styles.py (round 3 dead-CSS audit); the
+    # application-wide behavior this test cares about is unchanged.
+    styles = source("modules/visual_identity_styles.py")
     reduced = styles.split("@media (prefers-reduced-motion: reduce)", 1)[1]
     assert "*::before" in reduced
     assert "animation-duration: 0.01ms !important" in reduced
     assert "transition-duration: 0.01ms !important" in reduced
     assert "scroll-behavior: auto !important" in reduced
+    assert "@media (prefers-reduced-motion: reduce)" not in source("modules/ux_polish_styles.py")
 
 
 def test_shared_player_presentation_remains_authoritative():

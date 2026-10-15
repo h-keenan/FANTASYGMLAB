@@ -13,10 +13,13 @@ div[class*="st-key-dg_cta_primary_"] [data-testid="stButton"] button{background:
 div[class*="st-key-dg_cta_secondary_"] [data-testid="stButton"] button{background:var(--surface-interactive)!important;border:var(--border-width-default) solid var(--border-standard)!important;color:var(--text-secondary)!important}
 div[class*="st-key-dg_cta_tertiary_"] [data-testid="stButton"] button{background:transparent!important;border:0!important;border-block-end:var(--border-width-default) solid var(--border-standard)!important;color:var(--text-secondary)!important}
 div[class*="st-key-dg_cta_destructive_"] [data-testid="stButton"] button{background:var(--color-danger-soft)!important;border:var(--border-width-default) solid var(--color-danger)!important;color:var(--text-primary)!important}
-/* Cards */
-.dg-ui-card,.dg-card-standard,.home-command-card,.summary-tile,.trade-summary-card,.explorer-pick-card{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);box-shadow:var(--shadow-none)}
-.dg-card-raised,.home-command-card-primary,.home-command-card-wide{background:var(--surface-raised);border-color:var(--border-strong)}
-.dg-card-quiet,.dg-what-changed-quiet,.dg-daily-briefing-quiet,.dashboard-clear-state,.dg-gm-targets-quiet{background:var(--surface-1);border:var(--border-width-default) solid var(--border-subtle);border-radius:var(--radius-panel)}
+/* Cards. dg-card-standard/-raised/-quiet (an earlier generic-name alias
+   family for these same three roles) never shipped on any real card — only
+   the page-specific class names below ever render — so they were dropped
+   from these groups rather than kept as unreachable aliases. */
+.dg-ui-card,.home-command-card,.summary-tile,.trade-summary-card,.explorer-pick-card{background:var(--surface-1);border:var(--border-width-default) solid var(--border-standard);border-radius:var(--radius-panel);box-shadow:var(--shadow-none)}
+.home-command-card-primary,.home-command-card-wide{background:var(--surface-raised);border-color:var(--border-strong)}
+.dg-what-changed-quiet,.dg-daily-briefing-quiet,.dashboard-clear-state,.dg-gm-targets-quiet{background:var(--surface-1);border:var(--border-width-default) solid var(--border-subtle);border-radius:var(--radius-panel)}
 /* Disclosure */
 div[data-testid="stExpander"]{background:var(--surface-1)!important;border:var(--border-width-default) solid var(--border-standard)!important;border-radius:var(--radius-panel)!important;margin-block:0 var(--space-sm)!important;overflow:hidden;padding:0!important}
 div[data-testid="stExpander"] summary,div[data-testid="stExpander"] [data-testid="stExpanderDetails"]{border-radius:var(--radius-none)!important}

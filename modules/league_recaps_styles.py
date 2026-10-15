@@ -226,11 +226,11 @@ LEAGUE_RECAPS_CSS = """
 }
 .dg-recap-grade{color:var(--color-text-secondary)}
 .dg-tx-grade{display:inline-flex;font:var(--font-card-title);letter-spacing:.04em}
-.dg-tx-grade--success{color:var(--color-success)}
-.dg-tx-grade--positive,.dg-tx-grade--accent{color:var(--color-information)}
-.dg-tx-grade--neutral{color:var(--color-text-secondary)}
-.dg-tx-grade--warning,.dg-tx-grade--risk{color:var(--color-warning)}
-.dg-tx-grade--pending{color:var(--color-text-muted)}
+/* .dg-tx-grade--{success,positive,accent,neutral,warning,risk,pending} tone
+   variants live in league_history_styles.py only now — render_league_recaps_page
+   always calls league_history_ui.render_league_history_section, which injects
+   LEAGUE_HISTORY_CSS alongside this file on every real render, so the identical
+   copy that used to live here was pure dead weight. */
 @media (min-width:1024px){
     .dg-recap-edition,.dg-recap-section{max-width:none}
 }

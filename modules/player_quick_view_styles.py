@@ -121,18 +121,18 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .pqv-stat-percentile--low .pqv-stat-percentile-bar>span{background:var(--color-danger)}
 .pqv-stat-percentile--mid .pqv-stat-percentile-bar>span{background:var(--color-action)}
 .pqv-stat-percentile--high .pqv-stat-percentile-bar>span{background:var(--color-success)}
-.player-dossier-rank-cell strong.pqv-ovr--low{color:var(--color-danger)}
-.player-dossier-rank-cell strong.pqv-ovr--mid{color:var(--color-action)}
-.player-dossier-rank-cell strong.pqv-ovr--high{color:var(--color-success)}
 /* Overall-rating gauge ring — the headline 0-99 rating gets the same
    conic-gradient ring treatment the mobile app gives it (CircularProgressRing
    around "N OVR" in PlayerHero.tsx) instead of a plain colored number.
    Pattern copied from modules/trade_visual_language.py's .tvl-conf-ring
    (same conic-gradient + punched-out center technique, different metric)
    rather than inventing a new gauge mechanism. Band color keyed off the
-   same --color-danger/--color-action/--color-success tokens pqv-ovr--low/
-   mid/high above already use, so the ring's color always matches what the
-   plain-text band would have shown. */
+   same --color-danger/--color-action/--color-success tokens the ring
+   variants below use. The plain-text rank-strip band classes this comment
+   used to describe (.pqv-ovr--low/mid/high on .player-dossier-rank-cell
+   strong) never actually render — the rank-strip cell loop's tone_class
+   slot is always an empty string — and were removed as dead CSS; the ring
+   below is the only overall-rating band treatment that ships. */
 .pqv-ovr-ring{--pqv-ovr-tone:var(--color-action);align-items:center;background:conic-gradient(var(--pqv-ovr-tone) calc(var(--pqv-ovr-pct,0) * 1%),var(--color-border) 0);border-radius:50%;display:grid;height:3.25rem;place-items:center;position:relative;width:3.25rem}
 .pqv-ovr-ring::after{background:var(--surface-1);border-radius:50%;content:'';inset:.4rem;position:absolute}
 .pqv-ovr-ring-value{color:var(--pqv-ovr-tone);font-size:var(--font-size-body);font-weight:var(--font-weight-display);font-variant-numeric:tabular-nums;position:relative;z-index:1}
@@ -146,9 +146,9 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
    reuses the same accent-bordered-paragraph convention .pqv-decision-panel/
    .pqv-why-factor already use elsewhere on this screen; the chips reuse the
    exact same low/mid/high danger/action/success tone tokens the OVR ring
-   (.pqv-ovr-ring--{band}) and rank-strip text (.pqv-ovr--{band}) already use,
-   and the same pill shape .pqv-signal-badge/.pqv-hero-tier--solid already
-   use — no new color scheme or shape introduced for this. */
+   (.pqv-ovr-ring--{band}) already uses, and the same pill shape
+   .pqv-signal-badge/.pqv-hero-tier--solid already use — no new color scheme
+   or shape introduced for this. */
 .pqv-decision-fit{border-left:var(--border-width-semantic) solid var(--color-information);margin:0 0 var(--space-sm);padding-left:var(--space-md)}
 .pqv-decision-fit .player-dossier-section-heading{padding:0 0 var(--space-2xs)}
 .pqv-decision-fit-text{color:var(--color-text-secondary);font-size:var(--font-size-body);line-height:var(--line-height-body);margin:0;overflow-wrap:anywhere}

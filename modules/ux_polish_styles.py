@@ -185,9 +185,7 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
     }
 
     .home-command-card-note,
-    .summary-tile-note,
-    .live-draft-rec-reason,
-    .live-rank-reason {
+    .summary-tile-note {
         font-size: var(--dg-ux-small-type) !important;
         line-height: var(--line-height-caption) !important;
     }
@@ -197,8 +195,6 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
     .trade-side-header,
     .trade-asset-meta,
     .trade-card-value-strip,
-    .live-rank-meta,
-    .live-rank-score small,
     .summary-tile-note,
     .player-support-chip,
     .dg-status-badge,
@@ -227,16 +223,10 @@ body:has(.league-actions-sheet-marker) div[data-testid="stPopoverContent"] {
         display: none !important;
     }
 }
-
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-    }
-}
+/* The prefers-reduced-motion block that used to live here was byte-identical
+   to visual_identity_styles.py's COMMAND_CENTER_CSS copy, and APP_CSS always
+   injects both this file and COMMAND_CENTER_CSS together on every page load —
+   kept the one in visual_identity_styles.py since test_visual_identity.py
+   pins it there. */
 </style>
 """

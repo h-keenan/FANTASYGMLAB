@@ -5434,8 +5434,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         border-radius: 2px !important;
     }
 }
-.dg-section-command,
-.dg-section-alert,
 .dg-section-primary-action,
 .dg-section-opportunity-list,
 .dg-section-metrics,
@@ -5492,7 +5490,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         margin-top: 0.38rem !important;
         margin-bottom: 0.82rem !important;
     }
-    .dg-section-alert,
     .home-command-card-risk,
     .roster-limit-strip,
     .roster-limit-stat-danger,
@@ -5634,11 +5631,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
  * Those rules leaked "Open GM menu" as clipped "O / PE" when height collapsed.
  */
 .dg-preset-command,
-.dg-preset-alert,
 .dg-preset-primary-action,
-.dg-preset-opportunity,
-.dg-preset-player-list,
-.dg-preset-metrics,
 .dg-preset-secondary {
     border-radius: 2px;
 }
@@ -5657,7 +5650,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .team-name {
         letter-spacing: 0.01em !important;
     }
-    .dg-preset-alert,
     .dg-alert-warning,
     .home-command-card-risk,
     .roster-limit-strip {
@@ -5673,7 +5665,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         border-left: 5px solid rgba(103, 232, 249, 0.88) !important;
         padding-block: 0.62rem !important;
     }
-    .dg-preset-opportunity,
     .home-command-card-trade,
     .home-command-card-waiver,
     .trade-idea-positive {
@@ -5681,7 +5672,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
             linear-gradient(90deg, rgba(20, 184, 166, 0.115), rgba(5, 6, 9, 0.83) 32%) !important;
         border-left: 3px solid rgba(45, 212, 191, 0.74) !important;
     }
-    .dg-preset-player-list,
     .decision-panel,
     .free-agent-list,
     .scan-card-list,
@@ -5695,7 +5685,6 @@ div[data-testid="stDialog"] .stButton > button:hover {
         background:
             linear-gradient(180deg, rgba(229, 231, 235, 0.035), rgba(4, 5, 8, 0.58)) !important;
     }
-    .dg-preset-metrics,
     .summary-tile,
     .roster-limit-stat {
         background: rgba(229, 231, 235, 0.038) !important;

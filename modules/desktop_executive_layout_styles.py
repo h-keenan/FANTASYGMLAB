@@ -114,16 +114,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
         grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
     }
 
-    main:has(.dg-page-shell--trade-hub) .trade-summary-card,
-    main:has(.dg-page-shell--trade-hub) .trade-idea-card {
-        max-width: 100%;
-    }
-
-
-    main:has(.dg-page-shell--waivers) .free-agent-list {
-        max-width: 100%;
-    }
-
     .dg-intelligence-item {
         align-items: start;
         column-gap: var(--space-lg);
@@ -189,18 +179,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
     }
 }
 
-@media (min-width: 1280px) {
-    main:has(.dg-page-shell--trade-hub) .trade-summary-card,
-    main:has(.dg-page-shell--trade-hub) .trade-idea-card {
-        max-width: 100%;
-        width: 100%;
-    }
-
-    main:has(.dg-page-shell--trade-hub) .trade-matchup {
-        gap: var(--space-lg);
-    }
-}
-
 @media (min-width: 1440px) {
     :root {
         --dg-exec-content-max: var(--dg-exec-content-max-wide);
@@ -214,13 +192,6 @@ DESKTOP_EXECUTIVE_LAYOUT_CSS = """
 
     .home-command-grid {
         gap: var(--space-lg) !important;
-    }
-
-    main:has(.dg-page-shell--trade-hub) div[class*="st-key-trade_hub_more_ideas"] > div[data-testid="stVerticalBlock"] {
-        align-items: start;
-        display: grid !important;
-        gap: var(--space-md);
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
 
     .summary-tile-grid,
