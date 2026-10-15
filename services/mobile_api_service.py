@@ -1307,16 +1307,39 @@ def get_league_team_rankings(
                 "record_label": _clean_json_value(standing.get("record_label")),
                 "points_for": _clean_json_value(standing.get("points_for")),
                 "points_against": _clean_json_value(standing.get("points_against")),
+                # Already-computed presentation fields off the same
+                # standings row League Rankings' web Standings board reads
+                # (modules.league_standings.build_league_standings_bundle) —
+                # exposed as-is so a client never has to re-derive a
+                # win-percentage/playoff-seed label itself.
+                "standing_rank": _clean_json_value(standing.get("standing_rank")),
+                "win_pct_label": _clean_json_value(standing.get("win_pct_label")),
+                "points_for_label": _clean_json_value(standing.get("points_for_label")),
+                "points_against_label": _clean_json_value(standing.get("points_against_label")),
+                "playoff_status": _clean_json_value(standing.get("playoff_status")),
+                "on_playoff_line": bool(standing.get("on_playoff_line")),
                 "power_rank": _clean_json_value(row.get("power_rank")),
                 "power_rank_tied": bool(row.get("power_rank_tied")),
+                # Raw scores backing each rank above — League Rankings' web
+                # boards (Roster Power/Franchise/Draft Capital/Starter/Bench)
+                # show the real score next to the rank, same as the
+                # Streamlit page's render_power_rankings_board. All already
+                # computed in modules.league_rankings.build_league_rankings_frame.
+                "power_score": _clean_json_value(row.get("power_score")),
                 "franchise_rank": _clean_json_value(row.get("franchise_rank")),
                 "franchise_rank_tied": bool(row.get("franchise_rank_tied")),
+                "franchise_score": _clean_json_value(row.get("franchise_score")),
                 "draft_capital_rank": _clean_json_value(row.get("draft_capital_rank")),
                 "draft_capital_rank_tied": bool(row.get("draft_capital_rank_tied")),
+                "draft_capital_score": _clean_json_value(row.get("draft_capital")),
+                "pick_count": _clean_json_value(row.get("pick_count")),
+                "first_rounders": _clean_json_value(row.get("first_rounders")),
                 "starter_rank": _clean_json_value(row.get("starter_rank")),
                 "starter_rank_tied": bool(row.get("starter_rank_tied")),
+                "starter_score": _clean_json_value(row.get("starter_score")),
                 "bench_rank": _clean_json_value(row.get("bench_rank")),
                 "bench_rank_tied": bool(row.get("bench_rank_tied")),
+                "bench_score": _clean_json_value(row.get("bench_score")),
                 "age_rank": _clean_json_value(row.get("age_rank")),
                 "age_rank_tied": bool(row.get("age_rank_tied")),
                 "average_age": _clean_json_value(row.get("avg_age")),
@@ -1328,10 +1351,26 @@ def get_league_team_rankings(
                 "archetype_strengths": _as_string_list(row.get("archetype_strengths")),
                 "archetype_risks": _as_string_list(row.get("archetype_risks")),
                 "archetype_recommendations": _as_string_list(row.get("archetype_recommendations")),
+                "injured_starters": _clean_json_value(row.get("injured_starters")),
+                "health_flag": _clean_json_value(row.get("health_flag")),
             }
         )
 
-    return {"ok": True, "teams": teams, "reason": ""}
+    return {
+        "ok": True,
+        "teams": teams,
+        "reason": "",
+        # Standings-board framing (modules.league_standings.
+        # build_league_standings_bundle) — exposed so League Rankings' web
+        # Standings section can show the same "{season} Standings"/
+        # "Through Week N" header and not-ready copy the Streamlit page
+        # shows, without recomputing any of it client-side.
+        "standings_available": bool(standings_bundle.get("available")),
+        "standings_message": _clean_json_value(standings_bundle.get("message")) or "",
+        "season": _clean_json_value(standings_bundle.get("season")) or "",
+        "week_label": _clean_json_value(standings_bundle.get("week_label")) or "",
+        "playoff_teams": _clean_json_value(standings_bundle.get("playoff_teams")),
+    }
 
 
 @app.get("/v1/leagues/{league_id}/playoff-odds")

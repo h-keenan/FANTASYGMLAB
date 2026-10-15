@@ -20,7 +20,7 @@ export const DESTINATION_LABELS: Record<string, string> = {
   trade_hub: "Review in Trade Hub",
   waivers: "Open Waivers",
   my_team: "Open My Team",
-  rankings: "Open League Overview",
+  rankings: "Open League Rankings",
   dashboard: "Open workflow",
 };
 

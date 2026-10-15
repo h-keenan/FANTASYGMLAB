@@ -19,6 +19,7 @@ import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
 const INTERNAL_ROUTES: Record<string, string> = {
   trade_hub: "trade-hub",
   waivers: "waivers",
+  rankings: "league-rankings",
 };
 /** Backend categories are snake_case tokens (e.g. "top_priority") — title-case
  * them for display, matching Streamlit's kicker labels (Top Priority / Watch /
