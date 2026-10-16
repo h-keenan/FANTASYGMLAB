@@ -1018,6 +1018,24 @@ export interface UsageTrend {
   tone: "positive" | "negative";
 }
 
+/** GET /v1/players/{id}/weekly-stats — per-week PPR points + snap share for
+ * one player/season, mirrors mobile/src/lib/api.ts's identically-named
+ * types byte-for-byte (same `services/mobile_api_service.py` response both
+ * clients read). Powers Player Compare's "Points By Week" dual chart
+ * (Revision 14): no new backend surface, this endpoint already existed for
+ * mobile's Player Detail chart and app.py's own Points By Week section. */
+export interface WeeklyStatPoint {
+  week: number;
+  fantasy_points_ppr: number | null;
+  snap_share: number | null;
+}
+
+export interface WeeklyStatsResponse {
+  ok: true;
+  season: number;
+  weeks: WeeklyStatPoint[];
+}
+
 /** GET /v1/players/{id}/quick-view's `model` field — the same composite
  * Market/Opportunity/Scarcity/Role/Age/Confidence breakdown mobile's
  * PlayerDetailScreen ModelSection and app.py's Player Quick View dialog both
@@ -1746,6 +1764,17 @@ export const api = {
   // PlayerCompareScreen calls twice (once per side) via getPlayerQuickView.
   getPlayerQuickView: (playerId: string) =>
     authorizedRequest<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
+
+  // Player Compare's "Points By Week" dual chart (Revision 14) — same
+  // endpoint mobile's Player Detail chart calls (mobile/src/lib/api.ts's
+  // getPlayerWeeklyStats), fetched twice (once per side) the same way
+  // getPlayerQuickView above already is. Omitting `season` lets the backend
+  // default to the current season (sleeper.default_player_stats_season()),
+  // the only season Player Compare's dual chart renders for now.
+  getPlayerWeeklyStats: (playerId: string, season?: number) =>
+    authorizedRequest<WeeklyStatsResponse>(
+      `/v1/players/${encodeURIComponent(playerId)}/weekly-stats${season ? `?season=${season}` : ""}`,
+    ),
 
   // League Recaps / History (Revision 13) — Recaps tab shares mobile's
   // RecapScreen endpoint exactly (see RecapResponse's docstring); History
