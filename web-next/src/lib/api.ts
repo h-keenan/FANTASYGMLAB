@@ -1675,6 +1675,57 @@ export interface LiveDraftStateResponse {
   team_rankings: LiveDraftTeamRow[];
 }
 
+/** The hypothetical mid-draft Trade Evaluator's own pair of endpoints —
+ * split from LiveDraftStateResponse above because it needs a different
+ * shape (a labeled not-yet-made pick slot to select, then a submitted
+ * send/receive package to score), not another poll. Mirrors
+ * modules/live_draft_trade_evaluator.py verbatim; see GET/POST
+ * .../trade-evaluator's own docstrings in services/mobile_api_service.py
+ * for the full reuse chain. */
+export interface LiveDraftPickOption {
+  pick_key: string;
+  label: string;
+}
+
+export interface LiveDraftTradeEvaluatorOptionsResponse {
+  ok: boolean;
+  reason: string;
+  pick_data_stale: boolean;
+  pick_options: LiveDraftPickOption[];
+}
+
+/** One send/receive asset, already shaped like the app's existing
+ * `TradeAsset` (lib/api.ts) so TradeAssetRow/ExchangeSide render it with no
+ * second adapter — season/round come back as strings here (unlike the
+ * evaluator module's own int fields) to match that shape exactly. */
+export interface LiveDraftTradeAsset {
+  asset_type: "player" | "pick";
+  player_id: string | null;
+  name: string | null;
+  label: string | null;
+  position: string | null;
+  team: string | null;
+  age: number | null;
+  score: number | null;
+  injury_status: string | null;
+  tier: string | null;
+  season: string | null;
+  round: string | null;
+  owner_team_name: string | null;
+}
+
+export interface LiveDraftTradeEvaluatorResponse {
+  ok: boolean;
+  reason: "" | "stale_picks" | "assets_not_found" | "no_player_data";
+  stale_pick_keys: string[];
+  send_assets?: LiveDraftTradeAsset[];
+  receive_assets?: LiveDraftTradeAsset[];
+  send_total?: number;
+  receive_total?: number;
+  delta?: number;
+  verdict?: string;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
 
@@ -1971,5 +2022,37 @@ export const api = {
   getLiveDraftState: (leagueId: string, draftId: string, lens: string = "Dynasty") =>
     authorizedRequest<LiveDraftStateResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/live-draft/${encodeURIComponent(draftId)}?lens=${encodeURIComponent(lens)}`,
+    ),
+
+  // Hypothetical mid-draft Trade Evaluator — the remaining-pick options to
+  // populate the picker (already-drafted players come from
+  // LiveDraftStateResponse.pick_rows, already on hand).
+  getLiveDraftTradeEvaluatorOptions: (leagueId: string, draftId: string) =>
+    authorizedRequest<LiveDraftTradeEvaluatorOptionsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/live-draft/${encodeURIComponent(draftId)}/trade-evaluator`,
+    ),
+  postLiveDraftTradeEvaluator: (
+    leagueId: string,
+    draftId: string,
+    body: {
+      sendPickKeys?: string[];
+      receivePickKeys?: string[];
+      sendPlayerIds?: string[];
+      receivePlayerIds?: string[];
+      lens?: string;
+    },
+  ) =>
+    authorizedRequest<LiveDraftTradeEvaluatorResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/live-draft/${encodeURIComponent(draftId)}/trade-evaluator`,
+      {
+        method: "POST",
+        jsonBody: {
+          send_pick_keys: body.sendPickKeys ?? [],
+          receive_pick_keys: body.receivePickKeys ?? [],
+          send_player_ids: body.sendPlayerIds ?? [],
+          receive_player_ids: body.receivePlayerIds ?? [],
+          lens: body.lens ?? "Dynasty",
+        },
+      },
     ),
 };
