@@ -83,6 +83,16 @@
   --color-prestige-depth: #626a75;
   --color-prestige-replacement: #ef6a6a;
 
+  /* Player tier ladder (src/lib/playerTier.ts) — byte-for-byte port of
+     mobile's PLAYER_TIER_LADDER dark-mode hex values. */
+  --color-tier-generational: #78f2d5;
+  --color-tier-elite: #ef6cef;
+  --color-tier-impact-starter: #f06233;
+  --color-tier-starter: #b2c766;
+  --color-tier-contributor: #d7dbe2;
+  --color-tier-committee-role: #51c534;
+  --color-tier-depth-developmental: #626a75;
+
   /* Position identity */
   --color-position-qb: #fb7185;
   --color-position-rb: #4ade80;
@@ -250,6 +260,15 @@
     --color-prestige-development: #56626e;
     --color-prestige-depth: #5c6874;
     --color-prestige-replacement: #b0393d;
+
+    /* Player tier ladder — byte-for-byte port of mobile's TIER_COLOR_LIGHT. */
+    --color-tier-generational: #0c7d6e;
+    --color-tier-elite: #972697;
+    --color-tier-impact-starter: #ae3013;
+    --color-tier-starter: #5c701a;
+    --color-tier-contributor: #475569;
+    --color-tier-committee-role: #2b701a;
+    --color-tier-depth-developmental: #52525b;
 
     --color-position-qb: #be123c;
     --color-position-rb: #15803d;

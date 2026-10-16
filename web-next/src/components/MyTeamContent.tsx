@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
@@ -61,8 +62,9 @@ function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: bo
         identity={{ ...player, sourceLabel: "My Team" }}
         className="flex-1 flex items-center gap-3 min-w-0"
       >
-        <OvrGauge rating={player.overall_rating} size="sm" />
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} />
         <PositionBadge position={player.position} />
+        <OvrGauge rating={player.overall_rating} size="sm" />
         <div className="flex-1 flex flex-col gap-0.5 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-bold truncate" style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}>
@@ -86,7 +88,7 @@ function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: bo
       </PlayerIdentityTrigger>
       <div className="flex flex-col items-end gap-0.5 shrink-0">
         <span className="text-sm font-extrabold" style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-accent)" }}>
-          {player.score !== null ? Math.round(player.score) : "—"}
+          {player.score != null ? Math.round(player.score) : "—"}
         </span>
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           VALUE

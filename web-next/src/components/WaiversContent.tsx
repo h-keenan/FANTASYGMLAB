@@ -3,6 +3,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SnapshotTile } from "@/components/SnapshotTile";
@@ -214,8 +215,9 @@ function BestAvailableTile({ position, player, count }: { position: string; play
         className="flex flex-col items-center gap-1 p-3"
         style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
       >
-        <OvrGauge rating={player.overall_rating} size="md" />
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} />
         <PositionBadge position={position} />
+        <OvrGauge rating={player.overall_rating} size="md" />
         <span className="text-sm font-extrabold truncate max-w-full" style={{ color: "var(--color-text-primary)" }}>
           {player.name || "Unknown"}
         </span>
