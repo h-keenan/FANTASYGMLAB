@@ -1,4 +1,4 @@
-import type { QuickViewModel, RankedPlayer } from "./api";
+import type { QuickViewModel, RankedPlayer, WeeklyStatPoint } from "./api";
 import { formatRank, formatScore } from "./leagueRankingsPresentation";
 
 /**
@@ -14,13 +14,19 @@ import { formatRank, formatScore } from "./leagueRankingsPresentation";
  * this file only decides formatting, win-highlighting, and which rows are
  * worth rendering at all.
  *
- * Deliberately NOT ported: the Decision Fit narrative's win/lose framing (it
- * has none — see buildNarrativePair) and app.py's "Points By Week" dual
- * chart. The chart needs real charting infrastructure this codebase doesn't
- * have yet in web-next (no chart library/component exists anywhere in
- * web-next/src), and mobile's own PlayerCompareScreen.tsx — the cited
- * reference for this port's native layout — doesn't render it either. Left
- * for a future revision rather than guessed at here.
+ * Deliberately NOT ported: the Decision Fit narrative's win/lose framing —
+ * it has none (see buildNarrativePair).
+ *
+ * The "Points By Week" dual chart (app.py's weekly_points_chart.py section,
+ * Revision 14) IS now ported — see buildWeeklyPointsSummary below and
+ * WeeklyPointsChart.tsx for the rendering half. It renders as two
+ * independent single-player panels side by side (recharts), matching
+ * app.py's own treatment exactly: Player Compare there calls
+ * `_render_pqv_weekly_points` twice, once per column, rather than overlaying
+ * both players on one chart — there is no established "Player A color" vs.
+ * "Player B color" convention anywhere else on this page (ValuePill only
+ * ever colors the *winning* side green), so two single-color panels is the
+ * faithful port, not an invented two-series palette.
  */
 
 export interface CompareRow {
@@ -171,6 +177,36 @@ export function buildNarrativePair(
   const narrativeB = b?.decision_fit_narrative ?? null;
   if (!narrativeA && !narrativeB) return null;
   return { a: narrativeA, b: narrativeB };
+}
+
+export interface WeeklyPointsSummary {
+  games: number;
+  average: number;
+  peak: number;
+  peakWeek: number;
+}
+
+/** Headline numbers for a Points By Week panel's caption — average, peak,
+ * and the peak's week number. Pure port of
+ * modules/weekly_points_chart.weekly_points_summary's arithmetic (a plain
+ * average/max over already-scored weekly PPR totals — no scoring logic,
+ * just aggregation over numbers the Python engine already computed). Drops
+ * any week missing a PPR total first, same "absent, not zero" rule
+ * modules/weekly_points_chart.normalize_week_points documents (an unplayed
+ * week carries no fantasy_points_ppr at all, not a zero). */
+export function buildWeeklyPointsSummary(weeks: WeeklyStatPoint[]): WeeklyPointsSummary {
+  const played = weeks.filter((week): week is WeeklyStatPoint & { fantasy_points_ppr: number } => week.fantasy_points_ppr != null);
+  if (played.length === 0) {
+    return { games: 0, average: 0, peak: 0, peakWeek: 0 };
+  }
+  const total = played.reduce((sum, week) => sum + week.fantasy_points_ppr, 0);
+  const peakWeek = played.reduce((best, week) => (week.fantasy_points_ppr > best.fantasy_points_ppr ? week : best), played[0]);
+  return {
+    games: played.length,
+    average: total / played.length,
+    peak: peakWeek.fantasy_points_ppr,
+    peakWeek: peakWeek.week,
+  };
 }
 
 /** Opponent-picker default suggestion ordering — mirrors

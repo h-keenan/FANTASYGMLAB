@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { api, type QuickViewModel, type RankedPlayer } from "@/lib/api";
+import { api, type QuickViewModel, type RankedPlayer, type WeeklyStatPoint } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PositionBadge } from "@/components/PositionBadge";
+import { WeeklyPointsChart } from "@/components/WeeklyPointsChart";
 import {
   buildModelRows,
   buildNarrativePair,
@@ -291,6 +292,16 @@ export function PlayerCompareContent({
   // anyway).
   const [modelsLoadedFor, setModelsLoadedFor] = useState<string | null>(null);
 
+  // Points By Week (Revision 14) — its own independent fetch/loaded-for pair,
+  // same shape as modelA/modelB/modelsLoadedFor above but kept separate:
+  // GET .../weekly-stats is a different endpoint than GET .../quick-view, and
+  // a slow chart fetch should never hold up Model Breakdown/Trends/Decision
+  // Fit rendering (or vice versa).
+  const [weeksA, setWeeksA] = useState<WeeklyStatPoint[]>([]);
+  const [weeksB, setWeeksB] = useState<WeeklyStatPoint[]>([]);
+  const [weeklySeason, setWeeklySeason] = useState<number | null>(null);
+  const [weeklyLoadedFor, setWeeklyLoadedFor] = useState<string | null>(null);
+
   // Stale modelA/modelB left over from a previous opponent are never
   // rendered while playerB is null (valueRows/modelRows below only read
   // them once playerB is set again), so there is nothing to reset here —
@@ -319,7 +330,37 @@ export function PlayerCompareContent({
     };
   }, [playerA.player_id, playerB]);
 
+  useEffect(() => {
+    if (!playerB) return;
+    let cancelled = false;
+    Promise.all([api.getPlayerWeeklyStats(playerA.player_id), api.getPlayerWeeklyStats(playerB.player_id)])
+      .then(([a, b]) => {
+        if (cancelled) return;
+        setWeeksA(a.weeks);
+        setWeeksB(b.weeks);
+        setWeeklySeason(a.season);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWeeksA([]);
+          setWeeksB([]);
+          setWeeklySeason(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setWeeklyLoadedFor(playerB.player_id);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerA.player_id, playerB]);
+
   const loadingModels = playerB !== null && modelsLoadedFor !== playerB.player_id;
+  const showWeeklyPoints =
+    playerB !== null &&
+    weeklyLoadedFor === playerB.player_id &&
+    weeklySeason !== null &&
+    (weeksA.some((week) => week.fantasy_points_ppr != null) || weeksB.some((week) => week.fantasy_points_ppr != null));
   const valueRows = playerB ? buildValueRows(playerA, playerB) : [];
   const modelRows = playerB ? buildModelRows(modelA, modelB) : [];
   const showModelRows = playerB !== null && hasAnyValue(modelRows);
@@ -402,6 +443,19 @@ export function PlayerCompareContent({
             <section className="flex flex-col gap-2">
               <SectionHeader title="Decision Fit" />
               <NarrativeBlock playerA={playerA} playerB={playerB} narrative={narrative} />
+            </section>
+          ) : null}
+
+          {showWeeklyPoints ? (
+            <section className="flex flex-col gap-2">
+              <SectionHeader title="Points By Week" />
+              <WeeklyPointsChart
+                playerAName={playerA.name || "Player A"}
+                playerBName={playerB.name || "Player B"}
+                weeksA={weeksA}
+                weeksB={weeksB}
+                season={weeklySeason as number}
+              />
             </section>
           ) : null}
         </div>

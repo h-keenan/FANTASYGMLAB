@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlayerCompareContent } from "./PlayerCompareContent";
-import type { QuickViewModel, QuickViewResponse, RankedPlayer } from "@/lib/api";
+import type { QuickViewModel, QuickViewResponse, RankedPlayer, WeeklyStatsResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", async () => {
@@ -12,6 +12,7 @@ vi.mock("@/lib/api", async () => {
     api: {
       ...actual.api,
       getPlayerQuickView: vi.fn(),
+      getPlayerWeeklyStats: vi.fn(),
     },
   };
 });
@@ -56,11 +57,23 @@ function quickViewResult(m: QuickViewModel): QuickViewResponse {
   return { ok: true, stats: null, bio: null, model: m, reason: "" };
 }
 
+function weeklyStatsResult(weeks: WeeklyStatsResponse["weeks"], season = 2026): WeeklyStatsResponse {
+  return { ok: true, season, weeks };
+}
+
 const PLAYER_A = player({ player_id: "p1", name: "Player One", score: 1500, overall_rank: 12, position_rank: 4, age: 24 });
 const PLAYER_B = player({ player_id: "p2", name: "Player Two", score: 1200, overall_rank: 30, position_rank: 10, age: 27 });
 const POOL = [PLAYER_A, PLAYER_B, player({ player_id: "p3", name: "Player Three" })];
 
 describe("PlayerCompareContent", () => {
+  beforeEach(() => {
+    // Every existing test below picks an opponent without caring about the
+    // Points By Week chart — default both sides to "no weekly rows yet" so
+    // those tests see the same empty-weeks behavior they always have,
+    // without each needing its own getPlayerWeeklyStats mock.
+    vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue(weeklyStatsResult([]));
+  });
+
   it("shows the base player and an opponent picker when no second player is chosen yet", () => {
     render(<PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
 
@@ -144,5 +157,45 @@ describe("PlayerCompareContent", () => {
     expect(screen.queryByText("Model Breakdown")).not.toBeInTheDocument();
     // Value & Rank always renders — it never depends on the quick-view fetch.
     expect(screen.getByText("Value & Rank")).toBeInTheDocument();
+  });
+
+  it("fetches both sides' weekly stats and renders the Points By Week chart once either side has played weeks", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
+    vi.mocked(api.getPlayerWeeklyStats).mockImplementation((playerId: string) =>
+      Promise.resolve(
+        weeklyStatsResult(
+          playerId === "p1"
+            ? [
+                { week: 1, fantasy_points_ppr: 12.4, snap_share: 0.8 },
+                { week: 2, fantasy_points_ppr: 22.1, snap_share: 0.9 },
+              ]
+            : [],
+        ),
+      ),
+    );
+
+    render(
+      <PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+    );
+
+    await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1"));
+    expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p2");
+    await waitFor(() => expect(screen.getByText("Points By Week")).toBeInTheDocument());
+    // Both player-name labels render (one per panel), even though only
+    // Player One actually has weeks to chart.
+    expect(screen.getAllByText("Player One").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Player Two").length).toBeGreaterThan(0);
+  });
+
+  it("omits the Points By Week section when neither side has any played weeks", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
+    vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue(weeklyStatsResult([]));
+
+    render(
+      <PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+    );
+
+    await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalled());
+    expect(screen.queryByText("Points By Week")).not.toBeInTheDocument();
   });
 });
