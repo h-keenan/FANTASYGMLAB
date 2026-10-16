@@ -1,3 +1,5 @@
+import time
+
 import requests
 from io import BytesIO
 from typing import Any, Optional
@@ -69,14 +71,28 @@ def get_player_image_url(row_or_player_id: Any) -> str:
 def fetch_player_headshot_bytes(player_id: str) -> Optional[BytesIO]:
     """
     Fetch player headshot as BytesIO for Streamlit. If fails, return None. [web:119]
+
+    The caller (app.py's cached_headshot_data_url) caches a `None` result for
+    24h via `st.cache_data` — a single transient hiccup (a slow Sleeper CDN
+    response, a dropped connection) would otherwise read as "this player has
+    no photo" sitewide for a full day even though the photo genuinely exists
+    (coridian_, Player Quick View showing an initials fallback for a player
+    whose photo rendered fine elsewhere on the same page load, 2026-10-16).
+    One retry after a short backoff absorbs exactly that kind of one-off
+    blip before it gets baked into the day-long cache; a real 404 (no photo
+    on file for this player) still fails both attempts and correctly caches
+    as empty.
     """
     url = get_player_image_url(player_id)
     if not url:
         return None
-    try:
-        resp = requests.get(url, timeout=3)
-        if resp.status_code == 200:
-            return BytesIO(resp.content)
-    except Exception:
-        return None
+    for attempt in range(2):
+        try:
+            resp = requests.get(url, timeout=3)
+            if resp.status_code == 200:
+                return BytesIO(resp.content)
+        except Exception:
+            pass
+        if attempt == 0:
+            time.sleep(0.25)
     return None
