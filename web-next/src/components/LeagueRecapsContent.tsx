@@ -15,6 +15,7 @@ import type {
   StorylinesResponse,
 } from "@/lib/api";
 import { PillRow } from "@/components/PillRow";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import {
   FILTER_ALL,
@@ -332,14 +333,27 @@ function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number]
       </span>
     );
   }
+  if (!asset.player_id) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-xs px-2 py-1"
+        style={{ border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        <PositionBadge position={asset.position} />
+        <span style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{asset.name}</span>
+      </span>
+    );
+  }
   return (
-    <span
-      className="inline-flex items-center gap-1 text-xs px-2 py-1"
-      style={{ border: "var(--border-width-default) solid var(--color-border)" }}
-    >
-      <PositionBadge position={asset.position} />
-      <span style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{asset.name}</span>
-    </span>
+    <PlayerIdentityTrigger identity={{ ...asset, sourceLabel: "League History" }}>
+      <span
+        className="inline-flex items-center gap-1 text-xs px-2 py-1"
+        style={{ border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        <PositionBadge position={asset.position} />
+        <span style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{asset.name}</span>
+      </span>
+    </PlayerIdentityTrigger>
   );
 }
 

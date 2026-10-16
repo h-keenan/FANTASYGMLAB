@@ -11,6 +11,7 @@ import type {
   LiveDraftTeamRow,
 } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { LiveDraftTradeEvaluator } from "@/components/LiveDraftTradeEvaluator";
 import { streamlitPageUrl } from "@/lib/streamlitLink";
@@ -58,7 +59,7 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
       }}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <PlayerIdentityTrigger identity={{ ...rec, sourceLabel: "Live Draft" }} className="flex items-center gap-3 min-w-0">
           <PositionBadge position={rec.position} />
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
@@ -68,7 +69,7 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
               {rec.team || "—"} · {rec.tier || "Board Value"}
             </span>
           </div>
-        </div>
+        </PlayerIdentityTrigger>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
             {formatLiveDraftScore(rec.league_adjusted_draft_score)}
@@ -123,7 +124,10 @@ function RankingRowView({ row, leagueId, leagueName }: { row: LiveDraftRankingRo
       className="flex items-center justify-between gap-3 py-2"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <div className="flex items-center gap-3 min-w-0">
+      <PlayerIdentityTrigger
+        identity={{ ...row, leagueId, leagueName, sourceLabel: "Live Draft" }}
+        className="flex items-center gap-3 min-w-0"
+      >
         <span className="text-xs font-bold w-8 shrink-0" style={{ color: "var(--color-text-muted)" }}>
           #{row.overall_rank ?? "—"}
         </span>
@@ -138,7 +142,7 @@ function RankingRowView({ row, leagueId, leagueName }: { row: LiveDraftRankingRo
             {row.recommendation_label ? ` · ${row.recommendation_label}` : ""}
           </span>
         </div>
-      </div>
+      </PlayerIdentityTrigger>
       <div className="flex items-center gap-2 shrink-0">
         <span
           className="text-xs font-bold w-10 text-right"
@@ -213,7 +217,10 @@ function PickRowView({ row }: { row: LiveDraftPickRow }) {
         background: row.is_mine ? "var(--color-accent-soft)" : "transparent",
       }}
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <PlayerIdentityTrigger
+        identity={{ player_id: row.player_id, name: row.player_name, position: row.position, team: row.team, sourceLabel: "Live Draft" }}
+        className="flex items-center gap-2 min-w-0"
+      >
         <span className="text-xs font-bold w-10 shrink-0" style={{ color: "var(--color-text-muted)" }}>
           #{row.pick_no}
         </span>
@@ -224,7 +231,7 @@ function PickRowView({ row }: { row: LiveDraftPickRow }) {
         <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
           {row.team}
         </span>
-      </div>
+      </PlayerIdentityTrigger>
       <span className="text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>
         {row.fantasy_team}
       </span>

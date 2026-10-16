@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { GmTarget, GmTargetsResponse, LeagueRankingsResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { destinationCtaLabel } from "@/lib/streamlitLink";
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
@@ -53,7 +54,10 @@ function TargetRowView({
   return (
     <div className="flex flex-col gap-2 py-3" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <PlayerIdentityTrigger
+          identity={{ ...player, player_id: target.player_id, name, sourceLabel: "GM Targets", leagueId, leagueName }}
+          className="flex items-center gap-3 min-w-0"
+        >
           <PositionBadge position={player?.position} />
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -81,7 +85,7 @@ function TargetRowView({
               {contextLine ? ` · ${contextLine}` : ""}
             </span>
           </div>
-        </div>
+        </PlayerIdentityTrigger>
         <div className="flex items-center gap-2 shrink-0">
           {player?.score !== null && player?.score !== undefined ? (
             <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>

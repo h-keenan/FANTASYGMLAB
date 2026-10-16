@@ -1040,9 +1040,13 @@ export interface WeeklyStatsResponse {
  * Market/Opportunity/Scarcity/Role/Age/Confidence breakdown mobile's
  * PlayerDetailScreen ModelSection and app.py's Player Quick View dialog both
  * render for one player, reused (never recomputed) for Player Compare's
- * head-to-head rows. `stats`/`bio` are left untyped: Player Compare only
- * reads `model`, the same scoping mobile's own Compare screen uses (it
- * never fetches season stats/bio for its two sides either). */
+ * head-to-head rows and for the shared PlayerQuickView modal (Revision 22).
+ * `market_rating`/`opportunity_rating`/`scarcity_rating`/`role_rating`/
+ * `durability_rating` are the same four composite inputs (plus a durability
+ * read) re-expressed on the 0-99 OVR-ring scale — see
+ * modules.player_quick_view.sub_ratings — spread into this same dict by
+ * _project_player_model server-side; absent fields are always present as
+ * keys (nullable), never missing. */
 export interface QuickViewModel {
   market_score: number | null;
   opportunity_score: number | null;
@@ -1054,13 +1058,100 @@ export interface QuickViewModel {
   workload_trend: string | null;
   usage_trend: UsageTrend | null;
   decision_fit_narrative: string | null;
+  market_rating?: number | null;
+  opportunity_rating?: number | null;
+  scarcity_rating?: number | null;
+  role_rating?: number | null;
+  durability_rating?: number | null;
+}
+
+/** One stat row inside QuickViewSeason/QuickViewStats — mirrors
+ * modules.player_quick_view.StatItem / mobile's QuickViewStatItem exactly.
+ * `percentile` (1-100, within the player's position pool) is null whenever
+ * the comparison pool was too thin to rank against
+ * (modules.player_quick_view.PERCENTILE_MIN_POOL) — never a fabricated
+ * number. */
+export interface QuickViewStatItem {
+  label: string;
+  value: string;
+  note: string;
+  tone: string;
+  percentile: number | null;
+}
+
+/** One season's stat breakdown — mirrors
+ * modules.player_quick_view.SeasonStatView / mobile's QuickViewSeason. */
+export interface QuickViewSeason {
+  season: number | null;
+  season_type: string;
+  games: number | null;
+  complete: boolean | null;
+  label: string;
+  key_stats: QuickViewStatItem[];
+  fantasy: QuickViewStatItem[];
+  efficiency: QuickViewStatItem[];
+  usage: QuickViewStatItem[];
+}
+
+/** GET /v1/players/{id}/quick-view's `stats` field — mirrors
+ * modules.player_quick_view.PlayerQuickViewStats / mobile's QuickViewStats.
+ * `overall_rating` (0-99, the player's value_score percentile at their
+ * position re-expressed on the 2K "OVR" scale) and `prime_window` are both
+ * null under the same thin-pool gate as every StatItem.percentile above. */
+export interface QuickViewStats {
+  seasons: QuickViewSeason[];
+  college: QuickViewStatItem[];
+  college_available: boolean;
+  career_totals_available: boolean;
+  position: string;
+  overall_rating: number | null;
+  prime_window: Record<string, unknown> | null;
+}
+
+/** GET /v1/players/{id}/quick-view's `bio` field — mirrors
+ * modules.player_quick_view.ExecutiveSnapshot / mobile's QuickViewBio.
+ * Every field is already-normalized display text (or "" when unavailable),
+ * never a raw unformatted column value. */
+export interface QuickViewBio {
+  years_in_league: string;
+  draft_capital: string;
+  college: string;
+  height: string;
+  weight: string;
+  bye_week: string;
+  contract_status: string;
 }
 
 export interface QuickViewResponse {
   ok: boolean;
-  stats: unknown;
-  bio: unknown;
+  stats: QuickViewStats | null;
+  bio: QuickViewBio | null;
   model: QuickViewModel | null;
+  reason: "" | "not_found";
+}
+
+/** GET /v1/players/{id}/awards' response — mirrors
+ * modules.player_awards.PlayerBadge / mobile's PlayerAward. Deterministic,
+ * verified fantasy-performance badges only — never invented, never
+ * AI-generated, never presented as an official NFL honor. Empty `awards`
+ * means no qualifying season on file, not an error. */
+export interface PlayerAward {
+  badge_id: string;
+  category: string;
+  family: string;
+  title: string;
+  short_label: string;
+  tier: "gold" | "silver" | "bronze" | null;
+  season: number | null;
+  rank: number | null;
+  metric_value: number | null;
+  description: string;
+  occurrence_count: number;
+}
+
+export interface PlayerAwardsResponse {
+  ok: boolean;
+  awards: PlayerAward[];
   reason: "" | "not_found";
 }
 
@@ -1887,6 +1978,13 @@ export const api = {
   // PlayerCompareScreen calls twice (once per side) via getPlayerQuickView.
   getPlayerQuickView: (playerId: string) =>
     authorizedRequest<QuickViewResponse>(`/v1/players/${encodeURIComponent(playerId)}/quick-view`),
+
+  // Shared PlayerQuickView modal (Revision 22) — the same verified-badges
+  // endpoint mobile's PlayerDetailScreen already calls
+  // (getPlayerAwards -> GET .../awards). League-independent, same pattern
+  // as getPlayerQuickView above.
+  getPlayerAwards: (playerId: string) =>
+    authorizedRequest<PlayerAwardsResponse>(`/v1/players/${encodeURIComponent(playerId)}/awards`),
 
   // Player Compare's "Points By Week" dual chart (Revision 14) — same
   // endpoint mobile's Player Detail chart calls (mobile/src/lib/api.ts's

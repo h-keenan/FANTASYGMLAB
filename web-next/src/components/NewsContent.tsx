@@ -1,4 +1,5 @@
 import type { NewsItem, NewsPlayerIdentity, NewsResponse } from "@/lib/api";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { eventTypeColorVar, eventTypeLabel, relativeTime } from "@/lib/alertsPresentation";
 import { groupNewsByDate } from "@/lib/newsPresentation";
@@ -32,8 +33,8 @@ import { groupNewsByDate } from "@/lib/newsPresentation";
  */
 
 function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
-  return (
-    <div className="flex items-center gap-2">
+  const row = (
+    <>
       <PositionBadge position={identity.matched_player_position} />
       <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
         {identity.matched_player}
@@ -43,7 +44,24 @@ function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
           {identity.matched_player_team}
         </span>
       ) : null}
-    </div>
+    </>
+  );
+  if (!identity.matched_player_id) {
+    return <div className="flex items-center gap-2">{row}</div>;
+  }
+  return (
+    <PlayerIdentityTrigger
+      identity={{
+        player_id: identity.matched_player_id,
+        name: identity.matched_player,
+        position: identity.matched_player_position,
+        team: identity.matched_player_team,
+        sourceLabel: "News",
+      }}
+      className="flex items-center gap-2"
+    >
+      {row}
+    </PlayerIdentityTrigger>
   );
 }
 

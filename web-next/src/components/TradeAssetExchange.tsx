@@ -1,5 +1,6 @@
 import type { TradeAsset } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 
 /**
@@ -16,7 +17,22 @@ function formatValue(raw: number | null | undefined): string {
   return Math.round(raw).toLocaleString();
 }
 
-export function TradeAssetRow({ asset }: { asset: TradeAsset }) {
+export function TradeAssetRow({
+  asset,
+  disableQuickView = false,
+}: {
+  asset: TradeAsset;
+  /** Some callers (TradeAnalyzerContent's own add/remove pickers) already
+   * wrap this row in their OWN real `<button onClick=.../>` for a
+   * different action (add/remove this asset from a package). A `<button>`
+   * can't legally nest inside a `<button>`, and even if it rendered, a tap
+   * would ambiguously mean two different things at once — so those callers
+   * pass `disableQuickView` to get the original plain, non-interactive
+   * row back, same as before this modal existed. Every read-only display
+   * of this row (ExchangeSide / GM Plan / Trade Hub / Live Draft Trade
+   * Evaluator / Trade History) leaves this false. */
+  disableQuickView?: boolean;
+}) {
   if (asset.asset_type === "pick") {
     const plate = asset.pick_no ? `#${asset.pick_no}` : asset.round ? `R${asset.round}` : "PICK";
     return (
@@ -50,16 +66,36 @@ export function TradeAssetRow({ asset }: { asset: TradeAsset }) {
 
   return (
     <div className="flex items-center gap-3 py-1.5">
-      <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
-      <PositionBadge position={asset.position} />
-      <div className="flex flex-col min-w-0">
-        <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-          {asset.name || "Player"}
-        </span>
-        <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
-          {[asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || "Player"}
-        </span>
-      </div>
+      {asset.player_id && !disableQuickView ? (
+        <PlayerIdentityTrigger
+          identity={{ ...asset, player_id: asset.player_id, sourceLabel: "Trade Board" }}
+          className="flex items-center gap-3 min-w-0"
+        >
+          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
+          <PositionBadge position={asset.position} />
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+              {asset.name || "Player"}
+            </span>
+            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+              {[asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || "Player"}
+            </span>
+          </div>
+        </PlayerIdentityTrigger>
+      ) : (
+        <>
+          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
+          <PositionBadge position={asset.position} />
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+              {asset.name || "Player"}
+            </span>
+            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+              {[asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || "Player"}
+            </span>
+          </div>
+        </>
+      )}
       {asset.score !== null && asset.score !== undefined ? (
         <span className="ml-auto text-xs font-bold shrink-0" style={{ color: "var(--color-text-muted)" }}>
           {formatValue(asset.score)}

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 import { AuthProvider } from "@/context/AuthContext";
+import { PlayerQuickViewProvider } from "@/context/PlayerQuickViewContext";
 
 export const metadata: Metadata = {
   title: "FantasyGM Lab",
@@ -13,7 +14,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PlayerQuickViewProvider>{children}</PlayerQuickViewProvider>
+        </AuthProvider>
       </body>
     </html>
   );
