@@ -77,6 +77,7 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
         identity={{ ...player, sourceLabel: "Players", leagueId, leagueName }}
         className="flex items-center gap-3 min-w-0"
       >
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} />
         <PositionBadge position={player.position} />
         <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <div className="flex flex-col min-w-0">
