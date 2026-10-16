@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { TradeIdea } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
+import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ValueRing } from "@/components/ValueRing";
 import {
   LOW_CONFIDENCE_USER_NOTE,
@@ -119,13 +120,14 @@ export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
       {idea.category || impact ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <span
-            className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
+            className="flex items-center gap-1 px-1.5 py-0.5 uppercase text-xs font-extrabold"
             style={{
               color: accent,
               background: "var(--color-surface-muted)",
               letterSpacing: "var(--letter-spacing-badge)",
             }}
           >
+            <TradeCategoryGlyph category={idea.category} />
             {idea.category}
           </span>
           {impact ? (
