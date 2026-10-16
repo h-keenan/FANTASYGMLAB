@@ -1,7 +1,8 @@
 """Production topology probe for Founder Beta launch-ops closure.
 
 No secrets. Classifies app / marketing / webhook hosts.
-Exit 0 when the Streamlit app health gate passes (product is reachable).
+Exit 0 when the app health gate passes (product is reachable — Next.js or
+Streamlit, whichever is actually live at app.fantasygmlab.com).
 Exit 1 when app health fails. Ops blockers are reported, not treated as
 code failures.
 """
@@ -35,8 +36,14 @@ def classify(report: dict) -> dict:
     marketing_ready = bool(
         gates.get("static_is_marketing_html") and gates.get("static_is_not_streamlit")
     )
+    if gates.get("app_serves_nextjs"):
+        app_host = "nextjs"
+    elif gates.get("app_serves_streamlit"):
+        app_host = "streamlit"
+    else:
+        app_host = "unknown"
     return {
-        "app_host": "streamlit" if gates.get("app_serves_streamlit") else "unknown",
+        "app_host": app_host,
         "app_health_ok": bool(gates.get("app_health_ok")),
         "marketing_ready": marketing_ready,
         "apex_serves_streamlit": bool(gates.get("apex_serves_streamlit")),

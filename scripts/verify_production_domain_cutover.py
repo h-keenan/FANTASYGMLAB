@@ -67,7 +67,7 @@ def _get(url: str, *, timeout: float = 30.0, method: str = "GET") -> dict[str, A
                 "content_type": response.headers.get("Content-Type", ""),
                 "location": response.headers.get("Location", ""),
                 "x_render_routing": _header(response.headers, "x-render-routing"),
-                "sample": body[:120].decode("utf-8", errors="replace"),
+                "sample": body[:512].decode("utf-8", errors="replace"),
                 "bytes_read": len(body),
             }
     except urllib.error.HTTPError as exc:
@@ -79,7 +79,7 @@ def _get(url: str, *, timeout: float = 30.0, method: str = "GET") -> dict[str, A
             "content_type": exc.headers.get("Content-Type", "") if exc.headers else "",
             "location": exc.headers.get("Location", "") if exc.headers else "",
             "x_render_routing": _header(exc.headers, "x-render-routing"),
-            "sample": body[:120].decode("utf-8", errors="replace"),
+            "sample": body[:512].decode("utf-8", errors="replace"),
             "error": str(exc),
         }
     except Exception as exc:  # noqa: BLE001
@@ -104,6 +104,17 @@ def _looks_like_streamlit(sample: str, content_type: str) -> bool:
     return "streamlit" in lowered
 
 
+def _looks_like_nextjs(sample: str) -> bool:
+    """app.fantasygmlab.com switched from Streamlit to the web-next (Next.js)
+    frontend (coridian_, 2026-10-16 — intentional, confirmed cutover). Next's
+    own asset path convention (`/_next/static/...`) is the cheapest reliable
+    marker, same spirit as `_looks_like_streamlit`'s "streamlit" substring
+    check above. Confirmed the real marker lands at byte ~186 of the actual
+    page — `_get`'s `sample` is sliced to 512 bytes (was 120) specifically
+    so this check can see it; don't shrink that slice back down."""
+    return "_next/static" in (sample or "")
+
+
 def _looks_like_static_landing(sample: str) -> bool:
     lowered = (sample or "").casefold()
     return "data-fgl-static-landing" in lowered or (
@@ -126,6 +137,11 @@ def evaluate() -> dict[str, Any]:
                      else {"ok": False, "configuration": endpoints["status"]})
     robots = _get(STATIC_ROBOTS)
 
+    app_is_nextjs = bool(app.get("ok") and _looks_like_nextjs(app.get("sample", "")))
+    app_is_streamlit = bool(
+        app.get("ok") and _looks_like_streamlit(app.get("sample", ""), app.get("content_type", ""))
+    )
+
     gates = {
         "static_is_marketing_html": bool(
             static.get("ok") and _looks_like_static_landing(static.get("sample", ""))
@@ -133,10 +149,21 @@ def evaluate() -> dict[str, Any]:
         "static_is_not_streamlit": bool(
             static.get("ok") and not _looks_like_streamlit(static.get("sample", ""), static.get("content_type", ""))
         ),
-        "app_serves_streamlit": bool(
-            app.get("ok") and _looks_like_streamlit(app.get("sample", ""), app.get("content_type", ""))
-        ),
-        "app_health_ok": bool(
+        "app_serves_streamlit": app_is_streamlit,
+        "app_serves_nextjs": app_is_nextjs,
+        # True for either known stack — app.fantasygmlab.com switched from
+        # Streamlit to web-next (coridian_, 2026-10-16, intentional), and a
+        # future rollback would switch it back; this gate only needs "a
+        # stack we recognize is actually serving", not which one.
+        "app_serves_known_stack": app_is_nextjs or app_is_streamlit,
+        # Next.js has no `/_stcore/health` endpoint (that's Streamlit-
+        # specific) — its own root page loading successfully with
+        # recognizable Next markers IS the health signal. Streamlit keeps
+        # the real `/_stcore/health` probe, so a rollback to Streamlit is
+        # still checked the same way it always was (see
+        # `app_health_warm_ms`/`health` probe below, still Streamlit-only
+        # and tracked separately rather than deleted).
+        "app_health_ok": app_is_nextjs or bool(
             health.get("ok") and health.get("status") == 200 and "ok" in (health.get("sample") or "")
         ),
         "app_health_warm_ms": float(health.get("elapsed_ms") or 0) < 2000,
@@ -185,7 +212,7 @@ def evaluate() -> dict[str, Any]:
     required = [
         "static_is_marketing_html",
         "static_is_not_streamlit",
-        "app_serves_streamlit",
+        "app_serves_known_stack",
         "app_health_ok",
         "app_health_warm_ms",
         "dns_apex",
