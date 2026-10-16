@@ -248,7 +248,7 @@ export default function PaywallScreen({ navigation }: Props) {
         <GridBackground />
         <View style={[styles.center, { paddingTop: headerHeight }]}>
           <Ionicons name="checkmark-circle" size={56} color={colors.success} style={styles.successIcon} />
-          <AppText style={styles.successTitle}>You're on Premium</AppText>
+          <AppText style={styles.successTitle}>You're on GM Pro</AppText>
           <AppText style={styles.successSubtitle}>
             It may take a moment to reflect everywhere in the app.
           </AppText>
@@ -280,7 +280,7 @@ export default function PaywallScreen({ navigation }: Props) {
         <AppText style={styles.closeButtonText}>Close</AppText>
       </TouchableOpacity>
 
-      <AppText style={styles.title}>FantasyGM Lab Premium</AppText>
+      <AppText style={styles.title}>GM Pro</AppText>
       <AppText style={styles.subtitle}>Your price is locked in for as long as you stay subscribed.</AppText>
 
       <SectionHeading title="What's Included" icon="checkmark-done" />

@@ -34,6 +34,8 @@ import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import { getLastLeague } from '../lib/lastLeague';
 import { glanceSectionState } from '../lib/leaguesGlance';
 import { useOrbClearance } from '../lib/orbLayout';
+import { lapsedTrialExpiration } from '../lib/revenuecat';
+import { getShownTrialLapseExpiration, setShownTrialLapseExpiration } from '../lib/trialLapsedSeen';
 import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -306,11 +308,25 @@ export default function HomeScreen({ navigation }: Props) {
   useEffect(() => {
     if (autoNavigated.current || !leagues || leagues.length === 0) return;
     autoNavigated.current = true;
-    if (leagues.length > 1) {
-      navigation.navigate('Portfolio');
-      return;
-    }
     (async () => {
+      // Checked first, ahead of the normal league-routing below: a lapsed
+      // trial takes priority over jumping straight into a league (Zach,
+      // 2026-10-16 — "if they lapsed the trial we need a page to show them
+      // the new deal"). Folded into this same effect (rather than a second,
+      // independent one) so there's exactly one place deciding where Home
+      // auto-navigates on load, with no race between two effects over which
+      // fires first.
+      const lapseExpiration = await lapsedTrialExpiration();
+      if (lapseExpiration && (await getShownTrialLapseExpiration()) !== lapseExpiration) {
+        await setShownTrialLapseExpiration(lapseExpiration);
+        navigation.navigate('TrialLapsed');
+        return;
+      }
+
+      if (leagues.length > 1) {
+        navigation.navigate('Portfolio');
+        return;
+      }
       const last = await getLastLeague();
       const target =
         (last ? leagues.find((league) => league.league_id === last.leagueId) : null) ??
