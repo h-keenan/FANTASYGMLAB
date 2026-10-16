@@ -52,6 +52,7 @@ function WaiverIdentity({ player }: { player: WaiverPlayer }) {
   return (
     <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="flex items-center gap-3 min-w-0">
       <PositionBadge position={player.position} />
+      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
       <div className="flex flex-col min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
@@ -193,6 +194,7 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
         <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
           {formatWaiverScore(player.score)}
         </span>
+        <OvrGauge rating={player.overall_rating} size="sm" />
         {player.position_rank ? (
           <span
             className="px-1.5 py-0.5 text-xs font-bold"
@@ -202,7 +204,6 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
             {player.position_rank}
           </span>
         ) : null}
-        <OvrGauge rating={player.overall_rating} size="sm" />
       </div>
     </div>
   );
@@ -215,8 +216,8 @@ function BestAvailableTile({ position, player, count }: { position: string; play
         className="flex flex-col items-center gap-1 p-3"
         style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
       >
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} />
         <PositionBadge position={position} />
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <OvrGauge rating={player.overall_rating} size="md" />
         <span className="text-sm font-extrabold truncate max-w-full" style={{ color: "var(--color-text-primary)" }}>
           {player.name || "Unknown"}

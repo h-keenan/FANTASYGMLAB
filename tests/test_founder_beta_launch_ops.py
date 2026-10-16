@@ -74,7 +74,13 @@ def test_live_app_health_and_webhook_classification(monkeypatch):
     report = evaluate()
     summary = classify(report)
     assert summary["app_health_ok"] is True
-    assert summary["app_host"] == "streamlit"
+    # app.fantasygmlab.com switched from Streamlit to the web-next (Next.js)
+    # frontend (coridian_, 2026-10-16 — a confirmed, intentional cutover, not
+    # a regression). "nextjs" is the live, expected value now; this gate
+    # stays stack-aware (see verify_production_domain_cutover.py's
+    # app_serves_known_stack) so a future rollback to Streamlit would still
+    # pass here too, just reporting "streamlit" instead.
+    assert summary["app_host"] == "nextjs"
     assert summary["webhook_state"] == "not_configured"
     # Marketing cutover is Ops, not a code gate. Record the live shape.
     assert "apex_serves_streamlit" in summary

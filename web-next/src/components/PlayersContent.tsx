@@ -79,6 +79,7 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
       >
         <PlayerAvatar playerId={player.player_id} tier={player.tier} />
         <PositionBadge position={player.position} />
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
@@ -109,6 +110,7 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
         <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
           {formatWaiverScore(player.score)}
         </span>
+        <OvrGauge rating={player.overall_rating ?? null} size="sm" />
         {player.position && player.position_rank ? (
           <span
             className="px-1.5 py-0.5 text-xs font-bold"
@@ -118,7 +120,6 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
             {player.position_rank}
           </span>
         ) : null}
-        <OvrGauge rating={player.overall_rating ?? null} size="sm" />
         <a
           href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
           className="px-2 py-1 text-xs font-bold"

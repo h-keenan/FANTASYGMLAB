@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { TradeIdea } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
+import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ValueRing } from "@/components/ValueRing";
 import {
   LOW_CONFIDENCE_USER_NOTE,
@@ -14,7 +15,50 @@ import {
   levelToRingTone,
   realismLevel,
   realismRingPercent,
+  tradeIdeaShareText,
 } from "@/lib/tradeHubPresentation";
+
+/**
+ * navigator.share() when available (mobile Safari/Chrome, most modern
+ * browsers), falling back to a clipboard copy on a browser without it
+ * (most desktop browsers) — `copied` drives a short "Copied!" confirmation
+ * since a silent clipboard write gives no feedback otherwise.
+ */
+function ShareTradeButton({ idea }: { idea: TradeIdea }) {
+  const [copied, setCopied] = useState(false);
+
+  const onShare = async () => {
+    const text = tradeIdeaShareText(idea);
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text, title: `Trade idea vs. ${idea.partner_team_name}` });
+        return;
+      } catch {
+        // User cancelled the share sheet, or the platform rejected it —
+        // either way, fall through to clipboard so the action never just
+        // silently does nothing.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // No Share API and no clipboard permission — nothing more to do.
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onShare}
+      className="text-xs font-bold shrink-0"
+      style={{ color: "var(--color-accent)" }}
+    >
+      {copied ? "Copied!" : "Share"}
+    </button>
+  );
+}
 
 /**
  * The "You Send / You Get" trade-idea card — ports modules/trade_hub_ui.py's
@@ -76,13 +120,14 @@ export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
       {idea.category || impact ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <span
-            className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
+            className="flex items-center gap-1 px-1.5 py-0.5 uppercase text-xs font-extrabold"
             style={{
               color: accent,
               background: "var(--color-surface-muted)",
               letterSpacing: "var(--letter-spacing-badge)",
             }}
           >
+            <TradeCategoryGlyph category={idea.category} />
             {idea.category}
           </span>
           {impact ? (
@@ -106,14 +151,17 @@ export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
         <h3 className="text-base font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
           {idea.partner_team_name}
         </h3>
-        {idea.value_edge_band ? (
-          <span
-            className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
-            style={{ color: fairnessBandColor(idea.value_edge_band), border: `1px solid ${fairnessBandColor(idea.value_edge_band)}` }}
-          >
-            {idea.value_edge_band}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2 shrink-0">
+          {idea.value_edge_band ? (
+            <span
+              className="px-1.5 py-0.5 text-xs font-bold uppercase"
+              style={{ color: fairnessBandColor(idea.value_edge_band), border: `1px solid ${fairnessBandColor(idea.value_edge_band)}` }}
+            >
+              {idea.value_edge_band}
+            </span>
+          ) : null}
+          <ShareTradeButton idea={idea} />
+        </div>
       </div>
       {idea.partner_team_archetype_label ? (
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -121,16 +169,13 @@ export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
         </span>
       ) : null}
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-baseline gap-2">
-          <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-            Balance
-          </span>
-          <span className="text-2xl font-black" style={{ color: deltaColor, fontVariantNumeric: "tabular-nums" }}>
-            {deltaText}
-          </span>
-        </div>
-        <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
+      <div className="flex items-baseline gap-2">
+        <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          Balance
+        </span>
+        <span className="text-2xl font-black" style={{ color: deltaColor, fontVariantNumeric: "tabular-nums" }}>
+          {deltaText}
+        </span>
       </div>
 
       {/* Width-fill fix (PR #1050, reconfirmed here): minmax(0,1fr) on both
@@ -148,6 +193,13 @@ export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
         </div>
         <ExchangeSide label="You get" dotColor="var(--color-success)" assets={idea.package.receive} />
       </div>
+
+      {/* Discrepancy bar moved below the give/get package (coridian_,
+          2026-10-16: "I think the overall trade value discrepancy bar
+          should be underneath the trade, like underneath the players and
+          picks") — previously sat directly under the Balance figure, above
+          the package. */}
+      <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
 
       {isLowConfidence ? (
         <p className="text-xs" style={{ color: "var(--color-warning)" }}>
