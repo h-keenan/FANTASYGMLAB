@@ -2326,6 +2326,69 @@ def test_history_returns_real_transaction_timeline(monkeypatch):
     assert waiver["grade"]["kind"] == "waiver"
 
 
+def test_storylines_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/storylines")
+    assert response.status_code == 401
+
+
+def test_storylines_returns_404_for_missing_league(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={}):
+            response = client.get(
+                "/v1/leagues/missing/storylines", headers={"Authorization": "Bearer good-token"}
+            )
+    assert response.status_code == 404
+
+
+def test_storylines_returns_real_storyline_report(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_profiles = {
+        "1": {"team_name": "Home Team", "owner_name": "Alice", "username": "alice"},
+        "2": {"team_name": "Away Team", "owner_name": "Bob", "username": "bob"},
+    }
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=_RECAP_LEAGUE):
+            with patch("modules.sleeper.get_transactions", side_effect=_recap_transactions):
+                with patch("modules.sleeper.get_league_roster_profiles", return_value=fake_profiles):
+                    with patch("modules.rankings.load_players", return_value=_fake_players_frame()):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            response = client.get(
+                                "/v1/leagues/abc/storylines",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    report = body["storylines"]
+    assert report is not None
+    assert report["season"] == "2026"
+    # Real storyline computation (modules.league_storylines.
+    # build_league_storylines) off the single tx1 waiver claim from
+    # _recap_transactions — a wiring mistake (bad profiles/player_lookup
+    # shape, or calling the wrong builder) would leave this empty/None.
+    assert report["most_active"] is not None
+    assert report["most_active"]["roster_id"] == "1"
+    assert report["most_active"]["team_name"] == "Home Team"
+    assert report["biggest_faab"] is not None
+    assert report["biggest_faab"]["amount"] == 12
+
+
 def test_roster_relationship_map_classifies_every_slot():
     from services.mobile_api_service import _roster_relationship_map
 
