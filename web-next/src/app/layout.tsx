@@ -4,6 +4,7 @@ import "./globals.css";
 
 import { AuthProvider } from "@/context/AuthContext";
 import { PlayerQuickViewProvider } from "@/context/PlayerQuickViewContext";
+import { Header } from "@/components/Header";
 
 export const metadata: Metadata = {
   title: "FantasyGM Lab",
@@ -15,7 +16,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          <PlayerQuickViewProvider>{children}</PlayerQuickViewProvider>
+          <PlayerQuickViewProvider>
+            <Header />
+            {children}
+          </PlayerQuickViewProvider>
         </AuthProvider>
       </body>
     </html>
