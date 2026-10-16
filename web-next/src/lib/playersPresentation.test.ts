@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { RankedPlayer } from "./api";
-import { filterPlayers, matchesPlayersAge, matchesPlayersAvailability, matchesPlayersStatus } from "./playersPresentation";
+import {
+  filterPlayers,
+  matchesPlayersAge,
+  matchesPlayersAvailability,
+  matchesPlayersRosterStatus,
+  matchesPlayersStatus,
+} from "./playersPresentation";
 
 function player(overrides: Partial<RankedPlayer>): RankedPlayer {
   return {
@@ -64,6 +70,22 @@ describe("matchesPlayersAvailability", () => {
   });
 });
 
+describe("matchesPlayersRosterStatus", () => {
+  const rostered = new Set(["a"]);
+
+  it("passes everything for ALL", () => {
+    expect(matchesPlayersRosterStatus("a", rostered, "ALL")).toBe(true);
+    expect(matchesPlayersRosterStatus("z", rostered, "ALL")).toBe(true);
+  });
+
+  it("matches Rostered/Available against the given id set", () => {
+    expect(matchesPlayersRosterStatus("a", rostered, "Rostered")).toBe(true);
+    expect(matchesPlayersRosterStatus("a", rostered, "Available")).toBe(false);
+    expect(matchesPlayersRosterStatus("z", rostered, "Rostered")).toBe(false);
+    expect(matchesPlayersRosterStatus("z", rostered, "Available")).toBe(true);
+  });
+});
+
 describe("filterPlayers", () => {
   const pool = [
     player({ player_id: "a", name: "Alpha Receiver", position: "WR", age: 22, status: "Active", injury_status: null }),
@@ -113,5 +135,41 @@ describe("filterPlayers", () => {
       availabilityFilter: "Injured",
     });
     expect(result.map((p) => p.player_id)).toEqual(["b"]);
+  });
+
+  it("treats a missing rosterFilter/rosteredPlayerIds as ALL, same as before this facet existed", () => {
+    const result = filterPlayers(pool, {
+      search: "",
+      position: "ALL",
+      ageFilter: "ALL",
+      statusFilter: "ALL",
+      availabilityFilter: "ALL",
+    });
+    expect(result.map((p) => p.player_id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("filters by roster status when rosteredPlayerIds is given", () => {
+    const rosteredPlayerIds = new Set(["b"]);
+    const rostered = filterPlayers(pool, {
+      search: "",
+      position: "ALL",
+      ageFilter: "ALL",
+      statusFilter: "ALL",
+      availabilityFilter: "ALL",
+      rosterFilter: "Rostered",
+      rosteredPlayerIds,
+    });
+    expect(rostered.map((p) => p.player_id)).toEqual(["b"]);
+
+    const available = filterPlayers(pool, {
+      search: "",
+      position: "ALL",
+      ageFilter: "ALL",
+      statusFilter: "ALL",
+      availabilityFilter: "ALL",
+      rosterFilter: "Available",
+      rosteredPlayerIds,
+    });
+    expect(available.map((p) => p.player_id)).toEqual(["a", "c"]);
   });
 });
