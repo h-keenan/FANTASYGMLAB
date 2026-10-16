@@ -6,6 +6,7 @@ import type { DraftPickAsset, LeagueRankingsResponse, RankedPlayer } from "@/lib
 import { OvrGauge } from "@/components/OvrGauge";
 import { PickRow } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
@@ -76,6 +77,7 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
         identity={{ ...player, sourceLabel: "Players", leagueId, leagueName }}
         className="flex items-center gap-3 min-w-0"
       >
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} />
         <PositionBadge position={player.position} />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2 flex-wrap">

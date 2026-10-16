@@ -223,7 +223,7 @@ function OpponentPicker({
                 </span>
               </div>
               <span className="text-sm font-extrabold shrink-0" style={{ color: "var(--color-accent)" }}>
-                {candidate.score !== null ? Math.round(candidate.score) : "—"}
+                {candidate.score != null ? Math.round(candidate.score) : "—"}
               </span>
             </button>
           ))

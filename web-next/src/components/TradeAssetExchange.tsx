@@ -1,5 +1,6 @@
 import type { TradeAsset } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 
@@ -71,8 +72,9 @@ export function TradeAssetRow({
           identity={{ ...asset, player_id: asset.player_id, sourceLabel: "Trade Board" }}
           className="flex items-center gap-3 min-w-0"
         >
-          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
+          <PlayerAvatar playerId={asset.player_id} tier={asset.tier} />
           <PositionBadge position={asset.position} />
+          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
               {asset.name || "Player"}
@@ -84,8 +86,9 @@ export function TradeAssetRow({
         </PlayerIdentityTrigger>
       ) : (
         <>
-          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
+          <PlayerAvatar playerId={asset.player_id} tier={asset.tier} />
           <PositionBadge position={asset.position} />
+          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
               {asset.name || "Player"}

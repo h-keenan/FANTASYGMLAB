@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { api, TEAM_STANCE_OPTIONS, type GmTarget, type MyTeamResponse, type TeamStance, type TeamStanceResponse } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { buildProtectRows, splitProtectRows, type ProtectRow } from "@/lib/teamStancePresentation";
@@ -56,8 +57,9 @@ function ProtectPlayerRow({
         identity={{ ...player, sourceLabel: "Team Situation" }}
         className="flex-1 flex items-center gap-3 min-w-0"
       >
-        <OvrGauge rating={player.overall_rating} size="sm" />
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} />
         <PositionBadge position={player.position} />
+        <OvrGauge rating={player.overall_rating} size="sm" />
         <div className="flex-1 flex flex-col gap-0.5 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
