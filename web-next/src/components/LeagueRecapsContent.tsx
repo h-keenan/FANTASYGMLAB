@@ -1,15 +1,25 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
 
 import { api } from "@/lib/api";
-import type { HistoryResponse, HistorySide, HistoryTransaction, RecapResponse, RecapStory } from "@/lib/api";
+import type {
+  HistoryAsset,
+  HistoryResponse,
+  HistorySide,
+  HistoryTransaction,
+  RecapResponse,
+  RecapStory,
+  StorylineLeader,
+  StorylineTeam,
+  StorylinesResponse,
+} from "@/lib/api";
 import { PillRow } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
-import { streamlitPageUrl } from "@/lib/streamlitLink";
 import {
   FILTER_ALL,
+  FILTER_TRADES,
+  FILTER_WIRE,
   HISTORY_FILTERS,
   type RecapStoryGroup,
   buildRecapArchive,
@@ -36,17 +46,25 @@ import {
  * not just a thin left border on the lead story.
  *
  * Recaps reads the exact same GET .../recap endpoint mobile's RecapScreen
- * already calls. History is a new thin wrapper (GET .../history) over the
- * same modules.league_history / modules.transaction_grades the Streamlit
- * History tab already used — no grading or recap logic duplicated here.
+ * already calls. History is a thin wrapper (GET .../history) over the same
+ * modules.league_history / modules.transaction_grades the Streamlit History
+ * tab already used — no grading or recap logic duplicated here.
  *
- * Storylines (the page's third "Memory view" in Streamlit — biggest
- * trade/FAAB/activity narratives, modules/league_storylines_ui.py) is NOT
- * ported this revision: it has no mobile reference implementation and no
- * backing endpoint, and inventing one here would be guessed scope rather
- * than a thin wrapper over something that already exists. It deep-links to
- * the classic Streamlit page instead, same "not yet ported" contract every
- * other deferred surface uses (see streamlitLink.ts).
+ * Storylines (the page's third "Memory view" — season-long award cards:
+ * Most Active, Trade Market Leader, Biggest Trade, Biggest FAAB, Most Picks
+ * Acquired, Roster Turnover, Quietest Desk, Busiest Week, Most Moved Player;
+ * modules/league_storylines_ui.py + modules/league_storylines.py) was
+ * deferred in Revision 13 for having no mobile reference and no backing
+ * endpoint. Re-investigated for Revision 15: mobile still has no Storylines
+ * screen (its StorylineSummaryCard is an unrelated weekly-recap teaser, not
+ * this season-long awards panel), so this is a direct, faithful port of the
+ * Streamlit rendering straight off a new GET .../storylines endpoint (thin
+ * wrapper over modules.league_storylines.build_league_storylines — no
+ * award-selection logic duplicated here). Unlike Recaps' story cards,
+ * Streamlit's Storylines cards have no category/color taxonomy at all
+ * (modules/league_storylines_styles.py's .dg-ls-card is a single neutral
+ * style) — this port does not force-fit Recaps' category color system onto
+ * cards that were never categorized that way.
  */
 
 type MemoryView = "Recaps" | "History" | "Storylines";
@@ -624,28 +642,333 @@ function HistoryTab({
   );
 }
 
-function StorylinesTab() {
+// modules/league_storylines_ui.py's _breakdown_note(), verbatim.
+function breakdownNote(breakdown: StorylineLeader["breakdown"]): string {
+  if (!breakdown) return "";
+  const bits: string[] = [];
+  if (breakdown.trade) bits.push(`${breakdown.trade} trade${breakdown.trade !== 1 ? "s" : ""}`);
+  if (breakdown.waiver) bits.push(`${breakdown.waiver} waiver${breakdown.waiver !== 1 ? "s" : ""}`);
+  if (breakdown.free_agent) bits.push(`${breakdown.free_agent} FA add${breakdown.free_agent !== 1 ? "s" : ""}`);
+  return bits.join(" · ");
+}
+
+function StorylineTeamLine({ team }: { team: StorylineTeam }) {
   return (
-    <div
-      className="p-4 flex flex-col gap-2"
-      style={{ border: "var(--border-width-semantic) solid var(--color-accent)", background: "var(--color-surface-secondary)" }}
-    >
-      <p className="text-sm font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-        Storylines isn&apos;t in the new design yet
-      </p>
-      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-        Biggest trade, biggest FAAB pickup, and season activity narratives still live on the classic page. Open it there,
-        then use the League Memory pills to switch to Storylines.
-      </p>
-      <Link
-        href={streamlitPageUrl("league_recaps")}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="self-start text-xs font-bold uppercase px-3 py-2"
-        style={{ background: "var(--color-accent)", color: "var(--color-bg)", letterSpacing: "var(--letter-spacing-badge)" }}
+    <div className="flex flex-col min-w-0">
+      <span className="text-sm font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+        {team.team_name}
+      </span>
+      {team.owner_handle ? (
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {team.owner_handle}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function StorylineCard({
+  kicker,
+  question,
+  children,
+  wide,
+  route,
+  onOpenHistory,
+}: {
+  kicker: string;
+  question: string;
+  children: ReactNode;
+  wide?: boolean;
+  route?: string;
+  onOpenHistory?: (filter: string) => void;
+}) {
+  const style = {
+    background: "var(--color-surface-raised)",
+    border: "var(--border-width-default) solid var(--color-border)",
+    padding: "var(--space-sm) var(--space-md)",
+    display: "grid",
+    gap: "var(--space-2xs)",
+    gridColumn: wide ? "1 / -1" : undefined,
+  };
+  const body = (
+    <>
+      <span
+        className="text-xs uppercase"
+        style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}
       >
-        Open classic League Memory
-      </Link>
+        {kicker}
+      </span>
+      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        {question}
+      </span>
+      {children}
+    </>
+  );
+  if (route && onOpenHistory) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpenHistory(route)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") onOpenHistory(route);
+        }}
+        className="cursor-pointer"
+        style={style}
+      >
+        {body}
+      </div>
+    );
+  }
+  return <article style={style}>{body}</article>;
+}
+
+function StorylinesTab({
+  leagueId,
+  data,
+  setData,
+  onOpenHistory,
+}: {
+  leagueId: string;
+  data: StorylinesResponse | null;
+  setData: (next: StorylinesResponse) => void;
+  onOpenHistory: (filter: string) => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (data) return;
+    let cancelled = false;
+    api
+      .getLeagueStorylines(leagueId)
+      .then((response) => {
+        if (!cancelled) setData(response);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load league storylines.");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leagueId, data]);
+
+  if (!data && !error) {
+    return (
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        Loading league storylines…
+      </p>
+    );
+  }
+  if (error) {
+    return (
+      <p className="text-sm" role="alert" style={{ color: "var(--color-danger)" }}>
+        {error}
+      </p>
+    );
+  }
+  if (!data) return null;
+
+  const report = data.storylines;
+  if (!report) {
+    return (
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        Storylines need a loaded league.
+      </p>
+    );
+  }
+
+  const cards: ReactNode[] = [];
+
+  if (report.most_active) {
+    const leader = report.most_active;
+    const note = [
+      leader.tied ? "Tied on activity count" : "",
+      breakdownNote(leader.breakdown),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    cards.push(
+      <StorylineCard key="most-active" kicker="Most Active" question="Who is driving league activity?">
+        <StorylineTeamLine team={leader} />
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          {leader.metric} move{leader.metric !== 1 ? "s" : ""}
+        </span>
+        {note ? (
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {note}
+          </span>
+        ) : null}
+      </StorylineCard>,
+    );
+  }
+
+  if (report.trade_market_leader) {
+    const leader = report.trade_market_leader;
+    cards.push(
+      <StorylineCard key="trade-market" kicker="Trade Market" question="Who is driving the trade market?">
+        <StorylineTeamLine team={leader} />
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          {leader.metric} completed trade{leader.metric !== 1 ? "s" : ""}
+        </span>
+      </StorylineCard>,
+    );
+  }
+
+  if (report.largest_trade) {
+    const trade = report.largest_trade;
+    cards.push(
+      <StorylineCard
+        key="biggest-trade"
+        kicker="Biggest Trade"
+        question="Which completed trade moved the most assets?"
+        wide
+        route={FILTER_TRADES}
+        onOpenHistory={onOpenHistory}
+      >
+        <div className="flex flex-col gap-2">
+          {trade.teams.slice(0, 3).map((team) => (
+            <StorylineTeamLine key={team.roster_id || team.team_name} team={team} />
+          ))}
+        </div>
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          {trade.players} player{trade.players !== 1 ? "s" : ""} · {trade.picks} pick
+          {trade.picks !== 1 ? "s" : ""}
+        </span>
+        {trade.when ? (
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {trade.when}
+          </span>
+        ) : null}
+      </StorylineCard>,
+    );
+  }
+
+  if (report.biggest_faab) {
+    const faab = report.biggest_faab;
+    const player = "name" in faab.player ? (faab.player as HistoryAsset) : null;
+    cards.push(
+      <StorylineCard
+        key="biggest-faab"
+        kicker="Biggest FAAB"
+        question="Who spent the most on a single claim?"
+        route={FILTER_WIRE}
+        onOpenHistory={onOpenHistory}
+      >
+        <StorylineTeamLine team={faab} />
+        {player ? (
+          <div className="flex flex-wrap gap-1">
+            <AssetChip asset={player} />
+          </div>
+        ) : null}
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          ${faab.amount}
+        </span>
+        {faab.when ? (
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {faab.when}
+          </span>
+        ) : null}
+      </StorylineCard>,
+    );
+  }
+
+  if (report.most_picks_acquired) {
+    const leader = report.most_picks_acquired;
+    cards.push(
+      <StorylineCard key="most-picks" kicker="Most Picks Acquired" question="Who collected the most future picks?">
+        <StorylineTeamLine team={leader} />
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          {leader.metric} pick{leader.metric !== 1 ? "s" : ""} acquired
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          Incoming picks from completed trades, not current ownership.
+        </span>
+      </StorylineCard>,
+    );
+  }
+
+  if (report.roster_turnover) {
+    const leader = report.roster_turnover;
+    cards.push(
+      <StorylineCard key="roster-turnover" kicker="Roster Turnover" question="Which roster changed the most player assets?">
+        <StorylineTeamLine team={leader} />
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          {leader.metric} player-asset change{leader.metric !== 1 ? "s" : ""}
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          Unique players added or dropped per move. Same-player add/drop counts once.
+        </span>
+      </StorylineCard>,
+    );
+  }
+
+  if (report.quietest) {
+    const leader = report.quietest;
+    cards.push(
+      <StorylineCard key="quietest" kicker="Quietest Desk" question="Who stayed out of the market?">
+        <StorylineTeamLine team={leader} />
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          {leader.metric} completed move{leader.metric !== 1 ? "s" : ""}
+        </span>
+      </StorylineCard>,
+    );
+  }
+
+  if (report.busiest_week) {
+    const busy = report.busiest_week;
+    cards.push(
+      <StorylineCard key="busiest-week" kicker="Busiest Week" question="When was the market loudest?">
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          Week {busy.week}
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {busy.count} completed moves
+        </span>
+      </StorylineCard>,
+    );
+  }
+
+  if (report.most_traded_player) {
+    const traded = report.most_traded_player;
+    cards.push(
+      <StorylineCard key="most-traded-player" kicker="Most Moved Player" question="Which player changed hands the most?">
+        <div className="flex flex-wrap gap-1">
+          <AssetChip asset={traded.player} />
+        </div>
+        <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          {traded.count} completed trades
+        </span>
+      </StorylineCard>,
+    );
+  }
+
+  if (cards.length === 0) {
+    return (
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        Not enough completed activity this season to form storylines.
+      </p>
+    );
+  }
+
+  const heading = report.season ? `${report.season} storylines` : "Season storylines";
+
+  return (
+    <div className="flex flex-col gap-3">
+      <header className="flex flex-col gap-1">
+        <span
+          className="text-xs uppercase"
+          style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}
+        >
+          {heading}
+        </span>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          What this season&apos;s activity says, not a grade of old deals.
+        </p>
+      </header>
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(16rem, 1fr))" }}>
+        {cards}
+      </div>
     </div>
   );
 }
@@ -662,6 +985,7 @@ export function LeagueRecapsContent({
   const [view, setView] = useState<MemoryView>("Recaps");
   const [historyCache, setHistoryCache] = useState<Record<string, HistoryResponse>>({});
   const [historyFilter, setHistoryFilter] = useState<string>(FILTER_ALL);
+  const [storylinesData, setStorylinesData] = useState<StorylinesResponse | null>(null);
 
   const openHistory = (filter: string) => {
     setHistoryFilter(historyFilterToPill(filter));
@@ -679,7 +1003,15 @@ export function LeagueRecapsContent({
         setCache={setHistoryCache}
       />
     );
-  else body = <StorylinesTab />;
+  else
+    body = (
+      <StorylinesTab
+        leagueId={leagueId}
+        data={storylinesData}
+        setData={setStorylinesData}
+        onOpenHistory={openHistory}
+      />
+    );
 
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">

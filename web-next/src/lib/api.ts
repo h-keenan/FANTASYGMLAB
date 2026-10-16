@@ -1192,6 +1192,78 @@ export interface HistoryResponse {
   reason: HistoryReason;
 }
 
+/**
+ * League Recaps / History — Storylines tab (Revision 15). Mirrors
+ * modules.league_storylines.build_league_storylines's output verbatim; the
+ * new GET .../storylines endpoint is a thin wrapper that calls it with the
+ * current season's normalized History transactions, the same input shape
+ * the Streamlit Storylines tab (modules/league_storylines_ui.py) builds
+ * from modules.league_history_ui.cached_season_history_payload. No award
+ * selection/ranking math lives in this client — only display formatting.
+ */
+export interface StorylineTeam {
+  roster_id: string;
+  team_name: string;
+  owner_handle: string;
+  avatar_url: string;
+}
+
+export interface StorylineLeader extends StorylineTeam {
+  metric: number;
+  tied: boolean;
+  breakdown?: { trade: number; waiver: number; free_agent: number };
+}
+
+export interface StorylineLargestTrade {
+  transaction_id: string;
+  week: number;
+  timestamp: number;
+  when: string;
+  teams: StorylineTeam[];
+  players: number;
+  picks: number;
+  assets: number;
+}
+
+export interface StorylineBiggestFaab extends StorylineTeam {
+  amount: number;
+  transaction_id: string;
+  week: number;
+  timestamp: number;
+  when: string;
+  player: HistoryAsset | Record<string, never>;
+}
+
+export interface StorylineBusiestWeek {
+  week: number;
+  count: number;
+}
+
+export interface StorylineMostTradedPlayer {
+  count: number;
+  player: HistoryAsset;
+}
+
+export interface LeagueStorylinesReport {
+  season: string;
+  transaction_count: number;
+  most_active: StorylineLeader | null;
+  trade_market_leader: StorylineLeader | null;
+  most_picks_acquired: StorylineLeader | null;
+  roster_turnover: StorylineLeader | null;
+  largest_trade: StorylineLargestTrade | null;
+  biggest_faab: StorylineBiggestFaab | null;
+  quietest: StorylineLeader | null;
+  busiest_week: StorylineBusiestWeek | null;
+  most_traded_player: StorylineMostTradedPlayer | null;
+}
+
+export interface StorylinesResponse {
+  ok: boolean;
+  storylines: LeagueStorylinesReport | null;
+  reason: string;
+}
+
 // Draft Center (Revision 14) — GET .../draft-center's Overview pane only
 // (your own draft posture + league-wide decision/partner cards); see that
 // endpoint's own docstring for why Current Draft/History (live draft board)
@@ -1792,6 +1864,11 @@ export const api = {
         seasonLeagueId ? `?season_league_id=${encodeURIComponent(seasonLeagueId)}` : ""
       }`,
     ),
+
+  // Storylines tab (Revision 15) — GET .../storylines, the new thin wrapper
+  // over modules.league_storylines.build_league_storylines.
+  getLeagueStorylines: (leagueId: string) =>
+    authorizedRequest<StorylinesResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/storylines`),
 
   // Draft Center (Revision 14) — same two endpoints mobile's
   // DraftCenterScreen.tsx calls (Overview pane + pick assets); no new

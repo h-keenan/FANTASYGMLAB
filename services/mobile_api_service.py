@@ -125,6 +125,7 @@ from modules import (
     league_rankings,
     league_recaps,
     league_standings,
+    league_storylines,
     league_value_settings,
     league_workspace_ui,
     live_draft,
@@ -2939,6 +2940,57 @@ def get_league_history(
         "transactions": normalized,
         "reason": "",
     }
+
+
+@app.get("/v1/leagues/{league_id}/storylines")
+def get_league_storylines(
+    league_id: str,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Season-long storyline awards — shares the exact same builder as the
+    web app's League Recaps -> Storylines tab (modules.league_storylines.
+    build_league_storylines). Does not invent new awards or recompute any
+    metric here; it only assembles the same normalized transaction history
+    the web route reads off modules.league_history and hands it to the real
+    engine.
+
+    Scoped to the current season only (`league_id`'s own transactions), the
+    same scope the web route's cached_season_history_payload uses for this
+    tab -- unlike /history, this endpoint does not walk the prior-season
+    chain.
+    """
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    season = str(league.get("season") or "")
+    history_payload = league_history.collect_season_transactions(
+        league_id,
+        fetch_league=sleeper.get_league,
+        fetch_transactions=sleeper.get_transactions,
+    )
+    profiles = sleeper.get_league_roster_profiles(league_id) or {}
+
+    # Same (league_id, lens)-scoped valuation cache /recap and /history
+    # already share — see league_value_settings.build_valued_players_frame_cached.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens="Dynasty", players_db_path=PLAYERS_DB_PATH
+    )
+    lookup_rows: list[dict[str, Any]] = []
+    if not valued.empty:
+        cols = [c for c in ("player_id", "name", "position", "team", "value_score") if c in valued.columns]
+        if cols:
+            lookup_rows = valued[cols].to_dict("records")
+    player_lookup = league_history.player_lookup_from_rows(lookup_rows)
+
+    normalized = league_history.normalize_season_payload(
+        history_payload, profiles=profiles, player_lookup=player_lookup
+    )
+    report = league_storylines.build_league_storylines(
+        normalized, profiles=profiles, season=season
+    )
+    return {"ok": True, "storylines": report, "reason": ""}
 
 
 def _alert_key_for_link(link: str) -> str:

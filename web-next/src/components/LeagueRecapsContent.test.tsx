@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { LeagueRecapsContent } from "./LeagueRecapsContent";
-import type { HistoryResponse, RecapResponse, RecapStory } from "@/lib/api";
+import type { HistoryResponse, RecapResponse, RecapStory, StorylinesResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", async () => {
@@ -13,6 +13,7 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getLeagueRecap: vi.fn(),
       getLeagueHistory: vi.fn(),
+      getLeagueStorylines: vi.fn(),
     },
   };
 });
@@ -126,6 +127,88 @@ const BASE_HISTORY: HistoryResponse = {
   ],
 };
 
+const BASE_STORYLINES: StorylinesResponse = {
+  ok: true,
+  reason: "",
+  storylines: {
+    season: "2026",
+    transaction_count: 4,
+    most_active: {
+      roster_id: "1",
+      team_name: "Dynasty Overlords",
+      owner_handle: "@gm",
+      avatar_url: "",
+      metric: 5,
+      tied: false,
+      breakdown: { trade: 2, waiver: 2, free_agent: 1 },
+    },
+    trade_market_leader: {
+      roster_id: "1",
+      team_name: "Dynasty Overlords",
+      owner_handle: "@gm",
+      avatar_url: "",
+      metric: 2,
+      tied: false,
+    },
+    most_picks_acquired: null,
+    roster_turnover: null,
+    largest_trade: {
+      transaction_id: "tx-trade-1",
+      week: 4,
+      timestamp: 1_700_000_000_000,
+      when: "Week 4 · Nov 14, 2026",
+      teams: [
+        { roster_id: "1", team_name: "Dynasty Overlords", owner_handle: "@gm", avatar_url: "" },
+        { roster_id: "2", team_name: "Rival Squad", owner_handle: "@rival", avatar_url: "" },
+      ],
+      players: 3,
+      picks: 2,
+      assets: 5,
+    },
+    biggest_faab: {
+      roster_id: "1",
+      team_name: "Dynasty Overlords",
+      owner_handle: "@gm",
+      avatar_url: "",
+      amount: 42,
+      transaction_id: "tx-faab-1",
+      week: 3,
+      timestamp: 1_699_000_000_000,
+      when: "Week 3 · Nov 7, 2026",
+      player: {
+        kind: "player",
+        player_id: "9002",
+        name: "Waiver Wonder",
+        position: "RB",
+        team: "KC",
+        label: "Waiver Wonder",
+        known: true,
+      },
+    },
+    quietest: {
+      roster_id: "2",
+      team_name: "Rival Squad",
+      owner_handle: "@rival",
+      avatar_url: "",
+      metric: 0,
+      tied: false,
+    },
+    busiest_week: { week: 4, count: 6 },
+    most_traded_player: {
+      count: 2,
+      player: {
+        kind: "player",
+        player_id: "9003",
+        name: "Journeyman WR",
+        position: "WR",
+        team: "LAC",
+        label: "Journeyman WR",
+        known: true,
+      },
+    },
+  },
+};
+
 describe("LeagueRecapsContent", () => {
   it("colors each recap story's title by its category, not a flat/uniform color", () => {
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
@@ -172,12 +255,40 @@ describe("LeagueRecapsContent", () => {
     expect(screen.getByRole("button", { name: "Waivers / Free Agents" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("shows the classic-page deep link on the Storylines tab instead of guessed content", () => {
+  it("loads real season storyline awards on the Storylines tab and routes Biggest Trade into History", async () => {
+    (api.getLeagueStorylines as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(BASE_STORYLINES);
+    (api.getLeagueHistory as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(BASE_HISTORY);
+
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Storylines" }));
 
-    expect(screen.getByText(/isn't in the new design yet/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open classic League Memory" })).toBeInTheDocument();
+    expect(api.getLeagueStorylines).toHaveBeenCalledWith("league-1");
+    await waitFor(() => expect(screen.getByText("2026 storylines")).toBeInTheDocument());
+
+    // Real award cards from the backend report, not guessed/placeholder
+    // content — one per non-null field build_league_storylines returned.
+    expect(screen.getByText("Most Active")).toBeInTheDocument();
+    expect(screen.getByText("5 moves")).toBeInTheDocument();
+    expect(screen.getByText("Trade Market")).toBeInTheDocument();
+    expect(screen.getByText("Biggest Trade")).toBeInTheDocument();
+    expect(screen.getByText("3 players · 2 picks")).toBeInTheDocument();
+    expect(screen.getByText("Biggest FAAB")).toBeInTheDocument();
+    expect(screen.getByText("Waiver Wonder")).toBeInTheDocument();
+    expect(screen.getByText("$42")).toBeInTheDocument();
+    expect(screen.getByText("Quietest Desk")).toBeInTheDocument();
+    expect(screen.getByText("Busiest Week")).toBeInTheDocument();
+    expect(screen.getByText("Week 4")).toBeInTheDocument();
+    expect(screen.getByText("Most Moved Player")).toBeInTheDocument();
+    expect(screen.getByText("Journeyman WR")).toBeInTheDocument();
+    // Cards whose backend field was null (most_picks_acquired, roster_turnover)
+    // must not render — no placeholder/empty card in their place.
+    expect(screen.queryByText("Most Picks Acquired")).not.toBeInTheDocument();
+    expect(screen.queryByText("Roster Turnover")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Biggest Trade"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Trades" })).toHaveAttribute("aria-pressed", "true"),
+    );
   });
 });
