@@ -51,6 +51,17 @@ function RosterPickRow({
   selected: boolean;
   onToggle: () => void;
 }) {
+  // Deliberately NOT wrapped in PlayerIdentityTrigger: this entire row's
+  // one job is a selection toggle (clicking the name/badges IS "select this
+  // player for the search", an existing, tested contract), so a tap-to-
+  // open-quick-view here would silently change what clicking a player's
+  // name does on this one page instead of adding a new capability — the
+  // same kind of surface-specific judgment call this file's own "quick-
+  // view/full-detail split" comments already make elsewhere. The OVR badge
+  // is intentionally skipped as a "safe" alternate tap target too: a
+  // second, inconsistent meaning for the same badge on one page vs. every
+  // other page would be a worse outcome than leaving this one row as a
+  // pure selection control, unlike every other page's identity rows.
   return (
     <button
       type="button"

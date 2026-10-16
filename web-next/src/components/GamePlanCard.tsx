@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
 
@@ -88,12 +89,25 @@ export function GamePlanCard({
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         {item.reason}
       </p>
-      {item.route_player_name ? (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
-          <PositionBadge position={item.route_player_position} />
-          <span>{item.route_player_name}</span>
-          {item.route_player_team ? <span>· {item.route_player_team}</span> : null}
-        </div>
+      {item.route_player_name && item.route_player_id ? (
+        <PlayerIdentityTrigger
+          identity={{
+            player_id: item.route_player_id,
+            name: item.route_player_name,
+            position: item.route_player_position,
+            team: item.route_player_team,
+            tier: item.route_player_tier,
+            score: item.route_player_score,
+            sourceLabel: "GM Plan",
+          }}
+          className="flex items-center gap-2 text-xs"
+        >
+          <span style={{ color: "var(--color-text-muted)" }}>
+            <PositionBadge position={item.route_player_position} />
+          </span>
+          <span style={{ color: "var(--color-text-muted)" }}>{item.route_player_name}</span>
+          {item.route_player_team ? <span style={{ color: "var(--color-text-muted)" }}>· {item.route_player_team}</span> : null}
+        </PlayerIdentityTrigger>
       ) : null}
       {internalRoute ? (
         <Link

@@ -10,6 +10,7 @@ import type {
   GmPlanResponse,
   GmPlanTradeItem,
 } from "@/lib/api";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { formatTradeGain } from "@/lib/tradeHubPresentation";
@@ -119,15 +120,17 @@ function InjuryExposureFact({ item }: { item: GmPlanInjuryItem }) {
         <div className="flex flex-col divide-y mt-1" style={{ borderColor: "var(--color-border)" }}>
           {item.injured_players.map((player) => (
             <div key={player.player_id} className="flex items-center gap-2 py-1">
-              <PositionBadge position={player.position} />
-              <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-                {player.name}
-              </span>
-              {player.team ? (
-                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {player.team}
+              <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "GM Plan" }} className="flex items-center gap-2 flex-1 min-w-0">
+                <PositionBadge position={player.position} />
+                <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                  {player.name}
                 </span>
-              ) : null}
+                {player.team ? (
+                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                    {player.team}
+                  </span>
+                ) : null}
+              </PlayerIdentityTrigger>
               {player.injury_status ? (
                 <span className="ml-auto text-xs font-bold" style={{ color: "var(--color-danger)" }}>
                   {player.injury_status}

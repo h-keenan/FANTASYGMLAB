@@ -135,7 +135,7 @@ function TradeSidePanel({
               className="w-full text-left"
               aria-label={`Remove ${player.name ?? "player"}`}
             >
-              <TradeAssetRow asset={playerToTradeAsset(player)} />
+              <TradeAssetRow asset={playerToTradeAsset(player)} disableQuickView />
             </button>
           ))}
           {picks.map((pick) => (
@@ -641,7 +641,7 @@ export function TradeAnalyzerContent({
                 className="w-full text-left"
                 onClick={() => addPlayer(player)}
               >
-                <TradeAssetRow asset={playerToTradeAsset(player)} />
+                <TradeAssetRow asset={playerToTradeAsset(player)} disableQuickView />
               </button>
             ))
           )}

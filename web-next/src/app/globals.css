@@ -574,3 +574,321 @@ a {
   border: var(--border-width-default) solid var(--color-border);
   color: var(--color-text-primary);
 }
+
+/* Player Quick View (Revision 22) — the shared tap-to-open player detail
+   modal (components/PlayerQuickView.tsx), ported from app.py's Player
+   Quick View dialog (modules/player_quick_view_styles.py's PLAYER_QUICK_
+   VIEW_CSS). No dialog/modal primitive existed anywhere in web-next before
+   this, so these are new tokens-consuming rules, not a port of an
+   existing web-next class — but every color/spacing/radius value below is
+   an existing token from this file's :root block, nothing invented. */
+.pqv-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 6, 7, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  z-index: 50;
+}
+.pqv-modal {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+  background: var(--color-surface-raised);
+  border: var(--border-width-default) solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-overlay);
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.pqv-close {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  background: transparent;
+  border: var(--border-width-default) solid var(--color-border);
+  color: var(--color-text-secondary);
+  width: 2rem;
+  height: 2rem;
+  line-height: 1;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.pqv-close:hover,
+.pqv-close:focus-visible {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
+.pqv-hero {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: flex-start;
+  padding-right: var(--space-2xl);
+}
+.pqv-avatar {
+  flex-shrink: 0;
+  width: var(--size-roster-core-portrait);
+  height: var(--size-roster-core-portrait);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface-muted);
+  border: var(--border-width-default) solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--color-text-secondary);
+}
+.pqv-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.pqv-source-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+.pqv-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+.pqv-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+.pqv-rank-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-xs);
+}
+.pqv-rank-cells {
+  display: flex;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+.pqv-rank-cell {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.pqv-rank-cell strong {
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+.pqv-signal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+.pqv-chip {
+  background: var(--color-surface-muted);
+  border: var(--border-width-default) solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+}
+.pqv-chip--warning {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+.pqv-chip--danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.pqv-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.pqv-status-text {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+.pqv-decision-fit,
+.pqv-model-row,
+.pqv-stat-season,
+.pqv-awards,
+.pqv-bio {
+  border-top: var(--border-width-default) solid var(--color-border);
+  padding-top: var(--space-md);
+}
+.pqv-decision-fit h3,
+.pqv-model-row h3,
+.pqv-stat-season h3,
+.pqv-awards h3,
+.pqv-bio h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-sm) 0;
+}
+.pqv-decision-fit p {
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+  margin: 0;
+}
+.pqv-stat-group h4 {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin: var(--space-sm) 0 var(--space-xs) 0;
+}
+.pqv-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-sm);
+}
+.pqv-stat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pqv-stat-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+.pqv-stat-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.pqv-percentile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.pqv-percentile-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--color-border);
+  display: block;
+}
+.pqv-percentile-bar span {
+  height: 100%;
+  display: block;
+  background: var(--color-text-muted);
+}
+.pqv-percentile--low .pqv-percentile-bar span {
+  background: var(--color-danger);
+}
+.pqv-percentile--mid .pqv-percentile-bar span {
+  background: var(--color-action);
+}
+.pqv-percentile--high .pqv-percentile-bar span {
+  background: var(--color-success);
+}
+.pqv-percentile-label {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.pqv-sub-rating-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.pqv-sub-rating-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: var(--border-width-default) solid var(--color-border);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.pqv-sub-rating-chip-label {
+  color: var(--color-text-muted);
+}
+.pqv-sub-rating-chip--low {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.pqv-sub-rating-chip--mid {
+  color: var(--color-action);
+  border-color: var(--color-action);
+}
+.pqv-sub-rating-chip--high {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+.pqv-awards-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.pqv-award {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border: var(--border-width-default) solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+.pqv-award--gold {
+  border-color: var(--color-prestige-elite);
+  color: var(--color-prestige-elite);
+}
+.pqv-award--silver {
+  border-color: var(--color-prestige-starter);
+  color: var(--color-prestige-starter);
+}
+.pqv-award--bronze {
+  border-color: var(--color-position-te);
+  color: var(--color-position-te);
+}
+.pqv-bio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-sm);
+}
+.pqv-bio-cell {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.pqv-bio-cell strong {
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+}
+.pqv-actions {
+  border-top: var(--border-width-default) solid var(--color-border);
+  padding-top: var(--space-md);
+  display: flex;
+  justify-content: flex-end;
+}
+.pqv-action-link {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  border: var(--border-width-default) solid var(--color-border);
+  padding: var(--space-xs) var(--space-md);
+}
+
+@media (max-width: 480px) {
+  .pqv-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .pqv-modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-panel);
+  }
+}

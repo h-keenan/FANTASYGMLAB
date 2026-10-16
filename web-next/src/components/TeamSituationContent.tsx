@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { api, TEAM_STANCE_OPTIONS, type GmTarget, type MyTeamResponse, type TeamStance, type TeamStanceResponse } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { buildProtectRows, splitProtectRows, type ProtectRow } from "@/lib/teamStancePresentation";
 import { injuryTone } from "@/lib/myTeamPresentation";
@@ -51,29 +52,34 @@ function ProtectPlayerRow({
       className="flex items-center gap-3 py-2"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <OvrGauge rating={player.overall_rating} size="sm" />
-      <PositionBadge position={player.position} />
-      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {player.name || "Unknown player"}
-          </span>
-          {player.injury_label ? (
-            <span
-              className="px-1 text-xs font-bold uppercase"
-              style={{
-                color:
-                  tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)",
-              }}
-            >
-              {player.injury_label}
+      <PlayerIdentityTrigger
+        identity={{ ...player, sourceLabel: "Team Situation" }}
+        className="flex-1 flex items-center gap-3 min-w-0"
+      >
+        <OvrGauge rating={player.overall_rating} size="sm" />
+        <PositionBadge position={player.position} />
+        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+              {player.name || "Unknown player"}
             </span>
-          ) : null}
+            {player.injury_label ? (
+              <span
+                className="px-1 text-xs font-bold uppercase"
+                style={{
+                  color:
+                    tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)",
+                }}
+              >
+                {player.injury_label}
+              </span>
+            ) : null}
+          </div>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {player.team || "FA"}
+          </span>
         </div>
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {player.team || "FA"}
-        </span>
-      </div>
+      </PlayerIdentityTrigger>
       <button
         type="button"
         disabled={busy}

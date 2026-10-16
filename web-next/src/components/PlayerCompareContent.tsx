@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api, type QuickViewModel, type RankedPlayer, type WeeklyStatPoint } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { WeeklyPointsChart } from "@/components/WeeklyPointsChart";
 import {
@@ -141,7 +142,10 @@ function SectionHeader({ title }: { title: string }) {
 
 function IdentityCard({ player }: { player: RankedPlayer }) {
   return (
-    <div className="flex flex-col items-center gap-1 min-w-0 w-full">
+    <PlayerIdentityTrigger
+      identity={{ ...player, sourceLabel: "Player Compare" }}
+      className="flex flex-col items-center gap-1 min-w-0 w-full"
+    >
       <OvrGauge rating={player.overall_rating ?? null} size="md" />
       <span className="text-sm font-bold text-center truncate w-full" style={{ color: "var(--color-text-primary)" }}>
         {player.name || "Unknown"}
@@ -154,7 +158,7 @@ function IdentityCard({ player }: { player: RankedPlayer }) {
           </span>
         ) : null}
       </div>
-    </div>
+    </PlayerIdentityTrigger>
   );
 }
 

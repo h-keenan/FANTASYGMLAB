@@ -6,6 +6,7 @@ import type { DraftPickAsset, LeagueRankingsResponse, RankedPlayer } from "@/lib
 import { OvrGauge } from "@/components/OvrGauge";
 import { PickRow } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
 import { waiverInjuryDisplay, formatWaiverScore } from "@/lib/waiversPresentation";
@@ -71,7 +72,10 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
       className="flex items-center justify-between gap-3 py-2"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <div className="flex items-center gap-3 min-w-0">
+      <PlayerIdentityTrigger
+        identity={{ ...player, sourceLabel: "Players", leagueId, leagueName }}
+        className="flex items-center gap-3 min-w-0"
+      >
         <PositionBadge position={player.position} />
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -98,7 +102,7 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
             {player.team || "—"}
           </span>
         </div>
-      </div>
+      </PlayerIdentityTrigger>
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
           {formatWaiverScore(player.score)}

@@ -3,6 +3,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SnapshotTile } from "@/components/SnapshotTile";
 import { streamlitPageUrl } from "@/lib/streamlitLink";
@@ -48,7 +49,7 @@ function WaiverIdentity({ player }: { player: WaiverPlayer }) {
   const contextLine = freeAgentContextLine(player);
   const trending = trendingAddLabel(player);
   return (
-    <div className="flex items-center gap-3 min-w-0">
+    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="flex items-center gap-3 min-w-0">
       <PositionBadge position={player.position} />
       <div className="flex flex-col min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -81,7 +82,7 @@ function WaiverIdentity({ player }: { player: WaiverPlayer }) {
           </span>
         ) : null}
       </div>
-    </div>
+    </PlayerIdentityTrigger>
   );
 }
 
@@ -208,24 +209,26 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
 
 function BestAvailableTile({ position, player, count }: { position: string; player: WaiverPlayer; count: number }) {
   return (
-    <div
-      className="flex flex-col items-center gap-1 p-3 min-w-[7.5rem]"
-      style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
-    >
-      <OvrGauge rating={player.overall_rating} size="md" />
-      <PositionBadge position={position} />
-      <span className="text-sm font-extrabold truncate max-w-full" style={{ color: "var(--color-text-primary)" }}>
-        {player.name || "Unknown"}
-      </span>
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-          {formatWaiverScore(player.score)}
+    <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Waivers" }} className="min-w-[7.5rem]">
+      <div
+        className="flex flex-col items-center gap-1 p-3"
+        style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        <OvrGauge rating={player.overall_rating} size="md" />
+        <PositionBadge position={position} />
+        <span className="text-sm font-extrabold truncate max-w-full" style={{ color: "var(--color-text-primary)" }}>
+          {player.name || "Unknown"}
         </span>
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {count} active
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+            {formatWaiverScore(player.score)}
+          </span>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {count} active
+          </span>
+        </div>
       </div>
-    </div>
+    </PlayerIdentityTrigger>
   );
 }
 
