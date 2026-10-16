@@ -72,9 +72,8 @@ export function TradeAssetRow({
           identity={{ ...asset, player_id: asset.player_id, sourceLabel: "Trade Board" }}
           className="flex items-center gap-3 min-w-0"
         >
-          <PlayerAvatar playerId={asset.player_id} tier={asset.tier} />
           <PositionBadge position={asset.position} />
-          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
+          <PlayerAvatar playerId={asset.player_id} tier={asset.tier} size={40} />
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
               {asset.name || "Player"}
@@ -86,9 +85,8 @@ export function TradeAssetRow({
         </PlayerIdentityTrigger>
       ) : (
         <>
-          <PlayerAvatar playerId={asset.player_id} tier={asset.tier} />
           <PositionBadge position={asset.position} />
-          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
+          <PlayerAvatar playerId={asset.player_id} tier={asset.tier} size={40} />
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
               {asset.name || "Player"}
@@ -100,9 +98,12 @@ export function TradeAssetRow({
         </>
       )}
       {asset.score !== null && asset.score !== undefined ? (
-        <span className="ml-auto text-xs font-bold shrink-0" style={{ color: "var(--color-text-muted)" }}>
-          {formatValue(asset.score)}
-        </span>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
+          <span className="text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>
+            {formatValue(asset.score)}
+          </span>
+        </div>
       ) : null}
     </div>
   );

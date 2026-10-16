@@ -10,6 +10,7 @@
  */
 
 import { notReadyReasonMessage } from "./notReadyMessages";
+import type { TradeAsset, TradeIdea } from "./api";
 
 /** Byte-for-byte port of modules/trade_visual_language.py's confidence_level. */
 export function confidenceLevel(label: string | null | undefined): "high" | "medium" | "low" {
@@ -160,3 +161,28 @@ export function tradeHubReasonMessage(reason: string): string | null {
  * moved to the tap-through detail — coridian_, 2026-10-13) so a genuinely
  * low-confidence trade still reads as risky at a glance. */
 export const LOW_CONFIDENCE_USER_NOTE = "More dependent on partner preference and market fit.";
+
+function assetLabel(asset: TradeAsset): string {
+  return asset.name || asset.label || "Unknown asset";
+}
+
+/**
+ * Plain-text summary of a trade idea for the Share button (coridian_,
+ * 2026-10-16: "there's no share button on the trade"). Deliberately plain
+ * text rather than the shareable rendered-image card mobile's
+ * TradeSharePreviewModal produces — this app has no canvas/image-rendering
+ * pipeline yet, and a real text summary via the Web Share API (or a
+ * clipboard-copy fallback) is a genuinely useful share today rather than a
+ * half-built image generator. Never claims the trade was accepted/declined,
+ * same restraint mobile's ideaToShareVerdict comment calls out.
+ */
+export function tradeIdeaShareText(idea: TradeIdea): string {
+  const send = idea.package.send.map(assetLabel).join(", ") || "nothing";
+  const receive = idea.package.receive.map(assetLabel).join(", ") || "nothing";
+  return (
+    `Trade idea vs. ${idea.partner_team_name} (${idea.value_edge_band || "Fair"})\n` +
+    `You send: ${send}\n` +
+    `You get: ${receive}\n` +
+    `Balance: ${formatTradeGain(idea.trade_gain)}`
+  );
+}
