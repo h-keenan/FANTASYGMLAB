@@ -18,6 +18,7 @@ import HomeScreen from '../screens/HomeScreen';
 import LeagueDetailScreen from '../screens/LeagueDetailScreen';
 import TeamRosterScreen from '../screens/TeamRosterScreen';
 import PaywallScreen from '../screens/PaywallScreen';
+import TrialLapsedScreen from '../screens/TrialLapsedScreen';
 import NewsScreen from '../screens/NewsScreen';
 import MoreScreen from '../screens/MoreScreen';
 import LegalPageScreen from '../screens/LegalPageScreen';
@@ -51,6 +52,7 @@ export type RootStackParamList = {
   LeagueDetail: { leagueId: string; leagueName: string };
   TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string; rosterId: string };
   Paywall: undefined;
+  TrialLapsed: undefined;
   News: undefined;
   More: undefined;
   LegalPage: { pageKey: string };
@@ -235,6 +237,11 @@ export default function RootNavigator() {
             name="Paywall"
             component={PaywallScreen}
             options={{ presentation: 'modal', title: 'Premium' }}
+          />
+          <AppStack.Screen
+            name="TrialLapsed"
+            component={TrialLapsedScreen}
+            options={{ presentation: 'modal', headerShown: false }}
           />
         </AppStack.Navigator>
         {hideFloatingChrome ? null : <GmOrb />}

@@ -127,4 +127,25 @@ export async function restorePurchases(): Promise<boolean> {
   return isAtLeast(resolveEntitlementTier(info), PRO);
 }
 
+/**
+ * A free trial that ran its course and expired without converting to a paid
+ * subscription — distinct from "never subscribed" (no entitlement history at
+ * all) and from "currently on a paid plan" (`isActive` would be true). Drives
+ * the one-time "your trial ended — here's the new pricing" interstitial (Zach,
+ * 2026-10-16): checked against `entitlements.all` (every entitlement this
+ * account has ever held, active or not), not `entitlements.active`, since a
+ * lapsed trial is by definition no longer active.
+ *
+ * Returns the trial's own expiration date (ISO string) when one is found, so
+ * the caller can key its "already shown" flag to this specific lapse —
+ * null when there's no lapsed-trial history at all.
+ */
+export async function lapsedTrialExpiration(): Promise<string | null> {
+  if (!configured) return null;
+  const info = await Purchases.getCustomerInfo();
+  const entitlement = info.entitlements.all[PRO_ENTITLEMENT_ID];
+  if (!entitlement || entitlement.isActive || entitlement.periodType !== 'TRIAL') return null;
+  return entitlement.expirationDate;
+}
+
 export { PREMIUM_ENTITLEMENT_ID };
