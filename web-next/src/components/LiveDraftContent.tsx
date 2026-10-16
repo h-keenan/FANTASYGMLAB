@@ -12,6 +12,7 @@ import type {
 } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PositionBadge } from "@/components/PositionBadge";
+import { LiveDraftTradeEvaluator } from "@/components/LiveDraftTradeEvaluator";
 import { streamlitPageUrl } from "@/lib/streamlitLink";
 import {
   filterLiveDraftRankings,
@@ -35,13 +36,15 @@ import {
  * st.fragment(run_every=...) full-page rerun — a cleaner fit for a
  * single-page app than the thing it's replacing.
  *
- * Deliberately NOT ported here: the hypothetical mid-draft Trade Evaluator
- * (modules/live_draft_trade_evaluator.py's pick/player multiselect form)
- * and the detailed per-field score-breakdown table/lookup. Both are real,
- * separate surfaces with no thin-wrapper endpoint yet — same "not every
+ * The hypothetical mid-draft Trade Evaluator (modules/
+ * live_draft_trade_evaluator.py's pick/player multiselect form) now ports
+ * here too, as its own LiveDraftTradeEvaluator component below — the last
+ * of the 4 deliberately-deferred migration-sprint features. Still NOT
+ * ported: the detailed per-field score-breakdown table/lookup, a real,
+ * separate surface with no thin-wrapper endpoint yet — same "not every
  * pane gets a wrapper this revision" scope Draft Center's own component
  * already notes for its own deferred Current Draft/History and Scouting
- * panes. They stay on the classic Streamlit page, deep-linked at the
+ * panes. That one stays on the classic Streamlit page, deep-linked at the
  * bottom of this one.
  */
 
@@ -486,6 +489,14 @@ export function LiveDraftContent({
                 )}
               </section>
 
+              {state.status === "drafting" || state.status === "paused" ? (
+                <LiveDraftTradeEvaluator
+                  leagueId={leagueId}
+                  draftId={selectedDraftId}
+                  draftedRows={state.pick_rows}
+                />
+              ) : null}
+
               <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"
@@ -509,7 +520,7 @@ export function LiveDraftContent({
         className="text-sm font-bold self-start"
         style={{ color: "var(--color-accent)" }}
       >
-        Open the full Live Draft workspace (Trade Evaluator, score breakdowns) →
+        Open the full Live Draft workspace (detailed score breakdowns) →
       </a>
     </main>
   );

@@ -927,6 +927,304 @@ def test_live_draft_state_returns_a_real_built_snapshot(monkeypatch):
     assert body["pick_rows"] == []
 
 
+def _fake_live_draft_trade_eval_context():
+    """A small 2-team, 2-round snake draft room — matches _fake_live_draft()'s
+    own draft_order (sleeper-user-1 -> slot 1, someone-else -> slot 2)."""
+
+    league = {
+        "league_id": "abc",
+        "season": "2026",
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 2,
+    }
+    rosters = [
+        {"roster_id": 1, "owner_id": "sleeper-user-1", "players": ["wr0"]},
+        {"roster_id": 2, "owner_id": "someone-else", "players": ["wr1"]},
+    ]
+    users = [
+        {"user_id": "sleeper-user-1", "display_name": "GM One"},
+        {"user_id": "someone-else", "display_name": "GM Two"},
+    ]
+    profiles = {
+        "1": {"team_name": "My Dynasty", "owner_name": "GM One"},
+        "2": {"team_name": "Rival Squad", "owner_name": "GM Two"},
+    }
+    return league, rosters, users, profiles
+
+
+def test_live_draft_trade_evaluator_options_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/live-draft/draft-live/trade-evaluator")
+    assert response.status_code == 401
+
+
+def test_live_draft_trade_evaluator_options_409s_once_the_draft_is_complete(monkeypatch):
+    """Gates on LIVE_DRAFT_ACTIVE_STATUSES (drafting/paused) — narrower than
+    the main board endpoint's LIVE_DRAFT_SUPPORTED_STATUSES, matching
+    modules/live_draft_ui.py's own render-only-while-active gate for this
+    form (line ~1087)."""
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "abc"}):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft(status="complete")):
+                response = client.get(
+                    "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 409
+
+
+def test_live_draft_trade_evaluator_options_lists_only_remaining_picks(monkeypatch):
+    """Exercises modules.live_draft_trade_evaluator.remaining_pick_options
+    through the thin GET wrapper: a 2-team, 2-round snake draft with pick #1
+    already made should surface exactly the 3 picks that haven't happened
+    yet, each with a non-empty label."""
+
+    client = _client(monkeypatch)
+    league, rosters, _users, profiles = _fake_live_draft_trade_eval_context()
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=league):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                with patch(
+                    "modules.live_draft.fetch_sleeper_draft_picks",
+                    return_value=([{"pick_no": 1, "round": 1, "player_id": "wr0"}], ""),
+                ):
+                    with patch("modules.sleeper.get_rosters", return_value=rosters):
+                        with patch(
+                            "modules.sleeper.get_league_roster_profiles", return_value=profiles
+                        ):
+                            response = client.get(
+                                "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["pick_data_stale"] is False
+    pick_keys = {option["pick_key"] for option in body["pick_options"]}
+    assert pick_keys == {"pick:2", "pick:3", "pick:4"}
+    assert all(option["label"] for option in body["pick_options"])
+
+
+def test_live_draft_trade_evaluator_rejects_empty_sides(monkeypatch):
+    client = _client(monkeypatch)
+    league, _rosters, _users, _profiles = _fake_live_draft_trade_eval_context()
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=league):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                response = client.post(
+                    "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
+                    json={"send_player_ids": [], "receive_player_ids": []},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 422
+
+
+def test_live_draft_trade_evaluator_rejects_overlapping_selections(monkeypatch):
+    client = _client(monkeypatch)
+    league, _rosters, _users, _profiles = _fake_live_draft_trade_eval_context()
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=league):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                response = client.post(
+                    "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
+                    json={"send_player_ids": ["wr0"], "receive_player_ids": ["wr0"]},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 422
+
+
+def test_live_draft_trade_evaluator_rejects_unknown_lens(monkeypatch):
+    client = _client(monkeypatch)
+    league, _rosters, _users, _profiles = _fake_live_draft_trade_eval_context()
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=league):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                response = client.post(
+                    "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
+                    json={"send_player_ids": ["wr0"], "receive_player_ids": ["wr1"], "lens": "Nonsense"},
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 422
+
+
+def test_live_draft_trade_evaluator_flags_a_stale_pick_selection(monkeypatch):
+    """If a pick got drafted by someone else between page-load and submit,
+    the endpoint must refuse to score it rather than silently misvalue the
+    trade — the same re-check `_render_trade_evaluator`'s own comment
+    documents for the Streamlit form (it re-reads session_state's latest
+    polled picks right before scoring)."""
+
+    client = _client(monkeypatch)
+    league, rosters, _users, profiles = _fake_live_draft_trade_eval_context()
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=league):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                with patch(
+                    # pick:1 has already been made by the time of submit.
+                    "modules.live_draft.fetch_sleeper_draft_picks",
+                    return_value=([{"pick_no": 1, "round": 1, "player_id": "wr0"}], ""),
+                ):
+                    with patch("modules.sleeper.get_rosters", return_value=rosters):
+                        with patch(
+                            "modules.sleeper.get_league_roster_profiles", return_value=profiles
+                        ):
+                            response = client.post(
+                                "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
+                                json={"send_pick_keys": ["pick:1"], "receive_pick_keys": ["pick:2"]},
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == "stale_picks"
+    assert body["stale_pick_keys"] == ["pick:1"]
+
+
+def test_live_draft_trade_evaluator_returns_a_real_verdict_for_a_lopsided_package(monkeypatch):
+    """End-to-end through the real engine: a clearly-better drafted player
+    (wr0, score 8000) received for a clearly-worse one (wr11, score 6900)
+    sent should land as Favorable, not a mocked stub — exercises
+    modules.live_draft_trade_evaluator.evaluate_trade's real score/band
+    math via player_asset_from_mapping + trade_value_band."""
+
+    client = _client(monkeypatch)
+    league, rosters, _users, profiles = _fake_live_draft_trade_eval_context()
+    fake_pool = _fake_live_draft_player_pool()
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=league):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                with patch(
+                    "modules.live_draft.fetch_sleeper_draft_picks",
+                    return_value=(
+                        [
+                            {"pick_no": 1, "round": 1, "player_id": "wr0"},
+                            {"pick_no": 2, "round": 1, "player_id": "wr11"},
+                        ],
+                        "",
+                    ),
+                ):
+                    with patch("modules.sleeper.get_rosters", return_value=rosters):
+                        with patch(
+                            "modules.sleeper.get_league_roster_profiles", return_value=profiles
+                        ):
+                            with patch("modules.rankings.load_players", return_value=fake_pool):
+                                with patch(
+                                    "modules.player_eligibility.filter_current_fantasy_players",
+                                    side_effect=lambda df, **kwargs: df,
+                                ):
+                                    response = client.post(
+                                        "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
+                                        json={
+                                            "send_player_ids": ["wr11"],
+                                            "receive_player_ids": ["wr0"],
+                                        },
+                                        headers={"Authorization": "Bearer good-token"},
+                                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    assert body["stale_pick_keys"] == []
+    assert body["send_assets"][0]["player_id"] == "wr11"
+    assert body["receive_assets"][0]["player_id"] == "wr0"
+    assert body["send_total"] < body["receive_total"]
+    assert body["delta"] > 0
+    assert body["verdict"] == "Favorable"
+
+
+def test_live_draft_trade_evaluator_prices_a_remaining_pick_through_the_real_engine(monkeypatch):
+    """A not-yet-made pick on one side must be valued through the real
+    modules.trade_ideas.list_draft_pick_assets pipeline (never an invented
+    number) — exercises pick_asset_for_option's matched-asset path end to
+    end, the same per-pick pricing Trade Analyzer/Draft Center share."""
+
+    client = _client(monkeypatch)
+    league, rosters, users, profiles = _fake_live_draft_trade_eval_context()
+    fake_pool = _fake_live_draft_player_pool()
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=league):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                with patch(
+                    "modules.live_draft.fetch_sleeper_draft_picks",
+                    return_value=([{"pick_no": 1, "round": 1, "player_id": "wr0"}], ""),
+                ):
+                    with patch("modules.sleeper.get_rosters", return_value=rosters):
+                        with patch(
+                            "modules.sleeper.get_league_roster_profiles", return_value=profiles
+                        ):
+                            with patch("modules.sleeper.get_users", return_value=users):
+                                with patch("modules.sleeper.get_traded_picks", return_value=[]):
+                                    with patch(
+                                        "modules.rankings.load_players", return_value=fake_pool
+                                    ):
+                                        with patch(
+                                            "modules.player_eligibility.filter_current_fantasy_players",
+                                            side_effect=lambda df, **kwargs: df,
+                                        ):
+                                            response = client.post(
+                                                "/v1/leagues/abc/live-draft/draft-live/trade-evaluator",
+                                                json={
+                                                    "send_player_ids": ["wr0"],
+                                                    "receive_pick_keys": ["pick:2"],
+                                                },
+                                                headers={"Authorization": "Bearer good-token"},
+                                            )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["reason"] == ""
+    assert len(body["receive_assets"]) == 1
+    pick_asset = body["receive_assets"][0]
+    assert pick_asset["asset_type"] == "pick"
+    assert isinstance(pick_asset["score"], (int, float))
+    assert pick_asset["score"] >= 0
+    assert pick_asset["season"] == "2026"
+    assert body["verdict"] in {"Favorable", "Fair", "Slight Overpay", "Major Overpay"}
+
+
 def _fake_roster_frame():
     positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "RB", "WR"]
     rows = []

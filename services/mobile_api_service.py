@@ -129,6 +129,7 @@ from modules import (
     league_value_settings,
     league_workspace_ui,
     live_draft,
+    live_draft_trade_evaluator,
     manager_activity,
     my_news,
     news as news_cache,
@@ -1895,12 +1896,16 @@ def get_league_live_draft_state(
     valuation itself. Keeps this endpoint stateless like every sibling
     endpoint in this file.
 
-    Hypothetical mid-draft Trade Evaluator and the detailed per-field score
-    breakdown table are NOT covered by this endpoint — those stay on the
-    classic Streamlit page for now (deep-linked from the Next.js page),
-    same "not every pane has a thin-wrapper endpoint yet" scope Draft
-    Center's own docstring already notes for Current Draft/History and
-    Scouting.
+    The hypothetical mid-draft Trade Evaluator now has its own pair of
+    endpoints (GET/POST .../trade-evaluator below) rather than living here —
+    it needs a different request shape (a submitted send/receive package,
+    not a poll) and its own fresh picks/rosters read right before scoring
+    (so a pick made between page-load and submit is caught). The detailed
+    per-field score breakdown table is still NOT covered by any endpoint —
+    that stays on the classic Streamlit page for now (deep-linked from the
+    Next.js page), same "not every pane has a thin-wrapper endpoint yet"
+    scope Draft Center's own docstring already notes for Current
+    Draft/History and Scouting.
     """
 
     if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
@@ -2027,6 +2032,237 @@ def get_league_live_draft_state(
             if team_rankings_df is not None and not team_rankings_df.empty
             else []
         ),
+    }
+
+
+def _load_active_live_draft(league_id: str, draft_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Shared league/draft lookup + status gate for the Trade Evaluator's
+    two endpoints below. Gates on LIVE_DRAFT_ACTIVE_STATUSES ("drafting" /
+    "paused"), the same narrower set modules/live_draft_ui.py's
+    `_render_trade_evaluator` call site checks (line ~1087: it renders the
+    form only while the draft is actually in progress, unlike the main
+    board endpoint above which also serves "pre_draft"/"complete")."""
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    draft = sleeper.get_draft(draft_id)
+    if not draft:
+        raise HTTPException(status_code=404, detail="Draft not found.")
+    status = live_draft.normalize_draft_status(draft.get("status"))
+    if status not in live_draft.LIVE_DRAFT_ACTIVE_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="The Trade Evaluator is only available while this draft is in progress or paused.",
+        )
+    return league, draft
+
+
+@app.get("/v1/leagues/{league_id}/live-draft/{draft_id}/trade-evaluator")
+def get_live_draft_trade_evaluator_options(
+    league_id: str,
+    draft_id: str,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """The one piece of data the hypothetical mid-draft Trade Evaluator
+    needs that the client doesn't already have: every pick slot in this
+    draft room that has NOT been made yet, labeled for a picker.
+
+    Already-drafted players (the other side of the trade) are NOT
+    refetched here — the client already holds them in `pick_rows` from
+    GET .../live-draft/{draft_id} (player_id/player_name/position/
+    fantasy_team), so reusing that avoids a second identical read.
+
+    Wraps modules.live_draft_trade_evaluator.remaining_pick_options
+    verbatim — no new pick-slot logic here, see that module's own
+    docstring for the full reuse chain back to modules.trade_ideas.
+    """
+
+    _league, draft = _load_active_live_draft(league_id, draft_id)
+    picks, pick_error = live_draft.fetch_sleeper_draft_picks(draft_id)
+    rosters = sleeper.get_rosters(league_id)
+    roster_profiles = sleeper.get_league_roster_profiles(league_id)
+    rounds = live_draft.draft_round_count(draft)
+    teams = live_draft.draft_team_count(draft, rosters)
+
+    pick_options = live_draft_trade_evaluator.remaining_pick_options(
+        draft=draft,
+        rosters=rosters,
+        picks=picks,
+        rounds=rounds,
+        teams=teams,
+        roster_profiles=roster_profiles,
+    )
+    return {
+        "ok": True,
+        "reason": "",
+        "pick_data_stale": bool(pick_error),
+        "pick_options": [
+            {"pick_key": option.get("pick_key"), "label": option.get("label")}
+            for option in pick_options
+        ],
+    }
+
+
+class LiveDraftTradeEvaluatorRequest(BaseModel):
+    send_pick_keys: list[str] = Field(default_factory=list)
+    receive_pick_keys: list[str] = Field(default_factory=list)
+    send_player_ids: list[str] = Field(default_factory=list)
+    receive_player_ids: list[str] = Field(default_factory=list)
+    lens: str = "Dynasty"
+
+
+def _project_live_draft_trade_asset(asset: dict[str, Any]) -> dict[str, Any]:
+    """Project a modules.live_draft_trade_evaluator asset dict onto the same
+    wire shape as the app's existing `TradeAsset` type (lib/api.ts) so the
+    client reuses TradeAssetRow/ExchangeSide verbatim instead of needing a
+    second adapter."""
+
+    is_pick = asset.get("asset_type") == "pick"
+    return {
+        "asset_type": asset.get("asset_type"),
+        "player_id": _clean_json_value(asset.get("player_id")) if not is_pick else None,
+        "name": _clean_json_value(asset.get("name")),
+        "label": _clean_json_value(asset.get("label")),
+        "position": _clean_json_value(asset.get("position")),
+        "team": _clean_json_value(asset.get("team")),
+        "age": _clean_json_value(asset.get("age")),
+        "score": _clean_json_value(asset.get("score")),
+        "injury_status": _clean_json_value(asset.get("injury_status")) if not is_pick else None,
+        "tier": _clean_json_value(asset.get("player_tier")) if not is_pick else None,
+        "season": str(asset.get("season")) if is_pick and asset.get("season") else None,
+        "round": str(asset.get("round")) if is_pick and asset.get("round") else None,
+        "owner_team_name": _clean_json_value(asset.get("owner_team_name")) if is_pick else None,
+    }
+
+
+@app.post("/v1/leagues/{league_id}/live-draft/{draft_id}/trade-evaluator")
+def post_live_draft_trade_evaluator(
+    league_id: str,
+    draft_id: str,
+    body: LiveDraftTradeEvaluatorRequest,
+    _user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Hypothetical mid-draft trade evaluator: totals + a Favorable / Fair /
+    Slight Overpay / Major Overpay verdict for a proposed send/receive
+    package of not-yet-made picks and already-drafted players.
+
+    Wraps modules.live_draft_trade_evaluator.evaluate_trade verbatim (via
+    pick_asset_for_option/drafted_player_asset for the two asset sides) —
+    the exact same engine modules/live_draft_ui.py's Streamlit form already
+    calls. No valuation logic is reimplemented here: pick values come from
+    modules.trade_ideas.list_draft_pick_assets (the same per-pick pricing
+    Trade Analyzer/Draft Center use) with modules.league_rankings.
+    safe_pick_value's static round chart as fallback, and player values
+    come straight from the same league-valued players frame every other
+    lens-aware endpoint in this file shares.
+
+    Re-reads picks/rosters fresh on every call (never trusts a client-held
+    snapshot) and re-validates every selected pick slot is still open right
+    before scoring — the same "re-check against the freshest polled picks"
+    discipline `_render_trade_evaluator`'s own comment documents, since a
+    pick can be made by another team between when this page loaded and when
+    the user submits. A stale pick returns `reason: "stale_picks"` with the
+    offending keys rather than an HTTP error, so the client can ask the user
+    to refresh their selection and resubmit — an everyday state, not a
+    failure.
+    """
+
+    if body.lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    if not (body.send_pick_keys or body.send_player_ids):
+        raise HTTPException(status_code=422, detail="Add at least one pick or player to the side you send.")
+    if not (body.receive_pick_keys or body.receive_player_ids):
+        raise HTTPException(status_code=422, detail="Add at least one pick or player to the side you receive.")
+    overlap_picks = set(body.send_pick_keys) & set(body.receive_pick_keys)
+    overlap_players = set(body.send_player_ids) & set(body.receive_player_ids)
+    if overlap_picks or overlap_players:
+        raise HTTPException(status_code=422, detail="The same pick or player can't be on both sides of a trade.")
+
+    league, draft = _load_active_live_draft(league_id, draft_id)
+    picks, _pick_error = live_draft.fetch_sleeper_draft_picks(draft_id)
+    rosters = sleeper.get_rosters(league_id)
+    roster_profiles = sleeper.get_league_roster_profiles(league_id)
+    rounds = live_draft.draft_round_count(draft)
+    teams = live_draft.draft_team_count(draft, rosters)
+    season = live_draft.safe_int(draft.get("season"), 0)
+
+    pick_options = live_draft_trade_evaluator.remaining_pick_options(
+        draft=draft,
+        rosters=rosters,
+        picks=picks,
+        rounds=rounds,
+        teams=teams,
+        roster_profiles=roster_profiles,
+    )
+    selected_pick_keys = list(dict.fromkeys(body.send_pick_keys + body.receive_pick_keys))
+    stale_keys = live_draft_trade_evaluator.validate_pick_keys_still_open(
+        selected_pick_keys, open_options=pick_options
+    )
+    if stale_keys:
+        return {"ok": True, "reason": "stale_picks", "stale_pick_keys": stale_keys}
+
+    option_by_key = {option.get("pick_key"): option for option in pick_options}
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(body.lens)
+
+    players_df = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
+    )
+
+    # Same (league_id, lens)-scoped cache /draft-picks and /trade-analyzer
+    # already share — only computed at all when a pick is actually on
+    # either side of this proposed package.
+    draft_pick_assets: list[dict[str, Any]] = []
+    if body.send_pick_keys or body.receive_pick_keys:
+        pick_summary, _ = league_rankings.build_league_summary_and_draft_capital_cached(
+            league_id=league_id, lens=body.lens, players_db_path=PLAYERS_DB_PATH
+        )
+        if not pick_summary.empty:
+            draft_pick_assets = trade_ideas.list_draft_pick_assets(
+                league_id, pick_summary, league_settings=settings
+            )
+
+    def build_assets(pick_keys: list[str], player_ids: list[str]) -> list[dict[str, Any]]:
+        assets: list[dict[str, Any]] = []
+        for key in pick_keys:
+            option = option_by_key.get(key)
+            if option is None:
+                continue
+            assets.append(
+                live_draft_trade_evaluator.pick_asset_for_option(
+                    option, season=season, draft_pick_assets=draft_pick_assets
+                )
+            )
+        if player_ids and players_df is not None and not players_df.empty:
+            for player_id in player_ids:
+                asset = live_draft_trade_evaluator.drafted_player_asset(
+                    player_id, df_players=players_df, score_field=score_field
+                )
+                if asset is not None:
+                    assets.append(asset)
+        return assets
+
+    send_assets = build_assets(body.send_pick_keys, body.send_player_ids)
+    receive_assets = build_assets(body.receive_pick_keys, body.receive_player_ids)
+    if not send_assets and not receive_assets:
+        return {"ok": True, "reason": "assets_not_found", "stale_pick_keys": []}
+
+    result = live_draft_trade_evaluator.evaluate_trade(send_assets=send_assets, receive_assets=receive_assets)
+
+    return {
+        "ok": True,
+        "reason": "",
+        "stale_pick_keys": [],
+        "send_assets": [_project_live_draft_trade_asset(asset) for asset in result["send_assets"]],
+        "receive_assets": [_project_live_draft_trade_asset(asset) for asset in result["receive_assets"]],
+        "send_total": _clean_json_value(result["send_total"]),
+        "receive_total": _clean_json_value(result["receive_total"]),
+        "delta": _clean_json_value(result["delta"]),
+        "verdict": result["verdict"],
     }
 
 

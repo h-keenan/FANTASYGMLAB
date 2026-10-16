@@ -22,7 +22,7 @@
  * this in sync with that convention, not re-invented per page.
  */
 
-import type { LiveDraftRankingRow, LiveDraftTeamRow } from "./api";
+import type { LiveDraftPickRow, LiveDraftRankingRow, LiveDraftTeamRow, LiveDraftTradeAsset, TradeAsset } from "./api";
 
 export const LIVE_DRAFT_RANK_FILTERS = ["Overall", "QB", "RB", "WR", "TE", "Rookies", "Veterans"] as const;
 export type LiveDraftRankFilter = (typeof LIVE_DRAFT_RANK_FILTERS)[number];
@@ -107,4 +107,56 @@ export function movementGlyph(movement: number | undefined): string {
 export function formatLiveDraftScore(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "0.0";
   return value.toFixed(1);
+}
+
+/**
+ * Trade Evaluator (the last deferred piece of Revision 21) — pure display
+ * helpers only, same contract as the rank-movement functions above: every
+ * value/score/verdict is computed server-side by GET/POST
+ * .../trade-evaluator (modules/live_draft_trade_evaluator.py, wrapping the
+ * same Trade Analyzer valuation primitives). Nothing here re-derives a
+ * score.
+ */
+
+/** Already-drafted players for the OTHER side of a hypothetical trade come
+ * straight from the pick_rows this page already polled (never a second
+ * fetch) — same dedupe-by-player_id + label format
+ * `_render_trade_evaluator`'s own `player_label_by_id` builds. */
+export function liveDraftDraftedPlayerOptions(
+  rows: LiveDraftPickRow[],
+): { key: string; label: string }[] {
+  const seen = new Set<string>();
+  const options: { key: string; label: string }[] = [];
+  for (const row of rows) {
+    if (!row.player_id || seen.has(row.player_id)) continue;
+    seen.add(row.player_id);
+    options.push({
+      key: row.player_id,
+      label: `${row.player_name || "Unknown Player"} (${row.position || "UNK"} · ${row.fantasy_team || "Unknown team"})`,
+    });
+  }
+  return options;
+}
+
+/** Adapts a POST .../trade-evaluator asset onto the app's existing
+ * `TradeAsset` shape so TradeAssetRow/ExchangeSide (Trade Analyzer,
+ * Revision 15) render it with no new markup — null -> undefined is the
+ * only real transform, since the server already names every field to
+ * match. */
+export function liveDraftAssetToTradeAsset(asset: LiveDraftTradeAsset): TradeAsset {
+  return {
+    asset_type: asset.asset_type,
+    player_id: asset.player_id ?? undefined,
+    name: asset.name ?? undefined,
+    label: asset.label ?? undefined,
+    position: asset.position ?? undefined,
+    team: asset.team ?? undefined,
+    age: asset.age,
+    score: asset.score,
+    injury_status: asset.injury_status ?? undefined,
+    tier: asset.tier ?? undefined,
+    season: asset.season ?? undefined,
+    round: asset.round ?? undefined,
+    owner_team_name: asset.owner_team_name ?? undefined,
+  };
 }
