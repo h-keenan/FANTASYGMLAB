@@ -56,21 +56,6 @@ export const SUB_RATING_DISPLAY: ReadonlyArray<{
   { key: "durability_rating", abbr: "DUR", label: "Durability" },
 ];
 
-/** Up to two initials from a player's display name — the same fallback
- * avatar_html uses when no headshot is available. web-next has no headshot
- * CDN wiring yet (unlike mobile's cached_headshot_data_url), so the modal's
- * portrait is always this initials badge, not a photo. */
-export function playerInitials(name: string | null | undefined): string {
-  const trimmed = (name ?? "").trim();
-  if (!trimmed) return "?";
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  const initials = parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-  return initials || "?";
-}
-
 /** Groups to render for one QuickViewSeason, in display order, skipping any
  * group with no rows — mirrors the Key Stats / Fantasy / Usage / Efficiency
  * section order the Streamlit and mobile Stats tabs both use. */

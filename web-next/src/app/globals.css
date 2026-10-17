@@ -649,20 +649,6 @@ a {
   align-items: flex-start;
   padding-right: var(--space-2xl);
 }
-.pqv-avatar {
-  flex-shrink: 0;
-  width: var(--size-roster-core-portrait);
-  height: var(--size-roster-core-portrait);
-  border-radius: var(--radius-panel);
-  background: var(--color-surface-muted);
-  border: var(--border-width-default) solid var(--color-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.25rem;
-  color: var(--color-text-secondary);
-}
 .pqv-hero-copy {
   display: flex;
   flex-direction: column;
@@ -910,6 +896,29 @@ a {
     max-height: 92vh;
     border-radius: var(--radius-panel);
   }
+  .pqv-drag-handle {
+    display: flex;
+  }
+}
+
+/* Drag handle — visual affordance that this is a swipeable bottom sheet on
+   narrow viewports (coridian_, 2026-10-17: "I would like for the PQV and
+   other pop-ups to be a window that pops up from the bottom of the screen
+   that you can easily swipe down or X out"). Hidden by default (desktop's
+   centered modal isn't a sheet); shown only in the mobile breakpoint above,
+   alongside the swipe-to-dismiss gesture the dialog itself implements. */
+.pqv-drag-handle {
+  display: none;
+  justify-content: center;
+  padding-top: var(--space-sm);
+  margin: calc(var(--space-xl) * -1) calc(var(--space-xl) * -1) var(--space-sm);
+  touch-action: none;
+  cursor: grab;
+}
+.pqv-drag-handle-bar {
+  width: 2.5rem;
+  height: 0.25rem;
+  background: var(--color-border-strong);
 }
 
 /* LoadingScreen's brand-mark pulse — matches mobile's LoadingScreen.tsx
