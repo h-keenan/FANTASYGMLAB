@@ -232,7 +232,7 @@ MOBILE_PREMIUM_BENEFIT_LINES: tuple[dict[str, str], ...] = (
     },
     {
         "title": product_copy.PREMIUM_FULL_TRADE_HUB,
-        "line": "Every Trade Hub idea, not just the first 2 (skip the ads)",
+        "line": "Every Trade Hub idea, not just the first 2",
     },
     {
         "title": "GM Targets (full board)",
