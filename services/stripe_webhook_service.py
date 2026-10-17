@@ -13,6 +13,10 @@ Test mode is the safe default. Live mode requires explicit matching configuratio
 
 from __future__ import annotations
 
+import logging
+import os
+import sys
+
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -22,6 +26,21 @@ from modules import stripe_billing, stripe_webhook
 
 SERVICE_NAME = "stripe-webhook"
 EXPECTED_PUBLIC_HOST = "https://fantasygmlab-stripe-webhook.onrender.com"
+
+# Before this, an unhandled exception on this service produced only the
+# generic {"ok": false, "error": "Webhook processing failed."} 500 body
+# below — nothing was ever written anywhere a human could see it (the exact
+# gap services/mobile_api_service.py's own logging fix already closed for
+# that service; this mirrors it). A stdlib `logging` logger writing to
+# stdout is enough to make every crash debuggable from whatever platform's
+# log viewer captures this process's output.
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger("fantasygm.stripe_webhook")
 
 app = FastAPI(
     title="FantasyDesk Stripe Webhook",
@@ -53,7 +72,13 @@ async def _validation_exception_handler(_request: Request, _exc: RequestValidati
 
 
 @app.exception_handler(Exception)
-async def _unhandled_exception_handler(_request: Request, _exc: Exception):
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+    )
     return JSONResponse(
         status_code=500,
         content={"ok": False, "error": "Webhook processing failed."},
