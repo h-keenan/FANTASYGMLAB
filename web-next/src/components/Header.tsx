@@ -1,10 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { VALUATION_LENS_OPTIONS, useValuationLens } from "@/context/ValuationLensContext";
 
 const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "about_disclaimer", label: "About / Disclaimer" },
@@ -14,96 +17,230 @@ const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "no_affiliation", label: "No-Affiliation Disclaimer" },
 ];
 
+interface SavedLeagueRow {
+  league_id: string;
+  league_name: string | null;
+}
+
+function LeagueSwitcherButton({ leagueId }: { leagueId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [leagues, setLeagues] = useState<SavedLeagueRow[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    supabase
+      .from("saved_leagues")
+      .select("league_id, league_name")
+      .then(({ data }) => {
+        if (!cancelled) setLeagues(data ?? []);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="px-2.5 py-1.5 text-xs font-bold"
+        style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        Switch league ▾
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={() => setOpen(false)} />
+          <div role="menu" className="absolute left-0 top-full mt-1 flex flex-col py-1 min-w-[14rem]" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50 }}>
+            {leagues.length === 0 ? (
+              <span className="px-3 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                No other saved leagues
+              </span>
+            ) : (
+              leagues.map((row) => (
+                <button
+                  key={row.league_id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    router.push(`/dashboard/${encodeURIComponent(row.league_id)}?name=${encodeURIComponent(row.league_name || row.league_id)}`);
+                  }}
+                  className="px-3 py-2 text-xs font-semibold text-left"
+                  style={{ color: row.league_id === leagueId ? "var(--color-accent)" : "var(--color-text-secondary)" }}
+                >
+                  {row.league_name || row.league_id}
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function EvaluationLensButton({ leagueId }: { leagueId: string }) {
+  const { lens, setLens } = useValuationLens(leagueId);
+  const [open, setOpen] = useState(false);
+  const current = VALUATION_LENS_OPTIONS.find((option) => option.value === lens);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="px-2.5 py-1.5 text-xs font-bold"
+        style={{ color: "var(--color-premium)", border: "var(--border-width-default) solid var(--color-premium)" }}
+      >
+        {current?.label ?? "Dynasty"} ▾
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={() => setOpen(false)} />
+          <div role="menu" className="absolute left-0 top-full mt-1 flex flex-col py-1 min-w-[16rem]" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50 }}>
+            {VALUATION_LENS_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setLens(option.value);
+                  setOpen(false);
+                }}
+                className="flex flex-col px-3 py-2 text-left"
+                style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+              >
+                <span className="text-xs font-bold" style={{ color: option.value === lens ? "var(--color-premium)" : "var(--color-text-primary)" }}>
+                  {option.label}
+                </span>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  {option.hint}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Site-wide persistent top bar — rendered once in layout.tsx, so every
  * route gets it for free (coridian_: "add ... the header", 2026-10-16).
- * This app had no persistent nav/header at all before this: every route
- * was reachable only via Dashboard's own in-page "Explore" links or a
- * direct URL, and the 5 legal pages (see src/app/legal/[pageKey]) had no
- * entry point whatsoever. Kept deliberately small — a brand/home link plus
- * a menu for the genuinely-orphaned destinations (legal pages, sign out) —
- * rather than flattening all ~20 content pages into one global nav, which
- * mobile itself doesn't do either (RootNavigator is a Dashboard-first
- * drill-down, not a flat tab bar; see MoreScreen.tsx for the same
- * legal-links-plus-account grouping this menu mirrors).
+ * League switcher + evaluation lens (2026-10-17: "The header needs to have
+ * a league switcher built into it, as well as the evaluation lens similar
+ * to how the app is") only render on a league-scoped route — on `/` or
+ * `/portfolio`/`/news`/etc. there is no league context for either to act
+ * on. Real branding (2026-10-17: "The header also needs the branding") is
+ * the same brand mark mobile's splash/loading screen and GM orb use
+ * (public/brand-mark.png, copied from mobile/assets/splash-icon.png) — not
+ * invented fresh here.
  */
 export function Header() {
   const { session, signOut } = useAuth();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const params = useParams<{ leagueId?: string }>();
+  const searchParams = useSearchParams();
+  const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
+  const leagueName = searchParams.get("name") || leagueId;
 
   return (
     <header
-      className="flex items-center justify-between px-4 py-3 relative"
+      className="flex items-center justify-between px-4 py-3 relative gap-3 flex-wrap"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <Link href="/" className="text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
-        FantasyGM Lab
-      </Link>
-
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setMenuOpen((open) => !open)}
-          aria-expanded={menuOpen}
-          aria-haspopup="menu"
-          className="px-3 py-1.5 text-xs font-bold uppercase"
-          style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)", letterSpacing: "0.03em" }}
-        >
-          Menu
-        </button>
-
-        {menuOpen ? (
-          <>
-            {/* Full-viewport click-catcher to close on outside click —
-                simpler and more robust than a document-level listener for
-                a menu this small. */}
-            <button
-              type="button"
-              aria-hidden
-              tabIndex={-1}
-              className="fixed inset-0"
-              style={{ background: "transparent", zIndex: 40 }}
-              onClick={() => setMenuOpen(false)}
-            />
-            <div
-              role="menu"
-              className="absolute right-0 top-full mt-1 flex flex-col py-1 min-w-[12rem]"
-              style={{
-                background: "var(--color-surface-secondary)",
-                border: "var(--border-width-default) solid var(--color-border)",
-                zIndex: 50,
-              }}
-            >
-              {LEGAL_LINKS.map((item) => (
-                <Link
-                  key={item.pageKey}
-                  href={`/legal/${item.pageKey}`}
-                  role="menuitem"
-                  onClick={() => setMenuOpen(false)}
-                  className="px-3 py-2 text-xs font-semibold"
-                  style={{ color: "var(--color-text-secondary)" }}
-                >
-                  {item.label}
-                </Link>
-              ))}
-              {session ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void signOut().then(() => router.replace("/"));
-                  }}
-                  className="px-3 py-2 text-xs font-semibold text-left"
-                  style={{ color: "var(--color-danger)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
-                >
-                  Sign out
-                </button>
-              ) : null}
-            </div>
-          </>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Link href="/" className="flex items-center gap-2">
+          <Image src="/brand-mark.png" alt="" width={28} height={28} style={{ objectFit: "contain" }} />
+          <span className="text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
+            FantasyGM Lab
+          </span>
+        </Link>
+        {leagueId ? (
+          <span className="text-xs hidden sm:inline" style={{ color: "var(--color-text-muted)" }}>
+            {leagueName}
+          </span>
         ) : null}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {leagueId ? <LeagueSwitcherButton leagueId={leagueId} /> : null}
+        {leagueId ? <EvaluationLensButton leagueId={leagueId} /> : null}
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            className="px-3 py-1.5 text-xs font-bold uppercase"
+            style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)", letterSpacing: "0.03em" }}
+          >
+            Menu
+          </button>
+
+          {menuOpen ? (
+            <>
+              {/* Full-viewport click-catcher to close on outside click —
+                  simpler and more robust than a document-level listener for
+                  a menu this small. */}
+              <button
+                type="button"
+                aria-hidden
+                tabIndex={-1}
+                className="fixed inset-0"
+                style={{ background: "transparent", zIndex: 40 }}
+                onClick={() => setMenuOpen(false)}
+              />
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-1 flex flex-col py-1 min-w-[12rem]"
+                style={{
+                  background: "var(--color-surface-secondary)",
+                  border: "var(--border-width-default) solid var(--color-border)",
+                  zIndex: 50,
+                }}
+              >
+                {LEGAL_LINKS.map((item) => (
+                  <Link
+                    key={item.pageKey}
+                    href={`/legal/${item.pageKey}`}
+                    role="menuitem"
+                    onClick={() => setMenuOpen(false)}
+                    className="px-3 py-2 text-xs font-semibold"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                {session ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void signOut().then(() => router.replace("/"));
+                    }}
+                    className="px-3 py-2 text-xs font-semibold text-left"
+                    style={{ color: "var(--color-danger)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
+                  >
+                    Sign out
+                  </button>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
     </header>
   );

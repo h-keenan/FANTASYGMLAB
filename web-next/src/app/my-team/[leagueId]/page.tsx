@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
 import { MyTeamContent } from "@/components/MyTeamContent";
 
@@ -15,6 +16,7 @@ export default function MyTeamPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   // Best-effort supplements — a Strength & Pressure/Team Snapshot field
@@ -35,7 +37,7 @@ export default function MyTeamPage() {
     let cancelled = false;
 
     api
-      .getMyTeam(leagueId)
+      .getMyTeam(leagueId, lens)
       .then((result) => {
         if (!cancelled) setMyTeam(result);
       })
@@ -44,7 +46,7 @@ export default function MyTeamPage() {
       });
 
     api
-      .getMyTeamNeeds(leagueId)
+      .getMyTeamNeeds(leagueId, lens)
       .then((result) => {
         if (!cancelled) setNeeds(result);
       })
@@ -55,7 +57,7 @@ export default function MyTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   // Team Snapshot's ring/archetype/rank tiles — a separate effect because
   // the match-up needs `myTeam.roster_id`, which only arrives once the
@@ -64,7 +66,7 @@ export default function MyTeamPage() {
     if (!myTeam?.roster_id) return;
     let cancelled = false;
     api
-      .getTeamRankings(leagueId)
+      .getTeamRankings(leagueId, lens)
       .then((result) => {
         if (cancelled) return;
         setLeagueSize(result.teams.length);
@@ -77,7 +79,7 @@ export default function MyTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [leagueId, myTeam?.roster_id]);
+  }, [leagueId, lens, myTeam?.roster_id]);
 
   if (authLoading || (!myTeam && !error)) {
     return (
