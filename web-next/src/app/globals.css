@@ -530,15 +530,27 @@ a {
    per card_hierarchy_styles.py's own .summary-tile-weakness rule — added
    here for Draft Center's "Capital-Constrained Contender" posture tone,
    the first caller this file had for it. */
+/* coridian_, 2026-10-17: "Team Snapshot needs color throughout, not just
+   left-border accents" — every tone already colored its border rail and
+   headline value (.tone-value below), but the card's own background was
+   the same flat --color-surface-secondary regardless of tone, so a risk
+   card and a strength card only differed by a thin 3px sliver. Each tone
+   now also washes its card background with the matching already-defined
+   `-soft` token (same tokens the accent/information treatment elsewhere
+   on this page already uses for a tinted-not-solid fill), so the tone
+   reads at a glance without having to find the left edge first. */
 .tone-strength {
   border-left: var(--border-width-semantic) solid var(--color-success);
+  background: var(--color-success-soft);
 }
 .tone-power,
 .tone-strategy {
   border-left: var(--border-width-semantic) solid var(--color-information);
+  background: var(--color-information-soft);
 }
 .tone-franchise {
   border-left: var(--border-width-semantic) solid var(--color-premium);
+  background: var(--color-action-soft);
 }
 .tone-need,
 .tone-health,
@@ -546,9 +558,11 @@ a {
 .tone-warning,
 .tone-weakness {
   border-left: var(--border-width-semantic) solid var(--color-warning);
+  background: var(--color-warning-soft);
 }
 .tone-opportunity {
   border-left: var(--border-width-semantic) solid var(--color-opportunity);
+  background: var(--color-opportunity-soft);
 }
 .tone-neutral {
   border-left: var(--border-width-semantic) solid var(--color-border);
