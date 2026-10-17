@@ -29,14 +29,23 @@ export function PlayerAvatar({
   size?: number;
 }) {
   const [failed, setFailed] = useState(false);
-  const ringColor = `var(${resolvePlayerTier(tier).colorVar})`;
+  const tierIdentity = resolvePlayerTier(tier);
+  const ringColor = `var(${tierIdentity.colorVar})`;
   const dimension = { width: size, height: size, borderRadius: "50%" };
+  // coridian_: the ring color's meaning is never explained anywhere — a
+  // hover tooltip naming the tier is the cheapest fix that doesn't require
+  // new on-page UI real estate. Only shown when a caller actually passed a
+  // tier (some rows, e.g. League Recaps, render this avatar with no tier
+  // concept at all, where resolvePlayerTier's "Depth / Developmental"
+  // default would be a misleading tooltip, not a real classification).
+  const title = tier ? tierIdentity.semanticLabel : undefined;
 
   if (!playerId || failed) {
     return (
       <span
         className="shrink-0"
         style={{ ...dimension, display: "inline-block", border: `2px solid ${ringColor}`, background: "var(--color-surface-muted)" }}
+        title={title}
         aria-hidden
       />
     );
@@ -47,6 +56,7 @@ export function PlayerAvatar({
     <img
       src={`${SLEEPER_HEADSHOT_BASE}/${playerId}.jpg`}
       alt=""
+      title={title}
       style={{ ...dimension, border: `2px solid ${ringColor}`, objectFit: "cover", objectPosition: "top" }}
       className="shrink-0"
       onError={() => setFailed(true)}
