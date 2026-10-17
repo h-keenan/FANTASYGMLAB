@@ -13,6 +13,10 @@ Test mode is the safe default. Live mode requires explicit matching configuratio
 
 from __future__ import annotations
 
+import logging
+import os
+import sys
+
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -22,6 +26,16 @@ from modules import revenuecat_billing, revenuecat_webhook
 
 SERVICE_NAME = "revenuecat-webhook"
 EXPECTED_PUBLIC_HOST = "https://fantasygm-lab-revenuecat-webhook.onrender.com"
+
+# Mirrors services/stripe_webhook_service.py's identical fix — before this,
+# an unhandled exception here left zero trace anywhere a human could see it.
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger("fantasygm.revenuecat_webhook")
 
 app = FastAPI(
     title="FantasyDesk RevenueCat Webhook",
@@ -53,7 +67,13 @@ async def _validation_exception_handler(_request: Request, _exc: RequestValidati
 
 
 @app.exception_handler(Exception)
-async def _unhandled_exception_handler(_request: Request, _exc: Exception):
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+    )
     return JSONResponse(
         status_code=500,
         content={"ok": False, "error": "Webhook processing failed."},
