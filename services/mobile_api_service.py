@@ -145,6 +145,7 @@ from modules import (
     player_state_authority,
     players_refresh_flight,
     playoff_simulator,
+    premium,
     premium_page,
     push_tokens,
     push_triggers,
@@ -730,9 +731,23 @@ def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict
         return defaults
     if isinstance(rows, list) and rows and isinstance(rows[0], dict):
         row = rows[0]
-        entitlement = str(row.get("entitlement") or "free").strip().lower()
+        # The old `entitlement in {"free", "premium"} else "free"`
+        # whitelist here silently coerced "front_office" (the top paid
+        # tier modules/stripe_webhook.py writes on a real Front Office
+        # purchase — see modules.premium's FREE/PRO/FRONT_OFFICE tiers) to
+        # "free", wiping out every premium benefit for that customer.
+        # Normalize via modules.premium.canonical_tier first so any raw/
+        # legacy stored value maps correctly, then collapse PRO and
+        # FRONT_OFFICE to the wire value "premium" both this endpoint's
+        # callers (web-next's `entitlement: "free" | "premium"` type,
+        # mobile's equivalent) and every `is_at_least(entitlement, PRO)`
+        # check in this file already expect — front_office-specific
+        # capabilities (modules.premium.has_cross_league_exposure etc.)
+        # aren't gated anywhere on this API yet, so there's nothing lost by
+        # not exposing a third wire value until a caller actually needs it.
+        normalized_tier = premium.canonical_tier(row.get("entitlement"))
         return {
-            "entitlement": entitlement if entitlement in {"free", "premium"} else "free",
+            "entitlement": "premium" if normalized_tier != premium.FREE else "free",
             "sleeper_username": str(row.get("sleeper_username") or "").strip(),
             "status": "ok",
         }
@@ -4217,7 +4232,7 @@ def add_gm_target(
     profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {"entitlement": "free"}
     cap = (
         gm_targets.MAX_TARGETS_PREMIUM
-        if profile.get("entitlement") == "premium"
+        if premium.is_at_least(profile.get("entitlement"), premium.PRO)
         else gm_targets.MAX_TARGETS_FREE
     )
 
@@ -5250,7 +5265,7 @@ def get_league_dashboard(
     # priority-ordered Today's Game Plan list rather than the pre-
     # reorganization raw tile list web slices, since that's the exact
     # sequence this response actually displays.
-    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     all_items = list(briefing.items)
     visible_items = all_items if is_premium else all_items[:FREE_DASHBOARD_VISIBLE_ITEMS]
 
@@ -5282,6 +5297,27 @@ _PORTFOLIO_UPSELL = {
         "so there's nothing to aggregate yet. Upgrade to Premium to save every "
         "league you're in and see your record, rank, and top need or "
         "opportunity across all of them in one place."
+    ),
+}
+
+# GM Plan and Trade Finder are both Premium-only on app.py (see
+# render_gm_plan... and modules/trade_hub_ui.py's current_user_is_premium()
+# gates), but shipped fully free/ungated on this API — coridian_, 2026-10-17:
+# "streamlit had proper premium bqarriers" (confirming these should match).
+_GM_PLAN_UPSELL = {
+    "title": "Your season-arc roadmap",
+    "body": (
+        "GM Plan is a Premium feature: where you stand, your best trade "
+        "paths, and your roster construction — framed by your declared "
+        "Team Situation. Upgrade to Premium to unlock it."
+    ),
+}
+_TRADE_FINDER_UPSELL = {
+    "title": "Build and search for a trade",
+    "body": (
+        "Trade Finder is a Premium feature — build a custom package and "
+        "search every roster in your league for a real match. Upgrade to "
+        "Premium to unlock it."
     ),
 }
 
@@ -5399,7 +5435,7 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
     profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
-    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
 
     if not is_premium:
         return {
@@ -5640,7 +5676,7 @@ def get_leagues_glance(lens: str = "Dynasty", user: dict[str, Any] = Depends(req
     user_id = str(user.get("id") or "")
     access_token = str(user.get("_access_token") or "")
     profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
-    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
 
     base = {
         "ok": True,
@@ -5736,7 +5772,18 @@ def get_gm_plan(
 
     my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
     if my_roster is None:
-        return {"ok": True, "quiet": True, "focus_areas": [], "reason": reason}
+        return {"ok": True, "quiet": True, "focus_areas": [], "reason": reason, "is_premium": False, "upsell": None}
+
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    if not is_premium:
+        return {
+            "ok": True,
+            "quiet": True,
+            "focus_areas": [],
+            "reason": "",
+            "is_premium": False,
+            "upsell": _GM_PLAN_UPSELL,
+        }
 
     league = sleeper.get_league(league_id)
     if not league:
@@ -5843,7 +5890,7 @@ def get_gm_plan(
         injury_context=injury_context,
     )
 
-    return {"ok": True, "quiet": False, "reason": "", **plan}
+    return {"ok": True, "quiet": False, "reason": "", "is_premium": True, "upsell": None, **plan}
 
 
 # Display order for My Team's starters section — matches
@@ -7291,7 +7338,7 @@ def get_league_waivers(
     # port: web dedupes against its own `featured_free_agents` presentation
     # slice, which isn't reproduced here — this dedupes against the same
     # Priority Adds list this endpoint already returns instead.
-    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     stash_candidates: list[dict[str, Any]] = []
     watchlist_candidates: list[dict[str, Any]] = []
     faab_targets: list[dict[str, Any]] = []
@@ -7495,7 +7542,7 @@ def get_trade_hub_ideas(
         team_stance=declared_team_stance,
     )
 
-    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
     ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
     approved_count = len(ranked)
     ad_unlocks_applied = max(0, min(int(ad_unlocks or 0), MAX_AD_UNLOCKS))
@@ -7551,21 +7598,30 @@ def get_trade_finder_ideas(
             detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
         )
 
-    selected_ids = tuple(sorted({pid.strip() for pid in player_ids.split(",") if pid.strip()}))
-    if not selected_ids:
-        return {"ok": True, "ideas": [], "reason": "no_players_selected"}
-
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
 
+    # Trade Finder is Premium-only on app.py (modules.trade_hub_ui's
+    # current_user_is_premium() gate on the whole workspace) — coridian_,
+    # 2026-10-17: "streamlit had proper premium bqarriers." Checked before
+    # the selected-players validation below since a free user can't use
+    # this feature at all, regardless of what they selected.
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    if not is_premium:
+        return {"ok": True, "ideas": [], "reason": "", "is_premium": False, "upsell": _TRADE_FINDER_UPSELL}
+
+    selected_ids = tuple(sorted({pid.strip() for pid in player_ids.split(",") if pid.strip()}))
+    if not selected_ids:
+        return {"ok": True, "ideas": [], "reason": "no_players_selected", "is_premium": True, "upsell": None}
+
     my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
     if my_roster is None:
-        return {"ok": True, "ideas": [], "reason": reason}
+        return {"ok": True, "ideas": [], "reason": reason, "is_premium": True, "upsell": None}
 
     roster_id = my_roster.get("roster_id")
     if roster_id is None:
-        return {"ok": True, "ideas": [], "reason": "empty_roster"}
+        return {"ok": True, "ideas": [], "reason": "empty_roster", "is_premium": True, "upsell": None}
 
     gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
@@ -7585,7 +7641,7 @@ def get_trade_finder_ideas(
         team_stance=declared_team_stance,
     )
     ranked = _project_and_enrich_trade_idea_cards(records, league_id=league_id, lens=lens)
-    return {"ok": True, "ideas": ranked, "reason": ""}
+    return {"ok": True, "ideas": ranked, "reason": "", "is_premium": True, "upsell": None}
 
 
 @app.get("/v1/leagues/{league_id}/all-trades")
@@ -7626,7 +7682,7 @@ def get_league_all_trades(
     config = auth_supabase.get_supabase_config()
     user_id = str(user.get("id") or "")
     profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
-    is_premium = str(profile.get("entitlement") or "free") == "premium"
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
 
     league = sleeper.get_league(league_id)
     if not league:

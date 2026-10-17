@@ -2,8 +2,8 @@ import Link from "next/link";
 
 import type { BriefingItem, PortfolioFailedLeague, PortfolioLeague, PortfolioResponse } from "@/lib/api";
 import { categoryColorVar, categoryLabel } from "@/lib/portfolioPresentation";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { formatRank } from "@/components/SnapshotTile";
-import { streamlitPageUrl } from "@/lib/streamlitLink";
 
 /**
  * Ports modules/portfolio_page.py's render_portfolio_page — the cross-
@@ -166,30 +166,13 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
 
 export function PortfolioContent({ data }: { data: PortfolioResponse }) {
   if (!data.is_premium) {
-    const title = data.upsell?.title ?? "See every league at a glance";
-    const body =
-      data.upsell?.body ??
-      "Portfolio is a Premium feature — free accounts keep one saved league, so there's nothing to aggregate yet. " +
-        "Upgrade to Premium to save every league you're in and see your record, rank, and top need or opportunity " +
-        "across all of them in one place.";
     return (
-      <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
-        <header className="flex flex-col gap-1">
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Portfolio
-          </span>
-          <h1 style={{ font: "var(--font-page-title)" }}>{title}</h1>
-        </header>
-        <div
-          className="p-4 flex flex-col gap-3"
-          style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-action)" }}
-        >
-          <p className="text-sm">{body}</p>
-          <a href={streamlitPageUrl("premium")} className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
-            Upgrade →
-          </a>
-        </div>
-      </main>
+      <PremiumUpsellCard
+        kicker="Portfolio"
+        upsell={data.upsell}
+        fallbackTitle="See every league at a glance"
+        fallbackBody="Portfolio is a Premium feature — free accounts keep one saved league, so there's nothing to aggregate yet. Upgrade to Premium to save every league you're in and see your record, rank, and top need or opportunity across all of them in one place."
+      />
     );
   }
 

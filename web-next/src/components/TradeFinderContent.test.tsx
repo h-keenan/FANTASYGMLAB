@@ -118,7 +118,7 @@ describe("TradeFinderContent", () => {
   });
 
   it("searches with exactly the selected player_ids and renders results via the shared trade-idea card", async () => {
-    const response: TradeFinderResponse = { ok: true, ideas: [idea({})], reason: "" };
+    const response: TradeFinderResponse = { ok: true, ideas: [idea({})], reason: "", is_premium: true, upsell: null };
     vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
 
     render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
@@ -135,7 +135,7 @@ describe("TradeFinderContent", () => {
   });
 
   it("shows a no-results message when the search returns an empty idea list", async () => {
-    const response: TradeFinderResponse = { ok: true, ideas: [], reason: "" };
+    const response: TradeFinderResponse = { ok: true, ideas: [], reason: "", is_premium: true, upsell: null };
     vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
 
     render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
@@ -146,6 +146,27 @@ describe("TradeFinderContent", () => {
     });
 
     expect(screen.getByText(/No realistic trades found for this selection/)).toBeInTheDocument();
+  });
+
+  it("shows the premium upsell instead of the builder once a Free caller searches", async () => {
+    const response: TradeFinderResponse = {
+      ok: true,
+      ideas: [],
+      reason: "",
+      is_premium: false,
+      upsell: { title: "Build and search for a trade", body: "Upgrade to Premium to unlock it." },
+    };
+    vi.mocked(api.getTradeFinderIdeas).mockResolvedValue(response);
+
+    render(<TradeFinderContent leagueId="123" leagueName="Dynasty Overlords" myTeam={myTeam({})} />);
+
+    fireEvent.click(screen.getByText("My Running Back"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
+    });
+
+    expect(screen.getByRole("heading", { name: "Build and search for a trade" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Find Realistic Trades/ })).not.toBeInTheDocument();
   });
 
   it("shows the roster-not-ready message instead of a picker when `reason` is set", () => {
