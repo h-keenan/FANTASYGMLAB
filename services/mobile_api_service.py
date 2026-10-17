@@ -131,6 +131,7 @@ from modules import (
     live_draft,
     live_draft_trade_evaluator,
     manager_activity,
+    matchup_win_probability,
     my_news,
     news as news_cache,
     news_signal,
@@ -6408,6 +6409,7 @@ def _matchup_side(
     score_field: str,
     *,
     players_lookup: dict[str, Any] | None = None,
+    projection_context: "_ProjectionContext | None" = None,
 ) -> dict[str, Any]:
     """One team's side of the matchup: identity, suggested starters, season-value total.
 
@@ -6421,6 +6423,16 @@ def _matchup_side(
     _suggested_lineup_split reinstate a genuinely rostered player whose
     literal "Inactive" status got him filtered out of `valued` upstream —
     see _reinstated_inactive_roster_rows.
+
+    `projection_context`, when given, attaches each starter's this-week
+    `projection` (point_estimate/low/high/confidence) via the same
+    `_weekly_projection_for_player` the real lineup already uses — reusing
+    data already fetched for `_real_current_lineup`, not a new source (see
+    get_league_matchup's docstring note on why this view previously had no
+    weekly projection at all: coridian_, 2026-10-17, "everyy player on the
+    matchup screen needs a projection"). `None` when the caller couldn't
+    build one (no live lineup to enrich yet) — each starter's `projection`
+    is then `None` too, same honest-absence contract as everywhere else.
     """
 
     starters, _bench = _suggested_lineup_split(
@@ -6437,6 +6449,18 @@ def _matchup_side(
 
     for player in starters:
         player["why"] = _matchup_starter_why(player, best_score_by_position)
+        player["projection"] = (
+            _weekly_projection_for_player(
+                str(player.get("player_id") or ""),
+                projection_context.week,
+                projection_context.season,
+                players_lookup=projection_context.players_lookup,
+                weekly_stats=projection_context.weekly_stats,
+                defense_strength=projection_context.defense_strength,
+            )
+            if projection_context is not None
+            else None
+        )
 
     season_value_total = round(
         sum(float(p["score"]) for p in starters if isinstance(p.get("score"), (int, float))), 1
@@ -6732,6 +6756,7 @@ def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
         "opponent": None,
         "comparison": None,
         "real_comparison": None,
+        "win_probability": None,
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": reason,
@@ -6860,40 +6885,11 @@ def get_league_matchup(
         matchup_players_lookup = sleeper.get_players()
     except Exception:
         matchup_players_lookup = {}
-    my_side = _matchup_side(
-        my_roster_id,
-        my_roster,
-        profiles.get(my_roster_id) or {},
-        valued,
-        settings,
-        score_field,
-        players_lookup=matchup_players_lookup,
-    )
-    opponent_side = _matchup_side(
-        opponent_roster_id,
-        opponent_roster,
-        profiles.get(opponent_roster_id) or {},
-        valued,
-        settings,
-        score_field,
-        players_lookup=matchup_players_lookup,
-    )
-    if not my_side["starters"] and not opponent_side["starters"]:
-        return _empty_matchup("empty_roster", week=current_week)
 
-    # Additive: each side's REAL current-week lineup/points from Sleeper's
-    # own matchup entry, alongside the (unchanged) suggested season-value
-    # lineup already built into my_side/opponent_side above. Each real
-    # starter also carries this week's per-game `projection` (point
-    # estimate/low/high/confidence/honest status) and a `game_started` flag
-    # (modules.nfl_schedule's real kickoff time for his team/week) —
-    # computed from data fetched ONCE for the whole request (both rosters),
-    # not once per player, via `_ProjectionContext`/`_weekly_projection_for_
-    # player`/`_player_game_started`. Only attempted at all when at least
-    # one side actually has a live lineup to enrich, and treated as
-    # best-effort (same "fails soft" contract as every other enrichment
-    # fetch in this file) — a projection-data hiccup must never break the
-    # real Sleeper lineup/points response.
+    # Built BEFORE _matchup_side (not just _real_current_lineup below) so
+    # the suggested season-value lineup also gets each starter's this-week
+    # `projection` — see _matchup_side's own docstring for why. Best-effort,
+    # same "fails soft" contract as everywhere else in this file.
     projection_context = None
     has_any_real_starters = bool(my_entry.get("starters")) or bool(opponent_entry.get("starters"))
     if has_any_real_starters:
@@ -6918,6 +6914,39 @@ def get_league_matchup(
             )
         except Exception:
             projection_context = None
+
+    my_side = _matchup_side(
+        my_roster_id,
+        my_roster,
+        profiles.get(my_roster_id) or {},
+        valued,
+        settings,
+        score_field,
+        players_lookup=matchup_players_lookup,
+        projection_context=projection_context,
+    )
+    opponent_side = _matchup_side(
+        opponent_roster_id,
+        opponent_roster,
+        profiles.get(opponent_roster_id) or {},
+        valued,
+        settings,
+        score_field,
+        players_lookup=matchup_players_lookup,
+        projection_context=projection_context,
+    )
+    if not my_side["starters"] and not opponent_side["starters"]:
+        return _empty_matchup("empty_roster", week=current_week)
+
+    # Additive: each side's REAL current-week lineup/points from Sleeper's
+    # own matchup entry, alongside the (unchanged) suggested season-value
+    # lineup already built into my_side/opponent_side above. Each real
+    # starter also carries this week's per-game `projection` (point
+    # estimate/low/high/confidence/honest status) and a `game_started` flag
+    # (modules.nfl_schedule's real kickoff time for his team/week) —
+    # computed from data fetched ONCE for the whole request (both rosters),
+    # not once per player, via `_ProjectionContext`/`_weekly_projection_for_
+    # player`/`_player_game_started`.
     my_side.update(
         _real_current_lineup(my_entry, valued, score_field, projection_context=projection_context, settings=settings)
     )
@@ -6925,6 +6954,18 @@ def get_league_matchup(
         _real_current_lineup(
             opponent_entry, valued, score_field, projection_context=projection_context, settings=settings
         )
+    )
+
+    # Live, single-week win probability — built from each side's REAL
+    # current-week starters (real points once a game's started, this
+    # week's per-game projection otherwise), not the hypothetical
+    # suggested-optimal lineup. coridian_: "we need ... a bar saying whos
+    # winnig/ projected to win ... a live updating predictor." Honestly
+    # unavailable (not a guessed 50/50) when either side's starters aren't
+    # modeled enough yet — see modules.matchup_win_probability's own
+    # docstring for the coverage gate.
+    win_probability = matchup_win_probability.compute_live_win_probability(
+        my_side.get("real_starters") or [], opponent_side.get("real_starters") or []
     )
 
     return {
@@ -6936,6 +6977,7 @@ def get_league_matchup(
             my_side["season_value_total"], opponent_side["season_value_total"]
         ),
         "real_comparison": _real_matchup_comparison(my_side, opponent_side),
+        "win_probability": win_probability,
         "basis": SEASON_VALUE_BASIS,
         "basis_label": SEASON_VALUE_BASIS_LABEL,
         "reason": "",
