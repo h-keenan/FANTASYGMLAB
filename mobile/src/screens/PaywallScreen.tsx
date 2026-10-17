@@ -48,7 +48,7 @@ const FALLBACK_FEATURES = [
   'Your full Next Move briefing, not just the top 4',
   'Full League Pulse — see the whole league’s contenders and rebuilders',
   'The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist',
-  'Every Trade Hub idea, not just the first 2 (skip the ads)',
+  'Every Trade Hub idea, not just the first 2',
   'GM Targets watchlist up to 50 players (Free is capped at 3)',
   'Portfolio — your record, rank, and top need across every saved league, not just one',
 ];
