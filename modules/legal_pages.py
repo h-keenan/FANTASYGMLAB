@@ -10,7 +10,7 @@ from modules.html_rendering import render_html_fragment
 from modules.workspace_ui import render_section_header
 
 
-LAST_UPDATED = "September 29, 2026"
+LAST_UPDATED = "October 17, 2026"
 
 NO_AFFILIATION_TEXT = (
     f"{brand_identity.PRODUCT_NAME} is an independent fantasy football tool. It is not affiliated with, "
