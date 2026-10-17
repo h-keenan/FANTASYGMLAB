@@ -6550,6 +6550,7 @@ def _real_current_lineup(
     score_field: str,
     *,
     projection_context: "_ProjectionContext | None" = None,
+    settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """This roster's ACTUAL current-week lineup and points, straight from Sleeper.
 
@@ -6580,10 +6581,37 @@ def _real_current_lineup(
         matching = valued[valued["player_id"].astype(str).isin(starter_ids)]
         valued_by_id = {str(row["player_id"]): row for _, row in matching.iterrows()}
 
+    # A real Sleeper starter missing from `valued` isn't necessarily a
+    # non-player (team DEF): modules.player_eligibility.
+    # filter_current_fantasy_players treats a literal "Inactive" status as
+    # no-longer-current, so a genuinely rostered, genuinely-starting player
+    # can vanish from `valued` entirely — the same gap _matchup_side/
+    # _suggested_lineup_split already reinstate for the suggested-lineup
+    # view above (see _reinstated_inactive_roster_rows's docstring).
+    # Reused here, not reinvented, so both matchup views resolve identity
+    # the same way (coridian_, 2026-10-17: a real Sleeper opponent starter —
+    # Lamar Jackson, status "Inactive" that week — rendered as "Unknown
+    # player"/"FA" here despite resolving fine everywhere else).
+    missing_ids = {pid for pid in starter_ids if pid not in valued_by_id}
+    reinstated_by_id: dict[str, pd.Series] = {}
+    if missing_ids and projection_context is not None:
+        reinstated_rows = _reinstated_inactive_roster_rows(
+            missing_ids,
+            players_lookup=projection_context.players_lookup,
+            valued=valued,
+            settings=settings,
+            score_field=score_field,
+        )
+        reinstated_by_id = {
+            str(rec["player_id"]): pd.Series(rec) for rec in reinstated_rows
+        }
+
     rows: list[dict[str, Any]] = []
     for index, player_id in enumerate(starter_ids):
         actual_points = starters_points[index] if index < len(starters_points) else None
         row = valued_by_id.get(player_id)
+        if row is None:
+            row = reinstated_by_id.get(player_id)
         if row is not None:
             rows.append(
                 _project_real_starter_row(
@@ -6591,12 +6619,15 @@ def _real_current_lineup(
                 )
             )
         else:
-            # A real Sleeper starter who isn't in our valued pool (e.g. a
-            # team DEF, or filtered out upstream) — still show his real
-            # points, just without season-value enrichment. `project_player_week`
-            # itself returns `unknown_player` for an id it can't resolve, so
-            # this still gets an honest projection status rather than a bare
-            # None field.
+            # A real Sleeper starter who isn't in our valued pool and
+            # isn't a reinstatable "Inactive" rostered player either — a
+            # team DEF (no real player_id identity to resolve) or an id
+            # genuinely unknown to Sleeper's own player directory. Still
+            # show his real points, just without identity/season-value
+            # enrichment. `project_player_week` itself returns
+            # `unknown_player` for an id it can't resolve, so this still
+            # gets an honest projection status rather than a bare None
+            # field.
             rows.append(
                 {
                     "player_id": player_id,
@@ -6887,9 +6918,13 @@ def get_league_matchup(
             )
         except Exception:
             projection_context = None
-    my_side.update(_real_current_lineup(my_entry, valued, score_field, projection_context=projection_context))
+    my_side.update(
+        _real_current_lineup(my_entry, valued, score_field, projection_context=projection_context, settings=settings)
+    )
     opponent_side.update(
-        _real_current_lineup(opponent_entry, valued, score_field, projection_context=projection_context)
+        _real_current_lineup(
+            opponent_entry, valued, score_field, projection_context=projection_context, settings=settings
+        )
     )
 
     return {
