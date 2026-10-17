@@ -20,13 +20,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AuthProvider>
           <ValuationLensProvider>
             <PlayerQuickViewProvider>
-              {/* useSearchParams (Header's league-name lookup, GmOrb's) opts
-                  a page into client-side rendering unless wrapped in
-                  Suspense — this app's static pages (/, /news, /portfolio,
-                  ...) would otherwise fail to prerender. */}
-              <Suspense fallback={null}>
-                <Header />
-              </Suspense>
+              {/* Header handles its own internal Suspense boundary now
+                  (just around its league-aware sub-piece), so the brand
+                  mark/wordmark render synchronously on every page instead
+                  of waiting on hydration — a real new-user-UX-audit finding,
+                  2026-10-17 (the header was invisible in the server-rendered
+                  HTML of every single page). GmOrb still needs its own
+                  Suspense wrap for useSearchParams — this app's static pages
+                  (/, /news, /portfolio, ...) would otherwise fail to
+                  prerender — but a floating button popping in a beat after
+                  first paint is far less noticeable than a missing header. */}
+              <Header />
               {children}
               <Suspense fallback={null}>
                 <GmOrb />
