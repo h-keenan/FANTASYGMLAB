@@ -21,7 +21,7 @@ LIVE_DRAFT_CSS = """
 }
 
 .live-draft-kicker {
-    color: rgba(199, 251, 43, 0.92);
+    color: rgba(103, 232, 249, 0.92);
     font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.08em;

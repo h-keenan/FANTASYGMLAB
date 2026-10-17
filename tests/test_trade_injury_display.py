@@ -444,7 +444,7 @@ class TestTradeInjuryDisplay(unittest.TestCase):
             self.assertIn(visible_mapping, app.APP_CSS)
 
         self.assertIn("border-left: 4px solid rgba(248, 250, 252, 0.64)", app.APP_CSS)
-        self.assertIn("border-left: 5px solid rgba(199, 251, 43, 0.88)", app.APP_CSS)
+        self.assertIn("border-left: 5px solid rgba(103, 232, 249, 0.88)", app.APP_CSS)
         self.assertIn("border-left: 3px solid rgba(45, 212, 191, 0.74)", app.APP_CSS)
         self.assertIn("border-left: 2px solid rgba(229, 231, 235, 0.15)", app.APP_CSS)
 
