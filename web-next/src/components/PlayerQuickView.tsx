@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type PlayerAward, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
@@ -13,7 +14,6 @@ import {
   awardTierTone,
   overallRatingBand,
   ordinal,
-  playerInitials,
   seasonStatGroups,
   statPercentileBand,
 } from "@/lib/playerQuickViewPresentation";
@@ -37,8 +37,10 @@ import {
  * response (that endpoint is league-independent and assumes the caller
  * already has it — see lib/api.ts's QuickViewResponse docstring), so it
  * comes from the `identity` prop a caller's existing row data already
- * carries. web-next has no headshot CDN wiring yet, so the portrait is
- * always an initials badge, matching avatar_html's own text fallback.
+ * carries. The portrait is a real PlayerAvatar (Sleeper's headshot CDN,
+ * tier-colored ring) — coridian_, 2026-10-16: "still need player pfp in
+ * pqv" — falling back to a blank ringed circle for a player with no photo
+ * on file, same as every other avatar in the app.
  */
 export function PlayerQuickView({
   identity,
@@ -52,6 +54,35 @@ export function PlayerQuickView({
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Swipe-down-to-dismiss, via the drag handle only (not the whole modal —
+  // the body itself needs to stay normally scrollable). Pointer events
+  // cover touch and mouse in one handler; dragStartY stays a ref since it's
+  // write-only bookkeeping between pointerdown/pointermove, not something a
+  // render needs to react to.
+  const dragStartY = useRef<number | null>(null);
+  const [dragY, setDragY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const DISMISS_THRESHOLD_PX = 110;
+
+  function handleDragStart(event: React.PointerEvent<HTMLDivElement>) {
+    dragStartY.current = event.clientY;
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function handleDragMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (dragStartY.current === null) return;
+    setDragY(Math.max(0, event.clientY - dragStartY.current));
+  }
+  function handleDragEnd() {
+    if (dragY > DISMISS_THRESHOLD_PX) {
+      onClose();
+      return;
+    }
+    dragStartY.current = null;
+    setIsDragging(false);
+    setDragY(0);
+  }
   const [loadError, setLoadError] = useState(false);
 
   // Fetch detail/awards for this player. The provider mounts one
@@ -139,7 +170,21 @@ export function PlayerQuickView({
         aria-modal="true"
         aria-labelledby="pqv-name"
         onKeyDown={handleKeyDown}
+        style={{
+          transform: dragY ? `translateY(${dragY}px)` : undefined,
+          transition: isDragging ? "none" : "transform 180ms ease",
+        }}
       >
+        <div
+          className="pqv-drag-handle"
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={handleDragEnd}
+          onPointerCancel={handleDragEnd}
+          aria-hidden="true"
+        >
+          <span className="pqv-drag-handle-bar" />
+        </div>
         <button
           ref={closeButtonRef}
           type="button"
@@ -151,9 +196,7 @@ export function PlayerQuickView({
         </button>
 
         <header className="pqv-hero">
-          <div className="pqv-avatar" aria-hidden="true">
-            {playerInitials(identity.name)}
-          </div>
+          <PlayerAvatar playerId={identity.player_id} tier={identity.tier} size={88} />
           <div className="pqv-hero-copy">
             {identity.sourceLabel ? <div className="pqv-source-label">{identity.sourceLabel}</div> : null}
             <h2 id="pqv-name" className="pqv-name">
