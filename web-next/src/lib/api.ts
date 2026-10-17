@@ -1845,6 +1845,19 @@ export const api = {
   getMyRoster: (leagueId: string) =>
     authorizedRequest<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),
 
+  // Raw Sleeper league payload — used only for league.settings.type (0 =
+  // redraft, 1 = keeper, 2 = dynasty), to seed ValuationLensContext's
+  // per-league default with the league's real structural format instead of
+  // always assuming Dynasty (coridian_, 2026-10-17: "it should always
+  // check to see if the league is a dynasty or not... if it's redraft, it
+  // should not automatically input that as dynasty"). Mirrors
+  // modules.league_value_settings.detect_league_value_settings_from_payload's
+  // exact same mapping.
+  getLeague: (leagueId: string) =>
+    authorizedRequest<{ ok: boolean; league: { settings?: { type?: number } } }>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}`,
+    ),
+
   getDashboard: (leagueId: string, lens: string = "Dynasty") =>
     authorizedRequest<DashboardResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/dashboard?lens=${encodeURIComponent(lens)}`,
