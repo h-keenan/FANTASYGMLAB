@@ -6,6 +6,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph, type NavGlyphName } from "@/components/NavDestinationGlyph";
 
 interface Destination {
@@ -122,7 +123,7 @@ export function GmOrb() {
           >
             <div className="flex flex-col gap-1">
               <span className="text-xs font-bold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "0.03em" }}>
-                FantasyGM Lab
+                {BRAND_NAME}
               </span>
               <span style={{ font: "var(--type-section-title)" }}>Where to go</span>
             </div>

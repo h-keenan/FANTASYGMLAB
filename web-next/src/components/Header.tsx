@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { BRAND_NAME } from "@/lib/brand";
 import { supabase } from "@/lib/supabase";
 import { VALUATION_LENS_OPTIONS, useValuationLens } from "@/context/ValuationLensContext";
 
@@ -190,7 +191,7 @@ export function Header() {
         <Link href="/" className="flex items-center gap-2">
           <Image src="/brand-mark.png" alt="" width={28} height={28} style={{ objectFit: "contain" }} />
           <span className="text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
-            FantasyGM Lab
+            {BRAND_NAME}
           </span>
         </Link>
       </div>

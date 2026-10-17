@@ -1,5 +1,7 @@
 import Image from "next/image";
 
+import { BRAND_NAME } from "@/lib/brand";
+
 /**
  * Branded loading state — matching the web app's actual splash (coridian_,
  * 2026-10-17: "the website needs a loading screen similar to the one from
@@ -21,7 +23,7 @@ export function LoadingScreen({ status = "Loading…" }: { status?: string }) {
         style={{ animation: "brand-mark-pulse 900ms ease-in-out infinite" }}
       />
       <h1 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
-        FantasyGM Lab
+        {BRAND_NAME}
       </h1>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         {status}

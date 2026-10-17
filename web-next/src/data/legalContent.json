@@ -4,12 +4,12 @@
     "about_disclaimer": {
       "title": "About / Disclaimer",
       "kicker": "Launch Information",
-      "note": "What FantasyGM Lab is, what its recommendations mean, and where its limits are.",
+      "note": "What FantasyDesk is, what its recommendations mean, and where its limits are.",
       "sections": [
         {
-          "title": "About FantasyGM Lab",
+          "title": "About FantasyDesk",
           "paragraphs": [
-            "FantasyGM Lab is an independent fantasy football analysis and roster-management tool. It organizes league, roster, player, trade, waiver, draft, injury, and news context to help users make their own decisions.",
+            "FantasyDesk is an independent fantasy football analysis and roster-management tool. It organizes league, roster, player, trade, waiver, draft, injury, and news context to help users make their own decisions.",
             "For a plain-language explanation of what evaluations consider \u2014 without changing any values \u2014 see How We Evaluate."
           ],
           "bullets": []
@@ -17,18 +17,18 @@
         {
           "title": "Informational use only",
           "paragraphs": [
-            "Fantasy advice in FantasyGM Lab is provided for informational and entertainment purposes only. Users remain responsible for every lineup, roster, trade, waiver, and draft decision, and FantasyGM Lab does not guarantee results.",
+            "Fantasy advice in FantasyDesk is provided for informational and entertainment purposes only. Users remain responsible for every lineup, roster, trade, waiver, and draft decision, and FantasyDesk does not guarantee results.",
             "Projections, rankings, player values, injury notes, trade ideas, waiver suggestions, draft recommendations, and other analysis may be incomplete, delayed, outdated, or wrong. Injury and news information may lag or remain uncertain. Verify important information with current primary sources before acting."
           ],
           "bullets": [
-            "FantasyGM Lab does not provide gambling or betting advice.",
-            "FantasyGM Lab does not provide financial, legal, medical, or other professional advice."
+            "FantasyDesk does not provide gambling or betting advice.",
+            "FantasyDesk does not provide financial, legal, medical, or other professional advice."
           ]
         },
         {
           "title": "Independent product",
           "paragraphs": [
-            "FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
+            "FantasyDesk is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
           ],
           "bullets": []
         }
@@ -37,31 +37,31 @@
     "terms": {
       "title": "Terms of Use",
       "kicker": "Terms",
-      "note": "Plain-language conditions for using FantasyGM Lab.",
+      "note": "Plain-language conditions for using FantasyDesk.",
       "sections": [
         {
           "title": "Using the app",
           "paragraphs": [
-            "By using FantasyGM Lab, you agree to use it lawfully and responsibly. The app is intended for personal fantasy football research and decision support."
+            "By using FantasyDesk, you agree to use it lawfully and responsibly. The app is intended for personal fantasy football research and decision support."
           ],
           "bullets": [
             "Do not disrupt, overload, abuse, or attempt to gain unauthorized access to the app or its data.",
             "Do not use automated scraping, bulk extraction, or reverse engineering to copy or republish the service, except where applicable law expressly permits it.",
-            "Do not use FantasyGM Lab to impersonate others, violate third-party rights, or interfere with another user's access."
+            "Do not use FantasyDesk to impersonate others, violate third-party rights, or interfere with another user's access."
           ]
         },
         {
           "title": "Advice and responsibility",
           "paragraphs": [
             "All analysis is informational and for entertainment. You are responsible for checking league rules, player status, injuries, news, scoring settings, and transaction details before making a decision.",
-            "FantasyGM Lab does not guarantee the accuracy, completeness, availability, or outcome of projections, rankings, values, trades, waivers, draft recommendations, injury information, or news."
+            "FantasyDesk does not guarantee the accuracy, completeness, availability, or outcome of projections, rankings, values, trades, waivers, draft recommendations, injury information, or news."
           ],
           "bullets": []
         },
         {
           "title": "Availability and changes",
           "paragraphs": [
-            "FantasyGM Lab is an evolving product. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
+            "FantasyDesk is an evolving product. Features, data sources, calculations, and availability may change, break, be limited, or be discontinued without notice.",
             "These terms may be updated as the product changes. Continued use after an update means you accept the revised terms."
           ],
           "bullets": []
@@ -71,8 +71,8 @@
           "paragraphs": [
             "DRAFT \u2014 PENDING LEGAL REVIEW. This section is a first-pass draft prepared for an attorney to review and edit. It is not final, has not been reviewed or approved by qualified counsel, and must not be relied upon as binding until that review is complete.",
             "These Terms are governed by the laws of the State of Wyoming, without regard to its conflict-of-laws principles, except where applicable law (including consumer-protection law in your jurisdiction) requires otherwise.",
-            "Before filing a claim against FantasyGM Lab, you agree to first contact us at support@fantasygmlab.com and attempt in good faith to resolve the dispute informally. Most concerns can be resolved this way without a formal proceeding.",
-            "OPTIONAL, NOT YET ADOPTED \u2014 whether to include a mandatory arbitration and class-action-waiver clause at all is a separate business-risk decision that coridian_ and counsel should confirm before this paragraph is finalized. If adopted, this paragraph would require you and FantasyGM Lab to resolve any dispute not settled informally through binding individual arbitration rather than a court proceeding, and would require you to waive the right to participate in a class action or jury trial, subject to any rights that cannot be waived under applicable law."
+            "Before filing a claim against FantasyDesk, you agree to first contact us at support@fantasygmlab.com and attempt in good faith to resolve the dispute informally. Most concerns can be resolved this way without a formal proceeding.",
+            "OPTIONAL, NOT YET ADOPTED \u2014 whether to include a mandatory arbitration and class-action-waiver clause at all is a separate business-risk decision that coridian_ and counsel should confirm before this paragraph is finalized. If adopted, this paragraph would require you and FantasyDesk to resolve any dispute not settled informally through binding individual arbitration rather than a court proceeding, and would require you to waive the right to participate in a class action or jury trial, subject to any rights that cannot be waived under applicable law."
           ],
           "bullets": []
         },
@@ -81,8 +81,8 @@
           "paragraphs": [
             "DRAFT \u2014 PENDING LEGAL REVIEW. This section is a first-pass draft prepared for an attorney to review and edit. It is not final, has not been reviewed or approved by qualified counsel, and must not be relied upon as binding until that review is complete.",
             "The College Prospects feature lets any signed-in user submit a scouting grade, optional round projection, and an optional short note on a college prospect. These submissions are pooled into a shared aggregate and the individual grades and notes are visible to every signed-in user \u2014 this is a shared, crowdsourced feature, not a private one.",
-            "You retain ownership of any content you submit. By submitting a scouting grade, note, or other content, you grant FantasyGM Lab a non-exclusive, worldwide, royalty-free license to host, store, display, and aggregate that content as part of this and similar shared features, for as long as your account or the feature exists.",
-            "FantasyGM Lab may remove or hide submitted content that violates these Terms or is abusive, illegal, harassing, or otherwise inappropriate, without prior notice.",
+            "You retain ownership of any content you submit. By submitting a scouting grade, note, or other content, you grant FantasyDesk a non-exclusive, worldwide, royalty-free license to host, store, display, and aggregate that content as part of this and similar shared features, for as long as your account or the feature exists.",
+            "FantasyDesk may remove or hide submitted content that violates these Terms or is abusive, illegal, harassing, or otherwise inappropriate, without prior notice.",
             "To report content that violates these Terms, use the in-app Report option or contact support@fantasygmlab.com."
           ],
           "bullets": []
@@ -90,7 +90,7 @@
         {
           "title": "No affiliation",
           "paragraphs": [
-            "FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
+            "FantasyDesk is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
           ],
           "bullets": []
         }
@@ -99,12 +99,12 @@
     "privacy": {
       "title": "Privacy Policy",
       "kicker": "Privacy",
-      "note": "A practical summary of the data FantasyGM Lab may handle.",
+      "note": "A practical summary of the data FantasyDesk may handle.",
       "sections": [
         {
           "title": "Data the app may handle",
           "paragraphs": [
-            "FantasyGM Lab may handle or store basic information needed to run the app, including a Sleeper username, selected league and roster identifiers, league or team names, user preferences, roster roles, untouchable-player choices, feedback reports, and app or session state.",
+            "FantasyDesk may handle or store basic information needed to run the app, including a Sleeper username, selected league and roster identifiers, league or team names, user preferences, roster roles, untouchable-player choices, feedback reports, and app or session state.",
             "Feedback reports may include the page or recommendation being reported, related player or team identifiers, league context, confidence or reason fields, and an optional user comment.",
             "For signed-in accounts, this can also include college prospect scouting grades, round projections, and notes you submit and your prospect watchlist (College Prospects is a shared feature \u2014 see the User-generated content section of Terms of Use), trade outcome records you log, Decision Memory event and baseline history (a Premium feature), and notification read/dismiss state."
           ],
@@ -114,23 +114,23 @@
           "title": "How data is used",
           "paragraphs": [
             "This information is used to load the requested league, personalize analysis, preserve expected app context, diagnose problems, and improve the product.",
-            "Some information may be stored in the browser session, local application files, caches, or other project storage used by the current product. FantasyGM Lab does not claim that these systems provide perfect security or permanent retention."
+            "Some information may be stored in the browser session, local application files, caches, or other project storage used by the current product. FantasyDesk does not claim that these systems provide perfect security or permanent retention."
           ],
           "bullets": []
         },
         {
           "title": "Third-party services and data",
           "paragraphs": [
-            "FantasyGM Lab uses the following third-party services to operate: Supabase (account sign-in and app data storage), the Sleeper API and ESPN Fantasy API (public league, roster, and player data from the fantasy platform you connect), Apple Sign in with Apple and Google Sign-In (optional sign-in methods), RevenueCat and, on the web app, Stripe (subscription billing), the nflverse public data project (NFL schedule and game results), and Expo's push notification service (delivering app notifications to your device).",
-            "Each provider receives only the information it needs to perform its function \u2014 for example, your email and authentication tokens with Supabase, your league and roster identifiers with Sleeper or ESPN, and purchase or receipt information with RevenueCat or Stripe. FantasyGM Lab does not use any third-party advertising, analytics, or session-recording service, and does not sell your data.",
-            "Third-party data may be incomplete, delayed, unavailable, or subject to separate terms. FantasyGM Lab does not control those services."
+            "FantasyDesk uses the following third-party services to operate: Supabase (account sign-in and app data storage), the Sleeper API and ESPN Fantasy API (public league, roster, and player data from the fantasy platform you connect), Apple Sign in with Apple and Google Sign-In (optional sign-in methods), RevenueCat and, on the web app, Stripe (subscription billing), the nflverse public data project (NFL schedule and game results), and Expo's push notification service (delivering app notifications to your device).",
+            "Each provider receives only the information it needs to perform its function \u2014 for example, your email and authentication tokens with Supabase, your league and roster identifiers with Sleeper or ESPN, and purchase or receipt information with RevenueCat or Stripe. FantasyDesk does not use any third-party advertising, analytics, or session-recording service, and does not sell your data.",
+            "Third-party data may be incomplete, delayed, unavailable, or subject to separate terms. FantasyDesk does not control those services."
           ],
           "bullets": []
         },
         {
           "title": "First-party product analytics",
           "paragraphs": [
-            "Separately from the third-party services above, FantasyGM Lab also collects a first-party, pseudonymous analytics signal \u2014 for example, which screens or features are used and basic session timing \u2014 to diagnose problems and improve the product.",
+            "Separately from the third-party services above, FantasyDesk also collects a first-party, pseudonymous analytics signal \u2014 for example, which screens or features are used and basic session timing \u2014 to diagnose problems and improve the product.",
             "These events are tied to a pseudonymous session identifier and a one-way hashed account identifier, never your name, email, or raw account ID, and are never shared with a third party or advertising network."
           ],
           "bullets": []
@@ -141,7 +141,7 @@
             "You can manage your account data directly in the app, under More > Account:"
           ],
           "bullets": [
-            "Export My Data \u2014 request a copy of the account data FantasyGM Lab stores about you.",
+            "Export My Data \u2014 request a copy of the account data FantasyDesk stores about you.",
             "Delete Account \u2014 permanently delete your account and the data associated with it.",
             "Manage Subscription \u2014 if you subscribed through the mobile app, view or cancel it in Apple's or Google's own subscription settings; if you subscribed through the web app (billed via Stripe), manage or cancel it from your account settings there."
           ]
@@ -157,15 +157,15 @@
         {
           "title": "Children's privacy",
           "paragraphs": [
-            "FantasyGM Lab is not directed to children and is not intended for use by anyone under 13 years old. Account creation requires confirming a date of birth showing you are at least 13 before an account can be created; that date of birth itself is never stored.",
-            "FantasyGM Lab does not knowingly collect personal information from a child under 13. If you believe a child under 13 has provided personal information, contact support@fantasygmlab.com and it will be removed."
+            "FantasyDesk is not directed to children and is not intended for use by anyone under 13 years old. Account creation requires confirming a date of birth showing you are at least 13 before an account can be created; that date of birth itself is never stored.",
+            "FantasyDesk does not knowingly collect personal information from a child under 13. If you believe a child under 13 has provided personal information, contact support@fantasygmlab.com and it will be removed."
           ],
           "bullets": []
         },
         {
           "title": "No affiliation",
           "paragraphs": [
-            "FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
+            "FantasyDesk is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
           ],
           "bullets": []
         }
@@ -174,12 +174,12 @@
     "subscription_terms": {
       "title": "Subscription Terms",
       "kicker": "Premium Subscription",
-      "note": "How FantasyGM Lab Premium billing, renewal, and cancellation work.",
+      "note": "How FantasyDesk Premium billing, renewal, and cancellation work.",
       "sections": [
         {
           "title": "Auto-renewing subscription",
           "paragraphs": [
-            "FantasyGM Lab Premium is offered as an auto-renewing subscription. In the mobile app, payment is charged to your Apple ID or Google Play account at confirmation of purchase. On the web app, payment is processed by Stripe and charged to the card you provide at checkout.",
+            "FantasyDesk Premium is offered as an auto-renewing subscription. In the mobile app, payment is charged to your Apple ID or Google Play account at confirmation of purchase. On the web app, payment is processed by Stripe and charged to the card you provide at checkout.",
             "Your subscription automatically renews for the same length of time unless you cancel before the end of the current period. In the mobile app, auto-renew must be turned off at least 24 hours before renewal and you may be charged within that 24-hour window at the price you agreed to when subscribing. On the web app, canceling through your Stripe-billed account settings takes effect at the end of the current billing period."
           ],
           "bullets": []
@@ -191,21 +191,21 @@
           ],
           "bullets": [
             "Mobile app (Apple ID or Google Play billing) \u2014 manage or cancel in your device's own account settings: on iOS, under Settings > [your name] > Subscriptions; on Android, under the Google Play Store's Subscriptions page.",
-            "Web app (Stripe billing) \u2014 manage or cancel from your FantasyGM Lab account settings on the web app, or contact support@fantasygmlab.com for help."
+            "Web app (Stripe billing) \u2014 manage or cancel from your FantasyDesk account settings on the web app, or contact support@fantasygmlab.com for help."
           ]
         },
         {
           "title": "Refunds",
           "paragraphs": [
-            "Canceling stops future renewals but does not refund the current billing period, regardless of whether you subscribed through the mobile app or the web app. A mobile app purchase is also subject to Apple's or Google's own refund policy, since they process that payment, not FantasyGM Lab directly.",
-            "Current pricing and available plans (monthly, annual, or other terms) are shown on the FantasyGM Lab Premium screen before you subscribe, since pricing can vary by plan, region, and promotion."
+            "Canceling stops future renewals but does not refund the current billing period, regardless of whether you subscribed through the mobile app or the web app. A mobile app purchase is also subject to Apple's or Google's own refund policy, since they process that payment, not FantasyDesk directly.",
+            "Current pricing and available plans (monthly, annual, or other terms) are shown on the FantasyDesk Premium screen before you subscribe, since pricing can vary by plan, region, and promotion."
           ],
           "bullets": []
         },
         {
           "title": "What Premium includes",
           "paragraphs": [
-            "Premium unlocks full player rankings, unlimited saved leagues, the complete Trade Analyzer and roster-analysis feature set, Decision Memory (durable cross-session history of material roster-priority changes), and the full GM Targets board. Feature availability may evolve as FantasyGM Lab develops; material reductions to paid functionality will be communicated where required by the app store you subscribed through."
+            "Premium unlocks full player rankings, unlimited saved leagues, the complete Trade Analyzer and roster-analysis feature set, Decision Memory (durable cross-session history of material roster-priority changes), and the full GM Targets board. Feature availability may evolve as FantasyDesk develops; material reductions to paid functionality will be communicated where required by the app store you subscribed through."
           ],
           "bullets": []
         },
@@ -221,12 +221,12 @@
     "no_affiliation": {
       "title": "No-Affiliation Disclaimer",
       "kicker": "Independent Product",
-      "note": "FantasyGM Lab is not an official product of any league, team, player, or fantasy platform.",
+      "note": "FantasyDesk is not an official product of any league, team, player, or fantasy platform.",
       "sections": [
         {
           "title": "No endorsement or sponsorship",
           "paragraphs": [
-            "FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
+            "FantasyDesk is an independent fantasy football tool. It is not affiliated with, endorsed by, sponsored by, or officially connected to Sleeper, ESPN, the National Football League (NFL), the NFL Players Association (NFLPA), any NFL team, any player, or any other fantasy sports platform. All third-party names, marks, and data belong to their respective owners."
           ],
           "bullets": []
         },

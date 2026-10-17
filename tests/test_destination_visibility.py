@@ -83,7 +83,7 @@ class TestDestinationVisibility(unittest.TestCase):
 
         self.assertNotIn("premium", primary_keys)
         self.assertEqual(visible_by_key["premium"].category, "SUPPORT")
-        self.assertIn('"premium": "Free and Premium plan preview for FantasyGM Lab."', app_source)
+        self.assertIn('"premium": "Free and Premium plan preview for FantasyDesk."', app_source)
         self.assertNotIn("primary_labels = {", app_source)
 
     def test_mobile_secondary_normal_users_are_support_only_after_core_routes(self):

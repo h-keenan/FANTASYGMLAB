@@ -67,7 +67,7 @@ def should_show_orientation(
 def orientation_modal_content() -> ui_modal.ModalContent:
     return ui_modal.ModalContent(
         title=f"How {brand_identity.PRODUCT_NAME} works",
-        eyebrow="How to use FantasyGM Lab",
+        eyebrow="How to use FantasyDesk",
         summary=(
             "Use the Dashboard to choose the next question, then open the workspace "
             "built to answer it."

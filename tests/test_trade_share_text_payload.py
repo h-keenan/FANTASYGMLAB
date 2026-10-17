@@ -43,7 +43,7 @@ def _idea(send: list[dict], receive: list[dict], **overrides) -> dict:
 def test_canonical_trade_share_payload_handles_package_shapes(send, receive):
     card = share.build_trade_share_card(_idea(send, receive))
     payload = share.build_share_text_payload(card)
-    assert payload.startswith("FantasyGM Lab Trade Idea")
+    assert payload.startswith("FantasyDesk Trade Idea")
     assert "Trade with Tongue Punchers" in payload
     assert payload.index("Tongue Punchers receives") < payload.index("This roster receives")
     for asset in send + receive:
@@ -52,7 +52,7 @@ def test_canonical_trade_share_payload_handles_package_shapes(send, receive):
     assert "Edge: Tongue Punchers +991" in payload
     assert "Fit: Strong Fit · Confidence: Medium" in payload
     assert "Why it works:" in payload
-    assert payload.endswith("FantasyGM Lab")
+    assert payload.endswith("FantasyDesk")
 
 
 def test_share_payload_normalizes_special_characters_and_line_breaks_without_raw_fields():

@@ -1,12 +1,12 @@
 {
   "title": "How We Evaluate",
   "kicker": "HOW FANTASYGM LAB THINKS ABOUT VALUE",
-  "note": "How FantasyGM Lab evaluates players in league context, and how rankings differ from trade recommendations.",
+  "note": "How FantasyDesk evaluates players in league context, and how rankings differ from trade recommendations.",
   "sections": [
     {
       "title": "What values are (and aren't)",
       "paragraphs": [
-        "FantasyGM Lab values are built for a specific league and roster situation. They are not universal player grades, and they are not a promise about what will happen next week or next season.",
+        "FantasyDesk values are built for a specific league and roster situation. They are not universal player grades, and they are not a promise about what will happen next week or next season.",
         "The same player can be worth more or less once scoring, lineup rules, and league size are applied. Superflex and 2QB leagues raise quarterback value. Tight-end premium raises tight ends. PPR, half-PPR, and standard scoring shift running backs versus receivers. Deeper starting lineups and larger leagues increase demand for usable depth. Taxi squads can give a little extra room to stash young skill players."
       ],
       "bullets": []
@@ -41,7 +41,7 @@
     {
       "title": "Team strategy",
       "paragraphs": [
-        "Your team's direction can change whether an asset is attractive even when the league-wide player value stays similar. FantasyGM Lab can auto-read a direction from the roster or follow a manager override."
+        "Your team's direction can change whether an asset is attractive even when the league-wide player value stays similar. FantasyDesk can auto-read a direction from the roster or follow a manager override."
       ],
       "bullets": [
         "Contender: Leans toward present production and useful starters, and treats future picks a bit more cheaply.",

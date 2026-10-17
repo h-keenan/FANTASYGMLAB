@@ -740,7 +740,7 @@ function createStyles(colors: ThemeColors) {
   // "how do these two teams compare," so it needs more weight than the
   // ordinary-metadata size (14pt) it shipped at — see brief §2 ("give this
   // verdict slightly more visual prominence than ordinary metadata... it
-  // should read like FantasyGM Lab's analysis of the matchup").
+  // should read like FantasyDesk's analysis of the matchup").
   edgeHeadline: { flex: 1, fontSize: 17, fontWeight: '800', letterSpacing: 0.1 },
   basisLabel: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs },
   secondaryBasisLabel: { fontSize: 11, color: colors.textTertiary, lineHeight: 16, marginTop: spacing.xs / 2 },

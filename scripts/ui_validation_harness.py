@@ -506,7 +506,7 @@ def _navigation() -> None:
             "<div class='mobile-gm-sheet-marker'></div>"
             "<div class='mobile-gm-destination-panel'>"
             "<div class='mobile-gm-panel-header'>"
-            "<div class='mobile-gm-sheet-kicker'>FantasyGM Lab</div>"
+            "<div class='mobile-gm-sheet-kicker'>FantasyDesk</div>"
             "<div class='mobile-gm-sheet-title'>Where to go</div>"
             "<div class='mobile-gm-current-page'>Current: Dashboard</div>"
             "</div><div class='mobile-gm-sheet-note'>Founder Beta · Core routes first. Experimental routes are early access when enabled.</div>"
@@ -2407,8 +2407,8 @@ def _methodology() -> None:
     _marker(
         "methodology",
         (
-            "How FantasyGM Lab Evaluates Players",
-            "What FantasyGM Lab does not claim",
+            "How FantasyDesk Evaluates Players",
+            "What FantasyDesk does not claim",
             "Value is league-specific",
         ),
     )
@@ -2872,7 +2872,7 @@ def _viewport_preserve() -> None:
             "<div class='mobile-gm-sheet-marker'></div>"
             "<div class='mobile-gm-destination-panel'>"
             "<div class='mobile-gm-panel-header'>"
-            "<div class='mobile-gm-sheet-kicker'>FantasyGM Lab</div>"
+            "<div class='mobile-gm-sheet-kicker'>FantasyDesk</div>"
             "<div class='mobile-gm-sheet-title'>Where to go</div>"
             "</div></div>"
         )
@@ -3126,7 +3126,7 @@ def _news() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="FantasyGM Lab deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(page_title="FantasyDesk deterministic UI validation", layout="wide", initial_sidebar_state="collapsed")
     viewport_preservation.render_viewport_preservation()
     player_headshot_runtime.render_player_headshot_runtime()
     # Match production inject order from app.py script start, then command header

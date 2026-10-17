@@ -137,7 +137,7 @@ TABLE_NAME = "players"
 INJURY_COLUMNS: tuple[str, ...] = ("status", "injury_status")
 
 GIT_BRANCH = "main"
-COMMIT_AUTHOR_NAME = "FantasyGM Lab Injury Sync Bot"
+COMMIT_AUTHOR_NAME = "FantasyDesk Injury Sync Bot"
 COMMIT_AUTHOR_EMAIL = "injury-sync-bot@users.noreply.github.com"
 COMMIT_MESSAGE_SUBJECT = "chore(data): scheduled injury-status sync"
 COMMIT_MESSAGE_NOTE = (

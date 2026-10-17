@@ -42,7 +42,7 @@ If production still shows ~15 s on a **sleeping** Render instance after this dep
 ## First usable screen
 
 ### Signed-out
-- FantasyGM Lab branding (hero / shell)
+- FantasyDesk branding (hero / shell)
 - Sign-in / create-account / guest import path
 - Concise product context
 - **Not blocked on:** Trade Hub, League Intelligence, news, Trust evidence, deep rankings

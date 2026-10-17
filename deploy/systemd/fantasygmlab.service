@@ -1,4 +1,4 @@
-# FantasyGM Lab — systemd unit that brings the Docker Compose stack up on
+# FantasyDesk — systemd unit that brings the Docker Compose stack up on
 # boot and keeps it running.
 #
 # Why this exists at all: Docker Compose's own `restart: unless-stopped`
@@ -24,7 +24,7 @@
 # `docker` group so `docker compose` needs no sudo.
 
 [Unit]
-Description=FantasyGM Lab Docker Compose stack
+Description=FantasyDesk Docker Compose stack
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target

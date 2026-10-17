@@ -43,7 +43,7 @@ import {
  */
 
 const DISCLOSURE_TEXT =
-  "FantasyGM Lab does not submit waiver claims for you — place the claim in your Sleeper league once you've decided.";
+  "FantasyDesk does not submit waiver claims for you — place the claim in your Sleeper league once you've decided.";
 
 function WaiverIdentity({ player }: { player: WaiverPlayer }) {
   const injury = waiverInjuryDisplay(player.injury_status);

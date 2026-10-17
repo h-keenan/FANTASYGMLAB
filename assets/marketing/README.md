@@ -2,7 +2,7 @@
 
 ## Landing (in-app, lazy)
 
-Real FantasyGM Lab product assets used by the public Founder Beta landing.
+Real FantasyDesk product assets used by the public Founder Beta landing.
 
 | File | Source |
 | --- | --- |

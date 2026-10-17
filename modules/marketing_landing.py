@@ -1,6 +1,6 @@
 """Public marketing landing — presentation only.
 
-Answers what FantasyGM Lab is, what to do next, and that guest import is allowed.
+Answers what FantasyDesk is, what to do next, and that guest import is allowed.
 Does not load league, rankings, or Trade Hub work.
 """
 
@@ -161,9 +161,9 @@ def landing_proof_html() -> str:
     )
     return (
         "<section class='fgl-landing__proof' id='fgl-how-it-works' "
-        "data-fgl-how-it-works='1' aria-label='How FantasyGM Lab works'>"
+        "data-fgl-how-it-works='1' aria-label='How FantasyDesk works'>"
         "<div class='fgl-landing__kicker'>How it works</div>"
-        "<h2>FantasyGM Lab analyzes the league you import</h2>"
+        "<h2>FantasyDesk analyzes the league you import</h2>"
         "<p class='fgl-landing__support'>"
         "Import a Sleeper league, then get roster, trade, value, and league reads "
         "for that team — not a generic ranking dump."
@@ -479,7 +479,7 @@ def landing_hero_html(*, compact: bool = False) -> str:
     if compact:
         return (
             "<section class='fgl-landing__hero fgl-landing__hero--compact' "
-            "aria-label='FantasyGM Lab'>"
+            "aria-label='FantasyDesk'>"
             "<div class='fgl-landing__brand-row'>"
             f"{mark}"
             "<div class='fgl-landing__brand-copy'>"
@@ -488,7 +488,7 @@ def landing_hero_html(*, compact: bool = False) -> str:
             "</section>"
         )
     return (
-        "<section class='fgl-landing__hero' aria-label='FantasyGM Lab introduction'>"
+        "<section class='fgl-landing__hero' aria-label='FantasyDesk introduction'>"
         "<div class='fgl-landing__brand-row'>"
         f"{mark}"
         "<div class='fgl-landing__brand-copy'>"
@@ -555,7 +555,7 @@ def landing_body_html(
             "</div>"
             "<div class='fgl-landing__plan fgl-landing__plan--premium'><h3>Included now with Premium</h3>"
             f"{_list_html(premium_titles)}"
-            "<p class='fgl-landing__note'>Premium is deeper decision support on the same FantasyGM Lab surfaces — "
+            "<p class='fgl-landing__note'>Premium is deeper decision support on the same FantasyDesk surfaces — "
             "not a separate product.</p>"
             "</div></div>"
             f"<p class='fgl-landing__billing'>{escape(billing_note)}</p>"

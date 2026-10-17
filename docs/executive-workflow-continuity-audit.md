@@ -9,7 +9,7 @@ integration, caching contracts, or business rules were changed.
 
 ## Verdict
 
-FantasyGM Lab already shared one league identity, valuation frame, and canonical
+FantasyDesk already shared one league identity, valuation frame, and canonical
 recommendation narrative (PR #132). The remaining friction was **workflow
 continuity**: handoffs wrote focus keys and narrative provenance but did not
 always tell the user where they came from, how to return, or restore scroll

@@ -40,7 +40,7 @@ def main() -> None:
 
             page.goto(f"{BASE}/?surface=header-geometry")
             _wait(page)
-            shell = '[aria-label="FantasyGM Lab executive command header"]'
+            shell = '[aria-label="FantasyDesk executive command header"]'
             actions = '[class*="st-key-executive_command_actions"]'
             evidence[f"header_{width}"] = {
                 "shell": _rect(page, shell),

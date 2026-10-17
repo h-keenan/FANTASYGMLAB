@@ -145,7 +145,7 @@ export default function TradeSharePreviewModal({
       `Risk: ${verdict.risk_summary}`,
       verdict.counter_guidance ? `Counter guidance: ${verdict.counter_guidance}` : '',
       '',
-      'Analyzed with FantasyGM Lab',
+      'Analyzed with FantasyDesk',
     ].filter(Boolean);
     Share.share({ message: lines.join('\n') })
       .then(recordShare)

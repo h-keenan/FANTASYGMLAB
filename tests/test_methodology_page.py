@@ -75,7 +75,7 @@ def test_methodology_copy_matches_implemented_behavior():
         assert token not in html
         assert token not in METHODOLOGY.split("FORBIDDEN_USER_SUBSTRINGS", 1)[0]
     assert "class='methodology-factor-grid'" in html
-    assert "What FantasyGM Lab does not claim" in html
+    assert "What FantasyDesk does not claim" in html
     assert "AI-powered" not in html
 
 

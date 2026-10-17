@@ -85,7 +85,7 @@ class TestFeedbackUI(unittest.TestCase):
         )
         text_area.assert_called_once_with(
             "What looks wrong?",
-            placeholder="Optional context for the FantasyGM Lab team",
+            placeholder="Optional context for the FantasyDesk team",
             max_chars=1000,
             key="trade_feedback_comment",
         )

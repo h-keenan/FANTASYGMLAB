@@ -55,7 +55,7 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
       '',
       ...recap.stories.map((story) => `${story.title}: ${story.summary}`),
       '',
-      'Recapped with FantasyGM Lab',
+      'Recapped with FantasyDesk',
     ].filter(Boolean);
     Share.share({ message: lines.join('\n') }).catch(() => {});
   };

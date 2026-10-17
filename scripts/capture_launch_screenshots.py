@@ -205,7 +205,7 @@ def capture(*, port: int = 8518, skip_desktop: bool = False) -> list[Path]:
                 )
                 page.goto(landing_base, wait_until="networkidle", timeout=60_000)
                 page.wait_for_timeout(800)
-                page.get_by_text("FantasyGM Lab", exact=False).first.wait_for(
+                page.get_by_text("FantasyDesk", exact=False).first.wait_for(
                     state="attached", timeout=30_000
                 )
                 path = OUT / f"landing-{suffix}.png"

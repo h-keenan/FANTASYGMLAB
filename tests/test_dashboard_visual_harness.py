@@ -72,7 +72,7 @@ def test_premium_dashboard_shows_full_fixture_content_without_upgrade_prompts():
 
 def test_orientation_modal_opens_with_canonical_content():
     application = _app()
-    _button(application, "How FantasyGM Lab works").click().run()
+    _button(application, "How FantasyDesk works").click().run()
 
     assert not application.exception
     assert len(application.get("dialog")) == 1
@@ -118,13 +118,13 @@ def test_harness_exposes_native_accessible_orientation_actions():
     application = _app()
     labels = [button.label for button in application.button]
 
-    assert labels.index("Review My Team") < labels.index("How FantasyGM Lab works")
-    assert labels.index("How FantasyGM Lab works") < labels.index(
+    assert labels.index("Review My Team") < labels.index("How FantasyDesk works")
+    assert labels.index("How FantasyDesk works") < labels.index(
         "Don't show again"
     )
     for label in (
         "Review My Team",
-        "How FantasyGM Lab works",
+        "How FantasyDesk works",
         "Don't show again",
     ):
         button = _button(application, label)

@@ -1,4 +1,4 @@
-# UI Magna Carta — FantasyGM Lab Founder Beta
+# UI Magna Carta — FantasyDesk Founder Beta
 
 Durable UI and interaction contract for canonical Founder Beta surfaces.
 This is a constitution, not a polish checklist.

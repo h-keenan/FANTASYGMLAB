@@ -1,6 +1,6 @@
 # Founder Beta Launch Candidate (Production Readiness)
 
-Production break-test and readiness report for FantasyGM Lab Founder Beta.
+Production break-test and readiness report for FantasyDesk Founder Beta.
 
 | Field | Value |
 | --- | --- |
@@ -18,7 +18,7 @@ performance budget, and Chromium checks pass on current `main`. Public productio
 `BUILD 3065E31 · MAIN`, but Stripe checkout is not configured and Ops SQL / webhook /
 fresh-account walkthrough remain founder-only.
 
-FantasyGM Lab is **not cleared to charge real money** until the Ops P0 checklist
+FantasyDesk is **not cleared to charge real money** until the Ops P0 checklist
 below is completed on production hosts.
 
 ## What this PR fixed (code)

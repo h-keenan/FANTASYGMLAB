@@ -1,10 +1,10 @@
 # Founder Beta Launch Marketing Kit
 
-External distribution kit for FantasyGM Lab Founder Beta.
+External distribution kit for FantasyDesk Founder Beta.
 
 **Rollback boundary:** presentation/marketing assets and docs only. No football, rankings, valuations, Trust, auth, entitlements, Stripe, Supabase, Sleeper, lifecycle, navigation, or experimental-flag behavior changes.
 
-**Brand:** FantasyGM Lab FGL Arc Monogram only. No Candidate A/B/C language, alternate logos, or new marketing palettes.
+**Brand:** FantasyDesk FGL Arc Monogram only. No Candidate A/B/C language, alternate logos, or new marketing palettes.
 
 ---
 
@@ -26,7 +26,7 @@ Aligned with in-product `PRODUCT_TAGLINE` (“Your fantasy football front office
 
 ## Founder Beta explanation (canonical)
 
-> Founder Beta is early access to FantasyGM Lab while I work directly with the first group of dynasty managers to improve the product.
+> Founder Beta is early access to FantasyDesk while I work directly with the first group of dynasty managers to improve the product.
 
 Avoid wording that implies a finished product, guaranteed uptime, or permanent feature permanence.
 
@@ -82,15 +82,15 @@ Comparison asset: `assets/marketing/launch/free-vs-premium.png`
 
 ### Very short (bio / profile / link preview)
 
-FantasyGM Lab — league-aware dynasty recommendations. Founder Beta.
+FantasyDesk — league-aware dynasty recommendations. Founder Beta.
 
 ### Short (Discord / group chat)
 
-I’ve been building FantasyGM Lab — front-office software that gives dynasty managers a clear next move from their own league. Founder Beta is open if you want to try it: [LINK]
+I’ve been building FantasyDesk — front-office software that gives dynasty managers a clear next move from their own league. Founder Beta is open if you want to try it: [LINK]
 
 ### Medium (Reddit / X launch post)
 
-I’ve been building FantasyGM Lab for dynasty managers who are tired of bouncing between sites to decide what to do next.
+I’ve been building FantasyDesk for dynasty managers who are tired of bouncing between sites to decide what to do next.
 
 Import your Sleeper league, open Today’s Game Plan, and work trades, waivers, and roster calls with league-aware recommendations.
 
@@ -100,7 +100,7 @@ Would love feedback from people who actually run dynasty teams: [LINK]
 
 ### Founder story
 
-I built FantasyGM Lab because I wanted a fantasy football front office that starts from *my* league — scoring, roster, and priorities — instead of a generic ranking board.
+I built FantasyDesk because I wanted a fantasy football front office that starts from *my* league — scoring, roster, and priorities — instead of a generic ranking board.
 
 Today it helps with a clear next move: Today’s Game Plan, Trade Hub, Waivers, and player context that stay consistent across surfaces. Founder Beta means I’m shipping early, listening closely, and labeling experimental lanes honestly. It’s not a finished product promise — it’s a working tool for managers who want better decisions now and a seat at improving it.
 
@@ -121,7 +121,7 @@ No copyrighted music requirements — use original audio, voiceover, or silence.
 | 0:07–0:12 | Today’s Game Plan | `dashboard-game-plan` |
 | 0:12–0:18 | Trade Hub | `trade-hub` |
 | 0:18–0:23 | Waivers | `waivers` |
-| 0:23–0:28 | FantasyGM Lab — Founder Beta | End card + URL |
+| 0:23–0:28 | FantasyDesk — Founder Beta | End card + URL |
 
 CTA: Try Founder Beta with your league.
 
@@ -143,7 +143,7 @@ CTA: Try Founder Beta with your league.
 | 0:03–0:10 | What Changed | Dashboard What Changed |
 | 0:10–0:18 | Decision Memory [EXPERIMENTAL] | Feature asset; say “when enabled” |
 | 0:18–0:24 | GM Targets [EXPERIMENTAL] | Feature asset; say “when enabled” |
-| 0:24–0:30 | FantasyGM Lab — Founder Beta | End card |
+| 0:24–0:30 | FantasyDesk — Founder Beta | End card |
 
 ---
 
@@ -155,7 +155,7 @@ Tone: builder post, not ad. Disclose you are the creator. No fake endorsements.
 
 Title idea: Built a league-aware front office for dynasty managers (Founder Beta) — looking for feedback
 
-I’ve been building FantasyGM Lab because I wanted recommendations that start from my actual Sleeper league, not a generic board.
+I’ve been building FantasyDesk because I wanted recommendations that start from my actual Sleeper league, not a generic board.
 
 What it does today: Today’s Game Plan, Trade Hub, Waivers, and player context that stay consistent across surfaces.
 
@@ -165,7 +165,7 @@ I’m the creator — happy to take blunt feedback: [LINK]
 
 ### Detailed feedback-request post
 
-I’ve been building FantasyGM Lab as fantasy football front-office software for dynasty managers.
+I’ve been building FantasyDesk as fantasy football front-office software for dynasty managers.
 
 **Why:** I was tired of stitching five tabs together to answer “what should I do next?”
 
@@ -203,7 +203,7 @@ I’m the creator. Looking for dynasty managers willing to try it and tell me wh
 
 ### Lightweight message
 
-I’ve been building FantasyGM Lab — league-aware recommendations so dynasty managers get a clear next move.
+I’ve been building FantasyDesk — league-aware recommendations so dynasty managers get a clear next move.
 
 Useful today: Today’s Game Plan, Trade Hub, and Waivers tied to your imported league.
 
@@ -211,7 +211,7 @@ It’s Founder Beta (early access). If you want to try it: [LINK]
 
 ### Share-card caption patterns
 
-- Would you take this trade? (FantasyGM Lab — Experimental share card)
+- Would you take this trade? (FantasyDesk — Experimental share card)
 - Waiver add I’m looking at — context from my league setup
 - Hold call with rank context — sharing the card, not a guarantee
 
@@ -221,11 +221,11 @@ It’s Founder Beta (early access). If you want to try it: [LINK]
 
 ### Single post
 
-Built FantasyGM Lab for dynasty managers who want a clear next move from their own league — Game Plan, trades, waivers, player context. Founder Beta. Feedback welcome: [LINK]
+Built FantasyDesk for dynasty managers who want a clear next move from their own league — Game Plan, trades, waivers, player context. Founder Beta. Feedback welcome: [LINK]
 
 ### Short thread
 
-1/ I’ve been building FantasyGM Lab — fantasy football front-office software for dynasty managers.
+1/ I’ve been building FantasyDesk — fantasy football front-office software for dynasty managers.
 
 2/ Import your Sleeper league → Today’s Game Plan shows what to do next. Trade Hub and Waivers stay on the same recommendation truth.
 
@@ -235,7 +235,7 @@ Built FantasyGM Lab for dynasty managers who want a clear next move from their o
 
 ### Product screenshot caption
 
-Today’s Game Plan in FantasyGM Lab — league-aware next moves for a dynasty roster. Founder Beta.
+Today’s Game Plan in FantasyDesk — league-aware next moves for a dynasty roster. Founder Beta.
 
 ### Trade-card post
 
@@ -250,7 +250,7 @@ Avoid hashtag stuffing. No unsupported performance claims.
 - Production: `assets/brand/og-founder-beta.png` (1200×630)
 - Launch copy: `assets/marketing/launch/og-founder-beta-launch.png`
 
-Must show: FGL Arc Monogram, FantasyGM Lab, one-line value proposition, Founder Beta. No tiny unreadable UI.
+Must show: FGL Arc Monogram, FantasyDesk, one-line value proposition, Founder Beta. No tiny unreadable UI.
 
 ---
 

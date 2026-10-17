@@ -1,4 +1,4 @@
-"""Canonical executive workspace shell for authenticated FantasyGM Lab routes."""
+"""Canonical executive workspace shell for authenticated FantasyDesk routes."""
 
 from dataclasses import dataclass
 from html import escape

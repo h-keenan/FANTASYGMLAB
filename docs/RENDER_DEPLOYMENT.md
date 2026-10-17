@@ -2,7 +2,7 @@
 
 # Render Deployment
 
-FantasyGM Lab currently runs on Render as **two** services (dashboard names):
+FantasyDesk currently runs on Render as **two** services (dashboard names):
 `FANTASYGMLAB` (customer Streamlit app) and `fantasygmlab-stripe-webhook`
 (Stripe webhook/backend). A Blueprint static marketing service is **not
 currently deployed** and must not be treated as live. Python is pinned to

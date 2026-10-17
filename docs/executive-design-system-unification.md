@@ -1,6 +1,6 @@
 # Executive Design System Unification
 
-Presentation-only layer that makes FantasyGM Lab read as one executive OS.
+Presentation-only layer that makes FantasyDesk read as one executive OS.
 
 ## Visual system
 

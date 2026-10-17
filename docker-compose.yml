@@ -1,4 +1,4 @@
-# FantasyGM Lab — self-hosted stack.
+# FantasyDesk — self-hosted stack.
 #
 # Replicates render.yaml's four real (non-cron) services plus a Caddy
 # reverse proxy with automatic HTTPS. The 4 cron jobs in render.yaml

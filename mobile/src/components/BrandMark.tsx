@@ -2,7 +2,7 @@ import React from 'react';
 import { Image } from 'react-native';
 
 /**
- * The FantasyGM Lab brand mark — the glossy 3D football-with-ascending-bars
+ * The FantasyDesk brand mark — the glossy 3D football-with-ascending-bars
  * illustration that PRs #749/#750 rolled out to every static app icon and
  * logo file, replacing the old abstract three-arc "Analyze / Project /
  * Execute" bezier mark.

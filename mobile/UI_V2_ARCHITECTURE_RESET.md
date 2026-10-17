@@ -1,11 +1,11 @@
-# FantasyGM Lab — UI V2 Architecture Reset
+# FantasyDesk — UI V2 Architecture Reset
 
 > Sent by coridian_ via Discord, 2026-09-25. Supersedes the *implementation strategy* used for redesign
 > work up to this point. `UI_MAGNA_CARTA.md` remains the authoritative design-token/component/semantic
 > spec — this document changes how aggressively a redesign is allowed to restructure a screen, and adds
 > a mandatory feature-parity process. Read both before any major screen redesign.
 
-We are changing the implementation strategy for the FantasyGM Lab UI overhaul.
+We are changing the implementation strategy for the FantasyDesk UI overhaul.
 
 Previous redesign work has preserved too much of the existing layout and information architecture.
 From this point forward, **do not treat the existing page layout as the visual skeleton that must be
@@ -85,7 +85,7 @@ appropriate. Do not create a separate visual component system per screen.
 
 ## 7. Density target
 
-FantasyGM Lab should be information-rich but not crowded. A normal modern iPhone viewport should
+FantasyDesk should be information-rich but not crowded. A normal modern iPhone viewport should
 generally show several meaningful modules without excessive scrolling. Avoid giant empty card
 interiors, 60–100px gaps with no information, individual cards around every row, oversized headings.
 
@@ -103,7 +103,7 @@ pattern.
 
 ## 10. Do not add a footer
 
-FantasyGM Lab does not use a generic persistent bottom navigation. Preserve the canonical floating GM
+FantasyDesk does not use a generic persistent bottom navigation. Preserve the canonical floating GM
 orb and global navigation-sheet system.
 
 ## 11. Implementation strategy for each page
@@ -147,5 +147,5 @@ make that decision silently.
 
 ## Business logic + small features
 
-Preserve not just major business logic, but also the small product touches that make FantasyGM Lab
+Preserve not just major business logic, but also the small product touches that make FantasyDesk
 useful. A cleaner UI should expose those features more intelligently — not strip the app down.

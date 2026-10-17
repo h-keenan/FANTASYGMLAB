@@ -123,7 +123,7 @@ function infoNoteText(tab: TeamTab, leagueName: string): string {
     case 'bench':
       return `Every other rostered player in ${leagueName} not currently in your suggested starting lineup.`;
     case 'analysis':
-      return `Real roster analytics for ${leagueName} — the same team-evaluation model used across FantasyGM Lab.`;
+      return `Real roster analytics for ${leagueName} — the same team-evaluation model used across FantasyDesk.`;
     default:
       return `Your roster snapshot for ${leagueName} — strength, identity, and complete starting lineup at a glance.`;
   }

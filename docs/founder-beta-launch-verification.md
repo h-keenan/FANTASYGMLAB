@@ -1,6 +1,6 @@
 # Founder Beta Launch Verification
 
-Launch-readiness verification for FantasyGM Lab Founder Beta.
+Launch-readiness verification for FantasyDesk Founder Beta.
 Baseline branch point: `607754cd003b67b463bdc1f986d684678a9d1fbe`.
 
 ## Ops Activation status (2026-08-05)

@@ -10,7 +10,7 @@ caching contracts were changed.
 
 ## Verdict
 
-FantasyGM Lab already had a single rerun pipeline for league identity and
+FantasyDesk already had a single rerun pipeline for league identity and
 valuation:
 
 `resolve_active_league_context` → `WorkspaceIdentity` → one

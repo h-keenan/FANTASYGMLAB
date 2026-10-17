@@ -76,7 +76,7 @@ describe("WaiversContent", () => {
 
     expect(
       screen.getByText(
-        "FantasyGM Lab does not submit waiver claims for you — place the claim in your Sleeper league once you've decided.",
+        "FantasyDesk does not submit waiver claims for you — place the claim in your Sleeper league once you've decided.",
       ),
     ).toBeInTheDocument();
   });

@@ -1,8 +1,8 @@
-# FantasyGM Lab Brand Identity System
+# FantasyDesk Brand Identity System
 
 | Field | Value |
 | --- | --- |
-| Permanent mark | **FantasyGM Lab Symbol** (glossy football + growth-bar icon) |
+| Permanent mark | **FantasyDesk Symbol** (glossy football + growth-bar icon) |
 | Geometry key | `fantasygmlab-football-symbol` (`brand_identity.BRAND_MARK_GEOMETRY`) |
 | Asset root | `assets/brand/` (vendor masters under `assets/brand/source/`) |
 | API | `modules/brand_identity.py` |
@@ -10,7 +10,7 @@
 
 ## Brand idea
 
-FantasyGM Lab turns data into clarity so managers can make the next best move.
+FantasyDesk turns data into clarity so managers can make the next best move.
 
 The identity is a **vendor-supplied "no-swoop football" brand pack**: real
 artwork (photographic/glossy 3D rendering), not a CSS-drawable abstraction.
@@ -38,7 +38,7 @@ variants:
 | Full color | Default — dark or neutral surfaces | `fantasygmlab-symbol.png` |
 | Monochrome, white | Single-color mark on dark surfaces, small UI chrome (GM control) | `fantasygmlab-symbol-mono-white.png` / `fantasygmlab-symbol-compact.png` |
 | Monochrome, navy | Single-color mark on light surfaces | `fantasygmlab-symbol-mono-navy.png` |
-| Horizontal lockup | Symbol + "FantasyGM Lab" wordmark | `fantasygmlab-logo-horizontal.png` |
+| Horizontal lockup | Symbol + "FantasyDesk" wordmark | `fantasygmlab-logo-horizontal.png` |
 
 Small UI chrome (the GM control, footer lockups, shell marks ≤40px) uses the
 white monochrome cut for legibility and a small embedded-image payload;

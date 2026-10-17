@@ -16,7 +16,7 @@ semantics, lifecycle semantics, or business rules changed.
 
 ## Success criterion
 
-A new user can move through FantasyGM Lab on mobile or desktop without confusing
+A new user can move through FantasyDesk on mobile or desktop without confusing
 hierarchy, inconsistent terminology, dead interactions, giant unexplained spacing,
 mismatched components, duplicate patterns, unclear actions, or framework leftovers
 on audited primary routes.

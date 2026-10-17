@@ -14,7 +14,7 @@ workflow continuity semantics changed.
 
 After League A → League B the user can confidently tell they are in League B:
 
-- FantasyGM Lab shell
+- FantasyDesk shell
 - correct League B name / account
 - navigation
 - scoring/strategy context once resolved for League B

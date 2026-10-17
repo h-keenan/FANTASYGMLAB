@@ -1,9 +1,9 @@
-# FantasyGM Lab — Color System + Dark/Light Mode Audit
+# FantasyDesk — Color System + Dark/Light Mode Audit
 
 > Sent by coridian_ via Discord, 2026-09-25. Required before finalizing the UI overhaul. Applies
 > to both the mobile app's `theme.ts` and the web app's `modules/design_tokens.py`.
 
-FantasyGM Lab must have a deliberate, accessible color system in both dark mode and light mode. Do
+FantasyDesk must have a deliberate, accessible color system in both dark mode and light mode. Do
 not assume a color that works on the dark theme automatically works on the light theme.
 
 ## 1. Audit the tokens, not just individual screens

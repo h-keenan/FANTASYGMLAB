@@ -1,6 +1,6 @@
 # Archived brand mark explorations
 
-Historical mark directions reviewed during FantasyGM Lab brand work.
+Historical mark directions reviewed during FantasyDesk brand work.
 
 | File / folder | Direction | Status |
 | --- | --- | --- |

@@ -22,7 +22,7 @@ UI without mutating football contracts.
 
 ## Final verdict on remaining latency
 
-FantasyGM Lab has **no unexplained application-level duplicate-work bottleneck** left on
+FantasyDesk has **no unexplained application-level duplicate-work bottleneck** left on
 the measured logged-out warm path. Remaining delay classes are attributable to:
 
 1. **Streamlit framework floor** — global CSS/`st.html` re-injection (~426 KB) every rerun; AppTest wall ≫ server ms

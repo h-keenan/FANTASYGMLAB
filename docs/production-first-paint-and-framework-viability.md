@@ -1,6 +1,6 @@
 # Production First-Paint & Framework Viability
 
-Performance architecture investigation: why FantasyGM Lab can feel like a **13+ second** first load, what this PR changes, and whether Streamlit remains viable for Founder Beta.
+Performance architecture investigation: why FantasyDesk can feel like a **13+ second** first load, what this PR changes, and whether Streamlit remains viable for Founder Beta.
 
 | Field | Value |
 | --- | --- |
@@ -148,7 +148,7 @@ Full cutover runbook: [`docs/production-domain-cutover.md`](production-domain-cu
 
 ## Import contribution (local subprocess harness)
 
-Dominant third-party cold imports: **pandas** and **streamlit** (hundreds of ms each on a cold interpreter). FantasyGM Lab modules are comparatively small once those are loaded. Route-specific modules (`marketing_landing`, share cards) are already imported lazily at use sites where practical.
+Dominant third-party cold imports: **pandas** and **streamlit** (hundreds of ms each on a cold interpreter). FantasyDesk modules are comparatively small once those are loaded. Route-specific modules (`marketing_landing`, share cards) are already imported lazily at use sites where practical.
 
 ---
 

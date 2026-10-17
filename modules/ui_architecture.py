@@ -242,16 +242,16 @@ PLATFORM_DESTINATIONS: Tuple[PageDefinition, ...] = (
         category="ARCHIVED",
         domain="GM_TOOLS",
     ),
-    PageDefinition("premium", "Premium", "SUPPORT", "Free and Premium plan preview for FantasyGM Lab.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
-    PageDefinition("methodology", "How We Evaluate", "SUPPORT", "How FantasyGM Lab evaluates players in league context, and how rankings differ from trade recommendations.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("premium", "Premium", "SUPPORT", "Free and Premium plan preview for FantasyDesk.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("methodology", "How We Evaluate", "SUPPORT", "How FantasyDesk evaluates players in league context, and how rankings differ from trade recommendations.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
     PageDefinition("about_disclaimer", "About / Disclaimer", "SUPPORT", "Product information, recommendation limits, and general disclaimer.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
     # The 4 standalone legal documents below stay routable (still visible,
     # still SUPPORT category) so `?page=terms` etc. keep working directly,
     # but LEGAL_CONSOLIDATED_SUBKEYS (above) tells the nav-rendering loops to
     # skip a separate button for each — "legal" (below) is the one nav entry.
-    PageDefinition("terms", "Terms of Use", "SUPPORT", "Plain-language terms for using FantasyGM Lab.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
-    PageDefinition("privacy", "Privacy Policy", "SUPPORT", "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
-    PageDefinition("subscription_terms", "Subscription Terms", "SUPPORT", "Auto-renewal, billing, and cancellation terms for FantasyGM Lab Premium.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("terms", "Terms of Use", "SUPPORT", "Plain-language terms for using FantasyDesk.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("privacy", "Privacy Policy", "SUPPORT", "How FantasyDesk may handle usernames, league context, preferences, and feedback.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
+    PageDefinition("subscription_terms", "Subscription Terms", "SUPPORT", "Auto-renewal, billing, and cancellation terms for FantasyDesk Premium.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
     PageDefinition("no_affiliation", "No-Affiliation Disclaimer", "SUPPORT", "Independent-product and third-party ownership notice.", category="SUPPORT", beta_visible=True, domain="GENERAL"),
     PageDefinition(
         "legal",

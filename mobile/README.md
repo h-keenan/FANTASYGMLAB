@@ -1,4 +1,4 @@
-# FantasyGM Lab — mobile app
+# FantasyDesk — mobile app
 
 Expo (React Native) + TypeScript client for iOS and Android. Talks to the same
 Supabase project as the web app (`app.py`) for accounts/entitlement, and to

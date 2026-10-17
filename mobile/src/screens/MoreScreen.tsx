@@ -166,12 +166,12 @@ export default function MoreScreen({ navigation }: Props) {
         await Sharing.shareAsync(file.uri, {
           mimeType: 'application/json',
           UTI: 'public.json',
-          dialogTitle: 'My FantasyGM Lab data',
+          dialogTitle: 'My FantasyDesk data',
         });
       } else {
         // Rare fallback (file sharing unavailable on this device) — same
         // text-message share this screen used before.
-        await Share.share({ title: 'My FantasyGM Lab data', message: json });
+        await Share.share({ title: 'My FantasyDesk data', message: json });
       }
     } catch {
       Alert.alert('Could not export your data', 'Please try again in a moment.');

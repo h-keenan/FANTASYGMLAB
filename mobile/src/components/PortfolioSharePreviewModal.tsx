@@ -67,7 +67,7 @@ export default function PortfolioSharePreviewModal({ visible, onClose, leagues }
   const onShareText = () => {
     const headline = portfolioHeadlineStat(leagues);
     const lines = [
-      `My FantasyGM Lab Portfolio — ${headline}`,
+      `My FantasyDesk Portfolio — ${headline}`,
       '',
       ...leagues.map((league) => {
         const record = league.wins == null && league.losses == null ? '' : ` (${league.wins ?? 0}-${league.losses ?? 0})`;
@@ -75,7 +75,7 @@ export default function PortfolioSharePreviewModal({ visible, onClose, leagues }
         return `${league.league_name}${record}${rank}`;
       }),
       '',
-      'Tracked with FantasyGM Lab',
+      'Tracked with FantasyDesk',
     ].filter(Boolean);
     Share.share({ message: lines.join('\n') }).catch(() => {});
   };

@@ -80,7 +80,7 @@ REFRESH_SUBPROCESS_SCRIPT = ROOT / "scripts" / "refresh_players_db_subprocess.py
 REFRESH_SUBPROCESS_TIMEOUT_S = 600
 
 GIT_BRANCH = "main"
-COMMIT_AUTHOR_NAME = "FantasyGM Lab Players DB Bot"
+COMMIT_AUTHOR_NAME = "FantasyDesk Players DB Bot"
 COMMIT_AUTHOR_EMAIL = "players-db-bot@users.noreply.github.com"
 COMMIT_MESSAGE_SUBJECT = "chore(data): scheduled players.db refresh"
 

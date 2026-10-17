@@ -1,4 +1,4 @@
--- FantasyGM Lab entitlement authority hardening (additive / migration-safe).
+-- FantasyDesk entitlement authority hardening (additive / migration-safe).
 -- Run in Supabase Dashboard -> SQL Editor after docs/supabase_accounts.sql
 -- and docs/supabase_profile_entitlement.sql.
 --

@@ -1,4 +1,4 @@
-"""Measure per-module import cost for FantasyGM Lab cold process startup.
+"""Measure per-module import cost for FantasyDesk cold process startup.
 
 Usage:
   python scripts/measure_import_startup.py
@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # Ordered like a typical app cold path: stdlib-adjacent first, then heavy deps,
-# then FantasyGM Lab modules commonly imported by app.py.
+# then FantasyDesk modules commonly imported by app.py.
 CANDIDATES = [
     "pandas",
     "numpy",

@@ -1,4 +1,4 @@
-"""Measure real production first-paint waterfalls for FantasyGM Lab.
+"""Measure real production first-paint waterfalls for FantasyDesk.
 
 Separates infrastructure wake from Streamlit bootstrap from app markers.
 

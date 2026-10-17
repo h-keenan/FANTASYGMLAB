@@ -1,10 +1,10 @@
-"""Customer-facing FantasyGM Lab brand constants, assets, and markup helpers.
+"""Customer-facing FantasyDesk brand constants, assets, and markup helpers.
 
 Presentation only — no football, entitlement, billing, or auth logic. (The
 identity itself is now a football illustration; this module still contains
 no football *business* logic — stats, scoring, or otherwise.)
 
-Canonical mark: FantasyGM Lab Symbol — a glossy football + growth-bar icon
+Canonical mark: FantasyDesk Symbol — a glossy football + growth-bar icon
 sourced from the vendor "no-swoop football" brand pack (real artwork, not a
 CSS-drawn abstraction).
 
@@ -21,7 +21,7 @@ from html import escape
 from pathlib import Path
 
 
-PRODUCT_NAME = "FantasyGM Lab"
+PRODUCT_NAME = "FantasyDesk"
 PRODUCT_MARK = "FGL"  # textual fallback when images unavailable
 PRODUCT_DOMAIN = "fantasygmlab.com"
 PRODUCT_URL = f"https://{PRODUCT_DOMAIN}"
@@ -54,7 +54,7 @@ BRAND_WARNING = "#F59E0B"
 BRAND_PREMIUM = "#FACC15"
 BRAND_EXPERIMENTAL = "#8B93FF"
 
-BRAND_MARK_NAME = "FantasyGM Lab Symbol"
+BRAND_MARK_NAME = "FantasyDesk Symbol"
 BRAND_MARK_GEOMETRY = "fantasygmlab-football-symbol"
 BRAND_MARK_LEGACY_GEOMETRY = "fgl-arc-monogram"
 
@@ -151,7 +151,7 @@ def _png_data_uri(key: str, *, fallback_key: str = "mark") -> str:
 
 @lru_cache(maxsize=2)
 def gm_orb_mark_data_uri() -> str:
-    """Dark-surface compact FantasyGM Lab symbol data URI for the 44×44 GM control.
+    """Dark-surface compact FantasyDesk symbol data URI for the 44×44 GM control.
 
     Uses the on-disk compact PNG (a base64 ``image/png`` URI, not APP_CSS
     base64, not CSS-drawn shapes — the brand pack ships PNG artwork only).
@@ -248,7 +248,7 @@ def compact_mark_img_html(
     size_px: int = 28,
     css_class: str = "dg-compact-mark-img",
 ) -> str:
-    """Canonical compact FantasyGM Lab symbol as an image — not a CSS-drawn plate."""
+    """Canonical compact FantasyDesk symbol as an image — not a CSS-drawn plate."""
 
     uri = gm_orb_mark_data_uri().replace("'", "&#39;")
     px = int(size_px)

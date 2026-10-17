@@ -1,4 +1,4 @@
--- FantasyGM Lab durable feedback reports (additive / migration-safe).
+-- FantasyDesk durable feedback reports (additive / migration-safe).
 -- Run in Supabase Dashboard -> SQL Editor after docs/supabase_accounts.sql.
 --
 -- Why: Render's Streamlit filesystem is ephemeral. JSONL under data/ does not

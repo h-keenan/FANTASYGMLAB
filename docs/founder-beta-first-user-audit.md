@@ -9,7 +9,7 @@
 
 ## Simulation stance
 
-Walked FantasyGM Lab as a brand-new manager who has never heard of Trade Hub, League Intelligence, Value change, Trust, or the Menu control. Every label was asked: *Would a new user understand this? What should I do next?*
+Walked FantasyDesk as a brand-new manager who has never heard of Trade Hub, League Intelligence, Value change, Trust, or the Menu control. Every label was asked: *Would a new user understand this? What should I do next?*
 
 ## Top 25 usability issues (found → addressed)
 
@@ -83,7 +83,7 @@ Internal module names (`trust_engine`, `workflow_continuity`, diagnostics expand
 | Trade board with ideas | “Confidence estimates how likely this move improves your roster. Value change shows whether the package favors your side.” |
 | League Intelligence (Dashboard) | “League-wide signals that may change your next move — scarcity, posture, and market pressure.” |
 | Strategy selector help | Auto follows evaluated direction; changing focus re-ranks without skipping fairness |
-| Orientation | How to use FantasyGM Lab — Dashboard → My Team → Trade Hub → Waivers |
+| Orientation | How to use FantasyDesk — Dashboard → My Team → Trade Hub → Waivers |
 
 ## Empty / loading state audit
 

@@ -1,4 +1,4 @@
-"""FantasyGM Lab brand and identity presentation layer.
+"""FantasyDesk brand and identity presentation layer.
 
 Appended last so branding wins over legacy chrome without redesigning layouts.
 """

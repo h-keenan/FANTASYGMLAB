@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# FantasyGM Lab — web-next (Next.js) image for self-hosted deployment.
+# FantasyDesk — web-next (Next.js) image for self-hosted deployment.
 #
 # Separate from the root `Dockerfile`: that one builds the four Python
 # services (Streamlit + FastAPI) from one shared image; this is a Node/

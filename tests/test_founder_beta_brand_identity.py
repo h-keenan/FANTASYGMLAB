@@ -10,7 +10,7 @@ from modules.brand_identity_styles import BRAND_IDENTITY_CSS
 
 
 def test_brand_constants_are_fantasygm_lab():
-    assert brand_identity.PRODUCT_NAME == "FantasyGM Lab"
+    assert brand_identity.PRODUCT_NAME == "FantasyDesk"
     assert brand_identity.PRODUCT_MARK == "FGL"
     assert brand_identity.EXPERIMENTAL_LABEL == "[EXPERIMENTAL]"
     # Founder Beta positioning is retired — plain subscription product now.
@@ -23,7 +23,7 @@ def test_startup_shell_branding_and_phase_milestones():
     markup = startup_coordinator.startup_shell_html(
         startup_coordinator.StartupPhase.LEAGUE_RESTORING
     )
-    assert "FantasyGM Lab" in markup
+    assert "FantasyDesk" in markup
     assert "dg-startup-mark" in markup
     assert "dg-brand-plate" in markup
     assert "Loading league..." in markup
@@ -38,7 +38,7 @@ def test_startup_shell_branding_and_phase_milestones():
 def test_trade_summary_includes_screenshot_brand():
     brand = brand_identity.trade_screenshot_brand_html()
     assert "trade-summary-brand" in brand
-    assert "FantasyGM Lab" in brand
+    assert "FantasyDesk" in brand
     assert "Founder Beta" not in brand
     assert "dg-brand-plate__fgl" not in brand
     assert "compact_mark_img_html" in Path("modules/brand_identity.py").read_text(encoding="utf-8")
@@ -47,7 +47,7 @@ def test_trade_summary_includes_screenshot_brand():
 
 def test_premium_page_customer_ready_copy():
     html = premium_page.premium_page_html(entitlement=premium.FREE)
-    assert "FantasyGM Lab" in html
+    assert "FantasyDesk" in html
     assert "Founder Beta" not in html
     assert "test billing only" not in html.casefold()
     assert "DYNASTYGM_PREMIUM_OVERRIDE" not in html
@@ -82,7 +82,7 @@ def test_brand_identity_css_is_appended_last():
 
 def test_app_wires_fantasygm_lab_surfaces():
     source = Path("app.py").read_text(encoding="utf-8")
-    assert 'page_title="FantasyGM Lab"' in source
+    assert 'page_title="FantasyDesk"' in source
     assert "brand_identity.founder_beta_badge_html" not in source
     assert "brand_identity.PRODUCT_NAME" in source
     assert "brand_identity.EXPERIMENTAL_LABEL" in source

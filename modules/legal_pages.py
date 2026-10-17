@@ -20,10 +20,11 @@ NO_AFFILIATION_TEXT = (
     "marks, and data belong to their respective owners."
 )
 
-# Confirmed directly by the terminal operator on 2026-10-10. Corrected one
-# letter-transposition typo in how it was given ("fantasymglab.com") against
-# the domain used everywhere else in this repo ("fantasygmlab.com").
-SUPPORT_EMAIL = "support@fantasygmlab.com"
+# FantasyDesk rebrand, 2026-10-17 — moved off support@fantasygmlab.com to
+# match the new product domain. The new mailbox needs to actually exist
+# and receive mail before this reaches real users (see the rebrand plan's
+# Stage 4), separate from the DNS/domain cutover itself.
+SUPPORT_EMAIL = "support@fantasydesk.app"
 
 # --- Part 2 draft legal text -------------------------------------------
 #

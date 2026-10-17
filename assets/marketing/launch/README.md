@@ -1,7 +1,7 @@
 # Founder Beta launch assets
 
 External distribution kit for YouTube Shorts, Reddit, Discord, X, DMs, and OG previews.
-Canonical brand: FantasyGM Lab FGL Arc Monogram.
+Canonical brand: FantasyDesk FGL Arc Monogram.
 
 **These files are not loaded by the authenticated Streamlit app.**
 

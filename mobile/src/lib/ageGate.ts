@@ -4,7 +4,7 @@ const KEY = 'fgl:age-gate-passed';
 export const MINIMUM_AGE = 13;
 
 /**
- * COPPA age-gate: FantasyGM Lab isn't directed at children, but with no age
+ * COPPA age-gate: FantasyDesk isn't directed at children, but with no age
  * check at all a signup flow (email, Apple, Google) can't distinguish an
  * adult from a child. This is a device-local, one-time gate shown before
  * LoginScreen's actual auth UI — a neutral date-of-birth entry, not a "I am

@@ -1,4 +1,4 @@
--- FantasyGM Lab RevenueCat billing fields (mobile IAP + RC Billing web).
+-- FantasyDesk RevenueCat billing fields (mobile IAP + RC Billing web).
 -- Run this before enabling the verified RevenueCat webhook backend.
 -- Mirrors docs/supabase_stripe_billing.sql. See
 -- docs/supabase_entitlement_security_hardening.sql for the trigger that

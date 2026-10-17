@@ -67,7 +67,7 @@ def shell_strip(width: int, height: int = 64) -> Image.Image:
     draw.rectangle((0, 0, 4, height), fill=CYAN)
     mark = draw_brand_mark(28, compact=True)
     canvas.paste(mark, (16, (height - 28) // 2), mark)
-    draw.text((52, height // 2 - 10), "FantasyGM Lab", font=_font(18, bold=True), fill=WHITE)
+    draw.text((52, height // 2 - 10), "FantasyDesk", font=_font(18, bold=True), fill=WHITE)
     draw.rounded_rectangle((width - 72, 14, width - 16, height - 14), radius=4, outline=CYAN)
     draw.text((width - 58, height // 2 - 8), "GM", font=_font(14, bold=True), fill=WHITE)
     return canvas
@@ -87,7 +87,7 @@ def context_board() -> Image.Image:
     d = ImageDraw.Draw(loading)
     m = draw_brand_mark(40, compact=True)
     loading.paste(m, (24, 40), m)
-    d.text((78, 44), "FantasyGM Lab", font=_font(20, bold=True), fill=WHITE)
+    d.text((78, 44), "FantasyDesk", font=_font(20, bold=True), fill=WHITE)
     d.text((78, 72), "FOUNDER BETA", font=_font(12, bold=True), fill=(148, 163, 184))
     d.rectangle((24, 120, 360, 128), fill=(42, 46, 54))
     d.rectangle((24, 120, 180, 128), fill=CYAN)

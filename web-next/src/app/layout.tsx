@@ -7,9 +7,10 @@ import { PlayerQuickViewProvider } from "@/context/PlayerQuickViewContext";
 import { ValuationLensProvider } from "@/context/ValuationLensContext";
 import { GmOrb } from "@/components/GmOrb";
 import { Header } from "@/components/Header";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "FantasyGM Lab",
+  title: BRAND_NAME,
   description: "Dynasty fantasy football GM assistant.",
 };
 

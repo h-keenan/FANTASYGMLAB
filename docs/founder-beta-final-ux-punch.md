@@ -14,7 +14,7 @@ Presentation-only polish from the founder’s accumulated UX punch list. No foot
 | 6 | GM Orb | Stronger chrome + “Menu” hint; help text discoverability; nav behavior unchanged |
 | 7 | Notification Center | CTA buttons wired to destination open; category coverage retained for future live delivery |
 | 8 | Typography | Stronger title/subtitle/metadata contrast via consistency tokens |
-| 9 | Founder Beta Identity | Customer strings remain FantasyGM Lab / Founder Beta / Premium / Experimental |
+| 9 | Founder Beta Identity | Customer strings remain FantasyDesk / Founder Beta / Premium / Experimental |
 | 10 | Mobile | Touch-target floor on command actions; denser ≤430 strip |
 
 ## Remaining open (from durable FQA list)

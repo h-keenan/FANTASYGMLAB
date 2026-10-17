@@ -24,7 +24,7 @@ SERVICE_NAME = "stripe-webhook"
 EXPECTED_PUBLIC_HOST = "https://fantasygmlab-stripe-webhook.onrender.com"
 
 app = FastAPI(
-    title="FantasyGM Lab Stripe Webhook",
+    title="FantasyDesk Stripe Webhook",
     version="0.2.0",
     docs_url=None,
     redoc_url=None,

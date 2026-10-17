@@ -7,7 +7,7 @@ semantics.
 First useful workspace
 ----------------------
 After League A → League B the user must see:
-- FantasyGM Lab shell
+- FantasyDesk shell
 - correct League B identity / account
 - correct scoring/strategy context once resolved
 - navigation

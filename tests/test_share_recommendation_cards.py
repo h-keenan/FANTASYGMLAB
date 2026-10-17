@@ -46,7 +46,7 @@ def test_trade_card_maps_canonical_fields_only():
     assert card.receive_side_label == "This roster receives"
     assert card.acquire_total == 414
     assert card.send_total == 100
-    assert card.brand_footer == "FantasyGM Lab"
+    assert card.brand_footer == "FantasyDesk"
     assert "Founder Beta" not in card.brand_footer
     assert card.acquire_lines[0].label == "Player A"
     assert any(line.label == "2027 2nd" for line in card.send_lines)

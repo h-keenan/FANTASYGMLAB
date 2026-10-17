@@ -113,7 +113,7 @@ class StartupPhase(IntEnum):
 # Customer-facing copy mapped 1:1 to real startup phases. Progress width
 # is derived from the enum ordinal — never estimated or animated forward.
 _STATUS = {
-    StartupPhase.PROCESS_START: "Starting FantasyGM Lab...",
+    StartupPhase.PROCESS_START: "Starting FantasyDesk...",
     StartupPhase.PUBLIC_DATA_LOADING: "Loading player data...",
     StartupPhase.AUTH_RESTORING: "Restoring your session...",
     StartupPhase.PROFILE_LOADING: "Loading your profile...",

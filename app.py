@@ -601,7 +601,7 @@ NAVIGATION_SCROLL_RESET_COMPONENT = st.components.v2.component(
         const ready = doc.querySelector(`[data-dg-scroll-ready="${escaped}"]`)
         const main = doc.querySelector('[data-testid="stMain"]')
         if (target && ready && main) {
-          const commandHeader = doc.querySelector('[aria-label="FantasyGM Lab executive command header"]')
+          const commandHeader = doc.querySelector('[aria-label="FantasyDesk executive command header"]')
           const commandActions = doc.querySelector('[class*="st-key-executive_command_actions"]')
           const headerBottom = Math.max(
             commandHeader ? commandHeader.getBoundingClientRect().bottom : 0,
@@ -10889,7 +10889,7 @@ def franchise_trade_summary(
             return {
                 "partner": "No clear partner yet",
                 "buy_low": "Healthy cover first",
-                "rationale": "Current injury pressure is acute, so FantasyGM Lab is not elevating a headline trade unless it clearly brings healthy cover or avoids worsening the stressed positions.",
+                "rationale": "Current injury pressure is acute, so FantasyDesk is not elevating a headline trade unless it clearly brings healthy cover or avoids worsening the stressed positions.",
                 "outgoing_player": "",
                 "outgoing_player_id": "",
                 "outgoing_player_ids": [],
@@ -16733,7 +16733,7 @@ def main():
             category="startup",
         )
     st.set_page_config(
-        page_title="FantasyGM Lab",
+        page_title="FantasyDesk",
         page_icon=brand_identity.page_icon_path(),
         layout="wide",
         initial_sidebar_state="collapsed",
@@ -18090,14 +18090,14 @@ def main():
         "alerts": "Priority signals and a deeper activity timeline.",
         "archetypes": "Supporting franchise identity context for League Rankings and Teams.",
         "manager_tendencies": "Supporting manager-behavior context for League Rankings and Teams.",
-        "premium": "Free and Premium plan preview for FantasyGM Lab.",
+        "premium": "Free and Premium plan preview for FantasyDesk.",
         "founder_ops": "Founder-only operational health and read-only diagnostics.",
         "founder_labs": "Founder/dev inventory of dormant and hidden product surfaces.",
         "methodology": methodology_page.PAGE_PURPOSE,
         "about_disclaimer": "Product information, recommendation limits, and general disclaimer.",
         "legal": "Terms, privacy, subscription terms, and the no-affiliation disclaimer in one place.",
-        "terms": "Plain-language terms for using FantasyGM Lab.",
-        "privacy": "How FantasyGM Lab may handle usernames, league context, preferences, and feedback.",
+        "terms": "Plain-language terms for using FantasyDesk.",
+        "privacy": "How FantasyDesk may handle usernames, league context, preferences, and feedback.",
         "no_affiliation": "Independent-product and third-party ownership notice.",
     }
     # Live Dashboard command chrome owns SELECT/ALERTS/YOU. Guest landing
@@ -23452,7 +23452,7 @@ def main():
         render_page_shell(
             page_key=founder_ops.FOUNDER_OPS_PAGE_KEY,
             title="Founder Ops",
-            subtitle="Read-only operational health for FantasyGM Lab founders.",
+            subtitle="Read-only operational health for FantasyDesk founders.",
             meta_items=[
                 ("Founder only", "primary"),
             ],

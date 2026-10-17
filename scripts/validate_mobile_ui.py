@@ -62,8 +62,8 @@ SURFACES = {
         "Build the trade",
     ),
     "methodology": (
-        "How FantasyGM Lab Evaluates Players",
-        "What FantasyGM Lab does not claim",
+        "How FantasyDesk Evaluates Players",
+        "What FantasyDesk does not claim",
         "Value is league-specific",
     ),
     "recaps": (
@@ -1224,11 +1224,11 @@ def _assert_layout(page, surface: str, width: int, expected: tuple[str, ...]) ->
             methodology_text = page.inner_text("body")
         except Exception:
             methodology_text = body_text
-        if methodology_text.count("How FantasyGM Lab Evaluates Players") < 1:
+        if methodology_text.count("How FantasyDesk Evaluates Players") < 1:
             failures.append("methodology title missing")
         if "Load my leagues" in methodology_text or "Import your league" in methodology_text:
             failures.append("marketing/import hero stacked above methodology")
-        if methodology_text.count("How FantasyGM Lab Evaluates Players") > 2:
+        if methodology_text.count("How FantasyDesk Evaluates Players") > 2:
             failures.append("duplicate methodology titles")
     if surface == "dashboard":
         body_text = str(metrics.get("shellText") or "")

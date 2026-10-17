@@ -1,10 +1,10 @@
 # Executive Workspace Shell
 
-Every authenticated FantasyGM Lab workspace begins with one compact **Executive Command Header**.
+Every authenticated FantasyDesk workspace begins with one compact **Executive Command Header**.
 
 The header owns only:
 
-- FantasyGM Lab identity (FGL mark);
+- FantasyDesk identity (FGL mark);
 - Founder Beta badge;
 - the current page title;
 - the active league as the War Room;

@@ -1,6 +1,6 @@
 """Real per-game (weekly) fantasy point projections.
 
-Before this module, FantasyGM Lab had no per-game projection anywhere — only
+Before this module, FantasyDesk had no per-game projection anywhere — only
 ``modules.rankings``'s season-long ``value_score`` composite (a dynasty asset
 value, not a "how many points will this player score in Week N" number) and,
 once a game is live, real already-scored points via ``modules.sleeper.

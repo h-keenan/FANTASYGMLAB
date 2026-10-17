@@ -252,7 +252,7 @@ function generalDestinations(colors: ThemeColors): Destination[] {
       route: 'Paywall',
       icon: 'star-outline',
       color: colors.premium,
-      subtitle: 'Unlock the full FantasyGM Lab experience',
+      subtitle: 'Unlock the full FantasyDesk experience',
     },
     {
       label: 'More',
@@ -782,7 +782,7 @@ export default function GmOrb() {
           >
             <View style={styles.sheetHandle} />
           </Pressable>
-          <AppText style={styles.sheetKicker}>FantasyGM Lab</AppText>
+          <AppText style={styles.sheetKicker}>FantasyDesk</AppText>
           <AppText style={styles.sheetTitle}>Where to go</AppText>
 
           <TextInput

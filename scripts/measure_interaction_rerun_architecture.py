@@ -1,6 +1,6 @@
 """Interaction-rerun architecture harness (source + synthetic contracts).
 
-Measures ownership and rerun tax for representative FantasyGM Lab interactions.
+Measures ownership and rerun tax for representative FantasyDesk interactions.
 Does not change football truth. Enable optional runtime tracing with
 ``DYNASTYGM_RUNTIME_TRACE=1`` separately for production collection.
 

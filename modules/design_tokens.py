@@ -52,7 +52,7 @@ DESIGN_TOKEN_CSS = """
     --border-strong: var(--color-border-strong);
     --border-accent: var(--color-accent);
 
-    /* Brand accent aliases (FantasyGM Lab identity — keep in sync with brand_identity.py) */
+    /* Brand accent aliases (FantasyDesk identity — keep in sync with brand_identity.py) */
     --color-brand-accent: #22d3ee;
     --color-brand-bg: #050607;
     --color-brand-surface: #0f1114;

@@ -83,7 +83,7 @@ def test_scarce_inventory_copy_is_honest_for_one_approved():
         entitlement=premium.PREMIUM,
     )
     summary = trade_hub_ui.trade_hub_entitlement_summary(presentation, section_count=1)
-    assert summary == "One trade currently clears FantasyGM Lab's approval threshold."
+    assert summary == "One trade currently clears FantasyDesk's approval threshold."
     assert "hidden" not in summary.casefold()
 
 

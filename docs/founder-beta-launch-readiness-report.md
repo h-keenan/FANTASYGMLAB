@@ -1,6 +1,6 @@
 # Founder Beta Launch Readiness Report
 
-Release certification audit for FantasyGM Lab Founder Beta.
+Release certification audit for FantasyDesk Founder Beta.
 
 | Field | Value |
 | --- | --- |
@@ -68,7 +68,7 @@ Walkthrough mapped against current code paths and existing verification docs. **
 | Empty states | PQV missing player | Silent close — polish only |
 | Orphaned buttons | None found in route inventory | — |
 | Dead links | Terms / Privacy / About load on production probe | — |
-| Old branding | FantasyGM Lab / GM Orb consistent | — |
+| Old branding | FantasyDesk / GM Orb consistent | — |
 | Legacy UI | Multiple CSS migration layers in `app_styles.py` | Medium backlog — no blocker |
 
 No customer-visible stack traces, TODO markers, or lorem ipsum observed in launch surfaces (per ops activation probe).

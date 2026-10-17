@@ -1530,7 +1530,7 @@ def render_waiver_workspace_sections(
                 unsafe_allow_html=True,
             )
             st.caption(
-                "FantasyGM Lab does not submit waiver claims for you — "
+                "FantasyDesk does not submit waiver claims for you — "
                 "place the claim in your Sleeper league once you've decided."
             )
             if injury_positions:

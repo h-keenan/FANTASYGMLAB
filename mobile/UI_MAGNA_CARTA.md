@@ -1,16 +1,16 @@
-# FantasyGM Lab — UI Magna Carta
+# FantasyDesk — UI Magna Carta
 
 ## Purpose
 
-This document defines the canonical visual language, information architecture principles, component behavior, hierarchy rules, and interaction standards for FantasyGM Lab. Treat it as the default authority for all UI work unless a page-specific requirement explicitly overrides it.
+This document defines the canonical visual language, information architecture principles, component behavior, hierarchy rules, and interaction standards for FantasyDesk. Treat it as the default authority for all UI work unless a page-specific requirement explicitly overrides it.
 
-The goal is not merely consistency. FantasyGM Lab should feel like one coherent premium product built for someone managing a football franchise, not a collection of unrelated fantasy-football screens.
+The goal is not merely consistency. FantasyDesk should feel like one coherent premium product built for someone managing a football franchise, not a collection of unrelated fantasy-football screens.
 
 The product should visually communicate: **front-office intelligence + sports analytics + actionable GM decision support** — rather than: generic fantasy app + stat tables + decorative cards.
 
 ## 1. Core product feel
 
-FantasyGM Lab should feel: premium, serious, intelligent, modern, fast, compact, data-rich, decisive, mobile-native.
+FantasyDesk should feel: premium, serious, intelligent, modern, fast, compact, data-rich, decisive, mobile-native.
 
 It should **not** feel: childish, overly gamer-like, neon for the sake of neon, cluttered, spreadsheet-like, excessively card-heavy, like every metric has equal importance, like a generic fantasy-football clone.
 
@@ -53,7 +53,7 @@ Never organize screens solely around backend object structure. Organize them aro
 
 ## 5. Mobile-first rule
 
-FantasyGM Lab is a mobile-first product. Design first for modern iPhone dimensions. Desktop-like layouts must not simply be squeezed onto mobile.
+FantasyDesk is a mobile-first product. Design first for modern iPhone dimensions. Desktop-like layouts must not simply be squeezed onto mobile.
 
 Requirements: readable typography, comfortable touch targets, clear one-handed interaction, no horizontal page overflow, sensible sticky controls, correct safe-area handling, no content hidden beneath overlays, efficient vertical scrolling. Density should come from better grouping, not tiny text.
 
@@ -144,7 +144,7 @@ Use one shared style for: Stats/Trends/Schedule/Career/Model, For You/All Trades
 
 ## 19. Player identity component
 
-Player identity is one of the most important reusable systems in FantasyGM Lab. It should have one canonical visual language.
+Player identity is one of the most important reusable systems in FantasyDesk. It should have one canonical visual language.
 
 Shared player identity should support: portrait, portrait ring/state, player name, position badge, NFL team, age where appropriate, tier/classification, injury/status, opportunity/state, optional supporting context. It should have variants: compact row, standard row, hero — but all variants must clearly belong to the same component family. Do not invent separate player styling for Waivers, Matchup, Trade Hub, Rankings, Roster.
 
@@ -191,7 +191,7 @@ Short analytical conclusions should use one reusable component. Examples: Role t
 
 ## 29. Recommendation component
 
-FantasyGM Lab's value proposition is its recommendations. Recommendation components deserve stronger hierarchy than raw metadata. They should clearly answer: What should I do? Why? How confident is the recommendation? Reuse a common structure across roster recommendations, Next Move, trade recommendations, waiver recommendations. Page-specific variants are allowed, but their visual language must remain related.
+FantasyDesk's value proposition is its recommendations. Recommendation components deserve stronger hierarchy than raw metadata. They should clearly answer: What should I do? Why? How confident is the recommendation? Reuse a common structure across roster recommendations, Next Move, trade recommendations, waiver recommendations. Page-specific variants are allowed, but their visual language must remain related.
 
 ## 30. Trade UI
 
@@ -252,7 +252,7 @@ Concept images are not data sources. The production app remains authoritative fo
 
 ## 43. Concept image rule
 
-Page-specific concept images define: visual hierarchy, composition, grouping, density, intended polish. However: **global FantasyGM Lab components override generic elements accidentally depicted in concept images.** Example: if a generated concept contains a footer, ignore it — FantasyGM Lab uses the GM orb/navigation system.
+Page-specific concept images define: visual hierarchy, composition, grouping, density, intended polish. However: **global FantasyDesk components override generic elements accidentally depicted in concept images.** Example: if a generated concept contains a footer, ignore it — FantasyDesk uses the GM orb/navigation system.
 
 ## 44. Shared component first
 
@@ -292,6 +292,6 @@ A UI task is not complete simply because the screen renders. Before finishing: i
 
 ## 53. Final principle
 
-Every FantasyGM Lab screen should answer: **what does the user need to understand or decide here?** Make that obvious first. Everything else supports it. The UI should feel sophisticated because it knows what matters — not because it contains more boxes, more neon, or more decoration.
+Every FantasyDesk screen should answer: **what does the user need to understand or decide here?** Make that obvious first. Everything else supports it. The UI should feel sophisticated because it knows what matters — not because it contains more boxes, more neon, or more decoration.
 
 **One app. One design language. One component system. No generic footer. Keep the GM orb. Actionable intelligence before raw information.**

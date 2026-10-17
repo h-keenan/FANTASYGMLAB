@@ -1,4 +1,4 @@
-# FantasyGM Lab — static marketing landing
+# FantasyDesk — static marketing landing
 
 Lightweight static page for the apex domain. This is an intentionally
 **lighter variant** of the app's welcome screen, not a 1:1 mirror: no
