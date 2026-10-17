@@ -439,12 +439,15 @@ def filter_current_fantasy_players(
 ) -> pd.DataFrame:
     """Filter before ranking while preserving the original order of eligible rows.
 
-    `league` is optional and, when passed, additionally drops DEF/D-ST rows
-    for a league whose own `roster_positions` don't include a DEF slot at
-    all — those players were showing up in rankings/search/waivers for
-    leagues that can never actually roster them. Every existing caller that
-    doesn't pass `league` keeps its exact current behavior; this is opt-in
-    per call site, not a blanket behavior change.
+    `league` is optional and, when passed, additionally drops DEF/D-ST and
+    kicker rows for a league whose own `roster_positions` don't include
+    that slot at all — those players were showing up in rankings/search/
+    waivers for leagues that can never actually roster them (niche-scenario
+    audit, 2026-10-17: kicker-gating was missing even though DEF already
+    had this exact guard — same bug class, just never extended to K).
+    Every existing caller that doesn't pass `league` keeps its exact
+    current behavior; this is opt-in per call site, not a blanket behavior
+    change.
     """
     if players is None:
         players = pd.DataFrame()
@@ -481,4 +484,6 @@ def filter_current_fantasy_players(
         roster_positions = league.get("roster_positions") or []
         if "DEF" not in roster_positions:
             eligible = eligible[eligible["position"] != "DEF"]
+        if "K" not in roster_positions:
+            eligible = eligible[eligible["position"] != "K"]
     return eligible

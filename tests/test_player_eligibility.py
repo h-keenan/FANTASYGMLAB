@@ -205,6 +205,49 @@ def test_def_players_are_kept_when_no_league_is_passed_at_all():
     assert set(filtered["player_id"].tolist()) == {"kc-def", "current"}
 
 
+def test_kicker_players_are_dropped_for_a_league_with_no_k_roster_slot():
+    # Same bug class DEF already had a guard for — niche-scenario audit,
+    # 2026-10-17: kicker-gating was never extended to K.
+    players = _pre_annotated(
+        [
+            {"player_id": "a-kicker", "position": "K"},
+            {"player_id": "current", "position": "RB"},
+        ]
+    )
+    league = {"roster_positions": ["QB", "RB", "WR", "TE", "FLEX", "BN"]}
+
+    filtered = filter_current_fantasy_players(players, league=league)
+
+    assert filtered["player_id"].tolist() == ["current"]
+
+
+def test_kicker_players_are_kept_for_a_league_with_a_k_roster_slot():
+    players = _pre_annotated(
+        [
+            {"player_id": "a-kicker", "position": "K"},
+            {"player_id": "current", "position": "RB"},
+        ]
+    )
+    league = {"roster_positions": ["QB", "RB", "WR", "TE", "K", "FLEX", "BN"]}
+
+    filtered = filter_current_fantasy_players(players, league=league)
+
+    assert set(filtered["player_id"].tolist()) == {"a-kicker", "current"}
+
+
+def test_kicker_players_are_kept_when_no_league_is_passed_at_all():
+    players = _pre_annotated(
+        [
+            {"player_id": "a-kicker", "position": "K"},
+            {"player_id": "current", "position": "RB"},
+        ]
+    )
+
+    filtered = filter_current_fantasy_players(players)
+
+    assert set(filtered["player_id"].tolist()) == {"a-kicker", "current"}
+
+
 def test_missing_status_is_not_assumed_active_without_current_signal():
     player = _player(
         "unknown",
