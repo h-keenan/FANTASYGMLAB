@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { DashboardResponse } from "@/lib/api";
 import { GamePlanCard } from "@/components/GamePlanCard";
+import { NavDestinationGlyph, type NavGlyphName } from "@/components/NavDestinationGlyph";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
 import { streamlitPageUrl } from "@/lib/streamlitLink";
 
@@ -51,25 +52,30 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
 // docstring), so its two backing endpoints are new, not ports of an
 // existing mobile endpoint.
 
-const BUILT_PAGES: { label: string; path: string }[] = [
-  { label: "My Team", path: "my-team" },
-  { label: "Matchup", path: "matchup" },
-  { label: "Trade Hub", path: "trade-hub" },
-  { label: "Waivers", path: "waivers" },
-  { label: "League Rankings", path: "league-rankings" },
-  { label: "Alerts", path: "alerts" },
-  { label: "GM Plan", path: "gm-plan" },
-  { label: "GM Targets", path: "gm-targets" },
-  { label: "League Recaps / History", path: "league-recaps" },
-  { label: "Draft Center", path: "draft-center" },
-  { label: "Trade Analyzer", path: "trade-analyzer" },
-  { label: "Trade Finder", path: "trade-finder" },
-  { label: "Players", path: "players" },
+const BUILT_PAGES: { label: string; path: string; glyph: NavGlyphName }[] = [
+  { label: "My Team", path: "my-team", glyph: "myTeam" },
+  { label: "Matchup", path: "matchup", glyph: "matchup" },
+  { label: "Trade Hub", path: "trade-hub", glyph: "tradeHub" },
+  { label: "Waivers", path: "waivers", glyph: "waivers" },
+  { label: "League Rankings", path: "league-rankings", glyph: "leagueRankings" },
+  { label: "Alerts", path: "alerts", glyph: "alerts" },
+  { label: "GM Plan", path: "gm-plan", glyph: "gmPlan" },
+  { label: "GM Targets", path: "gm-targets", glyph: "gmTargets" },
+  // Team Situation (end-to-end-audit finding, 2026-10-17): already a real
+  // page, reachable via the GM orb and a link inside GM Plan, but missing
+  // from this exact list — same "built but not in Explore" gap Trade
+  // Finder had before this same audit.
+  { label: "Team Situation", path: "team-situation", glyph: "teamSituation" },
+  { label: "League Recaps / History", path: "league-recaps", glyph: "leagueRecaps" },
+  { label: "Draft Center", path: "draft-center", glyph: "draftCenter" },
+  { label: "Trade Analyzer", path: "trade-analyzer", glyph: "tradeAnalyzer" },
+  { label: "Trade Finder", path: "trade-finder", glyph: "tradeFinder" },
+  { label: "Players", path: "players", glyph: "players" },
   // Live Draft (Revision 21) — closes out the original migration punch
   // list. Shown unconditionally like every other entry here; the page
   // itself (not this nav) is what gates on an actual in-progress/paused
   // Sleeper draft, same as Streamlit's own route.
-  { label: "Live Draft", path: "live-draft" },
+  { label: "Live Draft", path: "live-draft", glyph: "liveDraft" },
 ];
 
 // Portfolio (Revision 8) spans every saved league at once — unlike every
@@ -84,13 +90,18 @@ const EXPLORE_CARD_STYLE = {
   border: "var(--border-width-default) solid var(--color-border)",
   color: "var(--color-text-primary)",
 } as const;
-const EXPLORE_CARD_CLASS = "px-4 py-3 text-sm font-bold flex items-center justify-between";
+const EXPLORE_CARD_CLASS = "px-4 py-3 text-sm font-bold flex items-center justify-between gap-2";
 
-function ExploreCard({ href, label }: { href: string; label: string }) {
+function ExploreCard({ href, label, glyph }: { href: string; label: string; glyph: NavGlyphName }) {
   return (
     <Link href={href} className={EXPLORE_CARD_CLASS} style={EXPLORE_CARD_STYLE}>
-      {label}
-      <span style={{ color: "var(--color-accent)" }}>→</span>
+      <span className="flex items-center gap-2 min-w-0">
+        <span className="shrink-0" style={{ color: "var(--color-accent)" }}>
+          <NavDestinationGlyph name={glyph} size={18} />
+        </span>
+        <span className="truncate">{label}</span>
+      </span>
+      <span className="shrink-0" style={{ color: "var(--color-accent)" }}>→</span>
     </Link>
   );
 }
@@ -213,15 +224,16 @@ export function DashboardContent({
           Every tool in one place.
         </p>
         <div className="grid grid-cols-2 gap-3">
-          <ExploreCard href="/portfolio" label="Portfolio" />
-          <ExploreCard href="/news" label="News" />
-          <ExploreCard href="/trade-history" label="Trade History" />
-          <ExploreCard href="/college-scouting" label="College Scouting" />
+          <ExploreCard href="/portfolio" label="Portfolio" glyph="portfolio" />
+          <ExploreCard href="/news" label="News" glyph="news" />
+          <ExploreCard href="/trade-history" label="Trade History" glyph="tradeHistory" />
+          <ExploreCard href="/college-scouting" label="College Scouting" glyph="collegeScouting" />
           {BUILT_PAGES.map((page) => (
             <ExploreCard
               key={page.path}
               href={`/${page.path}/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
               label={page.label}
+              glyph={page.glyph}
             />
           ))}
         </div>

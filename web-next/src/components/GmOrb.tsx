@@ -6,11 +6,13 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { NavDestinationGlyph, type NavGlyphName } from "@/components/NavDestinationGlyph";
 
 interface Destination {
   label: string;
   path: string;
   subtitle: string;
+  glyph: NavGlyphName;
 }
 
 /**
@@ -41,36 +43,36 @@ export function GmOrb() {
 
   const coreLeagueDestinations: Destination[] = leagueId
     ? [
-        { label: "Dashboard", path: `/dashboard/${encodeURIComponent(leagueId)}${query}`, subtitle: "Personalized insights and recommendations" },
-        { label: "Alerts", path: `/alerts/${encodeURIComponent(leagueId)}${query}`, subtitle: "Injuries, news, and important updates" },
-        { label: "My Team", path: `/my-team/${encodeURIComponent(leagueId)}${query}`, subtitle: "Roster, lineup, and team analysis" },
-        { label: "Matchup", path: `/matchup/${encodeURIComponent(leagueId)}${query}`, subtitle: "This week's matchup and comparison" },
-        { label: "Waivers", path: `/waivers/${encodeURIComponent(leagueId)}${query}`, subtitle: "Top adds, trends, and free agents" },
-        { label: "Players", path: `/players/${encodeURIComponent(leagueId)}${query}`, subtitle: "Search, rankings, and player insights" },
-        { label: "League Rankings", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}`, subtitle: "Power rankings across the league" },
+        { label: "Dashboard", path: `/dashboard/${encodeURIComponent(leagueId)}${query}`, subtitle: "Personalized insights and recommendations", glyph: "dashboard" },
+        { label: "Alerts", path: `/alerts/${encodeURIComponent(leagueId)}${query}`, subtitle: "Injuries, news, and important updates", glyph: "alerts" },
+        { label: "My Team", path: `/my-team/${encodeURIComponent(leagueId)}${query}`, subtitle: "Roster, lineup, and team analysis", glyph: "myTeam" },
+        { label: "Matchup", path: `/matchup/${encodeURIComponent(leagueId)}${query}`, subtitle: "This week's matchup and comparison", glyph: "matchup" },
+        { label: "Waivers", path: `/waivers/${encodeURIComponent(leagueId)}${query}`, subtitle: "Top adds, trends, and free agents", glyph: "waivers" },
+        { label: "Players", path: `/players/${encodeURIComponent(leagueId)}${query}`, subtitle: "Search, rankings, and player insights", glyph: "players" },
+        { label: "League Rankings", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}`, subtitle: "Power rankings across the league", glyph: "leagueRankings" },
       ]
     : [];
 
   const gmToolsDestinations: Destination[] = leagueId
     ? [
-        { label: "Trade Hub", path: `/trade-hub/${encodeURIComponent(leagueId)}${query}`, subtitle: "Trade ideas, ranked by fit" },
-        { label: "Trade Finder", path: `/trade-finder/${encodeURIComponent(leagueId)}${query}`, subtitle: "Build and search for a trade" },
-        { label: "Trade Analyzer", path: `/trade-analyzer/${encodeURIComponent(leagueId)}${query}`, subtitle: "Evaluate any trade package" },
-        { label: "GM Targets", path: `/gm-targets/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your saved watchlist" },
-        { label: "Team Situation", path: `/team-situation/${encodeURIComponent(leagueId)}${query}`, subtitle: "Declare your rebuild/compete stance" },
-        { label: "GM Plan", path: `/gm-plan/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your season-long roadmap" },
-        { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools" },
-        { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room" },
-        { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories" },
+        { label: "Trade Hub", path: `/trade-hub/${encodeURIComponent(leagueId)}${query}`, subtitle: "Trade ideas, ranked by fit", glyph: "tradeHub" },
+        { label: "Trade Finder", path: `/trade-finder/${encodeURIComponent(leagueId)}${query}`, subtitle: "Build and search for a trade", glyph: "tradeFinder" },
+        { label: "Trade Analyzer", path: `/trade-analyzer/${encodeURIComponent(leagueId)}${query}`, subtitle: "Evaluate any trade package", glyph: "tradeAnalyzer" },
+        { label: "GM Targets", path: `/gm-targets/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your saved watchlist", glyph: "gmTargets" },
+        { label: "Team Situation", path: `/team-situation/${encodeURIComponent(leagueId)}${query}`, subtitle: "Declare your rebuild/compete stance", glyph: "teamSituation" },
+        { label: "GM Plan", path: `/gm-plan/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your season-long roadmap", glyph: "gmPlan" },
+        { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools", glyph: "draftCenter" },
+        { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft" },
+        { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps" },
       ]
     : [];
 
   const generalDestinations: Destination[] = [
-    { label: "Home", path: "/", subtitle: "Switch leagues and manage account" },
-    { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league" },
-    { label: "News", path: "/news", subtitle: "Latest NFL news and updates" },
-    { label: "Trade History", path: "/trade-history", subtitle: "Trades you've shared and confirmed" },
-    { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects" },
+    { label: "Home", path: "/", subtitle: "Switch leagues and manage account", glyph: "home" },
+    { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league", glyph: "portfolio" },
+    { label: "News", path: "/news", subtitle: "Latest NFL news and updates", glyph: "news" },
+    { label: "Trade History", path: "/trade-history", subtitle: "Trades you've shared and confirmed", glyph: "tradeHistory" },
+    { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects", glyph: "collegeScouting" },
   ];
 
   return (
@@ -173,14 +175,19 @@ function NavRow({ destination, onNavigate }: { destination: Destination; onNavig
     <Link
       href={destination.path}
       onClick={onNavigate}
-      className="flex flex-col py-2.5"
+      className="flex items-center gap-3 py-2.5"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-        {destination.label}
+      <span className="shrink-0" style={{ color: "var(--color-accent)" }}>
+        <NavDestinationGlyph name={destination.glyph} size={20} />
       </span>
-      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {destination.subtitle}
+      <span className="flex flex-col min-w-0">
+        <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+          {destination.label}
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {destination.subtitle}
+        </span>
       </span>
     </Link>
   );
