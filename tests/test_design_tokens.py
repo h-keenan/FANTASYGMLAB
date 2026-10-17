@@ -26,14 +26,14 @@ def test_semantic_tokens_match_the_design_system_specification():
         # FantasyDesk brand sheet (2026-10-17) — Midnight/Charcoal/Graphite
         # foundation, Bone text, Field/Touchdown accent. See
         # DESIGN_TOKEN_CSS's own inline comment for the contrast math.
-        "--color-bg": "#0b0d0f",
-        "--color-shell": "#0b0d0f",
-        "--color-surface-primary": "#1a1f24",
-        "--color-text-primary": "#f8f6ef",
+        "--color-bg": "#0b0b0b",
+        "--color-shell": "#0b0b0b",
+        "--color-surface-primary": "#1f2226",
+        "--color-text-primary": "#f7f8fa",
         "--color-text-secondary": "#e5e7eb",
         "--color-text-muted": "#a8adb7",
         "--color-border": "#2a2e35",
-        "--color-accent": "#9ace4f",
+        "--color-accent": "#c7fb2b",
         "--color-success": "#22c55e",
         "--color-opportunity": "#14b8a6",
         "--color-action": "#facc15",
@@ -55,7 +55,7 @@ def test_semantic_tokens_match_the_design_system_specification():
         "--font-size-card-title": "0.875rem",
         "--font-size-body": "0.875rem",
         "--font-size-caption": "0.75rem",
-        "--focus-ring": "0 0 0 3px rgba(154, 206, 79, 0.34)",
+        "--focus-ring": "0 0 0 3px rgba(199, 251, 43, 0.34)",
         "--control-min-height": "44px",
         "--touch-target-min": "44px",
         "--primary-color": "var(--color-accent-strong)",
@@ -102,7 +102,7 @@ def test_shared_ux_aliases_preserve_accessibility_values():
     tokens = _properties(DESIGN_TOKEN_CSS)
     assert tokens["--control-min-height"] == "44px"
     assert tokens["--touch-target-min"] == "44px"
-    assert tokens["--focus-ring"] == "0 0 0 3px rgba(154, 206, 79, 0.34)"
+    assert tokens["--focus-ring"] == "0 0 0 3px rgba(199, 251, 43, 0.34)"
     assert tokens["--font-size-caption"] == "0.75rem"
 
 

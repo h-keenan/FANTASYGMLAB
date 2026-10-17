@@ -17,11 +17,11 @@ export function PositionBadge({ position }: { position: string | null | undefine
       style={{
         background: colorVar ? `var(${colorVar})` : "var(--color-surface-raised)",
         color: colorVar ? "var(--color-brand-mark-ink)" : "var(--color-text-secondary)",
-        // Brand-continuity audit, 2026-10-17: mobile's PositionBadge is a
-        // true capsule (radii.pill) — web-next's had zero radius, the same
-        // element reading as a sharp square on web and a rounded chip on
-        // mobile despite being the single most-seen UI element on both.
-        borderRadius: "var(--radius-pill)",
+        // coridian_, 2026-10-17: "positions need to be squared off not a
+        // pill" — overrides the brand-continuity audit's earlier pill
+        // treatment (which matched mobile's capsule shape); explicit
+        // direct feedback wins.
+        borderRadius: 0,
       }}
     >
       {position}

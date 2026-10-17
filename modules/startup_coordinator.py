@@ -139,8 +139,8 @@ _SHELL_CSS = """
 .dg-startup-shell {
     align-items: center;
     background:
-        radial-gradient(circle at 16% 10%, color-mix(in srgb, var(--color-accent-strong, #d1ff72) 10%, transparent), transparent 32%),
-        linear-gradient(180deg, var(--color-bg, #0b0d0f) 0%, var(--color-shell, #0b0d0f) 54%, var(--color-bg, #0b0d0f) 100%);
+        radial-gradient(circle at 16% 10%, color-mix(in srgb, var(--color-accent-strong, #aee704) 10%, transparent), transparent 32%),
+        linear-gradient(180deg, var(--color-bg, #0b0b0b) 0%, var(--color-shell, #0b0b0b) 54%, var(--color-bg, #0b0b0b) 100%);
     box-sizing: border-box;
     display: flex;
     inset: 0;
@@ -158,7 +158,7 @@ _SHELL_CSS = """
 }
 .dg-startup-card {
     align-items: center;
-    color: var(--color-text-primary, #f8f6ef);
+    color: var(--color-text-primary, #f7f8fa);
     display: flex;
     flex-direction: column;
     gap: 0.78rem;
@@ -172,7 +172,7 @@ _SHELL_CSS = """
         linear-gradient(160deg, rgba(248, 250, 252, 0.14), rgba(8, 12, 20, 0.45)),
         rgba(15, 23, 42, 0.85);
     border: 1px solid rgba(148, 163, 184, 0.28);
-    border-inline-start: 3px solid color-mix(in srgb, var(--color-accent-strong, #d1ff72) 88%, transparent);
+    border-inline-start: 3px solid color-mix(in srgb, var(--color-accent-strong, #aee704) 88%, transparent);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
     display: flex;
     font-size: clamp(0.95rem, 2.2vw, 1.15rem);
@@ -214,12 +214,12 @@ _SHELL_CSS = """
     text-transform: uppercase;
 }
 .dg-startup-milestone.is-complete {
-    border-color: color-mix(in srgb, var(--color-accent-strong, #d1ff72) 28%, transparent);
-    color: color-mix(in srgb, var(--color-accent, #9ace4f) 92%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent-strong, #aee704) 28%, transparent);
+    color: color-mix(in srgb, var(--color-accent, #c7fb2b) 92%, transparent);
 }
 .dg-startup-milestone.is-current {
-    border-color: color-mix(in srgb, var(--color-accent-strong, #d1ff72) 55%, transparent);
-    color: var(--color-accent, #9ace4f);
+    border-color: color-mix(in srgb, var(--color-accent-strong, #aee704) 55%, transparent);
+    color: var(--color-accent, #c7fb2b);
 }
 .dg-startup-progress {
     background: rgba(148, 163, 184, 0.16);
@@ -230,7 +230,7 @@ _SHELL_CSS = """
     width: min(14rem, 68vw);
 }
 .dg-startup-progress > span {
-    background: linear-gradient(90deg, var(--color-accent-strong, #d1ff72), var(--color-accent, #9ace4f));
+    background: linear-gradient(90deg, var(--color-accent-strong, #aee704), var(--color-accent, #c7fb2b));
     display: block;
     height: 100%;
     position: relative;

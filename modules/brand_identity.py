@@ -40,7 +40,7 @@ GM_ORB_MARK_ASSET_KEY = "mark_compact"
 GM_ORB_MARK_DISPLAY_PX = 28
 
 # Brand colors (compatible with modules/design_tokens.py — consolidated, not duplicated)
-BRAND_BG = "#0b0d0f"
+BRAND_BG = "#0b0b0b"
 BRAND_SURFACE = "#0F1114"
 BRAND_SURFACE_RAISED = "#1B1E23"
 BRAND_TEXT = "#F8FAFC"

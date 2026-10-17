@@ -42,7 +42,7 @@ def test_mobile_accessibility_floor_focus_and_keyboard_safety():
     assert "--dg-ux-control-height: var(--control-min-height)" in styles
     assert "--control-min-height: 44px" in tokens
     assert "--dg-ux-focus-ring: var(--focus-ring)" in styles
-    assert "--focus-ring: 0 0 0 3px rgba(154, 206, 79, 0.34)" in tokens
+    assert "--focus-ring: 0 0 0 3px rgba(199, 251, 43, 0.34)" in tokens
     assert "font-size: 16px !important" in styles
     assert "[role=\"button\"]:focus-visible" in styles
     assert "launch_choose_create_account" in styles

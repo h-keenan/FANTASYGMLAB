@@ -7,8 +7,8 @@ BRAND_IDENTITY_CSS = """
 /* GM Orb chrome is owned by MOBILE_INTERACTION_OVERLAY_CSS */
 
 .dg-brand-mark{align-items:center;box-sizing:border-box;display:inline-flex;justify-content:center;line-height:0;overflow:hidden}
-.dg-brand-plate{background:var(--color-surface-primary,#1a1f24);border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
-.dg-brand-plate--light{background:var(--color-text-primary, #f8f6ef)}
+.dg-brand-plate{background:var(--color-surface-primary,#1f2226);border-radius:18%;box-sizing:border-box;display:inline-block;flex:0 0 auto;overflow:hidden;position:relative;vertical-align:middle}
+.dg-brand-plate--light{background:var(--color-text-primary, #f7f8fa)}
 .dg-brand-plate__img{display:block;height:100%;object-fit:contain;width:100%}
 .dg-brand-mark--sm{height:1.75rem;min-width:1.75rem;width:1.75rem}
 .dg-brand-mark--md{height:2.75rem;min-width:2.75rem;width:2.75rem}
@@ -156,7 +156,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 
 div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover"] > button:hover {
     border-color: color-mix(in srgb, var(--color-accent-strong) 55%, transparent) !important;
-    color: var(--color-text-primary, #f8f6ef) !important;
+    color: var(--color-text-primary, #f7f8fa) !important;
 }
 
 .dg-feedback-brand {
@@ -167,7 +167,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 
 .dg-feedback-brand__title {
-    color: var(--color-text-primary, #f8f6ef);
+    color: var(--color-text-primary, #f7f8fa);
     font-size: 0.78rem;
     font-weight: 850;
     line-height: 1.2;
