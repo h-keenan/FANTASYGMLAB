@@ -13,6 +13,7 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getPlayerQuickView: vi.fn(),
       getPlayerAwards: vi.fn(),
+      getPlayerWeeklyStats: vi.fn(),
     },
   };
 });
@@ -117,6 +118,10 @@ describe("PlayerQuickView", () => {
   beforeEach(() => {
     vi.mocked(api.getPlayerQuickView).mockReset();
     vi.mocked(api.getPlayerAwards).mockReset();
+    vi.mocked(api.getPlayerWeeklyStats).mockReset();
+    // Benign default (no weeks played) so tests unrelated to the weekly
+    // chart don't need to mock this fetch themselves.
+    vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({ ok: true, season: 2026, weeks: [] });
   });
 
   it("shows a loading state before the detail/awards requests resolve", async () => {
@@ -148,6 +153,39 @@ describe("PlayerQuickView", () => {
     expect(screen.getByText(/88th pct/)).toBeInTheDocument();
     expect(screen.getByText(/Top-3 WR/)).toBeInTheDocument();
     expect(screen.getByText("Ohio State")).toBeInTheDocument();
+  });
+
+  it("shows the week-by-week points chart once weekly stats load", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+    vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({
+      ok: true,
+      season: 2026,
+      weeks: [
+        { week: 1, fantasy_points_ppr: 18.4, snap_share: 0.82 },
+        { week: 2, fantasy_points_ppr: 9.1, snap_share: 0.7 },
+      ],
+    });
+
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1"));
+    expect(await screen.findByText("Week by Week")).toBeInTheDocument();
+  });
+
+  it("omits the week-by-week section when no weeks have been played yet", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+    vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({
+      ok: true,
+      season: 2026,
+      weeks: [{ week: 1, fantasy_points_ppr: null, snap_share: null }],
+    });
+
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    expect(screen.queryByText("Week by Week")).not.toBeInTheDocument();
   });
 
   it("calls onClose on Escape, backdrop click, and the close button", async () => {
