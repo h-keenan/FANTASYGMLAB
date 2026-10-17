@@ -1019,8 +1019,9 @@ def dense_section_html(
     items: tuple[StatItem, ...] | list[StatItem],
     *,
     concept: str = "",
+    render_heading: bool = True,
 ) -> str:
-    icon = glyph_html(concept, size="header") if concept else ""
+    icon = glyph_html(concept, size="header") if concept and render_heading else ""
     rows = "".join(
         "<div class='player-quick-view-stat-row'>"
         f"<div class='player-quick-view-stat-label'>{escape(item.label)}</div>"
@@ -1031,9 +1032,14 @@ def dense_section_html(
         + "</div></div>"
         for item in items
     )
+    heading = (
+        f"<h3 class='player-quick-view-stat-heading'>{icon}{escape(title)}</h3>"
+        if render_heading
+        else ""
+    )
     return (
         "<section class='player-quick-view-stat-section'>"
-        f"<h3 class='player-quick-view-stat-heading'>{icon}{escape(title)}</h3>"
+        f"{heading}"
         f"<div class='player-quick-view-stat-grid'>{rows}</div></section>"
     )
 
@@ -2790,7 +2796,14 @@ def render_current_season(
         ):
             if items:
                 rendered.append(title)
-                st.markdown(dense_section_html(title, items, concept="rankings"), unsafe_allow_html=True)
+                # Expanded by default — nothing hidden, just collapsible so a
+                # dense stats tab doesn't read as one undifferentiated wall
+                # of numbers (coridian_'s "it all blends in" PQV feedback).
+                with st.expander(title, expanded=True):
+                    st.markdown(
+                        dense_section_html(title, items, concept="rankings", render_heading=False),
+                        unsafe_allow_html=True,
+                    )
 
     if not rendered and not omit_empty:
         st.markdown(
@@ -2893,10 +2906,13 @@ def render_college_production(
 ) -> None:
     model = _stats_model(stats)
     if model.college_available:
-        st.markdown(
-            dense_section_html("College Production", model.college, concept="rankings"),
-            unsafe_allow_html=True,
-        )
+        with st.expander("College Production", expanded=True):
+            st.markdown(
+                dense_section_html(
+                    "College Production", model.college, concept="rankings", render_heading=False
+                ),
+                unsafe_allow_html=True,
+            )
         return
     if not omit_empty:
         st.caption(college_unavailable_message())
