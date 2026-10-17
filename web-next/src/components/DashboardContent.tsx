@@ -158,16 +158,42 @@ export function DashboardContent({
             Team Snapshot
           </h2>
           <div className="flex flex-wrap gap-3">
-            <SnapshotTile label="Record" value={`${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}`} />
-            <SnapshotTile label="Power Rank" value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)} />
-            <SnapshotTile label="Franchise Rank" value={formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied)} />
-            <SnapshotTile label="Starter Strength" value={formatRank(snapshot.starter_rank, snapshot.starter_rank_tied)} />
-            <SnapshotTile label="Bench Strength" value={formatRank(snapshot.bench_rank, snapshot.bench_rank_tied)} />
             <SnapshotTile
+              glyph="record"
+              label="Record"
+              value={`${snapshot.wins ?? 0}-${snapshot.losses ?? 0}${snapshot.ties ? `-${snapshot.ties}` : ""}`}
+            />
+            <SnapshotTile
+              glyph="power"
+              label="Power Rank"
+              value={formatRank(snapshot.power_rank, snapshot.power_rank_tied)}
+              tone={snapshot.power_rank === 1 ? "premium" : "neutral"}
+            />
+            <SnapshotTile
+              glyph="franchise"
+              label="Franchise Rank"
+              value={formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied)}
+              tone={snapshot.franchise_rank === 1 ? "premium" : "neutral"}
+            />
+            <SnapshotTile
+              glyph="starter"
+              label="Starter Strength"
+              value={formatRank(snapshot.starter_rank, snapshot.starter_rank_tied)}
+              tone={snapshot.starter_rank === 1 ? "premium" : "neutral"}
+            />
+            <SnapshotTile
+              glyph="bench"
+              label="Bench Strength"
+              value={formatRank(snapshot.bench_rank, snapshot.bench_rank_tied)}
+              tone={snapshot.bench_rank === 1 ? "premium" : "neutral"}
+            />
+            <SnapshotTile
+              glyph="age"
               label="Avg Age"
               value={snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—"}
             />
             <SnapshotTile
+              glyph="injury"
               label="Injuries"
               value={snapshot.health_flag || "Stable"}
               tone={snapshot.injured_starters && snapshot.injured_starters > 0 ? "risk" : "positive"}
