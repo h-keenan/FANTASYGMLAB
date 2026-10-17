@@ -9,7 +9,11 @@ interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  /** `signedIn` is true only when Supabase returned an active session
+   * immediately (project has email auto-confirm on) — callers must not
+   * treat a successful signUp as "signed in" when it's false, since no
+   * session exists yet (confirmation email pending). */
+  signUp: (email: string, password: string) => Promise<{ error: string | null; signedIn: boolean }>;
   signInAsGuest: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   /** True for a currently-signed-in guest (anonymous) session — mirrors
@@ -58,12 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
       signUp: async (email, password) => {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
         });
-        return { error: error?.message ?? null };
+        return { error: error?.message ?? null, signedIn: Boolean(data.session) };
       },
       signInAsGuest: async () => {
         // Requires "Allow anonymous sign-ins" enabled in the Supabase

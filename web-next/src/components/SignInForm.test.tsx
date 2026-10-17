@@ -33,8 +33,8 @@ describe("SignInForm", () => {
     });
   });
 
-  it("does not call onSignedIn after a successful sign-up — email confirmation is still pending", async () => {
-    signUp.mockResolvedValue({ error: null });
+  it("does not call onSignedIn after a successful sign-up when email confirmation is still pending", async () => {
+    signUp.mockResolvedValue({ error: null, signedIn: false });
     const onSignedIn = vi.fn();
     render(<SignInForm onSignedIn={onSignedIn} />);
 
@@ -49,6 +49,21 @@ describe("SignInForm", () => {
     expect(await screen.findByText(/Check your email to confirm your account/)).toBeInTheDocument();
     // Flipped back to the sign-in form, not left stuck on create-account.
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("calls onSignedIn immediately after sign-up when the project auto-confirms email", async () => {
+    signUp.mockResolvedValue({ error: null, signedIn: true });
+    const onSignedIn = vi.fn();
+    render(<SignInForm onSignedIn={onSignedIn} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "New here? Create account" }));
+    fillAgeGate();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/Check your email to confirm your account/)).not.toBeInTheDocument();
   });
 
   it("calls onSignedIn after a successful sign-in", async () => {

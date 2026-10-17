@@ -15,20 +15,21 @@ import { AgeGate } from "./AgeGate";
  * modules/guest_conversion.py's signup dialog; sign-in is not (an
  * existing account already passed the gate at signup).
  *
- * `signUp` succeeding is not the same thing as being signed in — this
- * project requires email confirmation, so a successful signUp call returns
- * no error but also creates no session (mirrors mobile's LoginScreen.tsx,
- * the reference this form was ported from: it never calls its own
- * "proceed" step off a signUp result either, only ever off signIn).
- * Calling onSignedIn() unconditionally here meant a brand-new account
- * fell straight through to SleeperImportForm with useAuth().session still
- * null, which silently created a disposable anonymous guest session
+ * `signUp` succeeding is not automatically the same thing as being signed
+ * in: when the Supabase project requires email confirmation, a successful
+ * signUp call returns no error but also creates no session yet. This
+ * project currently has email auto-confirm ON (signUp returns an active
+ * session immediately), so `AuthContext.signUp`'s `signedIn` flag is
+ * checked here rather than assumed either way — covers both configurations
+ * without guessing. Calling onSignedIn() when no session actually exists
+ * would fall through to SleeperImportForm with useAuth().session still
+ * null, which silently creates a disposable anonymous guest session
  * instead (SleeperImportForm's own `if (!session) signInAsGuest()` guard,
  * written for the deliberate "Try without an account" tab) — the user
- * believed they'd created a real account and continued the flow, but
- * every league they saved belonged to that throwaway anonymous identity,
- * never to the unconfirmed email+password account sitting in Supabase
- * waiting for a confirmation click that was never going to come.
+ * would believe they'd created a real account and continued the flow, but
+ * every league they saved would belong to that throwaway anonymous
+ * identity, never to the email+password account actually sitting in
+ * Supabase.
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const { signIn, signUp } = useAuth();
@@ -51,7 +52,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
       setError(result.error);
       return;
     }
-    if (mode === "create-account") {
+    if (mode === "create-account" && !("signedIn" in result && result.signedIn)) {
       setNotice("Check your email to confirm your account, then sign in.");
       setMode("sign-in");
       setAgeConfirmed(false);
