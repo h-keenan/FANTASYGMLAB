@@ -22,6 +22,12 @@ class RevenueCatWebhookUpdateError(RuntimeError):
     pass
 
 
+# Mirrors modules/stripe_webhook.py's SUPPORTED_ENTITLEMENT_VALUES exactly —
+# the three tiers modules/premium.py defines (FREE/PRO/FRONT_OFFICE), using
+# the same legacy "premium" raw value Pro has always written.
+SUPPORTED_ENTITLEMENT_VALUES = {"free", "premium", "front_office"}
+
+
 # Process-local RevenueCat event_id cache. Duplicate deliveries within the TTL
 # skip a second Supabase PATCH; entitlement semantics remain idempotent either
 # way since the entitlement value is always re-derived from RevenueCat's
@@ -119,12 +125,12 @@ def _profile_update_url(config: SupabaseWebhookConfig, user_id: str) -> str:
 
 def build_profile_entitlement_payload(action: dict[str, str]) -> dict[str, str]:
     entitlement = _safe_text(action.get("entitlement")).casefold()
-    if entitlement and entitlement not in {"free", "premium"}:
+    if entitlement and entitlement not in SUPPORTED_ENTITLEMENT_VALUES:
         raise RevenueCatWebhookUpdateError("RevenueCat event did not produce a supported entitlement update.")
     payload: dict[str, str] = {
         "premium_updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    if entitlement in {"free", "premium"}:
+    if entitlement in SUPPORTED_ENTITLEMENT_VALUES:
         payload["entitlement"] = entitlement
     optional_fields = {
         "revenuecat_app_user_id": action.get("user_id"),
@@ -275,7 +281,7 @@ def process_verified_revenuecat_webhook(
             "action": action,
         }
     entitlement = _safe_text(action.get("entitlement")).casefold()
-    if entitlement not in {"free", "premium"}:
+    if entitlement not in SUPPORTED_ENTITLEMENT_VALUES:
         if event_id:
             _remember_event_id(event_id)
         return {

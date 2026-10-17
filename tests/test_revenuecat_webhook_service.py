@@ -205,6 +205,58 @@ def test_expiration_revokes_premium_when_no_active_entitlement():
     assert response.json()["entitlement"] == "free"
 
 
+def test_initial_purchase_grants_front_office_when_only_that_key_is_active():
+    from modules import revenuecat_webhook
+
+    revenuecat_webhook.clear_processed_event_ids_for_tests()
+    client = _client()
+    patch_session = Mock()
+    patch_session.patch.return_value = _fake_response(204)
+    get_session = Mock()
+    get_session.get.return_value = _fake_response(200, {"items": [{"lookup_key": "front_office", "id": "entl2"}]})
+    body = b'{"event": {"id": "evt_fo_1", "type": "INITIAL_PURCHASE", "app_user_id": "user-1", "environment": "SANDBOX"}}'
+    with (
+        patch.dict(os.environ, _base_env(), clear=True),
+        patch("modules.revenuecat_webhook.requests.patch", patch_session.patch),
+        patch("modules.revenuecat_billing.requests.get", get_session.get),
+    ):
+        response = client.post(
+            "/revenuecat/webhook",
+            content=body,
+            headers={"Authorization": "whtoken-x"},
+        )
+    assert response.status_code == 200
+    assert response.json()["entitlement"] == "front_office"
+    sent_payload = patch_session.patch.call_args.kwargs["json"]
+    assert sent_payload["entitlement"] == "front_office"
+
+
+def test_front_office_outranks_premium_when_both_keys_are_active():
+    from modules import revenuecat_webhook
+
+    revenuecat_webhook.clear_processed_event_ids_for_tests()
+    client = _client()
+    patch_session = Mock()
+    patch_session.patch.return_value = _fake_response(204)
+    get_session = Mock()
+    get_session.get.return_value = _fake_response(
+        200, {"items": [{"lookup_key": "premium"}, {"lookup_key": "front_office"}]}
+    )
+    body = b'{"event": {"id": "evt_fo_2", "type": "INITIAL_PURCHASE", "app_user_id": "user-1", "environment": "SANDBOX"}}'
+    with (
+        patch.dict(os.environ, _base_env(), clear=True),
+        patch("modules.revenuecat_webhook.requests.patch", patch_session.patch),
+        patch("modules.revenuecat_billing.requests.get", get_session.get),
+    ):
+        response = client.post(
+            "/revenuecat/webhook",
+            content=body,
+            headers={"Authorization": "whtoken-x"},
+        )
+    assert response.status_code == 200
+    assert response.json()["entitlement"] == "front_office"
+
+
 def test_duplicate_event_id_skips_second_supabase_patch():
     from modules import revenuecat_webhook
 
