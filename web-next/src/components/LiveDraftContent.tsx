@@ -303,6 +303,7 @@ export function LiveDraftContent({
   state,
   stateError,
   onRefresh,
+  lens = "Dynasty",
 }: {
   leagueId: string;
   leagueName: string;
@@ -312,6 +313,7 @@ export function LiveDraftContent({
   state: LiveDraftStateResponse | null;
   stateError: string | null;
   onRefresh: () => void;
+  lens?: string;
 }) {
   const liveOrPaused = discovery.drafts.filter((draft) => draft.status === "drafting" || draft.status === "paused");
   const hasCompleted = discovery.drafts.some((draft) => draft.status === "complete");
@@ -501,6 +503,7 @@ export function LiveDraftContent({
                   leagueId={leagueId}
                   draftId={selectedDraftId}
                   draftedRows={state.pick_rows}
+                  lens={lens}
                 />
               ) : null}
 

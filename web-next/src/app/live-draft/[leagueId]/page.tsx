@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import {
   api,
   ApiError,
@@ -34,6 +35,7 @@ export default function LiveDraftPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [discovery, setDiscovery] = useState<LiveDraftDiscoveryResponse | null>(null);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export default function LiveDraftPage() {
   const fetchSnapshot = useCallback(async () => {
     if (!selectedDraftId) return;
     try {
-      const result = await api.getLiveDraftState(leagueId, selectedDraftId);
+      const result = await api.getLiveDraftState(leagueId, selectedDraftId, lens);
       const movement = diffRankMovement(result.rankings, previousRanksRef.current);
       const teamMovement = diffTeamRankMovement(result.team_rankings, previousTeamRanksRef.current);
       previousRanksRef.current = ranksById(result.rankings);
@@ -101,7 +103,7 @@ export default function LiveDraftPage() {
         );
       }
     }
-  }, [leagueId, selectedDraftId, draftState]);
+  }, [leagueId, selectedDraftId, lens, draftState]);
 
   useEffect(() => {
     if (!selectedDraftId) return;
@@ -132,7 +134,7 @@ export default function LiveDraftPage() {
       if (interval) clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDraftId]);
+  }, [selectedDraftId, lens]);
 
   if (authLoading || (!discovery && !discoveryError)) {
     return (
@@ -167,6 +169,7 @@ export default function LiveDraftPage() {
       onRefresh={() => {
         fetchSnapshot();
       }}
+      lens={lens}
     />
   );
 }

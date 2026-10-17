@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type WaiversResponse } from "@/lib/api";
 import { WaiversContent } from "@/components/WaiversContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function WaiversPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [waivers, setWaivers] = useState<WaiversResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function WaiversPage() {
     let cancelled = false;
 
     api
-      .getLeagueWaivers(leagueId)
+      .getLeagueWaivers(leagueId, lens)
       .then((result) => {
         if (!cancelled) setWaivers(result);
       })
@@ -40,7 +42,7 @@ export default function WaiversPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!waivers && !error)) {
     return (

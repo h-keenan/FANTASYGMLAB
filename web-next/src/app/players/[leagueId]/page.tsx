@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type DraftPickAsset, type LeagueRankingsResponse } from "@/lib/api";
 import { PlayersContent } from "@/components/PlayersContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -22,6 +23,7 @@ export default function PlayersPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,12 +37,12 @@ export default function PlayersPage() {
     let cancelled = false;
 
     Promise.all([
-      api.getLeagueRankings(leagueId, "Dynasty", 300),
+      api.getLeagueRankings(leagueId, lens, 300),
       // Picks/rosters back the Picks view and the roster-status facet —
       // both genuinely optional (a league with no draft-capital data yet,
       // or no roster map), same graceful-empty fallback Trade Analyzer's
       // page.tsx already uses for these same two endpoints.
-      api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: "unavailable" })),
+      api.getLeagueDraftPicks(leagueId, lens).catch(() => ({ ok: true as const, picks: [], reason: "unavailable" })),
       api.getLeagueRosters(leagueId).catch(() => ({ ok: true as const, rosters: [] })),
     ])
       .then(([rankings, picksResult, rostersResult]) => {
@@ -55,7 +57,7 @@ export default function PlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!data && !error)) {
     return (
