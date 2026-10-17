@@ -362,6 +362,77 @@ class TestInjuryImpact(unittest.TestCase):
         # surface reads — not a second/fabricated tier scheme.
         self.assertEqual(alert["route_player_tier"], "Elite")
 
+    def test_injury_alert_mentions_every_actionable_player_not_just_the_starter(self):
+        # coridian_, 2026-10-17: "all players mentioned need to have the
+        # player pfp" — a card naming 3 players (1 starter + 2 future
+        # assets) previously only carried identity for the single starter
+        # `route_player_*` routes to; `mentioned_players` carries all of
+        # them, same identity shape, so a client can show a photo for each.
+        roster = pd.DataFrame(
+            [
+                {
+                    "player_id": "starter-qb",
+                    "name": "Starter QB",
+                    "position": "QB",
+                    "team": "PHI",
+                    "status": "Questionable",
+                    "injury_status": "questionable",
+                    "market_score": 95,
+                    "age": 27,
+                    "years_exp": 5,
+                    "depth_chart_slot": 1,
+                    "projected_starter": True,
+                    "opportunity_label": "Starter At Risk",
+                    "news_updated": time.time(),
+                    "player_tier": "Elite",
+                },
+                {
+                    "player_id": "future-qb",
+                    "name": "Future QB",
+                    "position": "QB",
+                    "team": "PHI",
+                    "status": "IR",
+                    "injury_status": "out",
+                    "market_score": 40,
+                    "age": 22,
+                    "years_exp": 1,
+                    "depth_chart_slot": 2,
+                    "projected_starter": False,
+                    "opportunity_label": "Backup With Upside",
+                    "news_updated": time.time(),
+                    "player_tier": "Depth",
+                },
+                {
+                    "player_id": "future-wr",
+                    "name": "Future WR",
+                    "position": "WR",
+                    "team": "PHI",
+                    "status": "IR",
+                    "injury_status": "out",
+                    "market_score": 35,
+                    "age": 21,
+                    "years_exp": 0,
+                    "depth_chart_slot": 3,
+                    "projected_starter": False,
+                    "opportunity_label": "Backup With Upside",
+                    "news_updated": time.time(),
+                    "player_tier": "Depth",
+                },
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = [True, False, False]
+
+        summary = summarize_team_injuries(roster, lineup)
+        alert = injury_ui.my_team_injury_alert(summary)
+
+        mentioned_ids = {item["player_id"] for item in alert["mentioned_players"]}
+        self.assertEqual(mentioned_ids, {"starter-qb", "future-qb", "future-wr"})
+        by_id = {item["player_id"]: item for item in alert["mentioned_players"]}
+        self.assertEqual(by_id["starter-qb"]["position"], "QB")
+        self.assertEqual(by_id["starter-qb"]["player_tier"], "Elite")
+        self.assertEqual(by_id["future-wr"]["player_tier"], "Depth")
+
     def test_stale_injury_data_is_labeled_uncertain_in_league_card(self):
         stale_time = time.time() - (90 * 24 * 60 * 60)
         roster = pd.DataFrame(

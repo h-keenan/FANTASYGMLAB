@@ -319,6 +319,39 @@ def test_build_trade_tile_leaves_player_identity_fields_empty_without_tier_data(
     )
     assert tile["route_player_position"] == ""
     assert tile["route_player_team"] == ""
+
+
+def test_build_trade_tile_skips_a_leading_pick_to_find_the_headline_player():
+    """A receive package can legitimately list a pick before the player
+    (e.g. "2027 2nd + Target WR1") — route_player_* must still resolve to
+    the actual player, not the pick (which has no player_id), or the card
+    silently shows no identity at all for the player the headline names.
+    coridian_, 2026-10-17: "all players mentioned need to have the player
+    pfp"."""
+
+    idea = _fake_trade_idea_record()
+    idea["receive_assets"] = [
+        {"asset_type": "pick", "label": "2027 2nd"},
+        {"asset_type": "player", "player_id": "target-wr1", "name": "Target WR1", "status": "Active"},
+    ]
+    tile = dashboard_engine.build_trade_tile(
+        idea, league_id="league-1", roster_id="1", score_field="dynasty_score"
+    )
+    assert tile["route_player_id"] == "target-wr1"
+    assert tile["route_player_name"] == "Target WR1"
+
+
+def test_build_trade_tile_leaves_route_player_empty_when_receive_side_is_all_picks():
+    """Honest edge case — no player asset anywhere in receive_assets means
+    no route_player identity to show, never a fabricated one."""
+
+    idea = _fake_trade_idea_record()
+    idea["receive_assets"] = [{"asset_type": "pick", "label": "2027 2nd"}]
+    tile = dashboard_engine.build_trade_tile(
+        idea, league_id="league-1", roster_id="1", score_field="dynasty_score"
+    )
+    assert tile["route_player_id"] == ""
+    assert tile["route_player_name"] == ""
     assert tile["route_player_tier"] == ""
     assert tile["route_player_score"] is None
 

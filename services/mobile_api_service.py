@@ -5030,6 +5030,7 @@ def _project_briefing_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "route_player_team": payload.get("route_player_team") or "",
         "route_player_tier": payload.get("route_player_tier") or "",
         "route_player_score": _clean_json_value(payload.get("route_player_score")),
+        "mentioned_players": list(payload.get("mentioned_players") or []),
         "recommendation_narrative": payload.get("recommendation_narrative"),
         "presentation": payload.get("presentation"),
         "recommendation_id": payload.get("recommendation_id") or "",
