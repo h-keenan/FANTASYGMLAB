@@ -453,6 +453,7 @@ def create_checkout_session(
         mode="subscription",
         customer_email=_safe_text(email) or None,
         line_items=[{"price": price_id, "quantity": 1}],
+        allow_promotion_codes=True,
         success_url=_safe_text(success_url or config.checkout_success_url)
         or app_config.stripe_return_url("/?page=premium&billing=success", base_url=config.app_base_url),
         cancel_url=_safe_text(cancel_url or config.checkout_cancel_url)
