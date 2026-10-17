@@ -272,9 +272,9 @@ def weekly_points_chart_html(
 
     caption = (
         "<p class='wpc-caption'>"
-        f"<strong>{_format_points(summary['average'])}</strong> avg &middot; "
-        f"<strong>{_format_points(summary['peak'])}</strong> high (Wk {peak_week}) &middot; "
-        f"<strong>{summary['games']}</strong> week{'s' if summary['games'] != 1 else ''} played"
+        f"<strong class='wpc-caption-avg'>{_format_points(summary['average'])}</strong> avg &middot; "
+        f"<strong class='wpc-caption-high'>{_format_points(summary['peak'])}</strong> high (Wk {peak_week}) &middot; "
+        f"<strong class='wpc-caption-games'>{summary['games']}</strong> week{'s' if summary['games'] != 1 else ''} played"
         "</p>"
     )
 

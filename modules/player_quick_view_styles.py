@@ -20,6 +20,9 @@ WEEKLY_POINTS_CHART_CSS = """
 .wpc-peak-label{fill:var(--color-text-primary);font-size:12px;font-variant-numeric:tabular-nums;text-anchor:middle}
 .wpc-caption{color:var(--color-text-secondary);font-size:var(--font-size-caption);line-height:var(--line-height-caption);overflow-wrap:anywhere}
 .wpc-caption strong{color:var(--color-text-primary);font-variant-numeric:tabular-nums;font-weight:var(--font-weight-body)}
+.wpc-caption-avg{color:var(--color-accent-strong)}
+.wpc-caption-high{color:var(--color-success)}
+.wpc-caption-games{color:var(--color-text-secondary)}
 .wpc-empty{border-left:var(--border-width-semantic) solid var(--color-border-strong);color:var(--color-text-secondary);font-size:var(--font-size-body);margin:0 0 var(--space-sm);max-width:44rem;padding-left:var(--space-sm)}
 div[class*="st-key-pqv_weekly_season_rail"]{margin:0 0 var(--space-xs);max-width:22rem}
 div[class*="st-key-pqv_weekly_season_rail"] [data-testid="stHorizontalBlock"]{gap:var(--space-xs)!important}
@@ -173,7 +176,8 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .pqv-model-summary-cell span{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
 .pqv-model-summary-cell strong{color:var(--color-text-primary);font-size:var(--font-size-body);overflow-wrap:anywhere}
 .pqv-accolade-chips{display:flex;flex-wrap:wrap;gap:var(--space-2xs);list-style:none;margin:var(--space-2xs) 0 0;padding:0}
-.pqv-accolade-chip{border:var(--border-width-default) solid var(--color-border-strong);color:var(--color-text-primary);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);padding:2px var(--space-xs);text-transform:uppercase}
+.pqv-accolade-chip{align-items:center;border:var(--border-width-default) solid var(--color-border-strong);color:var(--color-text-primary);display:inline-flex;font-size:var(--font-size-badge);gap:3px;letter-spacing:var(--letter-spacing-badge);padding:2px var(--space-xs);text-transform:uppercase}
+.pqv-accolade-chip .pqv-accolade-emblem{flex:0 0 0.85rem;height:0.85rem;width:0.85rem}
 .pqv-accolade-chip--gold{border-color:var(--color-prestige-elite)}
 .pqv-accolade-chip--silver{border-color:var(--color-prestige-starter)}
 .pqv-accolade-chip--bronze{border-color:var(--color-prestige-contributor)}
@@ -298,7 +302,7 @@ div[class*="st-key-pqv_actions_tertiary"] [data-testid="stButton"] button,div[cl
 .pqv-schedule-detail{color:var(--color-text-secondary);font-size:var(--font-size-caption)}
 .pqv-schedule-bye{color:var(--color-danger);font-weight:var(--font-weight-button);text-transform:uppercase}
 div[data-testid="stDialog"] [role="dialog"]:has(.player-quick-view-shell){max-height: min(88vh, 920px) !important}
-div[data-testid="stDialog"] [role="dialog"]:has(.player-quick-view-shell)>div:last-child{overflow-y: auto !important;overscroll-behavior:contain}
+div[data-testid="stDialog"] [role="dialog"]:has(.player-quick-view-shell)>div:last-child{overflow-x: hidden !important;overflow-y: auto !important;overscroll-behavior:contain}
 @media (max-width: 900px){
 .pqv-workspace-top,.pqv-decision-row,.pqv-evidence-row{grid-template-columns:minmax(0,1fr)}
 .player-dossier-snapshot-grid,.player-dossier-executive-grid{grid-template-columns:repeat(2,minmax(0,1fr))}

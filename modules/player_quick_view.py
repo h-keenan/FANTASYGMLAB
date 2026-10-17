@@ -1889,7 +1889,9 @@ def compact_accolade_chips_html(
     *,
     limit: int = 2,
 ) -> str:
-    """Tiny first-paint chips. Full emblems stay in the CAREER tab."""
+    """Tiny first-paint chips with a small category emblem (CSS shrinks the
+    same emblem the full CAREER tab uses, via .pqv-accolade-chip's own
+    sizing rule, rather than drawing a second icon set)."""
 
     chips: list[str] = []
     for badge in tuple(badges or ())[: max(0, limit)]:
@@ -1900,7 +1902,9 @@ def compact_accolade_chips_html(
         tier = badge.tier if badge.tier in {"gold", "silver", "bronze"} else "plain"
         chips.append(
             "<li class='pqv-accolade-chip "
-            f"pqv-accolade-chip--{escape(tier)}'>{escape(short)}{escape(year)}</li>"
+            f"pqv-accolade-chip--{escape(tier)}'>"
+            f"{_accolade_emblem_svg(_accolade_kind(badge))}"
+            f"{escape(short)}{escape(year)}</li>"
         )
     if not chips:
         return ""
