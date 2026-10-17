@@ -29,7 +29,7 @@ PAYWALL_GATE_CSS = """
     margin:0;
 }
 .paywall-blur-row{
-    background:var(--color-surface-raised,#1b1e23);
+    background:var(--color-surface-raised,#2b333b);
     border:1px solid var(--color-border,#2a2e35);
     border-radius:4px;
     filter:blur(2px);

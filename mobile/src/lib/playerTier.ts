@@ -20,16 +20,13 @@ export interface PlayerTierIdentity {
 // math and hue-distance reasoning behind each replacement. `contributor` and
 // `depth_developmental` are untouched; they were never part of a collision.
 export const PLAYER_TIER_LADDER: PlayerTierIdentity[] = [
-  // `generational` was #67E8F9 — only ~24deg of hue from theme.ts's
-  // `accent`/`accentSoft` (#00D4FF/#5CE4FF, hue 190deg) at near-identical
-  // saturation/lightness, so the single most prestigious tier read as
-  // "selected nav item" cyan instead of a distinct color. Re-hued to a
-  // jade/teal at hue 166deg: 24deg from `accent` *and* 24deg from `success`
-  // (#22C55E, hue 142deg) on the other side, so it sits in open space
-  // between both rather than drifting into either. Keeps the same high
-  // saturation/lightness as the old value (still reads "icy/premium" on
-  // near-black) — only the hue moved. 15.46:1 against `background`,
-  // 12.19:1 against `backgroundElevated`.
+  // `generational` was re-hued (2026-10-03) off a collision with theme.ts's
+  // then-cyan `accent`/`accentSoft` to a jade/teal at hue 166deg, 24deg from
+  // `success` (#22C55E, hue 142deg) on the other side. The 2026-10-17
+  // FantasyDesk brand-sheet accent swap (cyan hue 190deg -> Field/Touchdown
+  // green hue 85deg) moved `accent` well clear of this tier's hue too (81deg
+  // apart) — no new collision, so this value is untouched. 15.46:1 against
+  // `background`, 12.19:1 against `backgroundElevated`.
   { tierId: 'generational', semanticLabel: 'Generational', shortLabel: 'GENERATIONAL', abbrLabel: 'GEN', rankOrder: 1, color: '#78F2D5' },
   // `elite` was #8B93FF — byte-for-byte identical to theme.ts's `violet`
   // token (hue 236deg, "secondary analytics/informational category" per

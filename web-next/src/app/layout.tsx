@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Inter_Tight } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
 import "./globals.css";
 
@@ -9,6 +10,16 @@ import { GmOrb } from "@/components/GmOrb";
 import { Header } from "@/components/Header";
 import { BRAND_NAME } from "@/lib/brand";
 
+// FantasyDesk brand sheet (2026-10-17) — next/font self-hosts the font
+// (no runtime request to Google Fonts, no layout shift) and exposes it as
+// a CSS variable that --font-family-sans (globals.css) reads, same
+// "token, not a literal" pattern as every other value in that file.
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  variable: "--font-inter-tight",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: BRAND_NAME,
   description: "Dynasty fantasy football GM assistant.",
@@ -16,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`h-full antialiased ${interTight.variable}`}>
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           <ValuationLensProvider>

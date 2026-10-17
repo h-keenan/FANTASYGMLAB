@@ -32,9 +32,9 @@ def test_geometry_tokens_are_rectilinear():
 
 def test_monochrome_foundation_and_semantic_prestige_tokens_exist():
     for token in (
-        "--color-bg: #050607",
-        "--color-surface-primary: #0f1114",
-        "--color-surface-secondary: #15171b",
+        "--color-bg: #0b0d0f",
+        "--color-surface-primary: #1a1f24",
+        "--color-surface-secondary: #1a1f24",
         "--color-prestige-elite",
         "--color-prestige-starter",
         "--color-prestige-contributor",

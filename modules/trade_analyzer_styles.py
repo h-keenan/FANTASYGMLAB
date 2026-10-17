@@ -5,10 +5,10 @@ from modules.compact_fantasy_assets import COMPACT_FANTASY_ASSET_CSS
 TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 /* Incoming-offer Trade Analyzer — uses design tokens only. */
 .toa-share-card {
-  background: var(--surface-1, #0f1114);
+  background: var(--surface-1, #1a1f24);
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
   border-radius: var(--radius-panel, 0);
-  color: var(--color-text-primary, #f8fafc);
+  color: var(--color-text-primary, #f8f6ef);
   display: grid;
   gap: var(--space-sm, 0.65rem);
   margin: 0;
@@ -23,7 +23,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-brand-name {
-  color: var(--color-text-primary, #f8fafc);
+  color: var(--color-text-primary, #f8f6ef);
   font-size: var(--font-size-body, 0.95rem);
   font-weight: var(--font-weight-title, 700);
 }
@@ -52,7 +52,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
    accept=success, decline=danger, counter=accent, fair=neutral. Counter and
    fair used to share one amber, making two distinct verdicts read as one. */
 .toa-tone-accept .toa-verdict { color: var(--color-success, #22c55e); }
-.toa-tone-counter .toa-verdict { color: var(--color-accent-strong, #22d3ee); }
+.toa-tone-counter .toa-verdict { color: var(--color-accent-strong, #d1ff72); }
 .toa-tone-fair .toa-verdict { color: var(--color-text-secondary, #e5e7eb); }
 .toa-tone-decline .toa-verdict { color: var(--color-danger, #ef4444); }
 
@@ -68,7 +68,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
    and the individual .toa-side boxes it contains (surface-2), so depth
    reads card -> frame -> boxed asset, not one flat gray-on-gray stack. */
 .toa-trade-zone {
-  background: var(--surface-raised, #1b1e23);
+  background: var(--surface-raised, #2b333b);
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
   border-radius: var(--radius-panel, 0);
   box-shadow: var(--shadow-card, 0 3px 0 rgba(0, 0, 0, 0.34));
@@ -78,7 +78,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-side {
-  background: var(--surface-2, #15171b);
+  background: var(--surface-2, #1a1f24);
   border-left: 3px solid var(--border-standard, #2a2e35);
   border-radius: var(--radius-control, 12px);
   padding: var(--space-sm, 0.65rem);
@@ -150,7 +150,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-value-edge:not(.tvl-edge) strong {
-  color: var(--color-text-primary, #f8fafc);
+  color: var(--color-text-primary, #f8f6ef);
   font-size: var(--font-size-body, 0.95rem);
   letter-spacing: 0;
   text-transform: none;
@@ -192,8 +192,8 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-alt-package {
-  background: var(--surface-2, #15171b);
-  border-inline-start: 3px solid var(--color-accent-strong, #22d3ee);
+  background: var(--surface-2, #1a1f24);
+  border-inline-start: 3px solid var(--color-accent-strong, #d1ff72);
   border-radius: var(--radius-card, 0);
   display: grid;
   gap: var(--space-2xs, 0.3rem);
@@ -208,7 +208,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 }
 
 .toa-alt-package-label {
-  color: var(--color-text-primary, #f8fafc);
+  color: var(--color-text-primary, #f8f6ef);
   font-size: 0.85rem;
   font-weight: 650;
 }
@@ -257,7 +257,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 }
 
 .toa-block {
-  background: var(--surface-1, #0f1114);
+  background: var(--surface-1, #1a1f24);
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
   border-radius: var(--radius-panel, 0);
   margin: 0 0 var(--space-sm, 0.65rem);
@@ -267,7 +267,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 }
 
 .toa-block-title {
-  color: var(--color-text-primary, #f8fafc);
+  color: var(--color-text-primary, #f8f6ef);
   font-size: 0.95rem;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -284,7 +284,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 .toa-chip-list { display: grid; gap: 0.4rem; margin: 0.35rem 0 0.55rem; }
 
 .toa-chip {
-  background: var(--surface-2, #15171b);
+  background: var(--surface-2, #1a1f24);
   border: var(--border-width-default, 1px) solid var(--border-standard, #2a2e35);
   min-width: 0;
   padding: var(--space-xs, 0.35rem) var(--space-sm, 0.55rem);
@@ -295,7 +295,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 .toa-chip-copy { min-width: 0; }
 
 .toa-chip-name {
-  color: var(--color-text-primary, #f8fafc);
+  color: var(--color-text-primary, #f8f6ef);
   font-size: 0.92rem;
   font-weight: 650;
   overflow-wrap: anywhere;
@@ -348,7 +348,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 }
 
 .toa-add-feedback {
-  color: var(--color-accent-strong, #22d3ee);
+  color: var(--color-accent-strong, #d1ff72);
   font-size: 0.8rem;
   margin: 0.2rem 0 0.45rem;
 }

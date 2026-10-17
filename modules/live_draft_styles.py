@@ -21,7 +21,7 @@ LIVE_DRAFT_CSS = """
 }
 
 .live-draft-kicker {
-    color: rgba(103, 232, 249, 0.92);
+    color: rgba(154, 206, 79, 0.92);
     font-size: 0.68rem;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -30,7 +30,7 @@ LIVE_DRAFT_CSS = """
 
 .live-draft-title,
 .live-draft-command-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.08rem;
     font-weight: 900;
     line-height: 1.08;
@@ -90,7 +90,7 @@ LIVE_DRAFT_CSS = """
 }
 
 .live-draft-section-head span {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.9rem;
     font-weight: 900;
 }

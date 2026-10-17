@@ -156,7 +156,7 @@ def test_startup_splash_text_is_not_hardcoded_white():
     # correctly -- these two were simply inconsistent with it).
     html = startup_shell_html(StartupPhase.PAGE_READY)
     assert "color: #f8fafc;" not in html
-    assert html.count("color: var(--color-text-primary, #f8fafc);") >= 1
+    assert html.count("color: var(--color-text-primary, #f8f6ef);") >= 1
 
 
 def test_player_support_chip_premium_no_longer_mismatches_its_own_gold_background():

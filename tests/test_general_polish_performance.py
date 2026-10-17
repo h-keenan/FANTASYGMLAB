@@ -208,7 +208,7 @@ def test_trade_analyzer_partner_label_and_tokens():
     assert 'help="Manager who sent you the offer."' not in block
     assert "var(--color-accent-strong" in TRADE_ANALYZER_CSS
     assert "var(--color-danger" in TRADE_ANALYZER_CSS
-    assert ".toa-tone-accept .toa-verdict { color: #22d3ee; }" not in TRADE_ANALYZER_CSS
+    assert ".toa-tone-accept .toa-verdict { color: #d1ff72; }" not in TRADE_ANALYZER_CSS
 
 
 def test_hover_only_on_tappable_rows():

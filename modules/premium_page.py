@@ -114,14 +114,14 @@ PREMIUM_PLAN_CTA_COMPONENT = st.components.v2.component(
            default outline clears WCAG 1.4.11 (3:1) instead of the previous
            #3b4452, which was only ~1.4:1 against this button's background. */
         align-items: center; background: #0a0c10; border: 1px solid #64748b;
-        border-radius: 0; box-sizing: border-box; color: #f8fafc; display: flex;
+        border-radius: 0; box-sizing: border-box; color: #f8f6ef; display: flex;
         font: 750 12px/1.2 system-ui, sans-serif; justify-content: center;
         letter-spacing: .045em; min-height: 44px; padding: 10px 14px;
         text-align: center; text-decoration: none; text-transform: uppercase; width: 100%;
       }
-      #plan-cta[data-selected="true"] { border-color: #22d3ee; color: #67e8f9; }
+      #plan-cta[data-selected="true"] { border-color: #d1ff72; color: #9ace4f; }
       #plan-cta:focus-visible, #checkout-fallback:focus-visible {
-        outline: 3px solid rgba(103,232,249,.34); outline-offset: -3px;
+        outline: 3px solid rgba(154,206,79,.34); outline-offset: -3px;
       }
       #checkout-fallback { display: none; }
       #checkout-fallback[data-visible="true"] { display: flex; }
