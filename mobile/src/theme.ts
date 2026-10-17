@@ -5,8 +5,8 @@ import { Platform } from 'react-native';
  * constants. Kept deliberately small: this is a client-side presentation
  * layer only, it doesn't encode any product/valuation logic.
  *
- * Palette matches the FantasyDesk brand sheet (blue-black canvas, #151B22
- * cards, #C7FB2B/#FFC43D/#FF4D4D trajectory colors) rather than the web
+ * Palette matches the FGL brand style sheet (blue-black canvas, #151B22
+ * cards, #00D4FF/#FFC43D/#FF4D4D trajectory colors) rather than the web
  * app's own flat/dossier CSS tokens — the brand sheet is the newer,
  * explicitly-approved source of truth for how the *mobile app* should look
  * (deliberate divergence from modules/design_tokens.py, which the web app
@@ -40,15 +40,13 @@ const darkColors = {
   surfaceSolid: '#0D1117',
   border: '#242E3B',
   borderStrong: '#2E3A4A',
-  // Brand-sheet card outline (FantasyDesk, 2026-10-17 — was a cyan edge
-  // under the prior concept sheet, now Field green to match): every card
-  // reads with a faint accent edge against the dark background, not a
-  // neutral gray hairline. Scoped to AnimatedCard's default border only
-  // (never swapped in for the generic `border`/`borderStrong` line
-  // tokens, which stay neutral for dividers, inputs, and non-card
-  // outlines) so this doesn't cascade into unrelated UI that was never
-  // meant to look "branded."
-  cardBorder: 'rgba(199,251,43,0.28)',
+  // Concept-sheet card outline: every card there reads with a faint cyan
+  // edge against the navy background, not a neutral gray hairline. Scoped
+  // to AnimatedCard's default border only (never swapped in for the
+  // generic `border`/`borderStrong` line tokens, which stay neutral for
+  // dividers, inputs, and non-card outlines) so this doesn't cascade into
+  // unrelated UI that was never meant to look "branded."
+  cardBorder: 'rgba(92,228,255,0.28)',
   hairline: 'rgba(255,255,255,0.08)',
   textPrimary: '#F2F4F7',
   textSecondary: '#A6B0BB',
@@ -69,19 +67,17 @@ const darkColors = {
   // backgroundElevated, 4.33:1 on surface) — legible enough to read the
   // label, dim enough to unambiguously signal "not interactive right now."
   textDisabled: '#6F7A87',
-  // FantasyDesk brand sheet (2026-10-17) — Field/Touchdown green replaces
-  // the prior cyan (#00D4FF/#5CE4FF) throughout this accent family.
-  accent: '#C7FB2B',
-  accentSoft: '#AEE704',
-  accentMuted: 'rgba(199,251,43,0.14)',
-  // On-tint text/icon variant — for accent content painted directly over
-  // an `accentMuted` fill (selected segment labels, "CURRENT" nav badge,
-  // GM Stance's active pill). Dark mode's plain `accent` already clears AA
-  // by a wide margin there, so this is an alias today; it exists so
-  // components can consistently reach for "the color for accent text on
-  // an accent tint" and get the light-mode-correct answer for free (see
-  // lightColors.accentOnTint, which is NOT an alias).
-  accentOnTint: '#C7FB2B',
+  accent: '#00D4FF',
+  accentSoft: '#5CE4FF',
+  accentMuted: 'rgba(0,212,255,0.14)',
+  // On-tint text/icon variant — for cyan content painted directly over an
+  // `accentMuted` fill (selected segment labels, "CURRENT" nav badge, GM
+  // Stance's active pill). Dark mode's plain `accent` already clears AA by
+  // a wide margin there (~9.8:1 against accentMuted-over-black), so this is
+  // an alias today; it exists so components can consistently reach for
+  // "the color for cyan text on a cyan tint" and get the light-mode-correct
+  // answer for free (see lightColors.accentOnTint, which is NOT an alias).
+  accentOnTint: '#00D4FF',
   danger: '#FF4D4D',
   dangerMuted: 'rgba(255,77,77,0.14)',
   success: '#22C55E',
@@ -89,8 +85,8 @@ const darkColors = {
   successMuted: 'rgba(34,197,94,0.14)',
   premium: '#FFC43D',
   premiumMuted: 'rgba(255,196,61,0.14)',
-  badgeBackground: 'rgba(199,251,43,0.14)',
-  badgeText: '#AEE704',
+  badgeBackground: 'rgba(0,212,255,0.14)',
+  badgeText: '#5CE4FF',
   violet: '#8B93FF',
   // Color-system audit (2026-10-03): promoted out of GmOrb.tsx's
   // debugOverlayText, which hardcoded '#00FF88' with no light-mode
@@ -121,7 +117,7 @@ const lightColors = {
   surfaceSolid: '#FFFFFF',
   border: '#C7D9E3',
   borderStrong: '#AFC7D5',
-  cardBorder: 'rgba(79,104,2,0.25)',
+  cardBorder: 'rgba(0,120,160,0.25)',
   hairline: 'rgba(10,30,45,0.08)',
   textPrimary: '#0B1D26',
   textSecondary: '#3E5867',
@@ -139,20 +135,19 @@ const lightColors = {
   // surface): WCAG's text-contrast minimums don't apply to disabled
   // controls, and this needs to read as dimmer than textTertiary.
   textDisabled: '#6B8494',
-  // FantasyDesk brand sheet v2 (2026-10-17) — Prime green. #4F6802 is
-  // Prime (#C7FB2B) run through the same colorsys lightness-reduction
-  // this file's other re-derivations use, re-verified against this
-  // theme's own 3 light surfaces (5.06:1 worst-case).
-  accent: '#4F6802',
-  accentSoft: '#6C8F03',
-  accentMuted: 'rgba(79,104,2,0.12)',
-  // On-tint text/icon variant for accent content painted over an
+  accent: '#0077A3',
+  accentSoft: '#00A6CC',
+  accentMuted: 'rgba(0,119,163,0.12)',
+  // On-tint text/icon variant for cyan content painted over an
   // `accentMuted` fill or the pale `backgroundElevated` sheet surface.
-  // NOT an alias in light mode: plain `accent` doesn't clear AA against
-  // those tinted/elevated backgrounds either (same shared-component
-  // failure mode the prior cyan value documented) — #465D02 clears
-  // 5.93:1 worst-case, re-derived the same way as `accent` above.
-  accentOnTint: '#465D02',
+  // NOT an alias in light mode: plain `accent` (#0077A3) only reaches
+  // ~3.8-4.3:1 against an accentMuted-tinted background and 4.02:1 against
+  // `backgroundElevated` — under AA in both cases, which is exactly why
+  // several shared components' "selected"/"current" label text (segmented
+  // tabs, GM Orb's current nav row, Team Situation's active option) read as
+  // washed-out on the light theme despite dark mode looking fine with the
+  // same code. #00597A clears 5.9-6.6:1 against those same backgrounds.
+  accentOnTint: '#00597A',
   danger: '#D92D2D',
   dangerMuted: 'rgba(217,45,45,0.12)',
   success: '#178A43',
@@ -168,8 +163,8 @@ const lightColors = {
   // as plain text (4.81:1 / 4.42:1) without drifting the hue toward brown.
   premium: '#8A6508',
   premiumMuted: 'rgba(184,134,11,0.12)',
-  badgeBackground: 'rgba(79,104,2,0.12)',
-  badgeText: '#4F6802',
+  badgeBackground: 'rgba(0,119,163,0.12)',
+  badgeText: '#0077A3',
   violet: '#6B5FCC',
   // Color-system audit (2026-10-03): see darkColors.diagnosticText for why
   // this is its own token rather than `success`. Unlike every other pair in
@@ -287,12 +282,12 @@ export function awardTierColor(
 
 export const gradients = {
   hero: ['#16202C', '#000000'] as const,
-  accent: ['#AEE704', '#C7FB2B'] as const,
+  accent: ['#5CE4FF', '#00D4FF'] as const,
 };
 
 export const lightGradients = {
   hero: ['#FFFFFF', '#EAF3F8'] as const,
-  accent: ['#6C8F03', '#4F6802'] as const,
+  accent: ['#00A6CC', '#0077A3'] as const,
   /**
    * GridBackground's full-screen wash, light mode only — deliberately NOT
    * `hero` above (coridian_, verbal, 2026-10-06: "the header becomes
@@ -316,11 +311,11 @@ export const lightGradients = {
    * to the same `lightColors.background` dark mode fades to for symmetry.
    * It can't be as saturated as dark mode's navy: `BrandHeaderBar` paints
    * its wordmark accent and star icon directly in `colors.accent`
-   * over this wash, and WCAG AA (4.5:1) for that small bold text caps how
-   * dark/saturated this can go — `#D2FAFF` clears it at ~5.69:1 against
-   * the FantasyDesk accent (`#4F6802`, re-verified after the brand-sheet
-   * v2 accent swap — comfortably clears with margin to spare).
-   * `textPrimary` clears ~15.5:1 against it, no concern there.
+   * (`#0077A3`) over this wash, and WCAG AA (4.5:1) for that small bold
+   * text caps how dark/saturated this can go — `#D2FAFF` clears it at
+   * ~4.53:1 (`lightColors.background` itself only clears it at ~4.49:1, so
+   * this is already near the practical ceiling). `textPrimary` clears
+   * ~15.5:1 against it, no concern there.
    */
   headerWash: ['#D2FAFF', '#EAF3F8'] as const,
 };

@@ -50,15 +50,15 @@
   --border-accent: var(--color-accent);
 
   /* Brand accent (fixed, not themed) */
-  --color-brand-accent: #c7fb2b;
+  --color-brand-accent: #22d3ee;
   --color-brand-bg: #0b0b0b;
   --color-brand-surface: #1f2226;
   --color-brand-mark-ink: #0b1220;
 
-  /* Interaction and meaning — Prime (FantasyDesk brand sheet v2) */
-  --color-accent: #c7fb2b;
-  --color-accent-strong: #aee704;
-  --color-accent-soft: rgba(199, 251, 43, 0.14);
+  /* Interaction and meaning */
+  --color-accent: #67e8f9;
+  --color-accent-strong: #22d3ee;
+  --color-accent-soft: rgba(103, 232, 249, 0.14);
   --color-success: #22c55e;
   --color-opportunity: #14b8a6;
   --color-action: #facc15;
@@ -110,7 +110,7 @@
   --color-action-soft: rgba(250, 204, 21, 0.14);
   --color-warning-soft: rgba(245, 158, 11, 0.14);
   --color-danger-soft: rgba(239, 68, 68, 0.15);
-  --color-information-soft: rgba(199, 251, 43, 0.12);
+  --color-information-soft: rgba(103, 232, 249, 0.12);
   --color-diagnostic-soft: rgba(139, 147, 255, 0.12);
   --color-muted-soft: rgba(229, 231, 235, 0.06);
 
@@ -227,7 +227,7 @@
   --type-caption-emphasis: var(--font-weight-metadata) var(--font-size-caption) / var(--line-height-caption) var(--font-family-sans);
 
   /* Focus, controls, motion */
-  --focus-ring: 0 0 0 3px rgba(199, 251, 43, 0.34);
+  --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
   --control-min-height: 44px;
   --touch-target-min: 44px;
   --motion-fast: 120ms;
@@ -250,9 +250,9 @@
     --color-border: #c7d3da;
     --color-border-strong: #5d6b77;
 
-    --color-accent: #526d02;
-    --color-accent-strong: #526d02;
-    --color-accent-soft: rgba(82, 109, 2, 0.16);
+    --color-accent: #056e7c;
+    --color-accent-strong: #08616e;
+    --color-accent-soft: rgba(6, 110, 124, 0.16);
     --color-success: #147337;
     --color-opportunity: #0c7065;
     --color-action: #796103;
@@ -292,11 +292,11 @@
     --color-action-soft: rgba(250, 204, 21, 0.18);
     --color-warning-soft: rgba(245, 158, 11, 0.16);
     --color-danger-soft: rgba(239, 68, 68, 0.16);
-    --color-information-soft: rgba(199, 251, 43, 0.2);
+    --color-information-soft: rgba(103, 232, 249, 0.2);
     --color-diagnostic-soft: rgba(139, 147, 255, 0.16);
     --color-muted-soft: rgba(16, 24, 32, 0.06);
 
-    --focus-ring: 0 0 0 3px rgba(82, 109, 2, 0.45);
+    --focus-ring: 0 0 0 3px rgba(6, 110, 124, 0.45);
     --shadow-surface-inset: inset 0 1px 0 rgba(10, 30, 45, 0.05);
 
     color-scheme: light;

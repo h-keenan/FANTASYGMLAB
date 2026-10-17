@@ -342,7 +342,7 @@ main h4 {
 }
 .player-support-chip-info {
     background: rgba(34, 211, 238, 0.12);
-    border-color: rgba(199, 251, 43, 0.26);
+    border-color: rgba(103, 232, 249, 0.26);
     color: var(--color-accent);
 }
 .player-support-chip-risk {
@@ -586,7 +586,7 @@ main h4 {
        success state, so it borrows the same information/accent treatment as
        .launch-section-intro rather than success green (Magna Carta semantic
        color discipline: green is reserved for completed/positive outcomes). */
-    background: var(--color-information-soft, rgba(199, 251, 43, 0.12));
+    background: var(--color-information-soft, rgba(103, 232, 249, 0.12));
     border: 1px solid color-mix(in srgb, var(--color-accent-strong) 26%, transparent);
     border-radius: var(--radius-panel);
     margin: 0.64rem 0 0.82rem;
@@ -604,7 +604,7 @@ main h4 {
     line-height: 1.42;
 }
 .account-confirm-status {
-    color: var(--color-accent, #c7fb2b);
+    color: var(--color-accent, #67e8f9);
     font-size: 0.78rem;
     line-height: 1.35;
     margin-top: 0.45rem;
@@ -2475,8 +2475,8 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 .stButton button[kind="primary"],
 button[data-testid="stBaseButton-primary"] {
-    background: color-mix(in srgb, var(--dg-theme-accent-cyan, #aee704) 18%, var(--color-surface-raised));
-    border: 1px solid var(--dg-theme-accent-cyan, #aee704);
+    background: color-mix(in srgb, var(--dg-theme-accent-cyan, #22d3ee) 18%, var(--color-surface-raised));
+    border: 1px solid var(--dg-theme-accent-cyan, #22d3ee);
     border-radius: 0;
     color: var(--color-text-primary, #f7f8fa);
 }
@@ -5662,7 +5662,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .decision-panel-grid-alert .decision-panel:first-child {
         background:
             linear-gradient(90deg, rgba(34, 211, 238, 0.16), rgba(248, 250, 252, 0.075) 34%, rgba(5, 6, 9, 0.84)) !important;
-        border-left: 5px solid rgba(199, 251, 43, 0.88) !important;
+        border-left: 5px solid rgba(103, 232, 249, 0.88) !important;
         padding-block: 0.62rem !important;
     }
     .home-command-card-trade,
@@ -5697,7 +5697,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .summary-tile-grid-compact .summary-tile-power {
         background:
             linear-gradient(90deg, rgba(34, 211, 238, 0.11), rgba(229, 231, 235, 0.04) 34%, rgba(4, 5, 8, 0.72)) !important;
-        border-left-color: rgba(199, 251, 43, 0.8) !important;
+        border-left-color: rgba(103, 232, 249, 0.8) !important;
     }
     .dg-preset-secondary,
     .decision-panel-reference,

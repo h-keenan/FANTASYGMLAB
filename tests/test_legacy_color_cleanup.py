@@ -58,7 +58,7 @@ def _lower(text: str) -> str:
 
 def test_streamlit_theme_matches_canonical_tokens():
     config = (ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8")
-    assert 'primaryColor = "#aee704"' in config
+    assert 'primaryColor = "#22d3ee"' in config
     assert 'backgroundColor = "#0b0b0b"' in config
     assert 'secondaryBackgroundColor = "#1f2226"' in config
     assert 'textColor = "#f7f8fa"' in config
@@ -70,9 +70,9 @@ def test_streamlit_theme_matches_canonical_tokens():
 def test_design_tokens_bridge_streamlit_theme_variables():
     assert "--primary-color: var(--color-accent-strong);" in DESIGN_TOKEN_CSS
     assert "--background-color: var(--color-bg);" in DESIGN_TOKEN_CSS
-    assert "--color-accent: #c7fb2b;" in DESIGN_TOKEN_CSS
-    assert "--color-accent-strong: #aee704;" in DESIGN_TOKEN_CSS
-    assert "--focus-ring: 0 0 0 3px rgba(199, 251, 43, 0.34);" in DESIGN_TOKEN_CSS
+    assert "--color-accent: #67e8f9;" in DESIGN_TOKEN_CSS
+    assert "--color-accent-strong: #22d3ee;" in DESIGN_TOKEN_CSS
+    assert "--focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);" in DESIGN_TOKEN_CSS
 
 
 def test_component_family_binds_streamlit_widgets_to_tokens():
@@ -98,8 +98,8 @@ def test_active_css_drops_known_legacy_sky_and_streamlit_blues():
 
 
 def test_intentional_brand_cyan_and_light_mark_contrast_are_retained():
-    assert "--color-accent: #c7fb2b;" in DESIGN_TOKEN_CSS
-    assert "--color-brand-accent: #c7fb2b;" in DESIGN_TOKEN_CSS
+    assert "--color-accent: #67e8f9;" in DESIGN_TOKEN_CSS
+    assert "--color-brand-accent: #22d3ee;" in DESIGN_TOKEN_CSS
     # #0891B2 was a CSS light-surface contrast tweak for the retired FGL Arc
     # Monogram's cyan arc (drawn in pure CSS). The current mark is real PNG
     # artwork, not a CSS-colored shape, so light-surface contrast is now
@@ -128,9 +128,9 @@ def test_focus_and_selected_states_remain_visible():
 
 def test_chart_and_tier_presentation_use_canonical_accent():
     app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert 'CHART_COLORS = ["#aee704", "#64748b", "#14b8a6", "#f59e0b", "#ef4444"]' in app
+    assert 'CHART_COLORS = ["#22d3ee", "#64748b", "#14b8a6", "#f59e0b", "#ef4444"]' in app
     assert "#2563eb" not in app
-    assert "rgba(199, 251, 43, 0.16); color: #c7fb2b;" in app
+    assert "rgba(103, 232, 249, 0.16); color: #67e8f9;" in app
     assert "rgba(56, 189, 248" not in app
 
 

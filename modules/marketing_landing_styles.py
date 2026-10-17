@@ -26,16 +26,16 @@ body:has(.fgl-landing) .dg-build-identity{
 .fgl-landing__value{color:var(--color-text-primary,#f7f8fa);font-size:clamp(1.2rem,4.6vw,1.55rem);font-weight:800;hyphens:none;line-height:1.2;margin:0;max-width:36rem;overflow-wrap:break-word;word-break:normal}
 .fgl-landing__support{color:var(--color-text-secondary,rgba(203,213,225,.92));font-size:.95rem;line-height:1.4;margin:0;max-width:34rem}
 .fgl-landing__trust{color:var(--color-text-muted,rgba(148,163,184,.95));font-size:.78rem;line-height:1.35;margin:.05rem 0 .1rem;max-width:34rem}
-.fgl-landing__mobile-badge{align-items:center;background:color-mix(in srgb,var(--color-shell,#0b0b0b) 72%,transparent);border:1px solid color-mix(in srgb,var(--color-border,#2a2e35) 70%,transparent);border-inline-start:2px solid color-mix(in srgb,var(--color-brand-accent,#aee704) 72%,transparent);border-radius:999px;box-sizing:border-box;display:inline-flex;gap:.35rem;margin-top:.2rem;padding:.22rem .65rem .22rem .55rem;width:fit-content}
+.fgl-landing__mobile-badge{align-items:center;background:color-mix(in srgb,var(--color-shell,#0b0b0b) 72%,transparent);border:1px solid color-mix(in srgb,var(--color-border,#2a2e35) 70%,transparent);border-inline-start:2px solid color-mix(in srgb,var(--color-brand-accent,#22d3ee) 72%,transparent);border-radius:999px;box-sizing:border-box;display:inline-flex;gap:.35rem;margin-top:.2rem;padding:.22rem .65rem .22rem .55rem;width:fit-content}
 .fgl-landing__mobile-badge em{color:var(--color-text-muted,rgba(148,163,184,.95));font-size:.62rem;font-style:normal;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .fgl-landing__mobile-badge span{color:var(--color-text-secondary,rgba(226,232,240,.92));font-size:.72rem;font-weight:650}
-.fgl-preview{background:var(--color-surface-primary,rgba(15,23,42,.55));border:1px solid color-mix(in srgb,var(--color-accent-strong,#aee704) 22%,transparent);border-radius:.7rem;box-sizing:border-box;display:grid;gap:.55rem;min-width:0;padding:.7rem .75rem .65rem;box-shadow:inset 3px 0 0 var(--color-accent,#aee704)}
-.fgl-preview__kicker{color:var(--color-accent,#aee704);font-size:.68rem;font-weight:750;letter-spacing:.05em;text-transform:uppercase}
+.fgl-preview{background:var(--color-surface-primary,rgba(15,23,42,.55));border:1px solid color-mix(in srgb,var(--color-accent-strong,#22d3ee) 22%,transparent);border-radius:.7rem;box-sizing:border-box;display:grid;gap:.55rem;min-width:0;padding:.7rem .75rem .65rem;box-shadow:inset 3px 0 0 var(--color-accent,#22d3ee)}
+.fgl-preview__kicker{color:var(--color-accent,#22d3ee);font-size:.68rem;font-weight:750;letter-spacing:.05em;text-transform:uppercase}
 .fgl-preview__rail{display:grid;gap:.45rem}
 .fgl-preview__card{background:color-mix(in srgb,var(--color-bg,#020617) 35%,transparent);border:1px solid var(--color-border,rgba(148,163,184,.16));border-radius:.5rem;display:grid;gap:.28rem;padding:.5rem .55rem}
 .fgl-preview__surface{color:var(--color-prestige-elite,#d8b85a);font-size:.72rem;font-weight:750;letter-spacing:.04em;text-transform:uppercase}
 .fgl-preview__chips{display:flex;flex-wrap:wrap;gap:.28rem}
-.fgl-preview__chip{background:color-mix(in srgb,var(--color-accent-strong,#aee704) 14%,transparent);border:1px solid color-mix(in srgb,var(--color-accent,#aee704) 32%,transparent);border-radius:999px;color:var(--color-text-primary,#e5e7eb);font-size:.7rem;font-weight:650;line-height:1.2;padding:.12rem .45rem}
+.fgl-preview__chip{background:color-mix(in srgb,var(--color-accent-strong,#22d3ee) 14%,transparent);border:1px solid color-mix(in srgb,var(--color-accent,#22d3ee) 32%,transparent);border-radius:999px;color:var(--color-text-primary,#e5e7eb);font-size:.7rem;font-weight:650;line-height:1.2;padding:.12rem .45rem}
 .fgl-preview__note{color:var(--color-text-secondary,rgba(203,213,225,.9));font-size:.78rem;line-height:1.35;margin:0;overflow-wrap:anywhere}
 .fgl-preview__foot{color:var(--color-text-muted,rgba(148,163,184,.95));font-size:.75rem;line-height:1.35;margin:.1rem 0 0}
 .fgl-landing__preview{display:grid;gap:.55rem;list-style:none;margin:0;max-width:none;padding:0}

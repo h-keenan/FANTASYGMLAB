@@ -119,9 +119,9 @@ PREMIUM_PLAN_CTA_COMPONENT = st.components.v2.component(
         letter-spacing: .045em; min-height: 44px; padding: 10px 14px;
         text-align: center; text-decoration: none; text-transform: uppercase; width: 100%;
       }
-      #plan-cta[data-selected="true"] { border-color: #aee704; color: #c7fb2b; }
+      #plan-cta[data-selected="true"] { border-color: #22d3ee; color: #67e8f9; }
       #plan-cta:focus-visible, #checkout-fallback:focus-visible {
-        outline: 3px solid rgba(199,251,43,.34); outline-offset: -3px;
+        outline: 3px solid rgba(103,232,249,.34); outline-offset: -3px;
       }
       #checkout-fallback { display: none; }
       #checkout-fallback[data-visible="true"] { display: flex; }

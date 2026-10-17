@@ -52,7 +52,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
    accept=success, decline=danger, counter=accent, fair=neutral. Counter and
    fair used to share one amber, making two distinct verdicts read as one. */
 .toa-tone-accept .toa-verdict { color: var(--color-success, #22c55e); }
-.toa-tone-counter .toa-verdict { color: var(--color-accent-strong, #aee704); }
+.toa-tone-counter .toa-verdict { color: var(--color-accent-strong, #22d3ee); }
 .toa-tone-fair .toa-verdict { color: var(--color-text-secondary, #e5e7eb); }
 .toa-tone-decline .toa-verdict { color: var(--color-danger, #ef4444); }
 
@@ -193,7 +193,7 @@ TRADE_ANALYZER_CSS = COMPACT_FANTASY_ASSET_CSS + """
 
 .toa-alt-package {
   background: var(--surface-2, #1f2226);
-  border-inline-start: 3px solid var(--color-accent-strong, #aee704);
+  border-inline-start: 3px solid var(--color-accent-strong, #22d3ee);
   border-radius: var(--radius-card, 0);
   display: grid;
   gap: var(--space-2xs, 0.3rem);
@@ -348,7 +348,7 @@ div[data-testid="stVerticalBlock"]:has(.toa-partner-block) [data-testid="stSelec
 }
 
 .toa-add-feedback {
-  color: var(--color-accent-strong, #aee704);
+  color: var(--color-accent-strong, #22d3ee);
   font-size: 0.8rem;
   margin: 0.2rem 0 0.45rem;
 }
