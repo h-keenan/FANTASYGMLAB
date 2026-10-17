@@ -13,12 +13,12 @@ DESIGN_TOKEN_CSS = """
 /* DynastyGM semantic design tokens */
 :root {
     /* Foundation — FantasyDesk brand sheet v2: Obsidian/Gridiron/Steel. */
-    --color-bg: #0b0b0b;
-    --color-shell: #0b0b0b;
+    --color-bg: #000000;
+    --color-shell: #000000;
     --color-surface-primary: #1f2226;
     --color-surface-secondary: #1f2226;
     --color-surface-raised: #3d4248;
-    --color-surface-muted: #0b0b0b;
+    --color-surface-muted: #000000;
     --color-text-primary: #f7f8fa;
     --color-text-secondary: #e5e7eb;
     --color-text-muted: #a8adb7;
@@ -54,7 +54,7 @@ DESIGN_TOKEN_CSS = """
 
     /* Brand accent aliases (FantasyDesk identity — keep in sync with brand_identity.py) */
     --color-brand-accent: #22d3ee;
-    --color-brand-bg: #0b0b0b;
+    --color-brand-bg: #000000;
     --color-brand-surface: #1f2226;
     /* Small inverted "founder badge" / brand-mark glyph: a fixed light chip
        (--color-text-primary) with dark ink text, independent of the dark

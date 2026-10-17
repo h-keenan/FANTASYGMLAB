@@ -152,7 +152,7 @@ div[data-testid="stLayoutWrapper"]:has(> {_GM_ORB_KEY}) {{
 {_GM_ORB_BLOCK} button[data-testid^="stBaseButton"],
 {_GM_ORB_KEY} button[data-testid^="stBaseButton"] {{
     align-items: center !important;
-    background-color: var(--color-shell, #0b0b0b) !important;
+    background-color: var(--color-shell, #000000) !important;
     background-origin: content-box !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
