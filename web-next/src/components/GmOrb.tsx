@@ -7,14 +7,8 @@ import { useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
-import { NavDestinationGlyph, type NavGlyphName } from "@/components/NavDestinationGlyph";
-
-interface Destination {
-  label: string;
-  path: string;
-  subtitle: string;
-  glyph: NavGlyphName;
-}
+import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
+import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 
 /**
  * web-next's counterpart to mobile's GmOrb.tsx and the Streamlit web app's
@@ -25,6 +19,10 @@ interface Destination {
  * destination grouped League / GM Tools / General — the same three-group
  * taxonomy mobile's GmOrb.tsx already established, ported to this app's own
  * real routes rather than mobile's screen names.
+ *
+ * Mobile-width only (`md:hidden` on the trigger button) — DesktopSidebar
+ * is the desktop equivalent of this same destination list (coridian_,
+ * 2026-10-17: "desktop side menu").
  *
  * Deliberately smaller than mobile's version for a first pass: no drag-to-
  * reposition, no destination search, no unread/new-content badges. The core
@@ -38,43 +36,9 @@ export function GmOrb() {
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
   const leagueName = searchParams.get("name") || leagueId || "";
-  const query = leagueId ? `?name=${encodeURIComponent(leagueName)}` : "";
+  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations } = useNavDestinations(leagueId, leagueName);
 
   if (!session) return null;
-
-  const coreLeagueDestinations: Destination[] = leagueId
-    ? [
-        { label: "Dashboard", path: `/dashboard/${encodeURIComponent(leagueId)}${query}`, subtitle: "Personalized insights and recommendations", glyph: "dashboard" },
-        { label: "Alerts", path: `/alerts/${encodeURIComponent(leagueId)}${query}`, subtitle: "Injuries, news, and important updates", glyph: "alerts" },
-        { label: "My Team", path: `/my-team/${encodeURIComponent(leagueId)}${query}`, subtitle: "Roster, lineup, and team analysis", glyph: "myTeam" },
-        { label: "Matchup", path: `/matchup/${encodeURIComponent(leagueId)}${query}`, subtitle: "This week's matchup and comparison", glyph: "matchup" },
-        { label: "Waivers", path: `/waivers/${encodeURIComponent(leagueId)}${query}`, subtitle: "Top adds, trends, and free agents", glyph: "waivers" },
-        { label: "Players", path: `/players/${encodeURIComponent(leagueId)}${query}`, subtitle: "Search, rankings, and player insights", glyph: "players" },
-        { label: "League Rankings", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}`, subtitle: "Power rankings across the league", glyph: "leagueRankings" },
-      ]
-    : [];
-
-  const gmToolsDestinations: Destination[] = leagueId
-    ? [
-        { label: "Trade Hub", path: `/trade-hub/${encodeURIComponent(leagueId)}${query}`, subtitle: "Trade ideas, ranked by fit", glyph: "tradeHub" },
-        { label: "Trade Finder", path: `/trade-finder/${encodeURIComponent(leagueId)}${query}`, subtitle: "Build and search for a trade", glyph: "tradeFinder" },
-        { label: "Trade Analyzer", path: `/trade-analyzer/${encodeURIComponent(leagueId)}${query}`, subtitle: "Evaluate any trade package", glyph: "tradeAnalyzer" },
-        { label: "GM Targets", path: `/gm-targets/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your saved watchlist", glyph: "gmTargets" },
-        { label: "Team Situation", path: `/team-situation/${encodeURIComponent(leagueId)}${query}`, subtitle: "Declare your rebuild/compete stance", glyph: "teamSituation" },
-        { label: "GM Plan", path: `/gm-plan/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your season-long roadmap", glyph: "gmPlan" },
-        { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools", glyph: "draftCenter" },
-        { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft" },
-        { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps" },
-      ]
-    : [];
-
-  const generalDestinations: Destination[] = [
-    { label: "Home", path: "/", subtitle: "Switch leagues and manage account", glyph: "home" },
-    { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league", glyph: "portfolio" },
-    { label: "News", path: "/news", subtitle: "Latest NFL news and updates", glyph: "news" },
-    { label: "Trade History", path: "/trade-history", subtitle: "Trades you've shared and confirmed", glyph: "tradeHistory" },
-    { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects", glyph: "collegeScouting" },
-  ];
 
   return (
     <>
@@ -82,7 +46,7 @@ export function GmOrb() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open GM menu"
-        className="fixed bottom-6 left-1/2 flex items-center justify-center"
+        className="fixed bottom-6 left-1/2 flex items-center justify-center md:hidden"
         style={{
           transform: "translateX(-50%)",
           width: "3.25rem",
@@ -171,7 +135,7 @@ function NavSection({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-function NavRow({ destination, onNavigate }: { destination: Destination; onNavigate: () => void }) {
+function NavRow({ destination, onNavigate }: { destination: NavDestination; onNavigate: () => void }) {
   return (
     <Link
       href={destination.path}
@@ -179,7 +143,7 @@ function NavRow({ destination, onNavigate }: { destination: Destination; onNavig
       className="flex items-center gap-3 py-2.5"
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <span className="shrink-0" style={{ color: "var(--color-accent)" }}>
+      <span className="shrink-0" style={{ color: destination.color }}>
         <NavDestinationGlyph name={destination.glyph} size={20} />
       </span>
       <span className="flex flex-col min-w-0">
