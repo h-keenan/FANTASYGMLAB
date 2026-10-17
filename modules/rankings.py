@@ -14,6 +14,7 @@ import streamlit as st
 from modules import performance
 from modules import player_hydrate_stages
 from modules import public_player_snapshot
+from modules import redis_cache
 from modules import runtime_trace
 from modules import sleeper as sleeper_module
 from modules.fantasycalc import FANTASYCALC_CACHE_PATH, get_dynasty_values
@@ -4681,6 +4682,62 @@ def _cached_public_players(
     }
 
 
+# Self-hosted deployment runs this service across several worker processes
+# (docker-compose.yml's mobile-api comment) — every other expensive,
+# shared-across-requests computation in this app (valued-players frame,
+# trade-idea search, league rankings) already got a Redis layer so all
+# workers share one answer instead of each independently paying for its
+# own (see modules.redis_cache's module docstring). This builder was the
+# one gap: `_cached_public_players` above is a `@st.cache_data` wrapper,
+# which — like `_PROCESS_PUBLIC_FRAMES` below — lives in ONE process's
+# memory, so a request landing on a worker that hasn't built this yet pays
+# the full cost alone: live Sleeper season-stat fetches plus per-player
+# trust validation, measured directly at several seconds even for this
+# app's ~1,700-player pool, on a request path (the Dashboard) opened on
+# every session. TTL matches .github/workflows/players-db-refresh.yml's
+# 6-hour cadence: the real invalidation signal is the fingerprint
+# changing (a new players.db/Sleeper-metadata snapshot), this TTL is only
+# a safety net against an unbounded-stale shared entry if that signal is
+# ever missed.
+_REDIS_PUBLIC_PLAYERS_TTL_SECONDS = 21600
+_REDIS_PUBLIC_PLAYERS_LOCK_TIMEOUT_SECONDS = 30.0
+
+
+def _redis_public_players_cache_key(db_path: str, fingerprint: object) -> str:
+    return redis_cache.build_cache_key(
+        "public_players_frame", os.path.abspath(str(db_path or "")), repr(fingerprint)
+    )
+
+
+def _redis_shared_public_players(
+    db_path: str,
+    fingerprint: tuple[tuple[str, bool, int, int], ...],
+) -> tuple[pd.DataFrame, dict[str, Any], bool]:
+    """`_cached_public_players`, shared across worker processes via Redis
+    (fail-open on any Redis error — see modules.redis_cache's docstring,
+    "behave like the old single-process code").
+
+    Returns ``(frame, metadata, served_from_redis)`` — the third value
+    lets `load_players` tell a true cross-process Redis hit (this process
+    never touched `_cached_public_players` at all) apart from a
+    same-process Streamlit-cache hit, for `cache_status` instrumentation.
+    """
+
+    computed_locally = {"value": False}
+
+    def _compute() -> tuple[pd.DataFrame, dict[str, Any]]:
+        computed_locally["value"] = True
+        return _cached_public_players(db_path, fingerprint)
+
+    frame, metadata = redis_cache.redis_single_flight_cache(
+        cache_key=_redis_public_players_cache_key(db_path, fingerprint),
+        ttl_seconds=_REDIS_PUBLIC_PLAYERS_TTL_SECONDS,
+        compute=_compute,
+        lock_timeout_seconds=_REDIS_PUBLIC_PLAYERS_LOCK_TIMEOUT_SECONDS,
+    )
+    return frame, metadata, not computed_locally["value"]
+
+
 def _public_process_key(db_path: str, fingerprint: object) -> str:
     return (
         hashlib.sha256(
@@ -4837,9 +4894,12 @@ def load_players(db_path: str) -> pd.DataFrame:
             )
         builder_started = time.perf_counter()
         with player_hydrate_stages.stage("streamlit_cache_data", kind="cpu") as meta:
-            frame, metadata = _cached_public_players(db_path, fingerprint)
-            streamlit_hit = int((metadata or {}).get("created_ns") or 0) < started_ns
-            cache_status = "streamlit_hit" if streamlit_hit else "reconcile_miss"
+            frame, metadata, redis_hit = _redis_shared_public_players(db_path, fingerprint)
+            if redis_hit:
+                cache_status = "redis_hit"
+            else:
+                streamlit_hit = int((metadata or {}).get("created_ns") or 0) < started_ns
+                cache_status = "streamlit_hit" if streamlit_hit else "reconcile_miss"
             meta["cache_status"] = cache_status
         builder_ms = (time.perf_counter() - builder_started) * 1000
         stored = frame.copy()

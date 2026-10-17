@@ -65,6 +65,41 @@ def test_normalized_public_dataset_cache_hit_and_mutation_isolation():
     assert int(second.loc[second["player_id"].eq("current"), "dynasty_score"].iloc[0]) == 100
 
 
+def test_load_players_shares_across_worker_processes_via_redis():
+    """Simulates two separate worker processes (which don't share
+    _PROCESS_PUBLIC_FRAMES or _cached_public_players' own @st.cache_data
+    memory — see modules.rankings._redis_shared_public_players's
+    docstring) asking for the identical fingerprint. The second "process"
+    must get its answer from Redis, never re-running the expensive
+    builder. coridian_, 2026-10-17: dashboard loads "way too long" traced
+    to exactly this gap — each of the self-hosted deployment's several
+    worker processes independently rebuilding this from scratch."""
+
+    rankings.clear_public_player_cache()
+    source = _normalized_frame()
+    fingerprint = (("sqlite", True, 10, 1),)
+
+    with patch("modules.rankings._load_players_uncached", return_value=source) as loader:
+        first, _, first_redis_hit = rankings._redis_shared_public_players(
+            "shared-worker-test.db", fingerprint
+        )
+        assert first_redis_hit is False
+        assert loader.call_count == 1
+
+        # Simulate a second worker process: only its OWN two process-local
+        # caches are empty for a fresh worker, not Redis.
+        rankings.clear_process_public_frames()
+        rankings._cached_public_players.clear()
+
+        second, _, second_redis_hit = rankings._redis_shared_public_players(
+            "shared-worker-test.db", fingerprint
+        )
+
+    assert second_redis_hit is True
+    assert loader.call_count == 1
+    assert second["dynasty_score"].tolist() == first["dynasty_score"].tolist()
+
+
 def test_cache_invalidates_after_source_fingerprint_change():
     rankings.clear_public_player_cache()
     first_fingerprint = (("sqlite", True, 10, 1),)
