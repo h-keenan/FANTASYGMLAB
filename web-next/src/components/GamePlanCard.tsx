@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
@@ -105,6 +106,7 @@ export function GamePlanCard({
           <span style={{ color: "var(--color-text-muted)" }}>
             <PositionBadge position={item.route_player_position} />
           </span>
+          <PlayerAvatar playerId={item.route_player_id} tier={item.route_player_tier} size={24} />
           <span style={{ color: "var(--color-text-muted)" }}>{item.route_player_name}</span>
           {item.route_player_team ? <span style={{ color: "var(--color-text-muted)" }}>· {item.route_player_team}</span> : null}
         </PlayerIdentityTrigger>
