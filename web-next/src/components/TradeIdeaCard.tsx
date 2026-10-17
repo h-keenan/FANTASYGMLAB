@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { TradeIdea } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
+import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ValueRing } from "@/components/ValueRing";
 import {
@@ -148,9 +149,12 @@ export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
       ) : null}
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h3 className="text-base font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
-          {idea.partner_team_name}
-        </h3>
+        <div className="flex items-center gap-2 min-w-0">
+          <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
+          <h3 className="text-base font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+            {idea.partner_team_name}
+          </h3>
+        </div>
         <div className="flex items-center gap-2 shrink-0">
           {idea.value_edge_band ? (
             <span

@@ -39,9 +39,19 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
 
   const gmToolsDestinations: NavDestination[] = leagueId
     ? [
-        { label: "Trade Hub", path: `/trade-hub/${encodeURIComponent(leagueId)}${query}`, subtitle: "Trade ideas, ranked by fit", glyph: "tradeHub", color: "var(--color-accent)" },
-        { label: "Trade Finder", path: `/trade-finder/${encodeURIComponent(leagueId)}${query}`, subtitle: "Build and search for a trade", glyph: "tradeFinder", color: "var(--color-opportunity)" },
-        { label: "Trade Analyzer", path: `/trade-analyzer/${encodeURIComponent(leagueId)}${query}`, subtitle: "Evaluate any trade package", glyph: "tradeAnalyzer", color: "var(--color-diagnostic)" },
+        {
+          // Trade Finder and Trade Analyzer deliberately NOT listed as
+          // separate entries here — coridian_, 2026-10-17: "trade finder and
+          // trade analyzer are redundant because of the tabs on trade hub so
+          // we dont need those sidemenu/gm orb menus." Both are one tab-click
+          // away from this destination via TradesTabBar; their routes still
+          // exist, just without a dedicated nav entry.
+          label: "Trade Hub",
+          path: `/trade-hub/${encodeURIComponent(leagueId)}${query}`,
+          subtitle: "Trade ideas, trade finder, and trade analyzer",
+          glyph: "tradeHub",
+          color: "var(--color-accent)",
+        },
         { label: "GM Targets", path: `/gm-targets/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your saved watchlist", glyph: "gmTargets", color: "var(--color-premium)" },
         { label: "Team Situation", path: `/team-situation/${encodeURIComponent(leagueId)}${query}`, subtitle: "Declare your rebuild/compete stance", glyph: "teamSituation", color: "var(--color-warning)" },
         { label: "GM Plan", path: `/gm-plan/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your season-long roadmap", glyph: "gmPlan", color: "var(--color-success)" },

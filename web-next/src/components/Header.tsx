@@ -2,13 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
 import { supabase } from "@/lib/supabase";
 import { VALUATION_LENS_OPTIONS, useValuationLens } from "@/context/ValuationLensContext";
+import { swapLeagueIdInPath } from "@/lib/leagueSwitcher";
 
 const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "about_disclaimer", label: "About / Disclaimer" },
@@ -25,6 +26,7 @@ interface SavedLeagueRow {
 
 function LeagueSwitcherButton({ leagueId }: { leagueId: string }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [leagues, setLeagues] = useState<SavedLeagueRow[]>([]);
 
@@ -57,7 +59,7 @@ function LeagueSwitcherButton({ leagueId }: { leagueId: string }) {
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute left-0 top-full mt-1 flex flex-col py-1 min-w-[14rem]" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50 }}>
+          <div role="menu" className="absolute right-0 top-full mt-1 flex flex-col py-1 w-56" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
             {leagues.length === 0 ? (
               <span className="px-3 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 No other saved leagues
@@ -70,7 +72,8 @@ function LeagueSwitcherButton({ leagueId }: { leagueId: string }) {
                   role="menuitem"
                   onClick={() => {
                     setOpen(false);
-                    router.push(`/dashboard/${encodeURIComponent(row.league_id)}?name=${encodeURIComponent(row.league_name || row.league_id)}`);
+                    const newPath = swapLeagueIdInPath(pathname || "", leagueId, row.league_id);
+                    router.push(`${newPath}?name=${encodeURIComponent(row.league_name || row.league_id)}`);
                   }}
                   className="px-3 py-2 text-xs font-semibold text-left"
                   style={{ color: row.league_id === leagueId ? "var(--color-accent)" : "var(--color-text-secondary)" }}
@@ -106,7 +109,7 @@ function EvaluationLensButton({ leagueId }: { leagueId: string }) {
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute left-0 top-full mt-1 flex flex-col py-1 min-w-[16rem]" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50 }}>
+          <div role="menu" className="absolute right-0 top-full mt-1 flex flex-col py-1 w-64" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
             {VALUATION_LENS_OPTIONS.map((option) => (
               <button
                 key={option.value}

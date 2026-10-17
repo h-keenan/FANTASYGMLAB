@@ -53,7 +53,7 @@ function TargetRowView({
 
   return (
     <div className="flex flex-col gap-2 py-3" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <PlayerIdentityTrigger
           identity={{ ...player, player_id: target.player_id, name, sourceLabel: "GM Targets", leagueId, leagueName }}
           className="flex items-center gap-3 min-w-0"

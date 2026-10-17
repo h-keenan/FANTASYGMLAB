@@ -17,6 +17,7 @@ import {
   teamRankingsReasonMessage,
   type RankBoardKey,
 } from "@/lib/leagueRankingsPresentation";
+import { TeamAvatar } from "@/components/TeamAvatar";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -74,6 +75,7 @@ function RankBadge({ label, tone = "neutral" }: { label: string; tone?: "positiv
 function RankingRow({
   rankLabel,
   teamName,
+  avatarUrl,
   ownerName,
   primaryMetric,
   metricLabel,
@@ -85,6 +87,7 @@ function RankingRow({
 }: {
   rankLabel: string;
   teamName: string;
+  avatarUrl?: string | null;
   ownerName: string | null;
   primaryMetric: string;
   metricLabel: string;
@@ -108,6 +111,7 @@ function RankingRow({
       >
         {rankLabel}
       </span>
+      <TeamAvatar avatarUrl={avatarUrl} size={32} ringColor={firstPlace ? "var(--color-premium)" : "var(--color-border)"} />
       <div className="flex-1 flex flex-col gap-0.5 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
@@ -179,6 +183,7 @@ function StandingsSection({ data, myRosterId }: { data: LeagueTeamRankingsRespon
               <RankingRow
                 rankLabel={formatRank(team.standing_rank)}
                 teamName={team.team_name || "Team"}
+                avatarUrl={team.avatar_url}
                 ownerName={team.owner_name}
                 primaryMetric={team.record_label || "0-0"}
                 metricLabel="Record"
@@ -216,6 +221,7 @@ function PlayoffOddsRow({ team, rankLabel, myRosterId }: { team: PlayoffOddsTeam
     <RankingRow
       rankLabel={rankLabel}
       teamName={team.team_name || "Team"}
+      avatarUrl={team.avatar_url}
       ownerName={team.owner_name}
       primaryMetric={`${Math.round(team.playoff_probability)}%`}
       metricLabel="Playoff Odds"
@@ -316,6 +322,7 @@ function RankBoardSection({ board, teams, myRosterId }: { board: RankBoardKey; t
               key={team.roster_id}
               rankLabel={formatRank(rank, tied)}
               teamName={team.team_name || "Team"}
+              avatarUrl={team.avatar_url}
               ownerName={team.owner_name}
               primaryMetric={formatScore(score)}
               metricLabel={config.scoreLabel}

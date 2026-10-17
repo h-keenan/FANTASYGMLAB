@@ -15,8 +15,10 @@ import type {
   StorylinesResponse,
 } from "@/lib/api";
 import { PillRow } from "@/components/PillRow";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { TeamAvatar } from "@/components/TeamAvatar";
 import {
   FILTER_ALL,
   FILTER_TRADES,
@@ -350,6 +352,7 @@ function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number]
         className="inline-flex items-center gap-1 text-xs px-2 py-1"
         style={{ border: "var(--border-width-default) solid var(--color-border)" }}
       >
+        <PlayerAvatar playerId={asset.player_id} size={20} />
         <PositionBadge position={asset.position} />
         <span style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{asset.name}</span>
       </span>
@@ -369,15 +372,18 @@ function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string 
   const faab = faabLine(side, txType);
   return (
     <div className="flex flex-col gap-1 min-w-0">
-      <div className="flex flex-col min-w-0">
-        <span className="text-sm font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
-          {side.team_name}
-        </span>
-        {side.owner_handle ? (
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {side.owner_handle}
+      <div className="flex items-center gap-2 min-w-0">
+        <TeamAvatar avatarUrl={side.avatar_url} size={28} />
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+            {side.team_name}
           </span>
-        ) : null}
+          {side.owner_handle ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {side.owner_handle}
+            </span>
+          ) : null}
+        </div>
       </div>
       {txType === "trade" ? (
         <>
@@ -668,15 +674,18 @@ function breakdownNote(breakdown: StorylineLeader["breakdown"]): string {
 
 function StorylineTeamLine({ team }: { team: StorylineTeam }) {
   return (
-    <div className="flex flex-col min-w-0">
-      <span className="text-sm font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
-        {team.team_name}
-      </span>
-      {team.owner_handle ? (
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {team.owner_handle}
+    <div className="flex items-center gap-2 min-w-0">
+      <TeamAvatar avatarUrl={team.avatar_url} size={28} />
+      <div className="flex flex-col min-w-0">
+        <span className="text-sm font-extrabold truncate" style={{ color: "var(--color-text-primary)" }}>
+          {team.team_name}
         </span>
-      ) : null}
+        {team.owner_handle ? (
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {team.owner_handle}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

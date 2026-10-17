@@ -616,7 +616,7 @@ export function TradeAnalyzerContent({
           }}
         />
 
-        <div className="flex flex-col divide-y" style={{ borderColor: "var(--color-border)" }}>
+        <div className="flex flex-col divide-y max-h-80 overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
           {assetType === "picks" ? (
             pickResults.length === 0 ? (
               <p className="text-sm py-2" style={{ color: "var(--color-text-muted)" }}>
