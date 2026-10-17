@@ -83,7 +83,14 @@ function LandingPageContent() {
           return;
         }
         setCheckingSavedLeagues(false);
-      } catch {
+      } catch (err) {
+        // Previously silent — a failure here left zero trace anywhere,
+        // the same invisible-failure gap found and fixed today in
+        // services/stripe_webhook_service.py and
+        // services/revenuecat_webhook_service.py. console.error at least
+        // makes it visible in a browser's own dev tools during a future
+        // repro, even without a telemetry pipeline wired up yet.
+        console.error("Failed to load saved leagues after sign-in", err);
         setCheckingSavedLeagues(false);
       }
     })();
