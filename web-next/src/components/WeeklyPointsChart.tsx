@@ -4,7 +4,7 @@ import { Area, AreaChart, CartesianGrid, Dot, ResponsiveContainer, Tooltip, XAxi
 import type { DotProps } from "recharts";
 
 import type { WeeklyStatPoint } from "@/lib/api";
-import { buildWeeklyPointsSummary } from "@/lib/playerComparePresentation";
+import { buildWeeklyPointsSummary, fillWeeklyPointGaps } from "@/lib/playerComparePresentation";
 
 /**
  * Points By Week — web-next's port of app.py's weekly_points_chart.py
@@ -32,9 +32,12 @@ function formatPoints(value: number): string {
 function PeakDot(props: DotProps & { peakWeek: number }) {
   const { cx, cy, payload, peakWeek } = props as DotProps & {
     peakWeek: number;
-    payload?: { week: number };
+    payload?: { week: number; fantasy_points_ppr: number | null };
   };
-  if (cx == null || cy == null || !payload) return null;
+  // A gap week (null points, inserted by fillWeeklyPointGaps) has no real
+  // position to dot — recharts still invokes this renderer for it since the
+  // numeric x-axis still has an x coordinate for every week in range.
+  if (cx == null || cy == null || Number.isNaN(cy) || !payload || payload.fantasy_points_ppr == null) return null;
   const isPeak = payload.week === peakWeek;
   return (
     <Dot
@@ -71,7 +74,7 @@ export function WeeklyPointsPanel({
    * by player+season. */
   gradientId: string;
 }) {
-  const played = weeks.filter((week) => week.fantasy_points_ppr != null);
+  const hasPlayedWeek = weeks.some((week) => week.fantasy_points_ppr != null);
 
   return (
     <div className="flex flex-col gap-1 min-w-0">
@@ -81,10 +84,10 @@ export function WeeklyPointsPanel({
       >
         {name}
       </div>
-      {played.length === 0 ? (
+      {!hasPlayedWeek ? (
         <WeeklyPointsEmpty season={season} />
       ) : (
-        <PlayedWeeksChart weeks={played} gradientId={gradientId} name={name} />
+        <PlayedWeeksChart weeks={fillWeeklyPointGaps(weeks)} gradientId={gradientId} name={name} />
       )}
     </div>
   );
@@ -92,12 +95,16 @@ export function WeeklyPointsPanel({
 
 function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[]; gradientId: string; name: string }) {
   const summary = buildWeeklyPointsSummary(weeks);
-  const values = weeks.map((week) => week.fantasy_points_ppr as number);
+  const values = weeks
+    .map((week) => week.fantasy_points_ppr)
+    .filter((value): value is number => value != null);
   // Same framing as app.py's weekly_points_chart_html: the floor never rises
   // above zero and the ceiling never drops below 1, so a quiet season still
   // reads as a legible shape instead of amplifying noise.
   const minimum = Math.min(0, ...values);
   const maximum = Math.max(1, ...values);
+  const firstWeek = weeks[0].week;
+  const lastWeek = weeks[weeks.length - 1].week;
 
   const accessibleSummary =
     `Points by week for ${name}: ${summary.games} game${summary.games !== 1 ? "s" : ""}, ` +
@@ -123,6 +130,9 @@ function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[
             <CartesianGrid vertical={false} stroke="var(--color-border)" strokeDasharray="0" strokeOpacity={0.6} />
             <XAxis
               dataKey="week"
+              type="number"
+              domain={[firstWeek, lastWeek]}
+              allowDecimals={false}
               tickLine={false}
               axisLine={{ stroke: "var(--color-border)" }}
               tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}

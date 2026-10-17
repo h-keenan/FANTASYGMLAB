@@ -186,6 +186,29 @@ export interface WeeklyPointsSummary {
   peakWeek: number;
 }
 
+/** Expand a (possibly sparse) weekly series to one entry per NFL week
+ * between its earliest and latest reported week, inserting a null-points
+ * entry for any week missing in between (a bye or an inactive week sandwiched
+ * between played ones). coridian_ (2026-10-17): the chart's x-axis must read
+ * as real NFL weeks, not just "games played" — the prior behavior plotted
+ * only the weeks with a PPR total, evenly spaced by array position, which
+ * silently collapsed a mid-season bye/injury week into the same visual gap
+ * as two back-to-back played weeks. Never extrapolates past the latest
+ * reported week (that's "hasn't happened yet", not "missed"), and leaves an
+ * empty input alone. */
+export function fillWeeklyPointGaps(weeks: WeeklyStatPoint[]): WeeklyStatPoint[] {
+  if (weeks.length === 0) return weeks;
+  const byWeek = new Map(weeks.map((week) => [week.week, week]));
+  const weekNumbers = weeks.map((week) => week.week);
+  const first = Math.min(...weekNumbers);
+  const last = Math.max(...weekNumbers);
+  const dense: WeeklyStatPoint[] = [];
+  for (let week = first; week <= last; week += 1) {
+    dense.push(byWeek.get(week) ?? { week, fantasy_points_ppr: null, snap_share: null });
+  }
+  return dense;
+}
+
 /** Headline numbers for a Points By Week panel's caption — average, peak,
  * and the peak's week number. Pure port of
  * modules/weekly_points_chart.weekly_points_summary's arithmetic (a plain
