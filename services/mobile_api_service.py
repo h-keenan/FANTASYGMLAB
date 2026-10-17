@@ -937,16 +937,41 @@ def get_billing_plans(_user: dict[str, Any] = Depends(require_user)) -> dict[str
 
     config = stripe_billing.load_stripe_config()
     details = stripe_billing.plan_display_details(config)
+    pro_features = premium_page.mobile_premium_benefit_lines()
+    front_office_features = premium_page.front_office_benefit_lines()
     plans = []
     for detail_key, tier, interval in _BILLING_PLAN_KEYS:
         label, price, cadence = details.get(detail_key) or stripe_billing.DEFAULT_PLAN_DETAILS[detail_key]
-        plans.append({"tier": tier, "interval": interval, "label": label, "price": price, "cadence": cadence})
+        features = front_office_features if tier == stripe_billing.TIER_FRONT_OFFICE else pro_features
+        plans.append(
+            {
+                "tier": tier,
+                "interval": interval,
+                "label": label,
+                "price": price,
+                "cadence": cadence,
+                "features": features,
+            }
+        )
     return {"ok": True, "plans": plans}
 
 
 class CheckoutRequest(BaseModel):
     tier: str = stripe_billing.TIER_PRO
     interval: str = stripe_billing.MONTHLY
+    # Where to land after a successful/canceled checkout, e.g. "/" to resume
+    # onboarding instead of the standalone /premium page. Caller-supplied,
+    # so only ever used as a path appended to this app's own app_base_url
+    # (stripe_return_url never treats it as a full URL/host) — never a
+    # redirect to an arbitrary external site.
+    return_to: str = "/premium"
+
+
+def _safe_return_path(path: str) -> str:
+    clean = str(path or "").strip()
+    if not clean.startswith("/") or clean.startswith("//") or len(clean) > 200:
+        return "/premium"
+    return clean
 
 
 @app.post("/v1/billing/checkout")
@@ -965,6 +990,7 @@ def create_billing_checkout(
     if not user_id:
         raise HTTPException(status_code=401, detail="Checkout requires a signed-in account.")
     config = stripe_billing.load_stripe_config()
+    return_path = _safe_return_path(body.return_to)
     try:
         session = stripe_billing.create_checkout_session(
             config=config,
@@ -972,8 +998,8 @@ def create_billing_checkout(
             email=email,
             interval=body.interval,
             tier=body.tier,
-            success_url=app_config.stripe_return_url("/premium?billing=success", base_url=config.app_base_url),
-            cancel_url=app_config.stripe_return_url("/premium?billing=cancel", base_url=config.app_base_url),
+            success_url=app_config.stripe_return_url(f"{return_path}?billing=success", base_url=config.app_base_url),
+            cancel_url=app_config.stripe_return_url(f"{return_path}?billing=cancel", base_url=config.app_base_url),
         )
     except stripe_billing.BillingConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None

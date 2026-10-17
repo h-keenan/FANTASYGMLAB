@@ -95,6 +95,7 @@ export interface BillingPlan {
   label: string;
   price: string;
   cadence: string;
+  features: string[];
 }
 
 export interface BillingPlansResponse {
@@ -1895,10 +1896,14 @@ export const api = {
 
   getBillingPlans: () => authorizedRequest<BillingPlansResponse>("/v1/billing/plans"),
 
-  startBillingCheckout: (tier: BillingPlan["tier"], interval: BillingPlan["interval"]) =>
+  startBillingCheckout: (
+    tier: BillingPlan["tier"],
+    interval: BillingPlan["interval"],
+    returnTo?: string,
+  ) =>
     authorizedRequest<BillingCheckoutResponse>("/v1/billing/checkout", {
       method: "POST",
-      jsonBody: { tier, interval },
+      jsonBody: { tier, interval, ...(returnTo ? { return_to: returnTo } : {}) },
     }),
 
   openBillingPortal: () =>

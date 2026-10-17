@@ -262,6 +262,21 @@ def mobile_premium_benefit_lines() -> list[str]:
     return lines
 
 
+# Front Office's own capabilities, grounded in the three real, already-shipped
+# gates modules.premium defines for this tier (has_cross_league_exposure/
+# has_early_access_flag/has_priority_support_badge) — not invented copy.
+# "Everything in Pro" leads since Front Office is a strict superset, matching
+# the same phrasing already used for the App Store/Play Store listings.
+def front_office_benefit_lines() -> list[str]:
+    """Single-line Front Office benefit copy (checkout/paywall display)."""
+    return [
+        "Everything in Pro",
+        "Cross-league player ownership view",
+        "Early access to new models and features",
+        "Priority support",
+    ]
+
+
 POSSIBLE_FUTURE_FEATURES = (
     ("Weekly reports", "Possible recurring league summaries and movement tracking."),
     ("Historical franchise tracking", "Possible long-term snapshots for team direction and roster value changes."),

@@ -15,10 +15,20 @@ vi.mock("@/lib/api", async () => {
   };
 });
 
+const PRO_FEATURES = ["Full League Pulse", "Full waiver board"];
+const FRONT_OFFICE_FEATURES = ["Everything in Pro", "Priority support"];
+
 const PLANS: BillingPlan[] = [
-  { tier: "pro", interval: "monthly", label: "Monthly", price: "$9.99", cadence: "per month" },
-  { tier: "pro", interval: "annual", label: "Annual", price: "$59.99", cadence: "per year" },
-  { tier: "front_office", interval: "annual", label: "Annual", price: "$99.99", cadence: "per year" },
+  { tier: "pro", interval: "monthly", label: "Monthly", price: "$9.99", cadence: "per month", features: PRO_FEATURES },
+  { tier: "pro", interval: "annual", label: "Annual", price: "$59.99", cadence: "per year", features: PRO_FEATURES },
+  {
+    tier: "front_office",
+    interval: "annual",
+    label: "Annual",
+    price: "$99.99",
+    cadence: "per year",
+    features: FRONT_OFFICE_FEATURES,
+  },
 ];
 
 function setWindowLocation() {
@@ -42,6 +52,15 @@ describe("PremiumContent", () => {
     expect(screen.queryByText("Manage Billing")).not.toBeInTheDocument();
   });
 
+  it("lists each plan's own features, not a shared generic list", () => {
+    render(<PremiumContent entitlement="free" plans={PLANS} />);
+
+    expect(screen.getAllByText("Full League Pulse")).toHaveLength(2);
+    expect(screen.getByText("Priority support")).toBeInTheDocument();
+    // Front Office's "Everything in Pro" must not bleed onto the Pro cards.
+    expect(screen.getAllByText("Everything in Pro")).toHaveLength(1);
+  });
+
   it("shows Manage Billing for a premium account, alongside the same 3 plans", () => {
     render(<PremiumContent entitlement="premium" plans={PLANS} />);
 
@@ -61,7 +80,7 @@ describe("PremiumContent", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Subscribe" })[0]);
 
     await waitFor(() => expect(location.href).toBe("https://checkout.stripe.com/pay/cs_test_123"));
-    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly");
+    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly", undefined);
   });
 
   it("shows an error instead of redirecting when checkout fails to start", async () => {

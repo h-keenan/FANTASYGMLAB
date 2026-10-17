@@ -9,7 +9,7 @@ const TIER_LABELS: Record<BillingPlan["tier"], string> = {
   front_office: "Front Office",
 };
 
-function PlanCard({ plan }: { plan: BillingPlan }) {
+export function PlanCard({ plan, returnTo }: { plan: BillingPlan; returnTo?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +17,7 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.startBillingCheckout(plan.tier, plan.interval);
+      const result = await api.startBillingCheckout(plan.tier, plan.interval, returnTo);
       window.location.href = result.checkout_url;
     } catch (err) {
       setBusy(false);
@@ -42,6 +42,18 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
       <span style={{ font: "var(--type-primary-metric)" }}>
         {plan.price} <span className="text-sm font-normal">{plan.cadence}</span>
       </span>
+      <ul className="flex flex-col gap-1">
+        {plan.features.map((feature) => (
+          <li
+            key={feature}
+            className="text-sm flex gap-2"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            <span aria-hidden="true">•</span>
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
           {error}
