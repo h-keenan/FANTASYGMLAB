@@ -37,7 +37,9 @@ export default function PositionBadge({
 const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
-    borderRadius: radii.pill,
+    // coridian_, 2026-10-17: "positions need to be squared off not a
+    // pill" — matches web-next's PositionBadge.tsx, same explicit call.
+    borderRadius: radii.sm,
     borderWidth: 1,
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 1,

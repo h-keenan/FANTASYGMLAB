@@ -23,10 +23,10 @@ export const PLAYER_TIER_LADDER: PlayerTierIdentity[] = [
   // `generational` was re-hued (2026-10-03) off a collision with theme.ts's
   // then-cyan `accent`/`accentSoft` to a jade/teal at hue 166deg, 24deg from
   // `success` (#22C55E, hue 142deg) on the other side. The 2026-10-17
-  // FantasyDesk brand-sheet accent swap (cyan hue 190deg -> Field/Touchdown
-  // green hue 85deg) moved `accent` well clear of this tier's hue too (81deg
-  // apart) — no new collision, so this value is untouched. 15.46:1 against
-  // `background`, 12.19:1 against `backgroundElevated`.
+  // FantasyDesk brand-sheet accent swaps (cyan hue 190deg -> Prime green
+  // hue 75deg, brand-sheet v2) moved `accent` well clear of this tier's
+  // hue too (91deg apart) — no new collision, so this value is untouched.
+  // 15.46:1 against `background`, 12.19:1 against `backgroundElevated`.
   { tierId: 'generational', semanticLabel: 'Generational', shortLabel: 'GENERATIONAL', abbrLabel: 'GEN', rankOrder: 1, color: '#78F2D5' },
   // `elite` was #8B93FF — byte-for-byte identical to theme.ts's `violet`
   // token (hue 236deg, "secondary analytics/informational category" per

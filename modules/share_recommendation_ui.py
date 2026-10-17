@@ -268,12 +268,12 @@ def native_share_markup(
   /* This is a standalone sandboxed document (its own <html>), so it has no
      access to the parent page's :root custom properties and must hardcode
      literals. Values below are pinned to match design_tokens.py's
-     --color-border (#2a2e35), --color-surface-secondary (#1a1f24),
-     --color-text-primary (#f8f6ef), and --opacity-disabled (0.5) exactly —
+     --color-border (#2a2e35), --color-surface-secondary (#1f2226),
+     --color-text-primary (#f7f8fa), and --opacity-disabled (0.5) exactly —
      keep them in sync if those tokens change. */
   button{{
     width:100%;min-height:44px;border-radius:0;border:1px solid #2a2e35;
-    background:#1a1f24;color:#f8f6ef;font-size:15px;font-weight:650;cursor:pointer;
+    background:#1f2226;color:#f7f8fa;font-size:15px;font-weight:650;cursor:pointer;
   }}
   button[disabled]{{opacity:.5;cursor:default}}
 </style></head><body>

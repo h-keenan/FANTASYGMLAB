@@ -15,13 +15,13 @@
      from modules/design_tokens.py (see that file's own comment for the
      WCAG contrast math and the "3 given dark neutrals for a 5-step ramp"
      compression this applies). */
-  --color-bg: #0b0d0f;
-  --color-shell: #0b0d0f;
-  --color-surface-primary: #1a1f24;
-  --color-surface-secondary: #1a1f24;
-  --color-surface-raised: #2b333b;
-  --color-surface-muted: #0b0d0f;
-  --color-text-primary: #f8f6ef;
+  --color-bg: #0b0b0b;
+  --color-shell: #0b0b0b;
+  --color-surface-primary: #1f2226;
+  --color-surface-secondary: #1f2226;
+  --color-surface-raised: #3d4248;
+  --color-surface-muted: #0b0b0b;
+  --color-text-primary: #f7f8fa;
   --color-text-secondary: #e5e7eb;
   --color-text-muted: #a8adb7;
   --color-border: #2a2e35;
@@ -50,15 +50,15 @@
   --border-accent: var(--color-accent);
 
   /* Brand accent (fixed, not themed) */
-  --color-brand-accent: #9ace4f;
-  --color-brand-bg: #0b0d0f;
-  --color-brand-surface: #1a1f24;
+  --color-brand-accent: #c7fb2b;
+  --color-brand-bg: #0b0b0b;
+  --color-brand-surface: #1f2226;
   --color-brand-mark-ink: #0b1220;
 
-  /* Interaction and meaning — Field/Touchdown (FantasyDesk brand sheet) */
-  --color-accent: #9ace4f;
-  --color-accent-strong: #d1ff72;
-  --color-accent-soft: rgba(154, 206, 79, 0.14);
+  /* Interaction and meaning — Prime (FantasyDesk brand sheet v2) */
+  --color-accent: #c7fb2b;
+  --color-accent-strong: #aee704;
+  --color-accent-soft: rgba(199, 251, 43, 0.14);
   --color-success: #22c55e;
   --color-opportunity: #14b8a6;
   --color-action: #facc15;
@@ -110,7 +110,7 @@
   --color-action-soft: rgba(250, 204, 21, 0.14);
   --color-warning-soft: rgba(245, 158, 11, 0.14);
   --color-danger-soft: rgba(239, 68, 68, 0.15);
-  --color-information-soft: rgba(154, 206, 79, 0.12);
+  --color-information-soft: rgba(199, 251, 43, 0.12);
   --color-diagnostic-soft: rgba(139, 147, 255, 0.12);
   --color-muted-soft: rgba(229, 231, 235, 0.06);
 
@@ -167,11 +167,10 @@
   --opacity-disabled: 0.5;
   --opacity-divider: 0.12;
 
-  /* Typography — Inter Tight (FantasyDesk brand sheet, 2026-10-17),
-     self-hosted via next/font/google in app/layout.tsx, which exposes it
-     as --font-inter-tight on <html>. System-font fallback chain stays
-     after it for the render before the webfont's ready. */
-  --font-family-sans: var(--font-inter-tight), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Typography — SF Pro Display (FantasyDesk brand sheet v2): Apple
+     system font, no webfont needed; -apple-system/system-ui already
+     resolve to it. */
+  --font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-size-display: 2rem;
   --font-size-page-title: 1.5rem;
   --font-size-section-title: 1.125rem;
@@ -228,7 +227,7 @@
   --type-caption-emphasis: var(--font-weight-metadata) var(--font-size-caption) / var(--line-height-caption) var(--font-family-sans);
 
   /* Focus, controls, motion */
-  --focus-ring: 0 0 0 3px rgba(154, 206, 79, 0.34);
+  --focus-ring: 0 0 0 3px rgba(199, 251, 43, 0.34);
   --control-min-height: 44px;
   --touch-target-min: 44px;
   --motion-fast: 120ms;
@@ -251,9 +250,9 @@
     --color-border: #c7d3da;
     --color-border-strong: #5d6b77;
 
-    --color-accent: #4d6d1e;
-    --color-accent-strong: #4a6e00;
-    --color-accent-soft: rgba(77, 109, 30, 0.16);
+    --color-accent: #526d02;
+    --color-accent-strong: #526d02;
+    --color-accent-soft: rgba(82, 109, 2, 0.16);
     --color-success: #147337;
     --color-opportunity: #0c7065;
     --color-action: #796103;
@@ -293,11 +292,11 @@
     --color-action-soft: rgba(250, 204, 21, 0.18);
     --color-warning-soft: rgba(245, 158, 11, 0.16);
     --color-danger-soft: rgba(239, 68, 68, 0.16);
-    --color-information-soft: rgba(154, 206, 79, 0.2);
+    --color-information-soft: rgba(199, 251, 43, 0.2);
     --color-diagnostic-soft: rgba(139, 147, 255, 0.16);
     --color-muted-soft: rgba(16, 24, 32, 0.06);
 
-    --focus-ring: 0 0 0 3px rgba(77, 109, 30, 0.45);
+    --focus-ring: 0 0 0 3px rgba(82, 109, 2, 0.45);
     --shadow-surface-inset: inset 0 1px 0 rgba(10, 30, 45, 0.05);
 
     color-scheme: light;
