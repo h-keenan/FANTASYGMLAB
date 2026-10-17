@@ -1,7 +1,8 @@
+import Link from "next/link";
+
 import type { TradeHubResponse } from "@/lib/api";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
-import { streamlitPageUrl } from "@/lib/streamlitLink";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 
 /**
@@ -81,9 +82,9 @@ export function TradeHubContent({
           <p className="text-sm font-bold">
             {entitlement.hidden_count} more trade idea{entitlement.hidden_count === 1 ? "" : "s"} available on Premium.
           </p>
-          <a href={streamlitPageUrl("premium")} className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+          <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
             Upgrade →
-          </a>
+          </Link>
         </div>
       ) : null}
     </main>

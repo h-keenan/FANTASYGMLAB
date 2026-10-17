@@ -89,6 +89,29 @@ export interface MeResponse {
   premium_benefits: string[];
 }
 
+export interface BillingPlan {
+  tier: "pro" | "front_office";
+  interval: "monthly" | "annual";
+  label: string;
+  price: string;
+  cadence: string;
+}
+
+export interface BillingPlansResponse {
+  ok: boolean;
+  plans: BillingPlan[];
+}
+
+export interface BillingCheckoutResponse {
+  ok: boolean;
+  checkout_url: string;
+}
+
+export interface BillingPortalResponse {
+  ok: boolean;
+  portal_url: string;
+}
+
 export interface SleeperLeagueSummary {
   league_id: string;
   name: string;
@@ -1869,6 +1892,17 @@ export interface LiveDraftTradeEvaluatorResponse {
 
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
+
+  getBillingPlans: () => authorizedRequest<BillingPlansResponse>("/v1/billing/plans"),
+
+  startBillingCheckout: (tier: BillingPlan["tier"], interval: BillingPlan["interval"]) =>
+    authorizedRequest<BillingCheckoutResponse>("/v1/billing/checkout", {
+      method: "POST",
+      jsonBody: { tier, interval },
+    }),
+
+  openBillingPortal: () =>
+    authorizedRequest<BillingPortalResponse>("/v1/billing/portal", { method: "POST" }),
 
   lookupSleeperLeagues: (username: string) =>
     authorizedRequest<SleeperLeaguesResponse>(

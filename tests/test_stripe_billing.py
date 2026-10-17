@@ -184,6 +184,56 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(details[stripe_billing.ANNUAL], ("Annual", "$24.99", "per year"))
         self.assertEqual(retrieve.call_count, 2)
 
+    def test_fetch_live_plan_details_includes_front_office_when_configured(self):
+        stripe_billing.reset_price_display_cache_for_tests()
+        retrieve = Mock(
+            side_effect=lambda price_id: {
+                "price_month": SimpleNamespace(
+                    unit_amount=499, currency="usd", recurring=SimpleNamespace(interval="month")
+                ),
+                "price_year": SimpleNamespace(
+                    unit_amount=2499, currency="usd", recurring=SimpleNamespace(interval="year")
+                ),
+                "price_fo_year": SimpleNamespace(
+                    unit_amount=9999, currency="usd", recurring=SimpleNamespace(interval="year")
+                ),
+            }[price_id]
+        )
+        fake_stripe = SimpleNamespace(api_key="", Price=SimpleNamespace(retrieve=retrieve))
+        config = stripe_billing.StripeBillingConfig(
+            secret_key="sk_test_fo_fetch",
+            price_monthly="price_month",
+            price_annual="price_year",
+            price_front_office_annual="price_fo_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            details = stripe_billing.fetch_live_plan_details(config)
+
+        self.assertEqual(
+            details[stripe_billing.FRONT_OFFICE_ANNUAL], ("Annual", "$99.99", "per year")
+        )
+        self.assertEqual(retrieve.call_count, 3)
+
+    def test_fetch_live_plan_details_omits_front_office_when_not_configured(self):
+        stripe_billing.reset_price_display_cache_for_tests()
+        retrieve = Mock(
+            return_value=SimpleNamespace(
+                unit_amount=499, currency="usd", recurring=SimpleNamespace(interval="month")
+            )
+        )
+        fake_stripe = SimpleNamespace(api_key="", Price=SimpleNamespace(retrieve=retrieve))
+        config = stripe_billing.StripeBillingConfig(
+            secret_key="sk_test_no_fo",
+            price_monthly="price_month",
+            price_annual="price_year",
+        )
+
+        with patch.dict(sys.modules, {"stripe": fake_stripe}):
+            details = stripe_billing.fetch_live_plan_details(config)
+
+        self.assertNotIn(stripe_billing.FRONT_OFFICE_ANNUAL, details)
+
     def test_fetch_live_plan_details_caches_within_ttl(self):
         stripe_billing.reset_price_display_cache_for_tests()
         retrieve = Mock(

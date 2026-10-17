@@ -58,6 +58,10 @@ CONFIG_KEYS = (
 
 MONTHLY = "monthly"
 ANNUAL = "annual"
+# Distinct key from ANNUAL (which means Pro Annual throughout this module's
+# plan_display_details/fetch_live_plan_details dicts) — Front Office is a
+# separate priced tier, not another Pro interval.
+FRONT_OFFICE_ANNUAL = "front_office_annual"
 
 # Billing tiers. Kept as local literals rather than importing
 # modules.premium — see module docstring.
@@ -101,6 +105,7 @@ def launch_week_active(*, now: datetime | None = None) -> bool:
 DEFAULT_PLAN_DETAILS: dict[str, tuple[str, str, str]] = {
     MONTHLY: ("Monthly", "$3.99", "per month"),
     ANNUAL: ("Annual", "$19.99", "per year"),
+    FRONT_OFFICE_ANNUAL: ("Annual", "$99.99", "per year"),
 }
 
 _PRICE_DISPLAY_CACHE_TTL_SECONDS = 5 * 60
@@ -353,7 +358,10 @@ def _price_display_tuple(label: str, price_obj: Any, fallback_cadence: str) -> t
 def _price_cache_key(config: StripeBillingConfig) -> str:
     # Hash the secret key rather than storing it verbatim as a cache key.
     secret_fingerprint = hashlib.sha256(config.secret_key.encode("utf-8")).hexdigest()[:16]
-    return f"{config.billing_mode}:{secret_fingerprint}:{config.price_monthly}:{config.price_annual}"
+    return (
+        f"{config.billing_mode}:{secret_fingerprint}:{config.price_monthly}:"
+        f"{config.price_annual}:{config.price_front_office_annual}"
+    )
 
 
 def fetch_live_plan_details(
@@ -386,6 +394,12 @@ def fetch_live_plan_details(
             MONTHLY: _price_display_tuple("Monthly", monthly_price, "per month"),
             ANNUAL: _price_display_tuple("Annual", annual_price, "per year"),
         }
+        # Front Office is optional — Pro's own display must not fail or
+        # drop just because Front Office isn't configured in some
+        # environment (e.g. a test deploy that only has Pro prices set).
+        if config.price_front_office_annual:
+            front_office_price = stripe.Price.retrieve(config.price_front_office_annual)
+            details[FRONT_OFFICE_ANNUAL] = _price_display_tuple("Annual", front_office_price, "per year")
     except Exception:
         return None
     with _price_display_cache_lock:

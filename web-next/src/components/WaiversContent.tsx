@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 
 import type { WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
@@ -7,7 +8,6 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SnapshotTile } from "@/components/SnapshotTile";
-import { streamlitPageUrl } from "@/lib/streamlitLink";
 import {
   confidenceColor,
   faabRangeText,
@@ -363,9 +363,9 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
               Priority Adds stay free — Premium adds stash candidates, watchlist depth, and a FAAB shortlist so you don&apos;t miss
               the next claim.
             </p>
-            <a href={streamlitPageUrl("premium")} className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+            <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
               Upgrade →
-            </a>
+            </Link>
           </div>
         ) : !hasSecondaryCandidates ? (
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>

@@ -108,6 +108,7 @@ import requests
 
 from modules import (
     account_store,
+    app_config,
     auth_supabase,
     build_identity,
     canonical_player_ranking,
@@ -156,6 +157,7 @@ from modules import (
     sleeper,
     sleeper_leagues,
     startup_cold_path,
+    stripe_billing,
     team_stance,
     team_streaks,
     team_trade_history,
@@ -906,6 +908,124 @@ def link_sleeper_username(
     if not ok:
         return {"ok": False, "reason": "not_available", "error": error}
     return {"ok": True, "sleeper_username": username}
+
+
+# All three billing endpoints below are thin wrappers around
+# modules.stripe_billing's already-correct, already-unit-tested functions —
+# the same ones modules/premium_page.py (Streamlit) has used all along.
+# This is the first non-Streamlit caller of that module; no Stripe
+# integration logic is reimplemented here, only an HTTP surface web-next
+# can call. Every redirect URL below points at this app's own /premium
+# page (not Streamlit's `?page=premium`), since that's the real page a
+# web-next caller is on.
+_BILLING_PLAN_KEYS: tuple[tuple[str, str, str], ...] = (
+    (stripe_billing.MONTHLY, stripe_billing.TIER_PRO, stripe_billing.MONTHLY),
+    (stripe_billing.ANNUAL, stripe_billing.TIER_PRO, stripe_billing.ANNUAL),
+    (stripe_billing.FRONT_OFFICE_ANNUAL, stripe_billing.TIER_FRONT_OFFICE, stripe_billing.ANNUAL),
+)
+
+
+@app.get("/v1/billing/plans")
+def get_billing_plans(_user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Live Stripe pricing for the Premium page — never hardcoded here.
+
+    stripe_billing.plan_display_details() always prefers real Stripe Price
+    objects and only falls back to its own DEFAULT_PLAN_DETAILS constants
+    on a lookup failure, so this can't silently drift from what Stripe
+    actually charges, and can't break the page either.
+    """
+
+    config = stripe_billing.load_stripe_config()
+    details = stripe_billing.plan_display_details(config)
+    plans = []
+    for detail_key, tier, interval in _BILLING_PLAN_KEYS:
+        label, price, cadence = details.get(detail_key) or stripe_billing.DEFAULT_PLAN_DETAILS[detail_key]
+        plans.append({"tier": tier, "interval": interval, "label": label, "price": price, "cadence": cadence})
+    return {"ok": True, "plans": plans}
+
+
+class CheckoutRequest(BaseModel):
+    tier: str = stripe_billing.TIER_PRO
+    interval: str = stripe_billing.MONTHLY
+
+
+@app.post("/v1/billing/checkout")
+def create_billing_checkout(
+    body: CheckoutRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Start a real Stripe Checkout session for the signed-in caller.
+
+    Returns the Stripe-hosted checkout URL to redirect the browser to —
+    this app never collects card details itself.
+    """
+
+    user_id = str(user.get("id") or "")
+    email = str(user.get("email") or "")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Checkout requires a signed-in account.")
+    config = stripe_billing.load_stripe_config()
+    try:
+        session = stripe_billing.create_checkout_session(
+            config=config,
+            user_id=user_id,
+            email=email,
+            interval=body.interval,
+            tier=body.tier,
+            success_url=app_config.stripe_return_url("/premium?billing=success", base_url=config.app_base_url),
+            cancel_url=app_config.stripe_return_url("/premium?billing=cancel", base_url=config.app_base_url),
+        )
+    except stripe_billing.BillingConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not start checkout.") from None
+    checkout_url = str(getattr(session, "url", "") or "")
+    if not checkout_url:
+        raise HTTPException(status_code=502, detail="Could not start checkout.")
+    return {"ok": True, "checkout_url": checkout_url}
+
+
+@app.post("/v1/billing/portal")
+def create_billing_portal(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Open the Stripe customer portal for an existing subscriber to manage
+    or cancel. Needs `profiles.stripe_customer_id` — the same column
+    modules/premium_page.py's existing "Manage Billing" button already
+    reads (written by modules.stripe_webhook on a completed checkout), not
+    a new lookup invented for this endpoint.
+    """
+
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Managing billing requires a signed-in account.")
+    supabase_config = auth_supabase.get_supabase_config()
+    rows, _error = account_store.fetch_rows(
+        supabase_config,
+        access_token,
+        "profiles",
+        user_id=user_id,
+        extra_query="select=stripe_customer_id",
+    )
+    stripe_customer_id = ""
+    if rows and isinstance(rows[0], dict):
+        stripe_customer_id = str(rows[0].get("stripe_customer_id") or "").strip()
+    if not stripe_customer_id:
+        raise HTTPException(status_code=404, detail="No billing account found for this user yet.")
+    config = stripe_billing.load_stripe_config()
+    try:
+        portal = stripe_billing.create_customer_portal_session(
+            config=config,
+            stripe_customer_id=stripe_customer_id,
+            return_url=app_config.stripe_return_url("/premium", base_url=config.app_base_url),
+        )
+    except stripe_billing.BillingConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not open billing portal.") from None
+    portal_url = str(getattr(portal, "url", "") or "")
+    if not portal_url:
+        raise HTTPException(status_code=502, detail="Could not open billing portal.")
+    return {"ok": True, "portal_url": portal_url}
 
 
 @app.get("/v1/sleeper/leagues")

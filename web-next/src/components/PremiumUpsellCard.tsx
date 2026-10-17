@@ -1,5 +1,6 @@
+import Link from "next/link";
+
 import type { PremiumUpsell } from "@/lib/api";
-import { streamlitPageUrl } from "@/lib/streamlitLink";
 
 /**
  * The lock/upsell card every Premium-only page shows a Free caller instead
@@ -35,9 +36,9 @@ export function PremiumUpsellCard({
         style={{ background: "var(--color-action-soft)", border: "var(--border-width-default) solid var(--color-action)" }}
       >
         <p className="text-sm">{body}</p>
-        <a href={streamlitPageUrl("premium")} className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+        <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
           Upgrade →
-        </a>
+        </Link>
       </div>
     </main>
   );
