@@ -121,6 +121,25 @@
 	reverse_proxy web-next:8080
 }
 
+# --- fantasydesk-app (new primary domain, parallel with fantasygmlab.com) ---
+# Zach, 2026-10-17: "we are switching the landing page and web app to
+# fantasydesk.app" — run in parallel with fantasygmlab.com first, verify,
+# redirect old->new later (not a hard cutover, see
+# project memory "FantasyGMLAB -> FantasyDesk rebrand"). Unlike
+# fantasygmlab.com's apex (static marketing landing page) vs. app.
+# subdomain (the real app) split, fantasydesk.app's apex routes STRAIGHT
+# to web-next — this domain's whole purpose is to BE the app, not host a
+# separate marketing site. www redirects to the apex, same pattern
+# MARKETING_DOMAIN_WWW uses above.
+fantasydesk.app {
+	import encode_responses
+	reverse_proxy web-next:8080
+}
+
+www.fantasydesk.app {
+	redir https://fantasydesk.app{uri} permanent
+}
+
 # --- fantasygm-lab-mobile-api ------------------------------------------------
 {$MOBILE_API_DOMAIN} {
 	import encode_responses
