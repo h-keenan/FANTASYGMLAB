@@ -151,6 +151,7 @@ def build_injury_tile(injury_display_context: Mapping[str, Any]) -> dict[str, An
         "route_player_team": alert.get("route_player_team") or "",
         "route_player_tier": alert.get("route_player_tier") or "",
         "route_player_score": alert.get("route_player_score"),
+        "mentioned_players": alert.get("mentioned_players") or [],
     }
 
 
@@ -345,15 +346,27 @@ def build_trade_tile(
     send_assets = [
         asset for asset in (headline_idea.get("send_assets") or []) if isinstance(asset, Mapping)
     ]
-    route_player_id = _text(receive_assets[0].get("player_id")) if receive_assets else ""
+    # The headline ("value"/target_label below) already names whichever
+    # receive-side PLAYER asset trade_ideas._first_player_asset picked for
+    # `their_player`/`their_player_id` — this needs the same pick, not a
+    # blind receive_assets[0] (a receive package with a pick listed first,
+    # e.g. "2027 2nd + Tony Pollard", would otherwise point route_player at
+    # the pick, which has no player_id, so the card silently showed no
+    # identity at all for the player the headline actually names;
+    # coridian_, 2026-10-17: "all players mentioned need to have the
+    # player pfp").
+    headline_player_asset = next(
+        (asset for asset in receive_assets if _text(asset.get("player_id"))), None
+    )
+    route_player_id = _text(headline_player_asset.get("player_id")) if headline_player_asset else ""
     # Same raw asset dict compact_package/presentation_asset already reads
     # position/team/player_tier/score from (modules.trade_ideas._player_asset)
     # — not a second valuation source.
-    route_player_name = _text(receive_assets[0].get("name")) if receive_assets else ""
-    route_player_position = _text(receive_assets[0].get("position")) if receive_assets else ""
-    route_player_team = _text(receive_assets[0].get("team")) if receive_assets else ""
-    route_player_tier = _text(receive_assets[0].get("player_tier")) if receive_assets else ""
-    route_player_score = receive_assets[0].get("score") if receive_assets else None
+    route_player_name = _text(headline_player_asset.get("name")) if headline_player_asset else ""
+    route_player_position = _text(headline_player_asset.get("position")) if headline_player_asset else ""
+    route_player_team = _text(headline_player_asset.get("team")) if headline_player_asset else ""
+    route_player_tier = _text(headline_player_asset.get("player_tier")) if headline_player_asset else ""
+    route_player_score = headline_player_asset.get("score") if headline_player_asset else None
     package = compact_package(
         send_assets, receive_assets, value_edge=value_delta, confidence=confidence_label
     )

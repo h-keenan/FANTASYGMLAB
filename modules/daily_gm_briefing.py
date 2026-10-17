@@ -91,6 +91,12 @@ class DailyBriefingItem:
     route_player_tier: str = ""
     route_player_score: float | None = None
     route_focus_mode: str = ""
+    # Every player a multi-player tile's note text actually names (e.g.
+    # Injury Alert's "3 injured starters"), each with the same identity
+    # shape as route_player_* — not just the single `route_player_id` tile
+    # author picked to route navigation to. Empty tuple for every
+    # single-player tile; never fabricated beyond what the tile itself set.
+    mentioned_players: tuple[Mapping[str, Any], ...] = ()
     recommendation_narrative: Mapping[str, Any] | None = None
     handoff_context: Mapping[str, Any] | None = None
     player_rank_context: str = ""
@@ -122,6 +128,10 @@ class DailyBriefingItem:
             if field.name in {"presentation", "recommendation_narrative", "handoff_context"}:
                 payload[field.name] = (
                     dict(value) if isinstance(value, Mapping) and value else None
+                )
+            elif field.name == "mentioned_players":
+                payload[field.name] = tuple(
+                    dict(item) for item in (value or []) if isinstance(item, Mapping)
                 )
             else:
                 payload[field.name] = value
@@ -258,6 +268,11 @@ def _item_from_tile(
         route_player_tier=_text(tile.get("route_player_tier")),
         route_player_score=tile.get("route_player_score"),
         route_focus_mode=_text(tile.get("route_focus_mode")),
+        mentioned_players=tuple(
+            dict(item)
+            for item in (tile.get("mentioned_players") or [])
+            if isinstance(item, Mapping)
+        ),
         recommendation_narrative=narrative,
         handoff_context=(
             dict(tile.get("handoff_context"))

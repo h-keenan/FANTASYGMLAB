@@ -40,6 +40,34 @@ def test_compose_copies_presentation_assets():
     assert plan.items[0].presentation["receive"][0]["name"] == "Pat Bryant"
 
 
+def test_compose_carries_mentioned_players_through_from_tile():
+    injury = _tile(
+        "Injury Alert",
+        "3 injured starters",
+        rec_id="injury-1",
+        route_key="my_team",
+        mentioned_players=[
+            {"player_id": "1", "name": "Starter QB", "position": "QB", "team": "PHI", "player_tier": "Elite"},
+            {"player_id": "2", "name": "Future QB", "position": "QB", "team": "PHI", "player_tier": "Depth"},
+        ],
+    )
+    briefing = dashboard_workflow.organize_dashboard_items(
+        [injury], immediate_labels=frozenset({"Injury Alert"})
+    )
+    plan = dgb.compose_daily_gm_briefing(briefing)
+    mentioned = plan.items[0].mentioned_players
+    assert len(mentioned) == 2
+    assert mentioned[0]["name"] == "Starter QB"
+    assert mentioned[1]["player_tier"] == "Depth"
+
+
+def test_compose_defaults_mentioned_players_to_empty_tuple():
+    trade = _tile("Top Trade Opportunity", "Acquire RB depth", rec_id="trade-1", route_key="trade_hub")
+    briefing = dashboard_workflow.organize_dashboard_items([trade])
+    plan = dgb.compose_daily_gm_briefing(briefing)
+    assert plan.items[0].mentioned_players == ()
+
+
 def test_compose_one_canonical_trade_as_top_priority():
     trade = _tile(
         "Top Trade Opportunity",

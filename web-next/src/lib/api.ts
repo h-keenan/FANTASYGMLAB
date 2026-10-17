@@ -117,6 +117,14 @@ export interface MyRosterResponse {
   reason: string;
 }
 
+export interface BriefingMentionedPlayer {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  player_tier: string;
+}
+
 export interface BriefingItem {
   category: string;
   headline: string;
@@ -129,6 +137,10 @@ export interface BriefingItem {
   route_player_team: string;
   route_player_tier: string;
   route_player_score: number | null;
+  // Every player the card's text actually names (e.g. Injury Alert's "3
+  // injured starters") — not just the single route_player_* above. Empty
+  // for every single-player tile.
+  mentioned_players: BriefingMentionedPlayer[];
   recommendation_narrative: string | null;
   presentation: Record<string, unknown> | null;
   recommendation_id: string;
