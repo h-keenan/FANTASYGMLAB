@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type TradeHubResponse } from "@/lib/api";
 import { TradeHubContent } from "@/components/TradeHubContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function TradeHubPage() {
   const params = useParams<{ leagueId: string }>();
@@ -43,9 +44,7 @@ export default function TradeHubPage() {
 
   if (authLoading || (!tradeHub && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Trade Hub…</p>
-      </main>
+      <LoadingScreen status="Loading Trade Hub…" />
     );
   }
 

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type DraftPickAsset, type LeagueRankingsResponse } from "@/lib/api";
 import { PlayersContent } from "@/components/PlayersContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 interface LoadedData {
   rankings: LeagueRankingsResponse;
@@ -58,9 +59,7 @@ export default function PlayersPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Players…</p>
-      </main>
+      <LoadingScreen status="Loading Players…" />
     );
   }
 

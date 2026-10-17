@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type GmTargetsResponse, type MyTeamResponse, type TeamStanceResponse } from "@/lib/api";
 import { TeamSituationContent } from "@/components/TeamSituationContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function TeamSituationPage() {
   const params = useParams<{ leagueId: string }>();
@@ -48,9 +49,7 @@ export default function TeamSituationPage() {
 
   if (authLoading || (!teamStance && !myTeam && !targets && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Team Situation…</p>
-      </main>
+      <LoadingScreen status="Loading Team Situation…" />
     );
   }
 

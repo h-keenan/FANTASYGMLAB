@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type MatchupResponse } from "@/lib/api";
 import { MatchupContent } from "@/components/MatchupContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function MatchupPage() {
   const params = useParams<{ leagueId: string }>();
@@ -43,9 +44,7 @@ export default function MatchupPage() {
 
   if (authLoading || (!matchup && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Matchup…</p>
-      </main>
+      <LoadingScreen status="Loading Matchup…" />
     );
   }
 

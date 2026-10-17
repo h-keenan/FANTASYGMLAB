@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type WaiversResponse } from "@/lib/api";
 import { WaiversContent } from "@/components/WaiversContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function WaiversPage() {
   const params = useParams<{ leagueId: string }>();
@@ -43,9 +44,7 @@ export default function WaiversPage() {
 
   if (authLoading || (!waivers && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Waivers…</p>
-      </main>
+      <LoadingScreen status="Loading Waivers…" />
     );
   }
 

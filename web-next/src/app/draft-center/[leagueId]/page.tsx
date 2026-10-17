@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type DraftCenterResponse, type DraftPickAsset } from "@/lib/api";
 import { DraftCenterContent } from "@/components/DraftCenterContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function DraftCenterPage() {
   const params = useParams<{ leagueId: string }>();
@@ -69,9 +70,7 @@ export default function DraftCenterPage() {
 
   if (authLoading || (!draftCenter && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Draft Center…</p>
-      </main>
+      <LoadingScreen status="Loading Draft Center…" />
     );
   }
 

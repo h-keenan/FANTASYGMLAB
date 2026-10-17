@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type RecapResponse } from "@/lib/api";
 import { LeagueRecapsContent } from "@/components/LeagueRecapsContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function LeagueRecapsPage() {
   const params = useParams<{ leagueId: string }>();
@@ -43,9 +44,7 @@ export default function LeagueRecapsPage() {
 
   if (authLoading || (!recap && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading League Recaps…</p>
-      </main>
+      <LoadingScreen status="Loading League Recaps…" />
     );
   }
 

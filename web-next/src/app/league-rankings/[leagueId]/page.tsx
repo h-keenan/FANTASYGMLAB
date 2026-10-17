@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { LeagueRankingsContent } from "@/components/LeagueRankingsContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function LeagueRankingsPage() {
   const params = useParams<{ leagueId: string }>();
@@ -58,9 +59,7 @@ export default function LeagueRankingsPage() {
 
   if (authLoading || (!rankings && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading League Rankings…</p>
-      </main>
+      <LoadingScreen status="Loading League Rankings…" />
     );
   }
 

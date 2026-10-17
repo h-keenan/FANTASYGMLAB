@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type DashboardResponse } from "@/lib/api";
 import { DashboardContent } from "@/components/DashboardContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function DashboardPage() {
   const params = useParams<{ leagueId: string }>();
@@ -43,9 +44,7 @@ export default function DashboardPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Dashboard…</p>
-      </main>
+      <LoadingScreen status="Loading Dashboard…" />
     );
   }
 

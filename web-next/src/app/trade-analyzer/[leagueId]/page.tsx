@@ -12,6 +12,7 @@ import {
   type TeamProfile,
 } from "@/lib/api";
 import { TradeAnalyzerContent } from "@/components/TradeAnalyzerContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 interface LoadedData {
   myRoster: MyRosterResponse;
@@ -73,9 +74,7 @@ export default function TradeAnalyzerPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Trade Analyzer…</p>
-      </main>
+      <LoadingScreen status="Loading Trade Analyzer…" />
     );
   }
 

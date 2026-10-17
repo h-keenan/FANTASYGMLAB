@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type TradeOutcomeHistoryResponse } from "@/lib/api";
 import { TradeHistoryContent } from "@/components/TradeHistoryContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Like Portfolio, Trade History has no [leagueId] segment — the real
 // current page (modules/trade_outcomes_page.py) and GET
@@ -44,9 +45,7 @@ export default function TradeHistoryPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Trade History…</p>
-      </main>
+      <LoadingScreen status="Loading Trade History…" />
     );
   }
 
