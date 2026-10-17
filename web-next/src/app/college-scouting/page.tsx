@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type CollegeProspectsResponse } from "@/lib/api";
 import { CollegeScoutingContent } from "@/components/CollegeScoutingContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Like Portfolio/News/Trade History, College Scouting has no [leagueId]
 // segment — the real current page (modules/college_scouting_ui.py) and GET
@@ -44,9 +45,7 @@ export default function CollegeScoutingPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading College Scouting…</p>
-      </main>
+      <LoadingScreen status="Loading College Scouting…" />
     );
   }
 

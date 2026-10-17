@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type NewsResponse } from "@/lib/api";
 import { NewsContent } from "@/components/NewsContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Like Portfolio, News has no [leagueId] segment — GET /v1/news is a
 // general, non-roster-scoped feed for anyone, not "your team's" news (see
@@ -41,9 +42,7 @@ export default function NewsPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading News…</p>
-      </main>
+      <LoadingScreen status="Loading News…" />
     );
   }
 

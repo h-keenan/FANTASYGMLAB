@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "@/components/AgeGate";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
 import { supabase } from "@/lib/supabase";
@@ -68,11 +69,7 @@ export default function LandingPage() {
   };
 
   if (loading || checkingSavedLeagues) {
-    return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading…</p>
-      </main>
-    );
+    return <LoadingScreen />;
   }
 
   return (

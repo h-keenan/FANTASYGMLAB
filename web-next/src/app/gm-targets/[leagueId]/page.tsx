@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type GmTargetsResponse, type LeagueRankingsResponse } from "@/lib/api";
 import { GmTargetsContent } from "@/components/GmTargetsContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function GmTargetsPage() {
   const params = useParams<{ leagueId: string }>();
@@ -46,9 +47,7 @@ export default function GmTargetsPage() {
 
   if (authLoading || (!targets && !rankings && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading GM Targets…</p>
-      </main>
+      <LoadingScreen status="Loading GM Targets…" />
     );
   }
 

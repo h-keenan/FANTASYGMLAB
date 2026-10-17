@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type AlertsResponse } from "@/lib/api";
 import { AlertsContent } from "@/components/AlertsContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function AlertsPage() {
   const params = useParams<{ leagueId: string }>();
@@ -43,9 +44,7 @@ export default function AlertsPage() {
 
   if (authLoading || (!alerts && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Alerts…</p>
-      </main>
+      <LoadingScreen status="Loading Alerts…" />
     );
   }
 

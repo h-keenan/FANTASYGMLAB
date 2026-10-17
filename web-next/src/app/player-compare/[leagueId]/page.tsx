@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type LeagueRankingsResponse } from "@/lib/api";
 import { PlayerCompareContent } from "@/components/PlayerCompareContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 /**
  * Route for Player Compare (Revision 12). Takes both player IDs as query
@@ -66,9 +67,7 @@ export default function PlayerComparePage() {
 
   if (authLoading || (!rankings && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Player Compare…</p>
-      </main>
+      <LoadingScreen status="Loading Player Compare…" />
     );
   }
 

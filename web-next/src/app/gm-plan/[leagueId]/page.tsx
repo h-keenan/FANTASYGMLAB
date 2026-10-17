@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type GmPlanResponse } from "@/lib/api";
 import { GmPlanContent } from "@/components/GmPlanContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function GmPlanPage() {
   const params = useParams<{ leagueId: string }>();
@@ -43,9 +44,7 @@ export default function GmPlanPage() {
 
   if (authLoading || (!gmPlan && !error)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading GM Plan…</p>
-      </main>
+      <LoadingScreen status="Loading GM Plan…" />
     );
   }
 

@@ -911,3 +911,17 @@ a {
     border-radius: var(--radius-panel);
   }
 }
+
+/* LoadingScreen's brand-mark pulse — matches mobile's LoadingScreen.tsx
+   (900ms, ease-in-out, opacity 0.6-1.0 / scale 0.96-1.0), which that
+   component's own docstring says mirrors the Streamlit web app's splash. */
+@keyframes brand-mark-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

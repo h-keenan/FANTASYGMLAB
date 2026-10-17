@@ -17,6 +17,7 @@ import {
   teamRanksById,
 } from "@/lib/liveDraftPresentation";
 import { LiveDraftContent } from "@/components/LiveDraftContent";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Matches modules/live_draft.py's LIVE_DRAFT_POLL_INTERVAL_SECONDS (12s) —
 // the same cadence modules/live_draft_ui.py's Streamlit route already
@@ -135,9 +136,7 @@ export default function LiveDraftPage() {
 
   if (authLoading || (!discovery && !discoveryError)) {
     return (
-      <main className="flex-1 flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>Loading Live Draft…</p>
-      </main>
+      <LoadingScreen status="Loading Live Draft…" />
     );
   }
 
