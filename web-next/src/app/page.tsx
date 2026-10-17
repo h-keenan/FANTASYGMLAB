@@ -13,7 +13,11 @@ type Tab = "guest" | "account";
 export default function LandingPage() {
   const { session, loading } = useAuth();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("guest");
+  // Defaults to the real sign-in/create-account path, not guest — coridian_,
+  // 2026-10-17: "It defaults for you to sign in with a username from
+  // sleeper, not an account." Guest (Sleeper-username-only, no account) is
+  // still available as a secondary tab, just no longer the default.
+  const [tab, setTab] = useState<Tab>("account");
   const [guestAgeConfirmed, setGuestAgeConfirmed] = useState(false);
   const [accountReady, setAccountReady] = useState(false);
   const skippedExistingSession = useRef(false);
@@ -43,26 +47,23 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm flex flex-col gap-6">
-        <div className="flex flex-col gap-1 text-center">
-          <h1 style={{ font: "var(--font-page-title)" }}>FantasyGM Lab</h1>
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            Your dynasty fantasy football GM assistant.
-          </p>
-        </div>
+    <main className="flex-1 flex flex-col items-center px-4 py-12 gap-10">
+      {/* Hero / value prop — previously this page had none at all, nothing
+          to tell a new visitor what the app even is (coridian_, 2026-10-17:
+          "there is no clear representation as to what the app is"). Copy
+          below is verbatim from mobile's onboarding carousel (coridian_-
+          approved via Discord brainstorm, 2026-09-26 — "do not rephrase
+          without re-checking with product"), not newly written here. */}
+      <div className="w-full max-w-md flex flex-col gap-3 text-center">
+        <h1 style={{ font: "var(--font-page-title)" }}>Your fantasy front office, not just a stats app.</h1>
+        <p className="text-base" style={{ color: "var(--color-text-secondary)" }}>
+          Real recommendations across your Trade Hub, Waivers, and Next Move — not raw data you have to interpret
+          yourself.
+        </p>
+      </div>
 
+      <div className="w-full max-w-sm flex flex-col gap-6">
         <div className="flex" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-          <button
-            onClick={() => setTab("guest")}
-            className="flex-1 px-3 py-2 text-sm font-bold"
-            style={{
-              color: tab === "guest" ? "var(--color-accent)" : "var(--color-text-muted)",
-              borderBottom: tab === "guest" ? "var(--border-width-semantic) solid var(--color-accent)" : "none",
-            }}
-          >
-            Continue as guest
-          </button>
           <button
             onClick={() => setTab("account")}
             className="flex-1 px-3 py-2 text-sm font-bold"
@@ -71,7 +72,17 @@ export default function LandingPage() {
               borderBottom: tab === "account" ? "var(--border-width-semantic) solid var(--color-accent)" : "none",
             }}
           >
-            Sign in
+            Sign in / Create account
+          </button>
+          <button
+            onClick={() => setTab("guest")}
+            className="flex-1 px-3 py-2 text-sm font-bold"
+            style={{
+              color: tab === "guest" ? "var(--color-accent)" : "var(--color-text-muted)",
+              borderBottom: tab === "guest" ? "var(--border-width-semantic) solid var(--color-accent)" : "none",
+            }}
+          >
+            Try without an account
           </button>
         </div>
 
