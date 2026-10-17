@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "@/components/AgeGate";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
+import { supabase } from "@/lib/supabase";
 
 type Tab = "guest" | "account";
 
@@ -20,25 +21,53 @@ export default function LandingPage() {
   const [tab, setTab] = useState<Tab>("account");
   const [guestAgeConfirmed, setGuestAgeConfirmed] = useState(false);
   const [accountReady, setAccountReady] = useState(false);
+  const [checkingSavedLeagues, setCheckingSavedLeagues] = useState(false);
   const skippedExistingSession = useRef(false);
 
   // A returning user (page refresh with a still-valid persisted Supabase
-  // session — guest or signed-in) should land straight on the league
-  // picker, not be asked to pass the age gate or sign in again. Only
-  // applies once, on load — never re-triggers mid-flow.
+  // session — guest or signed-in) should land straight in their league, not
+  // be asked to pass the age gate or sign in again, and not have to pick a
+  // league back out of a list every time either (coridian_, 2026-10-17:
+  // "the website needs to remember that you've signed in, and whenever you
+  // open it, it needs to take you to the dashboard"). Mirrors mobile's own
+  // HomeScreen auto-nav exactly: exactly one saved league jumps straight to
+  // its Dashboard; two or more land on the cross-league Portfolio view
+  // instead of guessing which one; zero saved leagues falls through to the
+  // normal guest/account flow below. Only applies once, on load — never
+  // re-triggers mid-flow.
   useEffect(() => {
-    if (!loading && session && !skippedExistingSession.current) {
-      skippedExistingSession.current = true;
-      setGuestAgeConfirmed(true);
-      setAccountReady(true);
-    }
-  }, [loading, session]);
+    if (loading || !session || skippedExistingSession.current) return;
+    skippedExistingSession.current = true;
+    setGuestAgeConfirmed(true);
+    setAccountReady(true);
+    setCheckingSavedLeagues(true);
+    (async () => {
+      try {
+        const { data } = await supabase.from("saved_leagues").select("league_id, league_name");
+        const leagues = data ?? [];
+        if (leagues.length === 1) {
+          const only = leagues[0];
+          router.replace(
+            `/dashboard/${encodeURIComponent(only.league_id)}?name=${encodeURIComponent(only.league_name || only.league_id)}`,
+          );
+          return;
+        }
+        if (leagues.length > 1) {
+          router.replace("/portfolio");
+          return;
+        }
+        setCheckingSavedLeagues(false);
+      } catch {
+        setCheckingSavedLeagues(false);
+      }
+    })();
+  }, [loading, session, router]);
 
   const handleLeagueChosen = (leagueId: string, leagueName: string) => {
     router.push(`/dashboard/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`);
   };
 
-  if (loading) {
+  if (loading || checkingSavedLeagues) {
     return (
       <main className="flex-1 flex items-center justify-center">
         <p style={{ color: "var(--color-text-muted)" }}>Loading…</p>
