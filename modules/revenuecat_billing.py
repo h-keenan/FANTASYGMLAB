@@ -31,9 +31,11 @@ CONFIG_KEYS = (
     "REVENUECAT_WEBHOOK_AUTH_TOKEN",
     "REVENUECAT_BILLING_MODE",
     "REVENUECAT_ENTITLEMENT_LOOKUP_KEY",
+    "REVENUECAT_FRONT_OFFICE_ENTITLEMENT_LOOKUP_KEY",
 )
 
 DEFAULT_ENTITLEMENT_LOOKUP_KEY = "premium"
+DEFAULT_FRONT_OFFICE_ENTITLEMENT_LOOKUP_KEY = "front_office"
 
 
 class BillingConfigurationError(RuntimeError):
@@ -47,6 +49,7 @@ class RevenueCatBillingConfig:
     project_id: str = ""
     webhook_auth_token: str = ""
     entitlement_lookup_key: str = DEFAULT_ENTITLEMENT_LOOKUP_KEY
+    front_office_entitlement_lookup_key: str = DEFAULT_FRONT_OFFICE_ENTITLEMENT_LOOKUP_KEY
 
     @property
     def webhook_configured(self) -> bool:
@@ -87,6 +90,10 @@ def load_revenuecat_config(*, environ: dict | None = None, secrets: Any = None) 
         webhook_auth_token=values["REVENUECAT_WEBHOOK_AUTH_TOKEN"],
         entitlement_lookup_key=(
             _safe_text(values["REVENUECAT_ENTITLEMENT_LOOKUP_KEY"]) or DEFAULT_ENTITLEMENT_LOOKUP_KEY
+        ),
+        front_office_entitlement_lookup_key=(
+            _safe_text(values["REVENUECAT_FRONT_OFFICE_ENTITLEMENT_LOOKUP_KEY"])
+            or DEFAULT_FRONT_OFFICE_ENTITLEMENT_LOOKUP_KEY
         ),
     )
 
@@ -180,7 +187,12 @@ def map_revenuecat_event(
         return result
 
     active_keys = fetch_active_entitlement_lookup_keys(app_user_id, config=config, request_session=request_session)
-    result["entitlement"] = "premium" if config.entitlement_lookup_key in active_keys else "free"
+    if config.front_office_entitlement_lookup_key in active_keys:
+        result["entitlement"] = "front_office"
+    elif config.entitlement_lookup_key in active_keys:
+        result["entitlement"] = "premium"
+    else:
+        result["entitlement"] = "free"
     return result
 
 
