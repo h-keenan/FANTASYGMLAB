@@ -131,12 +131,19 @@
 # to web-next — this domain's whole purpose is to BE the app, not host a
 # separate marketing site. www redirects to the apex, same pattern
 # MARKETING_DOMAIN_WWW uses above.
-fantasydesk.app {
+#
+# Explicit http:// prefix (unlike the {$VAR}-driven blocks above, which
+# get it auto-added by fantasygmlab-sync-caddy's env-var substitution) —
+# a literal domain here isn't a {$VAR} hostname, so the generator never
+# touches it; without this prefix Caddy's own auto-HTTPS inferred scheme
+# produced a broken/duplicate route on the Cloudflare Tunnel side
+# (confirmed via the box's tunnel config, 2026-10-17).
+http://fantasydesk.app {
 	import encode_responses
 	reverse_proxy web-next:8080
 }
 
-www.fantasydesk.app {
+http://www.fantasydesk.app {
 	redir https://fantasydesk.app{uri} permanent
 }
 
