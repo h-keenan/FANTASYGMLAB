@@ -19,10 +19,12 @@ from modules import redis_cache
 def _fake_redis_for_tests():
     """Every test gets a private, flushed in-memory Redis-compatible store
     (fakeredis) instead of a real Redis server: CI has no Redis service
-    container, and the three modules.redis_cache-backed single-flight
-    caches plus services.mobile_api_service's rate limiter all call
-    modules.redis_cache.get_redis_client() internally, so this is the one
-    place that needs to swap in a test double for all of them at once.
+    container, and the four modules.redis_cache-backed single-flight
+    caches (trade-idea records, league rankings frames/summaries, playoff
+    odds, and the public-players frame) plus services.mobile_api_service's
+    rate limiter all call modules.redis_cache.get_redis_client()
+    internally, so this is the one place that needs to swap in a test
+    double for all of them at once.
 
     A fresh fakeredis.FakeServer() per test (not a module-level shared one)
     means no rate-limit counter or single-flight cache entry can ever leak

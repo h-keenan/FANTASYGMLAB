@@ -11,6 +11,7 @@ import pandas as pd
 
 from modules import player_hydrate_stages
 from modules import rankings
+from modules import redis_cache
 
 
 def _frame(score: int = 100) -> pd.DataFrame:
@@ -95,7 +96,15 @@ def test_source_fingerprint_change_misses_process_store():
     assert changed.attrs["public_player_cache_status"] == "reconcile_miss"
 
 
-def test_clear_public_player_cache_drops_process_store():
+def test_clear_public_player_cache_drops_process_store_but_not_the_shared_redis_entry():
+    """clear_public_player_cache's docstring is explicit: it drops this
+    PROCESS's own cache, not shared state. Redis (shared across worker
+    processes — see modules.rankings._redis_shared_public_players's
+    docstring) isn't process-local state, so a process-scoped clear
+    correctly leaves it alone: the next load_players call here still
+    finds the earlier build in Redis instead of re-running the expensive
+    builder, same as any other worker process would."""
+
     rankings.clear_public_player_cache()
     with (
         patch.object(rankings, "public_player_source_fingerprint", return_value=(("fix", True, 9, 9),)),
@@ -105,8 +114,8 @@ def test_clear_public_player_cache_drops_process_store():
         rankings.load_players("hydrate-c.db")
         rankings.clear_public_player_cache()
         again = rankings.load_players("hydrate-c.db")
-    assert loader.call_count == 2
-    assert again.attrs["public_player_cache_status"] == "reconcile_miss"
+    assert loader.call_count == 1
+    assert again.attrs["public_player_cache_status"] == "redis_hit"
 
 
 def test_hydrate_miss_records_exclusive_named_stages():
@@ -158,7 +167,13 @@ def test_concurrent_first_loads_still_single_flight():
     assert waiter.attrs["public_player_process_store_before"] is False
 
 
-def test_streamlit_hit_when_process_store_cleared():
+def test_redis_hit_when_process_store_cleared():
+    """Redis (shared across worker processes) is checked before this
+    process's own Streamlit cache, so clearing just the process-local
+    dict now surfaces a "redis_hit" here, not "streamlit_hit" — see
+    test_redis_entry_missing_falls_back_to_a_live_streamlit_hit below for
+    the narrower case that status still covers."""
+
     rankings.clear_public_player_cache()
     with (
         patch.object(rankings, "public_player_source_fingerprint", return_value=(("fix", True, 5, 5),)),
@@ -167,6 +182,31 @@ def test_streamlit_hit_when_process_store_cleared():
         first = rankings.load_players("hydrate-f.db")
         rankings.clear_process_public_frames()
         second = rankings.load_players("hydrate-f.db")
+    assert loader.call_count == 1
+    assert first.attrs["public_player_cache_status"] == "reconcile_miss"
+    assert second.attrs["public_player_cache_status"] == "redis_hit"
+    assert int(second.loc[0, "dynasty_score"]) == 3
+
+
+def test_redis_entry_missing_falls_back_to_a_live_streamlit_hit():
+    """"streamlit_hit" is still real: a worker's own @st.cache_data copy
+    can outlive a since-expired/evicted Redis entry for the same
+    fingerprint. Clearing only the process-local dict (not the Streamlit
+    cache) and the Redis key (not clear_public_player_cache, which would
+    also drop the Streamlit cache) isolates exactly that case."""
+
+    fingerprint = (("fix", True, 6, 6),)
+    rankings.clear_public_player_cache()
+    with (
+        patch.object(rankings, "public_player_source_fingerprint", return_value=fingerprint),
+        patch.object(rankings, "_load_players_uncached", side_effect=[_frame(3), _frame(9)]) as loader,
+    ):
+        first = rankings.load_players("hydrate-g.db")
+        rankings.clear_process_public_frames()
+        redis_cache.get_redis_client().delete(
+            rankings._redis_public_players_cache_key("hydrate-g.db", fingerprint)
+        )
+        second = rankings.load_players("hydrate-g.db")
     assert loader.call_count == 1
     assert first.attrs["public_player_cache_status"] == "reconcile_miss"
     assert second.attrs["public_player_cache_status"] == "streamlit_hit"

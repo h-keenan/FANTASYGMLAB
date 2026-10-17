@@ -15,14 +15,14 @@ copy:
   1. services/mobile_api_service.py's rate limiter (see its own "Rate
      limiting" section) — a plain Redis INCR/EXPIRE counter now, not a
      dict living in one process's memory.
-  2. The three `@lru_cache` + per-process `threading.Lock` single-flight
-     caches (modules.trade_hub_engine, modules.league_rankings x2,
-     modules.playoff_simulator) — `redis_single_flight_cache` below is
-     their shared replacement: a distributed lock (so only ONE worker,
-     cluster-wide, ever runs a given expensive computation at a time) plus
-     the computed result itself cached in Redis (so a cache hit in worker A
-     actually serves a request landing on worker B, not just worker A's
-     own future requests).
+  2. The several `@lru_cache`/process-local-dict + `threading.Lock`
+     single-flight caches (modules.trade_hub_engine, modules.league_rankings
+     x2, modules.playoff_simulator, modules.rankings' public-players frame)
+     — `redis_single_flight_cache` below is their shared replacement: a
+     distributed lock (so only ONE worker, cluster-wide, ever runs a given
+     expensive computation at a time) plus the computed result itself
+     cached in Redis (so a cache hit in worker A actually serves a request
+     landing on worker B, not just worker A's own future requests).
 
 Both are intentionally FAIL OPEN on any Redis error (connection refused,
 timeout, ...): Redis here is a pure performance/correctness-under-scale
