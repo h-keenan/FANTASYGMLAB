@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { api, type PlayerAward, type QuickViewResponse } from "@/lib/api";
+import { api, type PlayerAward, type QuickViewResponse, type WeeklyStatPoint } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
+import { WeeklyPointsPanel } from "@/components/WeeklyPointsChart";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
@@ -53,6 +54,7 @@ export function PlayerQuickView({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
+  const [weeklyStats, setWeeklyStats] = useState<{ season: number; weeks: WeeklyStatPoint[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Swipe-down-to-dismiss, via the drag handle only (not the whole modal —
@@ -90,7 +92,13 @@ export function PlayerQuickView({
   // PlayerQuickViewContext.tsx), so a new player is always a fresh mount
   // with fresh initial state rather than a reset done imperatively here.
   // Both calls are independent (one 404-shaped reason never blocks the
-  // other).
+  // other). Weekly stats (coridian_, 2026-10-17: "the PQV is missing info
+  // like the week by week points") is fetched separately via .catch
+  // rather than inside the same Promise.all — a missing/failed weekly-stats
+  // fetch must never block the identity/value/model data the rest of this
+  // modal actually needs, same reasoning as awards. Reuses the exact same
+  // GET .../weekly-stats endpoint + WeeklyPointsPanel component Player
+  // Compare's dual chart already does, not a new fetch/chart.
   useEffect(() => {
     let cancelled = false;
 
@@ -106,6 +114,16 @@ export function PlayerQuickView({
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+
+    api
+      .getPlayerWeeklyStats(identity.player_id)
+      .then((response) => {
+        if (cancelled) return;
+        setWeeklyStats({ season: response.season, weeks: response.weeks });
+      })
+      .catch(() => {
+        // Soft-fail: the rest of the modal is still useful without this.
       });
 
     return () => {
@@ -264,6 +282,18 @@ export function PlayerQuickView({
               ) : null}
 
               {model ? <SubRatingRow model={model} /> : null}
+
+              {weeklyStats && weeklyStats.weeks.some((week) => week.fantasy_points_ppr != null) ? (
+                <section className="pqv-stat-season">
+                  <h3>Week by Week</h3>
+                  <WeeklyPointsPanel
+                    name={identity.name || "This player"}
+                    weeks={weeklyStats.weeks}
+                    season={weeklyStats.season}
+                    gradientId="pqv-weekly-fill"
+                  />
+                </section>
+              ) : null}
 
               {stats?.seasons.map((season) => (
                 <section key={season.label} className="pqv-stat-season">
