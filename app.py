@@ -4357,7 +4357,7 @@ def render_player_quick_view_content(
         opportunity_note_parts.append(f"{opportunity_confidence}/100 role confidence")
     opportunity_metric_note = _truncate_text(" | ".join(opportunity_note_parts[:3]), 76)
 
-    identity_badges: list[tuple[str, str]] = []
+    identity_badges: list[tuple[str, str] | tuple[str, str, str]] = []
     injury_level_key = _safe_text(row.get("injury_level"), "healthy").strip().casefold()
     if injury_level_key not in {"", "healthy", "available"}:
         health_answer = injury_level_text
@@ -4373,6 +4373,7 @@ def render_player_quick_view_content(
                 "Usage",
                 f"{usage_trend['arrow']} {usage_trend['magnitude_pct']}% "
                 f"· {usage_trend['confidence_label']}",
+                usage_trend["tone"],
             )
         )
 

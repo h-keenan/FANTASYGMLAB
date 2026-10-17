@@ -1254,7 +1254,10 @@ def pqv_hero_html(
     dynasty_value: str = "",
     scoring_format: str = "",
     overall_rating: int | None = None,
-    signal_badges: list[tuple[str, str]] | tuple[tuple[str, str], ...] = (),
+    signal_badges: (
+        list[tuple[str, str] | tuple[str, str, str]]
+        | tuple[tuple[str, str] | tuple[str, str, str], ...]
+    ) = (),
     identity: PlayerTierIdentity | None = None,
     include_tier_legend: bool = False,
     status_freshness_label: str = "",
@@ -1275,7 +1278,9 @@ def pqv_hero_html(
         overall_rating=overall_rating,
     )
     filtered_badges = []
-    for question, answer in signal_badges:
+    for badge in signal_badges:
+        question, answer = badge[0], badge[1]
+        tone = badge[2] if len(badge) > 2 else ""
         if _text(answer).casefold() == role.casefold() and role:
             continue
         if _text(question).casefold() in {
@@ -1285,7 +1290,7 @@ def pqv_hero_html(
             "fantasy action",
         }:
             continue
-        filtered_badges.append((question, answer))
+        filtered_badges.append((question, answer, tone))
     portrait_class = portrait_frame_classes(
         identity,
         base="pqv-hero-portrait",
@@ -1381,21 +1386,32 @@ def pqv_primary_workspace_html(
     )
 
 
-def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, str], ...]) -> str:
+def labeled_signal_badges_html(
+    badges: (
+        list[tuple[str, str] | tuple[str, str, str]]
+        | tuple[tuple[str, str] | tuple[str, str, str], ...]
+    ),
+) -> str:
     """Labeled identity badges. Each badge answers a distinct question.
 
-    Every badge shared the same neutral gray accent regardless of what it
-    said — a "Health: Questionable" flag read no differently than a routine
-    "Usage" trend note. The caller only ever appends a "Health" badge when
-    the player is already flagged as not fully healthy (see the
+    Every badge used to share the same neutral gray accent regardless of
+    what it said — a "Health: Questionable" flag read no differently than a
+    directional "Usage" trend note. The caller only ever appends a "Health"
+    badge when the player is already flagged as not fully healthy (see the
     identity-badge construction in ``render_player_quick_view_content``), so
-    that one question is always a real concern and gets the same warning
-    accent ``_player_injury_chip`` already uses for it elsewhere.
+    that one question is always a real concern and keeps the hardcoded
+    warning accent ``_player_injury_chip`` already uses for it elsewhere.
+    A badge can also carry an explicit ``tone`` ("positive"/"negative") as
+    its optional third element — e.g. a Usage trend badge, whose direction
+    the caller already knows and shouldn't be re-derived from arrow glyphs
+    in display text.
     """
 
     parts: list[str] = []
     seen: set[str] = set()
-    for question, answer in badges:
+    for badge in badges:
+        question, answer = badge[0], badge[1]
+        tone = badge[2] if len(badge) > 2 else ""
         label = _text(question)
         value = _text(answer)
         if not label or not value:
@@ -1404,9 +1420,16 @@ def labeled_signal_badges_html(badges: list[tuple[str, str]] | tuple[tuple[str, 
         if key in seen:
             continue
         seen.add(key)
-        risk_class = " pqv-signal-badge--risk" if label.casefold() == "health" else ""
+        if label.casefold() == "health":
+            tone_class = " pqv-signal-badge--risk"
+        elif tone == "positive":
+            tone_class = " pqv-signal-badge--positive"
+        elif tone == "negative":
+            tone_class = " pqv-signal-badge--negative"
+        else:
+            tone_class = ""
         parts.append(
-            f"<span class='pqv-signal-badge{risk_class}' role='listitem'>"
+            f"<span class='pqv-signal-badge{tone_class}' role='listitem'>"
             f"<span class='pqv-signal-badge-question'>{escape(label)}</span>"
             f"<span class='pqv-signal-badge-answer'>{escape(value)}</span>"
             "</span>"

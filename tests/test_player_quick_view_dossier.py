@@ -325,6 +325,21 @@ def test_labeled_signal_badges_order_and_empty_case():
     assert player_quick_view.labeled_signal_badges_html(()) == ""
 
 
+def test_labeled_signal_badges_tone_colors_a_directional_usage_badge():
+    positive = player_quick_view.labeled_signal_badges_html(
+        (("Usage", "▲ 13% · high confidence", "positive"),)
+    )
+    negative = player_quick_view.labeled_signal_badges_html(
+        (("Usage", "▼ 13% · high confidence", "negative"),)
+    )
+    neutral = player_quick_view.labeled_signal_badges_html((("Usage", "Stable"),))
+
+    assert "pqv-signal-badge--positive" in positive
+    assert "pqv-signal-badge--negative" in negative
+    assert "pqv-signal-badge--positive" not in neutral
+    assert "pqv-signal-badge--negative" not in neutral
+
+
 def test_compact_model_and_career_summaries_are_scannable():
     model = player_quick_view.compact_model_summary_html(
         (
