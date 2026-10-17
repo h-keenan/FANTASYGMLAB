@@ -9173,6 +9173,61 @@ def test_matchup_real_starters_carry_a_per_game_projection(monkeypatch):
     assert mock_project.call_count == 2
 
 
+def test_matchup_real_starter_with_inactive_status_is_reinstated_not_unknown(monkeypatch):
+    """A real Sleeper starter whose literal status is "Inactive" gets
+    filtered out of `valued` entirely (modules.player_eligibility) —
+    before this fix, the ACTUAL-lineup view rendered that as a bare
+    "Unknown player"/no-team placeholder despite the player's real photo
+    resolving fine (PlayerAvatar only needs the id). coridian_,
+    2026-10-17: a real opponent starter rendered as "Unknown player"/"FA"
+    on the live Matchup screen. Reuses the exact same reinstatement path
+    (_reinstated_inactive_roster_rows) the suggested-lineup view already
+    had, so both matchup views resolve identity the same way."""
+
+    frame = _fake_matchup_players_frame()
+    frame = frame[frame["player_id"] != "opp1"].reset_index(drop=True)
+
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [20.5], "points": 20.5},
+        {"roster_id": 2, "matchup_id": 3, "starters": ["opp1"], "starters_points": [18.4], "points": 18.4},
+    ]
+    inactive_players_lookup = {
+        "opp1": {
+            "full_name": "Opp Player 1",
+            "position": "QB",
+            "team": "BAL",
+            "age": 28,
+            "status": "Inactive",
+            "injury_status": "",
+        }
+    }
+
+    client = _client(monkeypatch)
+    with _matchup_world(matchups, players=frame):
+        with patch("modules.sleeper.get_players", return_value=inactive_players_lookup):
+            with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                with patch(
+                    "modules.player_projections.team_defense_points_allowed_by_position", return_value={}
+                ):
+                    with patch(
+                        "modules.player_projections.project_player_week",
+                        return_value={"status": "unknown_player"},
+                    ):
+                        response = client.get(
+                            "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
+                        )
+
+    body = response.json()
+    opponent_starter = body["opponent"]["real_starters"][0]
+    assert opponent_starter["player_id"] == "opp1"
+    assert opponent_starter["name"] == "Opp Player 1"
+    assert opponent_starter["position"] == "QB"
+    assert opponent_starter["team"] == "BAL"
+    assert opponent_starter["status"] == "Inactive"
+    # Real points still carried through regardless.
+    assert opponent_starter["actual_points"] == 18.4
+
+
 def test_matchup_real_lineup_projection_fails_soft_on_error(monkeypatch):
     """A transient failure building the projection inputs must never break
     the real Sleeper lineup/points response itself — the client just gets
