@@ -24,16 +24,18 @@ import { streamlitPageUrl } from "@/lib/streamlitLink";
 
 // "My Team", "Matchup", "Trade Hub", "Waivers", "League Rankings",
 // "Alerts", "GM Plan", "GM Targets", "League Recaps / History", "Draft
-// Center", "Trade Analyzer", "Players", and now "Live Draft" have real
-// Next.js pages (see app/my-team/[leagueId], app/matchup/[leagueId],
-// app/trade-hub/[leagueId], app/waivers/[leagueId],
+// Center", "Trade Analyzer", "Trade Finder", "Players", and now "Live
+// Draft" have real Next.js pages (see app/my-team/[leagueId],
+// app/matchup/[leagueId], app/trade-hub/[leagueId], app/waivers/[leagueId],
 // app/league-rankings/[leagueId], app/alerts/[leagueId],
 // app/gm-plan/[leagueId], app/gm-targets/[leagueId],
 // app/league-recaps/[leagueId], app/draft-center/[leagueId],
-// app/trade-analyzer/[leagueId], app/players/[leagueId], and
-// app/live-draft/[leagueId]) and are rendered separately below as internal
-// <Link>s instead of Streamlit deep links — every other destination here
-// (including Trade Finder) is still Streamlit-only for this revision.
+// app/trade-analyzer/[leagueId], app/trade-finder/[leagueId],
+// app/players/[leagueId], and app/live-draft/[leagueId]) and are rendered
+// separately below as internal <Link>s. Trade Finder was already a real
+// page (reachable via the GM orb) but missing from this exact list — a
+// real end-to-end-audit finding, 2026-10-17: a new user looking at
+// Dashboard's own Explore grid for "what's here" wouldn't have found it.
 //
 // College Scouting (Revision 20) moved out of this Streamlit-deep-link
 // quick-actions list and down into the Portfolio/News/Trade History group
@@ -61,6 +63,7 @@ const BUILT_PAGES: { label: string; path: string }[] = [
   { label: "League Recaps / History", path: "league-recaps" },
   { label: "Draft Center", path: "draft-center" },
   { label: "Trade Analyzer", path: "trade-analyzer" },
+  { label: "Trade Finder", path: "trade-finder" },
   { label: "Players", path: "players" },
   // Live Draft (Revision 21) — closes out the original migration punch
   // list. Shown unconditionally like every other entry here; the page
@@ -207,7 +210,7 @@ export function DashboardContent({
           Explore
         </h2>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Workflows ported to this app open here; everything else still opens in Streamlit.
+          Every tool in one place.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <ExploreCard href="/portfolio" label="Portfolio" />
