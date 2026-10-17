@@ -26,8 +26,8 @@ def test_semantic_tokens_match_the_design_system_specification():
         # FantasyDesk brand sheet (2026-10-17) — Midnight/Charcoal/Graphite
         # foundation, Bone text, Field/Touchdown accent. See
         # DESIGN_TOKEN_CSS's own inline comment for the contrast math.
-        "--color-bg": "#0b0b0b",
-        "--color-shell": "#0b0b0b",
+        "--color-bg": "#000000",
+        "--color-shell": "#000000",
         "--color-surface-primary": "#1f2226",
         "--color-text-primary": "#f7f8fa",
         "--color-text-secondary": "#e5e7eb",

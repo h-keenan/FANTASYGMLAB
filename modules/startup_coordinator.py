@@ -140,7 +140,7 @@ _SHELL_CSS = """
     align-items: center;
     background:
         radial-gradient(circle at 16% 10%, color-mix(in srgb, var(--color-accent-strong, #22d3ee) 10%, transparent), transparent 32%),
-        linear-gradient(180deg, var(--color-bg, #0b0b0b) 0%, var(--color-shell, #0b0b0b) 54%, var(--color-bg, #0b0b0b) 100%);
+        linear-gradient(180deg, var(--color-bg, #000000) 0%, var(--color-shell, #000000) 54%, var(--color-bg, #000000) 100%);
     box-sizing: border-box;
     display: flex;
     inset: 0;

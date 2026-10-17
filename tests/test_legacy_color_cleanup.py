@@ -59,7 +59,7 @@ def _lower(text: str) -> str:
 def test_streamlit_theme_matches_canonical_tokens():
     config = (ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8")
     assert 'primaryColor = "#22d3ee"' in config
-    assert 'backgroundColor = "#0b0b0b"' in config
+    assert 'backgroundColor = "#000000"' in config
     assert 'secondaryBackgroundColor = "#1f2226"' in config
     assert 'textColor = "#f7f8fa"' in config
     assert "#00C2FF" not in config
