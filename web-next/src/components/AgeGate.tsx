@@ -43,6 +43,13 @@ export function AgeGate({ onConfirmed }: { onConfirmed: () => void }) {
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    // SignInForm renders this inside its own <form> during create-account
+    // (invalid nested-<form> markup, but React happily creates it in the
+    // live DOM either way) — without this, confirming a birthdate also
+    // bubbles the submit event up into the outer form's onSubmit, silently
+    // firing a signUp/signIn call with whatever (blank) email/password the
+    // user hasn't typed in yet.
+    event.stopPropagation();
     const m = Number(month);
     const d = Number(day);
     const y = Number(year);
