@@ -249,7 +249,6 @@ export function MyTeamContent({
               <div
                 key={observation.label + observation.titlePrefix + observation.titleSuffix}
                 className={`tone-${observation.tone} p-4 flex flex-col gap-1`}
-                style={{ background: "var(--color-surface-secondary)" }}
               >
                 <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
                   {observation.label}
@@ -273,7 +272,7 @@ export function MyTeamContent({
           <SectionHeading>
             <span id="biggest-need-heading">{needs.biggest_need.label}</span>
           </SectionHeading>
-          <div className="tone-need p-4 flex flex-col gap-1" style={{ background: "var(--color-surface-secondary)" }}>
+          <div className="tone-need p-4 flex flex-col gap-1">
             <span className="tone-value text-sm font-extrabold">
               {(() => {
                 const cls = positionTextClass(needs.biggest_need.value);
@@ -297,7 +296,6 @@ export function MyTeamContent({
               <div
                 key={item.position}
                 className={`tone-${item.tone} p-4 flex flex-col gap-1`}
-                style={{ background: "var(--color-surface-secondary)" }}
               >
                 <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
                   {item.label}

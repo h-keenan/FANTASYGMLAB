@@ -95,10 +95,7 @@ export function DraftCenterContent({
                 )}`}
               />
             </div>
-            <div
-              className={`tone-${posture.tone} p-4 flex flex-col gap-2`}
-              style={{ background: "var(--color-surface-secondary)" }}
-            >
+            <div className={`tone-${posture.tone} p-4 flex flex-col gap-2`}>
               <span
                 className="tone-value text-sm font-extrabold uppercase self-start"
                 style={{ letterSpacing: "var(--letter-spacing-badge)" }}
@@ -212,11 +209,7 @@ function DraftCardSection({ id, title, cards }: { id: string; title: string; car
       </h2>
       <div className="flex flex-col gap-3">
         {cards.map((card) => (
-          <div
-            key={card.label}
-            className={`tone-${card.tone} p-4 flex flex-col gap-2`}
-            style={{ background: "var(--color-surface-secondary)" }}
-          >
+          <div key={card.label} className={`tone-${card.tone} p-4 flex flex-col gap-2`}>
             <span
               className="tone-value text-xs font-bold uppercase self-start"
               style={{ letterSpacing: "var(--letter-spacing-badge)" }}
