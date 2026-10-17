@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type DashboardResponse } from "@/lib/api";
 import { DashboardContent } from "@/components/DashboardContent";
 
@@ -15,6 +16,7 @@ export default function DashboardPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export default function DashboardPage() {
     }
     let cancelled = false;
     api
-      .getDashboard(leagueId)
+      .getDashboard(leagueId, lens)
       .then((result) => {
         if (!cancelled) setData(result);
       })
@@ -37,7 +39,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!data && !error)) {
     return (
