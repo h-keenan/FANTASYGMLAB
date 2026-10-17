@@ -549,6 +549,174 @@ def test_link_sleeper_username_fails_closed_when_supabase_rejects_the_write(monk
     assert body["reason"] == "not_available"
 
 
+def test_billing_plans_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/billing/plans")
+    assert response.status_code == 401
+
+
+def test_billing_plans_returns_pro_and_front_office(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    from modules import stripe_billing
+
+    fake_details = {
+        stripe_billing.MONTHLY: ("Monthly", "$9.99", "per month"),
+        stripe_billing.ANNUAL: ("Annual", "$59.99", "per year"),
+        stripe_billing.FRONT_OFFICE_ANNUAL: ("Annual", "$99.99", "per year"),
+    }
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("modules.stripe_billing.plan_display_details", return_value=fake_details),
+    ):
+        response = client.get("/v1/billing/plans", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    plans = {(p["tier"], p["interval"]): p for p in response.json()["plans"]}
+    assert plans[("pro", "monthly")]["price"] == "$9.99"
+    assert plans[("pro", "annual")]["price"] == "$59.99"
+    assert plans[("front_office", "annual")]["price"] == "$99.99"
+
+
+def test_billing_plans_falls_back_when_front_office_price_missing(monkeypatch):
+    # plan_display_details only returns a front_office_annual key when
+    # STRIPE_PRICE_FRONT_OFFICE_ANNUAL is actually configured — confirms the
+    # endpoint still returns all 3 plans (via DEFAULT_PLAN_DETAILS) rather
+    # than dropping Front Office from the response entirely.
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    from modules import stripe_billing
+
+    fake_details = {
+        stripe_billing.MONTHLY: ("Monthly", "$9.99", "per month"),
+        stripe_billing.ANNUAL: ("Annual", "$59.99", "per year"),
+    }
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("modules.stripe_billing.plan_display_details", return_value=fake_details),
+    ):
+        response = client.get("/v1/billing/plans", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    plans = {(p["tier"], p["interval"]): p for p in response.json()["plans"]}
+    assert plans[("front_office", "annual")] == {
+        "tier": "front_office",
+        "interval": "annual",
+        **dict(zip(("label", "price", "cadence"), stripe_billing.DEFAULT_PLAN_DETAILS[stripe_billing.FRONT_OFFICE_ANNUAL])),
+    }
+
+
+def test_billing_checkout_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.post("/v1/billing/checkout", json={"tier": "pro", "interval": "monthly"})
+    assert response.status_code == 401
+
+
+def test_billing_checkout_returns_the_real_checkout_url(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_session = SimpleNamespace(url="https://checkout.stripe.com/pay/cs_test_123")
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("modules.stripe_billing.create_checkout_session", return_value=fake_session) as create_session,
+    ):
+        response = client.post(
+            "/v1/billing/checkout",
+            json={"tier": "pro", "interval": "annual"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "checkout_url": "https://checkout.stripe.com/pay/cs_test_123"}
+    kwargs = create_session.call_args.kwargs
+    assert kwargs["user_id"] == "user-123"
+    assert kwargs["email"] == "gm@example.com"
+    assert kwargs["tier"] == "pro"
+    assert kwargs["interval"] == "annual"
+    assert "/premium?billing=success" in kwargs["success_url"]
+    assert "/premium?billing=cancel" in kwargs["cancel_url"]
+
+
+def test_billing_checkout_surfaces_a_configuration_error_cleanly(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    from modules import stripe_billing
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch(
+            "modules.stripe_billing.create_checkout_session",
+            side_effect=stripe_billing.BillingConfigurationError("Front Office annual price is not configured."),
+        ),
+    ):
+        response = client.post(
+            "/v1/billing/checkout",
+            json={"tier": "front_office", "interval": "annual"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 503
+    assert "Front Office annual price is not configured." in response.json()["error"]
+
+
+def test_billing_portal_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.post("/v1/billing/portal")
+    assert response.status_code == 401
+
+
+def test_billing_portal_requires_a_stripe_customer_id_on_file(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"stripe_customer_id": None}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.post("/v1/billing/portal", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 404
+
+
+def test_billing_portal_returns_the_real_portal_url(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"stripe_customer_id": "cus_abc123"}]
+
+    fake_portal = SimpleNamespace(url="https://billing.stripe.com/p/session_abc")
+
+    with (
+        patch("requests.get", side_effect=[auth_user_response, profile_response]),
+        patch("modules.stripe_billing.create_customer_portal_session", return_value=fake_portal) as create_portal,
+    ):
+        response = client.post("/v1/billing/portal", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "portal_url": "https://billing.stripe.com/p/session_abc"}
+    kwargs = create_portal.call_args.kwargs
+    assert kwargs["stripe_customer_id"] == "cus_abc123"
+    assert "/premium" in kwargs["return_url"]
+
+
 def test_league_endpoints_wrap_sleeper_module(monkeypatch):
     client = _client(monkeypatch)
 

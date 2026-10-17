@@ -4,7 +4,6 @@ import type { DashboardResponse } from "@/lib/api";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { NavDestinationGlyph, type NavGlyphName } from "@/components/NavDestinationGlyph";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
-import { streamlitPageUrl } from "@/lib/streamlitLink";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -162,9 +161,9 @@ export function DashboardContent({
             <p className="text-sm font-bold">
               {data.entitlement.hidden_count} more move{data.entitlement.hidden_count === 1 ? "" : "s"} available on Premium.
             </p>
-            <a href={streamlitPageUrl("premium")} className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
+            <Link href="/premium" className="text-sm font-bold self-start" style={{ color: "var(--color-premium)" }}>
               Upgrade →
-            </a>
+            </Link>
           </div>
         ) : null}
       </section>
