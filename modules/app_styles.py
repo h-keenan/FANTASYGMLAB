@@ -52,7 +52,7 @@ main h1,
 main h2,
 main h3,
 main h4 {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
 }
 .block-container {
     max-width: 1380px;
@@ -242,7 +242,7 @@ main h4 {
     align-items: center;
     background: rgba(2, 6, 23, 0.26);
     border-radius: var(--radius-pill);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     display: inline-flex;
     flex: 0 0 auto;
     font-size: 0.56rem;
@@ -255,7 +255,7 @@ main h4 {
 .dg-status-badge-premium {
     background: linear-gradient(180deg, rgba(226, 232, 240, 0.2), rgba(148, 163, 184, 0.08));
     border-color: rgba(226, 232, 240, 0.34);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
 }
 .dg-status-badge-elite {
     background: linear-gradient(180deg, rgba(250, 204, 21, 0.22), rgba(217, 119, 6, 0.1));
@@ -342,7 +342,7 @@ main h4 {
 }
 .player-support-chip-info {
     background: rgba(34, 211, 238, 0.12);
-    border-color: rgba(103, 232, 249, 0.26);
+    border-color: rgba(154, 206, 79, 0.26);
     color: var(--color-accent);
 }
 .player-support-chip-risk {
@@ -368,7 +368,7 @@ main h4 {
     background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.28);
     border-radius: var(--radius-panel);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     display: flex;
     font-size: 0.94rem;
     font-weight: 900;
@@ -389,7 +389,7 @@ main h4 {
     text-transform: uppercase;
 }
 .platform-sidebar-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1rem;
     font-weight: 860;
     line-height: 1.12;
@@ -418,7 +418,7 @@ main h4 {
     text-transform: uppercase;
 }
 .mobile-gm-sheet-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.92rem;
     font-weight: 900;
     line-height: 1.08;
@@ -443,7 +443,7 @@ main h4 {
     border: 1px solid rgba(148, 163, 184, 0.12);
     border-radius: var(--radius-panel);
     box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     margin: 0 0 0.7rem;
     padding: 0.75rem 0.95rem;
 }
@@ -497,7 +497,7 @@ main h4 {
     background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.94));
     border: 1px solid rgba(148, 163, 184, 0.12);
     border-radius: var(--radius-panel);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     display: inline-flex;
     font-size: 1.02rem;
     font-weight: 900;
@@ -513,7 +513,7 @@ main h4 {
     width: 100%;
 }
 .home-command-team {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.08rem;
     font-weight: 900;
     line-height: 1.05;
@@ -567,7 +567,7 @@ main h4 {
     text-transform: uppercase;
 }
 .home-hero-stat-value {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.86rem;
     font-weight: 900;
     line-height: 1.14;
@@ -586,14 +586,14 @@ main h4 {
        success state, so it borrows the same information/accent treatment as
        .launch-section-intro rather than success green (Magna Carta semantic
        color discipline: green is reserved for completed/positive outcomes). */
-    background: var(--color-information-soft, rgba(103, 232, 249, 0.12));
+    background: var(--color-information-soft, rgba(154, 206, 79, 0.12));
     border: 1px solid color-mix(in srgb, var(--color-accent-strong) 26%, transparent);
     border-radius: var(--radius-panel);
     margin: 0.64rem 0 0.82rem;
     padding: 0.8rem 0.9rem;
 }
 .account-confirm-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.98rem;
     font-weight: 850;
     margin-bottom: 0.22rem;
@@ -604,7 +604,7 @@ main h4 {
     line-height: 1.42;
 }
 .account-confirm-status {
-    color: var(--color-accent, #67e8f9);
+    color: var(--color-accent, #9ace4f);
     font-size: 0.78rem;
     line-height: 1.35;
     margin-top: 0.45rem;
@@ -638,7 +638,7 @@ main h4 {
     text-transform: uppercase;
 }
 .launch-section-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1rem;
     font-weight: 880;
     line-height: 1.18;
@@ -685,7 +685,7 @@ main h4 {
     min-width: 0;
 }
 .launch-league-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.98rem;
     font-weight: 880;
     line-height: 1.18;
@@ -764,7 +764,7 @@ main h4 {
     white-space: nowrap;
 }
 .home-command-card-value {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.94rem;
     font-weight: 900;
     line-height: 1.14;
@@ -830,7 +830,7 @@ main h4 {
     --avatar-size: 112px;
 }
 .player-detail-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.24rem;
     font-weight: 900;
     line-height: 1.04;
@@ -867,7 +867,7 @@ main h4 {
     text-transform: uppercase;
 }
 .player-detail-score-value {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.96rem;
     font-weight: 900;
     line-height: 1.08;
@@ -968,7 +968,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     padding: 0.85rem 0.9rem;
 }
 .team-section-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1rem;
     font-weight: 800;
     margin-bottom: 0.55rem;
@@ -981,7 +981,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     text-transform: uppercase;
 }
 .section-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.02rem;
     font-weight: 880;
     line-height: 1.15;
@@ -1112,7 +1112,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 .summary-tile-value,
 .analysis-card-title,
 .decision-panel-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1rem;
     font-weight: 860;
     line-height: 1.2;
@@ -1146,7 +1146,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     text-transform: uppercase;
 }
 .summary-detail-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.04rem;
     font-weight: 920;
     line-height: 1.12;
@@ -1186,7 +1186,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     display: grid;
 }
 .summary-detail-list-heading {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.72rem;
     font-weight: 900;
     letter-spacing: 0.03em;
@@ -1209,7 +1209,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     min-width: 0;
 }
 .summary-detail-list-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     display: block;
     font-size: 0.86rem;
     font-weight: 850;
@@ -1399,7 +1399,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     text-transform: uppercase;
 }
 .team-score-value {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.08rem;
     font-weight: 850;
     margin-top: 0.24rem;
@@ -1439,7 +1439,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
         0 14px 30px rgba(2, 6, 23, 0.5),
         0 0 0 5px color-mix(in srgb, var(--color-accent-strong) 6%, transparent),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     display: flex;
     flex: 0 0 76px;
     font-size: 1.05rem;
@@ -1462,7 +1462,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
     text-transform: uppercase;
 }
 .team-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.55rem;
     font-weight: 900;
     line-height: 1.1;
@@ -1518,7 +1518,7 @@ div[data-testid="stDialog"] [data-testid="stVerticalBlock"] .player-quick-view-s
 }
 .advice-title,
 .prospect-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1rem;
     font-weight: 850;
     line-height: 1.2;
@@ -1711,7 +1711,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     margin: 0.75rem 0 1rem;
 }
 .scan-section-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.96rem;
     font-weight: 850;
     line-height: 1.2;
@@ -1859,7 +1859,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     min-width: 0;
 }
 .compact-player-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.96rem;
     font-weight: 800;
     letter-spacing: 0;
@@ -1923,7 +1923,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     background: rgba(226, 232, 240, 0.1);
     border: 1px solid rgba(226, 232, 240, 0.2);
     border-radius: var(--radius-pill);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     display: inline-flex;
     flex: 0 0 auto;
     font-size: 0.68rem;
@@ -1945,7 +1945,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     overflow: visible;
 }
 .compact-player-reason strong {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-weight: 850;
 }
 .scan-card-compact {
@@ -2185,7 +2185,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 .scan-card-tone-premium .scan-card-score {
     border-color: rgba(226, 232, 240, 0.28);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
 }
 .scan-card-tone-elite .scan-card-score {
     border-color: rgba(250, 204, 21, 0.28);
@@ -2325,7 +2325,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     text-transform: uppercase;
 }
 .scan-card-kpi-value {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.82rem;
     font-weight: 820;
     line-height: 1.15;
@@ -2363,7 +2363,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 .draft-review-grade {
     border: 1px solid rgba(148, 163, 184, 0.2);
     border-radius: var(--radius-pill);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.78rem;
     font-weight: 900;
     line-height: 1;
@@ -2418,7 +2418,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
     text-transform: uppercase;
 }
 .draft-team-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.98rem;
     font-weight: 860;
     line-height: 1.18;
@@ -2439,7 +2439,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, rgba(10, 16, 29, 0.98), rgba(6, 10, 20, 0.98));
     border-right: 1px solid rgba(148, 163, 184, 0.12);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
 }
 [data-testid="stSidebar"],
 [data-testid="stSidebar"] p,
@@ -2450,7 +2450,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3,
 [data-testid="stSidebar"] h4 {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
 }
 [data-testid="stSidebar"] .stButton button {
     width: 100%;
@@ -2464,7 +2464,7 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 [data-testid="stSidebar"] select,
 [data-testid="stSidebar"] [role="combobox"] {
     background: var(--color-bg);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
 }
 .stButton button {
     background: var(--color-surface-raised);
@@ -2475,10 +2475,10 @@ div[class*="st-key-"][class*="_global_feedback_control"] [data-testid="stPopover
 }
 .stButton button[kind="primary"],
 button[data-testid="stBaseButton-primary"] {
-    background: color-mix(in srgb, var(--dg-theme-accent-cyan, #22d3ee) 18%, var(--color-surface-raised));
-    border: 1px solid var(--dg-theme-accent-cyan, #22d3ee);
+    background: color-mix(in srgb, var(--dg-theme-accent-cyan, #d1ff72) 18%, var(--color-surface-raised));
+    border: 1px solid var(--dg-theme-accent-cyan, #d1ff72);
     border-radius: 0;
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
 }
 [data-testid="stMetric"] {
     background:
@@ -2550,7 +2550,7 @@ button[data-testid="stBaseButton-primary"] {
     text-transform: uppercase;
 }
 .trade-card-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.04rem;
     font-weight: 900;
     line-height: 1.22;
@@ -2587,7 +2587,7 @@ button[data-testid="stBaseButton-primary"] {
 .trade-delta-pill {
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-pill);
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     flex: 0 0 auto;
     font-size: 0.84rem;
     font-weight: 800;
@@ -2633,7 +2633,7 @@ button[data-testid="stBaseButton-primary"] {
     text-transform: uppercase;
 }
 .trade-side-value {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.95rem;
     text-transform: none;
 }
@@ -2689,7 +2689,7 @@ button[data-testid="stBaseButton-primary"] {
     background: linear-gradient(180deg, rgba(250, 204, 21, 0.96), rgba(245, 158, 11, 0.88));
 }
 .trade-asset-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.92rem;
     font-weight: 860;
     line-height: 1.14;
@@ -2816,7 +2816,7 @@ button[data-testid="stBaseButton-primary"] {
     padding-left: 0.24rem;
 }
 .trade-asset-name {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.96rem;
     font-weight: 860;
     line-height: 1.18;
@@ -2938,7 +2938,7 @@ button[data-testid="stBaseButton-primary"] {
     max-width: min(100%, 90rem);
 }
 .dg-intel-card {
-    background: var(--color-surface-primary, #0f1114);
+    background: var(--color-surface-primary, #1a1f24);
     border: 1px solid var(--dg-border, #2a2e36);
     border-radius: 2px;
     box-shadow: none;
@@ -2975,7 +2975,7 @@ button[data-testid="stBaseButton-primary"] {
     background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface-secondary));
     border: 1px solid rgba(148, 163, 184, 0.35);
     border-radius: 50%;
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     display: flex;
     flex: 0 0 52px;
     font-size: 0.84rem;
@@ -2994,7 +2994,7 @@ button[data-testid="stBaseButton-primary"] {
     min-width: 0;
 }
 .dg-intel-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1rem;
     font-weight: 850;
     line-height: 1.2;
@@ -3005,7 +3005,7 @@ button[data-testid="stBaseButton-primary"] {
     margin-top: 0.16rem;
 }
 .dg-intel-metric {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1.15rem;
     font-weight: 900;
     line-height: 1.1;
@@ -3075,7 +3075,7 @@ button[data-testid="stBaseButton-primary"] {
     text-transform: uppercase;
 }
 .dg-alert-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.98rem;
     font-weight: 900;
     line-height: 1.14;
@@ -3094,7 +3094,7 @@ button[data-testid="stBaseButton-primary"] {
     justify-content: space-between;
 }
 .news-card-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 1rem;
     font-weight: 800;
     line-height: 1.3;
@@ -3828,7 +3828,7 @@ button[data-testid="stBaseButton-primary"] {
     [data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="primary"] {
         background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-strong) 22%, transparent), color-mix(in srgb, var(--color-accent-strong) 18%, transparent));
         border: 1px solid color-mix(in srgb, var(--color-accent-strong) 28%, transparent);
-        color: var(--color-text-primary, #f8fafc);
+        color: var(--color-text-primary, #f8f6ef);
     }
     [data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="secondary"] {
         background: rgba(15, 23, 42, 0.72);
@@ -3837,11 +3837,11 @@ button[data-testid="stBaseButton-primary"] {
     }
     [data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="secondary"]:hover {
         background: rgba(30, 41, 59, 0.88);
-        color: var(--color-text-primary, #f8fafc);
+        color: var(--color-text-primary, #f8f6ef);
     }
     [data-testid="stPopoverContent"] [data-testid="stButton"] > button[kind="primary"]:hover {
         background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent-strong) 28%, transparent), color-mix(in srgb, var(--color-accent-strong) 22%, transparent));
-        color: var(--color-text-primary, #f8fafc);
+        color: var(--color-text-primary, #f8f6ef);
     }
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .mobile-gm-sheet-marker) {
         background: linear-gradient(180deg, rgba(8, 15, 28, 0.98), rgba(5, 9, 19, 1));
@@ -4521,7 +4521,7 @@ div[data-testid="stExpander"] {
     text-transform: uppercase;
 }
 .roster-limit-stat strong {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     display: block;
     font-size: 0.9rem;
     font-weight: 900;
@@ -4926,7 +4926,7 @@ main,
 .draft-review-grade.grade-solid {
     background: rgba(229, 231, 235, 0.12) !important;
     border-color: rgba(229, 231, 235, 0.28) !important;
-    color: var(--color-text-primary, #f8fafc) !important;
+    color: var(--color-text-primary, #f8f6ef) !important;
 }
 .draft-review-grade.grade-watch {
     background: rgba(245, 158, 11, 0.15) !important;
@@ -4975,7 +4975,7 @@ div[data-testid="stDialog"] [role="dialog"] > div:first-child {
 }
 div[data-testid="stDialog"] h2,
 div[data-testid="stDialog"] [data-testid="stMarkdownContainer"] h2 {
-    color: var(--color-text-primary, #f8fafc) !important;
+    color: var(--color-text-primary, #f8f6ef) !important;
     font-weight: 900 !important;
     letter-spacing: 0 !important;
 }
@@ -5112,7 +5112,7 @@ div[data-testid="stDialog"] .stButton > button {
     background: rgba(229, 231, 235, 0.08) !important;
     border: 1px solid rgba(229, 231, 235, 0.14) !important;
     border-radius: 0 !important;
-    color: var(--color-text-primary, #f8fafc) !important;
+    color: var(--color-text-primary, #f8f6ef) !important;
     font-weight: 850 !important;
 }
 div[data-testid="stDialog"] .stButton > button[kind="primary"],
@@ -5662,7 +5662,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .decision-panel-grid-alert .decision-panel:first-child {
         background:
             linear-gradient(90deg, rgba(34, 211, 238, 0.16), rgba(248, 250, 252, 0.075) 34%, rgba(5, 6, 9, 0.84)) !important;
-        border-left: 5px solid rgba(103, 232, 249, 0.88) !important;
+        border-left: 5px solid rgba(154, 206, 79, 0.88) !important;
         padding-block: 0.62rem !important;
     }
     .home-command-card-trade,
@@ -5697,7 +5697,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     .summary-tile-grid-compact .summary-tile-power {
         background:
             linear-gradient(90deg, rgba(34, 211, 238, 0.11), rgba(229, 231, 235, 0.04) 34%, rgba(4, 5, 8, 0.72)) !important;
-        border-left-color: rgba(103, 232, 249, 0.8) !important;
+        border-left-color: rgba(154, 206, 79, 0.8) !important;
     }
     .dg-preset-secondary,
     .decision-panel-reference,
@@ -5797,7 +5797,7 @@ div[data-testid="stDialog"] .stButton > button:hover {
     opacity: 0.35;
 }
 .trade-hub-locked-row > span {
-    background: var(--color-surface-raised, #1b1e23);
+    background: var(--color-surface-raised, #2b333b);
     border: 1px solid var(--color-border, #2a2e35);
     min-height: 0.55rem;
 }
@@ -6035,7 +6035,7 @@ div[class*="st-key-premium_choose_"] button {
     background: rgba(248, 250, 252, 0.08);
     border: 1px solid rgba(248, 250, 252, 0.12);
     border-radius: 2px;
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     padding: 0.06rem 0.18rem;
 }
 
@@ -6248,7 +6248,7 @@ div[data-testid="stDialog"] .player-detail-avatar:not(.player-quick-view-avatar)
     min-width: 0;
 }
 .league-switch-row-title {
-    color: var(--color-text-primary, #f8fafc);
+    color: var(--color-text-primary, #f8f6ef);
     font-size: 0.78rem;
     font-weight: 880;
     line-height: 1.12;

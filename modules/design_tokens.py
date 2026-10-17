@@ -10,16 +10,18 @@ restates a hex value.
 import re
 
 DESIGN_TOKEN_CSS = """
+/* Inter Tight (FantasyDesk brand sheet) — must be first: @import only honors before other rules. */
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800;900&display=swap');
 /* DynastyGM semantic design tokens */
 :root {
-    /* Foundation */
-    --color-bg: #050607;
-    --color-shell: #090a0c;
-    --color-surface-primary: #0f1114;
-    --color-surface-secondary: #15171b;
-    --color-surface-raised: #1b1e23;
-    --color-surface-muted: #0b0c0f;
-    --color-text-primary: #f8fafc;
+    /* Foundation — FantasyDesk brand sheet (2026-10-17). */
+    --color-bg: #0b0d0f;
+    --color-shell: #0b0d0f;
+    --color-surface-primary: #1a1f24;
+    --color-surface-secondary: #1a1f24;
+    --color-surface-raised: #2b333b;
+    --color-surface-muted: #0b0d0f;
+    --color-text-primary: #f8f6ef;
     --color-text-secondary: #e5e7eb;
     --color-text-muted: #a8adb7;
     --color-border: #2a2e35;
@@ -53,9 +55,9 @@ DESIGN_TOKEN_CSS = """
     --border-accent: var(--color-accent);
 
     /* Brand accent aliases (FantasyDesk identity — keep in sync with brand_identity.py) */
-    --color-brand-accent: #22d3ee;
-    --color-brand-bg: #050607;
-    --color-brand-surface: #0f1114;
+    --color-brand-accent: #9ace4f;
+    --color-brand-bg: #0b0d0f;
+    --color-brand-surface: #1a1f24;
     /* Small inverted "founder badge" / brand-mark glyph: a fixed light chip
        (--color-text-primary) with dark ink text, independent of the dark
        theme's normal foreground/background pairing. Was copy-pasted as the
@@ -64,16 +66,16 @@ DESIGN_TOKEN_CSS = """
        of three. */
     --color-brand-mark-ink: #0b1220;
 
-    /* Interaction and meaning */
-    --color-accent: #67e8f9;
-    --color-accent-strong: #22d3ee;
-    --color-accent-soft: rgba(103, 232, 249, 0.14);
+    /* Interaction and meaning — Field/Touchdown accent (FantasyDesk brand sheet). */
+    --color-accent: #9ace4f;
+    --color-accent-strong: #d1ff72;
+    --color-accent-soft: rgba(154, 206, 79, 0.14);
     --color-success: #22c55e;
     --color-opportunity: #14b8a6;
     --color-action: #facc15;
     --color-warning: #f59e0b;
     --color-danger: #ef4444;
-    --color-information: #67e8f9;
+    --color-information: #9ace4f;
     --color-diagnostic: #8b93ff;
     --color-premium: #facc15;
     --color-experimental: #8b93ff;
@@ -105,7 +107,7 @@ DESIGN_TOKEN_CSS = """
     --color-action-soft: rgba(250, 204, 21, 0.14);
     --color-warning-soft: rgba(245, 158, 11, 0.14);
     --color-danger-soft: rgba(239, 68, 68, 0.15);
-    --color-information-soft: rgba(103, 232, 249, 0.12);
+    --color-information-soft: rgba(154, 206, 79, 0.12);
     --color-diagnostic-soft: rgba(139, 147, 255, 0.12);
     --color-muted-soft: rgba(229, 231, 235, 0.06);
 
@@ -154,8 +156,8 @@ DESIGN_TOKEN_CSS = """
     --opacity-disabled: 0.5;
     --opacity-divider: 0.12;
 
-    /* Typography */
-    --font-family-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    /* Typography — Inter Tight (FantasyDesk brand sheet). */
+    --font-family-sans: "Inter Tight", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-size-display: 2rem;
     --font-size-page-title: 1.5rem;
     --font-size-section-title: 1.125rem;
@@ -200,7 +202,7 @@ DESIGN_TOKEN_CSS = """
     --type-body-explanation: var(--font-weight-body) var(--type-body-explanation-size) / var(--line-height-body) var(--font-family-sans);
 
     /* Focus, controls, and motion */
-    --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
+    --focus-ring: 0 0 0 3px rgba(154, 206, 79, 0.34);
     --control-min-height: 44px;
     --touch-target-min: 44px;
     --motion-fast: 120ms;
@@ -288,21 +290,23 @@ LIGHT_MODE_TOKENS: dict[str, str] = {
     # Interaction and meaning. Every one of these is the *same hue/saturation*
     # as its dark-mode counterpart with only HSL lightness reduced (via
     # colorsys, not by eye) until it cleared >=5:1 against all three tight
-    # surfaces — brand cyan included, so "primary interaction" keeps its
-    # identity instead of being reinterpreted as a generic dark blue.
-    # --color-information mirrors --color-accent (dark does the same: both
-    # #67e8f9), and --color-experimental mirrors --color-diagnostic (dark:
-    # both #8b93ff) — preserving the existing "these two are the same brand
-    # hue" relationships instead of inventing a new one.
-    "--color-accent": "#056E7C",  # from #67e8f9; 5.03-6.00:1
-    "--color-accent-strong": "#08616E",  # from #22d3ee; 6.34-7.56:1
-    "--color-accent-soft": "rgba(6, 110, 124, 0.16)",
+    # surfaces. Accent updated for the FantasyDesk brand sheet (2026-10-17):
+    # #4D6D1E/#4A6E00 are Field (#9ace4f) and Touchdown (#d1ff72) run
+    # through that same colorsys reduction (5.04:1 worst-case each) — not
+    # eyeballed, not a different hue. --color-information mirrors
+    # --color-accent (dark does the same), and --color-experimental mirrors
+    # --color-diagnostic (dark: both #8b93ff) — preserving the existing
+    # "these two are the same brand hue" relationships instead of inventing
+    # a new one.
+    "--color-accent": "#4D6D1E",  # from #9ace4f; 5.04:1
+    "--color-accent-strong": "#4A6E00",  # from #d1ff72; 5.04:1
+    "--color-accent-soft": "rgba(77, 109, 30, 0.16)",
     "--color-success": "#147337",  # from #22c55e; 5.02-6.63:1
     "--color-opportunity": "#0C7065",  # from #14b8a6; 5.04-6.82:1
     "--color-action": "#796103",  # from #facc15; 5.04-6.78:1
     "--color-warning": "#8A5906",  # from #f59e0b; 5.05-6.98:1
     "--color-danger": "#C81111",  # from #ef4444; 5.01-6.87:1
-    "--color-information": "#056E7C",
+    "--color-information": "#4D6D1E",
     "--color-diagnostic": "#5F52C8",  # from #8b93ff via mobile's lightColors.violet
     "--color-premium": "#796103",
     "--color-experimental": "#5F52C8",
@@ -358,13 +362,13 @@ LIGHT_MODE_TOKENS: dict[str, str] = {
     "--color-action-soft": "rgba(250, 204, 21, 0.18)",
     "--color-warning-soft": "rgba(245, 158, 11, 0.16)",
     "--color-danger-soft": "rgba(239, 68, 68, 0.16)",
-    "--color-information-soft": "rgba(103, 232, 249, 0.20)",
+    "--color-information-soft": "rgba(154, 206, 79, 0.20)",
     "--color-diagnostic-soft": "rgba(139, 147, 255, 0.16)",
     "--color-muted-soft": "rgba(16, 24, 32, 0.06)",
 
     # Focus ring — same accent hue, raised alpha (dark 0.34 -> light 0.45):
     # a translucent ring needs more opacity to read against a light ground.
-    "--focus-ring": "0 0 0 3px rgba(6, 110, 124, 0.45)",
+    "--focus-ring": "0 0 0 3px rgba(77, 109, 30, 0.45)",
     # Dark mode's inset rim is a light hairline "catching light" on a
     # near-black card (see --shadow-surface-inset's comment intent above);
     # a light card doesn't need a light catch-line, it needs the inverse — a

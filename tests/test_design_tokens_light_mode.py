@@ -48,9 +48,11 @@ def test_light_mode_css_is_a_plain_root_rule_with_no_component_selectors():
 
 
 def test_dark_palette_is_untouched_by_the_light_mode_addition():
-    # PR #782's dark audit stays exactly as shipped — light mode is additive.
-    assert DESIGN_TOKEN_HEX["--color-bg"] == "#050607"
-    assert DESIGN_TOKEN_HEX["--color-accent"] == "#67e8f9"
+    # PR #782's dark audit (now the FantasyDesk brand sheet, 2026-10-17)
+    # stays exactly as shipped by light-mode changes — light mode is
+    # additive, never a side effect of it.
+    assert DESIGN_TOKEN_HEX["--color-bg"] == "#0b0d0f"
+    assert DESIGN_TOKEN_HEX["--color-accent"] == "#9ace4f"
     assert DESIGN_TOKEN_HEX["--color-danger"] == "#ef4444"
 
 
