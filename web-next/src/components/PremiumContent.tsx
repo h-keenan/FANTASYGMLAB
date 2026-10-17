@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { api, type BillingPlan } from "@/lib/api";
+import { FeatureIncludedGlyph, PlanTierGlyph } from "@/components/PremiumGlyph";
 
 const TIER_LABELS: Record<BillingPlan["tier"], string> = {
   pro: "Pro",
@@ -34,22 +35,25 @@ export function PlanCard({ plan, returnTo }: { plan: BillingPlan; returnTo?: str
       }}
     >
       <span
-        className="text-xs font-bold uppercase"
+        className="flex items-center gap-1.5 text-xs font-bold uppercase"
         style={{ color: plan.tier === "front_office" ? "var(--color-premium)" : "var(--color-text-muted)" }}
       >
+        <PlanTierGlyph name={plan.tier} />
         {TIER_LABELS[plan.tier]} — {plan.label}
       </span>
       <span style={{ font: "var(--type-primary-metric)" }}>
         {plan.price} <span className="text-sm font-normal">{plan.cadence}</span>
       </span>
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-1.5">
         {plan.features.map((feature) => (
           <li
             key={feature}
-            className="text-sm flex gap-2"
+            className="text-sm flex items-start gap-2"
             style={{ color: "var(--color-text-secondary)" }}
           >
-            <span aria-hidden="true">•</span>
+            <span style={{ color: "var(--color-success)", marginTop: "0.1rem", flexShrink: 0 }}>
+              <FeatureIncludedGlyph />
+            </span>
             <span>{feature}</span>
           </li>
         ))}
