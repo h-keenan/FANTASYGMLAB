@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import {
   api,
   type DraftPickAsset,
@@ -30,6 +31,7 @@ export default function TradeAnalyzerPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,12 +46,12 @@ export default function TradeAnalyzerPage() {
 
     Promise.all([
       api.getMyRoster(leagueId),
-      api.getLeagueRankings(leagueId),
+      api.getLeagueRankings(leagueId, lens),
       // Picks/rosters/team-profiles can legitimately 404/empty for a league
       // with no draft-capital data yet (startup drafts, degraded ESPN
       // imports) — same graceful-empty fallback mobile's own screen uses,
       // so a roster-browse list with no picks never blocks the page.
-      api.getLeagueDraftPicks(leagueId).catch(() => ({ ok: true as const, picks: [], reason: "unavailable" })),
+      api.getLeagueDraftPicks(leagueId, lens).catch(() => ({ ok: true as const, picks: [], reason: "unavailable" })),
       api.getLeagueRosters(leagueId).catch(() => ({ ok: true as const, rosters: [] })),
       api.getLeagueTeamProfiles(leagueId).catch(() => ({ ok: true as const, profiles: {} })),
     ])
@@ -70,7 +72,7 @@ export default function TradeAnalyzerPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!data && !error)) {
     return (

@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { LeagueRankingsContent } from "@/components/LeagueRankingsContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function LeagueRankingsPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [rankings, setRankings] = useState<LeagueTeamRankingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function LeagueRankingsPage() {
     let cancelled = false;
 
     api
-      .getTeamRankings(leagueId)
+      .getTeamRankings(leagueId, lens)
       .then((result) => {
         if (!cancelled) setRankings(result);
       })
@@ -55,7 +57,7 @@ export default function LeagueRankingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!rankings && !error)) {
     return (

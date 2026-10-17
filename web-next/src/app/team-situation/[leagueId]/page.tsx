@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type GmTargetsResponse, type MyTeamResponse, type TeamStanceResponse } from "@/lib/api";
 import { TeamSituationContent } from "@/components/TeamSituationContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function TeamSituationPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [teamStance, setTeamStance] = useState<TeamStanceResponse | null>(null);
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
@@ -30,7 +32,7 @@ export default function TeamSituationPage() {
     }
     let cancelled = false;
 
-    Promise.all([api.getTeamStance(leagueId), api.getMyTeam(leagueId), api.getGmTargets(leagueId)])
+    Promise.all([api.getTeamStance(leagueId), api.getMyTeam(leagueId, lens), api.getGmTargets(leagueId)])
       .then(([stanceResult, teamResult, targetsResult]) => {
         if (!cancelled) {
           setTeamStance(stanceResult);
@@ -45,7 +47,7 @@ export default function TeamSituationPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!teamStance && !myTeam && !targets && !error)) {
     return (

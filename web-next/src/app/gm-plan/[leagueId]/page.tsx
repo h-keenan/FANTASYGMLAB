@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type GmPlanResponse } from "@/lib/api";
 import { GmPlanContent } from "@/components/GmPlanContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function GmPlanPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [gmPlan, setGmPlan] = useState<GmPlanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function GmPlanPage() {
     let cancelled = false;
 
     api
-      .getGmPlan(leagueId)
+      .getGmPlan(leagueId, lens)
       .then((result) => {
         if (!cancelled) setGmPlan(result);
       })
@@ -40,7 +42,7 @@ export default function GmPlanPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!gmPlan && !error)) {
     return (

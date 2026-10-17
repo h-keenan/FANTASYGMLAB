@@ -128,7 +128,7 @@ describe("TradeFinderContent", () => {
       fireEvent.click(screen.getByRole("button", { name: /Find Realistic Trades/ }));
     });
 
-    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"]);
+    expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "retool", "Dynasty");
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
     expect(screen.getByText("Favorable")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();

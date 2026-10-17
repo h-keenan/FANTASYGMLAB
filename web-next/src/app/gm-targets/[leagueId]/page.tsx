@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type GmTargetsResponse, type LeagueRankingsResponse } from "@/lib/api";
 import { GmTargetsContent } from "@/components/GmTargetsContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function GmTargetsPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [targets, setTargets] = useState<GmTargetsResponse | null>(null);
   const [rankings, setRankings] = useState<LeagueRankingsResponse | null>(null);
@@ -29,7 +31,7 @@ export default function GmTargetsPage() {
     }
     let cancelled = false;
 
-    Promise.all([api.getGmTargets(leagueId), api.getLeagueRankings(leagueId)])
+    Promise.all([api.getGmTargets(leagueId), api.getLeagueRankings(leagueId, lens)])
       .then(([targetsResult, rankingsResult]) => {
         if (!cancelled) {
           setTargets(targetsResult);
@@ -43,7 +45,7 @@ export default function GmTargetsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!targets && !rankings && !error)) {
     return (

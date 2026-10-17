@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type TradeHubResponse } from "@/lib/api";
 import { TradeHubContent } from "@/components/TradeHubContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function TradeHubPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [tradeHub, setTradeHub] = useState<TradeHubResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function TradeHubPage() {
     let cancelled = false;
 
     api
-      .getTradeHub(leagueId)
+      .getTradeHub(leagueId, "retool", lens)
       .then((result) => {
         if (!cancelled) setTradeHub(result);
       })
@@ -40,7 +42,7 @@ export default function TradeHubPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!tradeHub && !error)) {
     return (

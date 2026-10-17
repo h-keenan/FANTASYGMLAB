@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type MyTeamResponse } from "@/lib/api";
 import { TradeFinderContent } from "@/components/TradeFinderContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function TradeFinderPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function TradeFinderPage() {
     let cancelled = false;
 
     api
-      .getMyTeam(leagueId)
+      .getMyTeam(leagueId, lens)
       .then((result) => {
         if (!cancelled) setMyTeam(result);
       })
@@ -40,7 +42,7 @@ export default function TradeFinderPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!myTeam && !error)) {
     return (
@@ -58,5 +60,5 @@ export default function TradeFinderPage() {
     );
   }
 
-  return <TradeFinderContent leagueId={leagueId} leagueName={leagueName} myTeam={myTeam} />;
+  return <TradeFinderContent leagueId={leagueId} leagueName={leagueName} myTeam={myTeam} lens={lens} />;
 }

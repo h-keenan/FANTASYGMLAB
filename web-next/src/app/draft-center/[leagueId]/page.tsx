@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type DraftCenterResponse, type DraftPickAsset } from "@/lib/api";
 import { DraftCenterContent } from "@/components/DraftCenterContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function DraftCenterPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [draftCenter, setDraftCenter] = useState<DraftCenterResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export default function DraftCenterPage() {
     let cancelled = false;
 
     api
-      .getLeagueDraftCenter(leagueId)
+      .getLeagueDraftCenter(leagueId, lens)
       .then((result) => {
         if (!cancelled) setDraftCenter(result);
       })
@@ -44,7 +46,7 @@ export default function DraftCenterPage() {
       });
 
     api
-      .getLeagueDraftPicks(leagueId)
+      .getLeagueDraftPicks(leagueId, lens)
       .then((result) => {
         if (!cancelled) setPicks(result.picks);
       })
@@ -66,7 +68,7 @@ export default function DraftCenterPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!draftCenter && !error)) {
     return (

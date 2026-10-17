@@ -113,10 +113,12 @@ export function TradeFinderContent({
   leagueId,
   leagueName,
   myTeam,
+  lens = "Dynasty",
 }: {
   leagueId: string;
   leagueName: string;
   myTeam: MyTeamResponse;
+  lens?: string;
 }) {
   const reasonMessage = myTeam.reason ? tradeHubReasonMessage(myTeam.reason) : null;
 
@@ -146,7 +148,7 @@ export function TradeFinderContent({
     setSearchError(null);
     setSearching(true);
     try {
-      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds));
+      const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), "retool", lens);
       setIdeas(result.ideas);
       if (result.ideas.length === 0 && result.reason === "no_players_selected") {
         setSearchError("Select at least one player to search with.");

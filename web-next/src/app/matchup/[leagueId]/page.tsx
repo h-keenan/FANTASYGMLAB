@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type MatchupResponse } from "@/lib/api";
 import { MatchupContent } from "@/components/MatchupContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -16,6 +17,7 @@ export default function MatchupPage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
+  const { lens } = useValuationLens(leagueId);
 
   const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function MatchupPage() {
     let cancelled = false;
 
     api
-      .getLeagueMatchup(leagueId)
+      .getLeagueMatchup(leagueId, lens)
       .then((result) => {
         if (!cancelled) setMatchup(result);
       })
@@ -40,7 +42,7 @@ export default function MatchupPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, router]);
+  }, [authLoading, session, leagueId, lens, router]);
 
   if (authLoading || (!matchup && !error)) {
     return (
