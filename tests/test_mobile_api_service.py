@@ -5776,6 +5776,40 @@ def test_portfolio_premium_user_with_no_saved_leagues_is_empty_not_broken(monkey
     assert body["upsell"] is None
 
 
+def test_front_office_tier_is_treated_as_premium_not_silently_downgraded_to_free(monkeypatch):
+    """Regression test for a real bug (pre-launch audit, 2026-10-17):
+    `_fetch_profile_fields` used to whitelist only {"free", "premium"},
+    silently coercing a real `front_office` entitlement — the value
+    modules.stripe_webhook.py actually writes to Supabase on a Front
+    Office purchase — down to "free", wiping out every premium benefit
+    for that paying customer. Front Office must pass every `is_at_least
+    (entitlement, PRO)` gate in this file, same as "premium" does.
+    """
+
+    from services import mobile_api_service
+
+    monkeypatch.setattr(
+        mobile_api_service.account_store, "fetch_saved_leagues", lambda *a, **k: ([], "")
+    )
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "front_office", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/portfolio",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_premium"] is True
+    assert body["upsell"] is None
+
+
 def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monkeypatch):
     # Three saved leagues: one builds a real summary, one is an everyday
     # "not a member" skip state, one raises outright (a genuine Sleeper
@@ -6220,7 +6254,7 @@ def test_gm_plan_combines_declared_stance_real_week_and_real_signals(monkeypatch
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
     with contextlib.ExitStack() as stack:
         stack.enter_context(patch("requests.get", side_effect=[auth_user_response, profile_response]))
@@ -6310,7 +6344,7 @@ def test_gm_plan_flags_an_uncovered_starter_injury(monkeypatch):
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
 
@@ -6440,7 +6474,7 @@ def test_gm_plan_surfaces_playoff_odds_for_the_callers_own_roster(monkeypatch):
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
     with contextlib.ExitStack() as stack:
         stack.enter_context(patch("requests.get", side_effect=[auth_user_response, profile_response]))
@@ -6519,7 +6553,7 @@ def test_gm_plan_omits_playoff_odds_when_simulation_not_ready(monkeypatch):
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
     with contextlib.ExitStack() as stack:
         stack.enter_context(patch("requests.get", side_effect=[auth_user_response, profile_response]))
@@ -6886,8 +6920,10 @@ def test_trade_finder_returns_empty_without_a_player_selection(monkeypatch):
 
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
-    with patch("requests.get", return_value=auth_user_response):
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
         response = client.get(
             "/v1/leagues/abc/trade-finder",
             headers={"Authorization": "Bearer good-token"},
@@ -6898,6 +6934,32 @@ def test_trade_finder_returns_empty_without_a_player_selection(monkeypatch):
     assert body["ok"] is True
     assert body["ideas"] == []
     assert body["reason"] == "no_players_selected"
+
+
+def test_trade_finder_is_gated_behind_premium(monkeypatch):
+    """Trade Finder is Premium-only on app.py (modules.trade_hub_ui's
+    current_user_is_premium() gate) — this endpoint must match, not ship
+    the feature free/ungated."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        response = client.get(
+            "/v1/leagues/abc/trade-finder?player_ids=p1",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["ideas"] == []
+    assert body["is_premium"] is False
+    assert body["upsell"]["title"]
 
 
 def test_trade_finder_rejects_an_invalid_lens(monkeypatch):
@@ -6921,7 +6983,7 @@ def test_trade_finder_passes_the_selected_players_to_the_engine(monkeypatch):
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
 
     my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
     fake_record = {

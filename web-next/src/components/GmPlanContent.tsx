@@ -12,6 +12,7 @@ import type {
 } from "@/lib/api";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { formatTradeGain } from "@/lib/tradeHubPresentation";
 import { gmPlanReasonMessage } from "@/lib/gmPlanPresentation";
@@ -31,12 +32,11 @@ import { gmPlanReasonMessage } from "@/lib/gmPlanPresentation";
  * render them yet, so this page is actually ahead of mobile here, not
  * behind it.
  *
- * Deliberately not a hard premium gate: unlike Streamlit's own GM Plan
- * route (current_user_is_premium() blur+lock), GET .../gm-plan itself
- * returns no entitlement/premium field at all — the same ungated contract
- * mobile's screen already relies on. Inventing a client-side paywall
- * beyond what the shared API encodes would be a product decision this
- * page has no basis for, not a port.
+ * Premium-gated (2026-10-17, pre-launch audit): matches Streamlit's own
+ * GM Plan route (current_user_is_premium() blur+lock) — GET .../gm-plan
+ * now returns `is_premium`/`upsell`, and a Free caller sees the same
+ * PremiumUpsellCard Portfolio/Trade Finder use instead of a real roadmap.
+ * mobile's screen is still ungated and should get the same fix separately.
  */
 
 function focusItemKey(item: GmPlanFocusItem, index: number): string {
@@ -257,6 +257,17 @@ export function GmPlanContent({
           {notice}
         </p>
       </main>
+    );
+  }
+
+  if (!data.is_premium) {
+    return (
+      <PremiumUpsellCard
+        kicker="GM Plan"
+        upsell={data.upsell}
+        fallbackTitle="Your season-arc roadmap"
+        fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
+      />
     );
   }
 

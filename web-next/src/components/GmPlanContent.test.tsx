@@ -41,6 +41,8 @@ const BASE_RESPONSE: GmPlanResponse = {
   ok: true,
   quiet: false,
   reason: "",
+  is_premium: true,
+  upsell: null,
   season_phase: "trade_deadline_approach",
   season_phase_label: "Trade Deadline Approaching",
   team_stance: "rebuilding",
@@ -181,16 +183,38 @@ describe("GmPlanContent", () => {
   });
 
   it("shows the link-account message instead of an empty plan when `reason` is set", () => {
-    const notReady: GmPlanResponse = { ok: true, quiet: true, reason: "no_sleeper_username_linked", focus_areas: [] };
+    const notReady: GmPlanResponse = {
+      ok: true,
+      quiet: true,
+      reason: "no_sleeper_username_linked",
+      focus_areas: [],
+      is_premium: true,
+      upsell: null,
+    };
     render(<GmPlanContent leagueName="Dynasty Overlords" data={notReady} />);
 
     expect(screen.getByText("Link your Sleeper account to see a GM Plan for this league.")).toBeInTheDocument();
   });
 
   it("shows a quiet message when there are no focus areas at all for a reason-less response", () => {
-    const quiet: GmPlanResponse = { ok: true, quiet: true, reason: "", focus_areas: [] };
+    const quiet: GmPlanResponse = { ok: true, quiet: true, reason: "", focus_areas: [], is_premium: true, upsell: null };
     render(<GmPlanContent leagueName="Dynasty Overlords" data={quiet} />);
 
     expect(screen.getByText(/We don't have enough to build a GM Plan/)).toBeInTheDocument();
+  });
+
+  it("shows the premium upsell instead of a plan for a Free caller", () => {
+    const locked: GmPlanResponse = {
+      ok: true,
+      quiet: true,
+      reason: "",
+      focus_areas: [],
+      is_premium: false,
+      upsell: { title: "Your season-arc roadmap", body: "Upgrade to Premium to unlock it." },
+    };
+    render(<GmPlanContent leagueName="Dynasty Overlords" data={locked} />);
+
+    expect(screen.getByRole("heading", { name: "Your season-arc roadmap" })).toBeInTheDocument();
+    expect(screen.queryByText(/We don't have enough to build a GM Plan/)).not.toBeInTheDocument();
   });
 });

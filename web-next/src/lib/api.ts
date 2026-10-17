@@ -437,6 +437,11 @@ export interface TradeFinderResponse {
   ok: boolean;
   ideas: TradeIdea[];
   reason: string;
+  /** Trade Finder is Premium-only (matches app.py's current_user_is_premium()
+   * gate) — a Free caller gets an empty idea list plus `upsell` instead of
+   * real search results. */
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
 }
 
 // player_id/name/position/team/age/status/injury_status/tier/score mirror
@@ -814,10 +819,16 @@ export interface PortfolioFailedLeague {
   reason: string;
 }
 
-export interface PortfolioUpsell {
+/** Shared shape for every Premium-only endpoint's Free-tier response —
+ * Portfolio, GM Plan, and Trade Finder all return this same {title, body}
+ * instead of each inventing its own upsell type. */
+export interface PremiumUpsell {
   title: string;
   body: string;
 }
+
+/** @deprecated use PremiumUpsell — kept so existing imports don't break. */
+export type PortfolioUpsell = PremiumUpsell;
 
 export interface PortfolioResponse {
   ok: boolean;
@@ -828,7 +839,7 @@ export interface PortfolioResponse {
   /** Present only for a Free caller — Portfolio needs more than the one
    * league Free accounts can save, so Free gets this honest upsell instead
    * of an empty or broken screen. */
-  upsell: PortfolioUpsell | null;
+  upsell: PremiumUpsell | null;
   reason?: string;
 }
 
@@ -954,6 +965,10 @@ export interface GmPlanResponse {
   ok: boolean;
   quiet: boolean;
   reason: string;
+  /** GM Plan is Premium-only (matches app.py's render_gm_plan... gate) — a
+   * Free caller gets `quiet: true` plus `upsell` instead of a real roadmap. */
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
   season_phase?: GmPlanSeasonPhase;
   season_phase_label?: string;
   team_stance?: string;

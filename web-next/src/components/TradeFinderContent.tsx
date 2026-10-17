@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 
-import { api, type LineupPlayer, type MyTeamResponse, type TradeIdea } from "@/lib/api";
+import { api, type LineupPlayer, type MyTeamResponse, type PremiumUpsell, type TradeIdea } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
@@ -21,15 +22,15 @@ import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
  * the shared TradeIdeaCardView (TradeIdeaCard.tsx) rather than a second copy
  * of that ~180-line card.
  *
- * Premium gating is a deliberate divergence from Streamlit: Streamlit's own
- * render_trade_finder_workspace hard-gates the whole page behind
- * current_user_is_premium()/render_premium_lock, but GET .../trade-finder
- * itself returns no entitlement/premium field at all, and mobile's
- * TradeFinderScreen.tsx has no premium check anywhere either — the exact
- * same "ungated per the shared API contract" situation GmPlanContent.tsx
- * documents for GM Plan (Revision 9). Following the API/mobile contract
- * here rather than inventing a client-side paywall Streamlit's web-only
- * route happens to have but nothing else in the system encodes.
+ * Premium-gated (2026-10-17, pre-launch audit): matches Streamlit's own
+ * render_trade_finder_workspace hard-gate. GET .../trade-finder now
+ * returns `is_premium`/`upsell` on its search response; a Free caller's
+ * search comes back with an empty idea list and that upsell, which
+ * replaces this entire page (builder included) with the same
+ * PremiumUpsellCard Portfolio/GM Plan use — matching Streamlit's
+ * whole-workspace lock rather than letting a Free user build a selection
+ * that can never return results. mobile's TradeFinderScreen.tsx is still
+ * ungated and should get the same fix separately.
  *
  * Strategy/lens default to "retool"/"Dynasty", matching TradeHubContent's
  * own documented default (web-next has no GmStance/ValuationLens context
@@ -131,6 +132,9 @@ export function TradeFinderContent({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<TradeIdea[] | null>(null);
+  // null = not yet known (no search attempted); set from the first search
+  // response's `is_premium`/`upsell` — see the premium-gating note above.
+  const [premiumUpsell, setPremiumUpsell] = useState<{ locked: boolean; upsell: PremiumUpsell | null } | null>(null);
 
   function toggle(playerId: string) {
     setSelectedIds((prev) => {
@@ -150,6 +154,7 @@ export function TradeFinderContent({
     try {
       const result = await api.getTradeFinderIdeas(leagueId, Array.from(selectedIds), "retool", lens);
       setIdeas(result.ideas);
+      setPremiumUpsell({ locked: !result.is_premium, upsell: result.upsell });
       if (result.ideas.length === 0 && result.reason === "no_players_selected") {
         setSearchError("Select at least one player to search with.");
       }
@@ -168,6 +173,17 @@ export function TradeFinderContent({
           {reasonMessage}
         </p>
       </main>
+    );
+  }
+
+  if (premiumUpsell?.locked) {
+    return (
+      <PremiumUpsellCard
+        kicker="Trade Finder"
+        upsell={premiumUpsell.upsell}
+        fallbackTitle="Build and search for a trade"
+        fallbackBody="Trade Finder is a Premium feature — build a custom package and search every roster in your league for a real match. Upgrade to Premium to unlock it."
+      />
     );
   }
 
