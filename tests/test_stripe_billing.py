@@ -146,6 +146,7 @@ class TestStripeBilling(unittest.TestCase):
         self.assertEqual(kwargs["subscription_data"]["metadata"]["supabase_user_id"], "user-1")
         self.assertEqual(kwargs["client_reference_id"], "user-1")
         self.assertTrue(str(kwargs["idempotency_key"]).startswith("fgl-checkout-user-1-annual"))
+        self.assertTrue(kwargs["allow_promotion_codes"])
 
     def test_fetch_live_plan_details_returns_none_when_not_configured(self):
         stripe_billing.reset_price_display_cache_for_tests()
