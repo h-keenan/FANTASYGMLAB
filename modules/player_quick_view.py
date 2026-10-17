@@ -17,6 +17,7 @@ from modules import player_profile_ui
 from modules.player_awards import PlayerBadge
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.rankings import prime_window_status
+from modules.semantic_glyphs import glyph_html
 from modules.player_tier_identity import (
     PlayerTierIdentity,
     player_tier_legend_html,
@@ -794,7 +795,7 @@ def decision_fit_html(narrative: str | None) -> str:
     # screen already owns a "Why" heading (why_factors_grid_html's Why/Fit/
     # Risk grid). Both can be visible to the same viewer across tabs for the
     # same player, so this one needs its own distinct label.
-    heading = dossier_section_heading_html("Decision Fit").replace(
+    heading = dossier_section_heading_html("Decision Fit", concept="insights").replace(
         "<h3>",
         "<h3 id='pqv-decision-fit-title'>",
         1,
@@ -1013,7 +1014,13 @@ def _percentile_chip_html(percentile: float | None) -> str:
     )
 
 
-def dense_section_html(title: str, items: tuple[StatItem, ...] | list[StatItem]) -> str:
+def dense_section_html(
+    title: str,
+    items: tuple[StatItem, ...] | list[StatItem],
+    *,
+    concept: str = "",
+) -> str:
+    icon = glyph_html(concept, size="header") if concept else ""
     rows = "".join(
         "<div class='player-quick-view-stat-row'>"
         f"<div class='player-quick-view-stat-label'>{escape(item.label)}</div>"
@@ -1026,15 +1033,16 @@ def dense_section_html(title: str, items: tuple[StatItem, ...] | list[StatItem])
     )
     return (
         "<section class='player-quick-view-stat-section'>"
-        f"<h3 class='player-quick-view-stat-heading'>{escape(title)}</h3>"
+        f"<h3 class='player-quick-view-stat-heading'>{icon}{escape(title)}</h3>"
         f"<div class='player-quick-view-stat-grid'>{rows}</div></section>"
     )
 
 
-def dossier_section_heading_html(title: str, subtitle: str = "") -> str:
+def dossier_section_heading_html(title: str, subtitle: str = "", *, concept: str = "") -> str:
+    icon = glyph_html(concept, size="header") if concept else ""
     return (
         "<header class='player-dossier-section-heading'>"
-        f"<h3>{escape(title)}</h3>"
+        f"<h3>{icon}{escape(title)}</h3>"
         + (f"<p>{escape(subtitle)}</p>" if subtitle else "")
         + "</header>"
     )
@@ -1610,7 +1618,7 @@ def why_this_recommendation_html(
     body = why_factors_grid_html(factors, skip_values=skip_values)
     if not body:
         return ""
-    heading = dossier_section_heading_html(title).replace(
+    heading = dossier_section_heading_html(title, concept="insights").replace(
         "<h3>",
         "<h3 id='pqv-why-title'>",
         1,
@@ -1752,7 +1760,7 @@ def accolades_html(
         return ""
     if not include_heading:
         return cluster
-    heading = dossier_section_heading_html("Accolades").replace(
+    heading = dossier_section_heading_html("Accolades", concept="league").replace(
         "<h3>",
         "<h3 id='pqv-accolades-title'>",
         1,
@@ -1829,7 +1837,7 @@ def compact_model_summary_html(
         f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
         for label, value in cells
     )
-    heading = dossier_section_heading_html("Model").replace(
+    heading = dossier_section_heading_html("Model", concept="insights").replace(
         "<h3>",
         "<h3 id='pqv-model-summary-title'>",
         1,
@@ -1919,7 +1927,7 @@ def compact_career_summary_html(
     chips = compact_accolade_chips_html(badges, limit=2)
     if not body and not chips:
         return ""
-    heading = dossier_section_heading_html("Career").replace(
+    heading = dossier_section_heading_html("Career", concept="history").replace(
         "<h3>",
         "<h3 id='pqv-career-summary-title'>",
         1,
@@ -1950,7 +1958,7 @@ def career_glance_html(
         f"<span>{escape(label)}</span><strong>{escape(value)}</strong></div>"
         for label, value in cells
     )
-    heading = dossier_section_heading_html("Career").replace(
+    heading = dossier_section_heading_html("Career", concept="history").replace(
         "<h3>",
         "<h3 id='pqv-career-glance-title'>",
         1,
@@ -1987,7 +1995,7 @@ def career_dossier_html(
             )
             + "</div>"
         )
-    heading = dossier_section_heading_html("Career").replace(
+    heading = dossier_section_heading_html("Career", concept="history").replace(
         "<h3>",
         "<h3 id='pqv-career-title'>",
         1,
@@ -2099,7 +2107,7 @@ def executive_snapshot_html(snapshot: ExecutiveSnapshot) -> str:
     )
     if not content:
         return ""
-    heading = dossier_section_heading_html("Executive Summary").replace(
+    heading = dossier_section_heading_html("Executive Summary", concept="insights").replace(
         "<h3>",
         "<h3 id='player-dossier-executive-title'>",
         1,
@@ -2155,7 +2163,7 @@ def career_resume_html(
 ) -> str:
     """Render factual Career Context résumé — no invented prestige system."""
 
-    heading = dossier_section_heading_html("Career Context").replace(
+    heading = dossier_section_heading_html("Career Context", concept="history").replace(
         "<h3>",
         "<h3 id='player-dossier-resume-title'>",
         1,
@@ -2301,7 +2309,7 @@ def career_timeline_html(
     include_achievements: bool = False,
     skip_current_season: bool = False,
 ) -> str:
-    heading = dossier_section_heading_html("Career Timeline").replace(
+    heading = dossier_section_heading_html("Career Timeline", concept="history").replace(
         "<h3>",
         "<h3 id='player-dossier-timeline-title'>",
         1,
@@ -2378,7 +2386,7 @@ def recommendation_context_html(
     """
 
     title = "Decision" if active_recommendation else "Player Context"
-    heading = dossier_section_heading_html(title).replace(
+    heading = dossier_section_heading_html(title, concept="insights").replace(
         "<h3>",
         "<h3 id='player-dossier-context-title'>",
         1,
@@ -2597,6 +2605,7 @@ def current_season_summary_html(
     heading = dossier_section_heading_html(
         "Current Season",
         subtitle,
+        concept="rankings",
     ).replace("<h3>", "<h3 id='player-dossier-season-summary-title'>", 1)
     return (
         "<section class='player-dossier-season-summary pqv-fantasy-evidence pqv-season-snapshot' "
@@ -2760,6 +2769,7 @@ def render_current_season(
             dossier_section_heading_html(
                 "Complete Season Stats",
                 "Professional production, fantasy output, and usage from one consistent season.",
+                concept="rankings",
             ),
             unsafe_allow_html=True,
         )
@@ -2780,7 +2790,7 @@ def render_current_season(
         ):
             if items:
                 rendered.append(title)
-                st.markdown(dense_section_html(title, items), unsafe_allow_html=True)
+                st.markdown(dense_section_html(title, items, concept="rankings"), unsafe_allow_html=True)
 
     if not rendered and not omit_empty:
         st.markdown(
@@ -2812,6 +2822,7 @@ def render_news(
             dossier_section_heading_html(
                 "Recent News",
                 "Automatically loaded player headlines — not a news feed.",
+                concept="alerts",
             ),
             unsafe_allow_html=True,
         )
@@ -2883,7 +2894,7 @@ def render_college_production(
     model = _stats_model(stats)
     if model.college_available:
         st.markdown(
-            dense_section_html("College Production", model.college),
+            dense_section_html("College Production", model.college, concept="rankings"),
             unsafe_allow_html=True,
         )
         return
