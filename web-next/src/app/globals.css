@@ -332,6 +332,18 @@ body {
   height: 100%;
 }
 
+/* coridian_, 2026-10-17: "desktop scaling is still too small and hard to
+   read." Every --font-size-*/--type-*/--space-* token is rem-based
+   (relative to html's root size, not body's), so this is the one place
+   that scales all of them at once on a wider viewport, instead of
+   touching every page's own classes. Still mobile's exact scale below
+   the breakpoint. */
+@media (min-width: 768px) {
+  html {
+    font-size: 18px;
+  }
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text-primary);

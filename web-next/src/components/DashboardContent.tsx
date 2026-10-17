@@ -216,7 +216,12 @@ export function DashboardContent({
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-3" aria-labelledby="explore-heading">
+      {/* Hidden at md+ — coridian_, 2026-10-17: "the explore section with
+          all the pages is redundant with the GM orb and the desktop side
+          menu." DesktopSidebar covers every one of these destinations at
+          that width; mobile still needs this grid since GmOrb there is a
+          floating button, not a persistent nav. */}
+      <section className="flex flex-col gap-3 md:hidden" aria-labelledby="explore-heading">
         <h2 id="explore-heading" style={{ font: "var(--type-section-title)" }}>
           Explore
         </h2>
