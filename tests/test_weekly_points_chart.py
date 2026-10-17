@@ -104,7 +104,7 @@ def test_single_data_point_season_still_renders_a_readable_chart():
     assert float(coordinates[0][0]) < float(coordinates[1][0])
     assert coordinates[0][1] == coordinates[1][1]
     assert "21.4" in html
-    assert "<strong>1</strong> week played" in html
+    assert "<strong class='wpc-caption-games'>1</strong> week played" in html
 
 
 def test_zero_data_season_renders_a_message_not_an_empty_chart():
