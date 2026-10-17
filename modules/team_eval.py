@@ -331,6 +331,19 @@ def suggest_optimal_lineup(
     else:
         df["sort_score"] = 0
     df = df.sort_values("sort_score", ascending=False).reset_index(drop=True)
+    # Real bug (coridian_, 2026-10-17, screenshots showing Ashton Jeanty/
+    # Marvin Harrison/Parker Washington/Cam Skattebo each filling TWO
+    # lineup slots): `assign_slots` below tracks uniqueness by row INDEX,
+    # not by player_id, so if the incoming frame ever has the same
+    # player_id on two separate rows (upstream data duplication — not yet
+    # root-caused), each row gets independently assigned to its own slot
+    # and the same player appears twice. Deduping here, at the one shared
+    # engine every roster/lineup surface calls, is a guaranteed guard
+    # regardless of where the upstream duplicate came from. Kept row is
+    # the highest-`sort_score` one (sorted above), so this can't silently
+    # downgrade which copy of the player's data gets used.
+    if "player_id" in df.columns:
+        df = df.drop_duplicates(subset="player_id", keep="first").reset_index(drop=True)
     df["ruled_out"] = _ruled_out_flags(df)
 
     slots = _lineup_slots(lineup_settings)
