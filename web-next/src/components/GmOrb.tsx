@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -78,7 +79,7 @@ export function GmOrb() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open GM menu"
-        className="fixed bottom-6 left-1/2 flex items-center justify-center font-black text-sm"
+        className="fixed bottom-6 left-1/2 flex items-center justify-center"
         style={{
           transform: "translateX(-50%)",
           width: "3.25rem",
@@ -86,12 +87,16 @@ export function GmOrb() {
           borderRadius: "50%",
           background: "var(--color-background)",
           border: "1.5px solid var(--color-accent)",
-          color: "var(--color-accent)",
           boxShadow: "var(--shadow-card)",
           zIndex: 40,
         }}
       >
-        GM
+        {/* The actual brand mark, not a plain "GM" text label — mobile's own
+            GmOrb renders this same mark (coridian_'s brand-continuity ask,
+            2026-10-17: the floating nav button is one of the most-seen
+            elements on both platforms, so it should actually be the brand,
+            not a placeholder). */}
+        <Image src="/brand-mark.png" alt="" width={30} height={20} style={{ objectFit: "contain" }} />
       </button>
 
       {open ? (

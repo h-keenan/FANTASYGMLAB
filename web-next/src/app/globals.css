@@ -142,7 +142,12 @@
   --radius-lg: var(--radius-none);
   --radius-control: var(--radius-none);
   --radius-panel: var(--radius-none);
-  --radius-pill: 2px;
+  /* Brand-continuity audit, 2026-10-17: this was 2px — barely rounds a
+     corner, not a real capsule — while mobile's radii.pill is a true 999px
+     pill for exactly this token's purpose (position/tier chips). Fixed to
+     match; the one pre-existing consumer (.lean-bar-track, a thin progress
+     bar) reads correctly as a pill shape too, not a regression. */
+  --radius-pill: 999px;
   --radius-segment: 999px;
 
   /* Elevation */
