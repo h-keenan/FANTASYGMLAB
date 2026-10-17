@@ -11,6 +11,7 @@ import {
   deriveContextLine,
   formatSeasonValue,
   matchupReasonMessage,
+  projectionDisplay,
   realStarterPointsDisplay,
   recordLabel,
 } from "@/lib/matchupPresentation";
@@ -119,21 +120,37 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
         }`
       : null;
 
-  // "need team pfp and a bar saying whos winnig/ projected to win" —
-  // coridian_, 2026-10-17. The API has no win-probability field (see
-  // MatchupComparison/MatchupRealComparison in api.ts), so this is a current
-  // value/points lean, not a fabricated probability — reuses the same
-  // leanBar() math + .lean-bar-* CSS Trade Hub/Analyzer already ship,
-  // fed by the exact two numbers already shown above (myValue/opponentValue).
-  const myLeanScore = realComparison ? realComparison.my_points : comparison.my_season_value;
-  const opponentLeanScore = realComparison ? realComparison.opponent_points : comparison.opponent_season_value;
+  // "need team pfp and a bar saying whos winnig/ projected to win" /
+  // "we need real win odds we CANNOT have any loose ends" — coridian_,
+  // 2026-10-17. win_probability (modules.matchup_win_probability) is a
+  // real Normal-difference model over each side's real_starters, honestly
+  // unavailable (never a guessed 50/50) when either side's modeled
+  // coverage is too thin. Falls back to the current value/points lean
+  // (same leanBar() math + .lean-bar-* CSS Trade Hub/Analyzer ship) only
+  // when a real probability isn't available yet.
+  const winProbability = matchup.win_probability;
+  const hasRealOdds = winProbability?.available === true && winProbability.probability != null;
+  const myLeanScore = hasRealOdds
+    ? winProbability.probability!
+    : realComparison
+      ? realComparison.my_points
+      : comparison.my_season_value;
+  const opponentLeanScore = hasRealOdds
+    ? 1 - winProbability.probability!
+    : realComparison
+      ? realComparison.opponent_points
+      : comparison.opponent_season_value;
   // leanBar's "pos" (green) fires when the second arg exceeds the first, so
   // opponent goes first here — "pos" means I'm ahead, matching the
   // success/danger color sense everywhere else in this app.
   const { polarity: leanPolarity, halfTrackPercent } = leanBar(opponentLeanScore, myLeanScore);
-  const leanLabel = `${realComparison ? "Live points" : "Season value"} lean: you ${myLeanScore.toFixed(
-    1,
-  )}, opponent ${opponentLeanScore.toFixed(1)}.`;
+  const leanLabel = hasRealOdds
+    ? `Live win probability: you ${Math.round(winProbability.probability! * 100)}%, opponent ${Math.round(
+        (1 - winProbability.probability!) * 100,
+      )}%.`
+    : `${realComparison ? "Live points" : "Season value"} lean: you ${myLeanScore.toFixed(
+        1,
+      )}, opponent ${opponentLeanScore.toFixed(1)}.`;
 
   return (
     <div
@@ -188,6 +205,12 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
           />
         ) : null}
       </div>
+      {hasRealOdds ? (
+        <span className="text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
+          Win odds: you {Math.round(winProbability.probability! * 100)}% · opponent{" "}
+          {Math.round((1 - winProbability.probability!) * 100)}%
+        </span>
+      ) : null}
 
       <div className="flex flex-col gap-0.5">
         <span className="text-base font-extrabold" style={{ color: edgeColor(edge) }}>
@@ -209,6 +232,9 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
 function SuggestedStarterRow({ player }: { player: MatchupStarter }) {
   const tone = injuryTone(player.injury_label);
   const contextLine = deriveContextLine(player);
+  // coridian_, 2026-10-17: "everyy player on the matchup screen needs a
+  // projection" — this view previously showed only season-long VALUE.
+  const projection = projectionDisplay(player.projection);
   return (
     <div
       className="flex items-center gap-3 py-2"
@@ -239,6 +265,12 @@ function SuggestedStarterRow({ player }: { player: MatchupStarter }) {
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {contextLine || `${player.team || "FA"}${player.slot ? ` · ${player.slot}` : ""}`}
           </span>
+          {projection.value ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {projection.value}
+              {projection.caption ? ` · ${projection.caption}` : ""}
+            </span>
+          ) : null}
         </div>
       </PlayerIdentityTrigger>
       <div className="flex items-center gap-2 shrink-0">

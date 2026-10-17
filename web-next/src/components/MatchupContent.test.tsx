@@ -30,6 +30,7 @@ function starter(overrides: Partial<MatchupStarter>): MatchupStarter {
     opportunity_label: "Lead back",
     overall_rating: 82,
     why: "Elite tier · Lead back · top RB on this roster by season value",
+    projection: { status: "ok", point_estimate: 13.1, low: 9.4, high: 16.8, confidence: "medium", opponent: "SEA" },
     ...overrides,
   };
 }
@@ -92,6 +93,7 @@ const BASE_RESPONSE: MatchupResponse = {
   opponent: side({ roster_id: "2", team_name: "Rival Squad", season_value_total: 7600 }),
   comparison: COMPARISON,
   real_comparison: null,
+  win_probability: null,
   basis: "season_value",
   basis_label: COMPARISON.basis_label,
   reason: "",
@@ -199,5 +201,40 @@ describe("MatchupContent", () => {
     render(<MatchupContent leagueName="My League" matchup={notMember} />);
 
     expect(screen.getByText("You don't appear to own a team in this league.")).toBeInTheDocument();
+  });
+
+  it("shows each suggested-lineup starter's own per-game projection, not just season value", () => {
+    render(<MatchupContent leagueName="My League" matchup={BASE_RESPONSE} />);
+
+    // The default `starter()` fixture carries a point_estimate of 13.1.
+    expect(screen.getAllByText(/Proj 13\.1/).length).toBeGreaterThan(0);
+  });
+
+  it("shows real win odds (not the value lean) once win_probability is available", () => {
+    const withOdds: MatchupResponse = {
+      ...BASE_RESPONSE,
+      win_probability: {
+        available: true,
+        probability: 0.73,
+        my_projected_total: 112.4,
+        opponent_projected_total: 96.1,
+        coverage: { my: 1, opponent: 1 },
+      },
+    };
+
+    render(<MatchupContent leagueName="My League" matchup={withOdds} />);
+
+    expect(screen.getByText(/Win odds: you 73% · opponent 27%/)).toBeInTheDocument();
+  });
+
+  it("falls back to the value lean (no percentage) when win_probability is unavailable", () => {
+    const noOdds: MatchupResponse = {
+      ...BASE_RESPONSE,
+      win_probability: { available: false, reason: "insufficient_coverage", coverage: { my: 0.2, opponent: 1 } },
+    };
+
+    render(<MatchupContent leagueName="My League" matchup={noOdds} />);
+
+    expect(screen.queryByText(/Win odds:/)).not.toBeInTheDocument();
   });
 });

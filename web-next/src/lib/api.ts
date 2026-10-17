@@ -557,6 +557,12 @@ export interface PlayerWeekProjection {
  */
 export interface MatchupStarter extends LineupPlayer {
   why: string;
+  /** This week's per-game projection, reusing the exact same projection
+   * real_starters already carry — null only when the backend had no
+   * live lineup context to enrich from (see services.mobile_api_service's
+   * _matchup_side docstring). coridian_, 2026-10-17: "everyy player on the
+   * matchup screen needs a projection." */
+  projection: PlayerWeekProjection | null;
 }
 
 /**
@@ -639,6 +645,22 @@ export interface MatchupRealComparison {
   basis_label: string;
 }
 
+/** modules.matchup_win_probability.compute_live_win_probability's output —
+ * a real Normal-difference model over each side's real_starters (actual
+ * points once a game's started, this week's projection otherwise), never
+ * a guessed 50/50. `available` is false (not a fabricated number) when
+ * either side's modeled coverage is below the documented floor — see that
+ * module's own docstring for why. */
+export interface MatchupWinProbability {
+  available: boolean;
+  reason?: "no_starters" | "insufficient_coverage";
+  /** 0-1, this user's own side's win chance. */
+  probability?: number;
+  my_projected_total?: number;
+  opponent_projected_total?: number;
+  coverage?: { my: number; opponent: number };
+}
+
 export interface MatchupResponse {
   ok: boolean;
   /** Sleeper's current week (league settings.leg) — null when the league
@@ -650,6 +672,7 @@ export interface MatchupResponse {
   /** Real current-week score comparison — null when either side lacks live
    * data yet. */
   real_comparison: MatchupRealComparison | null;
+  win_probability: MatchupWinProbability | null;
   basis: "season_value";
   basis_label: string;
   reason: string;

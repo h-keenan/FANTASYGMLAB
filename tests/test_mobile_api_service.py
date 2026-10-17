@@ -9118,8 +9118,12 @@ def test_matchup_real_starters_carry_a_per_game_projection(monkeypatch):
     """Each REAL (actual) starter also carries this week's per-game
     projection from modules.player_projections.project_player_week —
     additive, and clearly a separate figure from the real `actual_points`
-    next to it. Shared projection inputs (players lookup, season weekly
-    stats, opponent-defense signal) are fetched/computed once for the whole
+    next to it. The SUGGESTED season-value lineup's starters now carry the
+    same per-game projection too (coridian_, 2026-10-17: "everyy player on
+    the matchup screen needs a projection") — reusing the identical
+    `_ProjectionContext` built for the real lineup, not a second fetch.
+    Shared projection inputs (players lookup, season weekly stats,
+    opponent-defense signal) are fetched/computed once for the whole
     request (both rosters), not once per starter.
     """
 
@@ -9167,10 +9171,17 @@ def test_matchup_real_starters_carry_a_per_game_projection(monkeypatch):
     # Distinct field from, never confused with, the real live points.
     assert mine_starter["actual_points"] == 20.5
 
+    # The suggested season-value lineup's starters carry the same
+    # projection shape too, not just the real lineup.
+    suggested_starter = body["my_team"]["starters"][0]
+    assert suggested_starter["projection"] == fake_projection
+
     # Computed once for the whole request (both rosters), not once per
     # starter — see _ProjectionContext/_weekly_projection_for_player.
+    # 1 real starter + 8 suggested-lineup starters (QB/RB/RB/WR/WR/WR/TE/FLEX)
+    # per side, both sides: (1 + 8) * 2 = 18.
     assert mock_defense.call_count == 1
-    assert mock_project.call_count == 2
+    assert mock_project.call_count == 18
 
 
 def test_matchup_real_starter_with_inactive_status_is_reinstated_not_unknown(monkeypatch):
@@ -9318,6 +9329,87 @@ def test_matchup_real_starter_game_started_is_null_when_no_schedule_row(monkeypa
 
     mine_starter = response.json()["my_team"]["real_starters"][0]
     assert mine_starter["game_started"] is None
+
+
+def test_matchup_response_carries_a_live_win_probability(monkeypatch):
+    """The real feature request: `win_probability` at the top level of the
+    response, built from both sides' REAL current-week starters (not the
+    hypothetical suggested-optimal lineup) — coridian_: "we need a live
+    updating predictor" / "we need real win odds."
+    """
+
+    from modules import player_projections
+
+    client = _client(monkeypatch)
+    # One starter each side. Mine hasn't played yet (projected mean 20,
+    # stdev 5 via low=15/high=25); opponent's game is already over with a
+    # real final score of 10 — a fixed (zero-variance) value that should
+    # dominate the comparison.
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3, "starters": ["mine1"], "starters_points": [0.0], "points": 0.0},
+        {"roster_id": 2, "matchup_id": 3, "starters": ["opp1"], "starters_points": [10.0], "points": 10.0},
+    ]
+    fake_projection = {
+        "status": "ok",
+        "point_estimate": 20.0,
+        "low": 15.0,
+        "high": 25.0,
+        "confidence": "high",
+        "opponent": "BUF",
+    }
+
+    with _matchup_world(matchups):
+        with patch("modules.sleeper.get_players", return_value={}):
+            with patch("modules.sleeper.get_season_player_stats", return_value={}):
+                with patch.object(player_projections, "team_defense_points_allowed_by_position", return_value={}):
+                    with patch.object(player_projections, "project_player_week", return_value=fake_projection):
+                        with patch("modules.nfl_schedule.load_games", return_value=pd.DataFrame()):
+                            with patch(
+                                "modules.nfl_schedule.team_matchup_for_week",
+                                return_value={"week": 5, "opponent": "BUF", "kickoff_at": None, "played": True},
+                            ):
+                                # My starter hasn't played; opponent's has
+                                # (and already finished) — distinct per
+                                # roster via side effect, same order
+                                # _real_current_lineup processes them in
+                                # (my_entry then opponent_entry).
+                                with patch(
+                                    "modules.nfl_schedule.game_has_started", side_effect=[False, True]
+                                ):
+                                    response = client.get(
+                                        "/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"}
+                                    )
+
+    body = response.json()
+    win_probability = body["win_probability"]
+    assert win_probability["available"] is True
+    # My side: Normal(20, 5^2) (not yet started). Opponent: fixed 10 (real,
+    # game over). diff_mean = 10, diff_stdev = 5 -> z = 2.0.
+    import math
+
+    expected = 0.5 * (1.0 + math.erf(2.0 / math.sqrt(2.0)))
+    assert win_probability["probability"] == round(expected, 4)
+    assert win_probability["my_projected_total"] == 20.0
+    assert win_probability["opponent_projected_total"] == 10.0
+    assert win_probability["coverage"] == {"my": 1.0, "opponent": 1.0}
+
+
+def test_matchup_win_probability_is_honestly_unavailable_before_real_lineups_lock(monkeypatch):
+    """Neither side has a real lineup yet (has_live_data false on both) —
+    `win_probability` is honestly unavailable, never a guessed 50/50."""
+
+    client = _client(monkeypatch)
+    matchups = [
+        {"roster_id": 1, "matchup_id": 3},
+        {"roster_id": 2, "matchup_id": 3},
+    ]
+
+    with _matchup_world(matchups):
+        response = client.get("/v1/leagues/abc/matchup", headers={"Authorization": "Bearer good-token"})
+
+    win_probability = response.json()["win_probability"]
+    assert win_probability["available"] is False
+    assert win_probability["reason"] == "no_starters"
 
 
 def test_trade_outcomes_requires_auth(monkeypatch):
