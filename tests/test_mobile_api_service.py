@@ -607,11 +607,32 @@ def test_billing_plans_falls_back_when_front_office_price_missing(monkeypatch):
 
     assert response.status_code == 200
     plans = {(p["tier"], p["interval"]): p for p in response.json()["plans"]}
-    assert plans[("front_office", "annual")] == {
-        "tier": "front_office",
-        "interval": "annual",
-        **dict(zip(("label", "price", "cadence"), stripe_billing.DEFAULT_PLAN_DETAILS[stripe_billing.FRONT_OFFICE_ANNUAL])),
-    }
+    front_office = plans[("front_office", "annual")]
+    label, price, cadence = stripe_billing.DEFAULT_PLAN_DETAILS[stripe_billing.FRONT_OFFICE_ANNUAL]
+    assert front_office["label"] == label
+    assert front_office["price"] == price
+    assert front_office["cadence"] == cadence
+    assert "Everything in Pro" in front_office["features"]
+
+
+def test_billing_plans_include_tier_specific_feature_lists(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get("/v1/billing/plans", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    plans = {(p["tier"], p["interval"]): p for p in response.json()["plans"]}
+    # Both Pro plans share the exact same canonical Premium benefit copy
+    # /v1/me already serves — never a separately-maintained list.
+    assert plans[("pro", "monthly")]["features"] == plans[("pro", "annual")]["features"]
+    assert len(plans[("pro", "monthly")]["features"]) > 0
+    front_office_features = plans[("front_office", "annual")]["features"]
+    assert front_office_features[0] == "Everything in Pro"
+    assert front_office_features != plans[("pro", "annual")]["features"]
 
 
 def test_billing_checkout_requires_auth(monkeypatch):
@@ -647,6 +668,59 @@ def test_billing_checkout_returns_the_real_checkout_url(monkeypatch):
     assert kwargs["interval"] == "annual"
     assert "/premium?billing=success" in kwargs["success_url"]
     assert "/premium?billing=cancel" in kwargs["cancel_url"]
+
+
+def test_billing_checkout_honors_a_caller_supplied_return_path(monkeypatch):
+    # The onboarding paywall sends return_to="/" so a successful checkout
+    # resumes onboarding (connect Sleeper) instead of landing on /premium.
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_session = SimpleNamespace(url="https://checkout.stripe.com/pay/cs_test_456")
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("modules.stripe_billing.create_checkout_session", return_value=fake_session) as create_session,
+    ):
+        response = client.post(
+            "/v1/billing/checkout",
+            json={"tier": "pro", "interval": "annual", "return_to": "/"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    kwargs = create_session.call_args.kwargs
+    assert "/?billing=success" in kwargs["success_url"]
+    assert "/?billing=cancel" in kwargs["cancel_url"]
+
+
+def test_billing_checkout_rejects_an_unsafe_return_path(monkeypatch):
+    # return_to is never treated as a full URL (stripe_return_url only ever
+    # appends it to this app's own app_base_url), but a malformed/protocol-
+    # relative value should still fall back to the safe default rather than
+    # being passed through as-is.
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_session = SimpleNamespace(url="https://checkout.stripe.com/pay/cs_test_789")
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("modules.stripe_billing.create_checkout_session", return_value=fake_session) as create_session,
+    ):
+        response = client.post(
+            "/v1/billing/checkout",
+            json={"tier": "pro", "interval": "annual", "return_to": "//evil.example.com"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    kwargs = create_session.call_args.kwargs
+    assert "/premium?billing=success" in kwargs["success_url"]
 
 
 def test_billing_checkout_surfaces_a_configuration_error_cleanly(monkeypatch):

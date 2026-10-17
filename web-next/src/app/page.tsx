@@ -1,20 +1,34 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "@/components/AgeGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { OnboardingPaywall } from "@/components/OnboardingPaywall";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
 import { supabase } from "@/lib/supabase";
 
 type Tab = "guest" | "account";
 
+// useSearchParams() (for ?billing=success, see paywallDismissed below)
+// requires a Suspense boundary around anything that calls it, or this
+// page's otherwise-static prerender fails the build entirely — Next.js
+// App Router's own documented requirement, not specific to this page.
 export default function LandingPage() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <LandingPageContent />
+    </Suspense>
+  );
+}
+
+function LandingPageContent() {
   const { session, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   // Defaults to the real sign-in/create-account path, not guest — coridian_,
   // 2026-10-17: "It defaults for you to sign in with a username from
   // sleeper, not an account." Guest (Sleeper-username-only, no account) is
@@ -22,6 +36,17 @@ export default function LandingPage() {
   const [tab, setTab] = useState<Tab>("account");
   const [guestAgeConfirmed, setGuestAgeConfirmed] = useState(false);
   const [accountReady, setAccountReady] = useState(false);
+  // Shown once per landing on this page — reset is irrelevant since this
+  // flow (accountReady with no saved leagues yet) only ever happens for an
+  // account that hasn't finished onboarding; once they have a saved league
+  // the returning-session effect above redirects them away before any of
+  // this renders again. Starts already-dismissed when returning from a
+  // completed checkout (?billing=success) — OnboardingPaywall's own
+  // checkout redirects back here, and showing the exact same trial offer
+  // again to someone who just subscribed would be absurd.
+  const [paywallDismissed, setPaywallDismissed] = useState(
+    () => searchParams.get("billing") === "success",
+  );
   const [checkingSavedLeagues, setCheckingSavedLeagues] = useState(false);
   const skippedExistingSession = useRef(false);
 
@@ -119,7 +144,11 @@ export default function LandingPage() {
             <AgeGate onConfirmed={() => setGuestAgeConfirmed(true)} />
           )
         ) : accountReady ? (
-          <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
+          paywallDismissed ? (
+            <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
+          ) : (
+            <OnboardingPaywall onSkip={() => setPaywallDismissed(true)} />
+          )
         ) : (
           <SignInForm onSignedIn={() => setAccountReady(true)} />
         )}
