@@ -58,7 +58,7 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
         border: `var(--border-width-default) solid ${primary ? "var(--color-accent)" : "var(--color-border)"}`,
       }}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <PlayerIdentityTrigger identity={{ ...rec, sourceLabel: "Live Draft" }} className="flex items-center gap-3 min-w-0">
           <PositionBadge position={rec.position} />
           <div className="flex flex-col min-w-0">

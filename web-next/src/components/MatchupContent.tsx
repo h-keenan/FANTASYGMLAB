@@ -4,7 +4,9 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { TeamAvatar } from "@/components/TeamAvatar";
 import { injuryTone } from "@/lib/myTeamPresentation";
+import { leanBar } from "@/lib/tradeHubPresentation";
 import {
   deriveContextLine,
   formatSeasonValue,
@@ -57,6 +59,7 @@ function VersusSide({
 }) {
   return (
     <div className="flex-1 flex flex-col items-center text-center gap-0.5 min-w-0">
+      <TeamAvatar avatarUrl={side.avatar_url} size={40} ringColor={highlighted ? "var(--color-accent)" : "var(--color-border)"} />
       <span className="text-sm font-bold truncate w-full" style={{ color: "var(--color-text-primary)" }}>
         {side.team_name}
       </span>
@@ -116,6 +119,22 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
         }`
       : null;
 
+  // "need team pfp and a bar saying whos winnig/ projected to win" —
+  // coridian_, 2026-10-17. The API has no win-probability field (see
+  // MatchupComparison/MatchupRealComparison in api.ts), so this is a current
+  // value/points lean, not a fabricated probability — reuses the same
+  // leanBar() math + .lean-bar-* CSS Trade Hub/Analyzer already ship,
+  // fed by the exact two numbers already shown above (myValue/opponentValue).
+  const myLeanScore = realComparison ? realComparison.my_points : comparison.my_season_value;
+  const opponentLeanScore = realComparison ? realComparison.opponent_points : comparison.opponent_season_value;
+  // leanBar's "pos" (green) fires when the second arg exceeds the first, so
+  // opponent goes first here — "pos" means I'm ahead, matching the
+  // success/danger color sense everywhere else in this app.
+  const { polarity: leanPolarity, halfTrackPercent } = leanBar(opponentLeanScore, myLeanScore);
+  const leanLabel = `${realComparison ? "Live points" : "Season value"} lean: you ${myLeanScore.toFixed(
+    1,
+  )}, opponent ${opponentLeanScore.toFixed(1)}.`;
+
   return (
     <div
       className="flex flex-col gap-3 p-4"
@@ -157,6 +176,17 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
           VS
         </span>
         <VersusSide side={opponent} value={opponentValue} subValue={opponentSub} highlighted={edge === "opponent"} />
+      </div>
+
+      <div className="lean-bar-track" role="img" aria-label={leanLabel}>
+        <span className="lean-bar-tick" aria-hidden="true" />
+        {halfTrackPercent > 0 ? (
+          <span
+            className={`lean-bar-fill lean-bar-fill--${leanPolarity}`}
+            style={{ width: `${halfTrackPercent}%` }}
+            aria-hidden="true"
+          />
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-0.5">
