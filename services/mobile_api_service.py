@@ -5927,8 +5927,12 @@ def _reinstated_inactive_roster_rows(
     missing_player_ids: set[str],
     *,
     players_lookup: dict[str, Any] | None,
+    valued: pd.DataFrame | None = None,
+    settings: dict[str, Any] | None = None,
+    score_field: str = "dynasty_score",
 ) -> list[dict[str, Any]]:
-    """Minimal rows for genuinely-rostered players the valued pool dropped.
+    """Real, fully-valued rows for genuinely-rostered players the valued pool
+    dropped — not just identity placeholders.
 
     modules.player_eligibility.filter_current_fantasy_players treats a
     literal Sleeper `status` of "Inactive" as no-longer-a-current-player —
@@ -5943,16 +5947,36 @@ def _reinstated_inactive_roster_rows(
 
     Deliberately narrow: only literal "Inactive" is reinstated.
     Retired/historical/deceased players really are gone even on a stale
-    Sleeper roster, so those correctly stay excluded. No valuation data is
-    invented for these rows (score/tier/opportunity_label are left absent)
-    — modules.team_eval.suggest_optimal_lineup's own injury_level/
+    Sleeper roster, so those correctly stay excluded.
+
+    A real score/tier/opportunity_label IS computed here now (previously
+    left blank — coridian_, 2026-10-16: "IR players don't have values for
+    some reason... fix it properly no bandaid fix"), via the exact same
+    production valuation code every other player goes through:
+    modules.rankings.hydrate_reconciled_valuations_from_cache (the same
+    mechanism structured_player_refresh.py already uses for newly-
+    reconciled identities, reading disk-cached market/stats data, never a
+    live network call) runs the real market/age/production/scarcity/role
+    pipeline for just these reinstated rows against `valued` as the
+    reference population, then modules.league_value_settings.
+    apply_valuation_lens re-runs on `valued` + the reinstated rows
+    TOGETHER (never the reinstated rows alone — tier assignment is
+    percentile-relative to the real population, so computing it over 1-2
+    rows in isolation would be meaningless) so dynasty_score/value_score/
+    rebuild_score/player_tier/opportunity_label all come out exactly as
+    they would have if this player had never been dropped from the pool in
+    the first place. `valued`/`settings` are optional (both call sites
+    always have them in practice) purely so a caller that genuinely can't
+    supply them still gets identity-only rows rather than an error —
+    modules.team_eval.suggest_optimal_lineup's own injury_level/
     is_ruled_out logic (which already treats a literal "Inactive" status as
-    ruled out, see modules.rankings.injury_level) naturally keeps a
+    ruled out, see modules.rankings.injury_level) still naturally keeps a
     reinstated row out of a starting slot unless nothing else is available
-    at the position, same as any other ruled-out player.
+    at the position, same as any other ruled-out player — a real score here
+    doesn't change that.
     """
 
-    rows: list[dict[str, Any]] = []
+    identity_rows: list[dict[str, Any]] = []
     for player_id in missing_player_ids:
         raw = (players_lookup or {}).get(player_id)
         if not isinstance(raw, dict):
@@ -5960,28 +5984,67 @@ def _reinstated_inactive_roster_rows(
         status = str(raw.get("status") or "").strip()
         if status.casefold() != "inactive":
             continue
-        name = str(raw.get("full_name") or "").strip()
-        if not name:
-            name = " ".join(
-                str(part).strip()
-                for part in (raw.get("first_name"), raw.get("last_name"))
-                if str(part or "").strip()
-            ).strip()
-        fantasy_positions = raw.get("fantasy_positions") or []
-        position = str(
-            raw.get("position") or (fantasy_positions[0] if fantasy_positions else "") or ""
-        ).strip()
-        rows.append(
+        record = rankings.normalize_player_record(player_id, raw)
+        if not record.get("name"):
+            record["name"] = f"Player {player_id}"
+        identity_rows.append(record)
+
+    if not identity_rows:
+        return []
+
+    if valued is None or valued.empty or not settings:
+        # No reference population to value against — identity only, same
+        # as this function's original behavior.
+        return [
             {
-                "player_id": player_id,
-                "name": name or f"Player {player_id}",
-                "position": position,
-                "team": str(raw.get("team") or ""),
-                "age": raw.get("age"),
-                "status": status,
-                "injury_status": str(raw.get("injury_status") or ""),
+                "player_id": rec["player_id"],
+                "name": rec["name"],
+                "position": rec["position"],
+                "team": rec["team"],
+                "age": rec["age"],
+                "status": rec["status"],
+                "injury_status": rec["injury_status"],
                 "player_tier": None,
                 "opportunity_label": None,
+            }
+            for rec in identity_rows
+        ]
+
+    candidates = pd.DataFrame.from_records(identity_rows)
+    hydrated = rankings.hydrate_reconciled_valuations_from_cache(valued, candidates)
+    # valuation_lens only affects a Redraft-specific blend ratio and which
+    # score field assign_player_tiers treats as primary — dynasty_score/
+    # value_score/rebuild_score are all computed every call regardless, so
+    # any of the 3 real lens names is safe here; this just avoids needing a
+    # 4th parameter threaded through both call sites for a value that
+    # barely matters.
+    lens = next(
+        (
+            name
+            for name, field in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD.items()
+            if field == score_field
+        ),
+        "Dynasty",
+    )
+    combined = pd.concat([valued, hydrated], ignore_index=True, sort=False)
+    combined = league_value_settings.apply_valuation_lens(combined, lens, settings)
+    reinstated_ids = {rec["player_id"] for rec in identity_rows}
+    scored = combined[combined["player_id"].astype(str).isin(reinstated_ids)]
+
+    rows: list[dict[str, Any]] = []
+    for _, row in scored.iterrows():
+        rows.append(
+            {
+                "player_id": str(row.get("player_id") or ""),
+                "name": _clean_json_value(row.get("name")),
+                "position": _clean_json_value(row.get("position")),
+                "team": _clean_json_value(row.get("team")),
+                "age": _clean_json_value(row.get("age")),
+                "status": _clean_json_value(row.get("status")),
+                "injury_status": _clean_json_value(row.get("injury_status")),
+                "player_tier": _clean_json_value(row.get("player_tier")),
+                "opportunity_label": _clean_json_value(row.get("opportunity_label")),
+                score_field: _clean_json_value(row.get(score_field)),
             }
         )
     return rows
@@ -6026,7 +6089,13 @@ def _suggested_lineup_split(
     present_ids = set(roster_df["player_id"].astype(str)) if not roster_df.empty else set()
     missing_ids = roster_player_ids - present_ids
     if missing_ids and players_lookup:
-        reinstated_rows = _reinstated_inactive_roster_rows(missing_ids, players_lookup=players_lookup)
+        reinstated_rows = _reinstated_inactive_roster_rows(
+            missing_ids,
+            players_lookup=players_lookup,
+            valued=valued,
+            settings=settings,
+            score_field=score_field,
+        )
         if reinstated_rows:
             roster_df = pd.concat([roster_df, pd.DataFrame(reinstated_rows)], ignore_index=True, sort=False)
 

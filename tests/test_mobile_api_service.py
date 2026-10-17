@@ -8216,9 +8216,18 @@ def test_my_team_reinstates_rostered_inactive_player_instead_of_hiding_them(monk
     assert reinstated["status"] == "Inactive"
     assert reinstated["injury_label"] == "Inactive"
     assert reinstated["ruled_out"] is True
-    # Never fabricated a value/tier for a player excluded from the valued pool.
-    assert reinstated["score"] is None
-    assert reinstated["tier"] is None
+    # A real score/tier IS now computed for a reinstated player (coridian_,
+    # 2026-10-16: "IR players don't have values for some reason... fix it
+    # properly no bandaid fix") — via the exact same production valuation
+    # code every other player goes through
+    # (modules.rankings.hydrate_reconciled_valuations_from_cache +
+    # modules.league_value_settings.apply_valuation_lens, run against the
+    # real valued pool as the reference population), not fabricated. This
+    # fixture player has no real stats/market data anywhere, so 0 is the
+    # correct, non-fabricated answer — proof nothing was invented, not a
+    # leftover blank.
+    assert reinstated["score"] == 0
+    assert reinstated["tier"] == "Developmental"
 
 
 def test_my_team_bench_distinguishes_ir_and_taxi_from_plain_bench(monkeypatch):
@@ -8375,11 +8384,13 @@ def test_my_team_ir_player_gets_a_real_value_score(monkeypatch):
     real eligibility pipeline so a genuine IR player (Sleeper `active: false`
     + status "Injured Reserve") must come out the other end with a real,
     non-null value_score, exactly like every other roster-status group
-    (starter/bench/taxi) — not silently dropped to a blank "— value" like
-    the reinstated-Inactive case in
+    (starter/bench/taxi). The reinstated-Inactive case in
     test_my_team_reinstates_rostered_inactive_player_instead_of_hiding_them
-    (which is the one case that's deliberately score-less: a player the
-    valued pool never had any data for at all)."""
+    now also gets a real computed score the same way (see
+    _reinstated_inactive_roster_rows) — that test's fixture player happens
+    to have zero real stats/market data anywhere, so its score comes out 0,
+    not None; it's no longer the "deliberately score-less" case this
+    docstring used to describe."""
 
     client = _client(monkeypatch)
 
