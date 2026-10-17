@@ -96,6 +96,10 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
    warning token instead of a new icon font, echoing the color-coded
    health read the mobile app gives this same field. */
 .pqv-signal-badge--risk .pqv-signal-badge-answer::before{content:"● "}
+.pqv-signal-badge--positive{border-color:var(--color-success)}
+.pqv-signal-badge--positive .pqv-signal-badge-answer{color:var(--color-success)}
+.pqv-signal-badge--negative{border-color:var(--color-danger)}
+.pqv-signal-badge--negative .pqv-signal-badge-answer{color:var(--color-danger)}
 .pqv-why-recommendation,.pqv-fantasy-evidence,.pqv-accolades,.pqv-career-glance,.pqv-career-dossier,.pqv-bio{margin:0 0 var(--space-sm);max-width:none}
 .player-quick-view-shell{max-width:54rem;min-width:0;overflow-x:clip}
 .player-quick-view-shell .dg-tier-legend{margin:var(--space-2xs) 0 0;max-width:22rem}
