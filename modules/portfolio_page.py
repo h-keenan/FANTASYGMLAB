@@ -29,7 +29,7 @@ from __future__ import annotations
 import concurrent.futures
 import functools
 from html import escape
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import streamlit as st
 
@@ -41,6 +41,7 @@ from modules import (
     metric_graphic_primitives as mgp,
     premium,
     saved_leagues,
+    sleeper,
     team_stance,
 )
 from modules.daily_gm_briefing import CATEGORY_LABELS
@@ -73,6 +74,8 @@ _CATEGORY_GLYPH_CONCEPT = {
 # both already-existing primitives (mgp.rank_badge_html, status_badge_html).
 PORTFOLIO_CSS = """
 .dg-portfolio-card-top{align-items:flex-start;display:flex;gap:var(--space-sm);justify-content:space-between}
+.dg-portfolio-card-identity{flex:1 1 auto;min-width:0}
+.dg-portfolio-team-logo{flex:0 0 2.25rem;height:2.25rem;width:2.25rem}
 .dg-portfolio-badges{align-items:center;display:flex;flex-wrap:wrap;gap:var(--space-2xs);margin-top:var(--space-2xs)}
 .dg-portfolio-item{align-items:flex-start;display:flex;gap:var(--space-2xs);margin-top:var(--space-2xs)}
 .dg-portfolio-item .dg-ui-badge,
@@ -233,17 +236,32 @@ def _build_portfolio_row(
             "reason": reason,
         }
 
+    # sleeper.get_roster_profile reads through the same lru_cache'd
+    # get_rosters/get_users calls build_league_summary already warmed for
+    # this league above — essentially free, not a second network round trip.
+    avatar_url = sleeper.get_roster_profile(league_id, summary.get("roster_id")).get(
+        "avatar_url", ""
+    )
+
     return {
         "status": "ok",
         "league_id": league_id,
         "league_name": league_name,
         "summary": summary,
+        "avatar_url": avatar_url,
     }
 
 
-def render_portfolio_page() -> dict[str, Any]:
+def render_portfolio_page(*, team_logo_html: Callable[..., str]) -> dict[str, Any]:
     """Render the Portfolio page. Returns `{"open_league": row | None}` —
-    see module docstring for how the caller should act on it."""
+    see module docstring for how the caller should act on it.
+
+    ``team_logo_html`` is injected rather than imported — it's defined in
+    app.py (same ``team_logo_html(avatar_url, team_name, css_class=...)``
+    every league-identity surface already shares, e.g. league_workspace_ui,
+    league_history_ui), and this module never imports app.py (see module
+    docstring).
+    """
 
     actions: dict[str, Any] = {"open_league": None}
     inject_global_styles(PORTFOLIO_CSS)
@@ -333,6 +351,7 @@ def render_portfolio_page() -> dict[str, Any]:
                 "league_id": result["league_id"],
                 "league_name": result["league_name"],
                 "summary": result["summary"],
+                "avatar_url": result.get("avatar_url", ""),
             }
         )
 
@@ -445,11 +464,17 @@ def render_portfolio_page() -> dict[str, Any]:
                 f"{extra_badge}<span class='dg-portfolio-item-text'>{escape(extra_text)}</span></div>"
             )
 
+        logo_html = team_logo_html(
+            entry.get("avatar_url", ""), team_name, css_class="team-logo-wrap dg-portfolio-team-logo"
+        )
         card_html = (
             "<article class='dg-ui-card dg-ui-card--default'>"
             "<div class='dg-portfolio-card-top'>"
-            f"<h3 class='dg-ui-card-title'>{escape(title_text)}</h3>"
+            + logo_html
+            + "<div class='dg-portfolio-card-identity'>"
+            + f"<h3 class='dg-ui-card-title'>{escape(title_text)}</h3>"
             + (f"<div class='dg-portfolio-badges'>{rank_badge}</div>" if rank_badge else "")
+            + "</div>"
             + "</div>"
             + (f"<div class='dg-ui-card-metadata'>{escape(metadata_text)}</div>" if metadata_text else "")
             + (f"<div class='dg-portfolio-badges'>{health_badge}</div>" if health_badge else "")

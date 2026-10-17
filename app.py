@@ -23422,7 +23422,7 @@ def main():
                 (f"Current plan: {premium_page.plan_status_label(current_user_entitlement())}", "primary"),
             ],
         )
-        portfolio_actions = portfolio_page.render_portfolio_page()
+        portfolio_actions = portfolio_page.render_portfolio_page(team_logo_html=team_logo_html)
         if portfolio_actions.get("open_league"):
             _resume_saved_supabase_league(portfolio_actions["open_league"], route_to_dashboard=True)
             st.rerun()

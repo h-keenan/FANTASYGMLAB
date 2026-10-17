@@ -34,7 +34,7 @@ def test_portfolio_free_user_gets_an_upsell_and_never_builds_summaries():
     with patch("modules.portfolio_page.premium.get_user_entitlement", return_value=premium.FREE):
         with patch("modules.portfolio_page.dashboard_engine.build_league_summary", _must_not_run):
             with patch("modules.portfolio_page.premium.render_premium_lock") as mock_lock:
-                actions = portfolio_page.render_portfolio_page()
+                actions = portfolio_page.render_portfolio_page(team_logo_html=lambda *args, **kwargs: "<div class='logo'></div>")
 
     assert actions == {"open_league": None}
     mock_lock.assert_called_once()
@@ -50,7 +50,7 @@ def test_portfolio_premium_user_with_no_saved_leagues_is_empty_not_broken():
                     return_value=([], ""),
                 ):
                     with patch("modules.portfolio_page.render_html_fragment") as mock_render:
-                        actions = portfolio_page.render_portfolio_page()
+                        actions = portfolio_page.render_portfolio_page(team_logo_html=lambda *args, **kwargs: "<div class='logo'></div>")
 
     assert actions == {"open_league": None}
     # The "no saved leagues yet" empty state, not a Premium upsell or an error.
@@ -107,7 +107,8 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure():
                             ):
                                 with patch("modules.portfolio_page.render_html_fragment") as mock_render:
                                     with patch("modules.portfolio_page.st.button", return_value=False):
-                                        actions = portfolio_page.render_portfolio_page()
+                                        with patch("modules.portfolio_page.sleeper.get_roster_profile", return_value={}):
+                                            actions = portfolio_page.render_portfolio_page(team_logo_html=lambda *args, **kwargs: "<div class='logo'></div>")
 
     assert actions == {"open_league": None}
     rendered_html = "\n".join(call.args[0] for call in mock_render.call_args_list)
@@ -184,7 +185,8 @@ def test_portfolio_renders_every_quick_glance_signal_not_just_the_first():
                             ):
                                 with patch("modules.portfolio_page.render_html_fragment") as mock_render:
                                     with patch("modules.portfolio_page.st.button", return_value=False):
-                                        portfolio_page.render_portfolio_page()
+                                        with patch("modules.portfolio_page.sleeper.get_roster_profile", return_value={}):
+                                            portfolio_page.render_portfolio_page(team_logo_html=lambda *args, **kwargs: "<div class='logo'></div>")
 
     rendered_html = "\n".join(call.args[0] for call in mock_render.call_args_list)
     assert "Starting RB and WR both out this week." in rendered_html
@@ -261,7 +263,8 @@ def test_portfolio_fanout_preserves_saved_league_order_despite_uneven_completion
                                     "modules.portfolio_page.render_html_fragment"
                                 ) as mock_render:
                                     with patch("modules.portfolio_page.st.button", return_value=False):
-                                        actions = portfolio_page.render_portfolio_page()
+                                        with patch("modules.portfolio_page.sleeper.get_roster_profile", return_value={}):
+                                            actions = portfolio_page.render_portfolio_page(team_logo_html=lambda *args, **kwargs: "<div class='logo'></div>")
 
     assert actions == {"open_league": None}
     rendered_html = [call.args[0] for call in mock_render.call_args_list]
@@ -346,9 +349,10 @@ def test_portfolio_fanout_runs_concurrently_and_is_faster_than_sequential():
                             ):
                                 with patch("modules.portfolio_page.render_html_fragment"):
                                     with patch("modules.portfolio_page.st.button", return_value=False):
-                                        started = time.perf_counter()
-                                        actions = portfolio_page.render_portfolio_page()
-                                        elapsed_s = time.perf_counter() - started
+                                        with patch("modules.portfolio_page.sleeper.get_roster_profile", return_value={}):
+                                            started = time.perf_counter()
+                                            actions = portfolio_page.render_portfolio_page(team_logo_html=lambda *args, **kwargs: "<div class='logo'></div>")
+                                            elapsed_s = time.perf_counter() - started
 
     assert actions == {"open_league": None}
     # Comfortably under the sequential baseline — a true parallel run lands
