@@ -159,12 +159,12 @@ The core rule is that the endpoint must verify the Stripe signature before updat
 2. Confirm the Streamlit web app service has checkout variables set.
 3. Confirm the webhook backend service has backend-only variables set.
 4. Visit `https://<render-webhook-service-host>/health` and expect `{"status":"ok"}`.
-5. Sign in to FantasyGM Lab as a Free account.
+5. Sign in to FantasyDesk as a Free account.
 6. Open Premium and create a Founder Premium test checkout.
 7. Complete Checkout with a Stripe test card, such as `4242 4242 4242 4242`.
 8. Confirm Stripe shows a verified webhook delivery.
 9. Confirm `public.profiles.entitlement = 'premium'`.
-10. Refresh FantasyGM Lab and confirm Premium locks disappear.
+10. Refresh FantasyDesk and confirm Premium locks disappear.
 11. Use Manage Billing to open the Stripe customer portal.
 12. Cancel the test subscription in the portal.
 13. Confirm Stripe sends cancellation/update events.

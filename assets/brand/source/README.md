@@ -1,6 +1,6 @@
 # Brand pack vendor masters
 
-High-resolution originals from the vendor "no-swoop football" FantasyGM Lab
+High-resolution originals from the vendor "no-swoop football" FantasyDesk
 brand pack, kept for regeneration and any future high-res compositing needs
 (e.g. reworking `og-founder-beta.png`). These are not consumed directly by
 `modules/brand_identity.ASSET_PATHS` — production surfaces use the smaller

@@ -1,4 +1,4 @@
-"""Verify FantasyGM Lab production domain cutover gates.
+"""Verify FantasyDesk production domain cutover gates.
 
 Checks DNS/HTTP shape for:
   fantasygmlab.com → static landing

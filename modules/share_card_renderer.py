@@ -1,4 +1,4 @@
-"""Deterministic Pillow renderer for FantasyGM Lab Share Recommendation cards.
+"""Deterministic Pillow renderer for FantasyDesk Share Recommendation cards.
 
 Content-driven vertical flow. One canonical PNG path. Portrait aspect ratio is
 always preserved (contain-fit inside a square box).
@@ -22,7 +22,7 @@ from modules.trade_visual_language import (
 )
 
 
-# FantasyGM Lab executive palette (matches design tokens, not a new system).
+# FantasyDesk executive palette (matches design tokens, not a new system).
 BG = (5, 6, 7)
 SURFACE = (15, 17, 20)
 SURFACE_RAISED = (27, 30, 35)
@@ -626,7 +626,7 @@ def _matchup_column_height(draw, lines, tokens: LayoutTokens, name_font, meta_fo
 
 
 def _why_lines(draw, card, body_font, max_w: int) -> list[str]:
-    text = card.reason or "See FantasyGM Lab for the full analysis."
+    text = card.reason or "See FantasyDesk for the full analysis."
     return _wrap(draw, text, body_font, max_w)
 
 

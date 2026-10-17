@@ -45,7 +45,7 @@ export default function LoadingScreen({ status = 'Loading…' }: { status?: stri
       <Animated.View style={markStyle}>
         <BrandMark width={180} height={122} />
       </Animated.View>
-      <AppText style={styles.title}>FantasyGM Lab</AppText>
+      <AppText style={styles.title}>FantasyDesk</AppText>
       <AppText style={styles.status}>{status}</AppText>
     </View>
   );

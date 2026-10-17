@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { BRAND_NAME as PRODUCT_NAME } from "@/lib/brand";
+
 /**
  * Ports modules/age_gate.py's web COPPA gate: a neutral date-of-birth
  * entry, not an "I am 13+" checkbox (a self-attestation checkbox reads as
@@ -13,7 +15,6 @@ import { useState } from "react";
  */
 
 const MINIMUM_AGE = 13;
-const PRODUCT_NAME = "FantasyGM Lab";
 
 function calculateAge(birthDate: Date, today: Date = new Date()): number {
   let age = today.getFullYear() - birthDate.getFullYear();

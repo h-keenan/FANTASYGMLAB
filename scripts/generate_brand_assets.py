@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic FGL Arc Monogram assets (Pillow + SVG) — RETIRED production mark.
 
-The FGL Arc Monogram drawn here was replaced as the production FantasyGM Lab
+The FGL Arc Monogram drawn here was replaced as the production FantasyDesk
 identity by the vendor "no-swoop football" brand pack (see
 docs/fantasygm-lab-brand-identity.md). `modules/brand_identity.ASSET_PATHS`
 no longer points at this script's output — production marks now live under
@@ -370,7 +370,7 @@ def svg_mark(
     )
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" '
-        'aria-label="FantasyGM Lab">'
+        'aria-label="FantasyDesk">'
         f'<rect width="64" height="64" rx="10" fill="{plate}"/>'
         f"{path_svg}{arrows}{text}</svg>"
     )
@@ -385,7 +385,7 @@ def svg_primary_horizontal(*, light: bool = False, monochrome: bool = False) -> 
     mark_body = inner[inner.find("<rect") : inner.rfind("</svg>")]
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 64" role="img" '
-        'aria-label="FantasyGM Lab">'
+        'aria-label="FantasyDesk">'
         f"<g>{mark_body}</g>"
         f'<text x="80" y="40" fill="{ink}" font-family="Inter,Segoe UI,system-ui,sans-serif" '
         f'font-size="26" font-weight="800" letter-spacing="0.04em">FANTASY</text>'
@@ -405,7 +405,7 @@ def svg_founder_beta() -> str:
     mark_body = inner[inner.find("<rect") : inner.rfind("</svg>")]
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 80" role="img" '
-        'aria-label="FantasyGM Lab Founder Beta">'
+        'aria-label="FantasyDesk Founder Beta">'
         f"<g>{mark_body}</g>"
         f'<text x="80" y="34" fill="{ink}" font-family="Inter,Segoe UI,system-ui,sans-serif" '
         f'font-size="22" font-weight="800" letter-spacing="0.04em">FANTASY</text>'
@@ -583,7 +583,7 @@ def main() -> int:
     if not readme.exists():
         readme.write_text(
             "# Archived Command Plate mark\n\n"
-            "Retired as the canonical FantasyGM Lab logo in favor of the "
+            "Retired as the canonical FantasyDesk logo in favor of the "
             "FGL Arc Monogram. Kept for historical design reference only.\n"
             "Do not wire these assets into production surfaces.\n",
             encoding="utf-8",

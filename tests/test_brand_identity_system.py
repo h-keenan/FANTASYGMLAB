@@ -1,4 +1,4 @@
-"""FantasyGM Lab brand identity system contracts."""
+"""FantasyDesk brand identity system contracts."""
 
 from __future__ import annotations
 
@@ -14,12 +14,12 @@ DOC = ROOT / "docs" / "fantasygm-lab-brand-identity.md"
 
 def test_brand_doc_locks_permanent_mark():
     text = DOC.read_text(encoding="utf-8")
-    assert "FantasyGM Lab Symbol" in text
+    assert "FantasyDesk Symbol" in text
     assert "FGL Arc Monogram" in text  # retired mark, referenced for history
     assert "command-plate" in text  # archived / legacy reference
     assert "no-swoop football" in text.casefold()
     assert "Product-semantic separation" in text
-    assert brand_identity.BRAND_MARK_NAME == "FantasyGM Lab Symbol"
+    assert brand_identity.BRAND_MARK_NAME == "FantasyDesk Symbol"
     assert brand_identity.BRAND_MARK_GEOMETRY == "fantasygmlab-football-symbol"
     assert brand_identity.BRAND_MARK_LEGACY_GEOMETRY == "fgl-arc-monogram"
 
@@ -62,7 +62,7 @@ def test_asset_inventory_exists():
 
 
 def test_brand_api_paths_and_helpers():
-    assert brand_identity.PRODUCT_NAME == "FantasyGM Lab"
+    assert brand_identity.PRODUCT_NAME == "FantasyDesk"
     assert brand_identity.PRODUCT_DOMAIN == "fantasygmlab.com"
     assert brand_identity.asset_path("brand_compact").name == "fantasygmlab-symbol.png"
     assert brand_identity.asset_path("mark_compact").name == "fantasygmlab-symbol-compact.png"
@@ -74,7 +74,7 @@ def test_brand_api_paths_and_helpers():
     assert "dg-brand-plate" in html
     assert "<img" in html
     assert "data:image/png;base64," in html
-    assert "aria-label='FantasyGM Lab'" in html
+    assert "aria-label='FantasyDesk'" in html
     assert brand_identity.asset_path("brand_compact").read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert not hasattr(brand_identity, "founder_beta_badge_html")
     assert brand_identity.GM_ORB_LABEL == "GM"
@@ -129,7 +129,7 @@ def test_no_football_logic_in_brand_modules():
 
 def test_customer_facing_name_is_fantasygm_lab():
     assert "Fantasy GM" not in brand_identity.PRODUCT_NAME
-    assert brand_identity.PRODUCT_NAME == "FantasyGM Lab"
+    assert brand_identity.PRODUCT_NAME == "FantasyDesk"
 
 
 def test_favicon_sizes_exist_and_are_square():

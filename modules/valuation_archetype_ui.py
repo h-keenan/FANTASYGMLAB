@@ -48,7 +48,7 @@ def archetype_modal_content(
                 "How to interpret it",
                 (
                     "League format is the Sleeper competition type (Redraft, Keeper, or Dynasty). "
-                    "Valuation is how FantasyGM Lab scores players. Roster posture is a separate "
+                    "Valuation is how FantasyDesk scores players. Roster posture is a separate "
                     "construction read of your team."
                 ),
             ),

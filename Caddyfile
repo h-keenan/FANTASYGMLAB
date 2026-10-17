@@ -1,4 +1,4 @@
-# FantasyGM Lab — Caddy reverse proxy / static file server.
+# FantasyDesk — Caddy reverse proxy / static file server.
 #
 # Why Caddy instead of nginx+certbot: Caddy issues and renews Let's
 # Encrypt (and, as a fallback, ZeroSSL) certificates automatically the

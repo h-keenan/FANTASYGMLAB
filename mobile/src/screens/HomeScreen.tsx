@@ -175,7 +175,7 @@ export default function HomeScreen({ navigation }: Props) {
       setMeError(
         meResult.reason instanceof Error
           ? meResult.reason.message
-          : 'Could not reach the FantasyGM Lab API.',
+          : 'Could not reach the FantasyDesk API.',
       );
     }
 
@@ -247,7 +247,7 @@ export default function HomeScreen({ navigation }: Props) {
       );
     } catch (error) {
       setAddMessage(
-        error instanceof ApiError ? error.message : 'Could not reach the FantasyGM Lab API.',
+        error instanceof ApiError ? error.message : 'Could not reach the FantasyDesk API.',
       );
     } finally {
       setAddBusy(false);
@@ -281,7 +281,7 @@ export default function HomeScreen({ navigation }: Props) {
     } catch (error) {
       setAddOptions(null);
       setAddMessage(
-        error instanceof ApiError ? error.message : 'Could not reach the FantasyGM Lab API.',
+        error instanceof ApiError ? error.message : 'Could not reach the FantasyDesk API.',
       );
     } finally {
       setAddBusy(false);
@@ -363,7 +363,7 @@ export default function HomeScreen({ navigation }: Props) {
                 <View style={styles.brandRow}>
                   <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
                   <View>
-                    <AppText style={styles.brandName}>FantasyGM Lab</AppText>
+                    <AppText style={styles.brandName}>FantasyDesk</AppText>
                     <AppText style={styles.email}>
                       {session?.user.is_anonymous
                         ? 'Guest'
@@ -602,7 +602,7 @@ export default function HomeScreen({ navigation }: Props) {
             {showNoLeagueHelp ? (
               <View style={styles.noLeagueCard}>
                 <AppText style={styles.noLeagueText}>
-                  FantasyGM Lab is a GM assistant for a league you already have on Sleeper — it
+                  FantasyDesk is a GM assistant for a league you already have on Sleeper — it
                   doesn't create or host leagues itself. Create a free league in the Sleeper app
                   (or at sleeper.com), then come back here and search your Sleeper username.
                 </AppText>

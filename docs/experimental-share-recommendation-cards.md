@@ -1,6 +1,6 @@
 # Share Recommendation Cards (#232 graduated Free)
 
-Growth/distribution surface: generate polished FantasyGM Lab share images from
+Growth/distribution surface: generate polished FantasyDesk share images from
 **existing canonical recommendation truth only**.
 
 | Field | Value |
@@ -69,7 +69,7 @@ Safe to post publicly.
 - Dimensions: **2160 × 2400** (9:10 at 2× Retina; logical 1080×1200), composed for **320/390px** phone fit-to-screen
 - In-app preview **displays** at ~320px CSS but the `<img>` source is the same **2160 × 2400** PNG used for Share/Save/long-press
 - Trade cards use **one** bipolar value-edge bar (not two side bars)
-- Compact QR footer: Scan to try FantasyGM Lab + FantasyGMLab.com
+- Compact QR footer: Scan to try FantasyDesk + FantasyGMLab.com
 - On-demand only after Share tap
 - Portrait fetch best-effort (2.5s); branded slate fallback on failure
 - No AI image generation; no paid external renderer
@@ -128,14 +128,14 @@ Every share PNG embeds one canonical QR owned by `modules/share_card_qr.py`.
 
 - URL: `https://fantasygmlab.com` only
 - High-contrast black-on-white with quiet zone (`border=4`)
-- Bottom-right, labeled “Scan to try FantasyGM Lab”
+- Bottom-right, labeled “Scan to try FantasyDesk”
 - Not generated per-surface
 
 ## Visual design
 
 Dark executive theme; actual FGL Arc Monogram raster (not plain “FGL” text);
 Acquire vs Send stacked with proportional value bars; large names;
-restrained cyan accent; FantasyGM Lab + QR + fantasygmlab.com footer.
+restrained cyan accent; FantasyDesk + QR + fantasygmlab.com footer.
 Founder Beta is not used as share-card chrome.
 
 

@@ -55,7 +55,7 @@ POSITIONING = (
 )
 SHORT_DESCRIPTOR = "Fantasy football front-office software for dynasty managers."
 FOUNDER_BETA = "Founder Beta"
-PRODUCT = "FantasyGM Lab"
+PRODUCT = "FantasyDesk"
 DOMAIN = "fantasygmlab.com"
 PRODUCT_URL = f"https://{DOMAIN}"
 
@@ -527,7 +527,7 @@ def write_readme() -> None:
         "# Founder Beta launch assets",
         "",
         "External distribution kit for YouTube Shorts, Reddit, Discord, X, DMs, and OG previews.",
-        "Canonical brand: FantasyGM Lab FGL Arc Monogram.",
+        "Canonical brand: FantasyDesk FGL Arc Monogram.",
         "",
         "**These files are not loaded by the authenticated Streamlit app.**",
         "",
@@ -617,7 +617,7 @@ def main() -> int:
         ),
         "youtube-short-1-cover.png": lambda: compose_youtube_cover(
             hook="Stop checking five different fantasy sites just to decide your next move.",
-            end_line="FantasyGM Lab — Founder Beta",
+            end_line="FantasyDesk — Founder Beta",
             kind="dashboard",
         ),
         "youtube-short-2-cover.png": lambda: compose_youtube_cover(
@@ -627,7 +627,7 @@ def main() -> int:
         ),
         "youtube-short-3-cover.png": lambda: compose_youtube_cover(
             hook="Your dynasty advice shouldn't reset every time you log in.",
-            end_line="FantasyGM Lab — Founder Beta",
+            end_line="FantasyDesk — Founder Beta",
             kind="memory",
             experimental_note="EXPERIMENTAL — when enabled",
         ),

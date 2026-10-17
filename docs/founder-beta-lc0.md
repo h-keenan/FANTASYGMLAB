@@ -1,6 +1,6 @@
 # Founder Beta Launch Candidate Zero (LC0)
 
-Production verification report for FantasyGM Lab Founder Beta.
+Production verification report for FantasyDesk Founder Beta.
 
 | Field | Value |
 | --- | --- |
@@ -17,7 +17,7 @@ Automated product, UI, Trust integrity, packaging, security-static, and performa
 budget checks pass on the post-#109 baseline. No launch-blocking product defect was
 found in this environment.
 
-FantasyGM Lab is **not** cleared to charge real money until the manual production
+FantasyDesk is **not** cleared to charge real money until the manual production
 checklist below is completed (Stripe test lifecycle on production URLs, entitlement
 hardening SQL applied, durable feedback SQL applied, fresh Free/Premium walkthrough).
 
@@ -71,7 +71,7 @@ Player Dossier · Live Draft · GM Orb navigation
 | Rapid command-strip popover open/close ×5 | 0 errors |
 | Multi-tab second page | shell=1, exceptions=0 |
 | Touch targets &lt; 28px on dashboard sample | 0 |
-| Shell aria-label | `FantasyGM Lab executive command header` |
+| Shell aria-label | `FantasyDesk executive command header` |
 
 Screenshots: `/opt/cursor/artifacts/founder-beta-lc0/`
 

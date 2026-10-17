@@ -38,7 +38,7 @@ def main() -> int:
         "Complete Stripe Checkout with a test card.",
         "Verify Stripe shows a successful webhook delivery.",
         "Verify public.profiles.entitlement is premium.",
-        "Refresh FantasyGM Lab and confirm Premium unlocks.",
+        "Refresh FantasyDesk and confirm Premium unlocks.",
         "Open Manage Billing and cancel through the Stripe portal.",
         "Verify cancellation webhook delivers and entitlement returns to free.",
     ]

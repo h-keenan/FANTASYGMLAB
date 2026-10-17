@@ -1,6 +1,6 @@
 # Founder Beta Operations & Production Activation
 
-Operations activation report for FantasyGM Lab Founder Beta.
+Operations activation report for FantasyDesk Founder Beta.
 
 | Field | Value |
 | --- | --- |

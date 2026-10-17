@@ -1311,7 +1311,7 @@ def trade_hub_entitlement_summary(
     hidden_count = int(presentation.get("hidden_count") or 0)
     if approved_count == 1:
         return (
-            "One trade currently clears FantasyGM Lab's approval threshold."
+            "One trade currently clears FantasyDesk's approval threshold."
         )
     if presentation.get("is_premium"):
         return (

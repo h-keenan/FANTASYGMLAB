@@ -252,8 +252,8 @@ def native_share_markup(
 
     payload = base64.b64encode(png).decode("ascii")
     safe_name = json.dumps(file_name)
-    safe_title = json.dumps(title or "FantasyGM Lab")
-    safe_text = json.dumps(text or f"{title} — FantasyGM Lab")
+    safe_title = json.dumps(title or "FantasyDesk")
+    safe_text = json.dumps(text or f"{title} — FantasyDesk")
     safe_button_label = (
         str(button_label or "Share")
         .replace("&", "&amp;")

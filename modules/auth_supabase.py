@@ -1114,13 +1114,13 @@ def pending_confirmation_copy(*, evidence: str = "ambiguous", email_masked: str 
         if masked:
             body = (
                 f"We sent a confirmation link to <strong>{masked}</strong>. "
-                "Click that link to finish creating your FantasyGM Lab account. "
+                "Click that link to finish creating your FantasyDesk account. "
                 "Your account is not active yet — you are not signed in."
             )
         else:
             body = (
                 "We sent a confirmation link to your email address. "
-                "Click that link to finish creating your FantasyGM Lab account. "
+                "Click that link to finish creating your FantasyDesk account. "
                 "Your account is not active yet — you are not signed in."
             )
         sent_claimed = "true"

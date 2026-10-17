@@ -18,7 +18,7 @@ unless noted as an identity/dedupe alignment fix.
 - Recommendation #1 remains the first card from
   `order_trade_hub_visible_ideas` / presentation order (#126/#122).
 - Scarce copy when exactly one idea clears Trust: *One trade currently clears
-  FantasyGM Lab's approval threshold.*
+  FantasyDesk's approval threshold.*
 
 ## Package-shape matrix
 

@@ -21,7 +21,7 @@ Streamlit `st.button` labeled `GM` with CSS typography (`font-size`, `letter-spa
 
 | Item | Contract |
 | --- | --- |
-| Asset | `assets/brand/fantasygmlab-symbol-compact.png` (white monochrome cut of the FantasyGM Lab football symbol) via `brand_identity.GM_ORB_MARK_ASSET_KEY` (`mark_compact`) |
+| Asset | `assets/brand/fantasygmlab-symbol-compact.png` (white monochrome cut of the FantasyDesk football symbol) via `brand_identity.GM_ORB_MARK_ASSET_KEY` (`mark_compact`) |
 | API | `gm_orb_mark_data_uri()`, `gm_orb_floating_trigger_html()`, `gm_orb_mark_asset_bytes()` |
 | Fit | `background-size: contain`, `background-origin: content-box`, `padding: 8px`, centered, **circular 44×44** (`border-radius: 50%`) |
 | A11y | Button label = `GM_ORB_ARIA_LABEL` (`Open GM menu`); visible text/children hidden via overlay CSS |

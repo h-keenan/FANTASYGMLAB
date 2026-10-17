@@ -56,7 +56,7 @@ const ShareCardChrome = forwardRef<
       <View style={styles.qrRow}>
         <View style={styles.qrTextGroup}>
           <AppText style={styles.qrKicker}>SCAN TO TRY</AppText>
-          <AppText style={styles.qrTitle}>FantasyGM Lab</AppText>
+          <AppText style={styles.qrTitle}>FantasyDesk</AppText>
           <AppText style={styles.qrSubtitle}>{qrSubtitle}</AppText>
         </View>
         <View style={styles.qrWrap}>

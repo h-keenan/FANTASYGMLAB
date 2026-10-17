@@ -4672,7 +4672,7 @@ def test_send_test_push_delivers_via_expo_for_registered_tokens(monkeypatch):
     assert sent_messages == [
         {
             "to": "ExponentPushToken[abc123]",
-            "title": "FantasyGM Lab",
+            "title": "FantasyDesk",
             "body": mock_post.call_args.kwargs["json"][0]["body"],
             "data": {"kind": "test"},
         }

@@ -42,7 +42,7 @@ export default async function LegalPage({ params }: { params: Promise<{ pageKey:
     <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
       <div className="flex flex-col gap-2">
         <Link href="/" className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
-          ← FantasyGM Lab
+          ← FantasyDesk
         </Link>
         <p className="text-xs font-bold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "0.03em" }}>
           {page.kicker}

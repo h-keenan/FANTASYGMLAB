@@ -95,7 +95,7 @@ def build_feed(db_path, news_loader):
         ideas.append({"player_id": str(pid), "name": player["name"], "team": player["team"],
                       "position": player["position"],
                       "reason": f"Sleeper recorded {count} adds in the last 24h. Review his role and league availability.",
-                      "source_name": "FantasyGM Lab / Sleeper trending adds",
+                      "source_name": "FantasyDesk / Sleeper trending adds",
                       "source_url": "https://api.sleeper.app/v1/players/nfl/trending/add?lookback_hours=24&limit=30",
                       "observed_at": stamp, "rostered": rostered.get(str(pid)), "overall_rating": player["overall_rating"]})
     try:
@@ -145,7 +145,7 @@ def build_feed(db_path, news_loader):
                                    "rank": trend.get("rank"), "lookback_hours": 24 * 7})
 
     return {"schema_version": 1, "generated_at": now,
-            "rankings": {"schema_version": 1, "source_id": "FantasyGM Lab API", "format_id": "base-dynasty",
+            "rankings": {"schema_version": 1, "source_id": "FantasyDesk API", "format_id": "base-dynasty",
                          "model_version": str(rankings.VALUATION_AUTHORITY_CONTRACT_VERSION),
                          "source_at": source_at, "generated_at": now, "players": players},
             "waiver_watch": ideas[:8], "news": news,

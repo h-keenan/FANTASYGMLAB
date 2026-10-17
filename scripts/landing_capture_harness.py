@@ -10,7 +10,7 @@ from modules.marketing_landing import render_marketing_landing
 
 def main() -> None:
     st.set_page_config(
-        page_title="FantasyGM Lab landing capture",
+        page_title="FantasyDesk landing capture",
         layout="wide",
         initial_sidebar_state="collapsed",
     )

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# FantasyGM Lab — shared application image for self-hosted deployment.
+# FantasyDesk — shared application image for self-hosted deployment.
 #
 # Why one image for four services (not four separate Dockerfiles):
 # every real (non-cron) service in render.yaml — fantasygm-lab (Streamlit),

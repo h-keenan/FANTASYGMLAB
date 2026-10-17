@@ -16,10 +16,10 @@ from modules.player_tier_identity import player_tier_legend_html
 
 PAGE_KEY = "methodology"
 NAV_LABEL = "How We Evaluate"
-PAGE_TITLE = "How FantasyGM Lab Evaluates Players"
+PAGE_TITLE = "How FantasyDesk Evaluates Players"
 PAGE_KICKER = "HOW FANTASYGM LAB THINKS ABOUT VALUE"
 PAGE_PURPOSE = (
-    "How FantasyGM Lab evaluates players in league context, and how rankings "
+    "How FantasyDesk evaluates players in league context, and how rankings "
     "differ from trade recommendations."
 )
 FOOTER_LABEL = "How We Evaluate"
@@ -113,7 +113,7 @@ PRODUCTION_VS_DYNASTY = (
 
 STRATEGY_INTRO = (
     "Your team's direction can change whether an asset is attractive even when "
-    "the league-wide player value stays similar. FantasyGM Lab can auto-read a "
+    "the league-wide player value stays similar. FantasyDesk can auto-read a "
     "direction from the roster or follow a manager override."
 )
 
@@ -331,7 +331,7 @@ def methodology_page_html() -> str:
         f"<p class='methodology-copy'>{escape(CONFIDENCE_COPY)}</p>"
         "</section>"
         "<section class='methodology-section methodology-limits' aria-labelledby='methodology-limits'>"
-        "<h2 id='methodology-limits' class='methodology-heading'>What FantasyGM Lab does not claim</h2>"
+        "<h2 id='methodology-limits' class='methodology-heading'>What FantasyDesk does not claim</h2>"
         f"<ul class='methodology-list'>{limits}</ul>"
         "</section>"
         "<section class='methodology-section' aria-labelledby='methodology-faq'>"

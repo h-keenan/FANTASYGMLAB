@@ -1,4 +1,4 @@
-# FantasyGM Lab — UI Hierarchy & Information Architecture Directive
+# FantasyDesk — UI Hierarchy & Information Architecture Directive
 
 > Sent by coridian_ via Discord, 2026-09-25. Governs all future UI redesign work unless a
 > page-specific prompt explicitly overrides part of it. Follow `UI_MAGNA_CARTA.md` for the global
@@ -99,7 +99,7 @@ screen specifically exists to rank/value players.
 
 ## 12. Recommendations should be stronger than raw data
 
-FantasyGM Lab is a GM assistant, not merely a database. When the model has an actionable
+FantasyDesk is a GM assistant, not merely a database. When the model has an actionable
 conclusion, prioritize it over raw metrics. Better: a bold headline ("Starter At Risk — Usage has
 fallen for three weeks") followed by detailed usage data. Worse: five metric cards followed by a
 tiny sentence saying "Starter At Risk." Use raw data to support the recommendation, not bury it.
@@ -199,7 +199,7 @@ or authentication. UI hierarchy work should consume existing data and logic.
 
 **Preserve the product. Replace the presentation.** Do not remove useful features. Do not preserve
 bad layouts. Make every screen communicate: what matters? Why does it matter? What can I do about
-it? Everything else should support those three questions. FantasyGM Lab should feel like one
+it? Everything else should support those three questions. FantasyDesk should feel like one
 cohesive mobile GM command system, not a collection of legacy pages with updated colors.
 
 ## 25. No page-specific color patching

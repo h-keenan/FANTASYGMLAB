@@ -56,7 +56,7 @@ export default function AgeGate({ onPassed }: { onPassed: () => void }) {
         <View style={styles.card}>
           <AppText style={styles.title}>Age Requirement</AppText>
           <AppText style={styles.body}>
-            You must be at least {MINIMUM_AGE} years old to use FantasyGM Lab. Nothing you entered has been saved.
+            You must be at least {MINIMUM_AGE} years old to use FantasyDesk. Nothing you entered has been saved.
           </AppText>
         </View>
       </View>

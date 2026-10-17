@@ -123,7 +123,7 @@ def test_trade_share_phone_scale_composition_and_artifacts():
     assert "YOU GIVE" not in renderer
     assert "YOU GET" not in renderer
     assert "def _trade_column_titles(" in renderer
-    assert "Scan to try FantasyGM Lab" in Path("modules/share_card_qr.py").read_text(
+    assert "Scan to try FantasyDesk" in Path("modules/share_card_qr.py").read_text(
         encoding="utf-8"
     )
 

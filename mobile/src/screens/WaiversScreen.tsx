@@ -208,7 +208,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
       <ScreenInfoNote
         text={`Free agents ranked for your roster — ordered by fit for ${
           neededPositions.length > 0 ? `your needs at ${neededPositions.join(', ')}` : 'your team'
-        }, not just raw value. Tap any recommendation for the full breakdown — that's where you decide. FantasyGM Lab doesn't submit waiver claims for you; place the claim from your Sleeper league once you've decided.`}
+        }, not just raw value. Tap any recommendation for the full breakdown — that's where you decide. FantasyDesk doesn't submit waiver claims for you; place the claim from your Sleeper league once you've decided.`}
       />
 
       {notice ? <AppText style={styles.notice}>{notice}</AppText> : null}

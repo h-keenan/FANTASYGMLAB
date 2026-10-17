@@ -76,7 +76,7 @@ export default function CompareSharePreviewModal({ visible, onClose, sideA, side
     const rowLines = rows
       .filter((row) => row.a !== null || row.b !== null)
       .map((row) => `${row.label}: ${display(row, row.a)} vs ${display(row, row.b)}`);
-    const lines = [`${sideA.name} vs ${sideB.name}`, ...rowLines, '', 'Compared with FantasyGM Lab'].filter(Boolean);
+    const lines = [`${sideA.name} vs ${sideB.name}`, ...rowLines, '', 'Compared with FantasyDesk'].filter(Boolean);
     Share.share({ message: lines.join('\n') }).catch(() => {});
   };
 

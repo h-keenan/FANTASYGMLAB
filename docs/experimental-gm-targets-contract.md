@@ -134,7 +134,7 @@ Not added to mobile primary orbs.
 | Recommendation | Bound narrative or activity-inbox record only; empty → “No current action” |
 | Material change | Existing `DecisionChangeEvent` for `player_id` — **no new events** |
 
-User intent (target) and FantasyGM Lab recommendation may disagree — that is intentional.
+User intent (target) and FantasyDesk recommendation may disagree — that is intentional.
 
 ## Decision Memory relationship
 

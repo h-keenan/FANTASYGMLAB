@@ -447,7 +447,7 @@ async def _lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="FantasyGM Lab Mobile API",
+    title="FantasyDesk Mobile API",
     version="0.1.0",
     docs_url=None,
     redoc_url=None,
@@ -4625,7 +4625,7 @@ def send_test_push(user: dict[str, Any] = Depends(require_user)) -> dict[str, An
         return {"ok": False, "reason": "no_registered_tokens"}
     result = push_tokens.send_expo_push_notifications(
         tokens,
-        title="FantasyGM Lab",
+        title="FantasyDesk",
         body="Push notifications are working — you'll hear from us when your roster needs attention.",
         data={"kind": "test"},
     )

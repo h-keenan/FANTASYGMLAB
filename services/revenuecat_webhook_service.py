@@ -24,7 +24,7 @@ SERVICE_NAME = "revenuecat-webhook"
 EXPECTED_PUBLIC_HOST = "https://fantasygm-lab-revenuecat-webhook.onrender.com"
 
 app = FastAPI(
-    title="FantasyGM Lab RevenueCat Webhook",
+    title="FantasyDesk RevenueCat Webhook",
     version="0.1.0",
     docs_url=None,
     redoc_url=None,

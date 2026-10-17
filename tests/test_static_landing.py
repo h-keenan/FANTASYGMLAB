@@ -13,7 +13,7 @@ def test_static_landing_exists_with_brand_and_cta():
 
     assert 'data-fgl-static-landing="1"' in html
     assert 'data-fgl-shell-ready="1"' in html
-    assert "FantasyGM Lab" in html
+    assert "FantasyDesk" in html
     assert "Founder Beta" not in html
     assert "Import your league" in html
     assert "utm_source=static_landing" in html
@@ -27,7 +27,7 @@ def test_static_landing_exists_with_brand_and_cta():
     assert "landing.css" in html
     assert "fonts.googleapis" not in html
     assert "fonts.googleapis" not in css
-    assert "FantasyGM Lab — Your Fantasy Football Front Office" in html
+    assert "FantasyDesk — Your Fantasy Football Front Office" in html
     assert "Your fantasy football front office." in html
     assert (
         "The only dynasty tool that runs your team like a front office: "

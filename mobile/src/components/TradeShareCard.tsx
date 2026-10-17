@@ -214,7 +214,7 @@ const TradeShareCard = forwardRef<View, {
       <View style={styles.qrRow}>
         <View style={styles.qrTextGroup}>
           <AppText style={styles.qrKicker}>SCAN TO TRY</AppText>
-          <AppText style={styles.qrTitle}>FantasyGM Lab</AppText>
+          <AppText style={styles.qrTitle}>FantasyDesk</AppText>
           <AppText style={styles.qrSubtitle}>Real trade grades, waiver signal, and a Trade Hub built for dynasty.</AppText>
         </View>
         <View style={styles.qrWrap}>

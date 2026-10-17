@@ -1,4 +1,4 @@
-"""Canonical QR for FantasyGM Lab share cards.
+"""Canonical QR for FantasyDesk share cards.
 
 One owner — every share PNG (player, waiver, trade hub, trade analyzer)
 embeds this graphic. Destination is the public site only.
@@ -11,7 +11,7 @@ from io import BytesIO
 from modules import brand_identity
 
 CANONICAL_SHARE_URL = brand_identity.PRODUCT_URL  # https://fantasygmlab.com
-QR_LABEL = "Scan to try FantasyGM Lab"
+QR_LABEL = "Scan to try FantasyDesk"
 RENDER_VERSION = 1
 
 

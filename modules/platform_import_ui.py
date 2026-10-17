@@ -59,7 +59,7 @@ def classify_mapping_quality(
         proceed = False
     elif rate < block_threshold:
         status = "blocked"
-        message = "ESPN import loaded, but too few roster players matched FantasyGM Lab player IDs."
+        message = "ESPN import loaded, but too few roster players matched FantasyDesk player IDs."
         proceed = False
     elif rate < warn_threshold:
         status = "degraded"

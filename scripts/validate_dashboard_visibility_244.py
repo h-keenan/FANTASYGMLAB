@@ -75,7 +75,7 @@ def _measure(page) -> dict:
             blockContainer: styleOf(q('.block-container')),
             nativeTitle: textVisible('FGL NATIVE RENDER TEST')
               || textVisible("Today's Game Plan"),
-            dashboardHeading: textVisible('Dashboard') || textVisible('FantasyGM Lab'),
+            dashboardHeading: textVisible('Dashboard') || textVisible('FantasyDesk'),
             gamePlan: textVisible("Today's Game Plan"),
             realButtonCount: buttons.length,
             fullscreenOverlayCovers: shellCovers,

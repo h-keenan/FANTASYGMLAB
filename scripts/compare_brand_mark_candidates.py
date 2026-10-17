@@ -135,7 +135,7 @@ def loading(name: str) -> Image.Image:
     draw = ImageDraw.Draw(canvas)
     mark = _mark(name, 40)
     _paste(canvas, mark, (190, 48))
-    draw.text((120, 104), "FantasyGM Lab", font=_font(28, bold=True), fill=WHITE)
+    draw.text((120, 104), "FantasyDesk", font=_font(28, bold=True), fill=WHITE)
     draw.text((155, 142), "FOUNDER BETA", font=_font(14, bold=True), fill=SLATE2)
     draw.text((145, 178), "Loading league...", font=_font(16), fill=SLATE1)
     return canvas
@@ -159,7 +159,7 @@ def share_card(name: str, kind: str) -> Image.Image:
     draw.rounded_rectangle((16, 16, 624, 344), radius=16, fill=(15, 17, 20))
     mark = _mark(name, 36)
     _paste(canvas, mark, (40, 36))
-    draw.text((90, 44), "FantasyGM Lab", font=_font(20, bold=True), fill=WHITE)
+    draw.text((90, 44), "FantasyDesk", font=_font(20, bold=True), fill=WHITE)
     title = "TRADE PATH" if kind == "trade" else "WAIVER ADD"
     draw.text((40, 90), title, font=_font(16, bold=True), fill=SLATE2)
     hero = "Player A  →  Player B" if kind == "trade" else "Add  ·  Player X"
@@ -177,7 +177,7 @@ def og(name: str) -> Image.Image:
     draw.rectangle((0, 0, 12, 630), fill=CYAN)
     mark = _mark(name, 160)
     _paste(canvas, mark, (72, 180))
-    draw.text((270, 200), "FantasyGM Lab", font=_font(64, bold=True), fill=WHITE)
+    draw.text((270, 200), "FantasyDesk", font=_font(64, bold=True), fill=WHITE)
     draw.text((270, 290), "Your fantasy football front office", font=_font(34), fill=SLATE1)
     draw.text((270, 360), "FOUNDER BETA", font=_font(26, bold=True), fill=SLATE2)
     draw.text((72, 560), "fantasygmlab.com", font=_font(34), fill=CYAN)
@@ -189,7 +189,7 @@ def founder_lockup(name: str) -> Image.Image:
     mark = _mark(name, 72)
     _paste(canvas, mark, (24, 24))
     draw = ImageDraw.Draw(canvas)
-    draw.text((112, 30), "FantasyGM Lab", font=_font(28, bold=True), fill=WHITE)
+    draw.text((112, 30), "FantasyDesk", font=_font(28, bold=True), fill=WHITE)
     draw.text((112, 70), "FOUNDER BETA", font=_font(18, bold=True), fill=SLATE2)
     return canvas
 
@@ -200,7 +200,7 @@ def premium(name: str) -> Image.Image:
     draw.rounded_rectangle((16, 16, 464, 144), radius=8, fill=(15, 17, 20), outline=(250, 204, 21))
     mark = _mark(name, 40)
     _paste(canvas, mark, (36, 40))
-    draw.text((92, 40), "FantasyGM Lab Premium", font=_font(24, bold=True), fill=WHITE)
+    draw.text((92, 40), "FantasyDesk Premium", font=_font(24, bold=True), fill=WHITE)
     draw.text((92, 78), "Tier of the same brand — not a separate logo.", font=_font(16), fill=SLATE1)
     draw.rounded_rectangle((92, 108, 168, 132), radius=2, fill=(42, 32, 8), outline=(250, 204, 21))
     draw.text((104, 112), "PREMIUM", font=_font(12, bold=True), fill=(250, 204, 21))

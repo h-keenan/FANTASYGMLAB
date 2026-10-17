@@ -132,7 +132,7 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
-        <AppText style={styles.title}>FantasyGM Lab</AppText>
+        <AppText style={styles.title}>FantasyDesk</AppText>
         <AppText style={styles.subtitle}>
           {resetMode
             ? 'Reset your password'

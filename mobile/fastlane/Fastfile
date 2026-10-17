@@ -108,7 +108,7 @@ platform :ios do
     if existing_id
       UI.success("App ID already registered: #{existing_id.identifier}")
     else
-      Spaceship::ConnectAPI::BundleId.create(name: "FantasyGM Lab", platform: "IOS", identifier: bundle_id)
+      Spaceship::ConnectAPI::BundleId.create(name: "FantasyDesk", platform: "IOS", identifier: bundle_id)
       UI.success("Registered App ID: #{bundle_id}")
     end
 
@@ -117,7 +117,7 @@ platform :ios do
       UI.success("App Store Connect app already exists: #{existing_app.name} (id=#{existing_app.id})")
     else
       app = Spaceship::ConnectAPI::App.create(
-        name: "FantasyGM Lab",
+        name: "FantasyDesk",
         version_string: "1.0",
         sku: "fantasygmlab-app",
         primary_locale: "en-US",

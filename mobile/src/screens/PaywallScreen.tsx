@@ -72,7 +72,7 @@ function isHighImpactFeature(feature: string): boolean {
 // spell out the billing period, so the period shown on this screen is
 // derived deterministically from RevenueCat's own `packageType` instead of
 // trusting store-side copy to mention it. Keeps LIFETIME/CUSTOM/UNKNOWN safe
-// (no current FantasyGM Lab offering uses them, but this must never render
+// (no current FantasyDesk offering uses them, but this must never render
 // blank or throw if one is ever added).
 function packagePeriodLabel(type: PurchasesPackage['packageType']): string {
   switch (type) {

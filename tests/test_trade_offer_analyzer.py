@@ -187,7 +187,7 @@ def test_result_card_is_screenshot_ready():
         strategy_label="Contender",
         partner_name="Rival FC",
     )
-    assert "dg-brand-plate" in html or "FantasyGM Lab" in html
+    assert "dg-brand-plate" in html or "FantasyDesk" in html
     assert "ACCEPT" in html
     assert "You receive" in html
     assert "You send" in html

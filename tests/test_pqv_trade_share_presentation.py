@@ -103,7 +103,7 @@ def test_collapsed_trade_card_omits_fgl_founder_beta_lockup():
     assert "Founder Beta" not in card
     assert "dg-brand-plate__fgl" not in card
     brand = brand_identity.trade_screenshot_brand_html()
-    assert "FantasyGM Lab" in brand
+    assert "FantasyDesk" in brand
     assert "Founder Beta" not in brand
     assert "dg-brand-plate__fgl" not in brand
     assert "<img" in brand

@@ -94,7 +94,7 @@ export default function PlayerSharePreviewModal({
       overallRating !== null ? `${overallRating} OVR` : '',
       ratingLines,
       '',
-      'Analyzed with FantasyGM Lab',
+      'Analyzed with FantasyDesk',
     ].filter(Boolean);
     Share.share({ message: lines.join('\n') }).catch(() => {});
   };

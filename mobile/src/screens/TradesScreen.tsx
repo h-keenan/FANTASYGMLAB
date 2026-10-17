@@ -27,7 +27,7 @@ const TAB_OPTIONS: Array<{ key: TradesTab; label: string }> = [
 ];
 
 /**
- * Single host screen for FantasyGM Lab's three trade workflows — Trade Hub
+ * Single host screen for FantasyDesk's three trade workflows — Trade Hub
  * ("Trade Block"), Trade Finder ("Search"), and Trade Analyzer ("Make a
  * Trade") — consolidated behind one Madden-style trade menu per coridian_'s
  * request, replacing three standalone screens that each duplicated the same

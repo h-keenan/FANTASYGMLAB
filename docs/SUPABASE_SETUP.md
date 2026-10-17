@@ -13,7 +13,7 @@ SUPABASE_ANON_KEY = "your-public-anon-key"
 
 Use the **project URL** only (`https://<ref>.supabase.co`). Do not paste the dashboard REST endpoint (`…/rest/v1`) — the app appends `/auth/v1/...` and `/rest/v1/...` itself. A doubled `/rest/v1` path returns PostgREST `PGRST125`. Both legacy JWT anon keys and `sb_publishable_…` keys are accepted on `SUPABASE_ANON_KEY` (publishable keys go on the `apikey` header only).
 
-If either value is missing, FantasyGM Lab hides account login and continues in guest mode.
+If either value is missing, FantasyDesk hides account login and continues in guest mode.
 
 ## 2. Create account tables
 
@@ -95,20 +95,20 @@ Do **not** disable Confirm email to work around SMTP. Fix SMTP instead.
 Suggested subject:
 
 ```text
-Confirm your FantasyGM Lab account
+Confirm your FantasyDesk account
 ```
 
 Suggested body:
 
 ```text
-Welcome to FantasyGM Lab.
+Welcome to FantasyDesk.
 
 Confirm your email to finish creating your account:
 {{ .ConfirmationURL }}
 
 If you did not request this, you can ignore this email.
 
-FantasyGM Lab is an independent fantasy football tool. It is not affiliated with, endorsed by, or sponsored by Sleeper, ESPN, NFL, NFLPA, teams, players, or any fantasy platform.
+FantasyDesk is an independent fantasy football tool. It is not affiliated with, endorsed by, or sponsored by Sleeper, ESPN, NFL, NFLPA, teams, players, or any fantasy platform.
 
 Support: support@example.com
 ```
