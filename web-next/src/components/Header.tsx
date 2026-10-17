@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -134,6 +134,37 @@ function EvaluationLensButton({ leagueId }: { leagueId: string }) {
 }
 
 /**
+ * The league-aware pieces of the header (switcher/lens/league-name) —
+ * split out specifically so useParams/useSearchParams (which force Next.js
+ * to render this subtree dynamically, client-side-only) don't hold back
+ * the rest of the header too. Before this split, the ENTIRE header needed
+ * a Suspense boundary around it just for this, which meant the brand
+ * mark/wordmark — content every single page needs, league-scoped or not —
+ * had nothing in the server-rendered HTML either, a blank gap until
+ * hydration (new-user UX audit finding, 2026-10-17). Only this smaller
+ * piece needs the Suspense wrap now; the rest of Header renders
+ * synchronously on every page.
+ */
+function HeaderLeagueControls() {
+  const params = useParams<{ leagueId?: string }>();
+  const searchParams = useSearchParams();
+  const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
+  const leagueName = searchParams.get("name") || leagueId;
+
+  if (!leagueId) return null;
+
+  return (
+    <>
+      <span className="text-xs hidden sm:inline" style={{ color: "var(--color-text-muted)" }}>
+        {leagueName}
+      </span>
+      <LeagueSwitcherButton leagueId={leagueId} />
+      <EvaluationLensButton leagueId={leagueId} />
+    </>
+  );
+}
+
+/**
  * Site-wide persistent top bar — rendered once in layout.tsx, so every
  * route gets it for free (coridian_: "add ... the header", 2026-10-16).
  * League switcher + evaluation lens (2026-10-17: "The header needs to have
@@ -149,10 +180,6 @@ export function Header() {
   const { session, signOut } = useAuth();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
-  const params = useParams<{ leagueId?: string }>();
-  const searchParams = useSearchParams();
-  const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
-  const leagueName = searchParams.get("name") || leagueId;
 
   return (
     <header
@@ -166,16 +193,12 @@ export function Header() {
             FantasyGM Lab
           </span>
         </Link>
-        {leagueId ? (
-          <span className="text-xs hidden sm:inline" style={{ color: "var(--color-text-muted)" }}>
-            {leagueName}
-          </span>
-        ) : null}
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        {leagueId ? <LeagueSwitcherButton leagueId={leagueId} /> : null}
-        {leagueId ? <EvaluationLensButton leagueId={leagueId} /> : null}
+        <Suspense fallback={null}>
+          <HeaderLeagueControls />
+        </Suspense>
 
         <div className="relative">
           <button
