@@ -147,6 +147,7 @@ export interface BriefingMentionedPlayer {
   position: string;
   team: string;
   player_tier: string;
+  injury_status?: string;
 }
 
 export interface BriefingItem {
@@ -161,6 +162,7 @@ export interface BriefingItem {
   route_player_team: string;
   route_player_tier: string;
   route_player_score: number | null;
+  route_player_injury_status: string;
   // Every player the card's text actually names (e.g. Injury Alert's "3
   // injured starters") — not just the single route_player_* above. Empty
   // for every single-player tile.

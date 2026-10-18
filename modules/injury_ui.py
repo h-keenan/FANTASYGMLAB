@@ -276,6 +276,7 @@ def my_team_injury_alert(context) -> dict:
     route_player_team = str(single_starter.get("team") or "") if single_starter else ""
     route_player_tier = str(single_starter.get("player_tier") or "") if single_starter else ""
     route_player_score = single_starter.get("player_value_score") if single_starter else None
+    route_player_injury_status = str(single_starter.get("injury_status") or "") if single_starter else ""
     # Every player the "note" text above actually names (up to 3, same cap
     # as role_summaries) — not just the single `route_player_*` starter.
     # coridian_, 2026-10-17: "all players mentioned need to have the player
@@ -289,6 +290,7 @@ def my_team_injury_alert(context) -> dict:
             "position": str(item.get("position") or ""),
             "team": str(item.get("team") or ""),
             "player_tier": str(item.get("player_tier") or ""),
+            "injury_status": str(item.get("injury_status") or ""),
         }
         for item in actionable[:3]
         if item.get("player_id") and item.get("name")
@@ -302,6 +304,7 @@ def my_team_injury_alert(context) -> dict:
         "route_player_team": route_player_team,
         "route_player_tier": route_player_tier,
         "route_player_score": route_player_score,
+        "route_player_injury_status": route_player_injury_status,
         "mentioned_players": mentioned_players,
         "starter_count": starter_count,
         "weekly_count": weekly_count,

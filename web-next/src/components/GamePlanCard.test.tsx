@@ -16,6 +16,7 @@ const BASE: BriefingItem = {
   route_player_team: "",
   route_player_tier: "",
   route_player_score: null,
+  route_player_injury_status: "",
   mentioned_players: [],
   recommendation_narrative: null,
   presentation: null,

@@ -2,6 +2,7 @@ import type { TradeAsset } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 
 /**
@@ -75,9 +76,12 @@ export function TradeAssetRow({
           <PositionBadge position={asset.position} />
           <PlayerAvatar playerId={asset.player_id} tier={asset.tier} size={40} />
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {asset.name || "Player"}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                {asset.name || "Player"}
+              </span>
+              <PlayerInjuryBadge status={asset.injury_status} />
+            </div>
             <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
               {[asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || "Player"}
             </span>
@@ -88,9 +92,12 @@ export function TradeAssetRow({
           <PositionBadge position={asset.position} />
           <PlayerAvatar playerId={asset.player_id} tier={asset.tier} size={40} />
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-              {asset.name || "Player"}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                {asset.name || "Player"}
+              </span>
+              <PlayerInjuryBadge status={asset.injury_status} />
+            </div>
             <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
               {[asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || "Player"}
             </span>

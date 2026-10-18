@@ -17,6 +17,7 @@ function briefingItem(overrides: Partial<BriefingItem>): BriefingItem {
     route_player_team: "SF",
     route_player_tier: "starter",
     route_player_score: 88,
+    route_player_injury_status: "",
     mentioned_players: [],
     recommendation_narrative: null,
     presentation: null,

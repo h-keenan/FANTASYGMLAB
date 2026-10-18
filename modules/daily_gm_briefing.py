@@ -90,6 +90,13 @@ class DailyBriefingItem:
     route_player_team: str = ""
     route_player_tier: str = ""
     route_player_score: float | None = None
+    # coridian_, 2026-10-18: "we need a status glyph? icon indicator
+    # indicating injury status including IR, questionable, pending etc." —
+    # same already-computed injury_status text every tile builder's
+    # underlying row carries (never a second lookup, never fabricated).
+    # Empty when healthy/unknown, same convention as every other
+    # route_player_* optional-identity field above.
+    route_player_injury_status: str = ""
     route_focus_mode: str = ""
     # Every player a multi-player tile's note text actually names (e.g.
     # Injury Alert's "3 injured starters"), each with the same identity
@@ -267,6 +274,7 @@ def _item_from_tile(
         route_player_team=_text(tile.get("route_player_team")),
         route_player_tier=_text(tile.get("route_player_tier")),
         route_player_score=tile.get("route_player_score"),
+        route_player_injury_status=_text(tile.get("route_player_injury_status")),
         route_focus_mode=_text(tile.get("route_focus_mode")),
         mentioned_players=tuple(
             dict(item)
