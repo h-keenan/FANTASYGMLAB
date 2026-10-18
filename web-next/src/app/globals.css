@@ -1298,7 +1298,16 @@ a {
 .onboarding-shell {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  /* Zach, 2026-10-18 (screenshot): the GM orb's floating trigger button
+     (fixed, z-index:40, always rendered app-wide whenever a user is
+     signed in — see GmOrb.tsx's `if (!session) return null`) was tying/
+     overlapping with this shell instead of staying hidden behind it, even
+     though 50 > 40 — the orb mounts as a sibling of the page content in
+     RootLayout, not inside it, so this needed real margin above every
+     other z-index this app uses (PQV's backdrop, Header's dropdowns, and
+     the orb's own open sheet all also sit at 50) to be unambiguously the
+     top layer, not just nominally higher than one of them. */
+  z-index: 100;
   background: #000;
   color: #f5f7fa;
   overflow: hidden;
