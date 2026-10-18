@@ -1304,11 +1304,15 @@ def pqv_hero_html(
             f" title='{escape(identity.accessibility_label, quote=True)}'"
             f" aria-label='{escape(identity.accessibility_label, quote=True)}'"
         )
-        # Hero header: one solid-fill pill for this one player, filled with the
-        # tier's own color and inked for contrast. Dense lists keep the
-        # translucent dg-tier-* chip; this is the single-player display.
+        # coridian_, 2026-10-18: the prestige ring "just looks like a border
+        # around PFPs" — merges the tier label onto the ring itself (sits on
+        # the portrait's bottom edge) rather than a plain colored outline
+        # with the label floating separately next to the name. One solid-
+        # fill pill for this one player, filled with the tier's own color
+        # and inked for contrast. Dense lists keep the translucent dg-tier-*
+        # chip; this is the single-player display.
         tier_label_html = (
-            "<div class='pqv-hero-tier pqv-hero-tier--solid'"
+            "<div class='pqv-hero-tier pqv-hero-tier--solid pqv-hero-tier--on-ring'"
             f" data-player-tier='{escape(identity.tier_id, quote=True)}'"
             f" style='{escape(tier_solid_pill_style(identity), quote=True)}'"
             f" title='{escape(identity.accessibility_label, quote=True)}'>"
@@ -1327,10 +1331,9 @@ def pqv_hero_html(
     )
     return (
         "<header class='pqv-identity player-quick-view-header-band player-quick-view-hero'>"
-        f"<div class='{portrait_class}'{portrait_attrs}>{avatar_html}</div>"
+        f"<div class='{portrait_class}'{portrait_attrs}>{avatar_html}{tier_label_html}</div>"
         "<div class='player-quick-view-copy'>"
         + (f"<div class='player-quick-view-source'>{escape(_text(source_label))}</div>" if _text(source_label) else "")
-        + tier_label_html
         + f"<h3 class='player-quick-view-name'>{escape(_text(name) or 'Player')}</h3>"
         + f"<div class='player-quick-view-meta'>{escape(_text(position) or 'Player')} · {escape(_text(team) or 'FA')} · Age {escape(_text(age_text) or 'N/A')}</div>"
         + freshness_html
