@@ -67,7 +67,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
           options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
         });
-        return { error: error?.message ?? null, signedIn: Boolean(data.session) };
+        if (error) return { error: error.message, signedIn: false };
+        // coridian_, 2026-10-18: "I create an account. It doesn't say
+        // anything... I try to sign in again and nothing happens, and it
+        // just says invalid." Root cause: Supabase's anti-enumeration
+        // behavior — calling signUp for an email that ALREADY has an
+        // account returns no error and no session, identical on the wire
+        // to "brand new signup, confirmation email pending." The only
+        // client-visible signal that tells these apart is `identities`:
+        // empty for an existing account (confirmed, so no email was ever
+        // sent for *this* call), non-empty for a genuinely new one. Every
+        // caller of this before today silently treated both as "check
+        // your email," which is actively wrong and misleading for an
+        // account that already exists — the real fix here, not just a
+        // UI polish pass.
+        if (data.user && data.user.identities && data.user.identities.length === 0) {
+          return { error: "An account with this email already exists. Try signing in instead.", signedIn: false };
+        }
+        return { error: null, signedIn: Boolean(data.session) };
       },
       signInAsGuest: async () => {
         // Requires "Allow anonymous sign-ins" enabled in the Supabase

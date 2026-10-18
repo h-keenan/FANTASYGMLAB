@@ -50,7 +50,7 @@ describe("SignInForm", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
   });
 
-  it("does not call onSignedIn after a successful sign-up when email confirmation is still pending", async () => {
+  it("shows a dedicated, unmissable Check your email screen when confirmation is still pending", async () => {
     signUp.mockResolvedValue({ error: null, signedIn: false });
     const onSignedIn = vi.fn();
     render(<SignInForm onSignedIn={onSignedIn} />);
@@ -63,9 +63,39 @@ describe("SignInForm", () => {
 
     await waitFor(() => expect(signUp).toHaveBeenCalledWith("new@example.com", "password1"));
     expect(onSignedIn).not.toHaveBeenCalled();
-    expect(await screen.findByText(/Check your email to confirm your account/)).toBeInTheDocument();
-    // Flipped back to the sign-in form, not left stuck on create-account.
+    // coridian_, 2026-10-18: "I create an account. It doesn't say
+    // anything" — a small text notice folded back into the sign-in form
+    // was too easy to miss; this is now its own full screen.
+    expect(await screen.findByRole("heading", { name: "Check your email" })).toBeInTheDocument();
+    expect(screen.getByText(/new@example\.com/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to sign in" }));
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  // coridian_, 2026-10-18: root cause of "create account... it just says
+  // invalid" — Supabase's anti-enumeration signUp response for an
+  // ALREADY-registered email is indistinguishable from "needs
+  // confirmation" except for an empty `identities` array. AuthContext now
+  // surfaces a real, specific error for this case instead of silently
+  // treating it as "check your email."
+  it("surfaces a clear error when signUp returns Supabase's already-registered signal", async () => {
+    signUp.mockResolvedValue({
+      error: "An account with this email already exists. Try signing in instead.",
+      signedIn: false,
+    });
+    const onSignedIn = vi.fn();
+    render(<SignInForm onSignedIn={onSignedIn} />);
+
+    continuePastEmailStep("already@example.com");
+    fireEvent.click(screen.getByRole("button", { name: "New here? Create account" }));
+    fillAgeGate();
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByText("An account with this email already exists. Try signing in instead.")).toBeInTheDocument();
+    expect(onSignedIn).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "Check your email" })).not.toBeInTheDocument();
   });
 
   it("calls onSignedIn immediately after sign-up when the project auto-confirms email", async () => {

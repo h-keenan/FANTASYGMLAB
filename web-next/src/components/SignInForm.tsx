@@ -61,13 +61,12 @@ const FIELD_STYLE: React.CSSProperties = {
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const { signIn, signUp } = useAuth();
-  const [step, setStep] = useState<"email" | "password">("email");
+  const [step, setStep] = useState<"email" | "password" | "check-email">("email");
   const [mode, setMode] = useState<"sign-in" | "create-account">("sign-in");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const handleEmailContinue = (event: React.FormEvent) => {
@@ -80,7 +79,6 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    setNotice(null);
     const result = mode === "sign-in" ? await signIn(email, password) : await signUp(email, password);
     setBusy(false);
     if (result.error) {
@@ -88,13 +86,49 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
       return;
     }
     if (mode === "create-account" && !("signedIn" in result && result.signedIn)) {
-      setNotice("Check your email to confirm your account, then sign in.");
-      setMode("sign-in");
-      setAgeConfirmed(false);
+      // coridian_, 2026-10-18: "I create an account. It doesn't say
+      // anything. It takes me back to the default sign-in page..." — a
+      // small text notice folded back into the sign-in form (now gone)
+      // was too easy to miss, especially for the one outcome a new user
+      // most needs to actually notice. A full dedicated screen can't be
+      // scrolled past unread.
+      setStep("check-email");
       return;
     }
     onSignedIn();
   };
+
+  if (step === "check-email") {
+    return (
+      <div className="flex flex-col gap-4 p-6 text-center items-center" style={GLASS_CARD_STYLE}>
+        <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          Check your email
+        </h2>
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          We sent a confirmation link to <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong>.
+          Confirm your account, then come back here to sign in.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setStep("password");
+            setMode("sign-in");
+            setAgeConfirmed(false);
+            setError(null);
+          }}
+          className="px-4 py-2.5 text-sm font-bold"
+          style={{
+            background: "var(--color-accent-strong)",
+            color: "var(--color-brand-mark-ink)",
+            fontWeight: "var(--font-weight-button)",
+            borderRadius: "12px",
+          }}
+        >
+          Back to sign in
+        </button>
+      </div>
+    );
+  }
 
   if (step === "email") {
     return (
@@ -142,7 +176,6 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         onClick={() => {
           setStep("email");
           setError(null);
-          setNotice(null);
         }}
         className="self-start text-xs"
         style={{ color: "var(--color-text-muted)" }}
@@ -174,11 +207,6 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
                 {error}
               </p>
             ) : null}
-            {notice ? (
-              <p className="text-xs" style={{ color: "var(--color-success)" }}>
-                {notice}
-              </p>
-            ) : null}
             <button
               type="submit"
               disabled={busy}
@@ -203,7 +231,6 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           setMode(mode === "sign-in" ? "create-account" : "sign-in");
           setAgeConfirmed(false);
           setError(null);
-          setNotice(null);
         }}
         className="text-xs underline self-start"
         style={{ color: "var(--color-text-muted)" }}
