@@ -14,6 +14,14 @@ interface AuthContextValue {
    * treat a successful signUp as "signed in" when it's false, since no
    * session exists yet (confirmation email pending). */
   signUp: (email: string, password: string) => Promise<{ error: string | null; signedIn: boolean }>;
+  /** Redirect-based — the browser navigates away to the provider and back,
+   * so there is no session to return here; AuthContext's own
+   * onAuthStateChange listener picks up the resulting session on return,
+   * same as every other auth method. Requires the provider configured with
+   * real credentials in the Supabase dashboard (Google/Apple OAuth client
+   * id+secret) — calling it before that is configured surfaces Supabase's
+   * own "Unsupported provider" error. */
+  signInWithOAuth: (provider: "google" | "apple") => Promise<{ error: string | null }>;
   signInAsGuest: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   /** True for a currently-signed-in guest (anonymous) session — mirrors
@@ -68,6 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
         });
         return { error: error?.message ?? null, signedIn: Boolean(data.session) };
+      },
+      signInWithOAuth: async (provider) => {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+        });
+        return { error: error?.message ?? null };
       },
       signInAsGuest: async () => {
         // Requires "Allow anonymous sign-ins" enabled in the Supabase

@@ -18,15 +18,18 @@ function fillAgeGate() {
 describe("SignInForm", () => {
   const signIn = vi.fn();
   const signUp = vi.fn();
+  const signInWithOAuth = vi.fn();
 
   beforeEach(() => {
     signIn.mockReset();
     signUp.mockReset();
+    signInWithOAuth.mockReset();
     vi.mocked(useAuth).mockReturnValue({
       session: null,
       loading: false,
       signIn,
       signUp,
+      signInWithOAuth,
       signInAsGuest: vi.fn(),
       signOut: vi.fn(),
       isGuest: false,
@@ -92,5 +95,40 @@ describe("SignInForm", () => {
     expect(await screen.findByText("Email already registered")).toBeInTheDocument();
     expect(onSignedIn).not.toHaveBeenCalled();
     expect(screen.queryByText(/Check your email to confirm/)).not.toBeInTheDocument();
+  });
+
+  it("shows Google/Apple buttons immediately in sign-in mode", () => {
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue with apple/i })).toBeInTheDocument();
+  });
+
+  it("gates Google/Apple buttons behind the age gate in create-account mode", () => {
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "New here? Create account" }));
+    expect(screen.queryByRole("button", { name: /continue with google/i })).not.toBeInTheDocument();
+
+    fillAgeGate();
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeInTheDocument();
+  });
+
+  it("calls signInWithOAuth with the right provider", async () => {
+    signInWithOAuth.mockResolvedValue({ error: null });
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /continue with apple/i }));
+
+    await waitFor(() => expect(signInWithOAuth).toHaveBeenCalledWith("apple"));
+  });
+
+  it("surfaces an OAuth error instead of silently doing nothing", async () => {
+    signInWithOAuth.mockResolvedValue({ error: "Unsupported provider: provider is not enabled" });
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /continue with google/i }));
+
+    expect(await screen.findByText(/unsupported provider/i)).toBeInTheDocument();
   });
 });
