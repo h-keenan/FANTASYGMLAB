@@ -14,17 +14,28 @@ export function PremiumUpsellCard({
   upsell,
   fallbackTitle,
   fallbackBody,
+  // GM Plan (Revision 20 merge, 2026-10-18) renders this mid-page, inside
+  // its OWN <main> — Protected Players/Watching stay free below it, so a
+  // top-level `return <PremiumUpsellCard .../>` (every other caller's
+  // pattern) isn't an option there. `bare` drops this component's own
+  // <main> wrapper so it composes as a plain section instead of nesting
+  // one <main> inside another (invalid HTML, and would double the page
+  // padding/width constraints). Every existing caller omits this and
+  // keeps the full-page <main> behavior unchanged.
+  bare = false,
 }: {
   kicker: string;
   upsell: PremiumUpsell | null;
   fallbackTitle: string;
   fallbackBody: string;
+  bare?: boolean;
 }) {
   const title = upsell?.title ?? fallbackTitle;
   const body = upsell?.body ?? fallbackBody;
+  const Wrapper = bare ? "section" : "main";
 
   return (
-    <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
+    <Wrapper className={bare ? "flex flex-col gap-8" : "flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto"}>
       <header className="flex flex-col gap-1">
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {kicker}
@@ -40,6 +51,6 @@ export function PremiumUpsellCard({
           Upgrade →
         </Link>
       </div>
-    </main>
+    </Wrapper>
   );
 }

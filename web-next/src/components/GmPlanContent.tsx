@@ -577,6 +577,7 @@ export function GmPlanContent({
           upsell={data.upsell}
           fallbackTitle="Your season-arc roadmap"
           fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
+          bare
         />
       ) : quiet ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>

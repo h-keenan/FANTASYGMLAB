@@ -280,6 +280,10 @@ describe("GmPlanContent", () => {
 
     expect(screen.getByRole("heading", { name: "Your season-arc roadmap" })).toBeInTheDocument();
     expect(screen.queryByText(/We don't have enough to build a GM Plan/)).not.toBeInTheDocument();
+    // A real regression this PR fixes: PremiumUpsellCard renders its own
+    // <main> by default, and this component already has its own — nesting
+    // one inside the other is invalid HTML. `bare` must be passed here.
+    expect(screen.getAllByRole("main")).toHaveLength(1);
   });
 
   // Revision 20 (2026-10-18): Team Situation + GM Targets merged in.

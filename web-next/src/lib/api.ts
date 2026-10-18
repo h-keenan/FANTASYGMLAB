@@ -1752,6 +1752,8 @@ export interface LiveDraftDiscoveryResponse {
   error: string;
   drafts: LiveDraftSummary[];
   active_draft_id: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
 }
 
 export interface LiveDraftPickRow {
@@ -1827,6 +1829,8 @@ export interface LiveDraftTeamRow {
 export interface LiveDraftStateResponse {
   ok: boolean;
   reason: string;
+  is_premium: boolean;
+  upsell: PremiumUpsell | null;
   pick_data_stale: boolean;
   status: "drafting" | "paused" | "pre_draft" | "complete" | string;
   rounds: number;
