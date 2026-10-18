@@ -5680,6 +5680,7 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
                 "league_id": result["league_id"],
                 "league_name": result["league_name"],
                 "team_name": summary.get("team_name") or "",
+                "team_avatar_url": summary.get("team_avatar_url") or "",
                 "wins": _clean_json_value(summary.get("wins")),
                 "losses": _clean_json_value(summary.get("losses")),
                 "ties": _clean_json_value(summary.get("ties")),

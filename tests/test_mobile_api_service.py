@@ -6126,6 +6126,7 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monk
                 "reason": "",
                 "roster_id": "1",
                 "team_name": "Ok Team",
+                "team_avatar_url": "https://sleepercdn.com/avatars/ok-team.png",
                 "wins": 7,
                 "losses": 3,
                 "ties": 0,
@@ -6183,6 +6184,7 @@ def test_portfolio_aggregates_across_saved_leagues_and_isolates_one_failure(monk
     assert league["league_id"] == "league-ok"
     assert league["league_name"] == "The Ok League"
     assert league["team_name"] == "Ok Team"
+    assert league["team_avatar_url"] == "https://sleepercdn.com/avatars/ok-team.png"
     assert league["wins"] == 7
     assert league["power_rank"] == 2
     assert league["franchise_rank"] == 3
