@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, type PlayerAward, type QuickViewResponse, type WeeklyStatPoint } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
+import { ModelRadarChart } from "@/components/ModelRadarChart";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -297,8 +298,6 @@ export function PlayerQuickView({
                 </section>
               ) : null}
 
-              {model ? <SubRatingRow model={model} /> : null}
-
               {weeklyStats && weeklyStats.weeks.some((week) => week.fantasy_points_ppr != null) ? (
                 <section className="pqv-stat-season">
                   <h3>Week by Week</h3>
@@ -333,6 +332,18 @@ export function PlayerQuickView({
               {awards.length > 0 ? <AwardsStrip awards={awards} /> : null}
 
               {bio ? <BioGrid bio={bio} /> : null}
+
+              {/* coridian_, 2026-10-18: "the model section needs to be
+                  moved all the way to the bottom and have that multi-axis
+                  thing still" — Model used to sit right after Decision
+                  Fit; now the last section, after stats/college/awards/
+                  bio. SubRatingRow (model) renders a real 5-axis radar
+                  chart (ModelRadarChart) when every factor is present,
+                  same as modules/player_quick_view.py's own
+                  model_radar_chart_html — the flat chip row stays the
+                  fallback for a player without a full read on every
+                  factor, same split the Python source makes. */}
+              {model ? <SubRatingRow model={model} /> : null}
             </>
           )}
         </div>
@@ -405,21 +416,26 @@ function SubRatingRow({
     rating: model[key],
   })).filter((chip) => chip.rating != null);
   if (chips.length === 0) return null;
+  const hasFullRead = SUB_RATING_DISPLAY.every(({ key }) => model[key] != null);
   return (
     <section className="pqv-model-row" aria-label="Model sub-ratings">
       <h3>Model</h3>
-      <div className="pqv-sub-rating-row">
-        {chips.map((chip) => (
-          <span
-            key={chip.abbr}
-            className={`pqv-sub-rating-chip pqv-sub-rating-chip--${overallRatingBand(chip.rating as number)}`}
-            aria-label={`${chip.label} rating ${chip.rating} of 99`}
-          >
-            <span className="pqv-sub-rating-chip-label">{chip.abbr}</span>
-            <strong>{chip.rating}</strong>
-          </span>
-        ))}
-      </div>
+      {hasFullRead ? (
+        <ModelRadarChart model={model} />
+      ) : (
+        <div className="pqv-sub-rating-row">
+          {chips.map((chip) => (
+            <span
+              key={chip.abbr}
+              className={`pqv-sub-rating-chip pqv-sub-rating-chip--${overallRatingBand(chip.rating as number)}`}
+              aria-label={`${chip.label} rating ${chip.rating} of 99`}
+            >
+              <span className="pqv-sub-rating-chip-label">{chip.abbr}</span>
+              <strong>{chip.rating}</strong>
+            </span>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
