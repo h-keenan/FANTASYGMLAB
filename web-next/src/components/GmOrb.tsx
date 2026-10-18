@@ -52,7 +52,7 @@ export function GmOrb() {
           width: "3.25rem",
           height: "3.25rem",
           borderRadius: "50%",
-          background: "var(--color-background)",
+          background: "var(--color-bg)",
           border: "1.5px solid var(--color-accent)",
           boxShadow: "var(--shadow-card)",
           zIndex: 40,

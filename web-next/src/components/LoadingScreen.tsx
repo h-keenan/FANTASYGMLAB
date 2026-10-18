@@ -14,7 +14,7 @@ import { BRAND_NAME } from "@/lib/brand";
  */
 export function LoadingScreen({ status = "Loading…" }: { status?: string }) {
   return (
-    <main className="flex-1 flex flex-col items-center justify-center gap-3" style={{ background: "var(--color-background)" }}>
+    <main className="flex-1 flex flex-col items-center justify-center gap-3" style={{ background: "var(--color-bg)" }}>
       <Image
         src="/brand-mark.png"
         alt=""

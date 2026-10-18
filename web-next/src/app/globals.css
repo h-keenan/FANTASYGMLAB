@@ -971,6 +971,118 @@ a {
   }
 }
 
+/* Landing page forced-dark scope (src/app/page.tsx) — coridian_, 2026-10-18:
+   screenshotted the real site in light mode (a real, common system
+   preference, not a hypothetical) and it's completely flat — plain white
+   background, no visual hook. Rather than design and maintain a SEPARATE
+   light-mode treatment for the one screen most responsible for a new
+   visitor's first impression, this forces the same dark palette the
+   OnboardingCarousel already uses (immediately after this) regardless of
+   the visitor's system theme — one deliberate brand moment before the
+   rest of the app, which does respect the normal light/dark toggle, takes
+   over. Re-asserts every token the light-mode media query above overrides,
+   so any component rendered inside .fd-landing-dark (SignInForm, AgeGate,
+   SleeperImportForm, OnboardingPaywall — unmodified) resolves the same
+   dark var(--color-*) values those components already reference, with no
+   per-component changes needed. */
+.fd-landing-dark {
+  --color-bg: #000000;
+  --color-shell: #000000;
+  --color-surface-primary: #1f2226;
+  --color-surface-secondary: #1f2226;
+  --color-surface-raised: #3d4248;
+  --color-surface-muted: #000000;
+  --color-text-primary: #f7f8fa;
+  --color-text-secondary: #e5e7eb;
+  --color-text-muted: #a8adb7;
+  --color-border: #2a2e35;
+  --color-border-strong: #64748b;
+  --color-accent: #67e8f9;
+  --color-accent-strong: #22d3ee;
+  --color-accent-soft: rgba(103, 232, 249, 0.14);
+  --color-success: #22c55e;
+  --color-opportunity: #14b8a6;
+  --color-action: #facc15;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-diagnostic: #8b93ff;
+  --color-muted: rgba(229, 231, 235, 0.52);
+  --color-information: var(--color-accent);
+  --color-premium: var(--color-action);
+  --color-experimental: var(--color-diagnostic);
+  --color-prestige-elite: #d8b85a;
+  --color-prestige-starter: #d7dbe2;
+  --color-prestige-contributor: #9da4ae;
+  --color-prestige-development: #79818c;
+  --color-prestige-depth: #626a75;
+  --color-prestige-replacement: #ef6a6a;
+  --color-tier-generational: #78f2d5;
+  --color-tier-elite: #ef6cef;
+  --color-tier-impact-starter: #f06233;
+  --color-tier-starter: #b2c766;
+  --color-tier-contributor: #d7dbe2;
+  --color-tier-committee-role: #51c534;
+  --color-tier-depth-developmental: #626a75;
+  --color-position-qb: #fb7185;
+  --color-position-rb: #4ade80;
+  --color-position-wr: #38bdf8;
+  --color-position-te: #fb923c;
+  --color-position-k: #a78bfa;
+  --color-position-dst: #d4d4d8;
+  --color-success-soft: rgba(34, 197, 94, 0.15);
+  --color-opportunity-soft: rgba(20, 184, 166, 0.14);
+  --color-action-soft: rgba(250, 204, 21, 0.14);
+  --color-warning-soft: rgba(245, 158, 11, 0.14);
+  --color-danger-soft: rgba(239, 68, 68, 0.15);
+  --color-information-soft: rgba(103, 232, 249, 0.12);
+  --color-diagnostic-soft: rgba(139, 147, 255, 0.12);
+  --color-muted-soft: rgba(229, 231, 235, 0.06);
+  --focus-ring: 0 0 0 3px rgba(103, 232, 249, 0.34);
+  --shadow-surface-inset: inset 0 1px 0 rgba(248, 250, 252, 0.025);
+  color-scheme: dark;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Same hand-rolled animated field-line + sweep background the carousel
+   uses — one consistent "intriguing" visual moment across the whole
+   pre-signup experience instead of two different treatments. */
+.fd-landing-dark .onboarding-field,
+.fd-landing-dark .onboarding-sweep {
+  position: absolute;
+  z-index: 0;
+}
+.fd-landing-dark .onboarding-field {
+  inset: 0;
+  opacity: 0.55;
+  background:
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
+  animation: onboarding-field-drift 14s linear infinite;
+}
+.fd-landing-dark .onboarding-sweep {
+  top: -20%;
+  left: 0;
+  width: 34%;
+  height: 140%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.06) 45%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 55%,
+    transparent
+  );
+  animation: onboarding-sweep 7s ease-in-out infinite;
+}
+.fd-landing-dark > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* OnboardingCarousel (components/OnboardingCarousel.tsx) — a deliberate,
    one-time exception to the rest of the app's sharp-cornered design
    language (--radius-panel defaults to --radius-none everywhere else):
