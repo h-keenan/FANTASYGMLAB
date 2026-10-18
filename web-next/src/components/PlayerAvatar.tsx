@@ -32,6 +32,13 @@ export function PlayerAvatar({
   const tierIdentity = resolvePlayerTier(tier);
   const ringColor = `var(${tierIdentity.colorVar})`;
   const dimension = { width: size, height: size, borderRadius: "50%" };
+  // coridian_, 2026-10-18: "The prestige ring is still too small around
+  // player PFP's" — a flat 2px border read fine at the 24-32px sizes most
+  // list rows use, but PQV's 112px hero avatar (bumped up from 88px
+  // earlier today) made the same 2px ring proportionally even thinner.
+  // Scales up only for the larger hero-sized avatars; small list rows stay
+  // exactly as they were.
+  const borderWidth = size >= 80 ? 5 : size >= 40 ? 3 : 2;
   // coridian_: the ring color's meaning is never explained anywhere — a
   // hover tooltip naming the tier is the cheapest fix that doesn't require
   // new on-page UI real estate. Only shown when a caller actually passed a
@@ -44,7 +51,7 @@ export function PlayerAvatar({
     return (
       <span
         className="shrink-0"
-        style={{ ...dimension, display: "inline-block", border: `2px solid ${ringColor}`, background: "var(--color-surface-muted)" }}
+        style={{ ...dimension, display: "inline-block", border: `${borderWidth}px solid ${ringColor}`, background: "var(--color-surface-muted)" }}
         title={title}
         aria-hidden
       />
@@ -57,7 +64,7 @@ export function PlayerAvatar({
       src={`${SLEEPER_HEADSHOT_BASE}/${playerId}.jpg`}
       alt=""
       title={title}
-      style={{ ...dimension, border: `2px solid ${ringColor}`, objectFit: "cover", objectPosition: "top" }}
+      style={{ ...dimension, border: `${borderWidth}px solid ${ringColor}`, objectFit: "cover", objectPosition: "top" }}
       className="shrink-0"
       onError={() => setFailed(true)}
     />

@@ -950,6 +950,10 @@ a {
   border-color: var(--color-danger);
   color: var(--color-danger);
 }
+.pqv-chip--positive {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
 .pqv-body {
   display: flex;
   flex-direction: column;
