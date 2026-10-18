@@ -194,7 +194,9 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
                 className={`onboarding-glass onboarding-pick${level === "beginner" ? " onboarding-pick--selected" : ""}`}
               >
                 <div className="onboarding-row">
-                  <span style={{ fontSize: "22px" }}>🌱</span>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2" aria-hidden="true">
+                    <path d="M12 21V11M12 11C12 7 9 5 5 5c0 4 2.5 6.5 7 6M12 11c0-3.5 2-5.5 6-5.5 0 3.5-2 5.5-6 5.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                   <span className="onboarding-row-title">New to dynasty</span>
                 </div>
                 <span className="onboarding-row-body">
@@ -207,7 +209,10 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
                 className={`onboarding-glass onboarding-pick${level === "advanced" ? " onboarding-pick--selected" : ""}`}
               >
                 <div className="onboarding-row">
-                  <span style={{ fontSize: "22px" }}>🏆</span>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-premium)" strokeWidth="2" aria-hidden="true">
+                    <path d="M8 21h8M12 17v4M6 4h12v3a6 6 0 0 1-12 0V4z" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M6 5H4a2 2 0 0 0 0 4h2M18 5h2a2 2 0 0 1 0 4h-2" strokeLinecap="round" />
+                  </svg>
                   <span className="onboarding-row-title">I know my stuff</span>
                 </div>
                 <span className="onboarding-row-body">Skip the explanations — just the call, the value, and the confidence.</span>
