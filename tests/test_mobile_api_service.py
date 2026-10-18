@@ -6968,6 +6968,10 @@ def test_trade_hub_resolves_roster_and_projects_generated_ideas(monkeypatch):
     assert mock_generate.call_args.kwargs["my_roster_id"] == 1
     assert mock_generate.call_args.kwargs["team_strategy"] == "contender"
     assert mock_generate.call_args.kwargs["league_id"] == "abc"
+    # Logic audit, 2026-10-18: the effective strategy is now on the wire so
+    # the client can label a strategy-adjusted value, instead of a number
+    # that just silently differs from Waivers/Dashboard/PQV.
+    assert body["team_strategy"] == "contender"
 
 
 def test_trade_hub_resolves_partner_avatar_by_team_name(monkeypatch):

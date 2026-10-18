@@ -26,6 +26,17 @@ import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
  * PNG-export feature, not core page parity).
  */
 
+/** Backend strategy values are snake_case engine tokens (e.g.
+ * "fringe_contender") — title-case for display, same approach
+ * formatGamePlanCategory already uses for a different snake_case field. */
+function formatStrategyLabel(strategy: string): string {
+  return strategy
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export function TradeHubContent({
   leagueId,
   leagueName,
@@ -60,6 +71,18 @@ export function TradeHubContent({
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Trade ideas built around your roster — You Send / You Get, ranked by fit.
         </p>
+        {/* Logic/valuation audit, 2026-10-18: Trade Hub applies a team-
+            strategy age-curve adjustment to player value that Waivers/
+            Dashboard/PQV's plain valuation pipeline doesn't — the same
+            player can show a different number there than here, with
+            nothing explaining why. This names the strategy these values
+            were generated under instead of leaving that silent. */}
+        {data.team_strategy ? (
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Values here reflect a <strong>{formatStrategyLabel(data.team_strategy)}</strong> strategy — they may
+            differ slightly from Waivers, Dashboard, or Player Quick View.
+          </span>
+        ) : null}
       </header>
 
       {data.ideas.length === 0 ? (

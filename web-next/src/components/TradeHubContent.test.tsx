@@ -51,6 +51,7 @@ const RESPONSE: TradeHubResponse = {
   reason: "",
   ideas: [idea({})],
   entitlement: { is_premium: false, approved_count: 1, visible_count: 1, hidden_count: 0, free_limit: 2 },
+  team_strategy: "retool",
 };
 
 describe("TradeHubContent", () => {
@@ -95,15 +96,26 @@ describe("TradeHubContent", () => {
     expect(screen.getByText("3 more trade ideas available on Premium.")).toBeInTheDocument();
   });
 
+  // Logic/valuation audit, 2026-10-18: Trade Hub applies a team-strategy
+  // age-curve adjustment to player value that Waivers/Dashboard/PQV's
+  // plain valuation pipeline doesn't — nothing in the UI explained why the
+  // same player could show a different number across tabs.
+  it("names the strategy these values were generated under", () => {
+    const contender: TradeHubResponse = { ...RESPONSE, team_strategy: "fringe_contender" };
+    render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={contender} />);
+
+    expect(screen.getByText("Fringe Contender")).toBeInTheDocument();
+  });
+
   it("shows the roster-not-ready message instead of an empty board when `reason` is set", () => {
-    const notReady: TradeHubResponse = { ok: true, reason: "empty_roster", ideas: [], entitlement: null };
+    const notReady: TradeHubResponse = { ok: true, reason: "empty_roster", ideas: [], entitlement: null, team_strategy: "" };
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={notReady} />);
 
     expect(screen.getByText(/Your roster in this league looks empty/)).toBeInTheDocument();
   });
 
   it("shows a no-ideas message when the board is empty for a real reason-less roster", () => {
-    const empty: TradeHubResponse = { ok: true, reason: "", ideas: [], entitlement: null };
+    const empty: TradeHubResponse = { ok: true, reason: "", ideas: [], entitlement: null, team_strategy: "retool" };
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={empty} />);
 
     expect(screen.getByText(/No trade ideas right now/)).toBeInTheDocument();
