@@ -153,6 +153,16 @@ describe("PlayerQuickView", () => {
     expect(screen.getByText(/88th pct/)).toBeInTheDocument();
     expect(screen.getByText(/Top-3 WR/)).toBeInTheDocument();
     expect(screen.getByText("Ohio State")).toBeInTheDocument();
+
+    // coridian_, 2026-10-18: "Starter and usage still need to be color
+    // coordinated" — the tier chip matches the avatar's own prestige-ring
+    // color (same resolvePlayerTier source), and the usage chip carries
+    // its real positive/negative tone instead of the same flat gray as
+    // every other inert chip.
+    const tierChip = screen.getByText("starter");
+    expect(tierChip.style.color).toBe("var(--color-tier-starter)");
+    const usageChip = screen.getByText(/12% usage/);
+    expect(usageChip.className).toContain("pqv-chip--positive");
   });
 
   it("shows the week-by-week points chart once weekly stats load", async () => {

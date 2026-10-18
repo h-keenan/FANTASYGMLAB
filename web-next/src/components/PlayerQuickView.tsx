@@ -9,6 +9,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
 import { WeeklyPointsPanel } from "@/components/WeeklyPointsChart";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
+import { resolvePlayerTier } from "@/lib/playerTier";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
   SUB_RATING_DISPLAY,
@@ -271,13 +272,25 @@ export function PlayerQuickView({
           </div>
         </div>
         <div className="pqv-signal-row">
-          {identity.tier ? <span className="pqv-chip">{identity.tier}</span> : null}
+          {/* coridian_, 2026-10-18: "Starter and usage still need to be
+              color coordinated" — both previously rendered as the same
+              flat gray .pqv-chip as every other chip here, no different
+              from an inert label. Tier now matches the avatar's own
+              prestige-ring color (same resolvePlayerTier source, so a
+              player's ring and tier chip always agree); usage uses its
+              own real tone (positive/negative) the API already computes
+              (modules.rankings.recency_trend_display), not a new rule. */}
+          {identity.tier ? (
+            <span className="pqv-chip" style={{ borderColor: `var(${resolvePlayerTier(identity.tier).colorVar})`, color: `var(${resolvePlayerTier(identity.tier).colorVar})` }}>
+              {identity.tier}
+            </span>
+          ) : null}
           {identity.opportunity_label ? <span className="pqv-chip">{identity.opportunity_label}</span> : null}
           {injury.label ? (
             <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
           ) : null}
           {model?.usage_trend ? (
-            <span className="pqv-chip">
+            <span className={`pqv-chip pqv-chip--${model.usage_trend.tone === "positive" ? "positive" : "danger"}`}>
               {model.usage_trend.arrow} {model.usage_trend.trend_pct}% usage · {model.usage_trend.confidence_label}
             </span>
           ) : null}

@@ -24,4 +24,15 @@ describe("PlayerAvatar", () => {
 
     expect(container.querySelector("span")).toHaveAttribute("title", "Impact Starter");
   });
+
+  // coridian_, 2026-10-18: "The prestige ring is still too small around
+  // player PFP's" — a flat 2px border read fine at small list-row sizes
+  // but was proportionally thin on PQV's 112px hero avatar.
+  it("thickens the ring for larger hero-sized avatars without changing small list-row sizes", () => {
+    const small = render(<PlayerAvatar playerId="p1" tier="starter" size={32} />);
+    expect(small.container.querySelector("img")?.style.border).toContain("2px");
+
+    const hero = render(<PlayerAvatar playerId="p1" tier="starter" size={112} />);
+    expect(hero.container.querySelector("img")?.style.border).toContain("5px");
+  });
 });
