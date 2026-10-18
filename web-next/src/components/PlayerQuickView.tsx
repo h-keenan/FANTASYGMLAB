@@ -193,6 +193,12 @@ export function PlayerQuickView({
           transition: isDragging ? "none" : "transform 180ms ease",
         }}
       >
+        {/* coridian_, 2026-10-18: "Also need that moving background behind
+            the pqv" — same field/sweep texture as the GM orb sheet,
+            contained to this modal rather than the viewport-fixed global
+            layer (which sits behind this modal's own opaque background). */}
+        <div className="pqv-field" aria-hidden="true" />
+        <div className="pqv-sweep" aria-hidden="true" />
         <div
           className="pqv-drag-handle"
           onPointerDown={handleDragStart}
@@ -212,6 +218,8 @@ export function PlayerQuickView({
         >
           ×
         </button>
+
+        <div className="pqv-scroll">
 
         {/* coridian_, 2026-10-18: "rework the top of the pqv with a bigger
             pfp and reorganized top" — the 88px avatar sat beside a narrow
@@ -341,6 +349,7 @@ export function PlayerQuickView({
             </a>
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   );
