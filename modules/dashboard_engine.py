@@ -150,6 +150,7 @@ def build_injury_tile(injury_display_context: Mapping[str, Any]) -> dict[str, An
         "route_player_team": alert.get("route_player_team") or "",
         "route_player_tier": alert.get("route_player_tier") or "",
         "route_player_score": alert.get("route_player_score"),
+        "route_player_injury_status": alert.get("route_player_injury_status") or "",
         "mentioned_players": alert.get("mentioned_players") or [],
     }
 
@@ -193,6 +194,7 @@ def build_waiver_tile(
         "route_player_team": _text(top_waiver.get("team")),
         "route_player_tier": _text(top_waiver.get("player_tier")),
         "route_player_score": top_waiver.get(score_field),
+        "route_player_injury_status": _text(top_waiver.get("injury_status")),
         "recommendation_narrative": narrative.to_dict() if narrative else None,
         "recommendation_id": narrative.recommendation_id if narrative else "",
     }
@@ -241,6 +243,7 @@ def build_value_trend_tile(roster_df: pd.DataFrame, score_field: str) -> dict[st
             "route_player_team": _text(row.get("team")),
             "route_player_tier": _text(row.get("player_tier")),
             "route_player_score": row.get(score_field),
+            "route_player_injury_status": _text(row.get("injury_status")),
         }
     return None
 

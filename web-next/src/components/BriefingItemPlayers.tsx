@@ -2,6 +2,7 @@ import type { BriefingItem } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
+import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 
 /**
@@ -75,6 +76,7 @@ export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem;
           </span>
           <PlayerAvatar playerId={item.route_player_id} tier={item.route_player_tier} size={32} />
           <span style={{ color: "var(--color-text-muted)" }}>{item.route_player_name}</span>
+          <PlayerInjuryBadge status={item.route_player_injury_status} />
           {item.route_player_team ? <span style={{ color: "var(--color-text-muted)" }}>· {item.route_player_team}</span> : null}
         </PlayerIdentityTrigger>
       ) : null}
@@ -97,6 +99,7 @@ export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem;
           </span>
           <PlayerAvatar playerId={player.player_id} tier={player.player_tier} size={32} />
           <span style={{ color: "var(--color-text-muted)" }}>{player.name}</span>
+          <PlayerInjuryBadge status={player.injury_status} />
           {player.team ? <span style={{ color: "var(--color-text-muted)" }}>· {player.team}</span> : null}
         </PlayerIdentityTrigger>
       ))}
