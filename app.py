@@ -5145,9 +5145,18 @@ def render_player_quick_view_content(
                 )
                 if decision_fit_html:
                     st.markdown(decision_fit_html, unsafe_allow_html=True)
-                sub_rating_row_html = player_quick_view.sub_rating_row_html(
-                    player_quick_view.sub_ratings(df_players, row)
-                )
+                model_sub_ratings = player_quick_view.sub_ratings(df_players, row)
+                # coridian_: "it needs to be one of those multi-axis graphs
+                # where it shows the multiple strengths of different
+                # attributes... like they have in RPGs." Radar chart first
+                # (the new visual read), exact chip numbers underneath
+                # (unchanged) — the radar only renders when every factor has
+                # a real value, so a thinner-pool player without a full read
+                # still gets the chip row's per-factor fallback.
+                model_radar_html = player_quick_view.model_radar_chart_html(model_sub_ratings)
+                if model_radar_html:
+                    st.markdown(model_radar_html, unsafe_allow_html=True)
+                sub_rating_row_html = player_quick_view.sub_rating_row_html(model_sub_ratings)
                 if sub_rating_row_html:
                     st.markdown(sub_rating_row_html, unsafe_allow_html=True)
                 st.markdown(advanced_detail_rows_html, unsafe_allow_html=True)

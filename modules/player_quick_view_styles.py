@@ -178,6 +178,14 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
 .pqv-sub-rating-chip--low strong{color:var(--color-danger)}
 .pqv-sub-rating-chip--mid strong{color:var(--color-action)}
 .pqv-sub-rating-chip--high strong{color:var(--color-success)}
+.pqv-radar{display:flex;justify-content:center;margin:0 0 var(--space-sm)}
+.pqv-radar-svg{height:auto;max-width:15rem;width:100%}
+.pqv-radar-grid-ring{fill:none;stroke:var(--color-border);stroke-width:1}
+.pqv-radar-spoke{stroke:var(--color-border);stroke-width:1}
+.pqv-radar-data{fill:color-mix(in srgb,var(--color-accent-strong) 28%,transparent);stroke:var(--color-accent-strong);stroke-linejoin:round;stroke-width:1.5}
+.pqv-radar-dot{fill:var(--color-accent-strong)}
+.pqv-radar-label{fill:var(--color-text-muted);font-size:9px;letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
+.pqv-radar-label-value{fill:var(--color-text-primary);font-variant-numeric:tabular-nums;font-weight:var(--font-weight-button)}
 .player-dossier-timeline-metrics{display:grid;gap:var(--space-2xs) var(--space-sm);grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-dossier-timeline-metrics span{color:var(--color-text-secondary);font-size:var(--font-size-caption);overflow-wrap:anywhere}
 .player-dossier-timeline-year{display:grid;gap:2px}
