@@ -111,7 +111,9 @@ function LandingPageContent() {
   }
 
   return (
-    <main className="flex-1 flex flex-col items-center px-4 py-12 gap-10">
+    <main className="fd-landing-dark flex-1 flex flex-col items-center px-4 py-12 gap-10">
+      <div className="onboarding-field" aria-hidden="true" />
+      <div className="onboarding-sweep" aria-hidden="true" />
       {/* Hero / value prop — previously this page had none at all, nothing
           to tell a new visitor what the app even is (coridian_, 2026-10-17:
           "there is no clear representation as to what the app is"). Copy
