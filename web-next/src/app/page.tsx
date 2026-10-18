@@ -129,6 +129,16 @@ function LandingPageContent() {
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-6">
+        {/* coridian_, 2026-10-18: "we need to specify on the website that
+            it's sleeper for the username and sleeper leagues right now
+            until we get ESPN integration down, then we can differentiate"
+            — a new addition here, not a rephrase of the hero copy above
+            (that's approved, do-not-rephrase product copy). The actual
+            field label/explanation already said "Sleeper" (onboarding
+            audit, 2026-10-18), but nothing said so before reaching it. */}
+        <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
+          Works with your Sleeper league — ESPN support is on the way.
+        </p>
         <div className="flex" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
           <button
             onClick={() => setTab("account")}
