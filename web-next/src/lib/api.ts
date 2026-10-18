@@ -555,6 +555,12 @@ export interface WaiversResponse {
    * "nothing to show" return paths (no player data / no free agents). */
   injured_starters?: number;
   injury_positions?: string[];
+  /** Sleeper's authoritative settings.waiver_budget / waiver_budget_used
+   * (modules/faab.py), already computed server-side for each priority
+   * add's own FAAB guidance — now also exposed as its own field. Absent
+   * on the two early "nothing to show" return paths. */
+  faab_remaining?: number | null;
+  faab_initial?: number | null;
   // Secondary waiver board (Stash Candidates / Watchlist Depth / FAAB
   // Shortlist) — empty for Free, populated for Premium. Matches web's
   // modules/waivers_ui.py Premium-only gate.

@@ -7468,6 +7468,17 @@ def get_league_waivers(
             if str(pos).upper() in {"QB", "RB", "WR", "TE", "K"}
         }
         injured_starters = int(injury_context.get("injured_starters") or 0)
+        # coridian_, 2026-10-18: "this says current need none when i
+        # beluve i have needs for my team" — get_needed_positions(...,
+        # include_fallback=False) only returns strict true_needs, which
+        # excludes a position with an injured starter whose backup still
+        # clears the weekly-coverage bar (temporary_injury_pressure, not
+        # a true_need). Dashboard/GM Plan's "Biggest Team Need" tile uses
+        # select_need_headline, a broader priority ladder that DOES
+        # surface injury pressure — union it in here so Waivers' "Current
+        # need" (and Priority Adds ranking, which also reads this list)
+        # match what the user already sees elsewhere in the app.
+        needed_positions = sorted(set(needed_positions) | injury_positions)
 
     if injury_positions:
         positions_upper = free_agents["position"].fillna("").astype(str).str.upper()
@@ -7624,6 +7635,14 @@ def get_league_waivers(
         # without re-deriving roster_injury_context client-side.
         "injured_starters": injured_starters,
         "injury_positions": sorted(injury_positions),
+        # coridian_, 2026-10-18: "our backend can read current ffa
+        # balance! ... i think we set it up just assuming it couldnt
+        # read that info" — faab_budget (Sleeper's authoritative
+        # settings.waiver_budget / waiver_budget_used, modules/faab.py)
+        # was already computed above for each priority-add's own FAAB
+        # guidance but never surfaced as its own field.
+        "faab_remaining": faab_budget.remaining,
+        "faab_initial": faab_budget.initial,
         "stash_candidates": stash_candidates,
         "watchlist_candidates": watchlist_candidates,
         "faab_targets": faab_targets,
