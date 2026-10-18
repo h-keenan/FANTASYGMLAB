@@ -58,12 +58,32 @@ const FIELD_STYLE: React.CSSProperties = {
  * every league they saved would belong to that throwaway anonymous
  * identity, never to the email+password account actually sitting in
  * Supabase.
+ *
+ * Rebuilt again, same day (Zach, all caps, after the segmented-control
+ * version above shipped): "EMAIL AUTH STILL FUCKING BROKEN, I PUT THE
+ * EMAIL IN, THEN IT ASKS ME TO SIGN IN OR CREATE ACCOUNT WHEN THAT SHOULD
+ * BE AUTOMATICALLY DONE." The explicit Sign in/Create account tabs above
+ * were themselves a deliberate fix for a real, separate complaint earlier
+ * today (coridian_: the old buried text link was too easy to miss) — this
+ * isn't reverting that fix, it's removing the need for ANY pre-choice at
+ * all. Step 2 is now just password + one Continue button: attempt
+ * signIn first, and only on failure attempt signUp — reusing the exact
+ * identities-array signal the "already exists" root-cause fix above
+ * already computes to tell "wrong password on a real account" apart from
+ * "no account yet" (Supabase's sign-in error is identical generic text
+ * for both, same anti-enumeration behavior as signUp). Neither stakeholder
+ * ask is actually in conflict: there's no hidden link to miss (coridian_'s
+ * original complaint) because there's nothing to choose at all, and it
+ * resolves automatically either way (Zach's ask).
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const { signIn, signUp } = useAuth();
   const [step, setStep] = useState<"email" | "password" | "check-email">("email");
-  const [mode, setMode] = useState<"sign-in" | "create-account">("sign-in");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  // Set only once signIn has actually failed and this turned out to need
+  // the signUp fallback — an existing user who signs in correctly never
+  // sees this at all.
+  const [needsAgeGate, setNeedsAgeGate] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -75,27 +95,54 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     setStep("password");
   };
 
+  const finishSignUp = async () => {
+    const result = await signUp(email, password);
+    setBusy(false);
+    if (result.error) {
+      // "already exists" only comes back from signUp's own identities
+      // check — meaning signIn's earlier generic failure was actually a
+      // wrong password on a real account, not a missing one.
+      setError(
+        result.error.toLowerCase().includes("already exists")
+          ? "Incorrect password. Try again."
+          : result.error,
+      );
+      return;
+    }
+    if (result.signedIn) {
+      onSignedIn();
+      return;
+    }
+    // coridian_, 2026-10-18: "I create an account. It doesn't say
+    // anything. It takes me back to the default sign-in page..." — a
+    // small text notice folded back into the sign-in form (now gone)
+    // was too easy to miss, especially for the one outcome a new user
+    // most needs to actually notice. A full dedicated screen can't be
+    // scrolled past unread.
+    setStep("check-email");
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const result = mode === "sign-in" ? await signIn(email, password) : await signUp(email, password);
-    setBusy(false);
-    if (result.error) {
-      setError(result.error);
+    const signInResult = await signIn(email, password);
+    if (!signInResult.error) {
+      setBusy(false);
+      onSignedIn();
       return;
     }
-    if (mode === "create-account" && !("signedIn" in result && result.signedIn)) {
-      // coridian_, 2026-10-18: "I create an account. It doesn't say
-      // anything. It takes me back to the default sign-in page..." — a
-      // small text notice folded back into the sign-in form (now gone)
-      // was too easy to miss, especially for the one outcome a new user
-      // most needs to actually notice. A full dedicated screen can't be
-      // scrolled past unread.
-      setStep("check-email");
+    // Could be "no account yet" (a genuinely new user) or "wrong password"
+    // on an existing one — confirm age before the signUp attempt that
+    // would disambiguate them, never retroactively once an account might
+    // already exist, same as the age gate every other account-creating
+    // path in this app (the guest tab's own AgeGate) already requires.
+    if (!ageConfirmed) {
+      setBusy(false);
+      setNeedsAgeGate(true);
       return;
     }
-    onSignedIn();
+    await finishSignUp();
   };
 
   if (step === "check-email") {
@@ -112,8 +159,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           type="button"
           onClick={() => {
             setStep("password");
-            setMode("sign-in");
-            setAgeConfirmed(false);
+            setNeedsAgeGate(false);
             setError(null);
           }}
           className="px-4 py-2.5 text-sm font-bold"
@@ -183,94 +229,56 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         ← {email}
       </button>
 
-      {/* coridian_, 2026-10-18: "it kind of hinders new users... because
-          it's something that they have to look for in the fine print
-          underneath login" — the sign-in/create-account choice was a tiny
-          underlined text link below the submit button, easy to miss
-          entirely. Now a real, equally-weighted segmented control right at
-          the top of this step, same visual language the old page-level
-          "Sign in / Create account" vs. "Try without an account" tabs
-          used, so a new user sees both options before they even reach the
-          password field instead of defaulting silently into sign-in. */}
-      <div role="tablist" className="flex" style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.12)" }}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "sign-in"}
-          onClick={() => {
-            setMode("sign-in");
-            setAgeConfirmed(false);
-            setError(null);
-          }}
-          className="flex-1 px-3 py-2 text-sm font-bold"
-          style={{
-            color: mode === "sign-in" ? "var(--color-accent)" : "var(--color-text-muted)",
-            borderBottom: mode === "sign-in" ? "2px solid var(--color-accent)" : "none",
-            marginBottom: "-1px",
-          }}
-        >
-          Sign in
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "create-account"}
-          onClick={() => {
-            setMode("create-account");
-            setError(null);
-          }}
-          className="flex-1 px-3 py-2 text-sm font-bold"
-          style={{
-            color: mode === "create-account" ? "var(--color-accent)" : "var(--color-text-muted)",
-            borderBottom: mode === "create-account" ? "2px solid var(--color-accent)" : "none",
-            marginBottom: "-1px",
-          }}
-        >
-          Create account
-        </button>
-      </div>
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+        Enter your password to continue — we&apos;ll sign you in, or set up your account if this is your first time.
+      </p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Password
-          <input
-            type="password"
-            required
-            autoFocus
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="px-3 py-2.5"
-            style={FIELD_STYLE}
-          />
-        </label>
+      {needsAgeGate && !ageConfirmed ? (
+        <AgeGate
+          onConfirmed={() => {
+            setAgeConfirmed(true);
+            setNeedsAgeGate(false);
+            setBusy(true);
+            void finishSignUp();
+          }}
+        />
+      ) : (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            Password
+            <input
+              type="password"
+              required
+              autoFocus
+              minLength={6}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="px-3 py-2.5"
+              style={FIELD_STYLE}
+            />
+          </label>
 
-        {mode === "create-account" && !ageConfirmed ? (
-          <AgeGate onConfirmed={() => setAgeConfirmed(true)} />
-        ) : (
-          <>
-            {error ? (
-              <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
-                {error}
-              </p>
-            ) : null}
-            <button
-              type="submit"
-              disabled={busy}
-              className="px-4 py-2.5 text-sm font-bold self-start"
-              style={{
-                background: "var(--color-accent-strong)",
-                color: "var(--color-brand-mark-ink)",
-                fontWeight: "var(--font-weight-button)",
-                opacity: busy ? "var(--opacity-disabled)" : 1,
-                borderRadius: "12px",
-              }}
-            >
-              {mode === "sign-in" ? "Sign in" : "Create account"}
-            </button>
-          </>
-        )}
-      </form>
+          {error ? (
+            <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            disabled={busy}
+            className="px-4 py-2.5 text-sm font-bold self-start"
+            style={{
+              background: "var(--color-accent-strong)",
+              color: "var(--color-brand-mark-ink)",
+              fontWeight: "var(--font-weight-button)",
+              opacity: busy ? "var(--opacity-disabled)" : 1,
+              borderRadius: "12px",
+            }}
+          >
+            {busy ? "Continuing…" : "Continue"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
