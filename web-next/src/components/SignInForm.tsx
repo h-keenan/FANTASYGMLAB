@@ -32,7 +32,7 @@ import { AgeGate } from "./AgeGate";
  * Supabase.
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithOAuth } = useAuth();
   const [mode, setMode] = useState<"sign-in" | "create-account">("sign-in");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [email, setEmail] = useState("");
@@ -40,6 +40,7 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState<"google" | "apple" | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -59,6 +60,21 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
       return;
     }
     onSignedIn();
+  };
+
+  // Redirect-based: on success the browser navigates away immediately, so
+  // there is nothing more to do here — onSignedIn() fires later from
+  // page.tsx's own returning-session effect once the user lands back with
+  // a session. Only a same-tab failure (e.g. the provider not configured
+  // yet in Supabase) ever reaches the error branch below.
+  const handleOAuth = async (provider: "google" | "apple") => {
+    setOauthBusy(provider);
+    setError(null);
+    const result = await signInWithOAuth(provider);
+    if (result.error) {
+      setOauthBusy(null);
+      setError(result.error);
+    }
   };
 
   return (
@@ -126,6 +142,46 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           </>
         )}
       </form>
+
+      {mode === "sign-in" || ageConfirmed ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-1" style={{ height: "var(--border-width-default)", background: "var(--color-border)" }} />
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              or
+            </span>
+            <div className="flex-1" style={{ height: "var(--border-width-default)", background: "var(--color-border)" }} />
+          </div>
+          <button
+            type="button"
+            onClick={() => handleOAuth("google")}
+            disabled={oauthBusy !== null}
+            className="px-4 py-2 text-sm font-bold flex items-center justify-center gap-2"
+            style={{
+              background: "var(--color-surface-secondary)",
+              color: "var(--color-text-primary)",
+              border: "var(--border-width-default) solid var(--color-border)",
+              opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
+            }}
+          >
+            {oauthBusy === "google" ? "Redirecting to Google…" : `Continue with Google`}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleOAuth("apple")}
+            disabled={oauthBusy !== null}
+            className="px-4 py-2 text-sm font-bold flex items-center justify-center gap-2"
+            style={{
+              background: "var(--color-surface-secondary)",
+              color: "var(--color-text-primary)",
+              border: "var(--border-width-default) solid var(--color-border)",
+              opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
+            }}
+          >
+            {oauthBusy === "apple" ? "Redirecting to Apple…" : `Continue with Apple`}
+          </button>
+        </div>
+      ) : null}
 
       <button
         type="button"

@@ -29,6 +29,7 @@ describe("SleeperImportForm", () => {
       loading: false,
       signIn: vi.fn(),
       signUp: vi.fn(),
+      signInWithOAuth: vi.fn(),
       signInAsGuest: vi.fn(),
       signOut: vi.fn(),
       isGuest: false,
