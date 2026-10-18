@@ -29,6 +29,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from modules import league_rankings
 from modules import league_value_settings
 from modules import player_eligibility
 from modules import player_quick_view
@@ -395,6 +396,7 @@ def generate_trade_idea_records(
     gm_target_player_ids: tuple[str, ...] = (),
     trade_block_player_ids: tuple[str, ...] = (),
     team_stance: str = "",
+    df_summary: pd.DataFrame | None = None,
 ) -> list[dict[str, Any]]:
     """The full, Trust-enforced idea dicts — same shape modules.trade_ideas
     and modules.trade_hub_ui already work with (trade_confidence_label,
@@ -426,7 +428,20 @@ def generate_trade_idea_records(
     Trade Hub card UI; callers that need the raw engine fields — ranking via
     modules.trade_hub_ui.order_trade_hub_visible_ideas, or narrative
     building via modules.canonical_recommendation_narrative.build_trade_narrative
-    (the Dashboard's Top Trade Opportunity tile) — should call this instead."""
+    (the Dashboard's Top Trade Opportunity tile) — should call this instead.
+
+    `df_summary` is an optional precomputed override for the per-roster
+    league summary below (modules.team_eval.build_league_summary) — the
+    same "accept it precomputed, else compute fresh" contract
+    modules.dashboard_engine.compose_next_move_briefing already uses for
+    its own roster_df/lineup_df/injury_context. `_generate_trade_idea_records_cached`
+    passes the ALREADY-CACHED result of modules.league_rankings.
+    build_league_summary_and_draft_capital_cached here instead of letting
+    this function redo that same full-league-wide pass from scratch on
+    every cache miss (coridian_, 2026-10-18: "it still takes too long to
+    load" — this exact recomputation, not a missing cache, was the real
+    cost behind Dashboard's ~11s cold load). Omitting it (every existing
+    test/caller) falls back to the original fresh computation, unchanged."""
 
     # OVR for every asset's PlayerIdentityRow badge (coridian_, Trade Hub
     # card screenshot: the colored tier ring alone doesn't say how good two
@@ -447,13 +462,14 @@ def generate_trade_idea_records(
             players_df, score_column=score_field
         )
 
-    df_summary = build_league_summary(
-        players_df,
-        league_id,
-        score_field=score_field,
-        current_score_field="value_score",
-        lineup_settings=dict(league_settings or {}),
-    )
+    if df_summary is None:
+        df_summary = build_league_summary(
+            players_df,
+            league_id,
+            score_field=score_field,
+            current_score_field="value_score",
+            lineup_settings=dict(league_settings or {}),
+        )
     if df_summary.empty:
         return []
 
@@ -565,6 +581,17 @@ def _generate_trade_idea_records_cached(
     valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
     rosters = sleeper.get_rosters(league_id)
+    # coridian_, 2026-10-18: "it still takes too long to load" — Dashboard's
+    # ~11s cold load traced to this exact per-roster league summary being
+    # redone from scratch here on every cache miss, even though League
+    # Rankings/Draft Center already share one cached copy of the identical
+    # computation (league_rankings.build_league_summary_and_draft_capital_cached,
+    # same 30s window). Reusing that cache entry here means Dashboard,
+    # Trade Hub, League Rankings, and Draft Center all share one pass
+    # instead of each paying it independently.
+    df_summary, _draft_capital_summary = league_rankings.build_league_summary_and_draft_capital_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
     return generate_trade_idea_records(
         league_id=league_id,
         my_roster_id=roster_id,
@@ -575,6 +602,7 @@ def _generate_trade_idea_records_cached(
         league_settings=settings,
         score_field=score_field,
         team_strategy=strategy,
+        df_summary=df_summary,
     )
 
 
