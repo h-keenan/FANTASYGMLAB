@@ -166,7 +166,12 @@ export interface BriefingItem {
   // for every single-player tile.
   mentioned_players: BriefingMentionedPlayer[];
   recommendation_narrative: string | null;
-  presentation: Record<string, unknown> | null;
+  // Today's Game Plan's "Top Trade Opportunity" tile (modules.dashboard_
+  // engine.build_trade_tile) nests the real give/get package here rather
+  // than in the single route_player_* fields above — GamePlanCard reads
+  // trade_package to render the same ExchangeSide give/get cards Trade Hub
+  // uses, not a generic avatar row.
+  presentation: { trade_package?: TradePackage } & Record<string, unknown> | null;
   recommendation_id: string;
   tier_label: string;
 }

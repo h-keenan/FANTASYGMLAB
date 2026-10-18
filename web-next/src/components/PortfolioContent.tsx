@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { BriefingItem, PortfolioFailedLeague, PortfolioLeague, PortfolioResponse } from "@/lib/api";
 import { categoryColorVar, categoryLabel } from "@/lib/portfolioPresentation";
+import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { formatRank } from "@/components/SnapshotTile";
 
@@ -44,22 +45,43 @@ function SignalRow({ item }: { item: BriefingItem }) {
   const text = item.reason || item.headline;
   if (!text) return null;
 
+  const hasPlayerVisual = Boolean(
+    (item.presentation?.trade_package &&
+      (item.presentation.trade_package.send.length > 0 || item.presentation.trade_package.receive.length > 0)) ||
+      (item.route_player_name && item.route_player_id) ||
+      (item.mentioned_players && item.mentioned_players.length > 0),
+  );
+  // Same dedup as modules/daily_gm_briefing_ui.py's _should_show_reason:
+  // a Watch item's reason text is often the same pipe-delimited identity
+  // dump the chips below now already show — showing both is redundant.
+  const showText = !(item.category === "watch" && hasPlayerVisual && (text.includes(" | ") || text.includes(" - ")));
+
   return (
-    <div className="flex items-start gap-2 mt-2">
-      <span
-        className="px-1.5 py-0.5 text-xs font-extrabold uppercase whitespace-nowrap"
-        style={{
-          borderRadius: "var(--radius-pill)",
-          background: `color-mix(in srgb, ${color} 15%, transparent)`,
-          color,
-          letterSpacing: "var(--letter-spacing-badge)",
-        }}
-      >
-        {label}
-      </span>
-      <span className="text-sm flex-1 min-w-0" style={{ color: "var(--color-text-secondary)" }}>
-        {text}
-      </span>
+    <div className="flex flex-col gap-1.5 mt-2">
+      <div className="flex items-start gap-2">
+        <span
+          className="px-1.5 py-0.5 text-xs font-extrabold uppercase whitespace-nowrap"
+          style={{
+            borderRadius: "var(--radius-pill)",
+            background: `color-mix(in srgb, ${color} 15%, transparent)`,
+            color,
+            letterSpacing: "var(--letter-spacing-badge)",
+          }}
+        >
+          {label}
+        </span>
+        {showText ? (
+          <span className="text-sm flex-1 min-w-0" style={{ color: "var(--color-text-secondary)" }}>
+            {text}
+          </span>
+        ) : null}
+      </div>
+      {/* coridian_, 2026-10-18, screenshot: "this portfolio looks terrible,
+          with zero player PFPs. These need to have the compact player cards
+          that we were supposed to make" — every signal here was a
+          pipe-separated text dump of player names with no identity at all.
+          Same BriefingItemPlayers chips Today's Game Plan already uses. */}
+      <BriefingItemPlayers item={item} sourceLabel="Portfolio" />
     </div>
   );
 }
