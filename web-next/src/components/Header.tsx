@@ -59,7 +59,13 @@ function LeagueSwitcherButton({ leagueId }: { leagueId: string }) {
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute right-0 top-full mt-1 flex flex-col py-1 w-56" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
+          {/* left-0, not right-0 — this button sits near the header's left
+              edge (it's the first of the league controls), so a right-0
+              anchored w-56 menu had nowhere to grow but off the left edge
+              of the viewport (coridian_, 2026-10-18, screenshot: "Switch
+              league button clips off screen"). left-0 keeps it growing
+              rightward into the header's own open space instead. */}
+          <div role="menu" className="absolute left-0 top-full mt-1 flex flex-col py-1 w-56" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
             {leagues.length === 0 ? (
               <span className="px-3 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
                 No other saved leagues
