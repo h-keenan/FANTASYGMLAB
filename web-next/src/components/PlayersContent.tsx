@@ -114,6 +114,7 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
           <span
             className="px-1.5 py-0.5 text-xs font-bold"
             style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
+            title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league or your roster.`}
           >
             {player.position}
             {player.position_rank}
