@@ -353,6 +353,55 @@ body {
   font-weight: var(--font-weight-body);
 }
 
+/* coridian_, 2026-10-18: "Add that moving background from signup to be
+   throughout the app let's test something. We need one for dark and one
+   for light mode." The same animated field-line + light-sweep texture
+   OnboardingCarousel/the landing page use (see .onboarding-field/
+   .onboarding-sweep below), fixed to the viewport behind every page's own
+   content instead of scoped to one shell. Unlike the landing page's
+   deliberate FORCED dark (.fd-landing-dark), this respects the visitor's
+   real prefers-color-scheme — every other page already does, and this is
+   meant to live alongside existing pages, not replace their theme. Line
+   color flips from white (dark mode, matching the original) to the dark
+   ink color (light mode) rather than reusing one color at a flipped
+   opacity, since the same alpha of white-on-dark vs. dark-on-white reads
+   very differently in practice. z-index: -1 relies on nothing else in this
+   app using a negative z-index (checked: nothing does) to stay behind
+   every real page element without needing to touch 20+ page files. */
+.app-background-field,
+.app-background-sweep {
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+}
+.app-background-field {
+  inset: 0;
+  opacity: 0.4;
+  background:
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
+  animation: onboarding-field-drift 14s linear infinite;
+}
+.app-background-sweep {
+  top: -20%;
+  left: 0;
+  width: 34%;
+  height: 140%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05) 45%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 55%, transparent);
+  animation: onboarding-sweep 9s ease-in-out infinite;
+}
+@media (prefers-color-scheme: light) {
+  .app-background-field {
+    opacity: 0.5;
+    background:
+      repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
+      repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
+  }
+  .app-background-sweep {
+    background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
+  }
+}
+
 * {
   box-sizing: border-box;
 }

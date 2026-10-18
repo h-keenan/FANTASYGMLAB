@@ -38,6 +38,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
+        {/* coridian_, 2026-10-18: "Add that moving background from signup
+            to be throughout the app" — same animated texture the landing
+            page/onboarding carousel use, fixed behind every page via CSS
+            (see .app-background-field/.app-background-sweep in
+            globals.css) rather than wrapping every page's own markup. */}
+        <div className="app-background-field" aria-hidden="true" />
+        <div className="app-background-sweep" aria-hidden="true" />
         <AuthProvider>
           <ValuationLensProvider>
             <PlayerQuickViewProvider>
