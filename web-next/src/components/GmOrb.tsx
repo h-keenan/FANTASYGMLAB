@@ -92,7 +92,7 @@ export function GmOrb() {
             2026-10-17: the floating nav button is one of the most-seen
             elements on both platforms, so it should actually be the brand,
             not a placeholder). */}
-        <Image src="/brand-mark.png" alt="" width={30} height={20} style={{ objectFit: "contain" }} />
+        <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
       </button>
 
       {open ? (
