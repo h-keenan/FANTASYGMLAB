@@ -29,6 +29,10 @@ export const GAME_PLAN_INTERNAL_ROUTES: Record<string, string> = {
   trade_analyzer: "trade-analyzer",
   players: "players",
   trade_finder: "trade-finder",
+  // Strategy Check (modules.dashboard_engine.build_strategy_check_tile,
+  // 2026-10-18) routes here to update the declared stance it compared
+  // against. Team Situation already has a real page.
+  team_situation: "team-situation",
 };
 
 /** Backend categories are snake_case tokens (e.g. "top_priority") — title-case

@@ -45,6 +45,12 @@ _WATCH_LABELS = frozenset(
         # "stable" placeholder), same convention as the other watch labels.
         "Value Trend",
         "News Alert",
+        # coridian_, 2026-10-18: "you might need to change your decision-
+        # making going through the rest of the season" — a real season-
+        # record vs. declared-stance mismatch (modules.dashboard_engine's
+        # build_strategy_check_tile), only once there's enough of a real
+        # season to say so with confidence.
+        "Strategy Check",
     }
 )
 
