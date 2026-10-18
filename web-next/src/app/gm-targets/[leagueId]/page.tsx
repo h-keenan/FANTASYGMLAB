@@ -1,67 +1,26 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
-import { useAuth } from "@/context/AuthContext";
-import { useValuationLens } from "@/context/ValuationLensContext";
-import { api, type GmTargetsResponse, type LeagueRankingsResponse } from "@/lib/api";
-import { GmTargetsContent } from "@/components/GmTargetsContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
-export default function GmTargetsPage() {
+/**
+ * Revision 20 (2026-10-18): GM Targets merged into GM Plan (see
+ * GmPlanContent's own docstring) — this route now only exists so a stale
+ * bookmark/link still lands somewhere real instead of a 404.
+ */
+export default function GmTargetsRedirectPage() {
   const params = useParams<{ leagueId: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
-  const { lens } = useValuationLens(leagueId);
-
-  const [targets, setTargets] = useState<GmTargetsResponse | null>(null);
-  const [rankings, setRankings] = useState<LeagueRankingsResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const name = searchParams.get("name");
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!session) {
-      router.replace("/");
-      return;
-    }
-    let cancelled = false;
+    router.replace(`/gm-plan/${encodeURIComponent(leagueId)}${name ? `?name=${encodeURIComponent(name)}` : ""}`);
+  }, [leagueId, name, router]);
 
-    Promise.all([api.getGmTargets(leagueId), api.getLeagueRankings(leagueId, lens)])
-      .then(([targetsResult, rankingsResult]) => {
-        if (!cancelled) {
-          setTargets(targetsResult);
-          setRankings(rankingsResult);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load GM Targets.");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, session, leagueId, lens, router]);
-
-  if (authLoading || (!targets && !rankings && !error)) {
-    return (
-      <LoadingScreen status="Loading GM Targets…" />
-    );
-  }
-
-  if (error || !targets || !rankings) {
-    return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load GM Targets."}
-        </p>
-      </main>
-    );
-  }
-
-  return <GmTargetsContent leagueId={leagueId} leagueName={leagueName} targets={targets} rankings={rankings} />;
+  return <LoadingScreen status="Redirecting to GM Plan…" />;
 }
