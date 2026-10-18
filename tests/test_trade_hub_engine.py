@@ -180,6 +180,62 @@ def test_generate_trade_idea_records_resolves_untouchable_ids_to_names_and_block
     assert mock_enforce.call_args.kwargs["untouchables"] == ("my-rb",)
 
 
+def test_generate_trade_idea_records_skips_the_full_league_summary_pass_when_precomputed():
+    """coridian_, 2026-10-18: "it still takes too long to load" — Dashboard's
+    ~11s cold load traced to this exact per-roster league summary
+    (modules.team_eval.build_league_summary) being redone from scratch on
+    every cache miss. A precomputed df_summary (what
+    _generate_trade_idea_records_cached now passes, from the already-cached
+    modules.league_rankings.build_league_summary_and_draft_capital_cached)
+    must skip that recomputation entirely."""
+
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("opp-rb", "RB", value=70)]
+    )
+    precomputed_summary = pd.DataFrame(
+        [{"league_id": "league-1", "roster_id": 1, "owner_id": "u1", "team_name": "Mine", "total_score": 80}]
+    )
+
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch.object(trade_hub_engine, "build_league_summary") as mock_build_summary:
+                with patch("modules.trade_ideas.build_trade_ideas", return_value=[]):
+                    trade_hub_engine.generate_trade_idea_records(
+                        league_id="league-1",
+                        my_roster_id=1,
+                        players_df=players_df,
+                        rosters=_rosters(),
+                        league_settings=SETTINGS,
+                        score_field="dynasty_score",
+                        df_summary=precomputed_summary,
+                    )
+
+    mock_build_summary.assert_not_called()
+
+
+def test_generate_trade_idea_records_computes_the_league_summary_fresh_when_not_precomputed():
+    players_df = pd.DataFrame(
+        [_player("my-qb", "QB", value=80), _player("opp-rb", "RB", value=70)]
+    )
+
+    with patch("modules.sleeper.get_rosters", return_value=_rosters()):
+        with patch("modules.sleeper.get_users", return_value=_users()):
+            with patch.object(
+                trade_hub_engine, "build_league_summary", wraps=trade_hub_engine.build_league_summary
+            ) as mock_build_summary:
+                with patch("modules.trade_ideas.build_trade_ideas", return_value=[]):
+                    trade_hub_engine.generate_trade_idea_records(
+                        league_id="league-1",
+                        my_roster_id=1,
+                        players_df=players_df,
+                        rosters=_rosters(),
+                        league_settings=SETTINGS,
+                        score_field="dynasty_score",
+                    )
+
+    mock_build_summary.assert_called_once()
+
+
 def test_generate_trade_idea_records_resolves_trade_block_ids_to_names():
     """Trade Finder's trade_block_player_ids is player_id-keyed; the
     engine's own trade_block_names restriction (modules.trade_ideas.
