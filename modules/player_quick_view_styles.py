@@ -77,6 +77,18 @@ div[data-testid="stDialog"] .pqv-hero-portrait .player-quick-view-avatar,div[dat
    set inline per player by modules/player_tier_identity.py). Deliberately not the
    translucent dg-tier-* list chip — this is the one hero display for this player. */
 .pqv-hero-tier.pqv-hero-tier--solid{align-items:center;align-self:start;background:var(--dg-tier-fill,var(--color-prestige-depth));border-radius:var(--radius-pill);color:var(--dg-tier-ink,var(--color-text-primary));display:inline-flex;justify-self:start;line-height:var(--line-height-badge);min-height:1.25rem;padding:var(--space-2xs) var(--space-sm);width:fit-content}
+/* Merges the tier label onto the ring itself (sits astride the portrait's
+   bottom edge) instead of floating separately next to the name — the ring
+   alone read as "just a colored border" (coridian_). Relies on
+   .pqv-hero-portrait.dg-tier-frame's own overflow:visible (football_asset_
+   styles.py) to let this protrude past the circle without being clipped. */
+.pqv-hero-tier--on-ring{bottom:-0.4rem;box-shadow:0 0 0 2px var(--color-surface-primary);font-size:10px;left:50%;margin:0;position:absolute;transform:translateX(-50%);white-space:nowrap;z-index:2}
+/* Thicker ring on PQV's hero portrait specifically (not the shared My Team
+   roster rows, which stay as-is — this is the one surface coridian_ called
+   out). !important since this must win over football_asset_styles.py's
+   shared .pqv-hero-portrait.dg-tier-frame rule regardless of which
+   stylesheet's inject_global_styles call lands in the DOM last. */
+.pqv-hero-portrait.dg-tier-frame{box-shadow:0 0 0 3px var(--dg-tier-a),0 0 12px 1px color-mix(in srgb,var(--dg-tier-a) 55%,transparent) !important}
 .player-dossier-rank-strip{display:flex;flex-wrap:wrap;gap:var(--space-sm) var(--space-md);margin:var(--space-xs) 0 0;padding:0}
 .player-dossier-rank-cell{display:grid;gap:2px;min-width:0}
 .player-dossier-rank-cell span,.pqv-signal-badge-question,.pqv-why-factor span,.pqv-recommendation-confidence,.pqv-glance-cell span,.pqv-career-glance-cell span,.pqv-kicker{color:var(--color-text-muted);font-size:var(--font-size-badge);letter-spacing:var(--letter-spacing-badge);text-transform:uppercase}
