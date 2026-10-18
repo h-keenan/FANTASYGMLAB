@@ -337,10 +337,14 @@ body {
    (relative to html's root size, not body's), so this is the one place
    that scales all of them at once on a wider viewport, instead of
    touching every page's own classes. Still mobile's exact scale below
-   the breakpoint. */
+   the breakpoint.
+   coridian_, 2026-10-18, same day, later (screenshot): "still need
+   better UI scaling on desktop stuff is too small" — the first bump
+   (16px -> 18px) wasn't enough; bumped again, by roughly the same
+   magnitude as that first step. */
 @media (min-width: 768px) {
   html {
-    font-size: 18px;
+    font-size: 20px;
   }
 }
 
