@@ -14,6 +14,7 @@ interface AuthContextValue {
    * treat a successful signUp as "signed in" when it's false, since no
    * session exists yet (confirmation email pending). */
   signUp: (email: string, password: string) => Promise<{ error: string | null; signedIn: boolean }>;
+  signInWithOAuth: (provider: "google" | "apple") => Promise<{ error: string | null }>;
   signInAsGuest: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   /** True for a currently-signed-in guest (anonymous) session — mirrors
@@ -85,6 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: "An account with this email already exists. Try signing in instead.", signedIn: false };
         }
         return { error: null, signedIn: Boolean(data.session) };
+      },
+      signInWithOAuth: async (provider) => {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+        });
+        return { error: error?.message ?? null };
       },
       signInAsGuest: async () => {
         // Requires "Allow anonymous sign-ins" enabled in the Supabase

@@ -77,7 +77,7 @@ const FIELD_STYLE: React.CSSProperties = {
  * resolves automatically either way (Zach's ask).
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithOAuth } = useAuth();
   const [step, setStep] = useState<"email" | "password" | "check-email">("email");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   // Set only once signIn has actually failed and this turned out to need
@@ -88,6 +88,23 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState<"google" | "apple" | null>(null);
+
+  // Google/Apple both enabled and verified working in Supabase, 2026-10-18.
+  // signInWithOAuth redirects away from this page entirely (Supabase
+  // handles the callback) — there's no intermediate step here to gate an
+  // age check behind the way the email flow does, same gap the original
+  // build of these buttons already accepted.
+  const handleOAuth = async (provider: "google" | "apple") => {
+    setOauthBusy(provider);
+    const result = await signInWithOAuth(provider);
+    if (result.error) {
+      setOauthBusy(null);
+      setError(result.error);
+    }
+    // On success the browser navigates away to the provider; nothing left
+    // to do here.
+  };
 
   const handleEmailContinue = (event: React.FormEvent) => {
     event.preventDefault();
@@ -178,40 +195,85 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
 
   if (step === "email") {
     return (
-      <form onSubmit={handleEmailContinue} className="flex flex-col gap-4 p-6" style={GLASS_CARD_STYLE}>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-            Get started
-          </h2>
-          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-            Enter your email to sign in or create an account.
-          </p>
+      <div className="flex flex-col gap-4 p-6" style={GLASS_CARD_STYLE}>
+        <form onSubmit={handleEmailContinue} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+              Get started
+            </h2>
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              Enter your email to sign in or create an account.
+            </p>
+          </div>
+          <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            Email
+            <input
+              type="email"
+              required
+              autoFocus
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="px-3 py-2.5"
+              style={FIELD_STYLE}
+            />
+          </label>
+          {error ? (
+            <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            className="px-4 py-2.5 text-sm font-bold"
+            style={{
+              background: "var(--color-accent-strong)",
+              color: "var(--color-brand-mark-ink)",
+              fontWeight: "var(--font-weight-button)",
+              borderRadius: "12px",
+            }}
+          >
+            Continue
+          </button>
+        </form>
+
+        <div className="flex items-center gap-3">
+          <div className="flex-1" style={{ height: "1px", background: "rgba(255, 255, 255, 0.12)" }} />
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            or
+          </span>
+          <div className="flex-1" style={{ height: "1px", background: "rgba(255, 255, 255, 0.12)" }} />
         </div>
-        <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Email
-          <input
-            type="email"
-            required
-            autoFocus
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="px-3 py-2.5"
-            style={FIELD_STYLE}
-          />
-        </label>
         <button
-          type="submit"
+          type="button"
+          onClick={() => handleOAuth("google")}
+          disabled={oauthBusy !== null}
           className="px-4 py-2.5 text-sm font-bold"
           style={{
-            background: "var(--color-accent-strong)",
-            color: "var(--color-brand-mark-ink)",
-            fontWeight: "var(--font-weight-button)",
+            background: "rgba(255, 255, 255, 0.06)",
+            color: "var(--color-text-primary)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
             borderRadius: "12px",
+            opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
           }}
         >
-          Continue
+          {oauthBusy === "google" ? "Redirecting to Google…" : "Continue with Google"}
         </button>
-      </form>
+        <button
+          type="button"
+          onClick={() => handleOAuth("apple")}
+          disabled={oauthBusy !== null}
+          className="px-4 py-2.5 text-sm font-bold"
+          style={{
+            background: "rgba(255, 255, 255, 0.06)",
+            color: "var(--color-text-primary)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "12px",
+            opacity: oauthBusy !== null ? "var(--opacity-disabled)" : 1,
+          }}
+        >
+          {oauthBusy === "apple" ? "Redirecting to Apple…" : "Continue with Apple"}
+        </button>
+      </div>
     );
   }
 
