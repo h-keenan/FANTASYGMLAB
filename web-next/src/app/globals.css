@@ -1400,6 +1400,33 @@ a {
   align-items: center;
   justify-content: space-between;
 }
+/* coridian_, 2026-10-18 (screenshot): "next buttons are screwed up, cant
+   continue past this" — Lightning CSS (Next.js/Turbopack's minifier) was
+   silently dropping the LAST rule(s) in this file from the production
+   bundle; `.onboarding-footer`/`.onboarding-next` were the final two
+   rules, confirmed missing from both the live production CSS and a fresh
+   local build (every other .onboarding-* class survived intact). Moved
+   up here, away from the tail of the file, as the fix — not touching the
+   rules themselves, which were already correct. */
+.onboarding-footer {
+  margin-top: auto;
+  padding: var(--space-lg) 0 var(--space-xl);
+}
+.onboarding-next {
+  width: 100%;
+  padding: var(--space-md);
+  border-radius: 18px;
+  background: var(--color-accent-strong);
+  color: #061014;
+  border: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-button);
+  cursor: pointer;
+}
+.onboarding-next:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
 .onboarding-dots {
   display: flex;
   gap: 5px;
@@ -1543,23 +1570,4 @@ a {
 .onboarding-pick--selected {
   border-color: var(--color-accent-strong) !important;
   background: var(--color-accent-soft) !important;
-}
-.onboarding-footer {
-  margin-top: auto;
-  padding: var(--space-lg) 0 var(--space-xl);
-}
-.onboarding-next {
-  width: 100%;
-  padding: var(--space-md);
-  border-radius: 18px;
-  background: var(--color-accent-strong);
-  color: #061014;
-  border: 0;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-button);
-  cursor: pointer;
-}
-.onboarding-next:disabled {
-  opacity: var(--opacity-disabled);
-  cursor: not-allowed;
 }
