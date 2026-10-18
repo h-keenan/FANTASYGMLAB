@@ -351,6 +351,29 @@ body {
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   font-weight: var(--font-weight-body);
+  /* coridian_, 2026-10-18: "the grey background on the modules needs to be
+     like a frosted glass so a little opacity so you can see the animated
+     background whilst also being able to read." Overridden here (not in
+     :root above) specifically so :root's own values stay byte-identical to
+     modules/design_tokens.py's ported hex values, per this file's own
+     top-of-file comment — this is a web-next-only presentational choice
+     shadowing them for actual rendering, not a change to the shared
+     source of truth Streamlit/mobile also read from. Every card already
+     reads these same var(--color-surface-*) names via inline style, so
+     this alone reaches every one of them with no per-component changes —
+     true blur would need a shared card class to hook backdrop-filter to,
+     which doesn't exist yet (every card's background is set inline);
+     flagging that as a real follow-up, not done here. */
+  --color-surface-primary: rgba(31, 34, 38, 0.82);
+  --color-surface-secondary: rgba(31, 34, 38, 0.82);
+  --color-surface-raised: rgba(61, 66, 72, 0.85);
+}
+@media (prefers-color-scheme: light) {
+  body {
+    --color-surface-primary: rgba(255, 255, 255, 0.82);
+    --color-surface-secondary: rgba(245, 249, 251, 0.82);
+    --color-surface-raised: rgba(255, 255, 255, 0.85);
+  }
 }
 
 /* coridian_, 2026-10-18: "Add that moving background from signup to be
@@ -1152,9 +1175,12 @@ a {
 .fd-landing-dark {
   --color-bg: #000000;
   --color-shell: #000000;
-  --color-surface-primary: #1f2226;
-  --color-surface-secondary: #1f2226;
-  --color-surface-raised: #3d4248;
+  /* Glass surfaces, matching body's own override above — this block
+     forces dark mode regardless of system theme, so it always wants the
+     dark glass values, never the light ones. */
+  --color-surface-primary: rgba(31, 34, 38, 0.82);
+  --color-surface-secondary: rgba(31, 34, 38, 0.82);
+  --color-surface-raised: rgba(61, 66, 72, 0.85);
   --color-surface-muted: #000000;
   --color-text-primary: #f7f8fa;
   --color-text-secondary: #e5e7eb;
