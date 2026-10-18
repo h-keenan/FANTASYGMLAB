@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
 import { api, type DashboardResponse } from "@/lib/api";
 import { DashboardContent } from "@/components/DashboardContent";
+import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 export default function DashboardPage() {
@@ -21,6 +22,11 @@ export default function DashboardPage() {
 
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the "Try again" button below — included in the fetch effect's
+  // deps so a retry re-runs it without a full page reload (see
+  // ErrorState.tsx for why this exists: a backgrounded-Safari timeout
+  // previously left no way back except reloading the whole page).
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
@@ -32,7 +38,10 @@ export default function DashboardPage() {
     api
       .getDashboard(leagueId, lens)
       .then((result) => {
-        if (!cancelled) setData(result);
+        if (!cancelled) {
+          setData(result);
+          setError(null);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load the Dashboard.");
@@ -40,7 +49,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, lens, router]);
+  }, [authLoading, session, leagueId, lens, router, retryToken]);
 
   if (authLoading || (!data && !error)) {
     return (
@@ -50,11 +59,13 @@ export default function DashboardPage() {
 
   if (error || !data) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load the Dashboard."}
-        </p>
-      </main>
+      <ErrorState
+        message={error || "Could not load the Dashboard."}
+        onRetry={() => {
+          setError(null);
+          setRetryToken((token) => token + 1);
+        }}
+      />
     );
   }
 

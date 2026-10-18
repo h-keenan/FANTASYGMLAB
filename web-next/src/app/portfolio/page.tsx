@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type PortfolioResponse } from "@/lib/api";
 import { PortfolioContent } from "@/components/PortfolioContent";
+import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Unlike every other ported page, Portfolio has no [leagueId] segment — it
@@ -17,6 +18,9 @@ export default function PortfolioPage() {
 
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // See ErrorState.tsx — bumped by "Try again" so a Safari-backgrounded
+  // timeout has a real way back instead of a dead page.
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
@@ -29,7 +33,10 @@ export default function PortfolioPage() {
     api
       .getPortfolio()
       .then((result) => {
-        if (!cancelled) setData(result);
+        if (!cancelled) {
+          setData(result);
+          setError(null);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Portfolio.");
@@ -38,7 +45,7 @@ export default function PortfolioPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, router]);
+  }, [authLoading, session, router, retryToken]);
 
   if (authLoading || (!data && !error)) {
     return (
@@ -48,11 +55,13 @@ export default function PortfolioPage() {
 
   if (error || !data) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p role="alert" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load Portfolio."}
-        </p>
-      </main>
+      <ErrorState
+        message={error || "Could not load Portfolio."}
+        onRetry={() => {
+          setError(null);
+          setRetryToken((token) => token + 1);
+        }}
+      />
     );
   }
 
