@@ -35,60 +35,71 @@ export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem;
     );
   }
 
-  if (item.route_player_name && item.route_player_id) {
-    return (
-      <PlayerIdentityTrigger
-        identity={{
-          player_id: item.route_player_id,
-          name: item.route_player_name,
-          position: item.route_player_position,
-          team: item.route_player_team,
-          tier: item.route_player_tier,
-          score: item.route_player_score,
-          sourceLabel,
-        }}
-        className="flex items-center gap-2 text-xs"
-      >
-        <span style={{ color: "var(--color-text-muted)" }}>
-          <PositionBadge position={item.route_player_position} />
-        </span>
-        <PlayerAvatar playerId={item.route_player_id} tier={item.route_player_tier} size={32} />
-        <span style={{ color: "var(--color-text-muted)" }}>{item.route_player_name}</span>
-        {item.route_player_team ? <span style={{ color: "var(--color-text-muted)" }}>· {item.route_player_team}</span> : null}
-      </PlayerIdentityTrigger>
-    );
+  // route_player_* (the one unambiguous player to deep-link a whole-card
+  // tap to) and mentioned_players (every player the text actually names,
+  // up to 3) are complementary, not mutually exclusive — a "1 injured
+  // starter" Watch card routes to that one starter AND names 2 other
+  // future-asset players in its reason text. Rendering these as an
+  // if/else-if (as a prior version of this component briefly did) silently
+  // dropped every mentioned player except the route target whenever a
+  // route_player happened to resolve (coridian_, 2026-10-18, screenshot:
+  // "it lists starters but it only shows one player's compact player
+  // card"). Both render; mentioned_players is filtered to skip whichever
+  // one route_player already showed, so nobody appears twice.
+  const hasRoutePlayer = Boolean(item.route_player_name && item.route_player_id);
+  const otherMentionedPlayers = (item.mentioned_players || []).filter(
+    (player) => player.player_id !== item.route_player_id,
+  );
+
+  if (!hasRoutePlayer && otherMentionedPlayers.length === 0) {
+    return null;
   }
 
-  if (item.mentioned_players && item.mentioned_players.length > 0) {
-    return (
-      <div className="flex flex-col gap-1.5">
-        {item.mentioned_players
-          .filter((player) => player.player_id !== item.route_player_id)
-          .map((player) => (
-            <PlayerIdentityTrigger
-              key={player.player_id}
-              identity={{
-                player_id: player.player_id,
-                name: player.name,
-                position: player.position,
-                team: player.team,
-                tier: player.player_tier,
-                score: null,
-                sourceLabel,
-              }}
-              className="flex items-center gap-2 text-xs"
-            >
-              <span style={{ color: "var(--color-text-muted)" }}>
-                <PositionBadge position={player.position} />
-              </span>
-              <PlayerAvatar playerId={player.player_id} tier={player.player_tier} size={32} />
-              <span style={{ color: "var(--color-text-muted)" }}>{player.name}</span>
-              {player.team ? <span style={{ color: "var(--color-text-muted)" }}>· {player.team}</span> : null}
-            </PlayerIdentityTrigger>
-          ))}
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      {hasRoutePlayer ? (
+        <PlayerIdentityTrigger
+          identity={{
+            player_id: item.route_player_id,
+            name: item.route_player_name,
+            position: item.route_player_position,
+            team: item.route_player_team,
+            tier: item.route_player_tier,
+            score: item.route_player_score,
+            sourceLabel,
+          }}
+          className="flex items-center gap-2 text-xs"
+        >
+          <span style={{ color: "var(--color-text-muted)" }}>
+            <PositionBadge position={item.route_player_position} />
+          </span>
+          <PlayerAvatar playerId={item.route_player_id} tier={item.route_player_tier} size={32} />
+          <span style={{ color: "var(--color-text-muted)" }}>{item.route_player_name}</span>
+          {item.route_player_team ? <span style={{ color: "var(--color-text-muted)" }}>· {item.route_player_team}</span> : null}
+        </PlayerIdentityTrigger>
+      ) : null}
+      {otherMentionedPlayers.map((player) => (
+        <PlayerIdentityTrigger
+          key={player.player_id}
+          identity={{
+            player_id: player.player_id,
+            name: player.name,
+            position: player.position,
+            team: player.team,
+            tier: player.player_tier,
+            score: null,
+            sourceLabel,
+          }}
+          className="flex items-center gap-2 text-xs"
+        >
+          <span style={{ color: "var(--color-text-muted)" }}>
+            <PositionBadge position={player.position} />
+          </span>
+          <PlayerAvatar playerId={player.player_id} tier={player.player_tier} size={32} />
+          <span style={{ color: "var(--color-text-muted)" }}>{player.name}</span>
+          {player.team ? <span style={{ color: "var(--color-text-muted)" }}>· {player.team}</span> : null}
+        </PlayerIdentityTrigger>
+      ))}
+    </div>
+  );
 }

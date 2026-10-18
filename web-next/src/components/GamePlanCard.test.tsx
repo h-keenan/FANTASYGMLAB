@@ -62,4 +62,33 @@ describe("GamePlanCard", () => {
     expect(screen.getByText("Jaylen Warren")).toBeInTheDocument();
     expect(screen.queryByText("You send")).not.toBeInTheDocument();
   });
+
+  // coridian_, 2026-10-18, screenshot: "it says watch injured starters and
+  // it lists starters but it only shows one player's compact player card" —
+  // a "1 injured starter" Watch item routes to the one unambiguous starter
+  // (route_player_*) AND names other future-asset players in its reason
+  // text (mentioned_players) — both must render, not just whichever one an
+  // if/else-if happened to hit first.
+  it("shows the route player's card AND every other mentioned player, not just one", () => {
+    const item: BriefingItem = {
+      ...BASE,
+      category: "watch",
+      route_player_id: "1",
+      route_player_name: "Aaron Jones",
+      route_player_team: "MIN",
+      mentioned_players: [
+        { player_id: "2", name: "Colbie Young", position: "WR", team: "CIN", player_tier: "" },
+        { player_id: "1", name: "Aaron Jones", position: "RB", team: "MIN", player_tier: "" },
+        { player_id: "3", name: "Jalen Milroe", position: "QB", team: "SEA", player_tier: "" },
+      ],
+    };
+    render(<GamePlanCard item={item} leagueId="abc" leagueName="Revivalry" />);
+
+    expect(screen.getByText("Aaron Jones")).toBeInTheDocument();
+    expect(screen.getByText("Colbie Young")).toBeInTheDocument();
+    expect(screen.getByText("Jalen Milroe")).toBeInTheDocument();
+    // Aaron Jones is both the route player AND in mentioned_players — must
+    // render exactly once, not twice.
+    expect(screen.getAllByText("Aaron Jones")).toHaveLength(1);
+  });
 });
