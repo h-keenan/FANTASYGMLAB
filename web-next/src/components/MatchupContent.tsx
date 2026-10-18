@@ -195,16 +195,26 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
         <VersusSide side={opponent} value={opponentValue} subValue={opponentSub} highlighted={edge === "opponent"} />
       </div>
 
-      <div className="lean-bar-track" role="img" aria-label={leanLabel}>
-        <span className="lean-bar-tick" aria-hidden="true" />
-        {halfTrackPercent > 0 ? (
+      {hasRealOdds ? (
+        <div className="winprob-bar-track" role="img" aria-label={leanLabel}>
           <span
-            className={`lean-bar-fill lean-bar-fill--${leanPolarity}`}
-            style={{ width: `${halfTrackPercent}%` }}
+            className="winprob-bar-fill"
+            style={{ width: `${Math.round(winProbability.probability! * 100)}%` }}
             aria-hidden="true"
           />
-        ) : null}
-      </div>
+        </div>
+      ) : (
+        <div className="lean-bar-track" role="img" aria-label={leanLabel}>
+          <span className="lean-bar-tick" aria-hidden="true" />
+          {halfTrackPercent > 0 ? (
+            <span
+              className={`lean-bar-fill lean-bar-fill--${leanPolarity}`}
+              style={{ width: `${halfTrackPercent}%` }}
+              aria-hidden="true"
+            />
+          ) : null}
+        </div>
+      )}
       {hasRealOdds ? (
         <span className="text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
           Win odds: you {Math.round(winProbability.probability! * 100)}% · opponent{" "}

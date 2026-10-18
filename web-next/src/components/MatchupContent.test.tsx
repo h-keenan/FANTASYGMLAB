@@ -227,6 +227,31 @@ describe("MatchupContent", () => {
     expect(screen.getByText(/Win odds: you 73% · opponent 27%/)).toBeInTheDocument();
   });
 
+  it("fills the win-probability bar to the real percentage, not capped at half", () => {
+    // coridian_, 2026-10-18 (screenshot, near-0%/100% matchup): "why does
+    // that bar only take up half then?" — the old shared .lean-bar-* track
+    // was a deviation-from-even indicator capped at 50% width by design
+    // (correct for Trade Hub's imbalance concept, wrong for an absolute
+    // probability). A real win-probability split must fill the track by
+    // its own percentage, full range.
+    const blowout: MatchupResponse = {
+      ...BASE_RESPONSE,
+      win_probability: {
+        available: true,
+        probability: 0.02,
+        my_projected_total: 60,
+        opponent_projected_total: 140,
+        coverage: { my: 1, opponent: 1 },
+      },
+    };
+
+    const { container } = render(<MatchupContent leagueName="My League" matchup={blowout} />);
+
+    const fill = container.querySelector(".winprob-bar-fill");
+    expect(fill).toHaveStyle({ width: "2%" });
+    expect(container.querySelector(".lean-bar-track")).not.toBeInTheDocument();
+  });
+
   it("falls back to the value lean (no percentage) when win_probability is unavailable", () => {
     const noOdds: MatchupResponse = {
       ...BASE_RESPONSE,
