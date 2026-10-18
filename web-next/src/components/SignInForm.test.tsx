@@ -39,15 +39,18 @@ function enterPasswordAndContinue(password: string) {
 describe("SignInForm", () => {
   const signIn = vi.fn();
   const signUp = vi.fn();
+  const signInWithOAuth = vi.fn();
 
   beforeEach(() => {
     signIn.mockReset();
     signUp.mockReset();
+    signInWithOAuth.mockReset();
     vi.mocked(useAuth).mockReturnValue({
       session: null,
       loading: false,
       signIn,
       signUp,
+      signInWithOAuth,
       signInAsGuest: vi.fn(),
       signOut: vi.fn(),
       isGuest: false,
@@ -60,6 +63,32 @@ describe("SignInForm", () => {
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+  });
+
+  // Google/Apple both enabled and verified working in Supabase, 2026-10-18.
+  it("offers Google and Apple sign-in alongside email, on the very first screen", async () => {
+    signInWithOAuth.mockResolvedValue({ error: null });
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    await waitFor(() => expect(signInWithOAuth).toHaveBeenCalledWith("google"));
+  });
+
+  it("calls signInWithOAuth for Apple too", async () => {
+    signInWithOAuth.mockResolvedValue({ error: null });
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Apple" }));
+    await waitFor(() => expect(signInWithOAuth).toHaveBeenCalledWith("apple"));
+  });
+
+  it("shows the OAuth error inline instead of silently failing", async () => {
+    signInWithOAuth.mockResolvedValue({ error: "Provider not configured" });
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+
+    expect(await screen.findByText("Provider not configured")).toBeInTheDocument();
   });
 
   it("signs in immediately on a correct password, with no sign-in/create-account choice shown at all", async () => {

@@ -714,6 +714,32 @@ a {
   right: 50%;
   background: var(--color-danger);
 }
+/* coridian_, 2026-10-18 (Matchup win-probability bar): "why does that bar
+   only take up half then?" — .lean-bar-* is deliberately a HALF-track
+   deviation-from-even indicator (Trade Hub's "how lopsided is this trade"
+   concept, see its own comment above) fed by leanBar()'s capped-at-50%
+   math, correct for that use but not for an absolute probability: a real
+   0% vs 100% win-probability split should fill the WHOLE track, not half
+   of it. A direct, full-width, two-segment fill instead — "you" from the
+   left, the remainder is implicitly "opponent" (the track's own base
+   color), so an extreme split visibly fills (or empties) the entire bar
+   the way a probability actually reads. */
+.winprob-bar-track {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+  overflow: hidden;
+}
+.winprob-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--color-success);
+  transition: width 0.2s ease-out;
+}
 
 /* Tone-colored tiles/cards for Roster Signals, Strength and Pressure,
    Position Groups, and Draft Center's posture/decision/partner cards all
