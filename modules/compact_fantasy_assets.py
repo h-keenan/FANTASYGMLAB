@@ -572,10 +572,19 @@ def identity_chips_html(
 
 
 def watch_attention_html(players: Sequence[Mapping[str, Any]] | None) -> str:
-    """Compact attention rows — portraits + identity, not debug pipes."""
+    """Compact attention rows — portraits + identity, not debug pipes.
+
+    Was the one Game Plan card type still missing position_pill/avatar_ring
+    — every Waiver and Trade card already opts into both (see
+    _card_visual_html in daily_gm_briefing_ui.py), so a Watch card's
+    injured-starter avatars read as plainer than every other card next to
+    them for no real reason.
+    """
 
     rows = [
-        compact_asset_html(player, size="standard", show_value=False)
+        compact_asset_html(
+            player, size="standard", show_value=False, position_pill=True, avatar_ring=True
+        )
         for player in (players or [])
         if isinstance(player, Mapping)
     ]
