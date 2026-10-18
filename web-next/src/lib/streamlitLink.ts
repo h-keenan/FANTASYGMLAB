@@ -36,6 +36,7 @@ export const DESTINATION_LABELS: Record<string, string> = {
   // TradesTabBar.tsx, rather than deep-linking to Streamlit.
   trade_analyzer: "Open Trade Analyzer",
   trade_finder: "Open Trade Finder",
+  team_situation: "Review Team Situation",
 };
 
 export function destinationCtaLabel(destination: string): string {

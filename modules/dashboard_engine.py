@@ -47,6 +47,7 @@ from modules import (
     news as news_cache,
     news_intelligence,
     rankings,
+    record_signal,
     sleeper,
     sleeper_leagues,
     team_stance,
@@ -248,6 +249,81 @@ def build_value_trend_tile(roster_df: pd.DataFrame, score_field: str) -> dict[st
     return None
 
 
+# coridian_, 2026-10-18: "you might need to change your decision-making
+# going through the rest of the season" — a team-level nudge when a user's
+# own declared Team Situation stance meaningfully disagrees with the real,
+# record-aware auto-computed posture modules.team_eval._classify_team_
+# strategy already produces. Only the genuinely conflicting pairs are
+# flagged — declared "competing" vs. auto "fringe_contender"/"retool" is
+# close enough to not be worth a popup; this is for real divergence.
+_STRATEGY_CHECK_CONFLICTS: dict[str, frozenset[str]] = {
+    team_stance.STANCE_COMPETING: frozenset({"rebuild", "tank"}),
+    team_stance.STANCE_REBUILDING: frozenset({"contender"}),
+}
+
+# Never flag this off a single early-season result — same noisy-sample-size
+# reasoning modules.record_signal's own weight floor already applies to the
+# auto-strategy math itself. "It's been six games" is coridian_'s own
+# example phrasing, and six real results is also naturally at or past the
+# halfway point of a normal dynasty regular season.
+STRATEGY_CHECK_MIN_GAMES_PLAYED = 6
+# Past this point in the season there's little left to meaningfully pivot
+# on — stop nagging once the regular season is basically over.
+STRATEGY_CHECK_MAX_SEASON_PROGRESS = 0.92
+
+
+def build_strategy_check_tile(
+    *,
+    declared_team_stance: str,
+    auto_strategy: str,
+    auto_strategy_label: str,
+    roster_record: Mapping[str, Any] | None,
+    season_progress: float | None,
+) -> dict[str, Any] | None:
+    """A real season-record-vs-declared-stance mismatch tile, or None when
+    there isn't one worth surfacing. Never fires without a declared stance
+    (nothing to compare against), without enough real games played, or
+    once the season's basically over — see the module-level constants
+    above for the exact gates.
+    """
+
+    stance = str(declared_team_stance or "").strip().lower()
+    conflicting_strategies = _STRATEGY_CHECK_CONFLICTS.get(stance)
+    if not conflicting_strategies or str(auto_strategy or "") not in conflicting_strategies:
+        return None
+    if not isinstance(roster_record, Mapping):
+        return None
+    wins = record_signal.safe_int(roster_record.get("wins"), 0)
+    losses = record_signal.safe_int(roster_record.get("losses"), 0)
+    ties = record_signal.safe_int(roster_record.get("ties"), 0)
+    games_played = wins + losses + ties
+    if games_played < STRATEGY_CHECK_MIN_GAMES_PLAYED:
+        return None
+    progress = season_progress if season_progress is not None else 0.0
+    if progress >= STRATEGY_CHECK_MAX_SEASON_PROGRESS:
+        return None
+
+    declared_label = team_stance.STANCE_LABELS.get(stance, stance.title())
+    auto_label = _text(auto_strategy_label) or str(auto_strategy or "").replace("_", " ").title()
+    record_text = f"{wins}-{losses}" + (f"-{ties}" if ties else "")
+    advice = (
+        "Worth reconsidering before the trade deadline."
+        if stance == team_stance.STANCE_COMPETING
+        else "This might be the year to push in instead of holding back."
+    )
+    note = (
+        f"You're {record_text} through {games_played} games — your roster profile says "
+        f"{auto_label}, not {declared_label}. {advice}"
+    )
+    return {
+        "label": "Strategy Check",
+        "value": f"{auto_label} outlook",
+        "note": note,
+        "tone": "risk",
+        "route_key": "team_situation",
+    }
+
+
 def build_news_tiles(
     *,
     league_id: str,
@@ -440,6 +516,10 @@ def compose_next_move_briefing(
     lineup_df: pd.DataFrame | None = None,
     injury_context: dict[str, Any] | None = None,
     team_stance: str = "",
+    roster_record: Mapping[str, Any] | None = None,
+    auto_strategy: str = "",
+    auto_strategy_label: str = "",
+    season_progress: float | None = None,
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
@@ -464,6 +544,13 @@ def compose_next_move_briefing(
     lets the caller compute it once and pass it to both. All three default
     to None and are computed fresh here when omitted, same purity
     guarantee as trade_idea_records above.
+
+    `roster_record`/`auto_strategy`/`auto_strategy_label`/`season_progress`
+    feed build_strategy_check_tile above — the caller's existing
+    rankings_frame lookup and roster settings already have these for free,
+    so this function never re-fetches league/rankings data itself to get
+    them. All default to empty/None, which simply means that tile never
+    fires (no stance comparison without the real inputs), not an error.
     """
 
     if roster_df is None:
@@ -536,6 +623,15 @@ def compose_next_move_briefing(
     value_trend_tile = build_value_trend_tile(roster_df, score_field)
     if value_trend_tile is not None:
         items.append(value_trend_tile)
+    strategy_check_tile = build_strategy_check_tile(
+        declared_team_stance=team_stance,
+        auto_strategy=auto_strategy,
+        auto_strategy_label=auto_strategy_label,
+        roster_record=roster_record,
+        season_progress=season_progress,
+    )
+    if strategy_check_tile is not None:
+        items.append(strategy_check_tile)
     items.extend(
         build_news_tiles(
             league_id=league_id,
@@ -696,30 +792,11 @@ def build_league_summary(
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
     injury_context = roster_injury_context(roster_df, lineup_df)
 
-    briefing = compose_next_move_briefing(
-        league_id=league_id,
-        roster_id=str(roster_id or ""),
-        players_df=valued,
-        roster_player_ids=roster_player_ids,
-        all_rostered_player_ids=all_rostered_player_ids,
-        league_settings=settings,
-        score_field=score_field,
-        entitlement=entitlement,
-        rosters=rosters,
-        team_strategy=team_strategy,
-        trade_idea_records=trade_idea_records,
-        roster_df=roster_df,
-        lineup_df=lineup_df,
-        injury_context=injury_context,
-        team_stance=team_stance_value,
-    )
-
-    injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
-    health_flag = (
-        injury_ui.team_injury_display_label(injury_display_context, include_uncertainty=True)
-        or "Stable"
-    )
-
+    # Moved ahead of compose_next_move_briefing below (this used to run
+    # AFTER it, purely for this function's own power_rank/archetype return
+    # fields) so build_strategy_check_tile's auto_strategy/auto_strategy_
+    # label inputs are free — the exact same already-cached rankings_frame
+    # row this function already needed for archetype_label, read once.
     power_rank = None
     power_rank_tied = False
     franchise_rank = None
@@ -728,6 +805,8 @@ def build_league_summary(
     roster_value_rank_tied = False
     archetype = None
     archetype_label = None
+    auto_strategy = ""
+    auto_strategy_label = ""
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
         league_id=league_id, lens=lens, players_db_path=players_db_path
     )
@@ -753,6 +832,36 @@ def build_league_summary(
             roster_value_rank_tied = bool(row.get("roster_value_rank_tied"))
             archetype = row.get("archetype")
             archetype_label = row.get("archetype_label")
+            auto_strategy = _text(row.get("strategy"))
+            auto_strategy_label = _text(row.get("strategy_label"))
+
+    briefing = compose_next_move_briefing(
+        league_id=league_id,
+        roster_id=str(roster_id or ""),
+        players_df=valued,
+        roster_player_ids=roster_player_ids,
+        all_rostered_player_ids=all_rostered_player_ids,
+        league_settings=settings,
+        score_field=score_field,
+        entitlement=entitlement,
+        rosters=rosters,
+        team_strategy=team_strategy,
+        trade_idea_records=trade_idea_records,
+        roster_df=roster_df,
+        lineup_df=lineup_df,
+        injury_context=injury_context,
+        team_stance=team_stance_value,
+        roster_record=my_roster.get("settings"),
+        auto_strategy=auto_strategy,
+        auto_strategy_label=auto_strategy_label,
+        season_progress=record_signal.season_progress_fraction(league),
+    )
+
+    injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
+    health_flag = (
+        injury_ui.team_injury_display_label(injury_display_context, include_uncertainty=True)
+        or "Stable"
+    )
 
     team_profile = sleeper.get_league_roster_profiles(league_id).get(str(roster_id or ""), {})
     roster_settings = my_roster.get("settings") or {}

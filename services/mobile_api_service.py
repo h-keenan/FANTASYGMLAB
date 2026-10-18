@@ -151,6 +151,7 @@ from modules import (
     push_tokens,
     push_triggers,
     rankings,
+    record_signal,
     redis_cache,
     roster_needs,
     saved_leagues,
@@ -5336,38 +5337,12 @@ def get_league_dashboard(
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
     injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
 
-    briefing = dashboard_engine.compose_next_move_briefing(
-        league_id=league_id,
-        roster_id=str(my_roster.get("roster_id") or ""),
-        players_df=valued,
-        roster_player_ids=roster_player_ids,
-        all_rostered_player_ids=all_rostered_player_ids,
-        league_settings=settings,
-        score_field=score_field,
-        entitlement=str(profile.get("entitlement") or "free"),
-        rosters=rosters,
-        team_strategy=team_strategy,
-        trade_idea_records=trade_idea_records,
-        roster_df=roster_df,
-        lineup_df=lineup_df,
-        injury_context=injury_context,
-    )
-
-    # Team Snapshot: record comes straight off the roster we already
-    # fetched; health/average age reuse the roster_df/lineup_df/injury_context
-    # computed once above. Power/franchise rank reuse modules.league_rankings
-    # (ported out of app.py's add_league_detail_ranks/build_league_display_frame
-    # in PR #520 for get_league_team_rankings) — the same league-wide frame
-    # that endpoint already computes on demand.
-    injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
-    health_flag = injury_ui.team_injury_display_label(injury_display_context, include_uncertainty=True) or "Stable"
-    injury_narrative = _project_team_injury_narrative(injury_display_context)
-    average_age = (
-        float(roster_df["age"].mean())
-        if not roster_df.empty and roster_df["age"].notna().any()
-        else None
-    )
-
+    # Moved ahead of compose_next_move_briefing below (this used to run
+    # AFTER it, purely for this endpoint's own Team Snapshot power/
+    # franchise rank fields) so build_strategy_check_tile's auto_strategy/
+    # auto_strategy_label inputs are free — the exact same already-cached
+    # rankings_frame row this endpoint already needed for Team Snapshot,
+    # read once.
     power_rank = None
     power_rank_tied = False
     franchise_rank = None
@@ -5376,6 +5351,8 @@ def get_league_dashboard(
     starter_rank_tied = False
     bench_rank = None
     bench_rank_tied = False
+    auto_strategy = ""
+    auto_strategy_label = ""
     rankings_frame = league_rankings.build_league_rankings_frame_cached(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
@@ -5396,6 +5373,45 @@ def get_league_dashboard(
             starter_rank_tied = bool(match.iloc[0].get("starter_rank_tied"))
             bench_rank = _clean_json_value(match.iloc[0].get("bench_rank"))
             bench_rank_tied = bool(match.iloc[0].get("bench_rank_tied"))
+            auto_strategy = _clean_json_value(match.iloc[0].get("strategy")) or ""
+            auto_strategy_label = _clean_json_value(match.iloc[0].get("strategy_label")) or ""
+
+    briefing = dashboard_engine.compose_next_move_briefing(
+        league_id=league_id,
+        roster_id=str(my_roster.get("roster_id") or ""),
+        players_df=valued,
+        roster_player_ids=roster_player_ids,
+        all_rostered_player_ids=all_rostered_player_ids,
+        league_settings=settings,
+        score_field=score_field,
+        entitlement=str(profile.get("entitlement") or "free"),
+        rosters=rosters,
+        team_strategy=team_strategy,
+        trade_idea_records=trade_idea_records,
+        roster_df=roster_df,
+        lineup_df=lineup_df,
+        injury_context=injury_context,
+        team_stance=declared_team_stance,
+        roster_record=my_roster.get("settings"),
+        auto_strategy=auto_strategy,
+        auto_strategy_label=auto_strategy_label,
+        season_progress=record_signal.season_progress_fraction(league),
+    )
+
+    # Team Snapshot: record comes straight off the roster we already
+    # fetched; health/average age reuse the roster_df/lineup_df/injury_context
+    # computed once above. Power/franchise rank reuse modules.league_rankings
+    # (ported out of app.py's add_league_detail_ranks/build_league_display_frame
+    # in PR #520 for get_league_team_rankings) — the same league-wide frame
+    # that endpoint already computes on demand.
+    injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
+    health_flag = injury_ui.team_injury_display_label(injury_display_context, include_uncertainty=True) or "Stable"
+    injury_narrative = _project_team_injury_narrative(injury_display_context)
+    average_age = (
+        float(roster_df["age"].mean())
+        if not roster_df.empty and roster_df["age"].notna().any()
+        else None
+    )
 
     roster_settings = my_roster.get("settings") or {}
     team_snapshot = {

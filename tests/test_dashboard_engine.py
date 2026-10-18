@@ -214,6 +214,53 @@ def test_compose_next_move_briefing_returns_a_real_composed_briefing():
         assert payload["league_id"] == league_id
 
 
+def test_compose_next_move_briefing_includes_strategy_check_on_a_real_mismatch():
+    """The new inputs are optional end-to-end — omitting them (the test
+    above) just means the tile never fires, same as every other optional
+    override this function already has."""
+
+    league_id = "dashboard-engine-test-league-strategy-check"
+    roster_id = "1"
+    my_players = [
+        _player("qb1", "QB", value=80),
+        _player("rb1", "RB", value=70),
+        _player("wr1", "WR", value=65),
+    ]
+    players_df = pd.DataFrame(my_players)
+
+    league_payload = _sleeper_response(
+        {
+            "roster_positions": ["QB", "RB", "WR"] + ["BN"] * 3,
+            "settings": {"taxi_slots": 0, "reserve_slots": 0},
+        }
+    )
+    rosters_payload = _sleeper_response(
+        [{"roster_id": 1, "players": [p["player_id"] for p in my_players], "taxi": [], "reserve": []}]
+    )
+
+    with patch("requests.get", side_effect=[league_payload, rosters_payload]):
+        briefing = dashboard_engine.compose_next_move_briefing(
+            league_id=league_id,
+            roster_id=roster_id,
+            players_df=players_df,
+            roster_player_ids={p["player_id"] for p in my_players},
+            all_rostered_player_ids={p["player_id"] for p in my_players},
+            league_settings=SETTINGS,
+            score_field="dynasty_score",
+            team_stance="competing",
+            roster_record={"wins": 2, "losses": 4, "ties": 0},
+            auto_strategy="tank",
+            auto_strategy_label="Tank",
+            season_progress=0.5,
+        )
+
+    strategy_check_items = [item for item in briefing.items if item.headline.startswith("Strategy Check") or "Tank" in item.reason]
+    assert strategy_check_items, [item.to_dict() for item in briefing.items]
+    item = strategy_check_items[0]
+    assert item.category == "watch"
+    assert item.destination == "team_situation"
+
+
 def _fake_trade_idea_record(*, partner: str = "Rival GM", gain: int = 40) -> dict:
     return {
         "partner_team_name": partner,
@@ -456,6 +503,121 @@ def test_build_value_trend_tile_returns_none_without_a_qualifying_decline():
 
 def test_build_value_trend_tile_returns_none_for_an_empty_roster():
     assert dashboard_engine.build_value_trend_tile(pd.DataFrame(), "dynasty_score") is None
+
+
+def test_build_strategy_check_tile_flags_a_real_mismatch():
+    """coridian_, 2026-10-18: "you're halfway through the year... you
+    might need to change your decision-making." Declared "competing" but
+    the auto-computed, record-aware posture says "tank" after enough real
+    games — a genuine mismatch worth surfacing."""
+
+    tile = dashboard_engine.build_strategy_check_tile(
+        declared_team_stance="competing",
+        auto_strategy="tank",
+        auto_strategy_label="Tank",
+        roster_record={"wins": 2, "losses": 4, "ties": 0},
+        season_progress=0.5,
+    )
+    assert tile is not None
+    assert tile["label"] == "Strategy Check"
+    assert "2-4" in tile["note"]
+    assert "6 games" in tile["note"]
+    assert "Tank" in tile["note"]
+    assert tile["route_key"] == "team_situation"
+    assert tile["tone"] == "risk"
+
+
+def test_build_strategy_check_tile_flags_a_missed_contender_window():
+    tile = dashboard_engine.build_strategy_check_tile(
+        declared_team_stance="rebuilding",
+        auto_strategy="contender",
+        auto_strategy_label="Contender",
+        roster_record={"wins": 6, "losses": 1, "ties": 0},
+        season_progress=0.5,
+    )
+    assert tile is not None
+    assert "push in" in tile["note"].lower()
+
+
+def test_build_strategy_check_tile_returns_none_without_a_declared_stance():
+    assert (
+        dashboard_engine.build_strategy_check_tile(
+            declared_team_stance="",
+            auto_strategy="tank",
+            auto_strategy_label="Tank",
+            roster_record={"wins": 1, "losses": 6, "ties": 0},
+            season_progress=0.5,
+        )
+        is None
+    )
+
+
+def test_build_strategy_check_tile_returns_none_for_balanced_stance():
+    assert (
+        dashboard_engine.build_strategy_check_tile(
+            declared_team_stance="balanced",
+            auto_strategy="tank",
+            auto_strategy_label="Tank",
+            roster_record={"wins": 1, "losses": 6, "ties": 0},
+            season_progress=0.5,
+        )
+        is None
+    )
+
+
+def test_build_strategy_check_tile_returns_none_for_a_close_enough_auto_read():
+    """declared "competing" + auto "fringe_contender"/"retool" is close
+    enough to not be worth a popup — only a genuine conflict fires."""
+
+    assert (
+        dashboard_engine.build_strategy_check_tile(
+            declared_team_stance="competing",
+            auto_strategy="retool",
+            auto_strategy_label="Retool",
+            roster_record={"wins": 3, "losses": 3, "ties": 0},
+            season_progress=0.5,
+        )
+        is None
+    )
+
+
+def test_build_strategy_check_tile_returns_none_before_enough_games_played():
+    assert (
+        dashboard_engine.build_strategy_check_tile(
+            declared_team_stance="competing",
+            auto_strategy="tank",
+            auto_strategy_label="Tank",
+            roster_record={"wins": 1, "losses": 4, "ties": 0},
+            season_progress=0.35,
+        )
+        is None
+    )
+
+
+def test_build_strategy_check_tile_returns_none_once_season_is_basically_over():
+    assert (
+        dashboard_engine.build_strategy_check_tile(
+            declared_team_stance="competing",
+            auto_strategy="tank",
+            auto_strategy_label="Tank",
+            roster_record={"wins": 4, "losses": 10, "ties": 0},
+            season_progress=0.95,
+        )
+        is None
+    )
+
+
+def test_build_strategy_check_tile_returns_none_without_a_roster_record():
+    assert (
+        dashboard_engine.build_strategy_check_tile(
+            declared_team_stance="competing",
+            auto_strategy="tank",
+            auto_strategy_label="Tank",
+            roster_record=None,
+            season_progress=0.5,
+        )
+        is None
+    )
 
 
 def test_build_news_tiles_reads_only_the_disk_cached_pool():
