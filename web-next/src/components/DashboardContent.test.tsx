@@ -68,6 +68,45 @@ describe("DashboardContent", () => {
     expect(screen.getByText(/2 more moves available on Premium/)).toBeInTheDocument();
   });
 
+  // coridian_, 2026-10-18: "you can just put them all under watch... to
+  // make this much simpler and more streamlined" — Top Priority keeps its
+  // own full card; every other category groups into one WatchListCard.
+  it("groups every non-top_priority item into one WatchListCard, separate from Top Priority's own card", () => {
+    const groupedFixture: DashboardResponse = {
+      ...FIXTURE,
+      items: [
+        { ...FIXTURE.items[0], category: "top_priority", headline: "Headline trade", recommendation_id: "rec-top" },
+        {
+          ...FIXTURE.items[0],
+          category: "watch",
+          headline: "Ashton Jeanty trending down",
+          reason: "Usage down 13%.",
+          route_player_id: "",
+          route_player_name: "",
+          recommendation_id: "rec-watch",
+        },
+        {
+          ...FIXTURE.items[0],
+          category: "waiver_opportunity",
+          headline: "Chimere Dike",
+          reason: "Strong opportunity.",
+          route_player_id: "",
+          route_player_name: "",
+          recommendation_id: "rec-waiver",
+        },
+      ],
+    };
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={groupedFixture} />);
+
+    // All three headlines render somewhere on the page...
+    expect(screen.getByText("Headline trade")).toBeInTheDocument();
+    expect(screen.getByText("Ashton Jeanty trending down")).toBeInTheDocument();
+    expect(screen.getByText("Chimere Dike")).toBeInTheDocument();
+    // ...but Watch and Waiver Opportunity share one card, while Top
+    // Priority gets its own — exactly 2 <article> cards total, not 3.
+    expect(document.querySelectorAll("article")).toHaveLength(2);
+  });
+
   it("shows the quiet-state copy instead of Game Plan cards when there's nothing urgent", () => {
     const quietFixture: DashboardResponse = {
       ...FIXTURE,

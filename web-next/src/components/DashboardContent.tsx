@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { DashboardResponse } from "@/lib/api";
 import { GamePlanCard } from "@/components/GamePlanCard";
 import { SnapshotTile, formatRank } from "@/components/SnapshotTile";
+import { WatchListCard } from "@/components/WatchListCard";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -58,14 +59,27 @@ export function DashboardContent({
           </p>
         ) : (
           <div className="flex flex-col gap-3">
-            {data.items.map((item) => (
-              <GamePlanCard
-                key={item.recommendation_id || item.headline}
-                item={item}
-                leagueId={leagueId}
-                leagueName={leagueName}
-              />
-            ))}
+            {/* coridian_, 2026-10-18: "you can just put them all under
+                watch... to make this much simpler and more streamlined" —
+                Top Priority keeps its own full card (it's the single
+                highest-priority recommendation); every other item groups
+                into one WatchListCard instead of each getting a full card
+                of its own. */}
+            {data.items
+              .filter((item) => item.category === "top_priority")
+              .map((item) => (
+                <GamePlanCard
+                  key={item.recommendation_id || item.headline}
+                  item={item}
+                  leagueId={leagueId}
+                  leagueName={leagueName}
+                />
+              ))}
+            <WatchListCard
+              items={data.items.filter((item) => item.category !== "top_priority")}
+              leagueId={leagueId}
+              leagueName={leagueName}
+            />
           </div>
         )}
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
 import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
+import { GAME_PLAN_INTERNAL_ROUTES, formatGamePlanCategory } from "@/lib/gamePlanPresentation";
 import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
 
 /**
@@ -11,45 +12,14 @@ import { destinationCtaLabel, streamlitPageUrl } from "@/lib/streamlitLink";
  * div-click-delegation hack (see Dashboard research notes) — normal React
  * navigation is simpler and was explicitly called out as the reason to do
  * this natively rather than port the mechanism.
+ *
+ * coridian_, 2026-10-18: "you can just put them all under watch and then
+ * have the micro player card... to make this much simpler and more
+ * streamlined" — every non-top_priority item (Watch/Waiver Opportunity/
+ * League Movement) now renders through WatchListCard's grouped sections
+ * instead of its own full GamePlanCard (see DashboardContent.tsx's
+ * item-partitioning). This component is Top Priority's full card only now.
  */
-/** destination -> this app's own internal Next.js route path, for every
- * destination that now has a real page (app/trade-hub/[leagueId],
- * app/waivers/[leagueId] as of Revision 4, app/gm-plan/[leagueId] as of
- * Revision 9) instead of Streamlit's `?page=` router. Every other
- * destination is still Streamlit-only. "gm_plan" isn't actually emitted
- * by modules.daily_gm_briefing's `_tile_destination` today (checked: it
- * only ever returns waivers/my_team/trade_hub/dashboard, or an explicit
- * tile route_key — no caller sets that to "gm_plan" yet), but is listed
- * here ahead of time the same way "rankings" already was, so a future
- * tile pointed at GM Plan routes internally without a second edit here.
- * "gm_targets" (Revision 11) is listed the same way, ahead of any tile
- * actually emitting it. "trade_analyzer" (Revision 15) is too — Today's
- * Game Plan doesn't emit it today either, same as "gm_plan"/"gm_targets"
- * above. "players" (Revision 16) is the same again — modules.
- * daily_gm_briefing's `_tile_destination` doesn't emit it, but Players now
- * has a real page too (app/players/[leagueId]). "trade_finder" (Revision 17)
- * is the same once more — Trade Finder now has a real page
- * (app/trade-finder/[leagueId]) too. */
-const INTERNAL_ROUTES: Record<string, string> = {
-  trade_hub: "trade-hub",
-  waivers: "waivers",
-  rankings: "league-rankings",
-  gm_plan: "gm-plan",
-  gm_targets: "gm-targets",
-  trade_analyzer: "trade-analyzer",
-  players: "players",
-  trade_finder: "trade-finder",
-};
-/** Backend categories are snake_case tokens (e.g. "top_priority") — title-case
- * them for display, matching Streamlit's kicker labels (Top Priority / Watch /
- * Waiver Opportunity / League Movement). */
-function formatCategory(category: string): string {
-  return category
-    .split("_")
-    .filter(Boolean)
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
 export function GamePlanCard({
   item,
@@ -64,18 +34,10 @@ export function GamePlanCard({
   leagueId: string;
   leagueName: string;
 }) {
-  const internalRoute = INTERNAL_ROUTES[item.destination];
-  // coridian_, 2026-10-18: "The Ashton Jeanty module that says trending
-  // down can be simplified to take up half of the room that it currently
-  // takes up. Same with the waiver opportunity" — Watch/Waiver cards carry
-  // far less content than Top Priority's trade visual (no give/get, no
-  // chip row most of the time), so they don't need the same roomy padding
-  // and 2-line reason text. Top Priority keeps the original spacing; its
-  // trade card genuinely needs the room.
-  const compact = item.category === "watch" || item.category === "waiver_opportunity";
+  const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination];
   return (
     <article
-      className={compact ? "flex flex-col gap-1 p-3" : "flex flex-col gap-2 p-4"}
+      className="flex flex-col gap-2 p-4"
       style={{
         background: "var(--color-surface-secondary)",
         border: "var(--border-width-default) solid var(--color-border)",
@@ -90,23 +52,10 @@ export function GamePlanCard({
           color: "var(--color-accent)",
         }}
       >
-        {formatCategory(item.category)}
+        {formatGamePlanCategory(item.category)}
       </span>
       <h3 style={{ font: "var(--font-card-title)" }}>{item.headline}</h3>
-      <p
-        className="text-sm"
-        style={
-          compact
-            ? {
-                color: "var(--color-text-secondary)",
-                display: "-webkit-box",
-                WebkitLineClamp: 1,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }
-            : { color: "var(--color-text-secondary)" }
-        }
-      >
+      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         {item.reason}
       </p>
       <BriefingItemPlayers item={item} sourceLabel="GM Plan" />
