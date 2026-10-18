@@ -10,6 +10,7 @@ import { BRAND_NAME } from "@/lib/brand";
 import { supabase } from "@/lib/supabase";
 import { VALUATION_LENS_OPTIONS, useValuationLens } from "@/context/ValuationLensContext";
 import { swapLeagueIdInPath } from "@/lib/leagueSwitcher";
+import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
 
 const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "about_disclaimer", label: "About / Disclaimer" },
@@ -24,7 +25,7 @@ interface SavedLeagueRow {
   league_name: string | null;
 }
 
-function LeagueSwitcherButton({ leagueId }: { leagueId: string }) {
+function LeagueSwitcherButton({ leagueId, leagueName }: { leagueId: string; leagueName: string | null }) {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -51,10 +52,16 @@ function LeagueSwitcherButton({ leagueId }: { leagueId: string }) {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="px-2.5 py-1.5 text-xs font-bold"
+        className="px-2.5 py-1.5 text-xs font-bold max-w-[9rem] truncate"
         style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
       >
-        Switch league ▾
+        {/* coridian_, 2026-10-18: "where it says dashboard and revivalary...
+            revival should go to the league switcher so that... you can
+            always see what league you're on in the header." The button
+            itself now names the current league instead of a generic
+            "Switch league" label — the league-name span this replaced was
+            hidden below sm width anyway, so mobile never showed it at all. */}
+        {leagueName || "Switch league"} ▾
       </button>
       {open ? (
         <>
@@ -165,12 +172,33 @@ function HeaderLeagueControls() {
 
   return (
     <>
-      <span className="text-xs hidden sm:inline" style={{ color: "var(--color-text-muted)" }}>
-        {leagueName}
-      </span>
-      <LeagueSwitcherButton leagueId={leagueId} />
+      <LeagueSwitcherButton leagueId={leagueId} leagueName={leagueName} />
       <EvaluationLensButton leagueId={leagueId} />
     </>
+  );
+}
+
+/**
+ * coridian_, 2026-10-18: "where it says dashboard and revivalary... I
+ * think dashboard should go up into the header... so you can always see
+ * what page you're on." Was only ever shown as a page-content <h1>-
+ * adjacent label (e.g. DashboardContent.tsx's own "Dashboard" span),
+ * which scrolls away with the rest of the page on a long screen. Derives
+ * the label from the pathname's first segment against the same
+ * destination list the GM orb/sidebar nav already use (PAGE_TITLE_BY_SEGMENT
+ * in navDestinations.ts) rather than a second hand-maintained list, so this
+ * needs no per-page wiring — it's already correct for every route today
+ * and for any future one that reuses an existing path segment.
+ */
+function HeaderPageTitle() {
+  const pathname = usePathname();
+  const segment = (pathname || "").split("/").filter(Boolean)[0] || "";
+  const title = PAGE_TITLE_BY_SEGMENT[segment];
+  if (!title) return null;
+  return (
+    <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
+      {title}
+    </span>
   );
 }
 
@@ -203,6 +231,7 @@ export function Header() {
             {BRAND_NAME}
           </span>
         </Link>
+        <HeaderPageTitle />
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

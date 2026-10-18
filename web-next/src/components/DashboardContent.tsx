@@ -41,10 +41,14 @@ export function DashboardContent({
     // (it only restated what the heading already said; the real content —
     // the actionable cards below — is what should hit the fold).
     <main className="flex-1 flex flex-col gap-6 px-4 py-5 max-w-3xl w-full mx-auto">
+      {/* coridian_, 2026-10-18: "dashboard should go up into the header...
+          so you can always see what page you're on" — the "Dashboard"
+          label now lives in the persistent Header (HeaderPageTitle) instead
+          of repeated here, where it scrolls away with the rest of the page.
+          The league name stays as this page's own <h1> — normal page
+          content, not something he asked to remove — it's ALSO now in the
+          header's league switcher button. */}
       <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Dashboard
-        </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
       </header>
 

@@ -71,3 +71,36 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
 
   return { coreLeagueDestinations, gmToolsDestinations, generalDestinations };
 }
+
+/** First path segment -> page label, for Header's persistent page title
+ * (coridian_, 2026-10-18: "where it says dashboard... should go up into
+ * the header... so you can always see what page you're on"). Derived from
+ * the same destinations above rather than a second hand-maintained list,
+ * plus the handful of real routes that aren't in the GM orb/sidebar nav
+ * (Trade Finder/Trade Analyzer/Player Compare — reachable via Trade Hub's
+ * own tabs, not a dedicated nav entry; Premium; Legal). */
+export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
+  dashboard: "Dashboard",
+  alerts: "Alerts",
+  "my-team": "My Team",
+  matchup: "Matchup",
+  waivers: "Waivers",
+  players: "Players",
+  "league-rankings": "League Rankings",
+  "trade-hub": "Trade Hub",
+  "gm-targets": "GM Targets",
+  "team-situation": "Team Situation",
+  "gm-plan": "GM Plan",
+  "draft-center": "Draft Center",
+  "live-draft": "Live Draft",
+  "league-recaps": "League Recaps",
+  portfolio: "Portfolio",
+  news: "News",
+  "trade-history": "Trade History",
+  "college-scouting": "College Scouting",
+  "trade-analyzer": "Trade Analyzer",
+  "trade-finder": "Trade Finder",
+  "player-compare": "Player Compare",
+  premium: "Premium",
+  legal: "Legal",
+};
