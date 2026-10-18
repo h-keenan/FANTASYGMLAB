@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
@@ -31,6 +31,32 @@ import { useNavDestinations, type NavDestination } from "@/lib/navDestinations";
  */
 export function GmOrb() {
   const [open, setOpen] = useState(false);
+  // Swipe-down-to-dismiss, same pattern PlayerQuickView.tsx already uses
+  // for its own bottom sheet — coridian_, 2026-10-18: "you should be able
+  // to swipe down from the GM orb to exit out of it or tap off of it to
+  // exit out of it" (tap-off already worked, via the backdrop button below).
+  const dragStartY = useRef<number | null>(null);
+  const [dragY, setDragY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const DISMISS_THRESHOLD_PX = 110;
+
+  function handleDragStart(event: React.PointerEvent<HTMLDivElement>) {
+    dragStartY.current = event.clientY;
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function handleDragMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (dragStartY.current === null) return;
+    setDragY(Math.max(0, event.clientY - dragStartY.current));
+  }
+  function handleDragEnd() {
+    if (dragY > DISMISS_THRESHOLD_PX) {
+      setOpen(false);
+    }
+    dragStartY.current = null;
+    setIsDragging(false);
+    setDragY(0);
+  }
   const { session } = useAuth();
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
@@ -46,7 +72,10 @@ export function GmOrb() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open GM menu"
-        className="fixed bottom-6 left-1/2 flex items-center justify-center md:hidden"
+        // coridian_, 2026-10-18: "Gm orb is still too high" — bottom-6
+        // (24px) left too much empty space below it; bottom-3 (12px) sits
+        // closer to the true bottom edge.
+        className="fixed bottom-3 left-1/2 flex items-center justify-center md:hidden"
         style={{
           transform: "translateX(-50%)",
           width: "3.25rem",
@@ -76,47 +105,76 @@ export function GmOrb() {
             onClick={() => setOpen(false)}
           />
           <div
-            className="absolute left-0 right-0 bottom-0 flex flex-col gap-4 px-5 pt-4 pb-8 overflow-y-auto"
+            className="gm-orb-sheet"
             style={{
-              maxHeight: "78vh",
-              background: "var(--color-surface-secondary)",
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
               borderTopLeftRadius: "var(--radius-lg, 0)",
               borderTopRightRadius: "var(--radius-lg, 0)",
               boxShadow: "var(--shadow-card)",
+              transform: dragY ? `translateY(${dragY}px)` : undefined,
+              transition: isDragging ? "none" : "transform 180ms ease",
             }}
           >
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-bold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "0.03em" }}>
-                {BRAND_NAME}
-              </span>
-              <span style={{ font: "var(--type-section-title)" }}>Where to go</span>
+            {/* Same animated field-line + sweep texture used app-wide,
+                contained to this sheet (not the viewport-fixed global
+                layer, which sits behind this sheet's own background) —
+                coridian_, 2026-10-18: "that background animation should be
+                on the GM orb menu". The sheet's background is a glass tint
+                instead of an opaque surface color specifically so this is
+                visible, same reasoning as .onboarding-glass. Kept outside
+                the scrollable content below so it never scrolls away. */}
+            <div className="gm-orb-sheet-field" aria-hidden="true" />
+            <div className="gm-orb-sheet-sweep" aria-hidden="true" />
+            <div
+              className="flex flex-col gap-4 px-5 pt-2 pb-8 overflow-y-auto"
+              style={{ position: "relative", zIndex: 1, maxHeight: "78vh" }}
+            >
+              <div
+                className="gm-orb-drag-handle"
+                onPointerDown={handleDragStart}
+                onPointerMove={handleDragMove}
+                onPointerUp={handleDragEnd}
+                onPointerCancel={handleDragEnd}
+                aria-hidden="true"
+              >
+                <span className="gm-orb-drag-handle-bar" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-bold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "0.03em" }}>
+                  {BRAND_NAME}
+                </span>
+                <span style={{ font: "var(--type-section-title)" }}>Where to go</span>
+              </div>
+
+              {leagueId ? (
+                <NavSection label={leagueName || "League"}>
+                  {coreLeagueDestinations.map((destination) => (
+                    <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
+                  ))}
+                </NavSection>
+              ) : (
+                <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+                  Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
+                </p>
+              )}
+
+              {leagueId ? (
+                <NavSection label="GM Tools">
+                  {gmToolsDestinations.map((destination) => (
+                    <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
+                  ))}
+                </NavSection>
+              ) : null}
+
+              <NavSection label="General">
+                {generalDestinations.map((destination) => (
+                  <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
+                ))}
+              </NavSection>
             </div>
-
-            {leagueId ? (
-              <NavSection label={leagueName || "League"}>
-                {coreLeagueDestinations.map((destination) => (
-                  <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
-                ))}
-              </NavSection>
-            ) : (
-              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                Open a league from Home to unlock Players, Waivers, Trade Analyzer, and more.
-              </p>
-            )}
-
-            {leagueId ? (
-              <NavSection label="GM Tools">
-                {gmToolsDestinations.map((destination) => (
-                  <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
-                ))}
-              </NavSection>
-            ) : null}
-
-            <NavSection label="General">
-              {generalDestinations.map((destination) => (
-                <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
-              ))}
-            </NavSection>
           </div>
         </div>
       ) : null}

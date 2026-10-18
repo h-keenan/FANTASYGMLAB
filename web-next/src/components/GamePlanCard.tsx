@@ -65,9 +65,17 @@ export function GamePlanCard({
   leagueName: string;
 }) {
   const internalRoute = INTERNAL_ROUTES[item.destination];
+  // coridian_, 2026-10-18: "The Ashton Jeanty module that says trending
+  // down can be simplified to take up half of the room that it currently
+  // takes up. Same with the waiver opportunity" — Watch/Waiver cards carry
+  // far less content than Top Priority's trade visual (no give/get, no
+  // chip row most of the time), so they don't need the same roomy padding
+  // and 2-line reason text. Top Priority keeps the original spacing; its
+  // trade card genuinely needs the room.
+  const compact = item.category === "watch" || item.category === "waiver_opportunity";
   return (
     <article
-      className="flex flex-col gap-2 p-4"
+      className={compact ? "flex flex-col gap-1 p-3" : "flex flex-col gap-2 p-4"}
       style={{
         background: "var(--color-surface-secondary)",
         border: "var(--border-width-default) solid var(--color-border)",
@@ -85,7 +93,20 @@ export function GamePlanCard({
         {formatCategory(item.category)}
       </span>
       <h3 style={{ font: "var(--font-card-title)" }}>{item.headline}</h3>
-      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+      <p
+        className="text-sm"
+        style={
+          compact
+            ? {
+                color: "var(--color-text-secondary)",
+                display: "-webkit-box",
+                WebkitLineClamp: 1,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }
+            : { color: "var(--color-text-secondary)" }
+        }
+      >
         {item.reason}
       </p>
       <BriefingItemPlayers item={item} sourceLabel="GM Plan" />

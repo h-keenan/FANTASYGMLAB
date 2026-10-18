@@ -402,6 +402,76 @@ body {
   }
 }
 
+/* GM orb's "Where to go" bottom sheet — coridian_, 2026-10-18: "that
+   background animation should be on the GM orb menu, and you should be
+   able to swipe down from the GM orb to exit out of it or tap off of it
+   to exit out of it" (tap-off already worked via the backdrop button).
+   A glass tint + backdrop-blur instead of an opaque surface color so the
+   same field/sweep texture (contained here, not the viewport-fixed global
+   layer which sits behind this sheet's own background) is actually
+   visible — same complaint as "the modules have 0% opacity, so you can't
+   see it through the module," scoped to this one self-contained sheet
+   rather than every surface in the app. */
+.gm-orb-sheet {
+  position: relative;
+  overflow: hidden;
+  background: rgba(31, 34, 38, 0.72);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+@media (prefers-color-scheme: light) {
+  .gm-orb-sheet {
+    background: rgba(255, 255, 255, 0.72);
+    border-top: 1px solid rgba(16, 24, 32, 0.08);
+  }
+}
+.gm-orb-sheet-field,
+.gm-orb-sheet-sweep {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+.gm-orb-sheet-field {
+  inset: 0;
+  opacity: 0.4;
+  background:
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
+  animation: onboarding-field-drift 14s linear infinite;
+}
+.gm-orb-sheet-sweep {
+  top: -20%;
+  left: 0;
+  width: 34%;
+  height: 140%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05) 45%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 55%, transparent);
+  animation: onboarding-sweep 9s ease-in-out infinite;
+}
+@media (prefers-color-scheme: light) {
+  .gm-orb-sheet-field {
+    opacity: 0.5;
+    background:
+      repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
+      repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
+  }
+  .gm-orb-sheet-sweep {
+    background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
+  }
+}
+.gm-orb-drag-handle {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-sm);
+  touch-action: none;
+  cursor: grab;
+}
+.gm-orb-drag-handle-bar {
+  width: 2.5rem;
+  height: 0.25rem;
+  background: var(--color-border-strong);
+}
+
 * {
   box-sizing: border-box;
 }
