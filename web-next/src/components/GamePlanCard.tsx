@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
+import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -90,7 +91,28 @@ export function GamePlanCard({
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         {item.reason}
       </p>
-      {item.route_player_name && item.route_player_id ? (
+      {/* coridian_, 2026-10-18: "Top priority still has no player card" /
+          "These player cards are too small" — Top Trade Opportunity's tile
+          (modules.dashboard_engine.build_trade_tile) always carries a real
+          give/get package under presentation.trade_package even when the
+          single route_player_* fields below don't resolve for it (a 2-sided
+          trade isn't one player). Reusing ExchangeSide here is the same
+          component Trade Hub/GM Plan/Trade History already render it with
+          — same 40px avatars, same OVR gauge, not a smaller one-off. */}
+      {item.presentation?.trade_package &&
+      (item.presentation.trade_package.send.length > 0 || item.presentation.trade_package.receive.length > 0) ? (
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-2 items-start">
+          <ExchangeSide label="You send" dotColor="var(--color-danger)" assets={item.presentation.trade_package.send} />
+          <div
+            className="hidden sm:flex items-center justify-center text-xs font-bold uppercase self-stretch"
+            style={{ color: "var(--color-accent)" }}
+            aria-hidden="true"
+          >
+            FOR
+          </div>
+          <ExchangeSide label="You get" dotColor="var(--color-success)" assets={item.presentation.trade_package.receive} />
+        </div>
+      ) : item.route_player_name && item.route_player_id ? (
         <PlayerIdentityTrigger
           identity={{
             player_id: item.route_player_id,
@@ -106,7 +128,7 @@ export function GamePlanCard({
           <span style={{ color: "var(--color-text-muted)" }}>
             <PositionBadge position={item.route_player_position} />
           </span>
-          <PlayerAvatar playerId={item.route_player_id} tier={item.route_player_tier} size={24} />
+          <PlayerAvatar playerId={item.route_player_id} tier={item.route_player_tier} size={32} />
           <span style={{ color: "var(--color-text-muted)" }}>{item.route_player_name}</span>
           {item.route_player_team ? <span style={{ color: "var(--color-text-muted)" }}>· {item.route_player_team}</span> : null}
         </PlayerIdentityTrigger>
@@ -132,7 +154,7 @@ export function GamePlanCard({
                 <span style={{ color: "var(--color-text-muted)" }}>
                   <PositionBadge position={player.position} />
                 </span>
-                <PlayerAvatar playerId={player.player_id} tier={player.player_tier} size={24} />
+                <PlayerAvatar playerId={player.player_id} tier={player.player_tier} size={32} />
                 <span style={{ color: "var(--color-text-muted)" }}>{player.name}</span>
                 {player.team ? <span style={{ color: "var(--color-text-muted)" }}>· {player.team}</span> : null}
               </PlayerIdentityTrigger>
