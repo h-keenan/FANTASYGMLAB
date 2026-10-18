@@ -1371,6 +1371,22 @@ a {
   box-sizing: border-box;
   padding: var(--space-lg) var(--space-lg) 0;
 }
+/* coridian_, 2026-10-18: "the onboarding like slideshow after you make an
+   account needs some scaling work, specifically on mobile, but I'm sure
+   it needs scaling work on desktop. Desktop still needs scaling
+   improvements overall, things still seem too small." Every size below
+   was a fixed px value, so none of it inherited the existing desktop
+   root-font-size bump (@media (min-width:768px) { html { font-size:
+   18px } }, coridian_, 2026-10-17, same reasoning: "desktop scaling is
+   still too small and hard to read") the rest of the app already scales
+   by — converted to rem so it does, plus a wider content column and a
+   real second bump at the same breakpoint instead of relying on the rem
+   conversion alone. */
+@media (min-width: 768px) {
+  .onboarding-content {
+    max-width: 34rem;
+  }
+}
 .onboarding-glass {
   background: rgba(255, 255, 255, 0.045);
   backdrop-filter: blur(22px) saturate(160%);
@@ -1418,19 +1434,19 @@ a {
   padding: 0 var(--space-md);
 }
 .onboarding-mark {
-  width: 64px;
-  height: 64px;
+  width: 4.5rem;
+  height: 4.5rem;
   border-radius: 18px;
   background: linear-gradient(135deg, var(--color-accent), var(--color-accent-strong));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 1.75rem;
   font-weight: 700;
   color: #000;
 }
 .onboarding-eyebrow {
-  font-size: 11px;
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1438,17 +1454,17 @@ a {
 }
 .onboarding-headline {
   margin: 0;
-  font-size: 28px;
+  font-size: 2rem;
   line-height: 1.15;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .onboarding-headline--sm {
-  font-size: 22px;
+  font-size: 1.5rem;
 }
 .onboarding-body {
   margin: 0;
-  font-size: var(--font-size-body);
+  font-size: 1.0625rem;
   line-height: 1.6;
   color: var(--color-text-muted);
 }
