@@ -518,6 +518,16 @@ a {
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
+/* coridian_, 2026-10-18, screenshot: a row with no OVR rating (e.g. an IR
+   player) had its value/"VALUE" column shift out of alignment with rows
+   that do have a badge, since OvrGauge previously rendered nothing at all
+   instead of reserving the same space. Same width/height classes as
+   .ovr-gauge--sm/md/lg (applied alongside this one), just no visible ring
+   or number — an invisible placeholder, not a fabricated rating. */
+.ovr-gauge-placeholder {
+  display: inline-block;
+  flex: 0 0 auto;
+}
 .ovr-gauge--sm {
   width: 1.65rem;
   height: 1.65rem;
