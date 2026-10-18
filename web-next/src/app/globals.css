@@ -1328,6 +1328,19 @@ a {
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
   animation: onboarding-field-drift 14s linear infinite;
+  /* coridian_, 2026-10-18: "Account creation does not work" — a real,
+     severe regression from today's landing-page reuse of this class
+     (#1167). position:absolute + z-index:0 sits ABOVE plain in-flow
+     static content in paint/hit-test order regardless of DOM order (CSS
+     stacking: positioned descendants with z-index >= 0 paint above
+     non-positioned in-flow descendants). OnboardingCarousel.tsx never hit
+     this because its real content sits inside .onboarding-content
+     (position:relative, z-index:2, explicitly layered above this). The
+     landing page's hero/tabs/SignInForm have no such wrapper, so this
+     layer silently absorbed every click/tap across the entire page —
+     sign-in, sign-up, tab switching, all of it. .onboarding-sweep already
+     had this; this one just didn't. */
+  pointer-events: none;
 }
 .onboarding-sweep {
   position: absolute;
