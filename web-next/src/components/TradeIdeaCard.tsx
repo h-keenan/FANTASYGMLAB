@@ -53,8 +53,13 @@ function ShareTradeButton({ idea }: { idea: TradeIdea }) {
     <button
       type="button"
       onClick={onShare}
-      className="text-xs font-bold shrink-0"
-      style={{ color: "var(--color-accent)" }}
+      // coridian_, 2026-10-18: "The share trade button is still just
+      // text" — plain colored text with no button chrome at all (no
+      // border/background), indistinguishable from a navigation link.
+      // Same small bordered-pill treatment the value-edge badge right
+      // beside it already uses in this row.
+      className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
+      style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
     >
       {copied ? "Copied!" : "Share"}
     </button>
