@@ -125,4 +125,21 @@ describe("WaiversContent", () => {
 
     expect(screen.getByText(/No waiver option materially improves/)).toBeInTheDocument();
   });
+
+  // coridian_, 2026-10-18: "our backend can read current ffa balance!"
+  // — Sleeper's real waiver_budget/waiver_budget_used was already
+  // computed server-side but never surfaced as its own field.
+  it("shows a Your FAAB tile when the backend reports a remaining balance", () => {
+    const withFaab: WaiversResponse = { ...BASE_RESPONSE, faab_remaining: 94, faab_initial: 100 };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={withFaab} />);
+
+    expect(screen.getByText("Your FAAB")).toBeInTheDocument();
+    expect(screen.getByText("$94")).toBeInTheDocument();
+  });
+
+  it("omits the Your FAAB tile when the backend has no balance to report", () => {
+    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+
+    expect(screen.queryByText("Your FAAB")).not.toBeInTheDocument();
+  });
 });

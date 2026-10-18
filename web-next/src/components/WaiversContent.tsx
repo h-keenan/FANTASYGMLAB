@@ -307,6 +307,7 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
         <SnapshotTile label="Available players" value={String(data.available_count ?? data.players.length)} />
         <SnapshotTile label="Avg Wire Score" value={String(data.avg_wire_score ?? 0)} />
         <SnapshotTile label="Current need" value={data.needed_positions.length > 0 ? data.needed_positions.join(" / ") : "None"} />
+        {data.faab_remaining != null ? <SnapshotTile label="Your FAAB" value={`$${data.faab_remaining}`} /> : null}
       </div>
 
       <section className="flex flex-col gap-3" aria-labelledby="priority-adds-heading">
@@ -354,6 +355,10 @@ export function WaiversContent({ leagueName, data }: { leagueName: string; data:
           Beyond Priority Adds
         </span>
         <SectionHeading>Beyond Priority Adds</SectionHeading>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          Ranked by raw value only — includes positions you don&apos;t currently need, so a higher number here can still rank
+          below a lower one in Priority Adds above.
+        </p>
         {!data.entitlement.is_premium ? (
           <div
             className="p-4 flex flex-col gap-2"
