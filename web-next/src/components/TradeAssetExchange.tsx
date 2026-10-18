@@ -141,15 +141,18 @@ export function ExchangeSide({
         // coridian_, 2026-10-18: "either a background for the header of
         // this module or the footer or a background color behind the
         // players you're sending or giving" — a faint tint of the side's
-        // own send/get dot color (same -soft tokens the rest of the app
-        // already uses for risk/success panels, not a new color) gives
-        // each side a real visual boundary instead of bare rows on the
-        // card's own background.
+        // own send/get dot color gives each side a real visual boundary
+        // instead of bare rows on the card's own background. First pass
+        // reused the shared -soft tokens (~15% alpha) — right for a small
+        // pill/badge, but coridian_, same day, on this exact change: "the
+        // red and green background I think is a little too strong" once
+        // it covered a whole block instead of a chip. A plain color-mix at
+        // a much lower percentage reads as a boundary, not a solid fill.
         <div
           className="flex flex-col divide-y px-2 py-1"
           style={{
             borderColor: "var(--color-border)",
-            background: dotColor === "var(--color-danger)" ? "var(--color-danger-soft)" : "var(--color-success-soft)",
+            background: `color-mix(in srgb, ${dotColor} 6%, transparent)`,
           }}
         >
           {assets.map((asset, index) => (
