@@ -46,7 +46,6 @@ from modules import (
     league_value_settings,
     news as news_cache,
     news_intelligence,
-    player_eligibility,
     rankings,
     sleeper,
     sleeper_leagues,
@@ -649,16 +648,23 @@ def build_league_summary(
 
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(players_db_path)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(players_db_path)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="portfolio", league=league
+    # Portfolio's real perf bug (coridian_, 2026-10-18: "~10s load"): this
+    # used to re-run load -> filter -> apply_valuation_lens from scratch for
+    # every saved league, every call — the full eligible-player-pool
+    # valuation pass, not just this roster's slice of it. That's exactly
+    # the shared "asker-independent, redone from scratch" cost
+    # build_valued_players_frame_cached already exists to fix (same 30s
+    # Redis-backed, single-flight cache modules.league_rankings/
+    # modules.trade_hub_engine/modules.playoff_simulator/modules.waivers_ui
+    # already use for their own downstream work) — this call site just
+    # never used it, so every one of Portfolio's per-league fan-out threads
+    # paid the full cost independently instead of sharing one cache entry
+    # per (league_id, lens) across the whole 30s window.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
     )
-    if players_df.empty:
+    if valued.empty:
         return {"ok": False, "reason": "no_player_data"}
-
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
 
     all_rostered_player_ids: set[str] = set()
