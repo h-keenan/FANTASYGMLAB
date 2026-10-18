@@ -404,6 +404,22 @@ def test_cap_keeps_roster_event_ahead_of_generic_volume():
     )
 
 
+def test_cached_news_events_keeps_the_shared_news_cache_warm():
+    """coridian_, 2026-10-18 (news audit): Alerts read the same shared news
+    cache Dashboard/News already refresh, but never triggered its own
+    refresh — a user who only ever opened Alerts would ride entirely on
+    other surfaces' traffic to keep it warm. This must call the same
+    off-the-critical-path refresh they already do."""
+
+    session = _roster_session()
+    with patch("modules.news.load_cached_news_pool", return_value=[]), patch(
+        "modules.news.schedule_news_cache_refresh"
+    ) as mock_refresh:
+        alerts_activity._cached_news_events(session, "L1")
+
+    mock_refresh.assert_called_once_with()
+
+
 def test_warm_header_does_not_call_fetch_news():
     news_mod.reset_provider_call_counters()
     session: dict = {"account_user_id": "u1", "selected_league_id": "L1"}

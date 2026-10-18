@@ -370,10 +370,17 @@ def _cached_news_events(session: Mapping[str, Any] | None, league_id: str) -> li
             if identity:
                 seen.add(identity)
     try:
-        from modules.news import load_cached_news_pool
+        from modules.news import load_cached_news_pool, schedule_news_cache_refresh
         from modules import news_intelligence as ni
         from modules import news_signal
 
+        # coridian_, 2026-10-18 (news audit): Alerts read the shared news
+        # cache but never kept it warm itself — Dashboard/News both already
+        # call this (off the request's critical path, never blocking this
+        # read) whenever it's gone stale. A user who only ever opens Alerts
+        # would otherwise ride entirely on other surfaces' traffic to
+        # refresh it.
+        schedule_news_cache_refresh()
         pool = load_cached_news_pool() or []
         roster_context = ni.load_news_roster_context(
             session if isinstance(session, Mapping) else {}, league_id=league_id
