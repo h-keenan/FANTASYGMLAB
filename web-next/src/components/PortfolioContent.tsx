@@ -5,6 +5,7 @@ import { categoryColorVar, categoryLabel } from "@/lib/portfolioPresentation";
 import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { formatRank } from "@/components/SnapshotTile";
+import { TeamAvatar } from "@/components/TeamAvatar";
 
 /**
  * Ports modules/portfolio_page.py's render_portfolio_page — the cross-
@@ -124,15 +125,22 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
       }}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col min-w-0">
-          <h3 style={{ font: "var(--font-card-title)" }}>
-            {league.team_name || "Unclaimed team"} — {league.league_name}
-          </h3>
-          {metadata ? (
-            <span className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-              {metadata}
-            </span>
-          ) : null}
+        <div className="flex items-start gap-2 min-w-0">
+          {/* coridian_, 2026-10-18 (screenshot): Portfolio's league cards
+              had no team logo at all. Same Sleeper CDN avatar the user's
+              own roster already has everywhere else in the app (Trade Hub,
+              Matchup, League Rankings) — not a new avatar source. */}
+          <TeamAvatar avatarUrl={league.team_avatar_url} size={32} />
+          <div className="flex flex-col min-w-0">
+            <h3 style={{ font: "var(--font-card-title)" }}>
+              {league.team_name || "Unclaimed team"} — {league.league_name}
+            </h3>
+            {metadata ? (
+              <span className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
+                {metadata}
+              </span>
+            ) : null}
+          </div>
         </div>
         {showRankBadge ? (
           <span

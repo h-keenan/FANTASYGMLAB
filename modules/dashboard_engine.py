@@ -772,6 +772,11 @@ def build_league_summary(
         "reason": "",
         "roster_id": str(roster_id or ""),
         "team_name": _text(team_profile.get("team_name")),
+        # coridian_, 2026-10-18 (screenshot): Portfolio's league cards had no
+        # team logo at all. Same Sleeper CDN avatar team_profile's own
+        # team_name above already reads from (sleeper.get_league_roster_
+        # profiles) — not a second fetch, not a new avatar source.
+        "team_avatar_url": _text(team_profile.get("avatar_url")),
         "wins": roster_settings.get("wins"),
         "losses": roster_settings.get("losses"),
         "ties": roster_settings.get("ties"),

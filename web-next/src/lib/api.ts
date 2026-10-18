@@ -822,6 +822,7 @@ export interface PortfolioLeague {
   league_id: string;
   league_name: string;
   team_name: string;
+  team_avatar_url: string;
   wins: number | null;
   losses: number | null;
   ties: number | null;

@@ -31,6 +31,7 @@ function league(overrides: Partial<PortfolioLeague>): PortfolioLeague {
     league_id: "league-1",
     league_name: "Dynasty Overlords",
     team_name: "The Contenders",
+    team_avatar_url: "",
     wins: 7,
     losses: 3,
     ties: 0,
@@ -81,6 +82,19 @@ describe("PortfolioContent", () => {
     expect(screen.getByText("Top Priority")).toBeInTheDocument();
     expect(screen.getByText("Watch")).toBeInTheDocument();
     expect(screen.getByText("Open Dynasty Overlords Dashboard →")).toBeInTheDocument();
+  });
+
+  // coridian_, 2026-10-18 (screenshot): Portfolio's league cards had no
+  // team logo at all.
+  it("renders the team's avatar image when team_avatar_url is set", () => {
+    render(
+      <PortfolioContent
+        data={{ ...BASE_RESPONSE, leagues: [league({ team_avatar_url: "https://sleepercdn.com/avatars/abc.png" })] }}
+      />,
+    );
+
+    const avatar = document.querySelector('img[src="https://sleepercdn.com/avatars/abc.png"]');
+    expect(avatar).toBeInTheDocument();
   });
 
   it("shows the Roster Power rank in the metadata line (not a badge) when rank is outside the top 3", () => {
