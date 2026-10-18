@@ -1,8 +1,32 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { GmPlanContent } from "./GmPlanContent";
-import type { GmPlanResponse, GmPlanTradeItem, TradeAsset } from "@/lib/api";
+import type {
+  GmPlanResponse,
+  GmPlanTradeItem,
+  GmTarget,
+  LineupPlayer,
+  MyTeamResponse,
+  RankedPlayer,
+  TeamStanceResponse,
+  TradeAsset,
+} from "@/lib/api";
+import { api } from "@/lib/api";
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      setTeamStance: vi.fn().mockResolvedValue({ ok: true, stance: "competing" }),
+      addGmTarget: vi.fn().mockResolvedValue({ ok: true, reason: "" }),
+      setGmTargetUntouchable: vi.fn().mockResolvedValue({ ok: true, reason: "" }),
+      removeGmTarget: vi.fn().mockResolvedValue({ ok: true, reason: "" }),
+    },
+  };
+});
 
 function asset(overrides: Partial<TradeAsset>): TradeAsset {
   return {
@@ -33,6 +57,57 @@ function tradeItem(overrides: Partial<GmPlanTradeItem>): GmPlanTradeItem {
     receive_assets: [asset({ player_id: "opp-wr", name: "Opp Wide Receiver", position: "WR" })],
     trade_gain: 237,
     source: "modules.trade_ideas / modules.trade_hub_engine.generate_trade_idea_records_cached",
+    ...overrides,
+  };
+}
+
+function lineupPlayer(overrides: Partial<LineupPlayer>): LineupPlayer {
+  return {
+    player_id: "p1",
+    name: "Test Player",
+    position: "WR",
+    team: "SF",
+    age: 24,
+    status: "Active",
+    injury_status: null,
+    injury_label: "",
+    ruled_out: false,
+    tier: "starter",
+    score: 1500,
+    slot: "WR1",
+    suggested_starter: true,
+    opportunity_label: null,
+    overall_rating: 72,
+    ...overrides,
+  };
+}
+
+function gmTarget(overrides: Partial<GmTarget>): GmTarget {
+  return {
+    player_id: "p1",
+    source_surface: "team_stance",
+    created_at: "2026-10-01T00:00:00Z",
+    untouchable: false,
+    ...overrides,
+  };
+}
+
+function rankedPlayer(overrides: Partial<RankedPlayer>): RankedPlayer {
+  return {
+    player_id: "p1",
+    name: "Test Target",
+    position: "WR",
+    team: "SF",
+    age: 24,
+    status: "Active",
+    injury_status: null,
+    tier: "starter",
+    score: 1500,
+    overall_rank: 12,
+    position_rank: 4,
+    rank_unavailable_reason: null,
+    opportunity_label: "Lead Receiver",
+    overall_rating: 72,
     ...overrides,
   };
 }
@@ -98,6 +173,14 @@ const BASE_RESPONSE: GmPlanResponse = {
   ],
 };
 
+const STANCE: TeamStanceResponse = { ok: true, stance: "rebuilding", strategy: "rebuild" };
+const MY_TEAM: MyTeamResponse = {
+  ok: true,
+  starters: [lineupPlayer({})],
+  bench: [lineupPlayer({ player_id: "p2", name: "Bench Guy", position: "RB" })],
+  reason: "",
+};
+
 describe("GmPlanContent", () => {
   it("renders the hero phase/stance badges, headline, and league name", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
@@ -106,24 +189,6 @@ describe("GmPlanContent", () => {
     expect(screen.getByText("Trade Deadline Approaching")).toBeInTheDocument();
     expect(screen.getByText("Rebuilding")).toBeInTheDocument();
     expect(screen.getByText("The trade market is most active right now.")).toBeInTheDocument();
-  });
-
-  it("links to Team Situation, labeled by whether a stance is already declared", () => {
-    render(<GmPlanContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
-
-    expect(screen.getByRole("link", { name: /Change your Team Situation/ })).toHaveAttribute(
-      "href",
-      "/team-situation/league-1?name=Dynasty%20Overlords",
-    );
-
-    const undeclared: GmPlanResponse = { ...BASE_RESPONSE, team_stance: "", team_stance_label: "" };
-    render(<GmPlanContent leagueId="league-1" leagueName="Dynasty Overlords" data={undeclared} />);
-    expect(screen.getByRole("link", { name: /Declare your Team Situation/ })).toBeInTheDocument();
-  });
-
-  it("omits the Team Situation link when no leagueId is passed", () => {
-    render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
-    expect(screen.queryByRole("link", { name: /Team Situation/ })).not.toBeInTheDocument();
   });
 
   it("renders Where You Stand facts including a flagged weak spot", () => {
@@ -142,7 +207,6 @@ describe("GmPlanContent", () => {
     expect(screen.getByText("My Running Back")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
     expect(screen.getByText("+237")).toBeInTheDocument();
-    // Circular OVR gauge renders the real rating for both sides.
     expect(screen.getAllByText("88").length).toBeGreaterThan(0);
   });
 
@@ -216,5 +280,195 @@ describe("GmPlanContent", () => {
 
     expect(screen.getByRole("heading", { name: "Your season-arc roadmap" })).toBeInTheDocument();
     expect(screen.queryByText(/We don't have enough to build a GM Plan/)).not.toBeInTheDocument();
+  });
+
+  // Revision 20 (2026-10-18): Team Situation + GM Targets merged in.
+  describe("Team Situation section", () => {
+    it("renders the declared stance option when teamStance is passed", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[]}
+          rankings={{ ok: true, players: [] }}
+        />,
+      );
+
+      expect(screen.getByRole("button", { name: "Rebuilding", pressed: true })).toBeInTheDocument();
+      expect(screen.getByText("Prioritize youth and future draft capital")).toBeInTheDocument();
+    });
+
+    it("calls setTeamStance when a different stance is picked", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[]}
+          rankings={{ ok: true, players: [] }}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Competing" }));
+
+      expect(api.setTeamStance).toHaveBeenCalledWith("league-1", "competing");
+    });
+
+    it("omits the section entirely when no teamStance is passed", () => {
+      render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+      expect(screen.queryByText("Team Situation")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Protected Players section", () => {
+    it("lists roster players and groups an already-untouchable one as protected", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[gmTarget({ untouchable: true })]}
+          rankings={{ ok: true, players: [] }}
+        />,
+      );
+
+      expect(screen.getByText("Test Player")).toBeInTheDocument();
+      expect(screen.getByText("Bench Guy")).toBeInTheDocument();
+      expect(screen.getByText("Rest of Roster")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Protected" })).toBeInTheDocument();
+    });
+
+    it("adds a GM Target then marks it untouchable when protecting a player not yet tracked", async () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[]}
+          rankings={{ ok: true, players: [] }}
+        />,
+      );
+
+      fireEvent.click(screen.getAllByRole("button", { name: "Protect" })[0]);
+
+      expect(api.addGmTarget).toHaveBeenCalledWith("league-1", "p1", "team_stance");
+      await screen.findByRole("button", { name: "Protected" });
+      expect(api.setGmTargetUntouchable).toHaveBeenCalledWith("league-1", "p1", true);
+    });
+
+    it("shows a no-roster message when the league has no roster players", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={{ ok: true, starters: [], bench: [], reason: "empty_roster" }}
+          targets={[]}
+          rankings={{ ok: true, players: [] }}
+        />,
+      );
+
+      expect(screen.getByText("No roster players found for this league.")).toBeInTheDocument();
+    });
+
+    it("omits the section entirely when no myTeam is passed", () => {
+      render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+      expect(screen.queryByText("Protected Players")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Watching section", () => {
+    it("shows only non-untouchable targets (Protected Players already covers untouchable ones)", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[
+            gmTarget({ player_id: "p1", untouchable: true, source_surface: "player_quick_view" }),
+            gmTarget({ player_id: "p9", untouchable: false, source_surface: "player_quick_view" }),
+          ]}
+          rankings={{
+            ok: true,
+            players: [rankedPlayer({ player_id: "p1", name: "Protected Player" }), rankedPlayer({ player_id: "p9", name: "Watched Player" })],
+          }}
+        />,
+      );
+
+      expect(screen.getByText("Watched Player")).toBeInTheDocument();
+      expect(screen.queryByText("Protected Player")).not.toBeInTheDocument();
+    });
+
+    it("links each watched target to Player Compare and shows its origin", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[gmTarget({ player_id: "p9", source_surface: "player_quick_view" })]}
+          rankings={{ ok: true, players: [rankedPlayer({ player_id: "p9", name: "Watched Player" })] }}
+        />,
+      );
+
+      expect(screen.getByRole("link", { name: "Compare" })).toHaveAttribute(
+        "href",
+        "/player-compare/league-1?a=p9&name=Dynasty%20Overlords",
+      );
+      expect(screen.getByText(/Added from Player Quick View/)).toBeInTheDocument();
+    });
+
+    it("calls removeGmTarget and optimistically removes the row when Remove is pressed", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[gmTarget({ player_id: "p9" })]}
+          rankings={{ ok: true, players: [rankedPlayer({ player_id: "p9", name: "Watched Player" })] }}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+      expect(api.removeGmTarget).toHaveBeenCalledWith("league-1", "p9");
+      expect(screen.queryByText("Watched Player")).not.toBeInTheDocument();
+    });
+
+    it("shows an empty-watchlist message when there's nothing to watch", () => {
+      render(
+        <GmPlanContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          data={BASE_RESPONSE}
+          teamStance={STANCE}
+          myTeam={MY_TEAM}
+          targets={[]}
+          rankings={{ ok: true, players: [] }}
+        />,
+      );
+
+      expect(screen.getByText(/Nothing here yet/)).toBeInTheDocument();
+    });
+
+    it("omits the section entirely when no rankings are passed", () => {
+      render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+      expect(screen.queryByText("Watching")).not.toBeInTheDocument();
+    });
   });
 });

@@ -5,7 +5,14 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
-import { api, type GmPlanResponse } from "@/lib/api";
+import {
+  api,
+  type GmPlanResponse,
+  type GmTargetsResponse,
+  type LeagueRankingsResponse,
+  type MyTeamResponse,
+  type TeamStanceResponse,
+} from "@/lib/api";
 import { GmPlanContent } from "@/components/GmPlanContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
@@ -20,6 +27,10 @@ export default function GmPlanPage() {
   const { lens } = useValuationLens(leagueId);
 
   const [gmPlan, setGmPlan] = useState<GmPlanResponse | null>(null);
+  const [teamStance, setTeamStance] = useState<TeamStanceResponse | null>(null);
+  const [myTeam, setMyTeam] = useState<MyTeamResponse | null>(null);
+  const [targets, setTargets] = useState<GmTargetsResponse | null>(null);
+  const [rankings, setRankings] = useState<LeagueRankingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,10 +41,25 @@ export default function GmPlanPage() {
     }
     let cancelled = false;
 
-    api
-      .getGmPlan(leagueId, lens)
-      .then((result) => {
-        if (!cancelled) setGmPlan(result);
+    // Revision 20 (2026-10-18): GM Plan absorbed Team Situation (stance +
+    // Protected Players) and GM Targets (the Watching list) — see
+    // GmPlanContent's own docstring. One page now needs all five of these,
+    // same five calls the two standalone pages made between them before.
+    Promise.all([
+      api.getGmPlan(leagueId, lens),
+      api.getTeamStance(leagueId),
+      api.getMyTeam(leagueId, lens),
+      api.getGmTargets(leagueId),
+      api.getLeagueRankings(leagueId, lens),
+    ])
+      .then(([gmPlanResult, stanceResult, teamResult, targetsResult, rankingsResult]) => {
+        if (!cancelled) {
+          setGmPlan(gmPlanResult);
+          setTeamStance(stanceResult);
+          setMyTeam(teamResult);
+          setTargets(targetsResult);
+          setRankings(rankingsResult);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load GM Plan.");
@@ -50,7 +76,7 @@ export default function GmPlanPage() {
     );
   }
 
-  if (error || !gmPlan) {
+  if (error || !gmPlan || !teamStance || !myTeam || !targets || !rankings) {
     return (
       <main className="flex-1 flex items-center justify-center px-4">
         <p role="alert" style={{ color: "var(--color-danger)" }}>
@@ -60,5 +86,15 @@ export default function GmPlanPage() {
     );
   }
 
-  return <GmPlanContent leagueId={leagueId} leagueName={leagueName} data={gmPlan} />;
+  return (
+    <GmPlanContent
+      leagueId={leagueId}
+      leagueName={leagueName}
+      data={gmPlan}
+      teamStance={teamStance}
+      myTeam={myTeam}
+      targets={targets.targets}
+      rankings={rankings}
+    />
+  );
 }

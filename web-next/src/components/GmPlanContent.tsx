@@ -1,21 +1,37 @@
-import Link from "next/link";
+"use client";
+
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type {
-  GmPlanFocusArea,
-  GmPlanFocusItem,
-  GmPlanInjuryItem,
-  GmPlanPlayoffOddsItem,
-  GmPlanRankItem,
-  GmPlanRecordItem,
-  GmPlanResponse,
-  GmPlanTradeItem,
+import {
+  api,
+  TEAM_STANCE_OPTIONS,
+  type GmPlanFocusArea,
+  type GmPlanFocusItem,
+  type GmPlanInjuryItem,
+  type GmPlanPlayoffOddsItem,
+  type GmPlanRankItem,
+  type GmPlanRecordItem,
+  type GmPlanResponse,
+  type GmPlanTradeItem,
+  type GmTarget,
+  type LeagueRankingsResponse,
+  type MyTeamResponse,
+  type TeamStance,
+  type TeamStanceResponse,
 } from "@/lib/api";
+import { OvrGauge } from "@/components/OvrGauge";
+import { PillRow } from "@/components/PillRow";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { formatTradeGain } from "@/lib/tradeHubPresentation";
 import { gmPlanReasonMessage } from "@/lib/gmPlanPresentation";
+import { buildProtectRows, splitProtectRows, type ProtectRow } from "@/lib/teamStancePresentation";
+import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTargetsPresentation";
+import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
+import { injuryTone } from "@/lib/myTeamPresentation";
 
 /**
  * Ports modules/gm_plan_ui.py's render_gm_plan_workspace / mobile's
@@ -23,20 +39,22 @@ import { gmPlanReasonMessage } from "@/lib/gmPlanPresentation";
  * phase/stance hero, then three focus-area sections (Where You Stand,
  * Trade Opportunities, Roster Construction). Reads the exact same
  * GET .../gm-plan endpoint both of those already call — no duplicated
- * aggregation or valuation logic here, only presentation. Trade
- * Opportunities' give/get identity (OvrGauge/PositionBadge, via the
- * shared TradeAssetExchange extracted from Trade Hub) reuses the same
- * send_assets/receive_assets TradeAsset dicts Trade Hub's own cards
- * render — modules.gm_plan's visual-identity fix (PR #1047) already put
- * these on the wire; mobile's own screen just hasn't been updated to
- * render them yet, so this page is actually ahead of mobile here, not
- * behind it.
+ * aggregation or valuation logic here, only presentation.
  *
- * Premium-gated (2026-10-17, pre-launch audit): matches Streamlit's own
- * GM Plan route (current_user_is_premium() blur+lock) — GET .../gm-plan
- * now returns `is_premium`/`upsell`, and a Free caller sees the same
- * PremiumUpsellCard Portfolio/Trade Finder use instead of a real roadmap.
- * mobile's screen is still ungated and should get the same fix separately.
+ * Revision 20 (2026-10-18, coridian_: "What do you think about merging
+ * the team situation, GM targets and GM plan into one page?" / agreed
+ * "yes I like it... same reasoning as killing the Explore grid today"):
+ * Team Situation (stance declaration + the roster-wide "Protected
+ * Players" checklist) and GM Targets (the Untouchable/Watching
+ * watchlist) are folded in here as always-visible sections — neither was
+ * ever Premium-gated, so they stay reachable for Free users even though
+ * the roadmap itself (season phase/stance hero + focus areas) still is.
+ * The two standalone pages (/team-situation, /gm-targets) now just
+ * redirect here; GM orb/sidebar nav lost those two entries, down to one
+ * "GM Plan" destination. Protected Players and the Watching group can
+ * both legitimately list the same untouchable roster player (one is a
+ * roster-wide checklist, the other a tracked-watchlist view over the
+ * same underlying flag) — a known, minor, forgivable overlap, not a bug.
  */
 
 function focusItemKey(item: GmPlanFocusItem, index: number): string {
@@ -237,56 +255,330 @@ function FocusAreaSection({ area }: { area: GmPlanFocusArea }) {
   );
 }
 
+function ProtectPlayerRow({
+  row,
+  busy,
+  onToggle,
+}: {
+  row: ProtectRow;
+  busy: boolean;
+  onToggle: (playerId: string, next: boolean) => void;
+}) {
+  const { player, protected: isProtected } = row;
+  const tone = injuryTone(player.injury_label);
+
+  return (
+    <div
+      className="flex items-center gap-3 py-2"
+      style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+    >
+      <PlayerIdentityTrigger
+        identity={{ ...player, sourceLabel: "Team Situation" }}
+        className="flex-1 flex items-center gap-3 min-w-0"
+      >
+        <PositionBadge position={player.position} />
+        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
+        <OvrGauge rating={player.overall_rating} size="sm" />
+        <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+              {player.name || "Unknown player"}
+            </span>
+            {player.injury_label ? (
+              <span
+                className="px-1 text-xs font-bold uppercase"
+                style={{
+                  color:
+                    tone === "danger" ? "var(--color-danger)" : tone === "warning" ? "var(--color-warning)" : "var(--color-text-muted)",
+                }}
+              >
+                {player.injury_label}
+              </span>
+            ) : null}
+          </div>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {player.team || "FA"}
+          </span>
+        </div>
+      </PlayerIdentityTrigger>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onToggle(player.player_id, !isProtected)}
+        className="px-2 py-1 text-xs font-bold shrink-0"
+        style={
+          isProtected
+            ? {
+                background: "var(--color-premium)",
+                color: "var(--color-brand-mark-ink)",
+                border: "var(--border-width-default) solid var(--color-premium)",
+              }
+            : { color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }
+        }
+      >
+        {busy ? "…" : isProtected ? "Protected" : "Protect"}
+      </button>
+    </div>
+  );
+}
+
+function TargetRowView({
+  row,
+  leagueId,
+  leagueName,
+  onToggleUntouchable,
+  onRemove,
+}: {
+  row: GmTargetRow;
+  leagueId: string;
+  leagueName: string;
+  onToggleUntouchable: (playerId: string, next: boolean) => void;
+  onRemove: (playerId: string) => void;
+}) {
+  const { target, player } = row;
+  const injury = waiverInjuryDisplay(player?.injury_status);
+  const contextLine = targetContextLine(row);
+  const name = player?.name || `Player ${target.player_id}`;
+
+  return (
+    <div className="flex flex-col gap-2 py-3" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
+      <div className="flex items-center justify-between gap-3">
+        <PlayerIdentityTrigger
+          identity={{ ...player, player_id: target.player_id, name, sourceLabel: "GM Targets", leagueId, leagueName }}
+          className="flex items-center gap-3 min-w-0"
+        >
+          <PositionBadge position={player?.position} />
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+                {name}
+              </span>
+              {injury.label ? (
+                <span
+                  className="text-xs font-bold uppercase"
+                  style={{
+                    color:
+                      injury.tone === "danger"
+                        ? "var(--color-danger)"
+                        : injury.tone === "warning"
+                          ? "var(--color-warning)"
+                          : "var(--color-text-muted)",
+                  }}
+                >
+                  {injury.label}
+                </span>
+              ) : null}
+            </div>
+            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+              {player?.team || "—"}
+              {contextLine ? ` · ${contextLine}` : ""}
+            </span>
+          </div>
+        </PlayerIdentityTrigger>
+        <div className="flex items-center gap-2 shrink-0">
+          {player?.score !== null && player?.score !== undefined ? (
+            <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
+              {formatWaiverScore(player.score)}
+            </span>
+          ) : null}
+          {player?.position_rank ? (
+            <span
+              className="px-1.5 py-0.5 text-xs font-bold"
+              style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
+            >
+              {player.position}
+              {player.position_rank}
+            </span>
+          ) : null}
+          <OvrGauge rating={player?.overall_rating ?? null} size="sm" />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <a
+          href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(target.player_id)}&name=${encodeURIComponent(leagueName)}`}
+          className="px-2 py-1 text-xs font-bold"
+          style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+        >
+          Compare
+        </a>
+        <button
+          type="button"
+          onClick={() => onToggleUntouchable(target.player_id, !target.untouchable)}
+          className="px-2 py-1 text-xs font-bold"
+          style={
+            target.untouchable
+              ? { background: "var(--color-premium)", color: "var(--color-brand-mark-ink)", border: "var(--border-width-default) solid var(--color-premium)" }
+              : { color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }
+          }
+        >
+          {target.untouchable ? "Unmark untouchable" : "Mark untouchable"}
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(target.player_id)}
+          className="px-2 py-1 text-xs font-bold"
+          style={{ color: "var(--color-danger)", border: "var(--border-width-default) solid var(--color-danger)" }}
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function GmPlanContent({
   leagueId,
   leagueName,
   data,
+  teamStance,
+  myTeam,
+  targets,
+  rankings,
 }: {
   /** Optional only so this component's existing unit tests (which predate
-   * Team Situation's Revision 19 link below) don't all need updating —
-   * app/gm-plan/[leagueId]/page.tsx always has a real one to pass. */
+   * the Revision 20 merge below) don't all need the full data set —
+   * app/gm-plan/[leagueId]/page.tsx always has real ones to pass. */
   leagueId?: string;
   leagueName: string;
   data: GmPlanResponse;
+  teamStance?: TeamStanceResponse;
+  myTeam?: MyTeamResponse;
+  targets?: GmTarget[];
+  rankings?: LeagueRankingsResponse;
 }) {
+  const [stance, setStanceState] = useState<TeamStance | "">(teamStance?.stance ?? "");
+  const [trackedRows, setTrackedRows] = useState<GmTarget[]>(targets ?? []);
+  const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
+
+  const protectRows = useMemo(
+    () => buildProtectRows(myTeam?.starters ?? [], myTeam?.bench ?? [], trackedRows),
+    [myTeam, trackedRows],
+  );
+  const { protectedRows, otherRows } = useMemo(() => splitProtectRows(protectRows), [protectRows]);
+
+  const byId = useMemo(
+    () => new Map((rankings?.players ?? []).map((p) => [p.player_id, p])),
+    [rankings],
+  );
+  const joinedTargets = useMemo<GmTargetRow[]>(
+    () => trackedRows.map((target) => ({ target, player: byId.get(target.player_id) ?? null })),
+    [trackedRows, byId],
+  );
+  const { watching } = useMemo(() => groupTargetRows(joinedTargets), [joinedTargets]);
+
+  const onPickStance = (value: string) => {
+    const next = value as TeamStance;
+    if (next === stance || !leagueId) return;
+    // Genuine optimistic update, result intentionally discarded — same
+    // contract mobile's GmStanceContext.setStance uses.
+    setStanceState(next);
+    void api.setTeamStance(leagueId, next).catch(() => {});
+  };
+
+  const onToggleProtect = (playerId: string, next: boolean) => {
+    if (!leagueId) return;
+    setBusyPlayerId(playerId);
+    const wasTracked = trackedRows.some((row) => row.player_id === playerId);
+    const previous = trackedRows;
+    setTrackedRows((prev) => {
+      if (!wasTracked) {
+        return [...prev, { player_id: playerId, source_surface: "team_stance", created_at: null, untouchable: next }];
+      }
+      return prev.map((row) => (row.player_id === playerId ? { ...row, untouchable: next } : row));
+    });
+
+    (async () => {
+      try {
+        if (next && !wasTracked) {
+          const addResult = await api.addGmTarget(leagueId, playerId, "team_stance");
+          if (!addResult.ok) throw new Error(addResult.reason || "not_available");
+        }
+        if (next || wasTracked) {
+          const result = await api.setGmTargetUntouchable(leagueId, playerId, next);
+          if (!result.ok) throw new Error(result.reason || "not_available");
+        }
+      } catch {
+        setTrackedRows(previous);
+      } finally {
+        setBusyPlayerId(null);
+      }
+    })();
+  };
+
+  const toggleUntouchable = (playerId: string, next: boolean) => {
+    if (!leagueId) return;
+    setTrackedRows((prev) => prev.map((row) => (row.player_id === playerId ? { ...row, untouchable: next } : row)));
+    api
+      .setGmTargetUntouchable(leagueId, playerId, next)
+      .then((result) => {
+        if (!result.ok) {
+          setTrackedRows((prev) => prev.map((row) => (row.player_id === playerId ? { ...row, untouchable: !next } : row)));
+        }
+      })
+      .catch(() => {
+        setTrackedRows((prev) => prev.map((row) => (row.player_id === playerId ? { ...row, untouchable: !next } : row)));
+      });
+  };
+
+  const removeTarget = (playerId: string) => {
+    if (!leagueId) return;
+    const previous = trackedRows;
+    setTrackedRows((prev) => prev.filter((row) => row.player_id !== playerId));
+    api.removeGmTarget(leagueId, playerId).catch(() => {
+      setTrackedRows(previous);
+    });
+  };
+
+  const selectedStanceOption = TEAM_STANCE_OPTIONS.find((option) => option.value === stance);
+  const noRoster = protectRows.length === 0;
+
   const notice = data.reason ? gmPlanReasonMessage(data.reason) : null;
-  if (notice) {
-    return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
-          {notice}
-        </p>
-      </main>
-    );
-  }
-
-  if (!data.is_premium) {
-    return (
-      <PremiumUpsellCard
-        kicker="GM Plan"
-        upsell={data.upsell}
-        fallbackTitle="Your season-arc roadmap"
-        fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
-      />
-    );
-  }
-
   const quiet = data.quiet || !data.focus_areas || data.focus_areas.length === 0;
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
       <header className="flex flex-col gap-1">
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           GM Plan
         </span>
         <h1 style={{ font: "var(--font-page-title)" }}>{leagueName}</h1>
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          A season-arc roadmap: where you stand, your best trade paths, and your roster construction — framed by
-          your declared Team Situation.
+          Your season-arc roadmap, declared stance, and protected/watched players — all in one place.
         </p>
       </header>
 
-      {quiet ? (
+      {teamStance ? (
+        <section className="flex flex-col gap-2">
+          <h2 style={{ font: "var(--type-section-title)" }}>Team Situation</h2>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Tell us how you see this team right now. We&apos;ll lean trade-idea language toward that stance, and use
+            it to shape your trade and lineup value adjustments too.
+          </p>
+          <PillRow
+            options={TEAM_STANCE_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
+            active={stance}
+            onSelect={onPickStance}
+          />
+          {selectedStanceOption ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {selectedStanceOption.description}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {notice ? (
+        <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
+          {notice}
+        </p>
+      ) : !data.is_premium ? (
+        <PremiumUpsellCard
+          kicker="GM Plan"
+          upsell={data.upsell}
+          fallbackTitle="Your season-arc roadmap"
+          fallbackBody="GM Plan is a Premium feature: where you stand, your best trade paths, and your roster construction — framed by your declared Team Situation. Upgrade to Premium to unlock it."
+        />
+      ) : quiet ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           We don&apos;t have enough to build a GM Plan for this league yet.
         </p>
@@ -331,15 +623,6 @@ export function GmPlanContent({
                 {data.headline}
               </p>
             ) : null}
-            {leagueId ? (
-              <Link
-                href={`/team-situation/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`}
-                className="text-xs font-bold self-start"
-                style={{ color: "var(--color-accent)" }}
-              >
-                {data.team_stance_label ? "Change your Team Situation" : "Declare your Team Situation"} →
-              </Link>
-            ) : null}
           </section>
 
           <div className="flex flex-col gap-6">
@@ -349,6 +632,83 @@ export function GmPlanContent({
           </div>
         </>
       )}
+
+      {myTeam && leagueId ? (
+        <section className="flex flex-col gap-2">
+          <h2 style={{ font: "var(--type-section-title)" }}>Protected Players</h2>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Mark players you don&apos;t want traded away. This is the same protection the Watching list below uses
+            — toggling it here or there shows up in both places.
+          </p>
+
+          {noRoster ? (
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              No roster players found for this league.
+            </p>
+          ) : (
+            <div
+              className="flex flex-col px-3"
+              style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+            >
+              {protectedRows.map((row) => (
+                <ProtectPlayerRow
+                  key={row.player.player_id}
+                  row={row}
+                  busy={busyPlayerId === row.player.player_id}
+                  onToggle={onToggleProtect}
+                />
+              ))}
+              {protectedRows.length > 0 && otherRows.length > 0 ? (
+                <h3
+                  className="text-xs font-bold uppercase pt-3"
+                  style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}
+                >
+                  Rest of Roster
+                </h3>
+              ) : null}
+              {otherRows.map((row) => (
+                <ProtectPlayerRow
+                  key={row.player.player_id}
+                  row={row}
+                  busy={busyPlayerId === row.player.player_id}
+                  onToggle={onToggleProtect}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {rankings && leagueId ? (
+        <section className="flex flex-col gap-2">
+          <h2 style={{ font: "var(--type-section-title)" }}>Watching</h2>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Players you&apos;re considering buying, selling, adding, or monitoring — not trade-protected.
+          </p>
+          {watching.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              Nothing here yet. Add players you&apos;re considering from a player&apos;s profile to start watching
+              them.
+            </p>
+          ) : (
+            <div
+              className="flex flex-col px-3"
+              style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+            >
+              {watching.map((row) => (
+                <TargetRowView
+                  key={row.target.player_id}
+                  row={row}
+                  leagueId={leagueId}
+                  leagueName={leagueName}
+                  onToggleUntouchable={toggleUntouchable}
+                  onRemove={removeTarget}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
     </main>
   );
 }

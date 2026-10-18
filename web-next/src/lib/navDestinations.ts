@@ -52,9 +52,20 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
           glyph: "tradeHub",
           color: "var(--color-accent)",
         },
-        { label: "GM Targets", path: `/gm-targets/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your saved watchlist", glyph: "gmTargets", color: "var(--color-premium)" },
-        { label: "Team Situation", path: `/team-situation/${encodeURIComponent(leagueId)}${query}`, subtitle: "Declare your rebuild/compete stance", glyph: "teamSituation", color: "var(--color-warning)" },
-        { label: "GM Plan", path: `/gm-plan/${encodeURIComponent(leagueId)}${query}`, subtitle: "Your season-long roadmap", glyph: "gmPlan", color: "var(--color-success)" },
+        {
+          // Revision 20 (2026-10-18, coridian_: "What do you think about
+          // merging the team situation, GM targets and GM plan into one
+          // page?" / "yes I like it... same reasoning as killing the
+          // Explore grid today") — GM Targets and Team Situation no
+          // longer have their own nav entries; both are now always-visible
+          // sections on this same page. Their routes still exist as
+          // redirects for stale bookmarks/links.
+          label: "GM Plan",
+          path: `/gm-plan/${encodeURIComponent(leagueId)}${query}`,
+          subtitle: "Your roadmap, stance, and protected/watched players",
+          glyph: "gmPlan",
+          color: "var(--color-success)",
+        },
         { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools", glyph: "draftCenter", color: "var(--color-danger)" },
         { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: "var(--color-danger)" },
         { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps", color: "var(--color-information)" },
