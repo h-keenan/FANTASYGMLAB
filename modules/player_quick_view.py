@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -775,6 +776,99 @@ def sub_rating_row_html(ratings: Mapping[str, int | None]) -> str:
     )
 
 
+_RADAR_VIEW_SIZE = 200
+_RADAR_CENTER = _RADAR_VIEW_SIZE / 2
+_RADAR_RADIUS = 68
+_RADAR_RINGS = (0.33, 0.66, 1.0)
+
+
+def _radar_point(index: int, fraction: float) -> tuple[float, float]:
+    """One of the 5 axis points at the given 0-1 distance from center —
+    72 degrees apart, starting straight up (same "stat wheel" layout every
+    RPG character sheet uses, coridian_'s own reference point)."""
+
+    angle = math.radians(-90 + index * (360 / len(_SUB_RATING_DISPLAY)))
+    radius = _RADAR_RADIUS * fraction
+    return (
+        _RADAR_CENTER + radius * math.cos(angle),
+        _RADAR_CENTER + radius * math.sin(angle),
+    )
+
+
+def model_radar_chart_html(ratings: Mapping[str, int | None]) -> str:
+    """Market/Opportunity/Scarcity/Role/Durability as a 5-axis radar chart —
+    coridian_: "it needs to be one of those multi-axis graphs where it
+    shows the multiple strengths of different attributes... like they have
+    in RPGs." Same ``sub_ratings()`` 0-99 values ``sub_rating_row_html``
+    already renders as chips; this is a second, visual representation of
+    the identical real numbers, not a new metric.
+
+    Renders nothing unless all 5 ratings are present — a radar polygon
+    needs a real point on every axis to be an honest shape; a missing
+    factor plotted as 0 would read as "worst," not "no confident read,"
+    which is exactly the fabrication ``sub_ratings()``'s own docstring
+    refuses to do. ``sub_rating_row_html`` (which omits missing factors
+    individually) stays the fallback for a player without a full Model
+    read on every factor.
+    """
+
+    values: list[int] = []
+    for key, _abbr in _SUB_RATING_DISPLAY:
+        value = ratings.get(key)
+        if value is None:
+            return ""
+        values.append(int(value))
+
+    ring_polygons = "".join(
+        "<polygon class='pqv-radar-grid-ring' points='"
+        + " ".join(f"{x:.1f},{y:.1f}" for x, y in (_radar_point(i, fraction) for i in range(len(values))))
+        + "'/>"
+        for fraction in _RADAR_RINGS
+    )
+    spokes = "".join(
+        f"<line class='pqv-radar-spoke' x1='{_RADAR_CENTER}' y1='{_RADAR_CENTER}' "
+        f"x2='{x:.1f}' y2='{y:.1f}'/>"
+        for x, y in (_radar_point(i, 1.0) for i in range(len(values)))
+    )
+    data_points = [_radar_point(i, value / 99) for i, value in enumerate(values)]
+    data_polygon = (
+        "<polygon class='pqv-radar-data' points='"
+        + " ".join(f"{x:.1f},{y:.1f}" for x, y in data_points)
+        + "'/>"
+    )
+    dots = "".join(
+        f"<circle class='pqv-radar-dot' cx='{x:.1f}' cy='{y:.1f}' r='2.5'/>"
+        for x, y in data_points
+    )
+    labels = []
+    for i, (_key, abbr) in enumerate(_SUB_RATING_DISPLAY):
+        label_x, label_y = _radar_point(i, 1.22)
+        value = values[i]
+        anchor = "middle"
+        if label_x < _RADAR_CENTER - 5:
+            anchor = "end"
+        elif label_x > _RADAR_CENTER + 5:
+            anchor = "start"
+        labels.append(
+            f"<text class='pqv-radar-label' x='{label_x:.1f}' y='{label_y:.1f}' "
+            f"text-anchor='{anchor}'>{escape(abbr)} <tspan class='pqv-radar-label-value'>{value}</tspan></text>"
+        )
+    accessible = ", ".join(
+        f"{abbr} {value}" for (_key, abbr), value in zip(_SUB_RATING_DISPLAY, values)
+    )
+    return (
+        "<div class='pqv-radar'>"
+        f"<svg class='pqv-radar-svg' viewBox='0 0 {_RADAR_VIEW_SIZE} {_RADAR_VIEW_SIZE}' "
+        f"role='img' aria-label='Model attributes: {escape(accessible, quote=True)}' focusable='false'>"
+        + ring_polygons
+        + spokes
+        + data_polygon
+        + dots
+        + "".join(labels)
+        + "</svg></div>"
+    )
+
+
 def decision_fit_html(narrative: str | None) -> str:
     """The Decision Fit sentence (``decision_fit_narrative``) as a visible
     callout — real backend output already served to mobile's ModelSection
@@ -1375,10 +1469,18 @@ def pqv_primary_workspace_html(
     )
     summaries = ""
     if model_html or career_html:
+        # Career before Model — coridian_, 2026-10-18: the Model summary
+        # "needs to be moved to the bottom or somewhere else." Who this
+        # player is/their track record (Career) reads as more identity-
+        # establishing than the quantitative Market/Opportunity/Scarcity
+        # breakdown (Model), matching the Magna Carta's own Player Detail
+        # hierarchy (who → how valuable → what to do → why → detailed
+        # stats); the full Model breakdown (including the new radar chart)
+        # still lives in its own MODEL tab, already last in the tab rail.
         summaries = (
             "<div class='pqv-compact-summaries'>"
-            + (f"<div class='pqv-compact-model'>{model_html}</div>" if model_html else "")
             + (f"<div class='pqv-compact-career'>{career_html}</div>" if career_html else "")
+            + (f"<div class='pqv-compact-model'>{model_html}</div>" if model_html else "")
             + "</div>"
         )
     return (

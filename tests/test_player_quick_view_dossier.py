@@ -200,8 +200,8 @@ def test_pqv_workspace_composes_decision_then_evidence():
     assert html.index("pqv-identity") < html.index("pqv-evidence-season")
     assert html.index("pqv-evidence-season") < html.index("pqv-decision-panel")
     assert html.index("pqv-decision-primary") < html.index("pqv-decision-secondary")
-    assert html.index("pqv-decision-panel") < html.index("pqv-compact-model")
-    assert html.index("pqv-compact-model") < html.index("pqv-compact-career")
+    assert html.index("pqv-decision-panel") < html.index("pqv-compact-career")
+    assert html.index("pqv-compact-career") < html.index("pqv-compact-model")
     assert "pqv-workspace-top--with-season" in html
     assert "pqv-workspace" in html
 
@@ -338,6 +338,33 @@ def test_labeled_signal_badges_tone_colors_a_directional_usage_badge():
     assert "pqv-signal-badge--negative" in negative
     assert "pqv-signal-badge--positive" not in neutral
     assert "pqv-signal-badge--negative" not in neutral
+
+
+def test_model_radar_chart_renders_all_five_axes_when_complete():
+    html = player_quick_view.model_radar_chart_html(
+        {
+            "market_rating": 89,
+            "opportunity_rating": 87,
+            "scarcity_rating": 89,
+            "role_rating": 84,
+            "durability_rating": 99,
+        }
+    )
+    assert "pqv-radar-data" in html
+    for abbr in ("MKT", "OPP", "SCR", "ROLE", "DUR"):
+        assert abbr in html
+    assert html.count("pqv-radar-dot") == 5
+
+
+def test_model_radar_chart_omits_itself_when_any_axis_is_missing():
+    partial = {
+        "market_rating": 89,
+        "opportunity_rating": None,
+        "scarcity_rating": 89,
+        "role_rating": 84,
+        "durability_rating": 99,
+    }
+    assert player_quick_view.model_radar_chart_html(partial) == ""
 
 
 def test_compact_model_and_career_summaries_are_scannable():
