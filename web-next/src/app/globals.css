@@ -360,20 +360,41 @@ body {
      shadowing them for actual rendering, not a change to the shared
      source of truth Streamlit/mobile also read from. Every card already
      reads these same var(--color-surface-*) names via inline style, so
-     this alone reaches every one of them with no per-component changes —
-     true blur would need a shared card class to hook backdrop-filter to,
-     which doesn't exist yet (every card's background is set inline);
-     flagging that as a real follow-up, not done here. */
-  --color-surface-primary: rgba(31, 34, 38, 0.82);
-  --color-surface-secondary: rgba(31, 34, 38, 0.82);
-  --color-surface-raised: rgba(61, 66, 72, 0.85);
+     this alone reaches every one of them with no per-component changes.
+     coridian_, same day, later (screenshot): "These modules still aren't
+     frosted so I can see the background" — 0.82 alpha with no blur reads
+     as basically solid, not glass. Lowered further here, paired with the
+     real backdrop-filter blur below (see the [style*=...] rule after this
+     block) — true blur finally has a hook to reach every card without the
+     shared card class this file's own earlier comment said didn't exist. */
+  --color-surface-primary: rgba(31, 34, 38, 0.6);
+  --color-surface-secondary: rgba(31, 34, 38, 0.6);
+  --color-surface-raised: rgba(61, 66, 72, 0.65);
 }
 @media (prefers-color-scheme: light) {
   body {
-    --color-surface-primary: rgba(255, 255, 255, 0.82);
-    --color-surface-secondary: rgba(245, 249, 251, 0.82);
-    --color-surface-raised: rgba(255, 255, 255, 0.85);
+    --color-surface-primary: rgba(255, 255, 255, 0.6);
+    --color-surface-secondary: rgba(245, 249, 251, 0.6);
+    --color-surface-raised: rgba(255, 255, 255, 0.65);
   }
+}
+
+/* The actual frosted-glass blur, site-wide, with no per-component changes:
+   every card in this app sets its background inline as literally
+   `var(--color-surface-primary|secondary|raised)` — that's real,
+   matchable text in the rendered `style` HTML attribute, so an attribute-
+   contains selector reaches every one of them without a shared card
+   class existing. A modest 10px blur (not the heavier 22px glass/sheet
+   treatment GM orb's menu and PQV's modal use for their own bigger
+   surfaces) keeps this cheap across dozens of simultaneously-visible
+   cards on a single page — backdrop-filter is real GPU cost, and this
+   app's own performance work earlier today is reason enough not to be
+   careless with it here. */
+[style*="var(--color-surface-primary)"],
+[style*="var(--color-surface-secondary)"],
+[style*="var(--color-surface-raised)"] {
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 
 /* coridian_, 2026-10-18: "Add that moving background from signup to be
