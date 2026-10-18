@@ -38,6 +38,12 @@ div[class*="st-key-"][class*="_utility"] [data-testid="stCaptionContainer"],div[
 .dg-gp-priority-icon{align-items:center;color:var(--color-accent);display:inline-flex;flex:0 0 auto;height:1rem;width:1rem}
 .dg-gp-priority-icon svg{display:block;height:100%;width:100%}
 .dg-gp-kind-pill{background:var(--color-surface-secondary);border:var(--border-width-default) solid var(--color-border-strong);border-radius:var(--radius-pill);padding:2px var(--space-sm)}
+.dg-gp-kind-pill--premium{border-color:var(--color-premium);color:var(--color-premium)}
+.dg-gp-kind-pill--success{border-color:var(--color-success);color:var(--color-success)}
+.dg-gp-kind-pill--danger{border-color:var(--color-danger);color:var(--color-danger)}
+.dg-gp-kind-pill--accent{border-color:var(--color-accent);color:var(--color-accent)}
+.dg-gp-kind-pill--diagnostic{border-color:var(--color-diagnostic);color:var(--color-diagnostic)}
+.dg-gp-kind-pill--premium .dg-glyph,.dg-gp-kind-pill--success .dg-glyph,.dg-gp-kind-pill--danger .dg-glyph,.dg-gp-kind-pill--accent .dg-glyph,.dg-gp-kind-pill--diagnostic .dg-glyph{color:inherit}
 /* Every Game Plan card's ring-opted avatars (Top Priority give/get, Top
    Waiver Opportunity's single player, League Movement's give/get) use one
    uniform accent ring (not a per-player tier color) — overrides the custom
@@ -346,9 +352,21 @@ def render_todays_game_plan(
                     "Watch": "health",
                     "League": "insights",
                 }.get(kind, "more")
-                kind_class = "dg-daily-briefing-kind"
-                if is_top_priority_trade:
-                    kind_class += " dg-gp-kind-pill"
+                # Every card's category pill, colored by kind — was plain
+                # uppercase gray text, same for Trade/Waiver/Watch/Roster/
+                # League, which is exactly what read as "not clear enough"
+                # (coridian_). Same semantic families as everywhere else
+                # (modules.semantic_glyphs.DESTINATION_COLOR): trade=amber,
+                # waiver=green, watch=red (health/risk), roster=cyan,
+                # league=purple.
+                kind_tone = {
+                    "Trade": "premium",
+                    "Waiver": "success",
+                    "Watch": "danger",
+                    "Roster": "accent",
+                    "League": "diagnostic",
+                }.get(kind, "")
+                kind_class = f"dg-daily-briefing-kind dg-gp-kind-pill dg-gp-kind-pill--{kind_tone}"
                 kind_html = (
                     f"<div class='{kind_class}'>"
                     f"{glyph_html(kind_concept, size='kicker')}"
