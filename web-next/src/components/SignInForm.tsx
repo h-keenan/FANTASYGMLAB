@@ -5,15 +5,43 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "./AgeGate";
 
+const GLASS_CARD_STYLE: React.CSSProperties = {
+  background: "rgba(255, 255, 255, 0.045)",
+  backdropFilter: "blur(22px) saturate(160%)",
+  WebkitBackdropFilter: "blur(22px) saturate(160%)",
+  border: "1px solid rgba(255, 255, 255, 0.09)",
+  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 36px rgba(0, 0, 0, 0.45)",
+  borderRadius: "22px",
+};
+
+const FIELD_STYLE: React.CSSProperties = {
+  background: "rgba(255, 255, 255, 0.06)",
+  color: "var(--color-text-primary)",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  borderRadius: "12px",
+};
+
 /**
  * Ports modules/account_ui.py's render_mobile_auth_entry sign-in/create-
- * account forms (email + password, "New here? Create account" toggle),
- * using Supabase JS directly like mobile/src/context/AuthContext.tsx does
- * — not Streamlit's raw-requests-against-GoTrue approach (that plumbing
- * only exists because Streamlit has no browser localStorage access; see
- * auth research notes). Create-account is age-gated, matching
- * modules/guest_conversion.py's signup dialog; sign-in is not (an
- * existing account already passed the gate at signup).
+ * account forms, using Supabase JS directly like mobile/src/context/
+ * AuthContext.tsx does. Every signIn/signUp call and the email-confirm
+ * handling below is unchanged from the original single-step version — only
+ * the UI flow and visual treatment changed.
+ *
+ * Rebuilt 2026-10-18 (coridian_: "Redo the entire auth create account
+ * page. It sucks rn. Just an email to get started" — sent right after the
+ * day's one real, severe bug: an unrelated background layer silently
+ * blocking every click on this exact page). Step 1 asks for only an
+ * email, matching that instruction literally; step 2 (password, the age
+ * gate for a new account, and the sign-in/create-account toggle) is
+ * exactly the previous single-step form's own content, just gated behind
+ * having entered an email first — no new auth capability, no guessing
+ * whether an email already has an account (Supabase's client SDK has no
+ * safe way to check that before an actual attempt), just a cleaner
+ * sequence through the same calls. Glass-card treatment matches
+ * OnboardingCarousel's already-approved liquid-glass language (this form
+ * only ever renders inside the landing page's forced-dark .fd-landing-dark
+ * wrapper, so the dark-only glass tokens are always correct here).
  *
  * `signUp` succeeding is not automatically the same thing as being signed
  * in: when the Supabase project requires email confirmation, a successful
@@ -33,6 +61,7 @@ import { AgeGate } from "./AgeGate";
  */
 export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const { signIn, signUp } = useAuth();
+  const [step, setStep] = useState<"email" | "password">("email");
   const [mode, setMode] = useState<"sign-in" | "create-account">("sign-in");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [email, setEmail] = useState("");
@@ -40,6 +69,12 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const handleEmailContinue = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!email) return;
+    setStep("password");
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -61,38 +96,72 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
     onSignedIn();
   };
 
-  return (
-    <div className="flex flex-col gap-4">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
+  if (step === "email") {
+    return (
+      <form onSubmit={handleEmailContinue} className="flex flex-col gap-4 p-6" style={GLASS_CARD_STYLE}>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+            Get started
+          </h2>
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            Enter your email to sign in or create an account.
+          </p>
+        </div>
+        <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
           Email
           <input
             type="email"
             required
+            autoFocus
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="px-3 py-2"
-            style={{
-              background: "var(--color-surface-secondary)",
-              color: "var(--color-text-primary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-            }}
+            className="px-3 py-2.5"
+            style={FIELD_STYLE}
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <button
+          type="submit"
+          className="px-4 py-2.5 text-sm font-bold"
+          style={{
+            background: "var(--color-accent-strong)",
+            color: "var(--color-brand-mark-ink)",
+            fontWeight: "var(--font-weight-button)",
+            borderRadius: "12px",
+          }}
+        >
+          Continue
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 p-6" style={GLASS_CARD_STYLE}>
+      <button
+        type="button"
+        onClick={() => {
+          setStep("email");
+          setError(null);
+          setNotice(null);
+        }}
+        className="self-start text-xs"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        ← {email}
+      </button>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
           Password
           <input
             type="password"
             required
+            autoFocus
             minLength={6}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="px-3 py-2"
-            style={{
-              background: "var(--color-surface-secondary)",
-              color: "var(--color-text-primary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-            }}
+            className="px-3 py-2.5"
+            style={FIELD_STYLE}
           />
         </label>
 
@@ -113,12 +182,13 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
             <button
               type="submit"
               disabled={busy}
-              className="px-4 py-2 text-sm font-bold self-start"
+              className="px-4 py-2.5 text-sm font-bold self-start"
               style={{
                 background: "var(--color-accent-strong)",
                 color: "var(--color-brand-mark-ink)",
                 fontWeight: "var(--font-weight-button)",
                 opacity: busy ? "var(--opacity-disabled)" : 1,
+                borderRadius: "12px",
               }}
             >
               {mode === "sign-in" ? "Sign in" : "Create account"}
