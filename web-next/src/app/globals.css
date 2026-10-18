@@ -333,7 +333,7 @@ body {
 }
 
 /* coridian_, 2026-10-17: "desktop scaling is still too small and hard to
-   read." Every --font-size-*/--type-*/--space-* token is rem-based
+   read." Every --font-size, --type, and --space token is rem-based
    (relative to html's root size, not body's), so this is the one place
    that scales all of them at once on a wider viewport, instead of
    touching every page's own classes. Still mobile's exact scale below
@@ -341,7 +341,13 @@ body {
    coridian_, 2026-10-18, same day, later (screenshot): "still need
    better UI scaling on desktop stuff is too small" — the first bump
    (16px -> 18px) wasn't enough; bumped again, by roughly the same
-   magnitude as that first step. */
+   magnitude as that first step.
+   Watch out editing this comment: a literal asterisk immediately
+   followed by a slash, anywhere inside it, silently closes a CSS
+   comment early — the original wording here (a slash-separated list
+   of token-name prefixes, each ending in an asterisk) did exactly
+   that undetected until a later edit added a bare quote right after
+   the accidental close, which broke the production build. */
 @media (min-width: 768px) {
   html {
     font-size: 20px;
