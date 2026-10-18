@@ -146,8 +146,10 @@ describe("PlayerQuickView", () => {
     await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
 
     expect(screen.getByText(/Market value \(92nd percentile at WR\)/)).toBeInTheDocument();
-    expect(screen.getByText("MKT")).toBeInTheDocument();
-    expect(screen.getByText("91")).toBeInTheDocument();
+    // All 5 Model ratings present -> the radar chart renders (coridian_,
+    // 2026-10-18: "have that multi-axis thing") instead of the flat chip
+    // row; its accessible summary carries the same real numbers.
+    expect(screen.getByText(/MKT 91, OPP 84, SCR 62, ROLE 73, DUR 58/)).toBeInTheDocument();
     expect(screen.getByText("Targets")).toBeInTheDocument();
     expect(screen.getByText("140")).toBeInTheDocument();
     expect(screen.getByText(/88th pct/)).toBeInTheDocument();
