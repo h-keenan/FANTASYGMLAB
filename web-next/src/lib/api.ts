@@ -1891,8 +1891,26 @@ export interface LiveDraftTradeEvaluatorResponse {
   verdict?: string;
 }
 
+export interface DevicePreferencesResponse {
+  ok: boolean;
+  ui_density: "guided" | "compact";
+  theme_mode: "light" | "dark" | "auto";
+  experience_level: "beginner" | "advanced" | null;
+  last_league: { league_id: string; league_name: string } | null;
+}
+
 export const api = {
   getMe: () => authorizedRequest<MeResponse>("/v1/me"),
+
+  /** Set once by the signup onboarding carousel's last step — not yet
+   * consumed anywhere to vary copy/explanation depth (separate, later
+   * work). Backed by the same user_settings row every other device
+   * preference already uses, not a new table. */
+  setExperienceLevel: (level: "beginner" | "advanced") =>
+    authorizedRequest<DevicePreferencesResponse>("/v1/preferences", {
+      method: "POST",
+      jsonBody: { experience_level: level },
+    }),
 
   getBillingPlans: () => authorizedRequest<BillingPlansResponse>("/v1/billing/plans"),
 

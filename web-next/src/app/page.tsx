@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { AgeGate } from "@/components/AgeGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { OnboardingPaywall } from "@/components/OnboardingPaywall";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
@@ -47,6 +48,11 @@ function LandingPageContent() {
   const [paywallDismissed, setPaywallDismissed] = useState(
     () => searchParams.get("billing") === "success",
   );
+  // Same reasoning as paywallDismissed just above (and the same session-
+  // only, not-persisted tradeoff that one already accepts) — the carousel
+  // sits before the paywall in this flow, so returning from a completed
+  // checkout means it was necessarily already seen or skipped this session.
+  const [carouselDone, setCarouselDone] = useState(() => searchParams.get("billing") === "success");
   const [checkingSavedLeagues, setCheckingSavedLeagues] = useState(false);
   const skippedExistingSession = useRef(false);
 
@@ -151,7 +157,9 @@ function LandingPageContent() {
             <AgeGate onConfirmed={() => setGuestAgeConfirmed(true)} />
           )
         ) : accountReady ? (
-          paywallDismissed ? (
+          !carouselDone ? (
+            <OnboardingCarousel onDone={() => setCarouselDone(true)} />
+          ) : paywallDismissed ? (
             <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
           ) : (
             <OnboardingPaywall onSkip={() => setPaywallDismissed(true)} />
