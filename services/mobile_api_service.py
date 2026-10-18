@@ -5367,7 +5367,9 @@ def get_league_dashboard(
     # compose_next_move_briefing and one recomputed right after it returned.
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-    injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+    injury_context = trade_analyzer_fit.roster_injury_context(
+        roster_df, lineup_df, taxi_player_ids=my_roster.get("taxi")
+    )
 
     # Moved ahead of compose_next_move_briefing below (this used to run
     # AFTER it, purely for this endpoint's own Team Snapshot power/
@@ -6046,7 +6048,9 @@ def get_gm_plan(
         roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
         if not roster_df.empty:
             lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-            injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+            injury_context = trade_analyzer_fit.roster_injury_context(
+                roster_df, lineup_df, taxi_player_ids=my_roster.get("taxi")
+            )
 
     rankings_row: dict[str, Any] | None = None
     total_teams: int | None = None
@@ -7455,7 +7459,9 @@ def get_league_waivers(
         needed_positions = trade_analyzer_fit.get_needed_positions(
             roster_df, None, settings, include_fallback=False, assessment=team_needs
         )
-        injury_context = trade_analyzer_fit.roster_injury_context(roster_df, lineup_df)
+        injury_context = trade_analyzer_fit.roster_injury_context(
+            roster_df, lineup_df, taxi_player_ids=my_roster.get("taxi")
+        )
         injury_positions = {
             str(pos).upper()
             for pos in (injury_context.get("injury_need_positions") or set())

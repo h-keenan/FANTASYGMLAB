@@ -2776,9 +2776,21 @@ def summarize_team_injuries(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,
     player_injury_index: dict[str, dict[str, Any]] | None = None,
+    taxi_player_ids: Sequence[object] | None = None,
 ) -> Dict[str, Any]:
     if roster_df is None or roster_df.empty:
         return _empty_team_injury_summary()
+
+    # coridian_, 2026-10-18: "If someone's in taxi squad they don't need to
+    # be always listed especially if it's not a crazy injury." A taxi
+    # player can't be started/sat regardless of health, so a minor tag
+    # (questionable/minor) has no decision attached to it — only a real
+    # (major) injury is worth calling out by name. Same modules.roster_needs
+    # convention for identifying taxi membership (the roster's own `taxi`
+    # list of player_ids); omitted entirely by a caller without taxi data,
+    # same graceful degradation that module's own taxi_player_ids param
+    # documents.
+    taxi_ids = {str(player_id).strip() for player_id in (taxi_player_ids or ()) if str(player_id).strip()}
 
     index = player_injury_index or build_player_injury_index(roster_df)
     roster_ids: list[str] = []
@@ -3009,6 +3021,10 @@ def summarize_team_injuries(
                 and item.get("injury_level") in {"major", "moderate"}
             )
         )
+        # A taxi-squad player can't be started/sat regardless of health, so
+        # only a real (major) injury is worth naming — a questionable/
+        # minor tag has no decision attached to it.
+        and not (str(item.get("player_id")) in taxi_ids and item.get("injury_level") != "major")
     ][:3]
 
     major_active_injured_starters = sum(

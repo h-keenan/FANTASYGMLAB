@@ -223,6 +223,56 @@ class TestInjuryImpact(unittest.TestCase):
         )
         self.assertEqual(summary["actionable_injury_players"][0]["name"], "Star Starter")
 
+    def test_taxi_squad_player_with_a_minor_injury_is_not_called_out(self):
+        """coridian_, 2026-10-18: "If someone's in taxi squad they don't
+        need to be always listed especially if it's not a crazy injury."
+        A taxi player can't be started/sat regardless of health, so a
+        minor/moderate tag has no decision attached to it — even a high-
+        value one shouldn't surface by name."""
+
+        roster = pd.DataFrame(
+            [
+                {
+                    "player_id": "taxi-questionable",
+                    "name": "Taxi Rookie",
+                    "position": "WR",
+                    "status": "Doubtful",
+                    "injury_status": "day-to-day",
+                    "market_score": 90,
+                    "news_updated": time.time(),
+                    "player_tier": "Star",
+                }
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = False
+
+        summary = summarize_team_injuries(roster, lineup, taxi_player_ids=["taxi-questionable"])
+
+        self.assertEqual(summary["actionable_injury_players"], [])
+
+    def test_taxi_squad_player_with_a_real_injury_still_shows(self):
+        roster = pd.DataFrame(
+            [
+                {
+                    "player_id": "taxi-major",
+                    "name": "Taxi Rookie",
+                    "position": "WR",
+                    "status": "IR",
+                    "injury_status": "season-ending",
+                    "market_score": 90,
+                    "news_updated": time.time(),
+                    "player_tier": "Star",
+                }
+            ]
+        )
+        lineup = roster.copy()
+        lineup["suggested_starter"] = False
+
+        summary = summarize_team_injuries(roster, lineup, taxi_player_ids=["taxi-major"])
+
+        self.assertEqual(summary["actionable_injury_players"][0]["name"], "Taxi Rookie")
+
     def test_injured_developmental_asset_with_cover_is_not_starter_crisis(self):
         roster = pd.DataFrame(
             [
