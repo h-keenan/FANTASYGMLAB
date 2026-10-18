@@ -10,9 +10,28 @@ import { GmOrb } from "@/components/GmOrb";
 import { Header } from "@/components/Header";
 import { BRAND_NAME } from "@/lib/brand";
 
+// Launch-readiness pass, 2026-10-18: no Open Graph/Twitter Card tags meant
+// a shared link (Discord, Twitter, iMessage) rendered as a bare URL with no
+// title/description preview. No og:image yet — the only image asset on
+// hand (icon.png, 180x180) is the wrong shape for a 1200x630 OG preview;
+// stretching it would look worse than no image. Add one once a real
+// 1200x630 asset exists (same blocker as the FD logomark).
+const DESCRIPTION = "Dynasty fantasy football GM assistant. Real recommendations across your Trade Hub, Waivers, and Next Move — not raw data you have to interpret yourself.";
+
 export const metadata: Metadata = {
   title: BRAND_NAME,
-  description: "Dynasty fantasy football GM assistant.",
+  description: DESCRIPTION,
+  openGraph: {
+    title: BRAND_NAME,
+    description: DESCRIPTION,
+    siteName: BRAND_NAME,
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: BRAND_NAME,
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
