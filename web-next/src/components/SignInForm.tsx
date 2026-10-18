@@ -183,6 +183,53 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
         ← {email}
       </button>
 
+      {/* coridian_, 2026-10-18: "it kind of hinders new users... because
+          it's something that they have to look for in the fine print
+          underneath login" — the sign-in/create-account choice was a tiny
+          underlined text link below the submit button, easy to miss
+          entirely. Now a real, equally-weighted segmented control right at
+          the top of this step, same visual language the old page-level
+          "Sign in / Create account" vs. "Try without an account" tabs
+          used, so a new user sees both options before they even reach the
+          password field instead of defaulting silently into sign-in. */}
+      <div role="tablist" className="flex" style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.12)" }}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "sign-in"}
+          onClick={() => {
+            setMode("sign-in");
+            setAgeConfirmed(false);
+            setError(null);
+          }}
+          className="flex-1 px-3 py-2 text-sm font-bold"
+          style={{
+            color: mode === "sign-in" ? "var(--color-accent)" : "var(--color-text-muted)",
+            borderBottom: mode === "sign-in" ? "2px solid var(--color-accent)" : "none",
+            marginBottom: "-1px",
+          }}
+        >
+          Sign in
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "create-account"}
+          onClick={() => {
+            setMode("create-account");
+            setError(null);
+          }}
+          className="flex-1 px-3 py-2 text-sm font-bold"
+          style={{
+            color: mode === "create-account" ? "var(--color-accent)" : "var(--color-text-muted)",
+            borderBottom: mode === "create-account" ? "2px solid var(--color-accent)" : "none",
+            marginBottom: "-1px",
+          }}
+        >
+          Create account
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
           Password
@@ -224,19 +271,6 @@ export function SignInForm({ onSignedIn }: { onSignedIn: () => void }) {
           </>
         )}
       </form>
-
-      <button
-        type="button"
-        onClick={() => {
-          setMode(mode === "sign-in" ? "create-account" : "sign-in");
-          setAgeConfirmed(false);
-          setError(null);
-        }}
-        className="text-xs underline self-start"
-        style={{ color: "var(--color-text-muted)" }}
-      >
-        {mode === "sign-in" ? "New here? Create account" : "Already have an account? Sign in"}
-      </button>
     </div>
   );
 }

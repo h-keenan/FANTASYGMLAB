@@ -56,7 +56,7 @@ describe("SignInForm", () => {
     render(<SignInForm onSignedIn={onSignedIn} />);
 
     continuePastEmailStep("new@example.com");
-    fireEvent.click(screen.getByRole("button", { name: "New here? Create account" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
     fillAgeGate();
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password1" } });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
@@ -88,7 +88,7 @@ describe("SignInForm", () => {
     render(<SignInForm onSignedIn={onSignedIn} />);
 
     continuePastEmailStep("already@example.com");
-    fireEvent.click(screen.getByRole("button", { name: "New here? Create account" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
     fillAgeGate();
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password1" } });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
@@ -104,7 +104,7 @@ describe("SignInForm", () => {
     render(<SignInForm onSignedIn={onSignedIn} />);
 
     continuePastEmailStep("new@example.com");
-    fireEvent.click(screen.getByRole("button", { name: "New here? Create account" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
     fillAgeGate();
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password1" } });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
@@ -132,7 +132,7 @@ describe("SignInForm", () => {
     render(<SignInForm onSignedIn={onSignedIn} />);
 
     continuePastEmailStep("dupe@example.com");
-    fireEvent.click(screen.getByRole("button", { name: "New here? Create account" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
     fillAgeGate();
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password1" } });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
@@ -140,6 +140,20 @@ describe("SignInForm", () => {
     expect(await screen.findByText("Email already registered")).toBeInTheDocument();
     expect(onSignedIn).not.toHaveBeenCalled();
     expect(screen.queryByText(/Check your email to confirm/)).not.toBeInTheDocument();
+  });
+
+  // coridian_, 2026-10-18: "it kind of hinders new users... because it's
+  // something that they have to look for in the fine print underneath
+  // login" — both choices are now equally-visible tabs, not a small
+  // underlined link buried below the submit button.
+  it("shows Sign in and Create account as equally visible tabs, not a buried link", () => {
+    render(<SignInForm onSignedIn={vi.fn()} />);
+
+    continuePastEmailStep("someone@example.com");
+
+    expect(screen.getByRole("tab", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Create account" })).toBeInTheDocument();
+    expect(screen.queryByText("New here? Create account")).not.toBeInTheDocument();
   });
 
   it("goes back to the email step without losing the typed email", () => {
