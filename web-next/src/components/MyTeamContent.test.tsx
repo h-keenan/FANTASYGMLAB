@@ -144,6 +144,42 @@ describe("MyTeamContent", () => {
     expect(screen.getByText("88")).toBeInTheDocument();
   });
 
+  // coridian_, 2026-10-18, screenshot: a row with no OVR rating left its
+  // value/"VALUE" column shifted out of alignment with rows that do have
+  // one. OvrGauge now reserves the same space either way — not a
+  // fabricated number, just a same-size invisible placeholder.
+  it("reserves the OVR gauge's width even when a player has no rating", () => {
+    const { container } = render(
+      <MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />,
+    );
+
+    expect(container.querySelector(".ovr-gauge-placeholder")).toBeInTheDocument();
+  });
+
+  // coridian_, 2026-10-18, screenshot: "the bench should be in order so.
+  // QBs, RBs, WRs, TEs, K, DST" — the API returns bench players in value
+  // order, mixing positions together.
+  it("sorts the active bench by position (QB, RB, WR, TE, K, DST)", () => {
+    const mixedOrderTeam: MyTeamResponse = {
+      ...MY_TEAM,
+      bench: [
+        player({ player_id: "bk1", name: "Bench Kicker", position: "K", roster_slot: "bench" }),
+        player({ player_id: "bwr1", name: "Bench Receiver", position: "WR", roster_slot: "bench" }),
+        player({ player_id: "bqb1", name: "Bench Quarterback", position: "QB", roster_slot: "bench" }),
+        player({ player_id: "brb1", name: "Bench Running Back", position: "RB", roster_slot: "bench" }),
+      ],
+    };
+    const { container } = render(
+      <MyTeamContent leagueName="Dynasty Overlords" myTeam={mixedOrderTeam} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />,
+    );
+
+    const text = container.textContent || "";
+    const names = ["Bench Quarterback", "Bench Running Back", "Bench Receiver", "Bench Kicker"];
+    const indices = names.map((name) => text.indexOf(name));
+    expect(indices.every((index) => index !== -1)).toBe(true);
+    expect(indices).toEqual([...indices].sort((a, b) => a - b));
+  });
+
   it("renders Strength & Pressure, Biggest Need, and Position Groups from real roster-needs data", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 

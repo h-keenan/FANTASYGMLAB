@@ -33,6 +33,15 @@ import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/pla
  * scope cut.
  */
 
+// coridian_, 2026-10-18: "the bench should be in order so. QBs, RBs, WRs,
+// TEs, K, DST" — any position not in this list (a rare/unknown value)
+// sorts after every known one rather than being dropped or erroring.
+const BENCH_POSITION_ORDER = ["QB", "RB", "WR", "TE", "K", "DST"];
+function positionSortIndex(position: string | null | undefined): number {
+  const index = BENCH_POSITION_ORDER.indexOf((position || "").toUpperCase());
+  return index === -1 ? BENCH_POSITION_ORDER.length : index;
+}
+
 function positionRoomText(room: string): ReactNode {
   const cls = positionTextClass(room);
   return (
@@ -134,9 +143,15 @@ export function MyTeamContent({
 
   const starters = myTeam.starters;
   const bench = myTeam.bench;
-  const activeBench = bench.filter((p) => p.roster_slot !== "ir" && p.roster_slot !== "taxi");
-  const irBench = bench.filter((p) => p.roster_slot === "ir");
-  const taxiBench = bench.filter((p) => p.roster_slot === "taxi");
+  // coridian_, 2026-10-18, screenshot: "the bench should be in order so.
+  // QBs, RBs, WRs, TEs, K, DST" — the API returns bench players in value
+  // order (mixing positions together); sort is stable, so within each
+  // position group the existing value order is preserved.
+  const byPosition = (list: LineupPlayer[]) =>
+    [...list].sort((a, b) => positionSortIndex(a.position) - positionSortIndex(b.position));
+  const activeBench = byPosition(bench.filter((p) => p.roster_slot !== "ir" && p.roster_slot !== "taxi"));
+  const irBench = byPosition(bench.filter((p) => p.roster_slot === "ir"));
+  const taxiBench = byPosition(bench.filter((p) => p.roster_slot === "taxi"));
 
   const startersTotalValue = sumScore(starters);
   const teamTotalValue = sumScore(starters) + sumScore(bench);
