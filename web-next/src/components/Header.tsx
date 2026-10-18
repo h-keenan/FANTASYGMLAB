@@ -226,7 +226,7 @@ export function Header() {
     >
       <div className="flex items-center gap-3 flex-wrap">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/brand-mark.png" alt="" width={28} height={28} style={{ objectFit: "contain" }} />
+          <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
           <span className="text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
             {BRAND_NAME}
           </span>

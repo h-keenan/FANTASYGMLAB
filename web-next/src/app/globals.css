@@ -425,6 +425,23 @@ body {
   }
 }
 
+/* Real FD brand mark (Zach, 2026-10-18 — finally unblocking the "FD
+   logomark" gap flagged all day): a solid-black source PNG
+   (public/brand-mark.png). This app's :root is dark-first (light values
+   only arrive under the override below, same as every other token in
+   this file), so the mark must default to WHITE — inverted here, not a
+   second source file — and only flip back to black under a real light
+   scheme. Every Image using the mark in a normal (non-forced-dark)
+   context gets this class. */
+.brand-mark-icon {
+  filter: invert(1);
+}
+@media (prefers-color-scheme: light) {
+  .brand-mark-icon {
+    filter: none;
+  }
+}
+
 /* GM orb's "Where to go" bottom sheet — coridian_, 2026-10-18: "that
    background animation should be on the GM orb menu, and you should be
    able to swipe down from the GM orb to exit out of it or tap off of it
@@ -1469,17 +1486,12 @@ a {
   gap: var(--space-md);
   padding: 0 var(--space-md);
 }
+/* Zach, 2026-10-18: the real FD mark (public/brand-mark-white.png) replaces
+   the earlier placeholder gradient-square "FD" text box here. */
 .onboarding-mark {
-  width: 4.5rem;
-  height: 4.5rem;
-  border-radius: 18px;
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-strong));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #000;
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: contain;
 }
 .onboarding-eyebrow {
   font-size: 0.8125rem;

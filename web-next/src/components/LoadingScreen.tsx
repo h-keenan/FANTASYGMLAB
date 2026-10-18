@@ -18,8 +18,9 @@ export function LoadingScreen({ status = "Loading…" }: { status?: string }) {
       <Image
         src="/brand-mark.png"
         alt=""
-        width={120}
-        height={81}
+        width={100}
+        height={100}
+        className="brand-mark-icon"
         style={{ animation: "brand-mark-pulse 900ms ease-in-out infinite" }}
       />
       <h1 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>

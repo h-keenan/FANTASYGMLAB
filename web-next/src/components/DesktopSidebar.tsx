@@ -46,7 +46,7 @@ export function DesktopSidebar() {
       }}
     >
       <Link href="/" className="flex items-center gap-2 px-1">
-        <Image src="/brand-mark.png" alt="" width={26} height={18} style={{ objectFit: "contain" }} />
+        <Image src="/brand-mark.png" alt="" width={24} height={24} className="brand-mark-icon" style={{ objectFit: "contain" }} />
       </Link>
 
       {leagueId ? (

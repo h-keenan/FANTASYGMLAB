@@ -12,7 +12,7 @@ import { BRAND_NAME } from "@/lib/brand";
 export default function NotFound() {
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: "var(--color-bg)" }}>
-      <Image src="/brand-mark.png" alt="" width={100} height={68} />
+      <Image src="/brand-mark.png" alt="" width={100} height={100} className="brand-mark-icon" />
       <h1 className="text-lg font-bold" style={{ color: "var(--color-text-primary)" }}>
         {BRAND_NAME}
       </h1>

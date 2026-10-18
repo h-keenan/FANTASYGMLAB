@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 
 import { api } from "@/lib/api";
@@ -76,7 +77,7 @@ export function OnboardingCarousel({ onDone }: { onDone: () => void }) {
 
         {step === 0 ? (
           <div className="onboarding-hero">
-            <div className="onboarding-mark">FD</div>
+            <Image src="/brand-mark-white.png" alt="" width={56} height={56} className="onboarding-mark" />
             <span className="onboarding-eyebrow">Who we are</span>
             <h1 className="onboarding-headline">Your fantasy front office, not just a stats app.</h1>
             <p className="onboarding-body">
