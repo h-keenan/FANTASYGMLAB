@@ -4852,6 +4852,13 @@ def update_push_preference(
 
 UI_DENSITY_VALUES = {"guided", "compact"}
 THEME_MODE_VALUES = {"light", "dark", "auto"}
+# Set once during the new web onboarding carousel's last step ("How much
+# dynasty experience do you have?") — not yet consumed anywhere to actually
+# vary copy/explanation depth (that's separate, later work); this is just
+# the durable store for the answer. None/unset is a real third state (an
+# existing account from before this question existed, or one who skipped
+# onboarding), distinct from "beginner" — never defaulted to either value.
+EXPERIENCE_LEVEL_VALUES = {"beginner", "advanced"}
 
 
 def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any]:
@@ -4863,9 +4870,13 @@ def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any
         theme_mode = "dark"
     last_league_id = str(settings.get("last_league_id") or "")
     last_league_name = str(settings.get("last_league_name") or "")
+    experience_level = settings.get("experience_level")
+    if experience_level not in EXPERIENCE_LEVEL_VALUES:
+        experience_level = None
     return {
         "ui_density": density,
         "theme_mode": theme_mode,
+        "experience_level": experience_level,
         "last_league": (
             {"league_id": last_league_id, "league_name": last_league_name} if last_league_id else None
         ),
@@ -4896,6 +4907,7 @@ class UpdateDevicePreferencesRequest(BaseModel):
     theme_mode: str | None = None
     last_league_id: str | None = None
     last_league_name: str | None = None
+    experience_level: str | None = None
 
 
 @app.post("/v1/preferences")
@@ -4919,6 +4931,11 @@ def update_device_preferences(
             status_code=422,
             detail="theme_mode must be one of: " + ", ".join(THEME_MODE_VALUES),
         )
+    if body.experience_level is not None and body.experience_level not in EXPERIENCE_LEVEL_VALUES:
+        raise HTTPException(
+            status_code=422,
+            detail="experience_level must be one of: " + ", ".join(EXPERIENCE_LEVEL_VALUES),
+        )
 
     config = auth_supabase.get_supabase_config()
     access_token = str(user.get("_access_token") or "")
@@ -4935,6 +4952,8 @@ def update_device_preferences(
         settings["last_league_id"] = body.last_league_id
     if body.last_league_name is not None:
         settings["last_league_name"] = body.last_league_name
+    if body.experience_level is not None:
+        settings["experience_level"] = body.experience_level
     payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
     ok, error = account_store.upsert_user_settings(config, access_token, payload)
     if not ok:
