@@ -80,6 +80,17 @@ export default function LiveDraftPage() {
     if (!selectedDraftId) return;
     try {
       const result = await api.getLiveDraftState(leagueId, selectedDraftId, lens);
+      // coridian_, 2026-10-18: "Live draft needs to be locked." A Free
+      // caller's discovery.is_premium already keeps LiveDraftContent from
+      // ever rendering the board, but this poll still runs underneath it
+      // (selectedDraftId gets set from the still-ungated drafts list) —
+      // the locked response has no rankings/team_rankings at all, so skip
+      // the diff/map entirely instead of crashing on undefined.
+      if (!result.is_premium) {
+        setDraftState(result);
+        setStateError(null);
+        return;
+      }
       const movement = diffRankMovement(result.rankings, previousRanksRef.current);
       const teamMovement = diffTeamRankMovement(result.team_rankings, previousTeamRanksRef.current);
       previousRanksRef.current = ranksById(result.rankings);

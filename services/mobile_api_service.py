@@ -1903,7 +1903,7 @@ def _resolve_my_roster(
 @app.get("/v1/leagues/{league_id}/live-draft")
 def get_league_live_draft_discovery(
     league_id: str,
-    _user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Discover this league's Sleeper drafts so the client can gate the
     read-only live draft assistant the same way modules.live_draft_ui's
@@ -1915,7 +1915,20 @@ def get_league_live_draft_discovery(
     modules/live_draft.py outside Streamlit; it has no mobile reference
     screen (see Live Draft's own revision notes), so this endpoint and its
     sibling below are new, not a port of an existing mobile endpoint.
+
+    `is_premium` rides along here too (coridian_, 2026-10-18: "Live draft
+    needs to be locked") even though this endpoint's own drafts list is
+    just discovery metadata (status/season/rounds), not the gated
+    recommendations/board — so a Free caller still sees whether a live
+    draft exists and gets a clear reason to upgrade, instead of a blank
+    page with no explanation. The real gate (withheld board/recommendation
+    data) is on the sibling state endpoint below.
     """
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
 
     league = sleeper.get_league(league_id)
     if not league:
@@ -1947,6 +1960,8 @@ def get_league_live_draft_discovery(
         "error": discovery.get("error") or "",
         "drafts": drafts,
         "active_draft_id": live_draft.safe_text(active.get("draft_id")),
+        "is_premium": is_premium,
+        "upsell": None if is_premium else _LIVE_DRAFT_UPSELL,
     }
 
 
@@ -2091,6 +2106,18 @@ def get_league_live_draft_state(
             detail="This draft isn't in a status the live draft assistant supports.",
         )
 
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
+    # coridian_, 2026-10-18: "Live draft needs to be locked." Checked here —
+    # after the 404/409 checks above (a bogus league/draft or an
+    # unsupported status is a real error regardless of tier, same as every
+    # other endpoint in this file) but before any of the real valuation
+    # work below, so a Free caller never pays for the live-draft poll's
+    # real cost just to be told to upgrade.
+    if not premium.is_at_least(profile.get("entitlement"), premium.PRO):
+        return {"ok": True, "reason": "", "state": None, "is_premium": False, "upsell": _LIVE_DRAFT_UPSELL}
+
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
     score_field = league_value_settings.valuation_score_field(lens)
 
@@ -2101,12 +2128,15 @@ def get_league_live_draft_state(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     if players_df.empty:
-        return {"ok": True, "reason": "no_player_data", "state": None}
+        return {"ok": True, "reason": "no_player_data", "state": None, "is_premium": True, "upsell": None}
 
     picks, pick_error = live_draft.fetch_sleeper_draft_picks(draft_id)
     rosters = sleeper.get_rosters(league_id)
     roster_profiles = sleeper.get_league_roster_profiles(league_id)
-    my_roster, _roster_reason = _resolve_my_roster(user, league_id)
+    # Reuses the profile already fetched for the premium gate above instead
+    # of a second identical Supabase round trip — same contract
+    # _resolve_my_roster's own `profile` param already documents.
+    my_roster, _roster_reason = _resolve_my_roster(user, league_id, profile=profile)
     my_roster_id = my_roster.get("roster_id") if my_roster else None
     my_roster_player_ids = {
         str(player_id) for player_id in ((my_roster or {}).get("players") or []) if player_id is not None
@@ -2156,6 +2186,8 @@ def get_league_live_draft_state(
     return {
         "ok": True,
         "reason": "",
+        "is_premium": True,
+        "upsell": None,
         "pick_data_stale": bool(pick_error),
         "status": state.get("status"),
         "rounds": _clean_json_value(state.get("rounds")),
@@ -5500,6 +5532,19 @@ _TRADE_FINDER_UPSELL = {
         "Trade Finder is a Premium feature — build a custom package and "
         "search every roster in your league for a real match. Upgrade to "
         "Premium to unlock it."
+    ),
+}
+
+# coridian_, 2026-10-18: "Live draft needs to be locked." Same shape as
+# _TRADE_FINDER_UPSELL above — neither Live Draft's own Sleeper reference
+# nor Streamlit's modules.live_draft_ui had a premium gate before this; a
+# new product decision, not catching a missed parity gap.
+_LIVE_DRAFT_UPSELL = {
+    "title": "Draft with real-time recommendations",
+    "body": (
+        "Live Draft is a Premium feature — Best Available/Best Fit picks, "
+        "a live roster-strength board, and positional-run alerts while "
+        "your draft is actually happening. Upgrade to Premium to unlock it."
     ),
 }
 

@@ -982,6 +982,71 @@ def test_live_draft_discovery_lists_supported_drafts_and_flags_the_active_one(mo
     assert live_entry["name"] == "Startup Draft"
 
 
+def test_live_draft_discovery_reports_is_premium_for_a_free_caller(monkeypatch):
+    """coridian_, 2026-10-18: "Live draft needs to be locked." Discovery
+    itself stays ungated (just metadata), but it must still report whether
+    this caller can actually use the real board, with a real upsell — not
+    just silently omit the field."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "abc"}):
+            with patch("modules.sleeper.get_league_drafts", return_value=[]):
+                response = client.get(
+                    "/v1/leagues/abc/live-draft", headers={"Authorization": "Bearer good-token"}
+                )
+
+    body = response.json()
+    assert body["is_premium"] is False
+    assert body["upsell"]["title"]
+    assert body["upsell"]["body"]
+
+
+def test_live_draft_state_is_locked_for_a_free_caller_after_a_real_404_409_check(monkeypatch):
+    """The gate must sit after the 404/409 checks (a bogus league/draft or
+    unsupported status is a real error regardless of tier, same as every
+    other endpoint in this file), not before them."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "abc"}):
+            with patch("modules.sleeper.get_draft", return_value=_fake_live_draft()):
+                response = client.get(
+                    "/v1/leagues/abc/live-draft/draft-live",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["is_premium"] is False
+    assert body["state"] is None
+    assert body["upsell"]["title"]
+
+    # A bogus draft still 404s for the same Free caller — the gate never
+    # short-circuits a real error state.
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value={"league_id": "abc"}):
+            with patch("modules.sleeper.get_draft", return_value=None):
+                not_found = client.get(
+                    "/v1/leagues/abc/live-draft/missing-draft",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+    assert not_found.status_code == 404
+
+
 def _fake_live_draft(*, status: str = "drafting") -> dict:
     return {
         "draft_id": "draft-live",
@@ -1095,7 +1160,12 @@ def test_live_draft_state_returns_a_real_built_snapshot(monkeypatch):
     auth_user_response = Mock(status_code=200)
     auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
     profile_response = Mock(status_code=200)
-    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    # coridian_, 2026-10-18: "Live draft needs to be locked." This test
+    # exercises the real engine success path, so it needs a real paying
+    # entitlement now that the endpoint gates on it — "premium" is the
+    # legacy raw stored value for Pro (see modules.premium's own
+    # docstring), not "free" like it was before this gate existed.
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
     fake_league = {
         "league_id": "abc",
         "scoring_settings": {"rec": 1.0},

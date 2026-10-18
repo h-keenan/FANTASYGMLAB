@@ -33,6 +33,8 @@ const DISCOVERY_NO_DRAFTS: LiveDraftDiscoveryResponse = {
   error: "",
   drafts: [],
   active_draft_id: "",
+  is_premium: true,
+  upsell: null,
 };
 
 const DISCOVERY_ONE_LIVE: LiveDraftDiscoveryResponse = {
@@ -40,6 +42,8 @@ const DISCOVERY_ONE_LIVE: LiveDraftDiscoveryResponse = {
   error: "",
   drafts: [{ draft_id: "draft-1", season: "2026", status: "drafting", rounds: 15, name: "Startup Draft" }],
   active_draft_id: "draft-1",
+  is_premium: true,
+  upsell: null,
 };
 
 const DISCOVERY_TWO_LIVE: LiveDraftDiscoveryResponse = {
@@ -50,11 +54,15 @@ const DISCOVERY_TWO_LIVE: LiveDraftDiscoveryResponse = {
     { draft_id: "draft-2", season: "2026", status: "paused", rounds: 4, name: "Rookie Draft" },
   ],
   active_draft_id: "draft-1",
+  is_premium: true,
+  upsell: null,
 };
 
 const STATE: LiveDraftStateResponse = {
   ok: true,
   reason: "",
+  is_premium: true,
+  upsell: null,
   pick_data_stale: false,
   status: "drafting",
   rounds: 15,
@@ -129,6 +137,42 @@ const STATE: LiveDraftStateResponse = {
 };
 
 describe("LiveDraftContent", () => {
+  it("shows the Premium upsell instead of the empty-drafts message for a Free caller", () => {
+    render(
+      <LiveDraftContent
+        leagueId="league-1"
+        leagueName="Dynasty Overlords"
+        discovery={{ ...DISCOVERY_NO_DRAFTS, is_premium: false, upsell: null }}
+        selectedDraftId=""
+        onSelectDraft={vi.fn()}
+        state={null}
+        stateError={null}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Draft with real-time recommendations" })).toBeInTheDocument();
+    expect(screen.queryByText("No Sleeper drafts were found for this league yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows the Premium upsell even when a live draft actually exists for a Free caller", () => {
+    render(
+      <LiveDraftContent
+        leagueId="league-1"
+        leagueName="Dynasty Overlords"
+        discovery={{ ...DISCOVERY_ONE_LIVE, is_premium: false, upsell: { title: "Custom title", body: "Custom body" } }}
+        selectedDraftId="draft-1"
+        onSelectDraft={vi.fn()}
+        state={null}
+        stateError={null}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Custom title" })).toBeInTheDocument();
+    expect(screen.getByText("Custom body")).toBeInTheDocument();
+  });
+
   it("shows the empty state when the league has no Sleeper drafts", () => {
     render(
       <LiveDraftContent

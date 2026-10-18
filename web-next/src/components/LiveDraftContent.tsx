@@ -13,6 +13,7 @@ import type {
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
+import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { LiveDraftTradeEvaluator } from "@/components/LiveDraftTradeEvaluator";
 import { streamlitPageUrl } from "@/lib/streamlitLink";
 import {
@@ -317,6 +318,24 @@ export function LiveDraftContent({
 }) {
   const liveOrPaused = discovery.drafts.filter((draft) => draft.status === "drafting" || draft.status === "paused");
   const hasCompleted = discovery.drafts.some((draft) => draft.status === "complete");
+
+  // coridian_, 2026-10-18: "Live draft needs to be locked." A real
+  // top-level return, not nested inside this component's own <main> below
+  // — PremiumUpsellCard renders its own full <main>, and nesting one
+  // inside another is invalid HTML (and would double up the page padding/
+  // width constraints). Takes priority over the "no live draft found"
+  // messaging further down — a Free caller sees the upgrade prompt
+  // regardless of whether a draft actually exists right now.
+  if (!discovery.is_premium) {
+    return (
+      <PremiumUpsellCard
+        kicker="Live Draft"
+        upsell={discovery.upsell}
+        fallbackTitle="Draft with real-time recommendations"
+        fallbackBody="Live Draft is a Premium feature — Best Available/Best Fit picks, a live roster-strength board, and positional-run alerts while your draft is actually happening. Upgrade to Premium to unlock it."
+      />
+    );
+  }
 
   return (
     <main className="flex-1 flex flex-col gap-8 px-4 py-8 max-w-3xl w-full mx-auto">
