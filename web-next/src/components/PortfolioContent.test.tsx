@@ -83,6 +83,37 @@ describe("PortfolioContent", () => {
     expect(screen.getByText("Open Dynasty Overlords Dashboard →")).toBeInTheDocument();
   });
 
+  // coridian_, 2026-10-18, screenshot: "not specific just says watch for no
+  // reason" — a signal whose reason text alone doesn't name its subject.
+  it("shows the signal's headline, not just its reason text", () => {
+    render(
+      <PortfolioContent
+        data={{
+          ...BASE_RESPONSE,
+          leagues: [
+            league({
+              top_item: briefingItem({
+                category: "watch",
+                headline: "Ashton Jeanty trending down",
+                reason: "Usage down 13% (high confidence) vs its earlier-season baseline.",
+              }),
+              top_items: [
+                briefingItem({
+                  category: "watch",
+                  headline: "Ashton Jeanty trending down",
+                  reason: "Usage down 13% (high confidence) vs its earlier-season baseline.",
+                }),
+              ],
+            }),
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Ashton Jeanty trending down")).toBeInTheDocument();
+    expect(screen.getByText(/Usage down 13%/)).toBeInTheDocument();
+  });
+
   it("shows the Roster Power rank in the metadata line (not a badge) when rank is outside the top 3", () => {
     render(
       <PortfolioContent

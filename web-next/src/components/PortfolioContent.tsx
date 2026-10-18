@@ -42,8 +42,16 @@ function rankLabel(league: PortfolioLeague): string {
 function SignalRow({ item }: { item: BriefingItem }) {
   const color = categoryColorVar(item.category);
   const label = categoryLabel(item.category);
-  const text = item.reason || item.headline;
-  if (!text) return null;
+  // coridian_, 2026-10-18, screenshot: "not specific just says watch for no
+  // reason" — a signal like "Usage down 13% (high confidence)..." read with
+  // no subject at all, because this only ever showed reason OR headline,
+  // never both. GamePlanCard/WatchListCard show headline (the subject,
+  // e.g. "Ashton Jeanty trending down") AND reason (the detail) as two
+  // separate lines; this now does the same instead of picking just one.
+  const reasonText = item.reason || "";
+  const headlineText = item.headline || "";
+  const showReason = Boolean(reasonText) && reasonText !== headlineText;
+  if (!headlineText && !reasonText) return null;
 
   const hasPlayerVisual = Boolean(
     (item.presentation?.trade_package &&
@@ -54,7 +62,8 @@ function SignalRow({ item }: { item: BriefingItem }) {
   // Same dedup as modules/daily_gm_briefing_ui.py's _should_show_reason:
   // a Watch item's reason text is often the same pipe-delimited identity
   // dump the chips below now already show — showing both is redundant.
-  const showText = !(item.category === "watch" && hasPlayerVisual && (text.includes(" | ") || text.includes(" - ")));
+  const showReasonText =
+    showReason && !(item.category === "watch" && hasPlayerVisual && (reasonText.includes(" | ") || reasonText.includes(" - ")));
 
   return (
     <div className="flex flex-col gap-1.5 mt-2">
@@ -70,11 +79,18 @@ function SignalRow({ item }: { item: BriefingItem }) {
         >
           {label}
         </span>
-        {showText ? (
-          <span className="text-sm flex-1 min-w-0" style={{ color: "var(--color-text-secondary)" }}>
-            {text}
-          </span>
-        ) : null}
+        <div className="flex flex-col flex-1 min-w-0">
+          {headlineText ? (
+            <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+              {headlineText}
+            </span>
+          ) : null}
+          {showReasonText ? (
+            <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              {reasonText}
+            </span>
+          ) : null}
+        </div>
       </div>
       {/* coridian_, 2026-10-18, screenshot: "this portfolio looks terrible,
           with zero player PFPs. These need to have the compact player cards
