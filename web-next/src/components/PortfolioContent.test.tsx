@@ -93,6 +93,48 @@ describe("PortfolioContent", () => {
     expect(screen.getByText("7-3 · Roster Power T-7")).toBeInTheDocument();
   });
 
+  it("renders a compact player card for a signal that names a player, not just text", () => {
+    render(<PortfolioContent data={BASE_RESPONSE} />);
+
+    // route_player_id/name on the top_priority item (see briefingItem()
+    // defaults) should render through BriefingItemPlayers as an identity
+    // chip, not just appear inside the headline/reason prose.
+    expect(screen.getAllByText("Test Player").length).toBeGreaterThan(0);
+  });
+
+  it("hides a Watch item's raw pipe-delimited reason once its player chips render", () => {
+    render(
+      <PortfolioContent
+        data={{
+          ...BASE_RESPONSE,
+          leagues: [
+            league({
+              top_item: briefingItem({
+                category: "watch",
+                reason: "Test Player (RB) - starter | Backup Guy (WR) - bench",
+                mentioned_players: [
+                  { player_id: "4046", name: "Test Player", position: "RB", team: "SF", player_tier: "starter" },
+                ],
+              }),
+              top_items: [
+                briefingItem({
+                  category: "watch",
+                  reason: "Test Player (RB) - starter | Backup Guy (WR) - bench",
+                  mentioned_players: [
+                    { player_id: "4046", name: "Test Player", position: "RB", team: "SF", player_tier: "starter" },
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/Test Player \(RB\) - starter \| Backup Guy/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Test Player").length).toBeGreaterThan(0);
+  });
+
   it("shows the health flag badge only when it isn't Stable", () => {
     render(<PortfolioContent data={{ ...BASE_RESPONSE, leagues: [league({ health_flag: "Injury-hit" })] }} />);
 

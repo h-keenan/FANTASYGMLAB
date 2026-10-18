@@ -100,7 +100,11 @@ export function TradeAssetRow({
       {asset.score !== null && asset.score !== undefined ? (
         <div className="ml-auto flex items-center gap-2 shrink-0">
           <OvrGauge rating={asset.overall_rating ?? null} size="sm" />
-          <span className="text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>
+          {/* coridian_, 2026-10-18: "the value on the far right should not
+              be gray" — this is the player's actual trade value, not a
+              muted caption, so it reads at full text-primary strength like
+              the name beside it. */}
+          <span className="text-xs font-bold" style={{ color: "var(--color-text-primary)" }}>
             {formatValue(asset.score)}
           </span>
         </div>
@@ -134,7 +138,20 @@ export function ExchangeSide({
           None selected
         </span>
       ) : (
-        <div className="flex flex-col divide-y" style={{ borderColor: "var(--color-border)" }}>
+        // coridian_, 2026-10-18: "either a background for the header of
+        // this module or the footer or a background color behind the
+        // players you're sending or giving" — a faint tint of the side's
+        // own send/get dot color (same -soft tokens the rest of the app
+        // already uses for risk/success panels, not a new color) gives
+        // each side a real visual boundary instead of bare rows on the
+        // card's own background.
+        <div
+          className="flex flex-col divide-y px-2 py-1"
+          style={{
+            borderColor: "var(--color-border)",
+            background: dotColor === "var(--color-danger)" ? "var(--color-danger-soft)" : "var(--color-success-soft)",
+          }}
+        >
           {assets.map((asset, index) => (
             <TradeAssetRow key={asset.player_id || asset.label || index} asset={asset} />
           ))}
