@@ -19,6 +19,11 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
   const [username, setUsername] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  // Distinguishes "that username has a typo" from "I don't have a Sleeper
+  // account at all" — the API's plain message text only covers the first
+  // case ("Check spelling and try again"), which left a genuinely new-to-
+  // Sleeper user with no path forward (see onboarding audit, 2026-10-18).
+  const [noSleeperAccount, setNoSleeperAccount] = useState(false);
   const [leagues, setLeagues] = useState<SleeperLeagueSummary[]>([]);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -28,6 +33,7 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
 
     setStatus("loading");
     setMessage(null);
+    setNoSleeperAccount(false);
     setLeagues([]);
 
     try {
@@ -43,6 +49,7 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
       const result = await api.lookupSleeperLeagues(clean);
       if (!result.ok || result.leagues.length === 0) {
         setStatus("error");
+        setNoSleeperAccount(result.status === "user_not_found");
         setMessage(result.message || "No eligible leagues found for that username.");
         return;
       }
@@ -113,6 +120,36 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      {/* Onboarding audit, 2026-10-18: a new user hit the Sleeper username
+          field with zero prior explanation of what Sleeper is or that an
+          existing account there is required — the landing page sells the
+          product's value but never mentions the dependency. */}
+      <div
+        className="flex flex-col gap-1 px-3 py-3 text-xs"
+        style={{
+          background: "var(--color-surface-secondary)",
+          borderLeft: "var(--border-width-semantic) solid var(--color-accent)",
+          color: "var(--color-text-secondary)",
+        }}
+      >
+        <p className="m-0">
+          FantasyDesk connects to your existing <strong>Sleeper</strong> fantasy league — it reads your real roster,
+          matchups, and league settings to build recommendations.
+        </p>
+        <p className="m-0">
+          Don&apos;t have a Sleeper league yet?{" "}
+          <a
+            href="https://sleeper.com"
+            target="_blank"
+            rel="noreferrer"
+            className="font-bold underline"
+            style={{ color: "var(--color-accent)" }}
+          >
+            Create a free one at sleeper.com
+          </a>
+          .
+        </p>
+      </div>
       <label className="flex flex-col gap-1 text-sm">
         Sleeper username
         <input
@@ -128,9 +165,24 @@ export function SleeperImportForm({ onLeagueChosen }: { onLeagueChosen: (leagueI
         />
       </label>
       {message ? (
-        <p role="alert" className="text-xs" style={{ color: "var(--color-warning)" }}>
-          {message}
-        </p>
+        <div role="alert" className="flex flex-col gap-1 text-xs" style={{ color: "var(--color-warning)" }}>
+          <p className="m-0">{message}</p>
+          {noSleeperAccount ? (
+            <p className="m-0" style={{ color: "var(--color-text-secondary)" }}>
+              Don&apos;t have a Sleeper account?{" "}
+              <a
+                href="https://sleeper.com"
+                target="_blank"
+                rel="noreferrer"
+                className="font-bold underline"
+                style={{ color: "var(--color-accent)" }}
+              >
+                Create a free one at sleeper.com
+              </a>
+              , join or start a league, then come back here.
+            </p>
+          ) : null}
+        </div>
       ) : null}
       <button
         type="submit"
