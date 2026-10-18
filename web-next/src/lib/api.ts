@@ -452,6 +452,12 @@ export interface TradeHubResponse {
   ideas: TradeIdea[];
   reason: string;
   entitlement: TradeHubEntitlement | null;
+  /** The effective team strategy (contender/rebuild/retool/...) these
+   * ideas were generated under — Trade Hub applies a strategy-driven
+   * age-curve adjustment to player value that Waivers/Dashboard/PQV's
+   * plain valuation pipeline doesn't, so the same player can show a
+   * different number here. Logic audit, 2026-10-18. */
+  team_strategy: string;
 }
 
 /** GET .../trade-finder's response — the same TradeIdea card shape as

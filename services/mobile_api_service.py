@@ -7725,6 +7725,15 @@ def get_trade_hub_ideas(
         "ok": True,
         "ideas": visible,
         "reason": "",
+        # Logic/valuation audit, 2026-10-18: Trade Hub applies a team-
+        # strategy age-curve adjustment (modules.trade_hub_engine.
+        # apply_strategy_age_curve, inside generate_trade_idea_records_cached
+        # above) that Waivers/Dashboard/PQV's plain valuation pipeline
+        # doesn't — so the same player's value can read differently here
+        # than elsewhere, with nothing in the UI explaining why. Exposing
+        # the effective strategy so the client can label it, instead of
+        # silently showing a number that just looks inconsistent.
+        "team_strategy": strategy,
         "entitlement": {
             "is_premium": is_premium,
             "approved_count": approved_count,
