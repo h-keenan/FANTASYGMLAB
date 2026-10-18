@@ -768,13 +768,57 @@ a {
 }
 .pqv-modal {
   position: relative;
+  overflow: hidden;
   width: min(640px, 100%);
-  max-height: min(88vh, 900px);
-  overflow-y: auto;
   background: var(--color-surface-raised);
   border: var(--border-width-default) solid var(--color-border);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-overlay);
+}
+/* coridian_, 2026-10-18: "Also need that moving background behind the
+   pqv" — same field/sweep texture as the GM orb sheet, contained to this
+   modal. Kept outside the scrollable content below (.pqv-scroll) so it
+   never scrolls away; .pqv-modal itself no longer scrolls (overflow:hidden
+   above) specifically so these absolutely-positioned layers stay fixed to
+   the modal's own box instead of being part of its scrollable content. */
+.pqv-field,
+.pqv-sweep {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+.pqv-field {
+  inset: 0;
+  opacity: 0.4;
+  background:
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
+  animation: onboarding-field-drift 14s linear infinite;
+}
+.pqv-sweep {
+  top: -20%;
+  left: 0;
+  width: 34%;
+  height: 140%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05) 45%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 55%, transparent);
+  animation: onboarding-sweep 9s ease-in-out infinite;
+}
+@media (prefers-color-scheme: light) {
+  .pqv-field {
+    opacity: 0.5;
+    background:
+      repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
+      repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
+  }
+  .pqv-sweep {
+    background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
+  }
+}
+.pqv-scroll {
+  position: relative;
+  z-index: 1;
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
   padding: var(--space-xl);
   display: flex;
   flex-direction: column;
@@ -784,6 +828,7 @@ a {
   position: absolute;
   top: var(--space-md);
   right: var(--space-md);
+  z-index: 2;
   background: transparent;
   border: var(--border-width-default) solid var(--color-border);
   color: var(--color-text-secondary);
