@@ -23,6 +23,15 @@
 export const GAME_PLAN_INTERNAL_ROUTES: Record<string, string> = {
   trade_hub: "trade-hub",
   waivers: "waivers",
+  // "my_team" and "dashboard" (2026-10-18, classic-domain audit,
+  // coridian_: "we need to remove the classic domain entirely from being
+  // accessible from the main site") — `_tile_destination`'s two most
+  // common real values, and both already have real pages here
+  // (app/my-team/[leagueId], app/dashboard/[leagueId]); there was never a
+  // reason for Today's Game Plan to still deep-link out to Streamlit for
+  // either one.
+  my_team: "my-team",
+  dashboard: "dashboard",
   rankings: "league-rankings",
   gm_plan: "gm-plan",
   gm_targets: "gm-targets",
