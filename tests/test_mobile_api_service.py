@@ -6834,6 +6834,59 @@ def test_dashboard_reports_no_linked_username(monkeypatch):
     assert body["entitlement"] == {"is_premium": False, "visible_count": 0, "hidden_count": 0}
 
 
+def test_dashboard_empty_roster_never_pays_for_the_full_valuation_pipeline(monkeypatch):
+    """coridian_, 2026-10-19: "timed out"/slow-load reports led to a perf
+    audit that found a real production repro — a league still mid-draft
+    (confirmed via the App Review demo account) resolves to an empty
+    roster, but Dashboard used to check that only AFTER calling
+    sleeper.get_league and building/valuing the WHOLE league's eligible
+    player pool (league_value_settings.build_valued_players_frame_cached)
+    — real, measured latency paid for work the empty-roster early return
+    then threw away. roster_player_ids only ever depends on my_roster
+    (already resolved earlier), so this must now short-circuit before
+    EITHER of those ever runs."""
+
+    from services import mobile_api_service
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+
+    get_league_mock = Mock(side_effect=AssertionError("sleeper.get_league must not run for an empty roster"))
+    build_valued_mock = Mock(
+        side_effect=AssertionError("build_valued_players_frame_cached must not run for an empty roster")
+    )
+
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": []}],
+            ):
+                with patch.object(mobile_api_service.sleeper, "get_league", get_league_mock):
+                    with patch.object(
+                        mobile_api_service.league_value_settings,
+                        "build_valued_players_frame_cached",
+                        build_valued_mock,
+                    ):
+                        response = client.get(
+                            "/v1/leagues/abc/dashboard",
+                            headers={"Authorization": "Bearer good-token"},
+                        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["quiet"] is True
+    assert body["reason"] == "empty_roster"
+    assert body["quiet_reason"] == "empty_roster"
+    get_league_mock.assert_not_called()
+    build_valued_mock.assert_not_called()
+
+
 def test_dashboard_early_return_entitlement_reflects_a_real_premium_caller(monkeypatch):
     """Same contract check as test_dashboard_reports_no_linked_username, but
     for a Pro caller — is_premium must reflect their real tier even on an
