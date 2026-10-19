@@ -11,7 +11,15 @@ const TIER_LABELS: Record<BillingPlan["tier"], string> = {
   front_office: "Front Office",
 };
 
-export function PlanCard({ plan, returnTo }: { plan: BillingPlan; returnTo?: string }) {
+export function PlanCard({
+  plan,
+  returnTo,
+  publishableKey,
+}: {
+  plan: BillingPlan;
+  returnTo?: string;
+  publishableKey: string;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -89,7 +97,7 @@ export function PlanCard({ plan, returnTo }: { plan: BillingPlan; returnTo?: str
         {busy ? "Starting checkout…" : "Subscribe"}
       </button>
       {clientSecret ? (
-        <EmbeddedCheckoutModal clientSecret={clientSecret} onClose={() => setClientSecret(null)} />
+        <EmbeddedCheckoutModal clientSecret={clientSecret} publishableKey={publishableKey} onClose={() => setClientSecret(null)} />
       ) : null}
     </div>
   );
@@ -145,9 +153,11 @@ function ManageBilling() {
 export function PremiumContent({
   entitlement,
   plans,
+  publishableKey,
 }: {
   entitlement: "free" | "premium";
   plans: BillingPlan[];
+  publishableKey: string;
 }) {
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-6 max-w-3xl w-full mx-auto">
@@ -166,7 +176,7 @@ export function PremiumContent({
         </h2>
         <div className="grid gap-3 sm:grid-cols-3">
           {plans.map((plan) => (
-            <PlanCard key={`${plan.tier}-${plan.interval}`} plan={plan} />
+            <PlanCard key={`${plan.tier}-${plan.interval}`} plan={plan} publishableKey={publishableKey} />
           ))}
         </div>
       </section>

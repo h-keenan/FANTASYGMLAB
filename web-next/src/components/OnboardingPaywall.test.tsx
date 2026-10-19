@@ -35,7 +35,7 @@ describe("OnboardingPaywall", () => {
   });
 
   it("loads and renders all 3 plans", async () => {
-    vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS });
+    vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS, stripe_publishable_key: "pk_test_123" });
     render(<OnboardingPaywall onSkip={vi.fn()} />);
 
     expect(await screen.findByText("$9.99")).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe("OnboardingPaywall", () => {
   });
 
   it("calls onSkip when 'Skip for now' is clicked", async () => {
-    vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS });
+    vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS, stripe_publishable_key: "pk_test_123" });
     const onSkip = vi.fn();
     render(<OnboardingPaywall onSkip={onSkip} />);
 
@@ -55,7 +55,7 @@ describe("OnboardingPaywall", () => {
   });
 
   it("starts embedded checkout with return_to='/' so a purchase resumes onboarding", async () => {
-    vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS });
+    vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS, stripe_publishable_key: "pk_test_123" });
     vi.mocked(api.startBillingCheckout).mockResolvedValue({
       ok: true,
       client_secret: "cs_test_onboarding_embedded",

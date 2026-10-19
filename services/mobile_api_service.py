@@ -919,10 +919,19 @@ def link_sleeper_username(
 # can call. Every redirect URL below points at this app's own /premium
 # page (not Streamlit's `?page=premium`), since that's the real page a
 # web-next caller is on.
+# coridian_, 2026-10-19: "go ahead and do that until we have enough
+# features to segregate between pro and front office" -- Front Office's
+# one real functional difference (unlimited saved leagues,
+# modules.saved_leagues.max_leagues_for) now also applies to Pro, so it's
+# no longer offered as a separate new-signup choice here. The single
+# already-subscribed Front Office customer keeps their existing
+# subscription untouched (nothing about an existing Stripe subscription
+# changes just because checkout stops offering it); stripe_billing.
+# TIER_FRONT_OFFICE and its price plumbing are left fully intact for when
+# there's a real feature split to bring it back for.
 _BILLING_PLAN_KEYS: tuple[tuple[str, str, str], ...] = (
     (stripe_billing.MONTHLY, stripe_billing.TIER_PRO, stripe_billing.MONTHLY),
     (stripe_billing.ANNUAL, stripe_billing.TIER_PRO, stripe_billing.ANNUAL),
-    (stripe_billing.FRONT_OFFICE_ANNUAL, stripe_billing.TIER_FRONT_OFFICE, stripe_billing.ANNUAL),
 )
 
 
@@ -938,12 +947,13 @@ def get_billing_plans(_user: dict[str, Any] = Depends(require_user)) -> dict[str
 
     config = stripe_billing.load_stripe_config()
     details = stripe_billing.plan_display_details(config)
-    pro_features = premium_page.mobile_premium_benefit_lines()
-    front_office_features = premium_page.front_office_benefit_lines()
+    # Front Office is no longer in _BILLING_PLAN_KEYS (see that constant's
+    # own comment) -- every plan here is Pro, so there's only one features
+    # list to build, not a per-tier branch.
+    features = premium_page.mobile_premium_benefit_lines()
     plans = []
     for detail_key, tier, interval in _BILLING_PLAN_KEYS:
         label, price, cadence = details.get(detail_key) or stripe_billing.DEFAULT_PLAN_DETAILS[detail_key]
-        features = front_office_features if tier == stripe_billing.TIER_FRONT_OFFICE else pro_features
         plans.append(
             {
                 "tier": tier,
@@ -954,7 +964,13 @@ def get_billing_plans(_user: dict[str, Any] = Depends(require_user)) -> dict[str
                 "features": features,
             }
         )
-    return {"ok": True, "plans": plans}
+    # Zach, 2026-10-19 ("we dont need renders publuishable" / "find a work
+    # around" -- web-next isn't on Render, there's no NEXT_PUBLIC_ build
+    # pipeline to add this to): served here at runtime instead, same place
+    # the Premium page already fetches plan data from before a user can
+    # even click Subscribe. Intentionally public/safe to ship to the
+    # client (unlike the secret key, which never leaves this service).
+    return {"ok": True, "plans": plans, "stripe_publishable_key": config.publishable_key}
 
 
 class CheckoutRequest(BaseModel):

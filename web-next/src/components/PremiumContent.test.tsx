@@ -44,7 +44,7 @@ describe("PremiumContent", () => {
   });
 
   it("renders all 3 plans and no Manage Billing banner for a free account", () => {
-    render(<PremiumContent entitlement="free" plans={PLANS} />);
+    render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
 
     expect(screen.getByText("$9.99")).toBeInTheDocument();
     expect(screen.getByText("$59.99")).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe("PremiumContent", () => {
   });
 
   it("lists each plan's own features, not a shared generic list", () => {
-    render(<PremiumContent entitlement="free" plans={PLANS} />);
+    render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
 
     expect(screen.getAllByText("Full League Pulse")).toHaveLength(2);
     expect(screen.getByText("Priority support")).toBeInTheDocument();
@@ -62,7 +62,7 @@ describe("PremiumContent", () => {
   });
 
   it("shows Manage Billing for a premium account, alongside the same 3 plans", () => {
-    render(<PremiumContent entitlement="premium" plans={PLANS} />);
+    render(<PremiumContent entitlement="premium" plans={PLANS} publishableKey="pk_test_123" />);
 
     expect(screen.getByText("You're on Premium.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Manage Billing" })).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe("PremiumContent", () => {
       ok: true,
       client_secret: "cs_test_embedded_123",
     });
-    render(<PremiumContent entitlement="free" plans={PLANS} />);
+    render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Subscribe" })[0]);
 
@@ -88,7 +88,7 @@ describe("PremiumContent", () => {
   it("shows an error instead of redirecting when checkout fails to start", async () => {
     setWindowLocation();
     vi.mocked(api.startBillingCheckout).mockRejectedValue(new Error("Could not start checkout."));
-    render(<PremiumContent entitlement="free" plans={PLANS} />);
+    render(<PremiumContent entitlement="free" plans={PLANS} publishableKey="pk_test_123" />);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Subscribe" })[0]);
 
@@ -101,7 +101,7 @@ describe("PremiumContent", () => {
       ok: true,
       portal_url: "https://billing.stripe.com/p/session_abc",
     });
-    render(<PremiumContent entitlement="premium" plans={PLANS} />);
+    render(<PremiumContent entitlement="premium" plans={PLANS} publishableKey="pk_test_123" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Manage Billing" }));
 

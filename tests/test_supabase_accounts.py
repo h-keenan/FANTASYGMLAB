@@ -1415,9 +1415,18 @@ class TestSavedLeagueCap(unittest.TestCase):
             saved_leagues.max_leagues_for_entitlement(premium.FREE),
             saved_leagues.MAX_LEAGUES_FREE,
         )
+        # coridian_, 2026-10-19: "go ahead and do that until we have
+        # enough features to segregate between pro and front office" --
+        # unlimited saved leagues (represented as the large guard value,
+        # not a literal None, for this back-compat int-returning wrapper)
+        # now applies to Pro too, same as Front Office already had.
         self.assertEqual(
             saved_leagues.max_leagues_for_entitlement(premium.PREMIUM),
-            saved_leagues.MAX_LEAGUES_PREMIUM,
+            saved_leagues.MAX_LEAGUES_FRONT_OFFICE_GUARD,
+        )
+        self.assertEqual(
+            saved_leagues.max_leagues_for_entitlement(premium.FRONT_OFFICE),
+            saved_leagues.MAX_LEAGUES_FRONT_OFFICE_GUARD,
         )
         # Unknown/absent entitlement must never grant the larger cap.
         self.assertEqual(
@@ -1425,7 +1434,7 @@ class TestSavedLeagueCap(unittest.TestCase):
             saved_leagues.MAX_LEAGUES_FREE,
         )
         self.assertEqual(saved_leagues.MAX_LEAGUES_FREE, 1)
-        self.assertGreater(saved_leagues.MAX_LEAGUES_PREMIUM, saved_leagues.MAX_LEAGUES_FREE)
+        self.assertGreater(saved_leagues.MAX_LEAGUES_FRONT_OFFICE_GUARD, saved_leagues.MAX_LEAGUES_FREE)
 
     def test_cap_resolves_from_the_session_entitlement_chain(self):
         free_session = {
@@ -1442,7 +1451,7 @@ class TestSavedLeagueCap(unittest.TestCase):
         )
         self.assertEqual(
             saved_leagues.max_leagues_for_session(premium_session),
-            saved_leagues.MAX_LEAGUES_PREMIUM,
+            saved_leagues.MAX_LEAGUES_FRONT_OFFICE_GUARD,
         )
 
     def test_is_at_cap_counts_only_distinct_other_leagues(self):
