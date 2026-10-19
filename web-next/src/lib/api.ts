@@ -1967,6 +1967,16 @@ export const api = {
       },
     }),
 
+  // coridian_, 2026-10-19: "need a way once signed in to add more leauges
+  // or remove leauges" — a saved_leagues row can exist without the user
+  // ever running Sleeper import here (Streamlit's automatic context
+  // persist writes one for any league merely viewed there), so this has
+  // to work regardless of how the league got saved.
+  removeSavedLeague: (leagueId: string) =>
+    authorizedRequest<{ ok: boolean; reason: string }>(`/v1/leagues/${encodeURIComponent(leagueId)}/save`, {
+      method: "DELETE",
+    }),
+
   linkSleeperUsername: (sleeperUsername: string) =>
     authorizedRequest<{ ok: boolean; sleeper_username?: string; reason?: string }>("/v1/me/link-sleeper", {
       method: "POST",

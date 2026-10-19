@@ -10324,6 +10324,78 @@ def test_save_league_fails_closed_when_the_saved_league_count_is_unreadable(monk
     mock_post.assert_not_called()
 
 
+# coridian_, 2026-10-19: "need a way once signed in to add more leauges or
+# remove leauges" / "the couldnt load 2 leauges takes up too much space and
+# i never selected those leauges to be loaded into the site to beguin
+# with" — Streamlit's automatic context persist can write a saved_leagues
+# row for any league merely viewed there, not just an explicit web-next
+# Sleeper import, so a user needs a real way to remove one regardless of
+# how it got saved.
+def test_remove_saved_league_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.delete("/v1/leagues/some-league/save").status_code == 401
+
+
+def test_remove_saved_league_deletes_the_row(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = [
+        {"league_id": "keep-me", "is_default": True},
+        {"league_id": "drop-me", "is_default": False},
+    ]
+    delete_response = Mock(status_code=204)
+
+    with patch("requests.get", side_effect=[auth_user_response, existing_response]):
+        with patch("requests.delete", return_value=delete_response) as mock_delete:
+            with patch("requests.post") as mock_post:
+                response = client.delete(
+                    "/v1/leagues/drop-me/save",
+                    headers={"Authorization": "Bearer good-token"},
+                )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    delete_query = mock_delete.call_args[0][0]
+    assert "user_id=eq.user-123" in delete_query
+    assert "league_id=eq.drop-me" in delete_query
+    # Removed league was never the default — no promotion write needed.
+    mock_post.assert_not_called()
+
+
+def test_remove_saved_league_promotes_a_new_default_when_the_default_is_removed(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    existing_response = Mock(status_code=200)
+    existing_response.json.return_value = [
+        {"league_id": "old-default", "is_default": True},
+        {"league_id": "promote-me", "is_default": False},
+    ]
+    delete_response = Mock(status_code=204)
+    clear_default_response = Mock(status_code=204)
+    write_response = Mock(status_code=201)
+    write_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, existing_response]):
+        with patch("requests.delete", return_value=delete_response):
+            with patch("requests.patch", return_value=clear_default_response):
+                with patch("requests.post", return_value=write_response) as mock_post:
+                    response = client.delete(
+                        "/v1/leagues/old-default/save",
+                        headers={"Authorization": "Bearer good-token"},
+                    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    written = mock_post.call_args.kwargs["json"]
+    assert written["league_id"] == "promote-me"
+    assert written["is_default"] is True
+
+
 def test_lookup_sleeper_leagues_returns_the_picker_options(monkeypatch):
     client = _client(monkeypatch)
     from modules import sleeper_leagues
