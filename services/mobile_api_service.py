@@ -76,6 +76,11 @@ Deployment topology (Render):
                                                     one player — source links, timestamps, supported
                                                     claims, confidence/corroboration, and a conservative
                                                     supersession signal — see docs/external-api-contract.md
+  - GET  /v1/external/players/{id}/rating-history — (static API key) previous/current 0-99 overall
+                                                    rating, delta, effective date, and a short honest
+                                                    explanation, from the daily Supabase snapshot table
+                                                    modules.player_rating_history writes — see
+                                                    docs/external-api-contract.md
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -170,6 +175,7 @@ from modules import (
     player_history,
     player_projections,
     player_quick_view,
+    player_rating_history,
     player_state_authority,
     players_refresh_flight,
     playoff_simulator,
@@ -5401,6 +5407,173 @@ def get_external_player_news(
         for group in groups[:limit]
     ]
     return {"ok": True, "player_id": str(player_id), "items": items}
+
+
+# ---------------------------------------------------------------------------
+# External (bot) rating-change history — Phase 3, last and biggest piece of
+# coridian_'s external content-posting bot wish list (full contract:
+# docs/external-api-contract.md). Gated by the exact same
+# require_external_api_key dependency as Phases 1/2 above; this section adds
+# no new auth. Unlike Phases 1/2, this is NOT computed fresh on every
+# request — it reads a real, persisted daily snapshot table
+# (modules.player_rating_history, docs/supabase_player_rating_snapshots.sql)
+# written once a day by .github/workflows/player-rating-snapshot.yml.
+# ---------------------------------------------------------------------------
+
+
+def _rating_history_corroborating_news(
+    player_id: str,
+    player_name: str,
+    *,
+    direction: int,
+    window_start_iso: str,
+    window_end_iso: str,
+) -> list[dict[str, Any]]:
+    """Real, checkable corroboration for one rating-history delta: actionable
+    news events about this player whose own `event_direction` agrees with
+    the rating's direction and whose article published inside this
+    snapshot's window (previous snapshot_date -> current snapshot_date).
+
+    Deliberately reuses the exact same building blocks
+    GET /v1/external/players/{id}/news (Phase 2, just above) already uses —
+    `news_cache.enriched_news_pool`, `news_signal.contains_phrase`,
+    `news_intelligence.group_player_events_by_identity` — rather than a
+    second, parallel news pipeline. Sorted newest-first so
+    `player_rating_history.explain_rating_change` picks the most recent
+    corroborating event when more than one qualifies.
+
+    Fails soft to `[]` on any error: a news-lookup hiccup must never break
+    the rating-history endpoint, it only means the explanation falls back
+    to the honest "no significant driver identified."
+    """
+
+    try:
+        if not player_name or direction == 0:
+            return []
+        wanted_direction = "up" if direction > 0 else "down"
+        news_cache.schedule_news_cache_refresh()
+        enriched = news_cache.enriched_news_pool()
+        matches = [
+            item
+            for item in enriched
+            if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS
+            and news_signal.contains_phrase(news_signal.article_text(item), player_name)
+        ]
+        groups = news_intelligence.group_player_events_by_identity(
+            matches, player_id=str(player_id), player_name=player_name
+        )
+        corroborating: list[dict[str, Any]] = []
+        for group in groups:
+            event: news_intelligence.FootballEvent = group["event"]
+            if event.event_direction != wanted_direction:
+                continue
+            published_at = (
+                datetime.fromtimestamp(event.article_time, tz=timezone.utc).isoformat()
+                if event.article_time and event.article_time > 0
+                else None
+            )
+            if published_at is None or not (window_start_iso <= published_at <= window_end_iso):
+                continue
+            corroborating.append(
+                {"description": event.explanation, "published_at": published_at, "confidence": event.confidence}
+            )
+        corroborating.sort(key=lambda row: row["published_at"], reverse=True)
+        return corroborating
+    except Exception:
+        return []
+
+
+@app.get(
+    "/v1/external/players/{player_id}/rating-history",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_player_rating_history(player_id: str) -> dict[str, Any]:
+    """Previous/current 0-99 overall rating, the delta between them, the
+    current snapshot's effective date, and a short, honest explanation —
+    Phase 3 of coridian_'s external content-posting bot wish list
+    (docs/external-api-contract.md).
+
+    Backed by modules.player_rating_history's daily Supabase snapshot table
+    (docs/supabase_player_rating_snapshots.sql), written once a day by
+    .github/workflows/player-rating-snapshot.yml — NOT computed fresh on
+    every request the way Phase 1's projections are. Until that table
+    exists and the sweep has actually run for 2+ days there is no real
+    history to report: this always returns 200 with
+    `status: "insufficient_history"` and every comparison field null rather
+    than a fabricated baseline or delta — the same honesty discipline
+    Phase 1's non-"ok" projection statuses and Phase 2's supersession scope
+    already establish in this file.
+    """
+
+    config = player_rating_history.load_rating_snapshot_config()
+    snapshots = player_rating_history.fetch_rating_history(config, str(player_id), limit=2)
+
+    if len(snapshots) < 2:
+        current = snapshots[0] if snapshots else None
+        return {
+            "player_id": str(player_id),
+            "status": "insufficient_history",
+            "previous_rating": None,
+            "current_rating": player_rating_history.snapshot_rating(current) if current else None,
+            "delta": None,
+            "effective_at": current.get("snapshot_date") if current else None,
+            "explanation": None,
+        }
+
+    current, previous = snapshots[0], snapshots[1]
+    current_rating = player_rating_history.snapshot_rating(current)
+    previous_rating = player_rating_history.snapshot_rating(previous)
+    if current_rating is None or previous_rating is None:
+        # Stored rows should always carry a valid 0-99 int (see
+        # build_snapshot_rows' own range check) — this is a defensive
+        # honesty fallback, not an expected path.
+        return {
+            "player_id": str(player_id),
+            "status": "insufficient_history",
+            "previous_rating": None,
+            "current_rating": current_rating,
+            "delta": None,
+            "effective_at": current.get("snapshot_date"),
+            "explanation": None,
+        }
+
+    delta = current_rating - previous_rating
+    effective_at = current.get("snapshot_date")
+
+    player_name = ""
+    try:
+        players_df = rankings.load_players(PLAYERS_DB_PATH)
+        if players_df is None or players_df.empty:
+            players_df = rankings.build_players_table(PLAYERS_DB_PATH)
+        row_matches = players_df[players_df["player_id"] == str(player_id)] if players_df is not None and not players_df.empty else None
+        if row_matches is not None and not row_matches.empty:
+            player_name = str(row_matches.iloc[0].get("name") or "").strip()
+    except Exception:
+        player_name = ""
+
+    corroborating: list[dict[str, Any]] = []
+    if delta != 0 and player_name:
+        previous_date = str(previous.get("snapshot_date") or "")
+        current_date = str(current.get("snapshot_date") or "")
+        corroborating = _rating_history_corroborating_news(
+            str(player_id),
+            player_name,
+            direction=1 if delta > 0 else -1,
+            window_start_iso=f"{previous_date}T00:00:00+00:00",
+            window_end_iso=f"{current_date}T23:59:59+00:00",
+        )
+
+    explanation = player_rating_history.explain_rating_change(delta=delta, corroborating_events=corroborating)
+
+    return {
+        "player_id": str(player_id),
+        "status": "ok",
+        "previous_rating": previous_rating,
+        "current_rating": current_rating,
+        "delta": delta,
+        "effective_at": effective_at,
+        "explanation": explanation,
+    }
 
 
 @app.get("/v1/players/{player_id}/career")

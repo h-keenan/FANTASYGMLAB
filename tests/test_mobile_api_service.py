@@ -5354,6 +5354,186 @@ def test_external_player_news_supersession_fires_for_recovery_not_for_escalation
         assert item["retraction_status"] is None
 
 
+# Phase 3 of coridian_'s external content-posting bot wish list: persisted
+# rating-change history (docs/external-api-contract.md). Gated by the exact
+# same require_external_api_key dependency Phases 1/2 use above — these
+# tests only confirm this new route is covered by it too, not re-testing
+# the missing/wrong-key 401 ground test_external_projections_reject_missing_
+# and_wrong_api_key already covers in full. Unlike Phases 1/2, this reads a
+# persisted snapshot table (modules.player_rating_history), so these tests
+# mock fetch_rating_history directly rather than any live Supabase call.
+def test_external_rating_history_requires_api_key(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    no_header = client.get("/v1/external/players/9001/rating-history")
+    assert no_header.status_code == 401
+
+    wrong_key = client.get(
+        "/v1/external/players/9001/rating-history",
+        headers={"Authorization": "Bearer not-the-secret"},
+    )
+    assert wrong_key.status_code == 401
+
+
+def test_external_rating_history_zero_snapshots_is_honest_insufficient_history(monkeypatch):
+    """No scheduled-job data has ever been written for this player: the
+    endpoint must say so plainly, never fabricate a baseline/delta."""
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    with patch.object(mobile_api_service.player_rating_history, "fetch_rating_history", return_value=[]):
+        response = client.get(
+            "/v1/external/players/9001/rating-history",
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "player_id": "9001",
+        "status": "insufficient_history",
+        "previous_rating": None,
+        "current_rating": None,
+        "delta": None,
+        "effective_at": None,
+        "explanation": None,
+    }
+
+
+def test_external_rating_history_one_snapshot_is_honest_insufficient_history(monkeypatch):
+    """Exactly one day of real data exists: current_rating is reported (it's
+    real), but previous_rating/delta/explanation must stay null — there is
+    nothing yet to compare against."""
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    one_snapshot = [{"player_id": "9001", "snapshot_date": "2026-10-19", "overall_rating": 80, "computed_at": "x"}]
+    with patch.object(mobile_api_service.player_rating_history, "fetch_rating_history", return_value=one_snapshot):
+        response = client.get(
+            "/v1/external/players/9001/rating-history",
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "insufficient_history"
+    assert body["current_rating"] == 80
+    assert body["previous_rating"] is None
+    assert body["delta"] is None
+    assert body["explanation"] is None
+    assert body["effective_at"] == "2026-10-19"
+
+
+def test_external_rating_history_normal_multi_day_case_without_corroborating_news(monkeypatch):
+    """Two real snapshots, no news lookup hit: status "ok", a real delta,
+    and the honest "no significant driver identified" fallback explanation
+    — never a fabricated cause."""
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    snapshots = [
+        {"player_id": "9001", "snapshot_date": "2026-10-19", "overall_rating": 84, "computed_at": "x"},
+        {"player_id": "9001", "snapshot_date": "2026-10-18", "overall_rating": 80, "computed_at": "y"},
+    ]
+    players_frame = pd.DataFrame([{"player_id": "9001", "name": "Nico Collins"}])
+    with patch.object(mobile_api_service.player_rating_history, "fetch_rating_history", return_value=snapshots):
+        with patch("modules.rankings.load_players", return_value=players_frame):
+            with patch.object(
+                mobile_api_service, "_rating_history_corroborating_news", return_value=[]
+            ) as mock_news:
+                response = client.get(
+                    "/v1/external/players/9001/rating-history",
+                    headers={"Authorization": "Bearer the-real-secret-key"},
+                )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["player_id"] == "9001"
+    assert body["status"] == "ok"
+    assert body["previous_rating"] == 80
+    assert body["current_rating"] == 84
+    assert body["delta"] == 4
+    assert body["effective_at"] == "2026-10-19"
+    assert body["explanation"] == "Overall rating increased 4 points since the last snapshot. " + (
+        mobile_api_service.player_rating_history.NO_SIGNIFICANT_DRIVER
+    )
+    mock_news.assert_called_once()
+    call_kwargs = mock_news.call_args.kwargs
+    assert call_kwargs["direction"] == 1
+    assert call_kwargs["window_start_iso"] == "2026-10-18T00:00:00+00:00"
+    assert call_kwargs["window_end_iso"] == "2026-10-19T23:59:59+00:00"
+
+
+def test_external_rating_history_cites_real_corroborating_news_in_window(monkeypatch):
+    """A real actionable news event, in the same direction as the rating
+    move and published inside the snapshot window, is cited by name in the
+    explanation — reusing Phase 2's own news/news_intelligence building
+    blocks rather than a second, parallel pipeline."""
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from modules import news as news_module
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    now = time.time()
+    snapshots = [
+        {"player_id": "9001", "snapshot_date": "2026-10-19", "overall_rating": 72, "computed_at": "x"},
+        {"player_id": "9001", "snapshot_date": "2026-10-18", "overall_rating": 85, "computed_at": "y"},
+    ]
+    players_frame = pd.DataFrame(
+        [{"player_id": "9001", "name": "Nico Collins", "status": "Out", "injury_status": "Hamstring"}]
+    )
+    fake_pool = [
+        {
+            "title": "Nico Collins ruled out for Sunday with hamstring injury",
+            "summary": "x",
+            "link": "https://espn.com/a1",
+            "source": "https://www.espn.com/espn/rss/nfl/news",
+            "published_ts": now - 3600,
+        },
+    ]
+
+    news_module.clear_enriched_news_pool_cache()
+    with patch.object(mobile_api_service.player_rating_history, "fetch_rating_history", return_value=snapshots):
+        with patch("modules.rankings.load_players", return_value=players_frame):
+            with patch("modules.news.schedule_news_cache_refresh", return_value=False):
+                with patch("modules.news.load_cached_news_pool", return_value=fake_pool):
+                    response = client.get(
+                        "/v1/external/players/9001/rating-history",
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["delta"] == -13
+    assert "decreased 13 points" in body["explanation"]
+    assert "ruled out" in body["explanation"].lower()
+
+
 def test_career_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/players/9001/career")
