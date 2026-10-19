@@ -744,7 +744,17 @@ def apply_valuation_lens(
 # downstream computations — this is that same fix one layer further
 # upstream, for the shared input every one of them (and these seven
 # endpoints) builds on top of.
-VALUED_PLAYERS_FRAME_TTL_SECONDS = 30
+#
+# coridian_, 2026-10-19, performance audit: 30s (this module's original
+# value, matching modules.league_rankings/modules.trade_hub_engine/
+# modules.waivers_ui's own live-time-bucket idiom) is much shorter than a
+# real league's roster actually changes — trades/waivers/drops happen a
+# handful of times a week, not every 30 seconds. Widened to 2 minutes
+# across all four of these shared caches together (same reasoning, same
+# change, in each module) — still fast enough that a user's own
+# trade/waiver completion shows up well within any reasonable expectation,
+# while cutting repeat-visit recompute cost to a quarter of what it was.
+VALUED_PLAYERS_FRAME_TTL_SECONDS = 120
 
 
 def _valued_players_frame_cache_bucket() -> int:

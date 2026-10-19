@@ -545,7 +545,11 @@ def generate_trade_idea_records(
 # pull one headline idea — shares the same cache instead of independently
 # recomputing the identical search Trade Hub may have just cached moments
 # earlier for the same user.
-TRADE_HUB_IDEAS_TTL_SECONDS = 30
+# coridian_, 2026-10-19, performance audit: widened from the original 30s
+# to 2 minutes, alongside the same change in modules.league_value_settings/
+# modules.league_rankings/modules.waivers_ui — a real league's roster
+# doesn't change faster than every couple minutes in practice.
+TRADE_HUB_IDEAS_TTL_SECONDS = 120
 
 
 def _trade_hub_ideas_cache_bucket() -> int:
