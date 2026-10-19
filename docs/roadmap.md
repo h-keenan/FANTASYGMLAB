@@ -20,8 +20,16 @@ mobile's `PlayerDetailScreen.tsx` tabs (stats/trends/schedule/career/
 model). That full page was never built. Queued (coridian_: "Queue it").
 
 ### Live Draft: needs real testing
-Completely untested end-to-end. Not urgent right now (mid-season, nobody's
-drafting), but must be verified before the next real draft window opens.
+Partially verified 2026-10-19: backend discovery/state/trade-evaluator-options
+endpoints confirmed working against a real, live (paused) Sleeper draft via
+the App Review demo account (`appreview@fantasydesk.app`) — correct draft
+metadata, correct per-pick ownership across all 150 picks, correct premium
+upsell gating. Not yet verified: the actual premium recommendation engine
+(Best Available/Best Fit picks, live roster-strength board) requires a
+premium test account, and web-next's Live Draft page has not been
+click-tested against a real in-progress draft in a browser. Not urgent right
+now (mid-season, nobody's drafting), but finish verifying before the next
+real draft window opens.
 
 ### In-app notifications
 Website notifications for news alerts and similar real-time events —
