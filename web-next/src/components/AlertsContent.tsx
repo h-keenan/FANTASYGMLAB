@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { AlertItem, AlertsResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import {
   ROSTER_RELATIONSHIP_LABEL,
@@ -42,6 +43,51 @@ import {
  * Also NOT ported: the recap-ready header card (mobile's RecapReadyCard) —
  * League Recaps has no Next.js page yet, nothing to link it to.
  */
+
+// coridian_: "you need to be able to click on the players (needs to be
+// compact player card)" — the whole row is also a link/button (source
+// article, or mark-as-read), so this can't just nest a second <button>
+// inside it (invalid HTML inside the <a> case, and would fight the row's
+// own click handler either way). AlertRow below instead uses the standard
+// "stretched link" layout: the row's own link/button is an absolutely-
+// positioned full-cover sibling with no z-index, and this chip gets
+// `relative z-10` so it paints above that overlay and intercepts its own
+// taps first — tapping the chip opens the player card, tapping anywhere
+// else on the row still hits the row's own link/button underneath.
+function AlertIdentityChip({ alert }: { alert: AlertItem }) {
+  const row = (
+    <>
+      <PositionBadge position={alert.matched_player_position} />
+      <PlayerAvatar playerId={alert.matched_player_id} tier={alert.matched_player_tier} size={28} />
+      <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+        {alert.matched_player}
+      </span>
+      {alert.matched_player_team ? (
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {alert.matched_player_team}
+        </span>
+      ) : null}
+    </>
+  );
+  if (!alert.matched_player_id) {
+    return <div className="flex items-center gap-2 mt-1">{row}</div>;
+  }
+  return (
+    <PlayerIdentityTrigger
+      identity={{
+        player_id: alert.matched_player_id,
+        name: alert.matched_player,
+        position: alert.matched_player_position,
+        team: alert.matched_player_team,
+        tier: alert.matched_player_tier,
+        sourceLabel: "Alerts",
+      }}
+      className="flex items-center gap-2 mt-1 relative z-10"
+    >
+      {row}
+    </PlayerIdentityTrigger>
+  );
+}
 
 function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: AlertItem) => void }) {
   const relationship = alert.roster_relationship;
@@ -86,26 +132,7 @@ function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: AlertIt
       </div>
 
       {alert.matched_player ? (
-        <div className="flex items-center gap-2 mt-1">
-          <PositionBadge position={alert.matched_player_position} />
-          {/* coridian_, 2026-10-19 (screenshot): "why is there no player
-              card on these?" — this row had a position badge and a name
-              but no photo, unlike News/Portfolio's identity chips, which
-              already use this exact PlayerAvatar. The whole row is a link
-              to the source article (or a mark-as-read trigger), so this
-              stays a plain image, not its own nested PlayerIdentityTrigger
-              — a second interactive element here would be invalid HTML
-              and would fight the row's own click/keydown handler. */}
-          <PlayerAvatar playerId={alert.matched_player_id} tier={alert.matched_player_tier} size={28} />
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {alert.matched_player}
-          </span>
-          {alert.matched_player_team ? (
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {alert.matched_player_team}
-            </span>
-          ) : null}
-        </div>
+        <AlertIdentityChip alert={alert} />
       ) : null}
 
       <p
@@ -138,17 +165,23 @@ function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: AlertIt
   const rowStyle = { opacity: alert.read ? 0.65 : 1 } as const;
 
   if (hasLink) {
+    // A <button> (the identity chip) can't nest inside a real <a> — invalid
+    // HTML. The link becomes an absolutely-positioned full-cover sibling
+    // instead (no z-index, so the chip's own `relative z-10` paints above
+    // it and wins the tap), same "stretched link" layout noted on
+    // AlertIdentityChip above.
     return (
-      <a
-        href={alert.link ?? "#"}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => onOpen(alert)}
-        className="block py-3"
-        style={{ ...rowStyle, borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-      >
+      <div className="relative block py-3" style={{ ...rowStyle, borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
         {body}
-      </a>
+        <a
+          href={alert.link ?? "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => onOpen(alert)}
+          aria-label={alert.title ?? "Open article"}
+          className="absolute inset-0"
+        />
+      </div>
     );
   }
 
