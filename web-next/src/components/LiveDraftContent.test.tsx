@@ -110,6 +110,11 @@ const STATE: LiveDraftStateResponse = {
       rank_scoring_format: "",
       rank_unavailable_reason: "",
       base_value: 100,
+      format_adjustment: 2,
+      scarcity_score: 1.5,
+      roster_fit_score: 1,
+      age_strategy_adjustment: 0.5,
+      availability_adjustment: 0.4,
       league_adjusted_draft_score: 105.4,
       overall_rating: 92,
       movement: 3,
@@ -229,6 +234,29 @@ describe("LiveDraftContent", () => {
     expect(screen.getByText("▲ 3")).toBeInTheDocument();
     expect(screen.getByText("My Dynasty (You)")).toBeInTheDocument();
     expect(screen.getByText("Already Drafted")).toBeInTheDocument();
+  });
+
+  // coridian_: "another redirect to the classic website to view the full
+  // live draft" — this breakdown used to only exist on the classic
+  // Streamlit page; tapping the score now reveals it in place instead.
+  it("reveals the score breakdown on tap, hidden before", () => {
+    render(
+      <LiveDraftContent
+        leagueId="league-1"
+        leagueName="Dynasty Overlords"
+        discovery={DISCOVERY_ONE_LIVE}
+        selectedDraftId="draft-1"
+        onSelectDraft={vi.fn()}
+        state={STATE}
+        stateError={null}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/Scarcity/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Score breakdown" }));
+    expect(screen.getByText(/Scarcity/)).toBeInTheDocument();
+    expect(screen.getByText(/Fit/)).toBeInTheDocument();
   });
 
   it("offers a draft selector only when more than one live/paused draft exists", () => {

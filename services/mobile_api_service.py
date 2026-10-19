@@ -2126,6 +2126,20 @@ def _project_live_draft_ranking_row(row: dict[str, Any]) -> dict[str, Any]:
         "rank_scoring_format": _clean_json_value(row.get("rank_scoring_format")),
         "rank_unavailable_reason": _clean_json_value(row.get("rank_unavailable_reason")),
         "base_value": _clean_json_value(row.get("base_value")),
+        # Same columns modules/live_draft.py already computes onto this same
+        # board DataFrame (format_adjustment/scarcity_score/roster_fit_score/
+        # age_strategy_adjustment/availability_adjustment sum, with
+        # base_value, into league_adjusted_draft_score) — the classic
+        # Streamlit page's "Score breakdown" expander already reads these
+        # exact columns (modules/live_draft_ui.py); just not previously
+        # serialized here, which was the one piece of Live Draft still
+        # linking out to that classic page (coridian_: "another redirect to
+        # the classic website to view the full live draft").
+        "format_adjustment": _clean_json_value(row.get("format_adjustment")),
+        "scarcity_score": _clean_json_value(row.get("scarcity_score")),
+        "roster_fit_score": _clean_json_value(row.get("roster_fit_score")),
+        "age_strategy_adjustment": _clean_json_value(row.get("age_strategy_adjustment")),
+        "availability_adjustment": _clean_json_value(row.get("availability_adjustment")),
         "league_adjusted_draft_score": _clean_json_value(row.get("league_adjusted_draft_score")),
         "overall_rating": _clean_json_value(row.get("overall_rating")),
         "movement": _clean_json_value(row.get("movement")),
@@ -5437,9 +5451,31 @@ def get_league_dashboard(
     user_id = str(user.get("id") or "")
     profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
 
+    # Zach, screenshot: Dashboard crashed with a generic client error for a
+    # league still mid-draft ("Something went wrong. It's been logged").
+    # Root cause: DashboardContent.tsx reads `data.entitlement.hidden_count`
+    # unconditionally, and DashboardResponse's own TS type declares
+    # `entitlement`/`quiet_reason` as always-present — but every early-return
+    # branch below omitted both, a real contract violation, not just a
+    # missing frontend null-check. One shared builder so all of them match
+    # the full response's exact shape (web-next/src/lib/api.ts's
+    # DashboardResponse) instead of drifting independently again.
+    is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
+
+    def _empty_dashboard_response(reason_value: str) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "items": [],
+            "quiet": True,
+            "quiet_reason": reason_value,
+            "team_snapshot": None,
+            "reason": reason_value,
+            "entitlement": {"is_premium": is_premium, "visible_count": 0, "hidden_count": 0},
+        }
+
     my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
     if my_roster is None:
-        return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": reason}
+        return _empty_dashboard_response(reason)
 
     league = sleeper.get_league(league_id)
     if not league:
@@ -5454,13 +5490,13 @@ def get_league_dashboard(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
     )
     if valued.empty:
-        return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": "no_player_data"}
+        return _empty_dashboard_response("no_player_data")
 
     score_field = league_value_settings.valuation_score_field(lens)
 
     roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
     if not roster_player_ids:
-        return {"ok": True, "items": [], "quiet": True, "team_snapshot": None, "reason": "empty_roster"}
+        return _empty_dashboard_response("empty_roster")
 
     rosters = sleeper.get_rosters(league_id)
     all_rostered_player_ids: set[str] = set()

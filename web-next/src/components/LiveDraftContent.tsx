@@ -15,7 +15,6 @@ import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { LiveDraftTradeEvaluator } from "@/components/LiveDraftTradeEvaluator";
-import { streamlitPageUrl } from "@/lib/streamlitLink";
 import {
   filterLiveDraftRankings,
   formatLiveDraftScore,
@@ -40,14 +39,12 @@ import {
  *
  * The hypothetical mid-draft Trade Evaluator (modules/
  * live_draft_trade_evaluator.py's pick/player multiselect form) now ports
- * here too, as its own LiveDraftTradeEvaluator component below — the last
- * of the 4 deliberately-deferred migration-sprint features. Still NOT
- * ported: the detailed per-field score-breakdown table/lookup, a real,
- * separate surface with no thin-wrapper endpoint yet — same "not every
- * pane gets a wrapper this revision" scope Draft Center's own component
- * already notes for its own deferred Current Draft/History and Scouting
- * panes. That one stays on the classic Streamlit page, deep-linked at the
- * bottom of this one.
+ * here too, as its own LiveDraftTradeEvaluator component below. The
+ * per-player score-breakdown lookup (modules/live_draft_ui.py's "Score
+ * breakdown" expander) is ported too, as a tap-to-reveal on each
+ * RankingRowView's score — coridian_: "another redirect to the classic
+ * website to view the full live draft" was this page's last deep link out
+ * to the classic Streamlit page; there's no remaining reason to leave it.
  */
 
 function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; primary: boolean }) {
@@ -118,51 +115,82 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
   );
 }
 
+// Label/column order mirrors modules/live_draft_ui.py's own "Score
+// breakdown" expander exactly (Base/Format/Scarcity/Fit/Age-Strategy/
+// Availability), so this reads as the same feature, not a new one.
+const SCORE_BREAKDOWN_FIELDS: { key: keyof LiveDraftRankingRow; label: string }[] = [
+  { key: "base_value", label: "Base" },
+  { key: "format_adjustment", label: "Format" },
+  { key: "scarcity_score", label: "Scarcity" },
+  { key: "roster_fit_score", label: "Fit" },
+  { key: "age_strategy_adjustment", label: "Age/Strategy" },
+  { key: "availability_adjustment", label: "Availability" },
+];
+
 function RankingRowView({ row, leagueId, leagueName }: { row: LiveDraftRankingRow; leagueId: string; leagueName: string }) {
   const movement = movementGlyph(row.movement);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   return (
-    <div
-      className="flex items-center justify-between gap-3 py-2"
-      style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-    >
-      <PlayerIdentityTrigger
-        identity={{ ...row, leagueId, leagueName, sourceLabel: "Live Draft" }}
-        className="flex items-center gap-3 min-w-0"
-      >
-        <span className="text-xs font-bold w-8 shrink-0" style={{ color: "var(--color-text-muted)" }}>
-          #{row.overall_rank ?? "—"}
-        </span>
-        <PositionBadge position={row.position} />
-        <div className="flex flex-col min-w-0">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {row.name || `Player ${row.player_id}`}
+    <div className="py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
+      <div className="flex items-center justify-between gap-3">
+        <PlayerIdentityTrigger
+          identity={{ ...row, leagueId, leagueName, sourceLabel: "Live Draft" }}
+          className="flex items-center gap-3 min-w-0"
+        >
+          <span className="text-xs font-bold w-8 shrink-0" style={{ color: "var(--color-text-muted)" }}>
+            #{row.overall_rank ?? "—"}
           </span>
-          <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
-            {row.team || "—"}
-            {row.position && row.position_rank ? ` · ${row.position}${row.position_rank}` : ""}
-            {row.recommendation_label ? ` · ${row.recommendation_label}` : ""}
+          <PositionBadge position={row.position} />
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
+              {row.name || `Player ${row.player_id}`}
+            </span>
+            <span className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+              {row.team || "—"}
+              {row.position && row.position_rank ? ` · ${row.position}${row.position_rank}` : ""}
+              {row.recommendation_label ? ` · ${row.recommendation_label}` : ""}
+            </span>
+          </div>
+        </PlayerIdentityTrigger>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className="text-xs font-bold w-10 text-right"
+            style={{ color: row.movement >= 2 ? "var(--color-success)" : row.movement <= -2 ? "var(--color-danger)" : "var(--color-text-muted)" }}
+          >
+            {movement}
           </span>
+          {/* coridian_: "another redirect to the classic website to view
+              the full live draft" — this tap-to-reveal breakdown is what
+              that link used to send people to a separate page for. */}
+          <button
+            type="button"
+            onClick={() => setShowBreakdown((value) => !value)}
+            aria-expanded={showBreakdown}
+            aria-label="Score breakdown"
+            className="text-sm font-extrabold underline decoration-dotted"
+            style={{ color: "var(--color-accent)" }}
+          >
+            {formatLiveDraftScore(row.league_adjusted_draft_score)}
+          </button>
+          <OvrGauge rating={row.overall_rating} size="sm" />
+          <a
+            href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(row.player_id)}&name=${encodeURIComponent(leagueName)}`}
+            className="px-2 py-1 text-xs font-bold"
+            style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+          >
+            Compare
+          </a>
         </div>
-      </PlayerIdentityTrigger>
-      <div className="flex items-center gap-2 shrink-0">
-        <span
-          className="text-xs font-bold w-10 text-right"
-          style={{ color: row.movement >= 2 ? "var(--color-success)" : row.movement <= -2 ? "var(--color-danger)" : "var(--color-text-muted)" }}
-        >
-          {movement}
-        </span>
-        <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-          {formatLiveDraftScore(row.league_adjusted_draft_score)}
-        </span>
-        <OvrGauge rating={row.overall_rating} size="sm" />
-        <a
-          href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(row.player_id)}&name=${encodeURIComponent(leagueName)}`}
-          className="px-2 py-1 text-xs font-bold"
-          style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
-        >
-          Compare
-        </a>
       </div>
+      {showBreakdown ? (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 pl-11 text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          {SCORE_BREAKDOWN_FIELDS.map(({ key, label }) => (
+            <span key={key}>
+              {label} {formatLiveDraftScore(row[key] as number | null)}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -543,14 +571,6 @@ export function LiveDraftContent({
           )}
         </>
       )}
-
-      <a
-        href={streamlitPageUrl("live_draft")}
-        className="text-sm font-bold self-start"
-        style={{ color: "var(--color-accent)" }}
-      >
-        Open the full Live Draft workspace (detailed score breakdowns) →
-      </a>
     </main>
   );
 }
