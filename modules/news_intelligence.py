@@ -1223,6 +1223,8 @@ def _build_roster_news_alert_tiles_unsafe(
     for name in ambiguous_names:
         name_to_id.pop(name, None)
 
+    effective_players_df = players_df if players_df is not None else my_team_df
+
     alerts: List[NewsAlert] = []
     timeline_alerts: List[NewsAlert] = []
     for raw in articles or []:
@@ -1237,7 +1239,7 @@ def _build_roster_news_alert_tiles_unsafe(
             opponent_ids=opponent_ids,
             free_agent_ids=fa_ids,
             player_name_to_id=name_to_id,
-            players_df=players_df if players_df is not None else my_team_df,
+            players_df=effective_players_df,
             league_settings=league_settings,
         )
         alert = apply_dedupe_and_escalation(
@@ -1261,7 +1263,38 @@ def _build_roster_news_alert_tiles_unsafe(
             continue
         seen_ids.add(tile_id)
         deduped.append(alert)
-    tiles = [a.as_tile() for a in deduped[: max(0, int(max_tiles))]]
+
+    # Dashboard-only identity reframe: when the directly-mentioned player is
+    # NOT on this roster but one of the caller's own roster players shares
+    # that NFL team, swap the tile's single compact-card identity onto the
+    # caller's own player instead (never the article subject, and never an
+    # unrelated name the upstream text-match happened to land on). See
+    # alert_presentation.dashboard_team_level_beneficiary for why this is a
+    # Dashboard-tile-only concern and not a change to Alerts-tab behavior
+    # (which deliberately keeps the article's real subject visible there).
+    from modules import alert_presentation as _alert_presentation
+
+    tiles: List[Dict[str, Any]] = []
+    for alert in deduped[: max(0, int(max_tiles))]:
+        tile = alert.as_tile()
+        beneficiary = _alert_presentation.dashboard_team_level_beneficiary(
+            alert.event, effective_players_df, my_roster_ids=my_ids
+        )
+        beneficiary_id = str(beneficiary.get("beneficiary_player_id") or "").strip()
+        if beneficiary_id:
+            beneficiary_name = str(beneficiary.get("beneficiary_player_name") or "").strip()
+            original_headline = str(tile.get("value") or "").strip()
+            tile["value"] = (
+                f"Affects {beneficiary_name}: {original_headline}"
+                if original_headline
+                else f"Affects {beneficiary_name}"
+            )
+            tile["route_player_id"] = beneficiary_id
+            tile["route_player_name"] = beneficiary_name
+            tile["player_id"] = beneficiary_id
+            tile["news_player_name"] = beneficiary_name
+            tile["route_key"] = "my_team"
+        tiles.append(tile)
     try:
         from modules import alerts_activity
 
