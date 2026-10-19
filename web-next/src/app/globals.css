@@ -956,6 +956,19 @@ a {
   align-items: flex-start;
   padding-right: var(--space-2xl);
 }
+/* coridian_, 2026-10-19: "the elite tag should be right under pfp" — a
+   narrow fixed-width column so the tier chip centers under the avatar
+   instead of stretching to match pqv-hero-copy's width. */
+.pqv-hero-avatar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+.pqv-tier-chip {
+  text-align: center;
+}
 .pqv-hero-copy {
   display: flex;
   flex-direction: column;
