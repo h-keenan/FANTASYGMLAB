@@ -6028,6 +6028,11 @@ def _build_league_glance_row(
     if not league_id:
         return {"status": "skip"}
     league_name = str(row.get("league_name") or "").strip() or league_id
+    # Same fix as _resolve_my_roster/_build_portfolio_row: this row's OWN
+    # sleeper_username (captured when this specific league was saved) over
+    # the account-wide `sleeper_username` param, which only reflects
+    # whichever Sleeper account was linked most recently.
+    row_sleeper_username = str(row.get("sleeper_username") or "") or sleeper_username
 
     def _compute() -> dict[str, Any]:
         team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
@@ -6037,7 +6042,7 @@ def _build_league_glance_row(
         return league_glance.build_league_glance(
             league_id=league_id,
             lens=lens,
-            sleeper_username=sleeper_username,
+            sleeper_username=row_sleeper_username,
             players_db_path=PLAYERS_DB_PATH,
             news_pool=news_pool_loader(),
             team_stance_value=team_stance_value,
