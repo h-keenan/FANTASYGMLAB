@@ -5013,6 +5013,9 @@ def _fetch_gm_target_rows(
     )
 
 
+_GM_TARGET_PLAYER_IDS_TTL_SECONDS = 15
+
+
 def _fetch_gm_target_player_ids(
     config: dict[str, Any], user_id: str, access_token: str, league_id: str
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -5020,10 +5023,31 @@ def _fetch_gm_target_player_ids(
 
     Fails soft to (empty, empty) — a GM Targets outage must never block Trade
     Hub or the Dashboard trade tile from generating ideas.
+
+    Read-only hot path (8 call sites across Trade Hub/Trade Finder/Dashboard
+    trade-idea generation) — cached the same way as saved_leagues/
+    profile_fields/team_stance in this audit. Deliberately NOT applied to
+    `_fetch_gm_target_rows` itself, which add_gm_target/set_gm_target_untouchable
+    also call as a pre-write existence/cap check that must always see the
+    latest row state.
     """
 
     if not user_id:
         return (), ()
+    cache_key = redis_cache.build_cache_key("gm_target_player_ids", user_id, league_id)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_GM_TARGET_PLAYER_IDS_TTL_SECONDS,
+            compute=lambda: _fetch_gm_target_player_ids_uncached(config, user_id, access_token, league_id),
+        )
+    except Exception:
+        return _fetch_gm_target_player_ids_uncached(config, user_id, access_token, league_id)
+
+
+def _fetch_gm_target_player_ids_uncached(
+    config: dict[str, Any], user_id: str, access_token: str, league_id: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     rows, error = _fetch_gm_target_rows(
         config, user_id, access_token, league_id, select="player_id,untouchable"
     )
