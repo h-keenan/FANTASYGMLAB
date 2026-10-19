@@ -41,11 +41,14 @@ describe("NewsContent", () => {
         }),
       ],
     };
-    render(<NewsContent data={data} />);
+    const { container } = render(<NewsContent data={data} />);
 
     expect(screen.getByText("Justin Jefferson")).toBeInTheDocument();
     expect(screen.getByText("WR")).toBeInTheDocument();
     expect(screen.getByText("MIN")).toBeInTheDocument();
+    // coridian_, 2026-10-19 (screenshot, same gap on Alerts): "why is
+    // there no player card on these?"
+    expect(container.querySelector('img[src*="6794.jpg"]')).toBeInTheDocument();
   });
 
   it("shows both stacked identity chips for a two-player item", () => {

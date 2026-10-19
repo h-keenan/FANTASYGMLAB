@@ -1,4 +1,5 @@
 import type { NewsItem, NewsPlayerIdentity, NewsResponse } from "@/lib/api";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { eventTypeColorVar, eventTypeLabel, relativeTime } from "@/lib/alertsPresentation";
@@ -36,6 +37,9 @@ function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
   const row = (
     <>
       <PositionBadge position={identity.matched_player_position} />
+      {/* coridian_, 2026-10-19 (screenshot, on Alerts — the identical gap
+          exists here): "why is there no player card on these?" */}
+      <PlayerAvatar playerId={identity.matched_player_id} size={28} />
       <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
         {identity.matched_player}
       </span>
