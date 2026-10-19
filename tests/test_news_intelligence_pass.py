@@ -688,3 +688,100 @@ def test_canonical_player_name_index_basic_and_edge_cases():
     )
     messy_index = ni.canonical_player_name_index(messy)
     assert messy_index.get(news_signal.normalize_player_name("Real Name")) == "9"
+
+
+# --- Dashboard Watch-tile team-level identity reframe (coridian_, 2026-10-19) ---
+#
+# Repro: a Raiders OL practice-squad cut attached an unrelated free agent's
+# compact player card to the Watch tile instead of either the article's real
+# (non-roster) subject or the caller's own Raiders RB. The caller's own
+# roster player on the SAME NFL team is the only identity actually useful on
+# a Dashboard card with room for exactly one. See
+# modules.alert_presentation.dashboard_team_level_beneficiary.
+
+
+def test_watch_tile_reframes_to_same_team_roster_player_when_subject_is_not_mine():
+    my_team = _players_frame(
+        [{"player_id": "wash-1", "name": "Mike Washington", "team": "LV", "position": "RB"}]
+    )
+    free_agents = _players_frame(
+        [{"player_id": "myarick-1", "name": "Chris Myarick", "team": "LV", "position": "TE"}]
+    )
+    players = pd.concat([my_team, free_agents], ignore_index=True)
+    article = _article(
+        title="Raiders cut OL Evan Neal from the practice squad",
+        summary="Evan Neal has been released by the Raiders from the practice squad Tuesday.",
+        matched_player="Chris Myarick",
+        matched_player_id="myarick-1",
+        matched_team="LV",
+        source="https://www.nfl.com/transactions",
+    )
+    tiles = ni.build_roster_news_alert_tiles(
+        [article],
+        session={},
+        league_id="L1",
+        league_settings={},
+        my_team_df=my_team,
+        starters_df=my_team,
+        free_agents_df=free_agents,
+        opponent_ids=[],
+        taxi_ids=[],
+        ir_ids=[],
+        players_df=players,
+        now=NOW,
+        max_tiles=5,
+    )
+    assert len(tiles) == 1
+    tile = tiles[0]
+    # Never the unrelated free agent the upstream text-match landed on...
+    assert tile["route_player_id"] != "myarick-1"
+    assert "Myarick" not in tile["value"]
+    # ...and never the article's real (still non-roster) subject either --
+    # the caller's own same-team roster player is the only useful identity.
+    assert tile["route_player_id"] == "wash-1"
+    assert tile["route_player_name"] == "Mike Washington"
+    assert tile["player_id"] == "wash-1"
+    assert tile["news_player_name"] == "Mike Washington"
+    assert tile["route_key"] == "my_team"
+    assert tile["value"] == "Affects Mike Washington: Raiders cut OL Evan Neal from the practice squad"
+
+
+def test_watch_tile_does_not_reframe_when_news_is_directly_about_my_player():
+    """Regression guard: the existing MY_STARTER/MY_BENCH direct-match path
+    (news genuinely about one of the caller's own roster players) must keep
+    working unchanged -- the reframe above only applies to the gap where the
+    directly-mentioned player is NOT on the roster."""
+
+    my_team = _players_frame(
+        [{"player_id": "wash-1", "name": "Mike Washington", "team": "LV", "position": "RB"}]
+    )
+    article = _article(
+        title="Mike Washington ruled out for Sunday",
+        summary="The Raiders ruled out Mike Washington for Sunday's game with a hamstring injury.",
+        matched_player="Mike Washington",
+        matched_player_id="wash-1",
+        matched_team="LV",
+        source="https://www.espn.com/nfl/story/_/id/washington-out",
+    )
+    tiles = ni.build_roster_news_alert_tiles(
+        [article],
+        session={},
+        league_id="L1",
+        league_settings={},
+        my_team_df=my_team,
+        starters_df=my_team,
+        free_agents_df=None,
+        opponent_ids=[],
+        taxi_ids=[],
+        ir_ids=[],
+        players_df=my_team,
+        now=NOW,
+        max_tiles=5,
+    )
+    assert len(tiles) == 1
+    tile = tiles[0]
+    assert tile["route_player_id"] == "wash-1"
+    assert tile["route_player_name"] == "Mike Washington"
+    assert tile["news_roster_relationship"] == ni.REL_MY_STARTER
+    assert not tile["value"].startswith("Affects ")
+    assert tile["value"] == "Mike Washington ruled out for Sunday"

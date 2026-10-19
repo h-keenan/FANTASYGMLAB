@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from modules import news_intelligence as ni
+from modules import news_signal
 
 IMPACT_OPPORTUNITY_RISING = "opportunity_rising"
 IMPACT_OPPORTUNITY_FALLING = "opportunity_falling"
@@ -672,6 +673,109 @@ def teammate_opportunity_from_structured(
         "supported": "1",
         "beneficiary_player_id": beneficiary_id,
     }
+
+
+_MY_ROSTER_RELATIONSHIPS = frozenset({"MY_STARTER", "MY_BENCH", "MY_TAXI", "MY_IR"})
+# Crude but deliberately narrow: an offensive-line transaction is worth
+# reframing onto the backfield (RB first, then QB -- an OL move almost never
+# changes a WR/TE's outlook the way it changes blocking for the run game and
+# the passer). Checked against the article's own headline text only (see
+# dashboard_team_level_beneficiary's docstring for why), so it only fires
+# when the story itself names the position, the same signal a reader sees.
+_OL_SIGNAL_RE = re.compile(r"\bol\b|\boffensive (?:line|tackle|guard)\b", re.IGNORECASE)
+_OL_AFFECTED_POSITIONS = ("RB", "QB")
+
+
+def dashboard_team_level_beneficiary(
+    event: ni.FootballEvent,
+    players_df: Any | None,
+    *,
+    my_roster_ids: Iterable[str] | None = None,
+) -> dict[str, str]:
+    """Dashboard-Watch-tile-only: map a non-roster news event onto a
+    same-NFL-team roster player when the article's real subject is not one
+    of the caller's own players.
+
+    Sibling of ``teammate_opportunity_from_structured`` above, which the
+    Alerts tab uses to keep the article's real subject as the displayed
+    identity and only adds a side ``beneficiary_player_id`` for "My
+    Players" filter membership -- correct there, since Alerts can show
+    every player a story names with its own card. The Dashboard Watch tile
+    has room for exactly one compact player card, and coridian_ flagged
+    (2026-10-19) that showing the subject's card is actively wrong when
+    that subject isn't on the roster at all: a Raiders OL practice-squad
+    cut attached an unrelated free agent's card instead of his own Raiders
+    RB's -- neither identity was useful, since neither is a player he can
+    act on.
+
+    When the caller's own roster has a player on the SAME NFL team as the
+    (non-roster) article subject, this returns that player's id/name so the
+    caller can swap route_player_id/name onto it and prefix the headline
+    with "Affects {name}: ...". Fails closed (empty dict) whenever there is
+    no same-team roster player -- this never fabricates a connection the
+    article doesn't support, and it never fires when the event is already
+    about one of the caller's own roster players (that existing
+    MY_STARTER/MY_BENCH/MY_TAXI/MY_IR path is correct as-is and must not be
+    touched here).
+
+    Team matching prefers the structured ``event.team`` field (the same
+    ``matched_team`` the rest of this pipeline already trusts); when that is
+    blank it falls back to the same city/nickname/code aliases
+    ``modules.my_news`` uses for its own team-relevance boost, read against
+    the article's own headline text only -- deliberately not the full
+    article body, which this call site does not have (only the derived
+    ``FootballEvent.article_title`` survives this far), and sufficient for
+    the reported case (team name was in the headline itself).
+    """
+
+    empty: dict[str, str] = {}
+    mine = {str(x).strip() for x in (my_roster_ids or ()) if str(x).strip()}
+    if not mine or players_df is None or getattr(players_df, "empty", True):
+        return empty
+    columns = getattr(players_df, "columns", ())
+    if "player_id" not in columns or "team" not in columns:
+        return empty
+    if str(event.roster_relationship or "").strip().upper() in _MY_ROSTER_RELATIONSHIPS:
+        return empty
+
+    mine_rows = players_df[players_df["player_id"].astype(str).isin(mine)]
+    if mine_rows.empty:
+        return empty
+
+    event_team = str(event.team or "").strip().upper()
+    headline = str(event.article_title or "")
+
+    def _team_matches(team_code: object) -> bool:
+        code = str(team_code or "").strip().upper()
+        if not code:
+            return False
+        if event_team:
+            return code == event_team
+        from modules import my_news
+
+        terms = [code.lower()] + [alias.lower() for alias in my_news.TEAM_NAME_ALIASES.get(code, ())]
+        return any(news_signal.contains_phrase(headline, term) for term in terms)
+
+    peers = mine_rows[mine_rows["team"].map(_team_matches)]
+    event_pid = str(event.player_id or "").strip()
+    if event_pid:
+        peers = peers[peers["player_id"].astype(str) != event_pid]
+    if peers.empty:
+        return empty
+
+    peers = peers.sort_values("player_id")
+    chosen = peers.iloc[0]
+    if "position" in peers.columns and _OL_SIGNAL_RE.search(headline):
+        preferred = peers[peers["position"].astype(str).str.upper().isin(_OL_AFFECTED_POSITIONS)]
+        if not preferred.empty:
+            rb_rows = preferred[preferred["position"].astype(str).str.upper() == "RB"]
+            chosen = rb_rows.iloc[0] if not rb_rows.empty else preferred.iloc[0]
+
+    beneficiary_id = str(chosen.get("player_id") or "").strip()
+    beneficiary_name = str(chosen.get("name") or "").strip()
+    if not beneficiary_id or not beneficiary_name:
+        return empty
+    return {"beneficiary_player_id": beneficiary_id, "beneficiary_player_name": beneficiary_name}
 
 
 def structured_roster_impact(
