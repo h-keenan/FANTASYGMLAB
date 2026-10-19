@@ -753,3 +753,29 @@ def test_compose_next_move_briefing_flags_roster_pressure_when_over_limit():
     assert not briefing.quiet
     assert briefing.items[0].category == "top_priority"
     assert "Over" in briefing.items[0].headline or "roster" in briefing.items[0].reason.lower()
+
+
+# coridian_, 2026-10-19: "5 leauges saved maybe only 2 populate (thats
+# correct ... the other leauges didnt renew this year) and it takes 8+
+# seconds" — a league that never got a follow-up created still resolves
+# fine from Sleeper (season just never advances), so without a fast-fail
+# it paid the full valuation/lineup/trade-ideas cost before eventually
+# failing downstream. This proves the fail is real AND early: the second
+# mocked response (rosters) is never consumed, so a function that still
+# tried to fetch rosters would raise StopIteration here, not return cleanly.
+def test_build_league_summary_fails_fast_for_a_league_whose_season_never_advanced():
+    league_id = "dashboard-engine-test-stale-league"
+    user_lookup_response = _sleeper_response({"user_id": "u1"})
+    stale_league_response = _sleeper_response({"league_id": league_id, "season": "2024"})
+
+    with patch("requests.get", side_effect=[user_lookup_response, stale_league_response]):
+        with patch("modules.sleeper.default_player_stats_season", return_value=2026):
+            result = dashboard_engine.build_league_summary(
+                league_id=league_id,
+                lens="Dynasty",
+                sleeper_username="gm_dynasty",
+                players_db_path="data/players.db",
+            )
+
+    assert result == {"ok": False, "reason": "league_season_ended"}
+    assert "league_season_ended" in dashboard_engine.LEAGUE_SUMMARY_SKIP_REASONS

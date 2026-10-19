@@ -677,6 +677,7 @@ LEAGUE_SUMMARY_SKIP_REASONS = frozenset(
         "not_a_member_of_league",
         "empty_roster",
         "no_player_data",
+        "league_season_ended",
     }
 )
 
@@ -733,6 +734,19 @@ def build_league_summary(
     league = sleeper.get_league(league_id)
     if not league:
         return {"ok": False, "reason": "league_not_found"}
+
+    # coridian_, 2026-10-19: "5 leauges saved maybe only 2 populate (thats
+    # correct ... the other leauges didnt renew this year) and it takes
+    # 8+ seconds" — a league that never got a follow-up created for the
+    # new season still resolves fine from Sleeper (the old league_id and
+    # its final roster persist indefinitely), so without this check it ran
+    # the FULL valuation/lineup/trade-ideas pipeline for a stale roster
+    # before failing somewhere downstream, paying the expensive path for
+    # exactly the leagues that have nothing useful to show. Bail out here,
+    # before any of that work starts, the same cheap way save_league
+    # already verifies a league exists at all.
+    if str(league.get("season") or "") != str(sleeper.default_player_stats_season()):
+        return {"ok": False, "reason": "league_season_ended"}
 
     rosters = sleeper.get_rosters(league_id)
     my_roster = next(
