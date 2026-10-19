@@ -13,8 +13,13 @@ import { BRAND_NAME } from "@/lib/brand";
  * surfaces consistent instead of inventing a fourth treatment.
  */
 export function LoadingScreen({ status = "Loading…" }: { status?: string }) {
+  // coridian_, 2026-10-19: "can't see animated background when loading" —
+  // this opaque fill used to sit on top of layout.tsx's fixed
+  // .app-background-sweep/.app-background-field (every other page's <main>
+  // has no background of its own, letting that global animated texture
+  // show through underneath).
   return (
-    <main className="flex-1 flex flex-col items-center justify-center gap-3" style={{ background: "var(--color-bg)" }}>
+    <main className="flex-1 flex flex-col items-center justify-center gap-3">
       <Image
         src="/brand-mark.png"
         alt=""
