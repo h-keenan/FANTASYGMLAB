@@ -113,6 +113,7 @@ from modules import (
     build_identity,
     canonical_player_ranking,
     college_scouting,
+    community_trades,
     dashboard_engine,
     draft_assistant,
     draft_center_ui,
@@ -863,6 +864,7 @@ _EXPORTABLE_USER_TABLES = (
     "decision_memory_baselines",
     "notification_read_state",
     "guess_the_player_streaks",
+    "community_trade_reactions",
 )
 
 
@@ -4385,6 +4387,172 @@ def get_trade_outcome_history(user: dict[str, Any] = Depends(require_user)) -> d
     if not isinstance(rows, list):
         return {"ok": True, "outcomes": []}
     return {"ok": True, "outcomes": [_project_trade_outcome_history(row) for row in rows if isinstance(row, dict)]}
+
+
+# ---------------------------------------------------------------------------
+# Community Trade Feed (docs/roadmap.md "Social / community layer") —
+# anonymized "craziest trades" feed pulled from ALL users' confirmed,
+# high-confidence trade_outcomes rows. See modules/community_trades.py's
+# module docstring for the full anonymization/cross-user-read design and
+# why this is the one place in this service that uses service-role access
+# inside a live request instead of a per-user token.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/v1/community/trades")
+def get_community_trades(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Anonymized feed of "interesting" (real, lopsided, high-confidence)
+    confirmed trades across every user's real leagues — never the current
+    user's own league filter, by design (this IS the cross-league feature).
+    Free for every signed-in user, no Premium gate (coridian_'s spec).
+    Fails closed to an empty feed on any error, same contract as every
+    other Supabase-backed read in this service.
+    """
+
+    try:
+        config = community_trades.load_community_feed_config()
+        if not config.configured:
+            return {"ok": True, "trades": [], "reaction_emoji": list(community_trades.COMMUNITY_REACTION_EMOJI)}
+
+        candidates = community_trades.fetch_interesting_trade_outcomes(config)
+        opted_out = community_trades.fetch_opted_out_user_ids(config)
+        viewer_user_id = str(user.get("id") or "")
+        visible = [
+            row for row in candidates if str(row.get("user_id") or "") not in opted_out
+        ]
+        outcome_ids = [str(row.get("id") or "") for row in visible]
+        reaction_rows = community_trades.fetch_reaction_rows(config, outcome_ids)
+        items = community_trades.build_community_feed_items(
+            visible,
+            opted_out_user_ids=opted_out,
+            reaction_rows=reaction_rows,
+            viewer_user_id=viewer_user_id,
+        )
+        return {"ok": True, "trades": items, "reaction_emoji": list(community_trades.COMMUNITY_REACTION_EMOJI)}
+    except Exception:
+        return {"ok": True, "trades": [], "reaction_emoji": list(community_trades.COMMUNITY_REACTION_EMOJI)}
+
+
+class CommunityTradeReactionRequest(BaseModel):
+    emoji: str
+    action: str = "add"
+
+
+@app.post("/v1/community/trades/{outcome_id}/react")
+def react_to_community_trade(
+    outcome_id: str,
+    body: CommunityTradeReactionRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Add or remove the caller's own emoji reaction. Uses the caller's own
+    access token (never service role) — RLS auth.uid() = user_id on
+    community_trade_reactions is sufficient and correct for "my own
+    reaction," so this mutation never needs modules.community_trades'
+    elevated cross-user access at all.
+
+    outcome_id is an unguessable uuid the caller only ever learns from GET
+    /v1/community/trades' own response; this endpoint does not separately
+    re-check that the trade is still visible in that feed (e.g. still
+    "interesting", or its owner hasn't since opted out) before accepting a
+    reaction on it — a deliberately small, documented gap: nothing about a
+    reaction (not even its existence) is ever shown back to any client
+    except as an anonymous count on an already-anonymized feed item, so a
+    stray reaction on a since-hidden trade carries no privacy or identity
+    risk, only a harmless uncounted row.
+    """
+
+    emoji = body.emoji.strip()
+    if emoji not in community_trades.COMMUNITY_REACTION_EMOJI:
+        raise HTTPException(
+            status_code=422,
+            detail="emoji must be one of: " + " ".join(community_trades.COMMUNITY_REACTION_EMOJI),
+        )
+    action = body.action.strip().lower()
+    if action not in {"add", "remove"}:
+        raise HTTPException(status_code=422, detail="action must be add or remove.")
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+
+    headers = auth_supabase.auth_headers(config, access_token)
+    try:
+        if action == "add":
+            headers["Prefer"] = "return=minimal,resolution=ignore-duplicates"
+            response = requests.post(
+                auth_supabase.rest_api_url(config, community_trades.COMMUNITY_REACTIONS_TABLE),
+                headers=headers,
+                json={"outcome_id": outcome_id, "user_id": user_id, "emoji": emoji},
+                timeout=15,
+            )
+        else:
+            query = f"outcome_id=eq.{outcome_id}&user_id=eq.{user_id}&emoji=eq.{emoji}"
+            headers["Prefer"] = "return=minimal"
+            response = requests.delete(
+                auth_supabase.rest_api_url(config, community_trades.COMMUNITY_REACTIONS_TABLE, query),
+                headers=headers,
+                timeout=15,
+            )
+    except Exception:
+        return {"ok": False, "reason": "not_available"}
+    if response.status_code >= 400:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "reason": ""}
+
+
+def _community_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    # On by default — absent key means "not opted out", matching
+    # coridian_'s "on by default, with a visible opt-out toggle" spec.
+    return {"opted_out": bool(settings.get("community_trades_opt_out", False))}
+
+
+@app.get("/v1/community/preferences")
+def get_community_preferences(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """This user's own Community Trade Feed opt-out flag. Backed by the
+    existing user_settings table under a "community_trades_opt_out" key —
+    same pattern as /v1/push/preferences' "push_categories" key — not a
+    new table."""
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    settings, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, **_community_preferences_from_settings({})}
+    return {"ok": True, **_community_preferences_from_settings(settings.get("settings") or {})}
+
+
+class UpdateCommunityPreferencesRequest(BaseModel):
+    opted_out: bool
+
+
+@app.post("/v1/community/preferences")
+def update_community_preferences(
+    body: UpdateCommunityPreferencesRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Set this user's own Community Trade Feed opt-out flag. When set, this
+    user's own confirmed trades must never appear in ANY other user's feed
+    — enforced by modules.community_trades.fetch_opted_out_user_ids'
+    service-role read, checked on every GET /v1/community/trades, not just
+    going forward from the moment this is toggled.
+    """
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, **_community_preferences_from_settings({})}
+    settings = dict(current.get("settings") or {})
+    settings["community_trades_opt_out"] = bool(body.opted_out)
+    payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
+    ok, error = account_store.upsert_user_settings(config, access_token, payload)
+    if not ok:
+        return {"ok": False, **_community_preferences_from_settings(settings)}
+    return {"ok": True, **_community_preferences_from_settings(settings)}
 
 
 def _stat_item_dict(item: player_quick_view.StatItem) -> dict[str, Any]:
