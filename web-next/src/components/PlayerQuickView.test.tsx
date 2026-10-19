@@ -181,11 +181,16 @@ describe("PlayerQuickView", () => {
 
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
 
-    await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1"));
-    expect(await screen.findByText("Week by Week")).toBeInTheDocument();
+    await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1", undefined));
+    expect(await screen.findByText("Week by Week · 2026")).toBeInTheDocument();
   });
 
-  it("omits the week-by-week section when no weeks have been played yet", async () => {
+  // coridian_, 2026-10-19: "need to see other years week by week" — a
+  // season with no games played is exactly when a selector back to an
+  // earlier season (which might have real data) is most useful, so the
+  // section stays visible (with the panel's own empty-season message)
+  // instead of disappearing, as it used to.
+  it("shows the week-by-week section's own empty-season message (not hidden) when no weeks have been played yet", async () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
     vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({
@@ -197,7 +202,33 @@ describe("PlayerQuickView", () => {
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
 
     await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
-    expect(screen.queryByText("Week by Week")).not.toBeInTheDocument();
+    expect(await screen.findByText("Week by Week · 2026")).toBeInTheDocument();
+    expect(screen.getByText(/No weekly fantasy points are recorded for the 2026 season yet/)).toBeInTheDocument();
+  });
+
+  it("lets the user pick an earlier season and refetches weekly stats for it", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+    vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({
+      ok: true,
+      season: 2026,
+      weeks: [{ week: 1, fantasy_points_ppr: 18.4, snap_share: 0.82 }],
+    });
+
+    render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1", undefined));
+    expect(await screen.findByLabelText("Season")).toBeInTheDocument();
+
+    vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({
+      ok: true,
+      season: 2024,
+      weeks: [{ week: 1, fantasy_points_ppr: 11.2, snap_share: 0.6 }],
+    });
+    fireEvent.change(screen.getByLabelText("Season"), { target: { value: "2024" } });
+
+    await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1", 2024));
+    expect(await screen.findByText("Week by Week · 2024")).toBeInTheDocument();
   });
 
   it("calls onClose on Escape, backdrop click, and the close button", async () => {
@@ -224,7 +255,7 @@ describe("PlayerQuickView", () => {
 
     expect(screen.queryByText("Awards")).not.toBeInTheDocument();
     expect(screen.queryByText("Model")).not.toBeInTheDocument();
-    expect(screen.getByText("Player One")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Player One" })).toBeInTheDocument();
   });
 
   it("renders a Compare link only when leagueId is provided", async () => {

@@ -57,6 +57,15 @@ export function PlayerQuickView({
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [weeklyStats, setWeeklyStats] = useState<{ season: number; weeks: WeeklyStatPoint[] } | null>(null);
+  // null = backend default (the current season). coridian_, 2026-10-19:
+  // "need to see other years week by week" — the endpoint and client
+  // already supported a `season` argument (Player Compare's dual chart
+  // already passes one per side), just never had a selector here.
+  const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
+  // The real current season, learned from the backend's own default-season
+  // response rather than guessed client-side — anchors the "how far back
+  // can I go" selector even after the user has picked an older season.
+  const [currentSeasonAnchor, setCurrentSeasonAnchor] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Swipe-down-to-dismiss, via the drag handle only (not the whole modal —
@@ -118,11 +127,20 @@ export function PlayerQuickView({
         if (!cancelled) setLoading(false);
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [identity.player_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     api
-      .getPlayerWeeklyStats(identity.player_id)
+      .getPlayerWeeklyStats(identity.player_id, selectedSeason ?? undefined)
       .then((response) => {
         if (cancelled) return;
         setWeeklyStats({ season: response.season, weeks: response.weeks });
+        if (selectedSeason == null) setCurrentSeasonAnchor(response.season);
       })
       .catch(() => {
         // Soft-fail: the rest of the modal is still useful without this.
@@ -131,7 +149,13 @@ export function PlayerQuickView({
     return () => {
       cancelled = true;
     };
-  }, [identity.player_id]);
+  }, [identity.player_id, selectedSeason]);
+
+  // mobile_api_service.py's own bound: MAX_WEEKLY_STATS_SEASONS_BACK = 7.
+  const WEEKLY_STATS_SEASONS_BACK = 7;
+  const seasonOptions = currentSeasonAnchor
+    ? Array.from({ length: WEEKLY_STATS_SEASONS_BACK + 1 }, (_, i) => currentSeasonAnchor - i)
+    : [];
 
   // Focus the close button on open, restore body scroll on close — the
   // minimal accessible-modal contract (focus moves into the dialog, page
@@ -291,7 +315,10 @@ export function PlayerQuickView({
             <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
           ) : null}
           {model?.usage_trend ? (
-            <span className={`pqv-chip pqv-chip--${model.usage_trend.tone === "positive" ? "positive" : "danger"}`}>
+            <span
+              className={`pqv-chip pqv-chip--${model.usage_trend.tone === "positive" ? "positive" : "danger"}`}
+              title={model.usage_trend.detail}
+            >
               {model.usage_trend.arrow} {model.usage_trend.trend_pct}% usage · {model.usage_trend.confidence_label}
             </span>
           ) : null}
@@ -311,9 +338,30 @@ export function PlayerQuickView({
                 </section>
               ) : null}
 
-              {weeklyStats && weeklyStats.weeks.some((week) => week.fantasy_points_ppr != null) ? (
+              {weeklyStats ? (
                 <section className="pqv-stat-season">
-                  <h3>Week by Week</h3>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h3>Week by Week · {weeklyStats.season}</h3>
+                    {seasonOptions.length > 1 ? (
+                      <select
+                        aria-label="Season"
+                        value={selectedSeason ?? currentSeasonAnchor ?? ""}
+                        onChange={(event) => setSelectedSeason(Number(event.target.value))}
+                        className="text-xs px-2 py-1"
+                        style={{
+                          background: "var(--color-surface-muted)",
+                          color: "var(--color-text-secondary)",
+                          border: "var(--border-width-default) solid var(--color-border)",
+                        }}
+                      >
+                        {seasonOptions.map((season) => (
+                          <option key={season} value={season}>
+                            {season}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                  </div>
                   <WeeklyPointsPanel
                     name={identity.name || "This player"}
                     weeks={weeklyStats.weeks}

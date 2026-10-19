@@ -1110,6 +1110,11 @@ export interface UsageTrend {
   confidence_label: string;
   arrow: string;
   tone: "positive" | "negative";
+  /** modules.rankings.recency_trend_display's own human-readable scope,
+   * e.g. "Weighted last 4 games 55.0 vs 42.0 baseline (6 usable games)." —
+   * already computed and returned by the backend, just never declared here
+   * before. coridian_, 2026-10-19: "usage needs to specify time period". */
+  detail?: string;
 }
 
 /** GET /v1/players/{id}/weekly-stats — per-week PPR points + snap share for
