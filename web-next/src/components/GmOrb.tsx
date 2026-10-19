@@ -64,6 +64,19 @@ export function GmOrb() {
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
   const leagueName = searchParams.get("name") || leagueId || "";
   const { coreLeagueDestinations, gmToolsDestinations, generalDestinations } = useNavDestinations(leagueId, leagueName);
+  // Founder Analytics (coridian_, 2026-10-19: "just put it in the orb menu
+  // for the specific account(s) listed on supabase") — gated on the SAME
+  // server-issued `founder_ops` app_metadata claim GET /v1/founder/analytics
+  // enforces (services/mobile_api_service.py's _founder_analytics_capable).
+  // This check is a UX nicety only: supabase-js's session.user.app_metadata
+  // comes straight off the verified Supabase Auth session, but the real
+  // authorization boundary is that backend 403, not this `if`. A non-
+  // founder cannot grant themselves this by editing anything client-side —
+  // app_metadata is never writable from the browser (only Supabase's Admin
+  // Auth API can set it), unlike user_metadata. Deliberately NOT added to
+  // useNavDestinations/navDestinations.ts, since that hook is shared with
+  // DesktopSidebar.tsx and has no notion of this per-account gate.
+  const founderCapable = session?.user?.app_metadata?.founder_ops === true;
 
   if (!session) return null;
   // Zach, 2026-10-19: "fix the bottom orb on onboard its covering" — "/"
@@ -192,6 +205,21 @@ export function GmOrb() {
                   <NavRow key={destination.path} destination={destination} onNavigate={() => setOpen(false)} />
                 ))}
               </NavSection>
+
+              {founderCapable ? (
+                <NavSection label="Founder">
+                  <NavRow
+                    destination={{
+                      label: "Founder Analytics",
+                      path: "/founder-analytics",
+                      subtitle: "Internal product analytics",
+                      glyph: "founderAnalytics",
+                      color: "var(--color-diagnostic)",
+                    }}
+                    onNavigate={() => setOpen(false)}
+                  />
+                </NavSection>
+              ) : null}
             </div>
           </div>
         </div>

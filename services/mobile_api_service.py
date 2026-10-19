@@ -6,6 +6,8 @@ Deployment topology (Render):
   - GET  /health              — process liveness (no Supabase dependency)
   - GET  /ready               — Supabase config readiness (no secret values)
   - GET  /v1/me               — authenticated user + entitlement + saved-league cap
+  - GET  /v1/founder/analytics — founder-only product analytics report (403 for
+                                  anyone without a server-issued founder_ops claim)
   - POST /v1/me/link-sleeper  — link a Sleeper username onto the caller's profile (roster resolution)
   - GET  /v1/sleeper/leagues?username=x  — the Sleeper leagues behind a username (add-league picker)
   - POST /v1/leagues/save                — save a Sleeper league to the account (cap-enforced)
@@ -117,6 +119,7 @@ from modules import (
     draft_assistant,
     draft_center_ui,
     faab,
+    founder_analytics,
     gm_plan,
     gm_targets,
     guess_the_player,
@@ -809,6 +812,52 @@ def _premium_benefit_lines() -> list[str]:
         return lines if lines else list(_FALLBACK_PREMIUM_BENEFIT_LINES)
     except Exception:
         return list(_FALLBACK_PREMIUM_BENEFIT_LINES)
+
+
+def _founder_analytics_capable(user: dict[str, Any]) -> bool:
+    """True only when the caller's own Supabase Auth app_metadata carries
+    `founder_ops: true`.
+
+    Same server-issued capability contract as
+    modules.founder_ops.server_issued_capability (the Streamlit "Founder
+    Ops" page's authorization): app_metadata is issued by Supabase Auth and
+    settable only via the Supabase Admin Auth API, never through a user's
+    own profile/user-metadata edits, so this cannot be forged client-side.
+    `user` is always the dict `require_user` already returned for this
+    request — its `app_metadata` already merges GoTrue's `user.app_metadata`,
+    Postgres `raw_app_meta_data`, and the access token's own `app_metadata`
+    claim (see auth_supabase.normalize_auth_user / canonical_app_metadata),
+    so no extra Supabase round trip is needed here.
+    """
+
+    metadata = user.get("app_metadata")
+    return isinstance(metadata, dict) and metadata.get("founder_ops") is True
+
+
+@app.get("/v1/founder/analytics")
+def get_founder_analytics(
+    window: str = "7d",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Founder-only product analytics report — session/signup/feature-
+    adoption rollups plus the "storage honesty" flag (durable Supabase table
+    vs. host-local-JSONL-fallback-only), for the handful of accounts with a
+    server-issued `founder_ops` capability claim (see
+    _founder_analytics_capable above). Every other caller gets a real 403,
+    not an empty/filtered report — this is an internal-analytics boundary,
+    not a UX nicety.
+
+    Delegates all aggregation to modules.founder_analytics.build_report —
+    the same read path the Streamlit app would use — so web-next and any
+    future client share one analytics engine instead of recomputing it here.
+    """
+
+    if not _founder_analytics_capable(user):
+        raise HTTPException(status_code=403, detail="Not authorized.")
+    valid_windows = {key for key, _label, _seconds in founder_analytics.WINDOWS}
+    window_key = window if window in valid_windows else "7d"
+    report = founder_analytics.build_report(window_key=window_key)
+    return {"ok": True, "report": report}
 
 
 @app.get("/v1/me")

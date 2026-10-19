@@ -1436,6 +1436,79 @@ export interface HistoryGrade {
   grade_model_label?: string;
 }
 
+/** GET /v1/founder/analytics — mirrors modules.founder_analytics.build_report's
+ * return shape exactly (services/mobile_api_service.py's get_founder_analytics
+ * serializes it as-is, no reshaping). Gated server-side on the caller's own
+ * Supabase Auth app_metadata.founder_ops claim — any non-founder caller gets
+ * a real 403, never an empty/filtered report (see that endpoint's docstring).
+ */
+export interface FounderAnalyticsProductModule {
+  module: string;
+  users: number;
+  sessions: number;
+  views: number;
+  meaningful_interactions: number;
+}
+
+export interface FounderAnalyticsNamedCount {
+  event: string;
+  label: string;
+  count: number;
+}
+
+export interface FounderAnalyticsLatencyStat {
+  p50: number | null;
+  p90: number | null;
+  p95: number | null;
+  n: number;
+}
+
+export interface FounderAnalyticsStorage {
+  kind: "supabase" | "host_local_jsonl";
+  file_name: string;
+  directory: string;
+  exists: boolean;
+  size_bytes: number;
+  writes_enabled: boolean;
+  retention_days: number;
+  survives_render_deploy: boolean;
+  multi_instance: string;
+  scope_label: string;
+}
+
+export interface FounderAnalyticsReport {
+  window_key: string;
+  window_label: string;
+  measured: boolean;
+  event_count: number;
+  sessions: number;
+  anonymous_users: number;
+  hashed_accounts: number;
+  product_modules: FounderAnalyticsProductModule[];
+  decision_engagement: FounderAnalyticsNamedCount[];
+  premium: FounderAnalyticsNamedCount[];
+  checkout_intervals: Record<string, number>;
+  errors: Record<string, number>;
+  error_sessions: number;
+  performance: Record<string, FounderAnalyticsLatencyStat>;
+  startup_latency_buckets: Record<string, number>;
+  storage: FounderAnalyticsStorage;
+  unavailable: string[];
+  partial_notes: string[];
+}
+
+export interface FounderAnalyticsResponse {
+  ok: boolean;
+  report: FounderAnalyticsReport;
+}
+
+export const FOUNDER_ANALYTICS_WINDOWS: Array<{ value: string; label: string }> = [
+  { value: "24h", label: "Last 24 hours" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "all", label: "All retained data" },
+];
+
 export interface HistoryTransaction {
   transaction_id: string;
   season: string;
@@ -2419,4 +2492,10 @@ export const api = {
         },
       },
     ),
+
+  // Founder-only internal product analytics — see FounderAnalyticsReport's
+  // own comment. Server enforces the real app_metadata.founder_ops gate;
+  // a non-founder caller gets a 403 ApiError here, not an empty report.
+  getFounderAnalytics: (window: string = "7d") =>
+    authorizedRequest<FounderAnalyticsResponse>(`/v1/founder/analytics?window=${encodeURIComponent(window)}`),
 };
