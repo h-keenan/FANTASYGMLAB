@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingPaywall } from "./OnboardingPaywall";
@@ -54,21 +54,19 @@ describe("OnboardingPaywall", () => {
     expect(onSkip).toHaveBeenCalledTimes(1);
   });
 
-  it("starts checkout with return_to='/' so a purchase resumes onboarding", async () => {
+  it("starts embedded checkout with return_to='/' so a purchase resumes onboarding", async () => {
     vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS });
     vi.mocked(api.startBillingCheckout).mockResolvedValue({
       ok: true,
-      checkout_url: "https://checkout.stripe.com/pay/cs_test_onboarding",
+      client_secret: "cs_test_onboarding_embedded",
     });
-    const location = { href: "" };
-    Object.defineProperty(window, "location", { value: location, writable: true, configurable: true });
     render(<OnboardingPaywall onSkip={vi.fn()} />);
 
     await screen.findByText("$9.99");
     fireEvent.click(screen.getAllByRole("button", { name: "Subscribe" })[0]);
 
-    await waitFor(() => expect(location.href).toBe("https://checkout.stripe.com/pay/cs_test_onboarding"));
-    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly", "/");
+    expect(await screen.findByLabelText("Close checkout")).toBeInTheDocument();
+    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly", "/", "embedded");
   });
 
   it("shows an error instead of plans when they fail to load", async () => {

@@ -69,18 +69,20 @@ describe("PremiumContent", () => {
     expect(screen.getByText("$99.99")).toBeInTheDocument();
   });
 
-  it("redirects to the real checkout URL after Subscribe", async () => {
-    const location = setWindowLocation();
+  // Zach, 2026-10-19: "We need to try to embed stripe so theres not a
+  // million redirectes" — Subscribe now opens Stripe's embedded Checkout
+  // in place instead of redirecting the whole browser away.
+  it("opens the embedded checkout modal after Subscribe, requesting embedded ui_mode", async () => {
     vi.mocked(api.startBillingCheckout).mockResolvedValue({
       ok: true,
-      checkout_url: "https://checkout.stripe.com/pay/cs_test_123",
+      client_secret: "cs_test_embedded_123",
     });
     render(<PremiumContent entitlement="free" plans={PLANS} />);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Subscribe" })[0]);
 
-    await waitFor(() => expect(location.href).toBe("https://checkout.stripe.com/pay/cs_test_123"));
-    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly", undefined);
+    expect(await screen.findByLabelText("Close checkout")).toBeInTheDocument();
+    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly", undefined, "embedded");
   });
 
   it("shows an error instead of redirecting when checkout fails to start", async () => {

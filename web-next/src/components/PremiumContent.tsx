@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { api, type BillingPlan } from "@/lib/api";
+import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
 import { FeatureIncludedGlyph, PlanTierGlyph } from "@/components/PremiumGlyph";
 
 const TIER_LABELS: Record<BillingPlan["tier"], string> = {
@@ -13,16 +14,26 @@ const TIER_LABELS: Record<BillingPlan["tier"], string> = {
 export function PlanCard({ plan, returnTo }: { plan: BillingPlan; returnTo?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
+  // Zach, 2026-10-19: "We need to try to embed stripe so theres not a
+  // million redirectes" — mounts Stripe's own Checkout UI in place
+  // (EmbeddedCheckoutModal) instead of leaving the app for
+  // checkout.stripe.com. Stripe itself still navigates the page to
+  // return_url once payment completes (same destination `returnTo`
+  // already pointed the old hosted flow at) -- that's the one
+  // unavoidable navigation, not a redirect away and back.
   const subscribe = async () => {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.startBillingCheckout(plan.tier, plan.interval, returnTo);
-      window.location.href = result.checkout_url;
+      const result = await api.startBillingCheckout(plan.tier, plan.interval, returnTo, "embedded");
+      if (!result.client_secret) throw new Error("Could not start checkout.");
+      setClientSecret(result.client_secret);
     } catch (err) {
-      setBusy(false);
       setError(err instanceof Error ? err.message : "Could not start checkout.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -77,6 +88,9 @@ export function PlanCard({ plan, returnTo }: { plan: BillingPlan; returnTo?: str
       >
         {busy ? "Starting checkout…" : "Subscribe"}
       </button>
+      {clientSecret ? (
+        <EmbeddedCheckoutModal clientSecret={clientSecret} onClose={() => setClientSecret(null)} />
+      ) : null}
     </div>
   );
 }

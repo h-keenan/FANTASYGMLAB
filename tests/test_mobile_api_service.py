@@ -670,6 +670,77 @@ def test_billing_checkout_returns_the_real_checkout_url(monkeypatch):
     assert "/premium?billing=cancel" in kwargs["cancel_url"]
 
 
+# Zach, 2026-10-19: "We need to try to embed stripe so theres not a
+# million redirectes"
+def test_billing_checkout_embedded_mode_returns_a_client_secret(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_session = SimpleNamespace(client_secret="cs_test_embedded_secret_123", url=None)
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("modules.stripe_billing.create_checkout_session", return_value=fake_session) as create_session,
+    ):
+        response = client.post(
+            "/v1/billing/checkout",
+            json={"tier": "pro", "interval": "monthly", "ui_mode": "embedded"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "client_secret": "cs_test_embedded_secret_123"}
+    kwargs = create_session.call_args.kwargs
+    assert kwargs["ui_mode"] == "embedded"
+    assert "/premium?billing=complete" in kwargs["return_url"]
+
+
+def test_billing_checkout_embedded_mode_fails_closed_without_a_client_secret(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_session = SimpleNamespace(client_secret=None, url=None)
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("modules.stripe_billing.create_checkout_session", return_value=fake_session),
+    ):
+        response = client.post(
+            "/v1/billing/checkout",
+            json={"tier": "pro", "interval": "monthly", "ui_mode": "embedded"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 502
+
+
+def test_billing_checkout_defaults_to_hosted_mode(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    fake_session = SimpleNamespace(url="https://checkout.stripe.com/pay/cs_test_hosted")
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch("modules.stripe_billing.create_checkout_session", return_value=fake_session) as create_session,
+    ):
+        response = client.post(
+            "/v1/billing/checkout",
+            json={"tier": "pro", "interval": "monthly"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "checkout_url": "https://checkout.stripe.com/pay/cs_test_hosted"}
+    assert create_session.call_args.kwargs["ui_mode"] == "hosted"
+
+
 def test_billing_checkout_honors_a_caller_supplied_return_path(monkeypatch):
     # The onboarding paywall sends return_to="/" so a successful checkout
     # resumes onboarding (connect Sleeper) instead of landing on /premium.
