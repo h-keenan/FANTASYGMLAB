@@ -34,17 +34,17 @@ describe("OnboardingPaywall", () => {
   });
 
   // Zach: "have one product here and call it Get Started For Free with a
-  // few bullets" — collapsed from 3 separate priced plan cards to one CTA
-  // (the annual plan, the better deal) with a handful of its real feature
-  // bullets and the price disclosed as fine print, not the headline.
-  it("renders one free-trial card for the annual plan with a few bullets", async () => {
+  // few bullets", then immediately after seeing it live: "have an annual
+  // button instead of showing the plan" — one button for the annual plan,
+  // price disclosed as fine print below it, no card or feature list.
+  it("renders a single Get Started For Free button for the annual plan, no card or bullets", async () => {
     vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS, stripe_publishable_key: "pk_test_123" });
     render(<OnboardingPaywall onSkip={vi.fn()} />);
 
     expect(await screen.findByRole("button", { name: "Get Started For Free" })).toBeInTheDocument();
     expect(screen.getByText(/Then \$59\.99 per year/)).toBeInTheDocument();
     expect(screen.queryByText("$9.99")).not.toBeInTheDocument();
-    expect(screen.getAllByText(/^(Full League Pulse|Every Trade Hub idea|GM Targets watchlist up to 50 players|Portfolio across every league)$/).length).toBe(4);
+    expect(screen.queryByText("Full League Pulse")).not.toBeInTheDocument();
   });
 
   it("calls onSkip when 'Skip for now' is clicked", async () => {

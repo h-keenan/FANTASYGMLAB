@@ -4,21 +4,17 @@ import { useEffect, useState } from "react";
 
 import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
 import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
-import { FeatureIncludedGlyph } from "@/components/PremiumGlyph";
 
 // Zach: "have one product here and call it Get Started For Free with a few
-// bullets" — this screen used to show both Pro plans (Monthly + Annual)
-// side by side as separate priced cards, which buried the actual offer
-// (a real 7-day FREE trial) under two dollar amounts on the one screen
-// most responsible for a new visitor actually starting it. One CTA, the
-// annual plan (the better deal for a visitor who doesn't yet have a
-// reason to prefer month-to-month), bullets pulled straight from the
-// plan's own real feature list rather than new invented copy — just
-// fewer of them. The monthly-vs-annual choice still exists on /premium
-// for anyone who wants it later.
-const BULLET_COUNT = 4;
-
-function FreeTrialCard({ plan, publishableKey }: { plan: BillingPlan; publishableKey: string }) {
+// bullets" (first pass: one CTA, the annual plan, with a handful of its
+// real feature bullets in a card), then immediately after seeing it live:
+// "have an annual button instead of showing the plan" — dropped the card/
+// bullets entirely, down to a single button. Price/terms stay disclosed as
+// fine print below the button (can't start a real paid trial without
+// saying what it costs after), just no card chrome or feature list. The
+// monthly-vs-annual choice still exists on /premium for anyone who wants
+// it later.
+function FreeTrialButton({ plan, publishableKey }: { plan: BillingPlan; publishableKey: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -38,17 +34,7 @@ function FreeTrialCard({ plan, publishableKey }: { plan: BillingPlan; publishabl
   };
 
   return (
-    <div className="p-4 flex flex-col gap-2" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-premium)" }}>
-      <ul className="flex flex-col gap-1.5">
-        {plan.features.slice(0, BULLET_COUNT).map((feature) => (
-          <li key={feature} className="text-sm flex items-start gap-2" style={{ color: "var(--color-text-secondary)" }}>
-            <span style={{ color: "var(--color-success)", marginTop: "0.1rem", flexShrink: 0 }}>
-              <FeatureIncludedGlyph />
-            </span>
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
+    <div className="flex flex-col gap-2">
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
           {error}
@@ -126,7 +112,7 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
           Loading plans…
         </p>
       ) : (
-        <FreeTrialCard plan={annualPlan} publishableKey={plans?.stripe_publishable_key ?? ""} />
+        <FreeTrialButton plan={annualPlan} publishableKey={plans?.stripe_publishable_key ?? ""} />
       )}
 
       <button
