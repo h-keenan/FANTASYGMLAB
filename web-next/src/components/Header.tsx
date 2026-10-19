@@ -296,6 +296,15 @@ export function Header() {
                   maxWidth: "calc(100vw - 2rem)",
                 }}
               >
+                <Link
+                  href="/methodology"
+                  role="menuitem"
+                  onClick={() => setMenuOpen(false)}
+                  className="px-3 py-2 text-xs font-semibold"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  How We Evaluate
+                </Link>
                 {LEGAL_LINKS.map((item) => (
                   <Link
                     key={item.pageKey}
