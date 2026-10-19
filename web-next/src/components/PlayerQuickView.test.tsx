@@ -314,4 +314,24 @@ describe("PlayerQuickView", () => {
     const link = screen.getByText("Compare this player");
     expect(link.closest("a")).toHaveAttribute("href", "/player-compare/league-1?a=p1&name=My%20League");
   });
+
+  // coridian_, 2026-10-19: "the pqv on the app has tabs that the site
+  // doesnt. Thats a consistency error" — the actual product fix: a real
+  // link from this condensed modal to the full Player Profile page (mobile's
+  // Stats/Trends/Schedule/Career/Model tabs), gated the same way the
+  // Compare link already is (both need a league context to deep-link into).
+  it("renders an Open Full Profile link only when leagueId is provided", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+    vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+
+    const { rerender } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    expect(screen.queryByText("Open Full Profile")).not.toBeInTheDocument();
+
+    rerender(
+      <PlayerQuickView identity={identity({ leagueId: "league-1", leagueName: "My League" })} onClose={vi.fn()} />,
+    );
+    const link = screen.getByText("Open Full Profile");
+    expect(link.closest("a")).toHaveAttribute("href", "/players/league-1/p1?name=My%20League");
+  });
 });

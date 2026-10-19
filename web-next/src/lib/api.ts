@@ -1336,6 +1336,79 @@ export interface PlayerAwardsResponse {
   reason: "" | "not_found";
 }
 
+/** GET /v1/players/{id}/career — the real multi-season resume, powering the
+ * Player Profile page's Career tab (the "PQV parity gap" — see
+ * docs/roadmap.md and PlayerQuickView.tsx's own header doc comment).
+ * Mirrors mobile's CareerKeyStat/CareerSeason/CareerResponse
+ * (mobile/src/lib/api.ts) byte-for-byte; same endpoint, same
+ * services/mobile_api_service.py response. Unlike GET .../quick-view's
+ * `stats.seasons` (always a single-current-season tuple by design — see
+ * QuickViewStats's own docstring), this returns every season on file. */
+export interface CareerKeyStat {
+  label: string;
+  value: string;
+}
+
+export interface CareerSeason {
+  season: number;
+  age: number | null;
+  games: number | null;
+  current_season: boolean;
+  key_stats: CareerKeyStat[];
+}
+
+export interface CareerResponse {
+  ok: true;
+  seasons: CareerSeason[];
+}
+
+/** GET /v1/players/{id}/schedule — the season's real game-by-game schedule
+ * (opponent, market lines, final scores once played, and a per-week
+ * projection for games not yet played), powering the Player Profile page's
+ * Schedule tab. Mirrors mobile's PlayerWeekProjection/ScheduleWeek/
+ * ScheduleResponse (mobile/src/lib/api.ts) byte-for-byte; same endpoint,
+ * same services/mobile_api_service.py response. `opponent_defense_tier` is
+ * real points-allowed data (modules.nfl_schedule.team_defense_strength),
+ * never a per-player grade — display only, never used to adjust this
+ * player's own value or rankings. */
+export interface PlayerWeekProjection {
+  status:
+    | "ok"
+    | "bye_week"
+    | "no_opponent"
+    | "no_schedule_data"
+    | "insufficient_player_data"
+    | "unsupported_position"
+    | "unknown_player"
+    | "no_team";
+  point_estimate: number | null;
+  low: number | null;
+  high: number | null;
+  confidence: "low" | "medium" | "high" | null;
+  opponent: string | null;
+}
+
+export interface ScheduleWeek {
+  week: number;
+  opponent: string | null;
+  is_home: boolean | null;
+  spread_line: number | null;
+  total_line: number | null;
+  played: boolean;
+  team_score: number | null;
+  opponent_score: number | null;
+  bye: boolean;
+  opponent_defense_tier: "tough" | "average" | "weak" | null;
+  projection: PlayerWeekProjection | null;
+}
+
+export interface ScheduleResponse {
+  ok: true;
+  team: string | null;
+  season?: number;
+  weeks: ScheduleWeek[];
+}
+
 /**
  * League Recaps / History (Revision 13) — mirrors mobile's RecapStory/
  * WeeklyRecap/RecapResponse types (mobile/src/lib/api.ts) exactly; both
@@ -2408,6 +2481,21 @@ export const api = {
     authorizedRequest<WeeklyStatsResponse>(
       `/v1/players/${encodeURIComponent(playerId)}/weekly-stats${season ? `?season=${season}` : ""}`,
     ),
+
+  // Player Profile's Career tab (the "PQV parity gap" — PlayerQuickView.tsx's
+  // own header doc comment flags mobile's PlayerDetailScreen tabs as never
+  // ported). Same verified multi-season endpoint mobile's PlayerDetailScreen
+  // already calls (getPlayerCareer -> GET .../career), league-independent,
+  // same pattern as getPlayerAwards above.
+  getPlayerCareer: (playerId: string) =>
+    authorizedRequest<CareerResponse>(`/v1/players/${encodeURIComponent(playerId)}/career`),
+
+  // Player Profile's Schedule tab — same endpoint mobile's
+  // PlayerDetailScreen already calls (getPlayerSchedule -> GET
+  // .../schedule), league-independent, same pattern as getPlayerAwards
+  // above.
+  getPlayerSchedule: (playerId: string) =>
+    authorizedRequest<ScheduleResponse>(`/v1/players/${encodeURIComponent(playerId)}/schedule`),
 
   // League Recaps / History (Revision 13) — Recaps tab shares mobile's
   // RecapScreen endpoint exactly (see RecapResponse's docstring); History
