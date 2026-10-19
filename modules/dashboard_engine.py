@@ -32,7 +32,6 @@ aren't replicated here.
 
 from __future__ import annotations
 
-import time
 from functools import partial
 from typing import Any, Mapping
 
@@ -736,12 +735,21 @@ LEAGUE_SUMMARY_SKIP_REASONS = frozenset(
 # build_league_summary's own calls, fixes the actual reported
 # Portfolio/Dashboard symptom the same narrow way
 # build_valued_players_frame_cached already fixed its own reported caller.
+#
+# Keyed on a plain (namespace, league_id) pair with Redis's own TTL expiry
+# -- the same shape _fetch_team_stance/_fetch_gm_target_player_ids/
+# _fetch_profile_fields already use -- NOT a `time.time() // TTL` bucket
+# component in the key the way league_rankings'/league_value_settings'
+# frame caches do. A real CI run surfaced exactly why that matters here:
+# this function makes FOUR of these calls in sequence within one request,
+# each independently computing "the current bucket" a few milliseconds
+# apart; if a bucket boundary happened to fall between two of those calls
+# (plausible under real scheduling jitter, not just a test artifact), the
+# later calls would key themselves into a brand-new, still-empty bucket
+# and silently lose the cache-sharing benefit for the rest of that single
+# request. A stable key + Redis TTL has no such boundary to straddle.
 _LEAGUE_SUMMARY_SLEEPER_TTL_SECONDS = 30
 _LEAGUE_SUMMARY_SLEEPER_LOCK_TIMEOUT_SECONDS = 6.0
-
-
-def _league_summary_sleeper_cache_bucket() -> int:
-    return int(time.time() // _LEAGUE_SUMMARY_SLEEPER_TTL_SECONDS)
 
 
 def _resolve_sleeper_user_id_for_league_summary(sleeper_username: str) -> str | None:
@@ -764,8 +772,7 @@ def _get_league_for_league_summary(league_id: str) -> dict[str, Any]:
     """Cross-worker-shared wrapper around sleeper.get_league for
     build_league_summary's own call -- see the module comment above."""
 
-    bucket = _league_summary_sleeper_cache_bucket()
-    cache_key = redis_cache.build_cache_key("league_summary_league", league_id, bucket)
+    cache_key = redis_cache.build_cache_key("league_summary_league", league_id)
     try:
         return redis_cache.redis_single_flight_cache(
             cache_key=cache_key,
@@ -781,8 +788,7 @@ def _get_rosters_for_league_summary(league_id: str) -> list[dict[str, Any]]:
     """Cross-worker-shared wrapper around sleeper.get_rosters for
     build_league_summary's own call -- see the module comment above."""
 
-    bucket = _league_summary_sleeper_cache_bucket()
-    cache_key = redis_cache.build_cache_key("league_summary_rosters", league_id, bucket)
+    cache_key = redis_cache.build_cache_key("league_summary_rosters", league_id)
     try:
         return redis_cache.redis_single_flight_cache(
             cache_key=cache_key,
@@ -803,8 +809,7 @@ def _get_league_roster_profiles_for_league_summary(league_id: str) -> dict[str, 
     build_league_summary needs that has no other cross-worker-shared call
     site in this function."""
 
-    bucket = _league_summary_sleeper_cache_bucket()
-    cache_key = redis_cache.build_cache_key("league_summary_roster_profiles", league_id, bucket)
+    cache_key = redis_cache.build_cache_key("league_summary_roster_profiles", league_id)
     try:
         return redis_cache.redis_single_flight_cache(
             cache_key=cache_key,
