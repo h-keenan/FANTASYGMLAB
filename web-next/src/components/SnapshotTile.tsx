@@ -53,11 +53,8 @@ export function SnapshotTile({
 
   return (
     <div
-      className="flex flex-col gap-1 p-3 min-w-[7rem]"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: `var(--border-width-default) solid ${tone === "premium" ? "var(--color-premium)" : "var(--color-border)"}`,
-      }}
+      className="glass-surface flex flex-col gap-1 p-3 min-w-[7rem]"
+      style={tone === "premium" ? { borderColor: "var(--color-premium)" } : undefined}
     >
       <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
         {glyph ? (

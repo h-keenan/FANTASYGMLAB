@@ -132,19 +132,20 @@
   --size-roster-core-portrait: 5.5rem;
   --size-roster-core-portrait-lg: 6rem;
 
-  /* Geometry: intentionally square/sharp, not rounded. The named scale
-     (square/sm/md/lg/control/panel) collapsed to the same value (0) when
-     this app adopted a flat, cornerless identity — rather than restate "0"
-     six more times, every name aliases the one canonical --radius-none, so
-     a future deliberate divergence only has to change one literal instead
-     of grepping for which zeros still need to match. */
+  /* Geometry: Zach + coridian_, 2026-10-19 (mockup approved): moved off the
+     flat/cornerless identity toward a softer "liquid glass" look — rounded
+     surfaces instead of sharp corners, consistent with the matching change
+     on mobile's radii in theme.ts. --radius-none stays defined (0) since a
+     few genuinely-square elements still reference it directly (position
+     badges, table cells) — only the named scale that used to alias it moved
+     to real values. */
   --radius-none: 0;
   --radius-square: var(--radius-none);
-  --radius-sm: var(--radius-none);
-  --radius-md: var(--radius-none);
-  --radius-lg: var(--radius-none);
-  --radius-control: var(--radius-none);
-  --radius-panel: var(--radius-none);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-control: 14px;
+  --radius-panel: 20px;
   /* Brand-continuity audit, 2026-10-17: this was 2px — barely rounds a
      corner, not a real capsule — while mobile's radii.pill is a true 999px
      pill for exactly this token's purpose (position/tier chips). Fixed to
@@ -332,6 +333,38 @@ body {
   height: 100%;
 }
 
+/* Zach + coridian_, 2026-10-19 (mockup approved): the shared "liquid
+   glass" surface treatment — rounded corners, layered blur, a soft inset
+   top highlight that reads as a catch-light on glass, replacing the old
+   flat/cornerless card look. One class so every surface migrated to it
+   stays visually identical and themeable from one place, instead of each
+   component hand-rolling its own blur/border/shadow combination (which is
+   exactly how the old redesign drifted out of sync across 89 component
+   files in the first place). Component padding/gap/content stay with the
+   component; this only owns the surface itself. Light mode gets a lighter
+   glass tint — the dark-tuned rgba values read as mud on a pale
+   background. */
+.glass-surface {
+  background: linear-gradient(165deg, rgba(50, 54, 60, 0.55), rgba(24, 26, 30, 0.78));
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 0 40px rgba(255, 255, 255, 0.03),
+    0 20px 40px rgba(0, 0, 0, 0.35);
+}
+@media (prefers-color-scheme: light) {
+  .glass-surface {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.75), rgba(245, 249, 251, 0.6));
+    border-color: rgba(10, 30, 45, 0.1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      0 20px 40px rgba(10, 30, 45, 0.08);
+  }
+}
+
 /* coridian_, 2026-10-17: "desktop scaling is still too small and hard to
    read." Every --font-size, --type, and --space token is rem-based
    (relative to html's root size, not body's), so this is the one place
@@ -489,12 +522,19 @@ body {
   background: rgba(31, 34, 38, 0.72);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  /* Liquid-glass pass, 2026-10-19: rounded top corners only — this is a
+     bottom sheet flush with the screen edge, not a floating card, so the
+     generic .glass-surface class (which rounds every corner) doesn't fit
+     here; same radius scale, applied manually. */
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 @media (prefers-color-scheme: light) {
   .gm-orb-sheet {
     background: rgba(255, 255, 255, 0.72);
-    border-top: 1px solid rgba(16, 24, 32, 0.08);
+    border-top: 1px solid rgba(16, 24, 32, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
 }
 .gm-orb-sheet-field,
@@ -877,10 +917,29 @@ a {
   position: relative;
   overflow: hidden;
   width: min(640px, 100%);
-  background: var(--color-surface-raised);
-  border: var(--border-width-default) solid var(--color-border);
+  /* Liquid-glass pass, 2026-10-19: same layered glass treatment as
+     .glass-surface (border-radius already came from --radius-panel, so
+     that part was already covered by the token change), applied directly
+     rather than via the class since this element also needs overflow:
+     hidden for the field/sweep layers below, which the shared class
+     doesn't assume. */
+  background: linear-gradient(165deg, rgba(50, 54, 60, 0.55), rgba(24, 26, 30, 0.78));
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-overlay);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    var(--shadow-overlay);
+}
+@media (prefers-color-scheme: light) {
+  .pqv-modal {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.85), rgba(245, 249, 251, 0.7));
+    border-color: rgba(10, 30, 45, 0.1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      var(--shadow-overlay);
+  }
 }
 /* coridian_, 2026-10-18: "Also need that moving background behind the
    pqv" — same field/sweep texture as the GM orb sheet, contained to this

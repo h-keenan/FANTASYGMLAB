@@ -36,14 +36,7 @@ export function GamePlanCard({
 }) {
   const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination];
   return (
-    <article
-      className="flex flex-col gap-2 p-4"
-      style={{
-        background: "var(--color-surface-secondary)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        boxShadow: "var(--shadow-card)",
-      }}
-    >
+    <article className="glass-surface flex flex-col gap-2 p-4">
       <span
         className="uppercase"
         style={{
