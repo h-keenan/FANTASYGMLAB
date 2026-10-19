@@ -86,7 +86,15 @@ export function GmOrb() {
         // closer to the true bottom edge.
         className="fixed bottom-3 left-1/2 flex items-center justify-center md:hidden"
         style={{
-          transform: "translateX(-50%)",
+          // coridian_: "GM orb bug when scrolling to the bottom of the
+          // screen. It does eventually go back to the bottom when you
+          // scroll back up." — the classic iOS Safari glitch where a
+          // `position: fixed` element drifts away from the visual viewport
+          // mid-scroll (tied to the URL bar collapsing) because the browser
+          // never promoted it to its own compositor layer. translate3d
+          // forces that layer the same way translateX already did visually,
+          // which is the standard fix for this exact symptom.
+          transform: "translate3d(-50%, 0, 0)",
           width: "3.25rem",
           height: "3.25rem",
           borderRadius: "50%",
@@ -94,6 +102,7 @@ export function GmOrb() {
           border: "1.5px solid var(--color-accent)",
           boxShadow: "var(--shadow-card)",
           zIndex: 40,
+          willChange: "transform",
         }}
       >
         {/* The actual brand mark, not a plain "GM" text label — mobile's own
