@@ -58,6 +58,9 @@ function answerResponse(overrides: Partial<GuessThePlayerAnswerResponse> = {}): 
 beforeEach(() => {
   vi.mocked(api.getGuessThePlayer).mockReset();
   vi.mocked(api.answerGuessThePlayer).mockReset();
+  // The dismiss-persistence fix writes a real key to window.localStorage,
+  // which otherwise survives across tests in this same file/worker.
+  window.localStorage.clear();
 });
 
 describe("GuessThePlayerCard", () => {
@@ -144,6 +147,40 @@ describe("GuessThePlayerCard", () => {
     fireEvent.click(screen.getByLabelText("Dismiss Guess the Player"));
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  // coridian_, 2026-10-19: "if you exit that module out, it shouldn't pop
+  // back up" -- real bug. Dismiss used to be plain useState, scoped to
+  // "this page view" only, so a fresh mount (navigating away and back to
+  // Dashboard) reset it and the card reappeared immediately. A real
+  // remount is the actual repro -- re-rendering the SAME mounted instance
+  // would never have caught this.
+  it("stays dismissed across a fresh remount for the same day's pick", async () => {
+    vi.mocked(api.getGuessThePlayer).mockResolvedValue(promptResponse());
+    const first = render(<GuessThePlayerCard />);
+    await screen.findByText("Whose stats are these?");
+    fireEvent.click(screen.getByLabelText("Dismiss Guess the Player"));
+    expect(first.container).toBeEmptyDOMElement();
+    first.unmount();
+
+    vi.mocked(api.getGuessThePlayer).mockResolvedValue(promptResponse());
+    const second = render(<GuessThePlayerCard />);
+    await waitFor(() => expect(api.getGuessThePlayer).toHaveBeenCalledTimes(2));
+    expect(second.container).toBeEmptyDOMElement();
+  });
+
+  it("shows again for a NEW day's different pick_id despite a stale dismiss", async () => {
+    vi.mocked(api.getGuessThePlayer).mockResolvedValue(promptResponse());
+    const first = render(<GuessThePlayerCard />);
+    await screen.findByText("Whose stats are these?");
+    fireEvent.click(screen.getByLabelText("Dismiss Guess the Player"));
+    first.unmount();
+
+    const dayTwo = promptResponse();
+    dayTwo.prompt!.pick_id = "pick-2";
+    vi.mocked(api.getGuessThePlayer).mockResolvedValue(dayTwo);
+    render(<GuessThePlayerCard />);
+    await screen.findByText("Whose stats are these?");
   });
 
   it("disables options once answered so a second click cannot double-submit", async () => {
