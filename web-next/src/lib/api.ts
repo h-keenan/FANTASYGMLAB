@@ -1840,6 +1840,57 @@ export interface TradeOutcomeHistoryResponse {
   outcomes: PastTradeOutcome[];
 }
 
+/** Community Trade Feed (Social/community layer, docs/roadmap.md) — an
+ * anonymized "craziest trades this week" feed pulled across ALL users' real
+ * leagues, not just the current user's own. Mirrors
+ * services/mobile_api_service.py's GET /v1/community/trades /
+ * modules/community_trades.py's build_community_feed_items output exactly:
+ * never a user_id/league_id/partner_team_name field anywhere in this shape
+ * — see that module's docstring for why. production/value reuse
+ * TradeOutcomeResultSummary's own field shapes (same underlying
+ * modules.trade_outcome_results computation, zero new scoring), so this
+ * page can reuse tradeHistoryPresentation.ts's verdictDetailText/
+ * verdictToneColorVar/toTradeAssets helpers directly instead of
+ * duplicating them. */
+export interface CommunityTradeAsset {
+  name: string;
+  position: string;
+  player_id?: string;
+  value_score?: number | null;
+}
+
+export interface CommunityTradeItem {
+  id: string;
+  send: CommunityTradeAsset[];
+  receive: CommunityTradeAsset[];
+  verdict: "worked_out" | "didnt_pan_out";
+  verdict_label: string;
+  confidence: "high";
+  production: { net_points_ppr: number; avg_net_per_week: number; weeks_counted: number } | null;
+  value: { sent_delta_pct: number; received_delta_pct: number; net_delta_pct: number } | null;
+  occurred_at: string | null;
+  /** Emoji -> count. Only emoji present in reaction_emoji ever appear here. */
+  reactions: Record<string, number>;
+  /** Which of reaction_emoji the SIGNED-IN viewer has reacted with. */
+  my_reactions: string[];
+}
+
+export interface CommunityTradesResponse {
+  ok: boolean;
+  trades: CommunityTradeItem[];
+  /** The fixed reaction set to render as tappable buttons — emoji-only, no
+   * free text, deliberately so this feature needs no moderation layer. */
+  reaction_emoji: string[];
+}
+
+export interface CommunityPreferencesResponse {
+  ok: boolean;
+  /** "I don't want MY trades to appear in this feed." On by default
+   * (false) — see services/mobile_api_service.py's
+   * _community_preferences_from_settings. */
+  opted_out: boolean;
+}
+
 // College Scouting (Revision 20) — the shared, crowdsourced college prospect
 // catalog (modules/college_scouting.py / GET /v1/scouting/prospects). Every
 // signed-in user grades the same prospect pool; the pooled aggregate (never
@@ -2422,6 +2473,23 @@ export const api = {
   // League-independent like getPortfolio/getNews above: no leagueId param.
   getTradeOutcomeHistory: () =>
     authorizedRequest<TradeOutcomeHistoryResponse>("/v1/trade-outcomes/history"),
+
+  // Community Trade Feed (Social/community layer) — same GET
+  // /v1/community/trades every signed-in user reads (never scoped to one
+  // league or gated on Premium), plus the react/opt-out mutations.
+  getCommunityTrades: () => authorizedRequest<CommunityTradesResponse>("/v1/community/trades"),
+  reactToCommunityTrade: (outcomeId: string, emoji: string, action: "add" | "remove") =>
+    authorizedRequest<{ ok: boolean; reason: string }>(
+      `/v1/community/trades/${encodeURIComponent(outcomeId)}/react`,
+      { method: "POST", jsonBody: { emoji, action } },
+    ),
+  getCommunityPreferences: () =>
+    authorizedRequest<CommunityPreferencesResponse>("/v1/community/preferences"),
+  updateCommunityPreferences: (optedOut: boolean) =>
+    authorizedRequest<CommunityPreferencesResponse>("/v1/community/preferences", {
+      method: "POST",
+      jsonBody: { opted_out: optedOut },
+    }),
 
   // College Scouting (Revision 20) — league-independent like getPortfolio/
   // getNews/getTradeOutcomeHistory above: the shared prospect pool is the

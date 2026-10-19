@@ -130,6 +130,7 @@ _TABLE_SETUP_DOCS: dict[str, str] = {
     "trade_outcomes": "docs/supabase_trade_outcomes.sql",
     "push_tokens": "docs/supabase_push_tokens.sql",
     "guess_the_player_streaks": "docs/supabase_guess_the_player.sql",
+    "community_trade_reactions": "docs/supabase_community_trade_reactions.sql",
 }
 
 
@@ -554,6 +555,7 @@ EXPORTABLE_USER_TABLES = (
     "decision_memory_baselines",
     "notification_read_state",
     "guess_the_player_streaks",
+    "community_trade_reactions",
 )
 
 

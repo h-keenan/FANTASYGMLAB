@@ -565,7 +565,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
     table_response.json.return_value = [{"user_id": "user-123"}]
 
     # auth fetch, then one requests.get per table in _EXPORTABLE_USER_TABLES.
-    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 14):
+    with patch("requests.get", side_effect=[auth_user_response] + [table_response] * 15):
         response = client.get("/v1/me/export", headers={"Authorization": "Bearer good-token"})
 
     assert response.status_code == 200
@@ -587,6 +587,7 @@ def test_export_my_data_returns_every_table(monkeypatch):
         "decision_memory_baselines",
         "notification_read_state",
         "guess_the_player_streaks",
+        "community_trade_reactions",
     }
     assert body["tables"]["profiles"] == [{"user_id": "user-123"}]
 
@@ -10690,6 +10691,213 @@ def test_trade_outcome_history_fails_soft_when_table_unreachable(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "outcomes": []}
+
+
+def test_community_trades_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/community/trades").status_code == 401
+    assert (
+        client.post("/v1/community/trades/outcome-1/react", json={"emoji": "\U0001f525"}).status_code == 401
+    )
+
+
+def test_community_trades_returns_empty_feed_when_service_role_not_configured(monkeypatch):
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.get("/v1/community/trades", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["trades"] == []
+    assert len(body["reaction_emoji"]) == 5
+
+
+def test_community_trades_feed_is_anonymized_and_excludes_opted_out_users(monkeypatch):
+    client = _client(monkeypatch)
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "viewer-user", "email": "gm@example.com"}
+
+    def _trade_row(outcome_id: str, user_id: str) -> dict:
+        return {
+            "id": outcome_id,
+            "user_id": user_id,
+            "league_id": "league-abc",
+            "partner_team_name": "Real Team Name",
+            "trade_summary": {
+                "partner_team_name": "Real Team Name",
+                "send": [{"name": "Sender Guy", "position": "WR", "player_id": "100"}],
+                "receive": [{"name": "Receiver Guy", "position": "RB", "player_id": "200"}],
+            },
+            "outcome_recorded_at": "2026-09-01T00:00:00Z",
+            "shared_at": "2026-08-01T00:00:00Z",
+            "result_summary": {
+                "status": "ready",
+                "verdict": "worked_out",
+                "verdict_label": "This trade has worked out",
+                "confidence": "high",
+                "production": {"net_points_ppr": 30, "avg_net_per_week": 6.0, "weeks_counted": 5},
+                "value": {"sent_delta_pct": -4, "received_delta_pct": 16, "net_delta_pct": 20},
+            },
+            "result_computed_at": "2026-09-05T00:00:00Z",
+        }
+
+    trade_outcomes_response = Mock(status_code=200)
+    trade_outcomes_response.json.return_value = [
+        _trade_row("outcome-visible", "other-user"),
+        _trade_row("outcome-opted-out", "opted-out-user"),
+    ]
+    user_settings_response = Mock(status_code=200)
+    user_settings_response.json.return_value = [
+        {"user_id": "opted-out-user", "settings": {"community_trades_opt_out": True}},
+    ]
+    reactions_response = Mock(status_code=200)
+    reactions_response.json.return_value = [
+        {"outcome_id": "outcome-visible", "user_id": "viewer-user", "emoji": "\U0001f525"},
+    ]
+
+    with patch(
+        "requests.get",
+        side_effect=[auth_user_response, trade_outcomes_response, user_settings_response, reactions_response],
+    ):
+        response = client.get("/v1/community/trades", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    trade_ids = [trade["id"] for trade in body["trades"]]
+    assert trade_ids == ["outcome-visible"]
+
+    trade = body["trades"][0]
+    # Never leaked, regardless of what the raw trade_outcomes row carried:
+    serialized = str(trade)
+    assert "league-abc" not in serialized
+    assert "Real Team Name" not in serialized
+    assert "other-user" not in serialized
+    assert trade["send"][0]["name"] == "Sender Guy"
+    assert trade["reactions"] == {"\U0001f525": 1}
+    assert trade["my_reactions"] == ["\U0001f525"]
+
+
+def test_react_to_community_trade_rejects_unknown_emoji(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/community/trades/outcome-1/react",
+            json={"emoji": "not-a-real-emoji"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 422
+
+
+def test_react_to_community_trade_rejects_unknown_action(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with patch("requests.get", return_value=auth_user_response):
+        response = client.post(
+            "/v1/community/trades/outcome-1/react",
+            json={"emoji": "\U0001f525", "action": "explode"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 422
+
+
+def test_react_to_community_trade_add_posts_own_reaction_row(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    insert_response = Mock(status_code=201)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.post", return_value=insert_response) as mock_post:
+            response = client.post(
+                "/v1/community/trades/outcome-1/react",
+                json={"emoji": "\U0001f525", "action": "add"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    posted_body = mock_post.call_args.kwargs["json"]
+    assert posted_body == {"outcome_id": "outcome-1", "user_id": "user-123", "emoji": "\U0001f525"}
+
+
+def test_react_to_community_trade_remove_deletes_own_reaction_row(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    delete_response = Mock(status_code=204)
+
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("requests.delete", return_value=delete_response) as mock_delete:
+            response = client.post(
+                "/v1/community/trades/outcome-1/react",
+                json={"emoji": "\U0001f525", "action": "remove"},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "reason": ""}
+    deleted_url = mock_delete.call_args.args[0]
+    assert "user_id=eq.user-123" in deleted_url
+    assert "outcome_id=eq.outcome-1" in deleted_url
+
+
+def test_community_preferences_require_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/community/preferences").status_code == 401
+    assert client.post("/v1/community/preferences", json={"opted_out": True}).status_code == 401
+
+
+def test_get_community_preferences_defaults_to_opted_in(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = []
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        response = client.get("/v1/community/preferences", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "opted_out": False}
+
+
+def test_update_community_preferences_upserts_opt_out_flag(monkeypatch):
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    settings_response = Mock(status_code=200)
+    settings_response.json.return_value = [{"user_id": "user-123", "settings": {"push_categories": {"watch": False}}}]
+    upsert_response = Mock(status_code=200)
+
+    with patch("requests.get", side_effect=[auth_user_response, settings_response]):
+        with patch("requests.post", return_value=upsert_response) as mock_post:
+            response = client.post(
+                "/v1/community/preferences",
+                json={"opted_out": True},
+                headers={"Authorization": "Bearer good-token"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "opted_out": True}
+    upserted_settings = mock_post.call_args.kwargs["json"]["settings"]
+    assert upserted_settings["community_trades_opt_out"] is True
+    # Existing unrelated settings preserved, not clobbered:
+    assert upserted_settings["push_categories"] == {"watch": False}
 
 
 def test_save_league_requires_auth(monkeypatch):
