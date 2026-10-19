@@ -12,6 +12,10 @@ import {
 } from "@/lib/api";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
+import {
+  getDismissedGuessThePlayerPickId,
+  setDismissedGuessThePlayerPickId,
+} from "@/lib/guessThePlayerDismissed";
 
 /**
  * Dashboard mini-game (coridian_, 2026-10-19, confirmed spec via Discord):
@@ -24,12 +28,12 @@ import { PositionBadge } from "@/components/PositionBadge";
  * league-independent (one shared daily pick for every signed-in user), so
  * it doesn't belong on the per-league dashboard payload.
  *
- * "Dismissible" is a plain local close (X) — this card has no existing
- * persisted-dismiss precedent anywhere else in web-next to copy (Mobile
- * Alerts' read-state table is the closest thing, and that is deliberately
- * reused here for the STREAK, not for hiding the card); closing it just
- * hides it for this page view, the simplest reading of "dismissible" that
- * doesn't invent new persisted state nobody asked for.
+ * "Dismissible" persists via lib/guessThePlayerDismissed.ts (coridian_,
+ * 2026-10-19: "if you exit that module out, it shouldn't pop back up" — a
+ * plain page-view-scoped useState used to reset on every fresh mount,
+ * reappearing the moment someone navigated away and back). Same
+ * pick_id-keyed localStorage shape mobile's own dismiss already uses, so a
+ * new day's pick is never suppressed by a stale dismiss.
  */
 
 type RevealState = {
@@ -46,7 +50,7 @@ function streakCaption(streak: { current_streak: number; best_streak: number }):
 
 export function GuessThePlayerCard() {
   const [data, setData] = useState<GuessThePlayerResponse | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissedPickId, setDismissedPickId] = useState<string | null>(() => getDismissedGuessThePlayerPickId());
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reveal, setReveal] = useState<RevealState | null>(null);
@@ -74,8 +78,20 @@ export function GuessThePlayerCard() {
     };
   }, []);
 
-  if (dismissed || !data || !data.available || !data.prompt) return null;
+  if (
+    !data ||
+    !data.available ||
+    !data.prompt ||
+    (dismissedPickId && dismissedPickId === data.prompt.pick_id)
+  ) {
+    return null;
+  }
   const prompt = data.prompt;
+
+  function dismiss() {
+    setDismissedPickId(prompt.pick_id);
+    setDismissedGuessThePlayerPickId(prompt.pick_id);
+  }
 
   async function handleGuess(option: GuessThePlayerOption) {
     if (reveal || submitting || !prompt) return;
@@ -123,7 +139,7 @@ export function GuessThePlayerCard() {
         <button
           type="button"
           aria-label="Dismiss Guess the Player"
-          onClick={() => setDismissed(true)}
+          onClick={dismiss}
           className="shrink-0 text-sm"
           style={{ color: "var(--color-text-muted)" }}
         >
