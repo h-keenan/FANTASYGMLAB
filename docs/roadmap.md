@@ -8,6 +8,17 @@ this gets added to over time as ideas come up.
 
 ## Open initiatives
 
+### Web: full player-profile page (PQV parity gap)
+coridian_, 2026-10-19: "the pqv on the app has tabs that the site doesn't.
+That's a consistency error." Confirmed real, and not an accidental gap —
+web-next's `PlayerQuickView.tsx` modal was deliberately scoped as a
+condensed "quick look" (identity, value/rank, health/usage, season stats,
+Model chips, awards, bio), with a documented intent at build time for a
+separate, bigger "Open Profile" destination carrying what the modal
+doesn't: career season-by-season history, news, schedule — matching
+mobile's `PlayerDetailScreen.tsx` tabs (stats/trends/schedule/career/
+model). That full page was never built. Queued (coridian_: "Queue it").
+
 ### Live Draft: needs real testing
 Completely untested end-to-end. Not urgent right now (mid-season, nobody's
 drafting), but must be verified before the next real draft window opens.
