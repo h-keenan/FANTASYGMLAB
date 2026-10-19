@@ -170,9 +170,17 @@ function PriorityAddCompactRow({ player, showDivider }: { player: WaiverPriority
         ) : null}
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-base font-extrabold" style={{ color: "var(--color-accent)" }}>
-          {formatWaiverScore(player.score)}
-        </span>
+        {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
+            should say in small print value above it" — the top Priority
+            Add card already had this caption; these compact rows didn't. */}
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+            Value
+          </span>
+          <span className="text-base font-extrabold" style={{ color: "var(--color-accent)" }}>
+            {formatWaiverScore(player.score)}
+          </span>
+        </div>
         <RecommendationPill label={player.recommendation_label} tone={player.recommendation_tone} />
       </div>
       <FaabRange player={player} />
@@ -191,9 +199,14 @@ function FreeAgentRow({ player }: { player: WaiverPlayer }) {
     >
       <WaiverIdentity player={player} />
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-          {formatWaiverScore(player.score)}
-        </span>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+            Value
+          </span>
+          <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
+            {formatWaiverScore(player.score)}
+          </span>
+        </div>
         <OvrGauge rating={player.overall_rating} size="sm" />
         {player.position_rank ? (
           <span
@@ -223,10 +236,15 @@ function BestAvailableTile({ position, player, count }: { position: string; play
         <span className="text-sm font-extrabold truncate max-w-full" style={{ color: "var(--color-text-primary)" }}>
           {player.name || "Unknown"}
         </span>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-            {formatWaiverScore(player.score)}
-          </span>
+        <div className="flex flex-col items-center gap-0.5">
+          <div className="flex items-center gap-1">
+            <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+              Value
+            </span>
+            <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+              {formatWaiverScore(player.score)}
+            </span>
+          </div>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {count} active
           </span>

@@ -106,9 +106,17 @@ function PlayerRow({ player, leagueId, leagueName }: { player: RankedPlayer; lea
         </div>
       </PlayerIdentityTrigger>
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
-          {formatWaiverScore(player.score)}
-        </span>
+        {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
+            should say in small print value above it so its not glaring
+            but its there in case someone gets confused" */}
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+            Value
+          </span>
+          <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>
+            {formatWaiverScore(player.score)}
+          </span>
+        </div>
         <OvrGauge rating={player.overall_rating ?? null} size="sm" />
         {player.position && player.position_rank ? (
           <span
