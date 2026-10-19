@@ -196,6 +196,7 @@ PLAYABLE_OR_INJURED_STATUSES = {
     "nfi",
     "physically unable to perform",
     "non-football injury",
+    "non football injury",
     "practice squad",
 }
 INJURY_STATUSES = {
@@ -208,6 +209,7 @@ INJURY_STATUSES = {
     "nfi",
     "physically unable to perform",
     "non-football injury",
+    "non football injury",
 }
 
 
@@ -2327,6 +2329,7 @@ def _injury_level_cached(status: str, injury_status: str) -> str:
         "nfi",
         "physically unable to perform",
         "non-football injury",
+        "non football injury",
         "season-ending",
         "season ending",
         "out for season",
@@ -5001,6 +5004,7 @@ def is_probably_stale_free_agent(row) -> bool:
         "nfi",
         "physically unable to perform",
         "non-football injury",
+        "non football injury",
         "practice squad",
     }:
         return True

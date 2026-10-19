@@ -56,6 +56,12 @@ NFL_NON_ACTIONABLE_STATUSES = frozenset(
         "nfi",
         "physically unable to perform",
         "non-football injury",
+        # Sleeper's real raw feed sends "Non Football Injury" (a space, not
+        # a hyphen) — confirmed against data/sleeper_players.json. The
+        # hyphenated form above never actually matches real data; kept
+        # alongside it defensively in case a different feed source ever
+        # does send the hyphenated spelling.
+        "non football injury",
     }
 )
 _NFL_NON_ACTIONABLE_STATUSES = NFL_NON_ACTIONABLE_STATUSES  # internal alias, kept for this module's own readability
