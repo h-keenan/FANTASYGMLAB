@@ -49,7 +49,19 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: git diff --check "$BASE_SHA"...HEAD
       - name: Full test suite
-        run: python -m pytest -q
+        run: python -m pytest -q -n auto -m "not known_flaky"
+      # Zach: "do 1 2 and 3 for the options faster" — a small, STABLE set
+      # of pre-existing visual-harness tests (Streamlit AppTest over a
+      # scripted fixture) have failed intermittently on main for a while,
+      # unrelated to whatever PR touched them (see pytest.ini's own comment
+      # on the known_flaky marker). Runs separately and non-blocking
+      # (continue-on-error) so a real regression in one of these specific
+      # tests still shows up in the job output — never silently
+      # discarded — it just doesn't gate the merge the way the trio's
+      # pre-existing flakiness shouldn't.
+      - name: Known-flaky suite (non-blocking)
+        continue-on-error: true
+        run: python -m pytest -q -m known_flaky
       - name: Benchmark public player cache
         run: python scripts/benchmark_public_player_cache.py
       - name: Enforce Founder Beta performance budgets

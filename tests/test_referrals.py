@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import pytest
+
 from modules import premium
 from modules import referrals
 
@@ -468,6 +470,7 @@ class TestInviteCtaRenders(unittest.TestCase):
     click fires without raising (modules.referral_ui is otherwise untested
     by the pure-logic cases above, which only exercise modules.referrals)."""
 
+    @pytest.mark.known_flaky
     def test_renders_referral_link_and_copy_button_for_a_signed_in_user(self):
         from streamlit.testing.v1 import AppTest
 

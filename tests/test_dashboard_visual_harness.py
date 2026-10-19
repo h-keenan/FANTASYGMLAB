@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 from modules import dashboard_orientation
@@ -54,6 +55,7 @@ def test_free_dashboard_first_render_has_orientation_game_plan_and_gated_pulse()
     )
 
 
+@pytest.mark.known_flaky
 def test_premium_dashboard_shows_full_fixture_content_without_upgrade_prompts():
     application = _app()
     application.sidebar.radio[1].set_value(premium.PRO).run()

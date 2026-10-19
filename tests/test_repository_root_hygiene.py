@@ -22,6 +22,7 @@ ALLOWED_ROOT_FILES = {
     "docker-compose.yml",
     "favicon.ico",
     "favicon.png",
+    "pytest.ini",
     "render.yaml",
     "requirements-dev.txt",
     "requirements.txt",
