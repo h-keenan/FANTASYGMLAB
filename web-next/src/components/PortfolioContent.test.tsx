@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PortfolioContent } from "./PortfolioContent";
@@ -174,6 +174,60 @@ describe("PortfolioContent", () => {
     // defaults) should render through BriefingItemPlayers as an identity
     // chip, not just appear inside the headline/reason prose.
     expect(screen.getAllByText("Test Player").length).toBeGreaterThan(0);
+  });
+
+  // coridian_, 2026-10-19, screenshot: "the player card location looks
+  // really awkward with it being under the related text" -- for a signal
+  // naming exactly one player, the compact player card must now sit in the
+  // SAME row as the category pill (not stacked below the headline/reason
+  // text underneath).
+  it("places a single player's compact card beside the category pill, not below the text", () => {
+    render(<PortfolioContent data={BASE_RESPONSE} />);
+
+    const badge = screen.getByText("Top Priority");
+    const badgeRow = badge.parentElement as HTMLElement;
+    // The default top_item (briefingItem({})) names exactly one player via
+    // route_player_id/name -- its card must be inside the pill's own row.
+    expect(within(badgeRow).getByText("Test Player")).toBeInTheDocument();
+    // The headline/reason text must NOT be in that same row -- it's the
+    // sibling block below, not a row-mate of the pill+card.
+    expect(within(badgeRow).queryByText("Trade away Test Player before Week 10")).not.toBeInTheDocument();
+  });
+
+  it("keeps a trade-package signal's player cards below the text, never beside the pill", () => {
+    render(
+      <PortfolioContent
+        data={{
+          ...BASE_RESPONSE,
+          leagues: [
+            league({
+              top_item: briefingItem({
+                category: "watch",
+                headline: "Trade package forming",
+                reason: "Two assets moving.",
+                route_player_id: "",
+                route_player_name: "",
+                mentioned_players: [],
+                presentation: {
+                  trade_package: {
+                    send: [{ asset_type: "player", player_id: "1", name: "Send Guy", position: "WR", team: "KC", tier: "starter" }],
+                    receive: [{ asset_type: "player", player_id: "2", name: "Get Guy", position: "RB", team: "SF", tier: "starter" }],
+                    value_edge: "even",
+                    confidence: "medium",
+                  },
+                },
+              }),
+              top_items: [],
+            }),
+          ],
+        }}
+      />,
+    );
+
+    const badge = screen.getByText("Watch");
+    const badgeRow = badge.parentElement as HTMLElement;
+    expect(within(badgeRow).queryByText("Send Guy")).not.toBeInTheDocument();
+    expect(screen.getByText("Send Guy")).toBeInTheDocument();
   });
 
   it("hides a Watch item's raw pipe-delimited reason once its player chips render", () => {

@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { api, type BriefingItem, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioResponse } from "@/lib/api";
 import { categoryColorVar, categoryLabel } from "@/lib/portfolioPresentation";
-import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
+import { BriefingItemPlayers, briefingItemIsSinglePlayer } from "@/components/BriefingItemPlayers";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { formatRank } from "@/components/SnapshotTile";
 import { TeamAvatar } from "@/components/TeamAvatar";
@@ -69,6 +69,66 @@ function SignalRow({ item, showDivider }: { item: BriefingItem; showDivider: boo
   const showReasonText =
     showReason && !(item.category === "watch" && hasPlayerVisual && (reasonText.includes(" | ") || reasonText.includes(" - ")));
 
+  const badge = (
+    <span
+      className="px-1.5 py-0.5 text-xs font-extrabold uppercase whitespace-nowrap"
+      style={{
+        borderRadius: "var(--radius-pill)",
+        background: `color-mix(in srgb, ${color} 15%, transparent)`,
+        color,
+        letterSpacing: "var(--letter-spacing-badge)",
+      }}
+    >
+      {label}
+    </span>
+  );
+  const text = (
+    <div className="flex flex-col flex-1 min-w-0">
+      {headlineText ? (
+        <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+          {headlineText}
+        </span>
+      ) : null}
+      {showReasonText ? (
+        <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          {reasonText}
+        </span>
+      ) : null}
+    </div>
+  );
+  // coridian_, 2026-10-18, screenshot: "this portfolio looks terrible, with
+  // zero player PFPs. These need to have the compact player cards that we
+  // were supposed to make" — every signal here was a pipe-separated text
+  // dump of player names with no identity at all. Same BriefingItemPlayers
+  // chips Today's Game Plan already uses.
+  const players = <BriefingItemPlayers item={item} sourceLabel="Portfolio" />;
+
+  // coridian_, 2026-10-19, screenshot: "the player card location looks
+  // really awkward with it being under the related text" — for the common
+  // single-player case, the card now sits beside the category pill instead
+  // of stacked below the article text. A trade package (2-column send/
+  // receive grid) or several mentioned players can't realistically sit
+  // beside a small pill without looking cramped, so those keep the
+  // original stacked layout.
+  if (briefingItemIsSinglePlayer(item)) {
+    return (
+      <div
+        className="flex flex-col gap-1.5 mt-2"
+        style={
+          showDivider
+            ? { paddingTop: "var(--space-sm)", borderTop: "var(--border-width-default) solid var(--color-border)" }
+            : undefined
+        }
+      >
+        <div className="flex items-center gap-2">
+          {badge}
+          {players}
+        </div>
+        {text}
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex flex-col gap-1.5 mt-2"
@@ -79,36 +139,10 @@ function SignalRow({ item, showDivider }: { item: BriefingItem; showDivider: boo
       }
     >
       <div className="flex items-start gap-2">
-        <span
-          className="px-1.5 py-0.5 text-xs font-extrabold uppercase whitespace-nowrap"
-          style={{
-            borderRadius: "var(--radius-pill)",
-            background: `color-mix(in srgb, ${color} 15%, transparent)`,
-            color,
-            letterSpacing: "var(--letter-spacing-badge)",
-          }}
-        >
-          {label}
-        </span>
-        <div className="flex flex-col flex-1 min-w-0">
-          {headlineText ? (
-            <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-              {headlineText}
-            </span>
-          ) : null}
-          {showReasonText ? (
-            <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              {reasonText}
-            </span>
-          ) : null}
-        </div>
+        {badge}
+        {text}
       </div>
-      {/* coridian_, 2026-10-18, screenshot: "this portfolio looks terrible,
-          with zero player PFPs. These need to have the compact player cards
-          that we were supposed to make" — every signal here was a
-          pipe-separated text dump of player names with no identity at all.
-          Same BriefingItemPlayers chips Today's Game Plan already uses. */}
-      <BriefingItemPlayers item={item} sourceLabel="Portfolio" />
+      {players}
     </div>
   );
 }

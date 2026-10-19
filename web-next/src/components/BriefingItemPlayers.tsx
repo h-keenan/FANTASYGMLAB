@@ -16,6 +16,28 @@ import { PositionBadge } from "@/components/PositionBadge";
  * the compact cards already existed here, just weren't reused for
  * Portfolio's own signal rows).
  */
+/**
+ * Whether this item renders as exactly one compact player card (no trade
+ * package, no multiple mentioned players) — callers that want to lay the
+ * single-player case out differently (e.g. Portfolio's signal row, side by
+ * side with its category pill instead of stacked below the text) check
+ * this BEFORE rendering, so the decision and the render stay in sync with
+ * BriefingItemPlayers' own actual logic below instead of a second,
+ * independently-drifting copy of it.
+ */
+export function briefingItemIsSinglePlayer(item: BriefingItem): boolean {
+  const hasTradePackage = Boolean(
+    item.presentation?.trade_package &&
+      (item.presentation.trade_package.send.length > 0 || item.presentation.trade_package.receive.length > 0),
+  );
+  if (hasTradePackage) return false;
+  const hasRoutePlayer = Boolean(item.route_player_name && item.route_player_id);
+  const otherMentionedPlayers = (item.mentioned_players || []).filter(
+    (player) => player.player_id !== item.route_player_id,
+  );
+  return hasRoutePlayer ? otherMentionedPlayers.length === 0 : otherMentionedPlayers.length === 1;
+}
+
 export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem; sourceLabel: string }) {
   if (
     item.presentation?.trade_package &&
