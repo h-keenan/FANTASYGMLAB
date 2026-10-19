@@ -297,6 +297,14 @@ class TradeIdeaCard:
     # read it are unaffected.
     send_score: int = 0
     receive_score: int = 0
+    # Stable identity for this exact idea (modules.trade_hub_ui.
+    # idea_recommendation_id — the same canonical hash Trade Hub's own
+    # session-state handoff/focus plumbing already keys on), added so a
+    # client can ask GET .../trade-hub/{recommendation_id}/share-card.png
+    # for a branded PNG of precisely this idea without re-posting its
+    # contents (the server re-derives the idea from its own cached search
+    # instead of trusting a client payload — see that endpoint's docstring).
+    recommendation_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -313,6 +321,7 @@ class TradeIdeaCard:
             "landed_gm_target_player_ids": list(self.landed_gm_target_player_ids),
             "send_score": self.send_score,
             "receive_score": self.receive_score,
+            "recommendation_id": self.recommendation_id,
         }
 
 
@@ -349,6 +358,7 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         ),
         send_score=int(idea.get("my_score") or 0),
         receive_score=int(idea.get("their_score") or 0),
+        recommendation_id=trade_hub_ui.idea_recommendation_id(idea),
     )
 
 

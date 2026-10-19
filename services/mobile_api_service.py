@@ -122,7 +122,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -188,6 +188,8 @@ from modules import (
     redis_cache,
     roster_needs,
     saved_leagues,
+    share_card_renderer,
+    share_recommendation_cards,
     sleeper,
     sleeper_leagues,
     startup_cold_path,
@@ -9305,6 +9307,113 @@ def get_trade_hub_ideas(
             "ad_unlocks_applied": ad_unlocks_applied,
         },
     }
+
+
+@app.get("/v1/leagues/{league_id}/trade-hub/{recommendation_id}/share-card.png")
+def get_trade_hub_idea_share_card(
+    league_id: str,
+    recommendation_id: str,
+    strategy: str = "retool",
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> Response:
+    """Branded, QR-coded share PNG for one Trade Hub idea.
+
+    The gap this closes: web-next's ShareTradeButton (TradeIdeaCard.tsx)
+    only ever called navigator.share({text, title}) with no image
+    attached at all — even though modules.share_recommendation_cards /
+    modules.share_card_renderer (the exact PNG+QR+branding pipeline the
+    legacy Streamlit app already uses for its player-quick-view share
+    card, #232) has existed and rendered real branded cards all along.
+    This wires that mature pipeline to web-next instead of building a new
+    one.
+
+    The idea is re-derived server-side from the SAME cached search
+    GET .../trade-hub itself reads (trade_hub_engine.
+    generate_trade_idea_records_cached, keyed on league_id/roster_id/
+    strategy/lens/untouchables/gm-targets — see that function's own
+    docstring) and matched by trade_hub_ui.idea_recommendation_id, rather
+    than trusting any idea payload a client could post — a caller can only
+    ever get a branded card for a trade idea this server itself just
+    generated for their own roster, never a client-fabricated "trade". If
+    the board has since moved on (a stale/no-longer-current
+    recommendation_id, or build_trade_share_card otherwise declines it),
+    this returns a real 404 with that decline_reason as the error detail,
+    never a fabricated image.
+    """
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
+
+    my_roster, reason = _resolve_my_roster(user, league_id, profile=profile)
+    if my_roster is None:
+        raise HTTPException(status_code=404, detail=reason or "Roster not found.")
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+
+    roster_id = my_roster.get("roster_id")
+    if roster_id is None:
+        raise HTTPException(status_code=404, detail="empty_roster")
+
+    gm_target_ids, gm_untouchable_ids = _fetch_gm_target_player_ids(
+        config, user_id, access_token, league_id
+    )
+    declared_team_stance = _fetch_team_stance(config, user_id, access_token, league_id)
+    # Same (league_id, roster_id, strategy, lens, untouchables, gm-targets)
+    # key /trade-hub itself reads — this call hits that cache rather than
+    # recomputing the search, and crucially re-derives the exact idea set
+    # the client's own /trade-hub response was built from.
+    records = trade_hub_engine.generate_trade_idea_records_cached(
+        league_id=league_id,
+        roster_id=int(roster_id),
+        strategy=strategy,
+        lens=lens,
+        players_db_path=PLAYERS_DB_PATH,
+        untouchable_player_ids=gm_untouchable_ids,
+        gm_target_player_ids=gm_target_ids,
+        team_stance=declared_team_stance,
+    )
+    idea = next(
+        (record for record in records if trade_hub_ui.idea_recommendation_id(record) == recommendation_id),
+        None,
+    )
+
+    team_profile = sleeper.get_league_roster_profiles(league_id).get(str(roster_id), {})
+    my_team_name = str(team_profile.get("team_name") or "")
+    detected_settings = league_value_settings.detect_league_value_settings_from_payload(league)
+
+    card = share_recommendation_cards.build_trade_share_card(
+        idea or {},
+        source_surface="trade_hub",
+        scoring_format=str(detected_settings.get("scoring_format") or ""),
+        my_team_name=my_team_name,
+    )
+    if not card.is_shareable:
+        raise HTTPException(
+            status_code=404,
+            detail=card.decline_reason
+            or "This recommendation has changed. Review the latest analysis before sharing.",
+        )
+
+    try:
+        png = share_card_renderer.render_share_card_png(card)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc) or "This recommendation has changed. Review the latest analysis before sharing.",
+        ) from exc
+
+    return Response(content=png, media_type="image/png")
 
 
 @app.get("/v1/leagues/{league_id}/trade-finder")

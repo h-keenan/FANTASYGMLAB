@@ -1,0 +1,207 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ShareTradeButton } from "./TradeIdeaCard";
+import { api, type TradeAsset, type TradeIdea } from "@/lib/api";
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getTradeHubIdeaShareCardBlob: vi.fn(),
+    },
+  };
+});
+
+/**
+ * ShareTradeButton (TradeIdeaCard.tsx) closes the "share sheet never
+ * actually attached an image" gap: it used to call
+ * navigator.share({text, title}) only. Now it fetches the real branded
+ * PNG (GET .../trade-hub/{recommendation_id}/share-card.png) and attaches
+ * it via the Files-capable Web Share API when available, falling back to
+ * the original text-only share/clipboard-copy path for anything that
+ * can't do that — a browser missing navigator.share/canShare, an idea
+ * with no recommendation_id, or a failed PNG fetch (e.g. a stale idea the
+ * server 404s).
+ */
+
+function asset(overrides: Partial<TradeAsset>): TradeAsset {
+  return {
+    asset_type: "player",
+    player_id: "p1",
+    name: "Test Player",
+    position: "RB",
+    team: "SF",
+    age: 25,
+    score: 2000,
+    tier: "starter",
+    overall_rating: 88,
+    ...overrides,
+  };
+}
+
+function idea(overrides: Partial<TradeIdea> = {}): TradeIdea {
+  return {
+    partner_team_name: "Rival GM",
+    partner_team_avatar_url: null,
+    partner_team_archetype_label: "Rebuilding",
+    partner_trade_tendency: "Neutral",
+    rationale: "Clear value upgrade at a position of need.",
+    trade_gain: 800,
+    confidence_label: "High",
+    market_realism_label: "Realistic",
+    reasoning_tags: ["Need-Based"],
+    package: {
+      send: [asset({ player_id: "my-rb", name: "My Running Back" })],
+      receive: [asset({ player_id: "opp-wr", name: "Opp Wide Receiver", position: "WR" })],
+      value_edge: "+800",
+      confidence: "High",
+    },
+    category: "Headline Recommendation",
+    value_edge_band: "Favorable",
+    impact_tag: "high_impact",
+    landed_gm_target_player_ids: [],
+    send_score: 1200,
+    receive_score: 2000,
+    recommendation_id: "rec-abc123",
+    ...overrides,
+  };
+}
+
+/** Jsdom doesn't define navigator.share/canShare/clipboard by default --
+ * these helpers add/remove them per test as own, configurable properties
+ * so each test can simulate a different browser capability without
+ * leaking into the next test. */
+function stubShare(impl?: (data: ShareData) => Promise<void>) {
+  const fn = vi.fn(impl ?? (() => Promise.resolve()));
+  Object.defineProperty(navigator, "share", { value: fn, configurable: true, writable: true });
+  return fn;
+}
+
+function stubCanShare(impl: (data?: ShareData) => boolean) {
+  const fn = vi.fn(impl);
+  Object.defineProperty(navigator, "canShare", { value: fn, configurable: true, writable: true });
+  return fn;
+}
+
+function removeShareApis() {
+  delete (navigator as unknown as Record<string, unknown>).share;
+  delete (navigator as unknown as Record<string, unknown>).canShare;
+}
+
+function stubClipboard() {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+    writable: true,
+  });
+  return writeText;
+}
+
+describe("ShareTradeButton", () => {
+  beforeEach(() => {
+    vi.mocked(api.getTradeHubIdeaShareCardBlob).mockReset();
+  });
+
+  afterEach(() => {
+    removeShareApis();
+    delete (navigator as unknown as Record<string, unknown>).clipboard;
+  });
+
+  it("attaches the real branded PNG via the Files-capable Web Share API", async () => {
+    const share = stubShare();
+    stubCanShare(() => true);
+    vi.mocked(api.getTradeHubIdeaShareCardBlob).mockResolvedValue(
+      new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }),
+    );
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" strategy="retool" lens="Dynasty" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+
+    expect(api.getTradeHubIdeaShareCardBlob).toHaveBeenCalledWith("league-1", "rec-abc123", "retool", "Dynasty");
+    const shareArgs = share.mock.calls[0][0] as ShareData;
+    expect(shareArgs.files).toHaveLength(1);
+    expect(shareArgs.files?.[0].type).toBe("image/png");
+    expect(shareArgs.title).toContain("Rival GM");
+    expect(shareArgs.text).toBeTruthy();
+  });
+
+  it("shows a loading state on the button while the PNG fetches", async () => {
+    stubShare();
+    stubCanShare(() => true);
+    let resolveBlob: (blob: Blob) => void = () => {};
+    vi.mocked(api.getTradeHubIdeaShareCardBlob).mockReturnValue(
+      new Promise((resolve) => {
+        resolveBlob = resolve;
+      }),
+    );
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(screen.getByRole("button")).toBeDisabled());
+    expect(screen.getByRole("button").textContent).toMatch(/preparing/i);
+
+    resolveBlob(new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }));
+
+    await waitFor(() => expect(screen.getByRole("button")).not.toBeDisabled());
+  });
+
+  it("falls back to the text-only share when navigator.share/canShare aren't present", async () => {
+    removeShareApis();
+    const writeText = stubClipboard();
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(api.getTradeHubIdeaShareCardBlob).not.toHaveBeenCalled();
+    await screen.findByText("Copied!");
+  });
+
+  it("falls back to the text-only navigator.share when canShare rejects the file", async () => {
+    const share = stubShare();
+    stubCanShare(() => false);
+    vi.mocked(api.getTradeHubIdeaShareCardBlob).mockResolvedValue(
+      new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }),
+    );
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    const shareArgs = share.mock.calls[0][0] as ShareData;
+    expect(shareArgs.files).toBeUndefined();
+    expect(shareArgs.text).toBeTruthy();
+  });
+
+  it("falls back to the text-only share when the PNG fetch fails (e.g. a stale/changed idea)", async () => {
+    const share = stubShare();
+    stubCanShare(() => true);
+    vi.mocked(api.getTradeHubIdeaShareCardBlob).mockRejectedValue(new Error("not found"));
+
+    render(<ShareTradeButton idea={idea()} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    const shareArgs = share.mock.calls[0][0] as ShareData;
+    expect(shareArgs.files).toBeUndefined();
+    expect(shareArgs.text).toBeTruthy();
+  });
+
+  it("skips the image fetch entirely when leagueId or recommendation_id is missing", async () => {
+    stubShare();
+    stubCanShare(() => true);
+
+    render(<ShareTradeButton idea={idea({ recommendation_id: undefined })} leagueId="league-1" />);
+    fireEvent.click(screen.getByRole("button"));
+
+    await waitFor(() => expect(navigator.share).toHaveBeenCalledTimes(1));
+    expect(api.getTradeHubIdeaShareCardBlob).not.toHaveBeenCalled();
+  });
+});

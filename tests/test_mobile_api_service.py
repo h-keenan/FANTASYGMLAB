@@ -8719,6 +8719,199 @@ def test_trade_hub_premium_entitlement_sees_full_board_ignoring_ad_unlocks(monke
     assert body["entitlement"]["hidden_count"] == 0
 
 
+def _fake_shareable_idea_record(*, partner: str = "Rival GM", gain: int = 800) -> dict:
+    """A real idea record with actual send/receive assets -- unlike
+    _fake_idea_record above (empty send_assets/receive_assets, fine for the
+    entitlement-count tests that don't care about share-card content), this
+    one is a genuinely shareable idea for the share-card PNG tests below."""
+    return {
+        "partner_team_name": partner,
+        "partner_roster_id": 2,
+        "rationale": "Clear upgrade at a position of need.",
+        "trade_gain": gain,
+        "trade_confidence_label": "High",
+        "market_realism_label": "Realistic",
+        "reasoning_tags": ["Need-Based"],
+        "my_score": 1200,
+        "their_score": 1200 + gain,
+        "send_assets": [
+            {
+                "asset_type": "player",
+                "player_id": "my-rb",
+                "name": "My Running Back",
+                "position": "RB",
+                "team": "SF",
+                "score": 1200,
+            }
+        ],
+        "receive_assets": [
+            {
+                "asset_type": "player",
+                "player_id": "opp-wr",
+                "name": "Opp Wide Receiver",
+                "position": "WR",
+                "team": "KC",
+                "score": 1200 + gain,
+            }
+        ],
+        "fit_grade": "A",
+    }
+
+
+def _trade_hub_share_card_mocks(stack: contextlib.ExitStack, *, records: list[dict]) -> None:
+    """Shared mock set for the GET .../trade-hub/{id}/share-card.png tests --
+    same auth/roster/league resolution as the other real-idea trade-hub
+    tests above, via function-level auth/profile patches (not a finite
+    requests.get side_effect list) since each of these tests makes two full
+    authenticated requests (the board, then the share card)."""
+
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    stack.enter_context(
+        patch(
+            "services.mobile_api_service.auth_supabase.fetch_auth_user",
+            return_value=({"id": "user-123", "email": "gm@example.com"}, ""),
+        )
+    )
+    stack.enter_context(
+        patch(
+            "services.mobile_api_service._fetch_profile_fields",
+            return_value={"entitlement": "free", "sleeper_username": "gm_dynasty"},
+        )
+    )
+    stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+    stack.enter_context(
+        patch(
+            "modules.sleeper.get_rosters",
+            return_value=[
+                {"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids},
+                {"roster_id": 2, "owner_id": "sleeper-user-2", "players": []},
+            ],
+        )
+    )
+    stack.enter_context(patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE))
+    stack.enter_context(
+        patch(
+            "modules.sleeper.get_league_roster_profiles",
+            return_value={
+                "1": {"team_name": "My Team", "avatar_url": None},
+                "2": {"team_name": "Rival GM", "avatar_url": None},
+            },
+        )
+    )
+    stack.enter_context(
+        patch(
+            "modules.sleeper.get_users",
+            return_value=[
+                {"user_id": "sleeper-user-1", "display_name": "GM One"},
+                {"user_id": "sleeper-user-2", "display_name": "GM Two"},
+            ],
+        )
+    )
+    stack.enter_context(patch("modules.sleeper.get_traded_picks", return_value=[]))
+    stack.enter_context(patch("modules.rankings.load_players", return_value=_fake_roster_frame()))
+    stack.enter_context(
+        patch(
+            "modules.player_eligibility.filter_current_fantasy_players",
+            side_effect=lambda df, **kwargs: df,
+        )
+    )
+    stack.enter_context(patch("modules.trade_hub_engine.generate_trade_idea_records", return_value=records))
+
+
+def test_trade_hub_share_card_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    response = client.get("/v1/leagues/abc/trade-hub/deadbeef1234abcd/share-card.png")
+    assert response.status_code == 401
+
+
+def test_trade_hub_share_card_renders_a_real_png_for_a_real_idea(monkeypatch):
+    # The gap this closes: web-next's ShareTradeButton only ever called
+    # navigator.share({text, title}) -- no image at all -- even though
+    # modules.share_recommendation_cards/modules.share_card_renderer have
+    # rendered a real branded, QR-coded PNG since #232. This pins that the
+    # new endpoint actually produces real PNG bytes for a real Trade Hub
+    # idea, re-derived server-side from the same cached search GET
+    # .../trade-hub itself reads (never a client-posted payload).
+    client = _client(monkeypatch)
+
+    with contextlib.ExitStack() as stack:
+        _trade_hub_share_card_mocks(stack, records=[_fake_shareable_idea_record()])
+
+        trade_hub_response = client.get(
+            "/v1/leagues/abc/trade-hub?strategy=retool&lens=Dynasty",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        assert trade_hub_response.status_code == 200
+        ideas = trade_hub_response.json()["ideas"]
+        assert len(ideas) == 1
+        recommendation_id = ideas[0]["recommendation_id"]
+        assert recommendation_id
+
+        share_response = client.get(
+            f"/v1/leagues/abc/trade-hub/{recommendation_id}/share-card.png"
+            "?strategy=retool&lens=Dynasty",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert share_response.status_code == 200
+    assert share_response.headers["content-type"] == "image/png"
+    assert share_response.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_trade_hub_share_card_declines_a_changed_idea_with_a_clean_error(monkeypatch):
+    # _fake_idea_record (used by the entitlement tests above) has empty
+    # send_assets/receive_assets -- build_trade_share_card treats that as
+    # "this recommendation has changed since it was generated" and declines
+    # it (is_shareable=False). The endpoint must surface that as a real 4xx
+    # with the decline_reason as the error detail, never a fabricated image
+    # or a 500.
+    client = _client(monkeypatch)
+
+    with contextlib.ExitStack() as stack:
+        _trade_hub_share_card_mocks(stack, records=[_fake_idea_record("Rival GM", gain=25)])
+
+        trade_hub_response = client.get(
+            "/v1/leagues/abc/trade-hub?strategy=retool&lens=Dynasty",
+            headers={"Authorization": "Bearer good-token"},
+        )
+        recommendation_id = trade_hub_response.json()["ideas"][0]["recommendation_id"]
+        assert recommendation_id
+
+        share_response = client.get(
+            f"/v1/leagues/abc/trade-hub/{recommendation_id}/share-card.png"
+            "?strategy=retool&lens=Dynasty",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert share_response.status_code == 404
+    body = share_response.json()
+    assert body["ok"] is False
+    assert body["error"]
+
+
+def test_trade_hub_share_card_404s_for_an_unmatched_recommendation_id(monkeypatch):
+    # A client can only ever ask for a card by the recommendation_id of an
+    # idea this server itself just generated for the caller's own roster --
+    # an id that doesn't match anything in the current board (stale link,
+    # tampered id, board moved on) must 404 with a clean error, never a
+    # fabricated image built from thin air.
+    client = _client(monkeypatch)
+
+    with contextlib.ExitStack() as stack:
+        _trade_hub_share_card_mocks(stack, records=[_fake_shareable_idea_record()])
+
+        share_response = client.get(
+            "/v1/leagues/abc/trade-hub/not-a-real-recommendation-id/share-card.png"
+            "?strategy=retool&lens=Dynasty",
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert share_response.status_code == 404
+    body = share_response.json()
+    assert body["ok"] is False
+    assert body["error"]
+
+
 def test_trade_finder_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/leagues/abc/trade-finder?player_ids=p1")
