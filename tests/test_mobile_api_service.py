@@ -4947,6 +4947,216 @@ def test_schedule_returns_empty_for_an_unknown_player(monkeypatch):
     assert response.json() == {"ok": True, "team": None, "weeks": []}
 
 
+def test_external_projections_require_api_key_configured(monkeypatch):
+    """No FANTASYDESK_EXTERNAL_API_KEY set on the server at all: fail closed
+    with 503 (not 401) — this is a configuration problem, not a caller
+    sending the wrong credential. Note this route must not require
+    SUPABASE_URL/SUPABASE_ANON_KEY (unlike require_user) since a bot has no
+    Supabase session at all, so this uses a bare TestClient rather than the
+    shared `_client` fixture.
+    """
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.delenv("FANTASYDESK_EXTERNAL_API_KEY", raising=False)
+    client = TestClient(mobile_api_service.app)
+    response = client.get(
+        "/v1/external/players/9001/projections",
+        params={"week": 7, "season": 2026},
+        headers={"Authorization": "Bearer anything"},
+    )
+    assert response.status_code == 503
+
+
+def test_external_projections_reject_missing_and_wrong_api_key(monkeypatch):
+    """Both a missing Authorization header and a wrong key return the same
+    generic 401 — a caller can never learn from the response whether their
+    key was absent, malformed, or merely wrong.
+    """
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    no_header = client.get("/v1/external/players/9001/projections", params={"week": 7, "season": 2026})
+    assert no_header.status_code == 401
+
+    wrong_key = client.get(
+        "/v1/external/players/9001/projections",
+        params={"week": 7, "season": 2026},
+        headers={"Authorization": "Bearer not-the-secret"},
+    )
+    assert wrong_key.status_code == 401
+    assert no_header.json()["error"] == wrong_key.json()["error"]
+
+
+def test_external_player_projection_ok_case_returns_every_contracted_field(monkeypatch):
+    """A real "ok" projection surfaces every field the external contract
+    (docs/external-api-contract.md) promises, including the two genuinely
+    new ones project_player_week itself doesn't track: `calculated_at` and
+    `model_version`.
+    """
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_projection = {
+        "status": "ok",
+        "player_id": "4046",
+        "position": "RB",
+        "team": "KC",
+        "week": 7,
+        "season": 2026,
+        "opponent": "MIA",
+        "point_estimate": 14.2,
+        "low": 9.8,
+        "high": 18.6,
+        "confidence": "medium",
+        "basis": {"recent_games_played": 3},
+    }
+    with patch.object(
+        mobile_api_service.player_projections, "project_player_week", return_value=fake_projection
+    ) as mock_project:
+        response = client.get(
+            "/v1/external/players/4046/projections",
+            params={"week": 7, "season": 2026},
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["player_id"] == "4046"
+    assert body["season"] == 2026
+    assert body["week"] == 7
+    assert body["scoring_format"] == "ppr"
+    assert body["status"] == "ok"
+    assert body["projected_points"] == 14.2
+    assert body["low"] == 9.8
+    assert body["high"] == 18.6
+    assert body["confidence"] == "medium"
+    assert body["model_version"] == mobile_api_service.EXTERNAL_PROJECTIONS_MODEL_VERSION
+    # A real ISO 8601 UTC timestamp computed at request time, not a cached value.
+    from datetime import datetime
+
+    datetime.fromisoformat(body["calculated_at"])
+    mock_project.assert_called_once_with("4046", 7, 2026)
+
+
+def test_external_player_projection_bye_week_nulls_every_numeric_field(monkeypatch):
+    """A non-"ok" status (bye week here) must pass through honestly: no
+    fabricated point_estimate/low/high/confidence for a player with no game
+    that week.
+    """
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    with patch.object(
+        mobile_api_service.player_projections,
+        "project_player_week",
+        return_value={"status": "bye_week", "player_id": "4046", "week": 9, "season": 2026},
+    ):
+        response = client.get(
+            "/v1/external/players/4046/projections",
+            params={"week": 9, "season": 2026},
+            headers={"Authorization": "Bearer the-real-secret-key"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "bye_week"
+    assert body["projected_points"] is None
+    assert body["low"] is None
+    assert body["high"] is None
+    assert body["confidence"] is None
+    # scoring_format/model_version/calculated_at are still reported even on
+    # a non-"ok" status — only the projection numbers themselves are null.
+    assert body["scoring_format"] == "ppr"
+    assert body["model_version"] == mobile_api_service.EXTERNAL_PROJECTIONS_MODEL_VERSION
+
+
+def test_external_week_projections_batch_filters_by_position_and_shares_inputs_once(monkeypatch):
+    """The full-slate batch endpoint only calls project_player_week for
+    projectable positions, honors an optional position filter, and fetches
+    its shared inputs (players lookup / season weekly stats / opponent
+    defense signal) exactly once for the whole request regardless of how
+    many players it projects.
+    """
+
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    fake_players = {
+        "4046": {"position": "RB", "team": "KC"},
+        "4047": {"position": "WR", "team": "MIA"},
+        "4048": {"position": "DEF", "team": "BUF"},  # not a projectable position
+    }
+
+    def fake_project(player_id, week, season, **kwargs):
+        return {"status": "ok", "player_id": player_id, "point_estimate": 1.0, "low": 0.5, "high": 1.5, "confidence": "low"}
+
+    with patch.object(mobile_api_service.sleeper, "get_players", return_value=fake_players):
+        with patch.object(
+            mobile_api_service.sleeper, "get_season_player_stats", return_value={}
+        ) as mock_weekly_stats:
+            with patch.object(
+                mobile_api_service.player_projections,
+                "team_defense_points_allowed_by_position",
+                return_value={},
+            ) as mock_defense:
+                with patch.object(
+                    mobile_api_service.player_projections, "project_player_week", side_effect=fake_project
+                ) as mock_project:
+                    response = client.get(
+                        "/v1/external/projections",
+                        params={"week": 7, "season": 2026, "position": "RB"},
+                        headers={"Authorization": "Bearer the-real-secret-key"},
+                    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["season"] == 2026
+    assert body["week"] == 7
+    assert body["scoring_format"] == "ppr"
+    assert [item["player_id"] for item in body["items"]] == ["4046"]
+    mock_project.assert_called_once()
+    mock_weekly_stats.assert_called_once()
+    mock_defense.assert_called_once()
+
+
+def test_external_week_projections_rejects_unsupported_position(monkeypatch):
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from services import mobile_api_service
+
+    monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
+    client = TestClient(mobile_api_service.app)
+
+    response = client.get(
+        "/v1/external/projections",
+        params={"week": 7, "season": 2026, "position": "DEF"},
+        headers={"Authorization": "Bearer the-real-secret-key"},
+    )
+    assert response.status_code == 422
+
+
 def test_career_requires_auth(monkeypatch):
     client = _client(monkeypatch)
     response = client.get("/v1/players/9001/career")

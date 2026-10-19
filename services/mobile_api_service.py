@@ -67,6 +67,11 @@ Deployment topology (Render):
   - DELETE /v1/scouting/prospects/{id}/report        — remove my own scouting report
   - POST   /v1/scouting/watchlist/{id}                — follow a prospect (personal watchlist)
   - DELETE /v1/scouting/watchlist/{id}                — unfollow a prospect
+  - GET  /v1/external/players/{id}/projections  — (static API key, not a user session) one
+                                                    player's weekly projection for the external
+                                                    content-posting bot — see docs/external-api-contract.md
+  - GET  /v1/external/projections                — (static API key) the full week's projectable
+                                                    slate, optionally filtered by position
 
 Auth model: the mobile app signs the user in against Supabase directly
 (same `auth.users` table as the web app) and sends the resulting access
@@ -76,6 +81,14 @@ request — it never sees a password and never holds the service-role key.
 Profile/entitlement reads use the caller's own token so Postgres Row Level
 Security (not this service) decides what they can see, matching the web
 app's client-side Supabase usage.
+
+The `/v1/external/*` routes are a separate, narrower exception: there is no
+Supabase user behind an external bot, so those routes authenticate with one
+static, shared API key (`FANTASYDESK_EXTERNAL_API_KEY`, see
+`require_external_api_key` and docs/external-api-contract.md) instead of
+`require_user` — that key never grants access to any other route in this
+file, same boundary `services/fantasy_content.py`'s own separate content
+token already draws for a different payload.
 
 This service intentionally contains no fantasy-analytics logic of its own —
 it is a thin JSON wrapper around the existing `modules.sleeper` data access
@@ -92,6 +105,7 @@ import hashlib
 import logging
 import os
 import re
+import secrets
 import sys
 import threading
 import time
@@ -5102,6 +5116,164 @@ def get_player_schedule(
                 week.setdefault("projection", None)
 
     return {"ok": True, "team": str(team), "season": season, "weeks": weeks}
+
+
+# ---------------------------------------------------------------------------
+# External (bot) read-only projections API — Phase 1 of coridian_'s external
+# content-posting bot wish list (full contract: docs/external-api-contract.md).
+# That bot has no Supabase user account, so it cannot use `require_user`; it
+# authenticates with a single static API key instead, checked separately
+# from — and never granting access to — any `require_user`-gated route
+# above. This is the ONLY place that key is checked.
+# ---------------------------------------------------------------------------
+
+EXTERNAL_API_KEY_ENV = "FANTASYDESK_EXTERNAL_API_KEY"
+
+# Bumped only when modules.player_projections.project_player_week's actual
+# FORMULA changes in a way that would shift point_estimate/low/high/
+# confidence for the same (player_id, week, season) inputs. A response
+# *field* change (adding/renaming/removing a key) is a separate, breaking-
+# vs-non-breaking concern this constant does not track — see
+# docs/external-api-contract.md's versioning policy for both.
+EXTERNAL_PROJECTIONS_MODEL_VERSION = "v1"
+
+
+def require_external_api_key(authorization: str | None = Header(default=None)) -> None:
+    """Static bearer-token auth for `/v1/external/*` — a single shared
+    secret (`FANTASYDESK_EXTERNAL_API_KEY`, see docs/external-api-contract.md),
+    not a per-user Supabase session: there is no "user" for a bot. Uses
+    `secrets.compare_digest` (never `==`) so comparison time doesn't leak how
+    much of the key was right, and raises the identical 401 regardless of
+    *why* the key was rejected (missing header, wrong scheme, wrong key) —
+    a caller can never learn it was "close."
+    """
+
+    expected = app_config.config_value(EXTERNAL_API_KEY_ENV)
+    if not expected:
+        raise HTTPException(status_code=503, detail="External API is not configured.")
+    scheme, _, token = (authorization or "").partition(" ")
+    token = token.strip()
+    if scheme.lower() != "bearer" or not token or not secrets.compare_digest(token, expected):
+        raise HTTPException(status_code=401, detail="Invalid API key.")
+
+
+def _external_projection_payload(
+    player_id: str, season: int, week: int, result: dict[str, Any]
+) -> dict[str, Any]:
+    """Shape one `project_player_week` result into the external contract
+    (docs/external-api-contract.md): `player_id`/`season`/`week`/
+    `scoring_format`/`calculated_at`/`model_version` are always present;
+    `projected_points`/`low`/`high`/`confidence` are `None` for any non-"ok"
+    status — the same honesty discipline as `_projection_summary_dict`
+    above (never fabricate a number for a bye week, unknown player, etc.).
+    `scoring_format` is always `"ppr"`: `project_player_week` only ever
+    computes PPR points — there is no multi-format support to report here.
+    """
+
+    status = str(result.get("status") or "unknown_player")
+    payload: dict[str, Any] = {
+        "player_id": str(player_id),
+        "season": int(season),
+        "week": int(week),
+        "scoring_format": "ppr",
+        "status": status,
+        "projected_points": None,
+        "low": None,
+        "high": None,
+        "confidence": None,
+        "calculated_at": datetime.now(timezone.utc).isoformat(),
+        "model_version": EXTERNAL_PROJECTIONS_MODEL_VERSION,
+    }
+    if status == "ok":
+        payload.update(
+            {
+                "projected_points": result.get("point_estimate"),
+                "low": result.get("low"),
+                "high": result.get("high"),
+                "confidence": result.get("confidence"),
+            }
+        )
+    return payload
+
+
+@app.get(
+    "/v1/external/players/{player_id}/projections",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_player_projection(
+    player_id: str,
+    week: int,
+    season: int | None = None,
+) -> dict[str, Any]:
+    """One player's weekly projection, for the external content-posting bot
+    (Phase 1 of coridian_'s wish list — docs/external-api-contract.md).
+    Always 200 with a `status` field; edge cases (bye week, unknown player,
+    unsupported position, etc.) pass through honestly with every numeric
+    field null, never an HTTP error — mirrors `/v1/players/{id}/schedule`'s
+    own `_projection_summary_dict` discipline above.
+    """
+
+    resolved_season = int(season) if season is not None else sleeper.default_player_stats_season()
+    result = player_projections.project_player_week(str(player_id), int(week), resolved_season)
+    return _external_projection_payload(player_id, resolved_season, int(week), result)
+
+
+@app.get(
+    "/v1/external/projections",
+    dependencies=[Depends(require_external_api_key)],
+)
+def get_external_week_projections(
+    week: int,
+    season: int | None = None,
+    position: str | None = None,
+) -> dict[str, Any]:
+    """This week's full projectable slate (QB/RB/WR/TE/K), in one call — a
+    posting bot deciding what to post about almost always wants "this
+    week's slate", not one player id at a time (see
+    docs/external-api-contract.md). Shared inputs (players lookup, season
+    weekly stats, opponent-defense signal) are fetched once for the whole
+    request, the same pattern `/v1/players/{id}/schedule` already uses via
+    `_weekly_projection_for_player` above. Optional `position` filters to
+    one of QB/RB/WR/TE/K.
+    """
+
+    resolved_season = int(season) if season is not None else sleeper.default_player_stats_season()
+    position_filter = str(position).strip().upper() if position else None
+    if position_filter and position_filter not in player_projections.PROJECTABLE_POSITIONS:
+        raise HTTPException(status_code=422, detail="position must be one of QB, RB, WR, TE, K.")
+
+    players = sleeper.get_players()
+    weekly_stats = sleeper.get_season_player_stats(season=resolved_season, retain_weekly=True)
+    defense_strength = player_projections.team_defense_points_allowed_by_position(
+        resolved_season, weekly_stats=weekly_stats, players=players
+    )
+
+    items: list[dict[str, Any]] = []
+    for player_id, player in players.items():
+        player_position = str((player or {}).get("position") or "").strip().upper()
+        if player_position not in player_projections.PROJECTABLE_POSITIONS:
+            continue
+        if position_filter and player_position != position_filter:
+            continue
+        record = weekly_stats.get(str(player_id))
+        weekly_rows = record.get("weekly") if isinstance(record, dict) else None
+        result = player_projections.project_player_week(
+            player_id,
+            int(week),
+            resolved_season,
+            players=players,
+            player_weekly_rows=weekly_rows or [],
+            defense_strength=defense_strength,
+        )
+        items.append(_external_projection_payload(player_id, resolved_season, int(week), result))
+
+    return {
+        "season": resolved_season,
+        "week": int(week),
+        "scoring_format": "ppr",
+        "model_version": EXTERNAL_PROJECTIONS_MODEL_VERSION,
+        "items": items,
+    }
 
 
 @app.get("/v1/players/{player_id}/career")
