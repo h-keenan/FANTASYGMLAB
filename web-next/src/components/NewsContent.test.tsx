@@ -1,8 +1,24 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NewsContent } from "./NewsContent";
 import type { NewsItem, NewsResponse } from "@/lib/api";
+
+// A real Date.now()-relative published_ts ("1 hour ago") plus the
+// component's own default `nowMs` (also real Date.now(), see
+// groupNewsByDate) made every assertion of "Today" genuinely flaky right
+// around midnight UTC — CI runs in UTC, and "1 hour ago" crosses into
+// yesterday for roughly the first hour of every day. Pinning the clock
+// mid-day, far from any boundary, makes every item below deterministically
+// "Today" regardless of when the suite actually runs.
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-06-15T12:00:00Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function newsItem(overrides: Partial<NewsItem>): NewsItem {
   return {
