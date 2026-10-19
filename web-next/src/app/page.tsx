@@ -4,15 +4,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
-import { AgeGate } from "@/components/AgeGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { OnboardingPaywall } from "@/components/OnboardingPaywall";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
 import { supabase } from "@/lib/supabase";
-
-type Tab = "guest" | "account";
 
 // useSearchParams() (for ?billing=success, see paywallDismissed below)
 // requires a Suspense boundary around anything that calls it, or this
@@ -30,12 +27,6 @@ function LandingPageContent() {
   const { session, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Defaults to the real sign-in/create-account path, not guest — coridian_,
-  // 2026-10-17: "It defaults for you to sign in with a username from
-  // sleeper, not an account." Guest (Sleeper-username-only, no account) is
-  // still available as a secondary tab, just no longer the default.
-  const [tab, setTab] = useState<Tab>("account");
-  const [guestAgeConfirmed, setGuestAgeConfirmed] = useState(false);
   const [accountReady, setAccountReady] = useState(false);
   // Shown once per landing on this page — reset is irrelevant since this
   // flow (accountReady with no saved leagues yet) only ever happens for an
@@ -57,20 +48,18 @@ function LandingPageContent() {
   const skippedExistingSession = useRef(false);
 
   // A returning user (page refresh with a still-valid persisted Supabase
-  // session — guest or signed-in) should land straight in their league, not
-  // be asked to pass the age gate or sign in again, and not have to pick a
-  // league back out of a list every time either (coridian_, 2026-10-17:
-  // "the website needs to remember that you've signed in, and whenever you
-  // open it, it needs to take you to the dashboard"). Mirrors mobile's own
-  // HomeScreen auto-nav exactly: exactly one saved league jumps straight to
-  // its Dashboard; two or more land on the cross-league Portfolio view
-  // instead of guessing which one; zero saved leagues falls through to the
-  // normal guest/account flow below. Only applies once, on load — never
-  // re-triggers mid-flow.
+  // session) should land straight in their league, not be asked to sign in
+  // again, and not have to pick a league back out of a list every time
+  // either (coridian_, 2026-10-17: "the website needs to remember that
+  // you've signed in, and whenever you open it, it needs to take you to
+  // the dashboard"). Mirrors mobile's own HomeScreen auto-nav exactly:
+  // exactly one saved league jumps straight to its Dashboard; two or more
+  // land on the cross-league Portfolio view instead of guessing which one;
+  // zero saved leagues falls through to the normal sign-in flow below.
+  // Only applies once, on load — never re-triggers mid-flow.
   useEffect(() => {
     if (loading || !session || skippedExistingSession.current) return;
     skippedExistingSession.current = true;
-    setGuestAgeConfirmed(true);
     setAccountReady(true);
     setCheckingSavedLeagues(true);
     (async () => {
@@ -139,36 +128,8 @@ function LandingPageContent() {
         <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
           Works with your Sleeper league — ESPN support is on the way.
         </p>
-        <div className="flex" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-          <button
-            onClick={() => setTab("account")}
-            className="flex-1 px-3 py-2 text-sm font-bold"
-            style={{
-              color: tab === "account" ? "var(--color-accent)" : "var(--color-text-muted)",
-              borderBottom: tab === "account" ? "var(--border-width-semantic) solid var(--color-accent)" : "none",
-            }}
-          >
-            Sign in / Create account
-          </button>
-          <button
-            onClick={() => setTab("guest")}
-            className="flex-1 px-3 py-2 text-sm font-bold"
-            style={{
-              color: tab === "guest" ? "var(--color-accent)" : "var(--color-text-muted)",
-              borderBottom: tab === "guest" ? "var(--border-width-semantic) solid var(--color-accent)" : "none",
-            }}
-          >
-            Try without an account
-          </button>
-        </div>
 
-        {tab === "guest" ? (
-          guestAgeConfirmed ? (
-            <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
-          ) : (
-            <AgeGate onConfirmed={() => setGuestAgeConfirmed(true)} />
-          )
-        ) : accountReady ? (
+        {accountReady ? (
           !carouselDone ? (
             <OnboardingCarousel onDone={() => setCarouselDone(true)} />
           ) : paywallDismissed ? (

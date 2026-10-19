@@ -1339,7 +1339,16 @@ a {
   background: var(--color-bg);
   color: var(--color-text-primary);
   position: relative;
-  overflow: hidden;
+  /* overflow: hidden alone clipped real page content (the rest of the
+     sign-in card) on any browser window shorter than the full page — not
+     just below the fold, unreachable, since a plain `hidden` box has no
+     scrollbar. Only .onboarding-sweep (height: 140%, below) actually needs
+     clipping; overflow-y: auto keeps that same clip at rest while letting
+     a visitor scroll to content that doesn't fit. Zach: "why is it cut
+     off" (screenshot of the real landing page, Continue button right at
+     the window edge). */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Same hand-rolled animated field-line + sweep background the carousel

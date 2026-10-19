@@ -2,8 +2,67 @@
 
 import { useEffect, useState } from "react";
 
-import { api, type BillingPlansResponse } from "@/lib/api";
-import { PlanCard } from "@/components/PremiumContent";
+import { api, type BillingPlan, type BillingPlansResponse } from "@/lib/api";
+import { EmbeddedCheckoutModal } from "@/components/EmbeddedCheckoutModal";
+
+// Zach: "have one product here and call it Get Started For Free with a few
+// bullets" (first pass: one CTA, the annual plan, with a handful of its
+// real feature bullets in a card), then immediately after seeing it live:
+// "have an annual button instead of showing the plan" — dropped the card/
+// bullets entirely, down to a single button. Price/terms stay disclosed as
+// fine print below the button (can't start a real paid trial without
+// saying what it costs after), just no card chrome or feature list. The
+// monthly-vs-annual choice still exists on /premium for anyone who wants
+// it later.
+function FreeTrialButton({ plan, publishableKey }: { plan: BillingPlan; publishableKey: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+
+  const subscribe = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.startBillingCheckout(plan.tier, plan.interval, "/", "embedded");
+      if (!result.client_secret) throw new Error("Could not start checkout.");
+      setClientSecret(result.client_secret);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start checkout.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {error ? (
+        <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
+          {error}
+        </p>
+      ) : null}
+      <button
+        type="button"
+        onClick={subscribe}
+        disabled={busy}
+        className="px-4 py-2.5 text-sm font-bold"
+        style={{
+          background: "var(--color-accent-strong)",
+          color: "var(--color-brand-mark-ink)",
+          fontWeight: "var(--font-weight-button)",
+          opacity: busy ? "var(--opacity-disabled)" : 1,
+        }}
+      >
+        {busy ? "Starting…" : "Get Started For Free"}
+      </button>
+      <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
+        Then {plan.price} {plan.cadence} — cancel anytime before your trial ends and you&apos;re never charged.
+      </p>
+      {clientSecret ? (
+        <EmbeddedCheckoutModal clientSecret={clientSecret} publishableKey={publishableKey} onClose={() => setClientSecret(null)} />
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Shown once, right after a brand-new account's first real sign-in (email
@@ -13,10 +72,6 @@ import { PlanCard } from "@/components/PremiumContent";
  * away before they ever reach here, so by construction this never shows to
  * an existing, onboarded user). Skippable: this is a trial offer, not a
  * hard gate — Free access stays real and immediate.
- *
- * `returnTo="/"` on each plan's checkout so a completed purchase resumes
- * onboarding (connect Sleeper) instead of landing on the standalone
- * /premium page, which would otherwise be a dead end mid-signup.
  */
 export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
   const [plans, setPlans] = useState<BillingPlansResponse | null>(null);
@@ -37,6 +92,8 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
     };
   }, []);
 
+  const annualPlan = plans?.plans.find((plan) => plan.interval === "annual") ?? plans?.plans[0] ?? null;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 text-center">
@@ -50,21 +107,12 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
         <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
           {error}
         </p>
-      ) : !plans ? (
+      ) : !annualPlan ? (
         <p className="text-sm text-center" style={{ color: "var(--color-text-muted)" }}>
           Loading plans…
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {plans.plans.map((plan) => (
-            <PlanCard
-              key={`${plan.tier}-${plan.interval}`}
-              plan={plan}
-              returnTo="/"
-              publishableKey={plans.stripe_publishable_key}
-            />
-          ))}
-        </div>
+        <FreeTrialButton plan={annualPlan} publishableKey={plans?.stripe_publishable_key ?? ""} />
       )}
 
       <button

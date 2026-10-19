@@ -17,14 +17,13 @@ vi.mock("@/lib/api", async () => {
 
 const PLANS: BillingPlan[] = [
   { tier: "pro", interval: "monthly", label: "Monthly", price: "$9.99", cadence: "per month", features: ["Full League Pulse"] },
-  { tier: "pro", interval: "annual", label: "Annual", price: "$59.99", cadence: "per year", features: ["Full League Pulse"] },
   {
-    tier: "front_office",
+    tier: "pro",
     interval: "annual",
     label: "Annual",
-    price: "$99.99",
+    price: "$59.99",
     cadence: "per year",
-    features: ["Everything in Pro"],
+    features: ["Full League Pulse", "Every Trade Hub idea", "GM Targets watchlist up to 50 players", "Portfolio across every league", "Complete waiver board"],
   },
 ];
 
@@ -34,13 +33,18 @@ describe("OnboardingPaywall", () => {
     vi.mocked(api.startBillingCheckout).mockReset();
   });
 
-  it("loads and renders all 3 plans", async () => {
+  // Zach: "have one product here and call it Get Started For Free with a
+  // few bullets", then immediately after seeing it live: "have an annual
+  // button instead of showing the plan" — one button for the annual plan,
+  // price disclosed as fine print below it, no card or feature list.
+  it("renders a single Get Started For Free button for the annual plan, no card or bullets", async () => {
     vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS, stripe_publishable_key: "pk_test_123" });
     render(<OnboardingPaywall onSkip={vi.fn()} />);
 
-    expect(await screen.findByText("$9.99")).toBeInTheDocument();
-    expect(screen.getByText("$59.99")).toBeInTheDocument();
-    expect(screen.getByText("$99.99")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Get Started For Free" })).toBeInTheDocument();
+    expect(screen.getByText(/Then \$59\.99 per year/)).toBeInTheDocument();
+    expect(screen.queryByText("$9.99")).not.toBeInTheDocument();
+    expect(screen.queryByText("Full League Pulse")).not.toBeInTheDocument();
   });
 
   it("calls onSkip when 'Skip for now' is clicked", async () => {
@@ -48,13 +52,13 @@ describe("OnboardingPaywall", () => {
     const onSkip = vi.fn();
     render(<OnboardingPaywall onSkip={onSkip} />);
 
-    await screen.findByText("$9.99");
+    await screen.findByRole("button", { name: "Get Started For Free" });
     fireEvent.click(screen.getByText("Skip for now — continue free"));
 
     expect(onSkip).toHaveBeenCalledTimes(1);
   });
 
-  it("starts embedded checkout with return_to='/' so a purchase resumes onboarding", async () => {
+  it("starts embedded checkout for the annual plan with return_to='/' so a purchase resumes onboarding", async () => {
     vi.mocked(api.getBillingPlans).mockResolvedValue({ ok: true, plans: PLANS, stripe_publishable_key: "pk_test_123" });
     vi.mocked(api.startBillingCheckout).mockResolvedValue({
       ok: true,
@@ -62,11 +66,10 @@ describe("OnboardingPaywall", () => {
     });
     render(<OnboardingPaywall onSkip={vi.fn()} />);
 
-    await screen.findByText("$9.99");
-    fireEvent.click(screen.getAllByRole("button", { name: "Subscribe" })[0]);
+    fireEvent.click(await screen.findByRole("button", { name: "Get Started For Free" }));
 
     expect(await screen.findByLabelText("Close checkout")).toBeInTheDocument();
-    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "monthly", "/", "embedded");
+    expect(api.startBillingCheckout).toHaveBeenCalledWith("pro", "annual", "/", "embedded");
   });
 
   it("shows an error instead of plans when they fail to load", async () => {
