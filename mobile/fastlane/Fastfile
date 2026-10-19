@@ -145,17 +145,21 @@ platform :ios do
     # signing pointed at match's profile before archiving.
     update_code_signing_settings(
       use_automatic_signing: false,
-      path: "ios/FantasyGMLab.xcodeproj",
+      path: "ios/FantasyDesk.xcodeproj",
       team_id: ENV.fetch("APPLE_TEAM_ID"),
       code_sign_identity: "Apple Distribution",
       bundle_identifier: ENV.fetch("FGL_BUNDLE_ID"),
       profile_name: ENV.fetch("sigh_#{ENV.fetch('FGL_BUNDLE_ID')}_appstore_profile-name"),
     )
     build_app(
-      # Confirmed against a real `expo prebuild` run — Expo names both
-      # "FantasyGMLab" (from app.json's `name`, spaces stripped).
-      workspace: ENV["FGL_IOS_WORKSPACE"] || "ios/FantasyGMLab.xcworkspace",
-      scheme: ENV["FGL_IOS_SCHEME"] || "FantasyGMLab",
+      # Expo names both from app.json's `name` (spaces stripped) — that was
+      # "FantasyGMLab" when this lane was written; the FantasyDesk rebrand
+      # (app.json's `name` is now "FantasyDesk") changed what `expo
+      # prebuild` actually generates here without anyone updating this
+      # hardcoded default — confirmed against a real prebuild run after the
+      # rebrand broke `ios beta` with "Path is invalid" on the old name.
+      workspace: ENV["FGL_IOS_WORKSPACE"] || "ios/FantasyDesk.xcworkspace",
+      scheme: ENV["FGL_IOS_SCHEME"] || "FantasyDesk",
       export_method: "app-store",
       xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('APPLE_TEAM_ID')}",
     )
@@ -170,15 +174,15 @@ platform :ios do
     match(type: "appstore", api_key: api_key, readonly: true)
     update_code_signing_settings(
       use_automatic_signing: false,
-      path: "ios/FantasyGMLab.xcodeproj",
+      path: "ios/FantasyDesk.xcodeproj",
       team_id: ENV.fetch("APPLE_TEAM_ID"),
       code_sign_identity: "Apple Distribution",
       bundle_identifier: ENV.fetch("FGL_BUNDLE_ID"),
       profile_name: ENV.fetch("sigh_#{ENV.fetch('FGL_BUNDLE_ID')}_appstore_profile-name"),
     )
     build_app(
-      workspace: ENV["FGL_IOS_WORKSPACE"] || "ios/FantasyGMLab.xcworkspace",
-      scheme: ENV["FGL_IOS_SCHEME"] || "FantasyGMLab",
+      workspace: ENV["FGL_IOS_WORKSPACE"] || "ios/FantasyDesk.xcworkspace",
+      scheme: ENV["FGL_IOS_SCHEME"] || "FantasyDesk",
       export_method: "app-store",
       xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch('APPLE_TEAM_ID')}",
     )
