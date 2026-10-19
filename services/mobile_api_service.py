@@ -1979,22 +1979,45 @@ def _resolve_my_roster(
 ) -> tuple[dict[str, Any] | None, str]:
     """Identify which of this league's rosters belongs to the signed-in user.
 
-    Resolves via the Sleeper username linked on their profile (same
-    profiles.sleeper_username the web app sets) -> Sleeper user_id -> the
-    roster whose owner_id matches. All non-matches are expected, everyday
-    states (not errors) — callers return 200 with the `reason` rather than
-    an HTTP error status for any of them.
+    Resolves via a Sleeper username -> Sleeper user_id -> the roster whose
+    owner_id matches. All non-matches are expected, everyday states (not
+    errors) — callers return 200 with the `reason` rather than an HTTP
+    error status for any of them.
+
+    coridian_, real production repro: an account that links a SECOND
+    Sleeper username (e.g. a throwaway test league) overwrites
+    profiles.sleeper_username — the single, global value this function used
+    to read exclusively — which silently broke roster resolution for every
+    OTHER already-saved league still linked under the first username, even
+    though saved_leagues.sleeper_username (captured per-league, at save
+    time) still has the right one sitting right there. Now prefers that
+    per-league value when a saved_leagues row exists for this league_id,
+    falling back to the profile's global value otherwise (the exact
+    previous behavior, unchanged for the common one-Sleeper-username case
+    and for leagues not yet saved, e.g. mid-import).
 
     `profile` lets a caller that already fetched the profile (e.g. for
     entitlement) pass it in instead of this function fetching it again —
     same Supabase round trip, not two.
     """
 
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
     if profile is None:
-        config = auth_supabase.get_supabase_config()
-        user_id = str(user.get("id") or "")
-        profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or "")) if user_id else {}
-    sleeper_username = str(profile.get("sleeper_username") or "")
+        profile = _fetch_profile_fields(config, user_id, access_token) if user_id else {}
+
+    sleeper_username = ""
+    if user_id:
+        saved_rows, saved_error = account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+        if not saved_error:
+            normalized_league_id = saved_leagues.normalize_league_id(league_id)
+            for row in saved_rows:
+                if saved_leagues.normalize_league_id(row.get("league_id")) == normalized_league_id:
+                    sleeper_username = str(row.get("sleeper_username") or "")
+                    break
+    if not sleeper_username:
+        sleeper_username = str(profile.get("sleeper_username") or "")
     if not sleeper_username:
         return None, "no_sleeper_username_linked"
 
@@ -5757,6 +5780,14 @@ def _build_portfolio_row(
     if not league_id:
         return {"status": "skip"}
     league_name = str(row.get("league_name") or "").strip() or league_id
+    # Same fix as _resolve_my_roster: this row's OWN sleeper_username
+    # (captured when this specific league was saved) over the account-wide
+    # `sleeper_username` param, which only reflects whichever Sleeper
+    # account was linked most recently — real repro, coridian_: linking a
+    # second Sleeper username for a new league silently broke every other
+    # saved league in Portfolio that was linked under the first one, even
+    # though the right username was sitting right here on each row.
+    row_sleeper_username = str(row.get("sleeper_username") or "") or sleeper_username
 
     try:
         team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
@@ -5766,7 +5797,7 @@ def _build_portfolio_row(
         summary = dashboard_engine.build_league_summary(
             league_id=league_id,
             lens=lens,
-            sleeper_username=sleeper_username,
+            sleeper_username=row_sleeper_username,
             players_db_path=PLAYERS_DB_PATH,
             team_stance_value=team_stance_value,
             gm_target_player_ids=gm_target_ids,
