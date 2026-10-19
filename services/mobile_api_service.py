@@ -1971,6 +1971,38 @@ def get_league_draft_picks(
     return {"ok": True, "picks": projected, "reason": ""}
 
 
+# coridian_, 2026-10-19: real reported site-wide load-time regression,
+# traced to account_store.fetch_saved_leagues (a plain, uncached Supabase
+# round trip) having no cache at all, newly called from inside
+# _resolve_my_roster as of the per-league-username fix above -- and
+# _resolve_my_roster is itself called from ~14 different single-league
+# endpoints (Dashboard, My Team, Matchup, Waivers, Trade Hub, Alerts, GM
+# Plan, GM Targets, Draft Center, Trade Analyzer, Trade Finder, League
+# Rankings, Team Situation, Live Draft state), so every one of those page
+# loads paid a fresh ~150-250ms Supabase round trip that didn't exist
+# before today. Short TTL on purpose: saved_leagues only changes on a
+# deliberate user action (add/remove/relink a league), so a brief
+# staleness window is invisible in practice while still collapsing a
+# user's whole burst of navigation (Dashboard -> Waivers -> Trade Hub in
+# a few seconds) down to effectively one real fetch.
+_SAVED_LEAGUES_TTL_SECONDS = 15
+
+
+def _fetch_saved_leagues_cached(config: dict, access_token: str, user_id: str) -> tuple[list[dict], str]:
+    cache_key = redis_cache.build_cache_key("saved_leagues", user_id)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_SAVED_LEAGUES_TTL_SECONDS,
+            compute=lambda: account_store.fetch_saved_leagues(config, access_token, user_id=user_id),
+        )
+    except Exception:
+        # Same fail-open contract redis_single_flight_cache documents for a
+        # Redis outage -- never let a cache-layer problem turn into a
+        # roster-resolution failure.
+        return account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+
+
 def _resolve_my_roster(
     user: dict[str, Any],
     league_id: str,
@@ -2009,7 +2041,7 @@ def _resolve_my_roster(
 
     sleeper_username = ""
     if user_id:
-        saved_rows, saved_error = account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+        saved_rows, saved_error = _fetch_saved_leagues_cached(config, access_token, user_id)
         if not saved_error:
             normalized_league_id = saved_leagues.normalize_league_id(league_id)
             for row in saved_rows:
@@ -5888,7 +5920,7 @@ def get_portfolio(lens: str = "Dynasty", user: dict[str, Any] = Depends(require_
     if not user_id:
         return {"ok": True, "is_premium": True, "lens": lens, "leagues": [], "failed_leagues": [], "upsell": None}
 
-    saved_rows, error = account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+    saved_rows, error = _fetch_saved_leagues_cached(config, access_token, user_id)
     if error:
         return {
             "ok": True,
@@ -6136,7 +6168,7 @@ def get_leagues_glance(lens: str = "Dynasty", user: dict[str, Any] = Depends(req
     if not user_id:
         return base
 
-    saved_rows, error = account_store.fetch_saved_leagues(config, access_token, user_id=user_id)
+    saved_rows, error = _fetch_saved_leagues_cached(config, access_token, user_id)
     if error:
         return {**base, "reason": "saved_leagues_unavailable"}
 
