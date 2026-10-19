@@ -5711,6 +5711,36 @@ def test_get_team_stance_includes_the_backend_computed_strategy(monkeypatch):
     assert body["strategy"] == "rebuild"
 
 
+def test_team_stance_caches_across_requests_for_the_same_user_and_league(monkeypatch):
+    """coridian_, 2026-10-19: third uncached hot path found in the same
+    site-wide load-time audit as saved_leagues/profile_fields —
+    _fetch_team_stance had no cache at all despite ~11 call sites. Two
+    back-to-back requests for the SAME (user, league), within the short
+    TTL, must reuse the cached fetch (one requests.get for it, not two)."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-cache-999", "email": "gm@example.com"}
+    team_stance_response = Mock(status_code=200)
+    team_stance_response.json.return_value = [{"stance": "competing"}]
+
+    # Exactly 3 responses for 2 requests' worth of auth + 1 stance fetch —
+    # if the cache failed to hit, the second request would exhaust this
+    # list.
+    with patch(
+        "requests.get",
+        side_effect=[auth_user_response, team_stance_response, auth_user_response],
+    ):
+        first = client.get("/v1/leagues/cache-league/team-stance", headers={"Authorization": "Bearer good-token"})
+        second = client.get("/v1/leagues/cache-league/team-stance", headers={"Authorization": "Bearer good-token"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["stance"] == "competing"
+    assert second.json()["stance"] == "competing"
+
+
 def test_get_team_stance_defaults_to_retool_strategy_when_nothing_stored(monkeypatch):
     client = _client(monkeypatch)
 
