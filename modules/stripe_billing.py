@@ -434,6 +434,8 @@ def create_checkout_session(
     cancel_url: str = "",
     trial_days: int | None = None,
     now: datetime | None = None,
+    ui_mode: str = "hosted",
+    return_url: str = "",
 ):
     """Start a Stripe Checkout session for the given (tier, interval).
 
@@ -447,6 +449,18 @@ def create_checkout_session(
     explicitly to force no trial on a Pro checkout. Trial mechanics are
     entirely Stripe-native (`subscription_data.trial_period_days`) — this
     function does not track trial state locally.
+
+    Zach, 2026-10-19: "We need to try to embed stripe so theres not a
+    million redirectes" — `ui_mode="embedded"` returns a session carrying
+    `client_secret` (mounted client-side via Stripe.js's EmbeddedCheckout,
+    which also surfaces Apple Pay/Google Pay automatically — no separate
+    Payment Element build or manual Apple Pay domain registration needed,
+    both are already handled by the Checkout product itself) instead of a
+    hosted `url` to redirect to. Stripe requires exactly one of
+    (success_url + cancel_url) XOR return_url depending on ui_mode — never
+    both — so this branches the kwargs rather than always building the
+    same dict. Default stays "hosted" (the redirect flow) so every
+    existing caller (Streamlit's premium_page.py) is unaffected.
     """
 
     _require_checkout_runtime(config)
@@ -463,18 +477,31 @@ def create_checkout_session(
     )
     if resolved_trial_days and resolved_trial_days > 0:
         subscription_data["trial_period_days"] = int(resolved_trial_days)
+
+    embedded = _safe_text(ui_mode).casefold() == "embedded"
+    url_kwargs: dict[str, Any] = (
+        {
+            "ui_mode": "embedded",
+            "return_url": _safe_text(return_url)
+            or app_config.stripe_return_url("/?page=premium&billing=success", base_url=config.app_base_url),
+        }
+        if embedded
+        else {
+            "success_url": _safe_text(success_url or config.checkout_success_url)
+            or app_config.stripe_return_url("/?page=premium&billing=success", base_url=config.app_base_url),
+            "cancel_url": _safe_text(cancel_url or config.checkout_cancel_url)
+            or app_config.stripe_return_url("/?page=premium&billing=cancel", base_url=config.app_base_url),
+        }
+    )
+
     return stripe.checkout.Session.create(
         mode="subscription",
         customer_email=_safe_text(email) or None,
         line_items=[{"price": price_id, "quantity": 1}],
         allow_promotion_codes=True,
-        success_url=_safe_text(success_url or config.checkout_success_url)
-        or app_config.stripe_return_url("/?page=premium&billing=success", base_url=config.app_base_url),
-        cancel_url=_safe_text(cancel_url or config.checkout_cancel_url)
-        or app_config.stripe_return_url("/?page=premium&billing=cancel", base_url=config.app_base_url),
         client_reference_id=clean_user_id,
         # Reduce duplicate checkouts for the same user+interval+price.
-        idempotency_key=f"fgl-checkout-{clean_user_id}-{_safe_text(interval).casefold()}-{price_id}"[:255],
+        idempotency_key=f"fgl-checkout-{clean_user_id}-{_safe_text(interval).casefold()}-{price_id}-{ui_mode}"[:255],
         metadata={
             "supabase_user_id": clean_user_id,
             "billing_interval": _safe_text(interval).casefold(),
@@ -482,6 +509,7 @@ def create_checkout_session(
             "billing_tier": tier_key,
         },
         subscription_data=subscription_data,
+        **url_kwargs,
     )
 
 

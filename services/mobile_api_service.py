@@ -966,6 +966,12 @@ class CheckoutRequest(BaseModel):
     # (stripe_return_url never treats it as a full URL/host) — never a
     # redirect to an arbitrary external site.
     return_to: str = "/premium"
+    # Zach, 2026-10-19: "We need to try to embed stripe so theres not a
+    # million redirectes" — "hosted" (default) keeps the existing
+    # redirect-to-checkout.stripe.com flow; "embedded" returns a
+    # client_secret the frontend mounts in place via Stripe.js's
+    # EmbeddedCheckout instead of leaving the app at all.
+    ui_mode: str = "hosted"
 
 
 def _safe_return_path(path: str) -> str:
@@ -982,8 +988,10 @@ def create_billing_checkout(
 ) -> dict[str, Any]:
     """Start a real Stripe Checkout session for the signed-in caller.
 
-    Returns the Stripe-hosted checkout URL to redirect the browser to —
-    this app never collects card details itself.
+    Hosted mode (default) returns the Stripe-hosted checkout URL to
+    redirect the browser to. Embedded mode (body.ui_mode="embedded")
+    instead returns a client_secret the frontend mounts in place via
+    Stripe.js — either way, this app never collects card details itself.
     """
 
     user_id = str(user.get("id") or "")
@@ -992,6 +1000,7 @@ def create_billing_checkout(
         raise HTTPException(status_code=401, detail="Checkout requires a signed-in account.")
     config = stripe_billing.load_stripe_config()
     return_path = _safe_return_path(body.return_to)
+    embedded = str(body.ui_mode or "").strip().casefold() == "embedded"
     try:
         session = stripe_billing.create_checkout_session(
             config=config,
@@ -999,6 +1008,10 @@ def create_billing_checkout(
             email=email,
             interval=body.interval,
             tier=body.tier,
+            ui_mode="embedded" if embedded else "hosted",
+            return_url=app_config.stripe_return_url(f"{return_path}?billing=complete", base_url=config.app_base_url)
+            if embedded
+            else "",
             success_url=app_config.stripe_return_url(f"{return_path}?billing=success", base_url=config.app_base_url),
             cancel_url=app_config.stripe_return_url(f"{return_path}?billing=cancel", base_url=config.app_base_url),
         )
@@ -1013,6 +1026,13 @@ def create_billing_checkout(
         # caller, which still must never leak internal Stripe error text.
         logger.exception("Stripe checkout session creation failed for user_id=%s tier=%s interval=%s", user_id, body.tier, body.interval)
         raise HTTPException(status_code=502, detail="Could not start checkout.") from None
+
+    if embedded:
+        client_secret = str(getattr(session, "client_secret", "") or "")
+        if not client_secret:
+            raise HTTPException(status_code=502, detail="Could not start checkout.")
+        return {"ok": True, "client_secret": client_secret}
+
     checkout_url = str(getattr(session, "url", "") or "")
     if not checkout_url:
         raise HTTPException(status_code=502, detail="Could not start checkout.")

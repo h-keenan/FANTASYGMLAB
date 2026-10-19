@@ -105,7 +105,10 @@ export interface BillingPlansResponse {
 
 export interface BillingCheckoutResponse {
   ok: boolean;
-  checkout_url: string;
+  /** Present for the "hosted" ui_mode (the default) — redirect the browser here. */
+  checkout_url?: string;
+  /** Present for ui_mode="embedded" — mount via Stripe.js's EmbeddedCheckout instead. */
+  client_secret?: string;
 }
 
 export interface BillingPortalResponse {
@@ -1953,10 +1956,16 @@ export const api = {
     tier: BillingPlan["tier"],
     interval: BillingPlan["interval"],
     returnTo?: string,
+    uiMode?: "hosted" | "embedded",
   ) =>
     authorizedRequest<BillingCheckoutResponse>("/v1/billing/checkout", {
       method: "POST",
-      jsonBody: { tier, interval, ...(returnTo ? { return_to: returnTo } : {}) },
+      jsonBody: {
+        tier,
+        interval,
+        ...(returnTo ? { return_to: returnTo } : {}),
+        ...(uiMode ? { ui_mode: uiMode } : {}),
+      },
     }),
 
   openBillingPortal: () =>
