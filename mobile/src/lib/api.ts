@@ -1595,6 +1595,74 @@ export interface DashboardResponse {
   reason: string;
 }
 
+/**
+ * "Guess the Player" mini-game (coridian_, 2026-10-19: "on the app it would
+ * be a pop-up") — mirrors web-next's GuessThePlayer* types (web-next/src/
+ * lib/api.ts) exactly, since both clients hit the same GET /v1/guess-the-
+ * player / POST /v1/guess-the-player/answer (services/mobile_api_service.py).
+ * See modules/guess_the_player.py's module docstring for the real selection
+ * spec. `stat_line` only ever holds real per-week fields this app tracks
+ * (targets/receptions/rush or pass attempts) — never a fabricated yards/TD
+ * figure.
+ */
+export interface GuessThePlayerStatLineItem {
+  label: string;
+  value: number;
+}
+
+export interface GuessThePlayerOption {
+  player_id: string;
+  name: string;
+}
+
+export interface GuessThePlayerPrompt {
+  pick_id: string;
+  season: number;
+  week: number;
+  position: string;
+  /** Raw stored tier string (e.g. "depth") — same shape PlayerAvatar/
+   * resolvePlayerTier already normalize everywhere else, so the ring can
+   * render even before the reveal. */
+  tier: string;
+  stat_line: GuessThePlayerStatLineItem[];
+  fantasy_points_ppr: number;
+  options: GuessThePlayerOption[];
+}
+
+export interface GuessThePlayerStreak {
+  current_streak: number;
+  best_streak: number;
+}
+
+export interface GuessThePlayerCorrectIdentity {
+  player_id: string;
+  name: string;
+  team: string;
+  position: string;
+  tier: string;
+}
+
+export interface GuessThePlayerResponse {
+  ok: boolean;
+  available: boolean;
+  reason: string;
+  prompt: GuessThePlayerPrompt | null;
+  already_answered: boolean;
+  last_result: 'correct' | 'incorrect' | null;
+  /** Only ever populated when `already_answered` is true — never sent
+   * alongside an unanswered prompt (that would leak the answer). */
+  correct_player: GuessThePlayerCorrectIdentity | null;
+  streak: GuessThePlayerStreak;
+}
+
+export interface GuessThePlayerAnswerResponse {
+  ok: boolean;
+  already_answered: boolean;
+  correct: boolean;
+  correct_player: GuessThePlayerCorrectIdentity;
+  streak: GuessThePlayerStreak;
+}
+
 /** The single highest-value-score player on a saved league's roster — the
  * top row of modules.dashboard_engine.build_league_summary's already-
  * computed roster_df, no new valuation math. Lean on purpose (not a full
@@ -1919,6 +1987,15 @@ export const api = {
   },
   getLeagueDashboard: (leagueId: string) =>
     authorizedFetch<DashboardResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/dashboard`),
+  // "Guess the Player" mini-game (coridian_, 2026-10-19) — league-
+  // independent, one shared daily pick for every signed-in user, so it
+  // doesn't take a leagueId the way getLeagueDashboard does.
+  getGuessThePlayer: () => authorizedFetch<GuessThePlayerResponse>('/v1/guess-the-player'),
+  answerGuessThePlayer: (pickId: string, playerId: string) =>
+    authorizedPost<GuessThePlayerAnswerResponse>('/v1/guess-the-player/answer', {
+      pick_id: pickId,
+      player_id: playerId,
+    }),
   /** Cross-league Portfolio — one row per saved league (Premium). */
   getPortfolio: () => authorizedFetch<PortfolioResponse>('/v1/portfolio'),
   /** "All leagues at a glance" cards for the My Leagues screen (Premium).
