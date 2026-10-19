@@ -6555,6 +6555,19 @@ def _reinstated_inactive_roster_rows(
     )
     combined = pd.concat([valued, hydrated], ignore_index=True, sort=False)
     combined = league_value_settings.apply_valuation_lens(combined, lens, settings)
+    # coridian_, 2026-10-19: "some IR players are still not listed with an
+    # overall [rating]" — real repro: this function already computes a real
+    # score/tier for a reinstated row (see this function's own docstring for
+    # that earlier fix), but the 0-99 "overall rating" badge is a SEPARATE
+    # percentile column (_overall_rating_col) that _suggested_lineup_split
+    # computes once over `valued` BEFORE these rows exist, so a reinstated
+    # row got concatenated in with no value for it at all (silently NaN,
+    # not zero) — the row had a real Value but no OVR gauge. Computed here,
+    # over the same `combined` population scored/tiered above, for the
+    # same percentile-needs-a-real-population reason already documented.
+    combined["_overall_rating_col"] = player_quick_view.overall_ratings_for_pool(
+        combined, score_column=score_field
+    )
     reinstated_ids = {rec["player_id"] for rec in identity_rows}
     scored = combined[combined["player_id"].astype(str).isin(reinstated_ids)]
 
@@ -6571,6 +6584,7 @@ def _reinstated_inactive_roster_rows(
                 "injury_status": _clean_json_value(row.get("injury_status")),
                 "player_tier": _clean_json_value(row.get("player_tier")),
                 "opportunity_label": _clean_json_value(row.get("opportunity_label")),
+                "_overall_rating_col": _clean_json_value(row.get("_overall_rating_col")),
                 score_field: _clean_json_value(row.get(score_field)),
             }
         )

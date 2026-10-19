@@ -9003,6 +9003,63 @@ def test_my_team_reinstates_rostered_inactive_player_instead_of_hiding_them(monk
     assert reinstated["tier"] == "Developmental"
 
 
+def test_reinstated_inactive_roster_row_gets_a_real_overall_rating(monkeypatch):
+    """coridian_, 2026-10-19: "some IR players are still not listed with an
+    overall [rating]" — real repro. _reinstated_inactive_roster_rows already
+    computed a real score/tier for a reinstated player (the 2026-10-16 fix),
+    but the separate 0-99 "overall rating" percentile column
+    (_overall_rating_col) was only ever computed over `valued` BEFORE the
+    reinstated row existed, so it concatenated in with no value for that
+    column at all (silently None, not zero/missing-on-purpose) — a real
+    Value but no OVR gauge. Calls the function directly (not through an
+    endpoint) with a 12-RB pool, clearing PERCENTILE_MIN_POOL (10), so the
+    percentile computation this test exists to check actually runs rather
+    than legitimately returning None for a too-thin pool.
+    """
+    from services import mobile_api_service
+
+    valued = pd.DataFrame(
+        [
+            {"player_id": f"rb{i}", "position": "RB", "dynasty_score": 1000 + i * 100}
+            for i in range(12)
+        ]
+    )
+    raw_players_lookup = {
+        "ir_rb": {
+            "player_id": "ir_rb",
+            "full_name": "IR Runner",
+            "position": "RB",
+            "fantasy_positions": ["RB"],
+            "team": "KC",
+            "status": "Inactive",
+            "injury_status": "IR",
+            "age": 24,
+        }
+    }
+
+    def _fake_hydrate(reference_frame, candidates):
+        return candidates.assign(dynasty_score=1150)
+
+    with patch("modules.rankings.hydrate_reconciled_valuations_from_cache", side_effect=_fake_hydrate):
+        with patch("modules.league_value_settings.apply_valuation_lens", side_effect=lambda df, lens, settings: df):
+            rows = mobile_api_service._reinstated_inactive_roster_rows(
+                {"ir_rb"},
+                players_lookup=raw_players_lookup,
+                valued=valued,
+                # A real (non-empty) settings dict -- an empty one is the
+                # "no reference population" early-return guard's actual
+                # falsy check, same as `valued is None`/`valued.empty`.
+                settings={"scoring_settings": {}},
+                score_field="dynasty_score",
+            )
+
+    assert len(rows) == 1
+    assert rows[0]["player_id"] == "ir_rb"
+    assert rows[0]["dynasty_score"] == 1150
+    assert rows[0]["_overall_rating_col"] is not None, "a reinstated IR player must get a real overall rating, not a silently missing one"
+    assert 0 <= rows[0]["_overall_rating_col"] <= 99
+
+
 def test_my_team_bench_distinguishes_ir_and_taxi_from_plain_bench(monkeypatch):
     """A real IR/taxi placement must read distinctly from an ordinary
     scratched bench player — the gap this endpoint used to have (bench was
