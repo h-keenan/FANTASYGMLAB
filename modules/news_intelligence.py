@@ -368,6 +368,12 @@ class NewsAlert:
             "tone": "risk" if self.severity in {SEV_CRITICAL, SEV_HIGH} else "opportunity",
             "route_key": "alerts" if self.event.roster_relationship == REL_FREE_AGENT else "my_team",
             "route_player_id": self.event.player_id,
+            # BriefingItemPlayers.tsx only renders an identity card when
+            # route_player_name AND route_player_id are both truthy — this
+            # tile had player_name sitting in the display-only
+            # news_player_name field below, so a resolved player_id alone
+            # never got a card (the "Turpin ruled out" gap coridian_ flagged).
+            "route_player_name": self.event.player_name,
             "player_id": self.event.player_id,
             "news_player_name": self.event.player_name,
             "recommendation_id": stable_id,
