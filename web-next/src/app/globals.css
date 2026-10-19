@@ -1372,7 +1372,21 @@ a {
     rgba(255, 255, 255, 0.06) 55%,
     transparent
   );
-  animation: onboarding-sweep 7s ease-in-out infinite;
+  /* coridian_, 2026-10-19: "on desktop, that background animation looks a
+     little clunky because of the width of the screen, so you can see the
+     animation stop and then loop" — this beam's own width/travel distance
+     scale with the landing page's full-bleed width, but the shared
+     onboarding-sweep keyframe's ease-in-out timing decelerates to a near-
+     stop right at each end of its path before instantly snapping back to
+     the start. On a narrow surface (PQV's modal, the onboarding carousel)
+     that deceleration happens over a much shorter physical distance and
+     reads as a soft glow; on a wide desktop viewport the same deceleration
+     plays out over hundreds of extra pixels of empty runway, so the
+     "slow... stop... jump" is plainly visible. linear removes the
+     deceleration (so there's nothing to visibly "stop") without touching
+     the travel path, duration, angle, or color — every other reuse of the
+     shared keyframe (PQV, onboarding carousel) is untouched. */
+  animation: onboarding-sweep 7s linear infinite;
 }
 .fd-landing-dark > * {
   position: relative;
