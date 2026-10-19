@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import {
   api,
   ApiError,
@@ -49,6 +50,11 @@ export default function LiveDraftPage() {
   // never tracks this itself).
   const previousRanksRef = useRef<Record<string, number>>({});
   const previousTeamRanksRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!session) return;
+    trackFeatureUse("live_draft_opened", { leagueId });
+  }, [session, leagueId]);
 
   useEffect(() => {
     if (authLoading) return;

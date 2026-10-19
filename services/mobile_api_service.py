@@ -8,6 +8,8 @@ Deployment topology (Render):
   - GET  /v1/me               — authenticated user + entitlement + saved-league cap
   - GET  /v1/founder/analytics — founder-only product analytics report (403 for
                                   anyone without a server-issued founder_ops claim)
+  - POST /v1/analytics/event   — record one product analytics event (guest-allowed;
+                                  see modules.launch_analytics.TRACKED_EVENTS)
   - POST /v1/me/link-sleeper  — link a Sleeper username onto the caller's profile (roster resolution)
   - GET  /v1/sleeper/leagues?username=x  — the Sleeper leagues behind a username (add-league picker)
   - POST /v1/leagues/save                — save a Sleeper league to the account (cap-enforced)
@@ -125,6 +127,7 @@ from modules import (
     gm_targets,
     guess_the_player,
     injury_ui,
+    launch_analytics,
     league_format_context,
     league_history,
     league_glance,
@@ -705,6 +708,56 @@ def require_user(
     return normalized
 
 
+def optional_user(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any] | None:
+    """Same Supabase verification as require_user, but degrades to None
+    instead of raising for a missing header, an invalid/expired token, or an
+    unconfigured Supabase backend.
+
+    POST /v1/analytics/event is the first endpoint on this service that must
+    accept both authenticated and fully anonymous/guest callers on the same
+    request path (most of modules.launch_analytics.TRACKED_EVENTS are
+    guest/pre-auth events — landing_viewed, guest_*, signup_started, etc.),
+    so require_user's hard 401/503 doesn't fit. Still populates
+    request.state.user_id / Sentry user context when a session IS present,
+    same as require_user, so crash attribution stays consistent either way.
+    Deliberately skips require_user's _maybe_schedule_players_refresh() side
+    effect — analytics pings have nothing to do with players.db freshness.
+    """
+
+    value = (authorization or "").strip()
+    if not value:
+        return None
+    scheme, _, token = value.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    token = token.strip()
+    try:
+        config = auth_supabase.get_supabase_config()
+        if not auth_supabase.is_configured(config):
+            return None
+        user, _error = auth_supabase.fetch_auth_user(config, token)
+    except Exception:
+        return None
+    if not user:
+        return None
+    normalized = auth_supabase.normalize_auth_user(user, access_token=token)
+    normalized["_access_token"] = token
+    user_id = normalized.get("id")
+    if user_id:
+        request.state.user_id = user_id
+        if SENTRY_DSN:
+            try:
+                import sentry_sdk
+
+                sentry_sdk.set_user({"id": user_id})
+            except Exception:
+                pass
+    return normalized
+
+
 # coridian_, 2026-10-19: real reported site-wide load-time complaint
 # (separate regression already fixed for account_store.fetch_saved_leagues
 # -- see _fetch_saved_leagues_cached above). Auditing every authenticated
@@ -859,6 +912,124 @@ def get_founder_analytics(
     window_key = window if window in valid_windows else "7d"
     report = founder_analytics.build_report(window_key=window_key)
     return {"ok": True, "report": report}
+
+
+class AnalyticsEventRequest(BaseModel):
+    """Body for POST /v1/analytics/event.
+
+    `event` must already be a canonical name from
+    modules.launch_analytics.TRACKED_EVENTS (anything else is a no-op, same
+    allowlist discipline track_event itself already enforces). `anon_id` is
+    minted and persisted client-side (web-next's lib/analytics.ts, mobile's
+    equivalent) — this service has no server-side session object to
+    mint-once-and-persist into the way
+    modules.launch_analytics.anonymous_id() does for Streamlit's
+    `st.session_state` (see that function's docstring). `once_key` is an
+    OPAQUE per-call dedup hint the client supplies (e.g. a league id) — see
+    record_analytics_event for why this endpoint always re-scopes it before
+    handing it to track_event.
+    """
+
+    event: str
+    props: dict[str, Any] | None = None
+    anon_id: str
+    once_key: str | None = None
+
+
+@app.post("/v1/analytics/event")
+def record_analytics_event(
+    body: AnalyticsEventRequest,
+    user: dict[str, Any] | None = Depends(optional_user),
+) -> dict[str, bool]:
+    """Product analytics ingestion for web-next/mobile — the only caller of
+    modules.launch_analytics.track_event/track_page_view from this service.
+
+    The real bug this closes: analytics_events had zero rows despite real
+    user traffic, because neither web-next nor mobile ever called into
+    modules.launch_analytics at all — its only existing caller was the
+    legacy Streamlit app.py, which current users (web-next on
+    fantasydesk.app, the mobile app) don't hit anymore. That module's
+    track_* functions expect a Streamlit-session-state-shaped `state` dict
+    (anonymous_id()/hash_account_id() read/write specific keys on it, e.g.
+    to mint-once-and-persist a stable anon id across reruns in the same
+    browser tab) — a stateless FastAPI request has no equivalent. This
+    endpoint builds that shape fresh per request (the "shim") from the
+    caller's own client-generated anon_id plus, when present, their verified
+    Supabase user id, then calls straight into the existing, already-tested
+    track_event/track_page_view so their dedup/account-hashing/
+    ROUTE_EVENT_MAP/internal-traffic-exclusion logic is reused unchanged
+    instead of re-implemented here.
+
+    Deliberately permissive of anonymous callers (`Depends(optional_user)`,
+    not `require_user`) — most of TRACKED_EVENTS are guest/pre-auth events
+    (landing_viewed, guest_*, signup_started, ...), and requiring auth here
+    would silently drop every one of them.
+
+    Fail-soft by contract, like every other launch_analytics write path: an
+    unrecognized event, a malformed/missing anon_id, or any internal error
+    here returns `{"ok": False}` rather than ever raising — an analytics
+    ping must never fail a real user-facing request.
+    """
+
+    try:
+        event_name = launch_analytics.normalize_event_name(str(body.event or "").strip())
+        if event_name not in launch_analytics.TRACKED_EVENTS:
+            return {"ok": False}
+        anon_id = str(body.anon_id or "").strip()
+        if not anon_id:
+            return {"ok": False}
+        raw_props = dict(body.props) if isinstance(body.props, dict) else {}
+
+        user_id = str((user or {}).get("id") or "").strip()
+        state_shim: dict[str, Any] = {launch_analytics.SESSION_ANON_KEY: anon_id}
+        if user_id:
+            state_shim["auth_session"] = {"user_id": user_id}
+
+        if event_name == "page_view":
+            route = str(raw_props.get("route") or "").strip()
+            if not route:
+                return {"ok": False}
+            launch_analytics.track_page_view(
+                route,
+                state=state_shim,
+                source_surface=str(raw_props.get("source_surface") or "navigation"),
+            )
+            return {"ok": True}
+
+        # Non-route events: build the same safe/pseudonymous context props
+        # build_context_props already assembles for every other caller
+        # (account_state, entitlement default, league_key, route,
+        # source_surface, experiment flags), then forward whatever this
+        # caller also sent in `props` on top.
+        context_props = launch_analytics.build_context_props(
+            state_shim,
+            route=str(raw_props.get("route") or ""),
+            source_surface=str(raw_props.get("source_surface") or "feature"),
+            league_id=str(raw_props.get("league_id") or ""),
+            extra=raw_props,
+        )
+
+        # The client-supplied once_key is opaque (e.g. a raw league id) and
+        # must be scoped to THIS caller before reaching track_event, whose
+        # dedup marker set (_SESSION_EMITTED) is one process-global set
+        # shared by every request — an un-scoped once_key would let one
+        # account's event permanently suppress every other account's
+        # identical event.
+        once_key = ""
+        if body.once_key and body.once_key.strip():
+            scope = launch_analytics.hash_account_id(user_id) if user_id else anon_id
+            league_scope = launch_analytics.hash_league_id(str(raw_props.get("league_id") or ""))
+            once_key = f"{scope}:{league_scope}:{event_name}:{body.once_key.strip()}"
+
+        launch_analytics.track_event(
+            event_name,
+            props=context_props,
+            once_key=once_key,
+            state=state_shim,
+        )
+        return {"ok": True}
+    except Exception:
+        return {"ok": False}
 
 
 @app.get("/v1/me")

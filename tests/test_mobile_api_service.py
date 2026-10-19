@@ -531,6 +531,198 @@ def test_founder_analytics_falls_back_to_default_window_for_unknown_value(monkey
     mock_build_report.assert_called_once_with(window_key="7d")
 
 
+# --- POST /v1/analytics/event -----------------------------------------------
+#
+# The real bug these tests guard: web-next/mobile never called into
+# modules.launch_analytics at all (only the legacy Streamlit app.py did, and
+# real users don't hit that anymore), so analytics_events stayed empty
+# despite real traffic. This endpoint is the fix — the first caller of
+# launch_analytics.track_event/track_page_view from this service.
+
+
+def test_analytics_event_rejects_an_event_name_outside_the_allowlist(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "not_a_real_event", "anon_id": "anon_abc123"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False}
+    mock_track.assert_not_called()
+
+
+def test_analytics_event_rejects_a_blank_anon_id(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "  "},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False}
+    mock_track.assert_not_called()
+
+
+def test_analytics_event_allows_a_fully_anonymous_caller_with_no_authorization_header(monkeypatch):
+    # Most of TRACKED_EVENTS are guest/pre-auth events -- this endpoint must
+    # not require Depends(require_user)'s strict 401.
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    mock_track.assert_called_once()
+    _args, kwargs = mock_track.call_args
+    assert "auth_session" not in kwargs["state"]
+    assert kwargs["state"][mobile_api_service.launch_analytics.SESSION_ANON_KEY] == "anon_abc123"
+
+
+def test_analytics_event_derives_user_id_from_a_valid_bearer_token(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track,
+    ):
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+            headers={"Authorization": "Bearer good-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    _args, kwargs = mock_track.call_args
+    assert kwargs["state"]["auth_session"]["user_id"] == "user-123"
+
+
+def test_analytics_event_with_an_invalid_bearer_token_degrades_to_anonymous(monkeypatch):
+    # An expired/invalid token must never turn a best-effort analytics ping
+    # into a 401 -- it just loses the account attribution.
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    auth_user_response = Mock(status_code=401)
+    auth_user_response.json.return_value = {"error": "invalid token"}
+
+    with (
+        patch("requests.get", return_value=auth_user_response),
+        patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track,
+    ):
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+            headers={"Authorization": "Bearer bad-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    _args, kwargs = mock_track.call_args
+    assert "auth_session" not in kwargs["state"]
+
+
+def test_analytics_event_page_view_routes_through_track_page_view(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_page_view") as mock_track_page_view:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "page_view", "anon_id": "anon_abc123", "props": {"route": "/trade-hub/123"}},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    mock_track_page_view.assert_called_once()
+    _args, kwargs = mock_track_page_view.call_args
+    assert _args[0] == "/trade-hub/123"
+
+
+def test_analytics_event_page_view_without_a_route_is_a_no_op(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_page_view") as mock_track_page_view:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "page_view", "anon_id": "anon_abc123"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False}
+    mock_track_page_view.assert_not_called()
+
+
+def test_analytics_event_scopes_once_key_per_caller_identity(monkeypatch):
+    # track_event's own dedup marker set is process-global, not request-
+    # scoped -- two different accounts sending the literal same once_key
+    # must never suppress each other's event.
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        client.post(
+            "/v1/analytics/event",
+            json={"event": "trade_hub_opened", "anon_id": "anon_first", "once_key": "league-9"},
+        )
+        client.post(
+            "/v1/analytics/event",
+            json={"event": "trade_hub_opened", "anon_id": "anon_second", "once_key": "league-9"},
+        )
+
+    first_once_key = mock_track.call_args_list[0].kwargs["once_key"]
+    second_once_key = mock_track.call_args_list[1].kwargs["once_key"]
+    assert first_once_key  # non-empty -- dedup was actually requested
+    assert first_once_key != second_once_key  # different callers never collide
+
+
+def test_analytics_event_without_once_key_requests_no_dedup(monkeypatch):
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event") as mock_track:
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "gm_orb_opened", "anon_id": "anon_abc123"},
+        )
+
+    assert response.status_code == 200
+    assert mock_track.call_args.kwargs["once_key"] == ""
+
+
+def test_analytics_event_is_fail_soft_when_track_event_raises(monkeypatch):
+    # Analytics must never fail a real user-facing request -- an internal
+    # error here is a 200/{"ok": False}, never a 500.
+    client = _client(monkeypatch)
+    from services import mobile_api_service
+
+    with patch.object(mobile_api_service.launch_analytics, "track_event", side_effect=RuntimeError("boom")):
+        response = client.post(
+            "/v1/analytics/event",
+            json={"event": "pqv_opened", "anon_id": "anon_abc123"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False}
+
+
 def test_me_reports_ok_status_for_a_new_user_with_no_profile_row_yet(monkeypatch):
     client = _client(monkeypatch)
 

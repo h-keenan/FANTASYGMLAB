@@ -8,6 +8,7 @@ import { ValuationLensProvider } from "@/context/ValuationLensContext";
 import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { GmOrb } from "@/components/GmOrb";
 import { Header } from "@/components/Header";
+import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { BRAND_NAME } from "@/lib/brand";
 
 // Launch-readiness pass, 2026-10-18: no Open Graph/Twitter Card tags meant
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             globals.css) rather than wrapping every page's own markup. */}
         <div className="app-background-field" aria-hidden="true" />
         <div className="app-background-sweep" aria-hidden="true" />
+        <RouteAnalytics />
         <AuthProvider>
           <ValuationLensProvider>
             <PlayerQuickViewProvider>

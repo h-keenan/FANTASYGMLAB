@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import { PlayerQuickView } from "@/components/PlayerQuickView";
+import { trackFeatureUse } from "@/lib/analytics";
 
 /**
  * Minimal player-identity summary a caller already has in hand (every page
@@ -54,6 +55,10 @@ export function PlayerQuickViewProvider({ children }: { children: ReactNode }) {
   const openPlayer = useCallback((next: PlayerQuickViewIdentity) => {
     if (!next?.player_id) return;
     setIdentity(next);
+    // Every real open is its own meaningful interaction (not a reached-
+    // once-ever milestone), so no dedup here — see lib/analytics.ts's
+    // trackFeatureUse doc.
+    trackFeatureUse("pqv_opened", { leagueId: next.leagueId, dedupe: false });
   }, []);
   const closePlayer = useCallback(() => setIdentity(null), []);
 

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import { api, type DraftCenterResponse, type DraftPickAsset } from "@/lib/api";
 import { DraftCenterContent } from "@/components/DraftCenterContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -18,6 +19,11 @@ export default function DraftCenterPage() {
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
   const { lens } = useValuationLens(leagueId);
+
+  useEffect(() => {
+    if (!session) return;
+    trackFeatureUse("draft_center_opened", { leagueId });
+  }, [session, leagueId]);
 
   const [draftCenter, setDraftCenter] = useState<DraftCenterResponse | null>(null);
   const [error, setError] = useState<string | null>(null);

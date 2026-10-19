@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import { trackFeatureUse } from "@/lib/analytics";
 import { api, type WaiversResponse } from "@/lib/api";
 import { WaiversContent } from "@/components/WaiversContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -18,6 +19,11 @@ export default function WaiversPage() {
   const leagueId = decodeURIComponent(params.leagueId);
   const leagueName = searchParams.get("name") || leagueId;
   const { lens } = useValuationLens(leagueId);
+
+  useEffect(() => {
+    if (!session) return;
+    trackFeatureUse("waivers_opened", { leagueId });
+  }, [session, leagueId]);
 
   const [waivers, setWaivers] = useState<WaiversResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
