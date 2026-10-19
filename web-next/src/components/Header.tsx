@@ -95,6 +95,19 @@ function LeagueSwitcherButton({ leagueId, leagueName }: { leagueId: string; leag
                 </button>
               ))
             )}
+            {/* coridian_, screenshot of this exact menu: "how do i add
+                leauges" — there was no way to, once already past
+                onboarding ("/" auto-redirects anyone with a saved league
+                away before SleeperImportForm ever renders again). */}
+            <Link
+              href="/connect-league"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="px-3 py-2 text-xs font-bold text-left"
+              style={{ color: "var(--color-accent)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
+            >
+              + Add another league
+            </Link>
           </div>
         </>
       ) : null}
