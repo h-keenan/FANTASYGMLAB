@@ -32,6 +32,7 @@ aren't replicated here.
 
 from __future__ import annotations
 
+import time
 from functools import partial
 from typing import Any, Mapping
 
@@ -48,6 +49,7 @@ from modules import (
     news_intelligence,
     rankings,
     record_signal,
+    redis_cache,
     sleeper,
     sleeper_leagues,
     team_stance,
@@ -88,9 +90,22 @@ def build_roster_pressure_tile(
 ) -> dict[str, Any]:
     """Roster size vs. league limit — mirrors app.py's roster_limit_status
     slot-counting formula exactly, without its much larger drop/trade/keep
-    candidate-building tail (not needed for a single summary tile)."""
+    candidate-building tail (not needed for a single summary tile).
 
-    league = sleeper.get_league(league_id) or {}
+    Uses the same cross-worker-shared Sleeper read wrappers
+    build_league_summary itself uses (see that function's module-level
+    comment) rather than calling modules.sleeper directly: this tile is
+    reached from build_league_summary's own compose_next_move_briefing
+    call, so a plain `sleeper.get_league`/`get_rosters` call here would
+    have been served from the SAME process's now-warm local lru_cache on
+    the request that populated it, but come back stone cold (and pay a
+    real duplicate Sleeper round trip) on a request that instead warmed
+    only the Redis-shared cache via the wrappers above — exactly the kind
+    of local/Redis split that made this function's own direct calls look
+    "already cached" in-process while still being a real cross-worker gap.
+    """
+
+    league = _get_league_for_league_summary(league_id) or {}
     settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
     positions = tuple(str(pos or "").upper() for pos in (league.get("roster_positions") or []))
     bench_positions = {"BN", "BE", "BENCH"}
@@ -110,7 +125,11 @@ def build_roster_pressure_tile(
         max_roster_size = starter_slots + bench_slots
 
     roster_payload = next(
-        (r for r in (sleeper.get_rosters(league_id) or []) if str(r.get("roster_id")) == str(roster_id)),
+        (
+            r
+            for r in (_get_rosters_for_league_summary(league_id) or [])
+            if str(r.get("roster_id")) == str(roster_id)
+        ),
         {},
     )
     live_player_ids = {str(pid) for pid in (roster_payload.get("players") or []) if pid is not None}
@@ -682,6 +701,121 @@ LEAGUE_SUMMARY_SKIP_REASONS = frozenset(
 )
 
 
+# coridian_, 2026-10-19: real production repro on the "Revivalry" 12-team
+# dynasty league — a back-to-back Portfolio reload still took ~10s instead
+# of a sub-1s warm-cache hit, even AFTER the duplicate full-pool valuation
+# pass fix (see modules.league_rankings' own comment on
+# _build_league_summary_and_draft_capital_cached) made every downstream
+# valuation/rankings/trade-idea computation genuinely shared via Redis.
+#
+# Root cause: THIS function's own four Sleeper reads below --
+# sleeper_leagues.resolve_sleeper_user_id, sleeper.get_league,
+# sleeper.get_rosters, sleeper.get_league_roster_profiles (itself a
+# get_rosters + get_users pair) -- run unconditionally on every call, ahead
+# of any of those now-Redis-shared caches, and were never migrated off
+# modules.sleeper's plain per-process `lru_cache`. docker-compose.yml's
+# mobile-api runs MOBILE_API_WORKERS (4 by default) separate uvicorn worker
+# PROCESSES behind one shared port; a request landing on a different
+# worker than the one that served the prior request has a stone-cold local
+# lru_cache for these reads, forcing several real Sleeper network round
+# trips every time, even though every heavier downstream pass
+# (build_valued_players_frame_cached, build_league_rankings_frame_cached,
+# generate_trade_idea_records_cached) is already a clean Redis hit.
+#
+# Deliberately NOT changing modules.sleeper.get_league/get_rosters/
+# get_users/get_user_id themselves: they're shared by ~11 other
+# league-scoped endpoints (Trade Hub, Waivers, My Team, Matchup, Team
+# Rankings, ...) and by the single-process (no --workers) web app's own
+# Game Plan manual-refresh flow, which depends on
+# sleeper.clear_live_league_endpoint_caches() actually forcing a fresh
+# fetch on demand -- a Redis layer there would need that invalidation path
+# rewritten too (there's no league_id to target a SCAN/DELETE by, since
+# redis_cache.build_cache_key hashes its parts), which is a materially
+# bigger, riskier change than this one reported bug calls for. A short,
+# call-site-local Redis single-flight cache here, wrapping only
+# build_league_summary's own calls, fixes the actual reported
+# Portfolio/Dashboard symptom the same narrow way
+# build_valued_players_frame_cached already fixed its own reported caller.
+_LEAGUE_SUMMARY_SLEEPER_TTL_SECONDS = 30
+_LEAGUE_SUMMARY_SLEEPER_LOCK_TIMEOUT_SECONDS = 6.0
+
+
+def _league_summary_sleeper_cache_bucket() -> int:
+    return int(time.time() // _LEAGUE_SUMMARY_SLEEPER_TTL_SECONDS)
+
+
+def _resolve_sleeper_user_id_for_league_summary(sleeper_username: str) -> str | None:
+    """Cross-worker-shared wrapper around sleeper_leagues.resolve_sleeper_user_id
+    for build_league_summary's own call -- see the module comment above."""
+
+    cache_key = redis_cache.build_cache_key("league_summary_sleeper_user_id", sleeper_username)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_LEAGUE_SUMMARY_SLEEPER_TTL_SECONDS,
+            compute=lambda: sleeper_leagues.resolve_sleeper_user_id(sleeper_username),
+            lock_timeout_seconds=_LEAGUE_SUMMARY_SLEEPER_LOCK_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
+
+
+def _get_league_for_league_summary(league_id: str) -> dict[str, Any]:
+    """Cross-worker-shared wrapper around sleeper.get_league for
+    build_league_summary's own call -- see the module comment above."""
+
+    bucket = _league_summary_sleeper_cache_bucket()
+    cache_key = redis_cache.build_cache_key("league_summary_league", league_id, bucket)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_LEAGUE_SUMMARY_SLEEPER_TTL_SECONDS,
+            compute=lambda: sleeper.get_league(league_id),
+            lock_timeout_seconds=_LEAGUE_SUMMARY_SLEEPER_LOCK_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return sleeper.get_league(league_id)
+
+
+def _get_rosters_for_league_summary(league_id: str) -> list[dict[str, Any]]:
+    """Cross-worker-shared wrapper around sleeper.get_rosters for
+    build_league_summary's own call -- see the module comment above."""
+
+    bucket = _league_summary_sleeper_cache_bucket()
+    cache_key = redis_cache.build_cache_key("league_summary_rosters", league_id, bucket)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_LEAGUE_SUMMARY_SLEEPER_TTL_SECONDS,
+            compute=lambda: sleeper.get_rosters(league_id),
+            lock_timeout_seconds=_LEAGUE_SUMMARY_SLEEPER_LOCK_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return sleeper.get_rosters(league_id)
+
+
+def _get_league_roster_profiles_for_league_summary(league_id: str) -> dict[str, dict[str, Any]]:
+    """Cross-worker-shared wrapper around sleeper.get_league_roster_profiles
+    for build_league_summary's own call -- see the module comment above.
+    get_league_roster_profiles itself has no caching of its own; it pairs
+    get_rosters (already warmed by _get_rosters_for_league_summary above,
+    within this same request) with get_users, the one Sleeper read
+    build_league_summary needs that has no other cross-worker-shared call
+    site in this function."""
+
+    bucket = _league_summary_sleeper_cache_bucket()
+    cache_key = redis_cache.build_cache_key("league_summary_roster_profiles", league_id, bucket)
+    try:
+        return redis_cache.redis_single_flight_cache(
+            cache_key=cache_key,
+            ttl_seconds=_LEAGUE_SUMMARY_SLEEPER_TTL_SECONDS,
+            compute=lambda: sleeper.get_league_roster_profiles(league_id),
+            lock_timeout_seconds=_LEAGUE_SUMMARY_SLEEPER_LOCK_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return sleeper.get_league_roster_profiles(league_id)
+
+
 def build_league_summary(
     *,
     league_id: str,
@@ -727,11 +861,11 @@ def build_league_summary(
     if not str(sleeper_username or "").strip():
         return {"ok": False, "reason": "no_sleeper_username_linked"}
 
-    sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
+    sleeper_user_id = _resolve_sleeper_user_id_for_league_summary(sleeper_username)
     if not sleeper_user_id:
         return {"ok": False, "reason": "sleeper_user_not_found"}
 
-    league = sleeper.get_league(league_id)
+    league = _get_league_for_league_summary(league_id)
     if not league:
         return {"ok": False, "reason": "league_not_found"}
 
@@ -748,7 +882,7 @@ def build_league_summary(
     if str(league.get("season") or "") != str(sleeper.default_player_stats_season()):
         return {"ok": False, "reason": "league_season_ended"}
 
-    rosters = sleeper.get_rosters(league_id)
+    rosters = _get_rosters_for_league_summary(league_id)
     my_roster = next(
         (r for r in rosters if str(r.get("owner_id") or "") == sleeper_user_id), None
     )
@@ -877,7 +1011,7 @@ def build_league_summary(
         or "Stable"
     )
 
-    team_profile = sleeper.get_league_roster_profiles(league_id).get(str(roster_id or ""), {})
+    team_profile = _get_league_roster_profiles_for_league_summary(league_id).get(str(roster_id or ""), {})
     roster_settings = my_roster.get("settings") or {}
 
     # The single highest-value-score asset on this roster — just the top row

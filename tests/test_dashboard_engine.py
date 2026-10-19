@@ -779,3 +779,107 @@ def test_build_league_summary_fails_fast_for_a_league_whose_season_never_advance
 
     assert result == {"ok": False, "reason": "league_season_ended"}
     assert "league_season_ended" in dashboard_engine.LEAGUE_SUMMARY_SKIP_REASONS
+
+
+# coridian_, 2026-10-19: real production repro on the "Revivalry" 12-team
+# dynasty league -- a back-to-back Portfolio reload still took ~10s instead
+# of a sub-1s warm-cache hit, even AFTER modules.league_rankings' own
+# duplicate full-pool valuation pass fix made every downstream valuation/
+# rankings/trade-idea computation genuinely Redis-shared. Root cause:
+# build_league_summary's own Sleeper reads (resolve_sleeper_user_id,
+# sleeper.get_league, sleeper.get_rosters, sleeper.get_league_roster_profiles
+# -- itself a get_rosters + get_users pair) ran unconditionally ahead of
+# those caches and were never migrated off modules.sleeper's plain
+# per-process lru_cache -- so a request landing on a DIFFERENT mobile-api
+# worker process (docker-compose.yml runs MOBILE_API_WORKERS, 4 by default)
+# than the one that served the prior request paid real Sleeper network
+# round trips every single time, despite every heavier pass being a clean
+# cache hit.
+#
+# A single pytest process can't literally run two OS processes, but it can
+# simulate "landing on a different worker" the one way that actually
+# matters here: clearing modules.sleeper's own per-process lru_cache (the
+# part that is NOT shared across real workers) while leaving the
+# fakeredis-backed cache untouched (the part that IS shared across real
+# workers, via this test file's autouse fakeredis fixture). Fails before
+# the fix (the second "worker" pays 4 more real Sleeper calls, total 8);
+# passes after it (the second "worker" reuses the first's Redis-cached
+# reads, total stays at 4).
+def test_build_league_summary_reuses_sleeper_reads_across_a_simulated_different_worker():
+    from modules import league_rankings, league_value_settings, sleeper, trade_hub_engine
+
+    league_id = "dashboard-engine-test-cross-worker-league"
+    calls: list[str] = []
+
+    def _fake_get(url, timeout=None):
+        calls.append(url)
+        if url.endswith("/user/gm_dynasty"):
+            return _sleeper_response({"user_id": "u1"})
+        if url.endswith(f"/league/{league_id}"):
+            return _sleeper_response({"league_id": league_id, "season": "2026", "settings": {}})
+        if url.endswith(f"/league/{league_id}/rosters"):
+            return _sleeper_response(
+                [{"roster_id": 1, "owner_id": "u1", "players": ["p1"], "taxi": []}]
+            )
+        if url.endswith(f"/league/{league_id}/users"):
+            return _sleeper_response([{"user_id": "u1", "display_name": "GM Dynasty"}])
+        raise AssertionError(f"unexpected Sleeper URL in this test: {url}")
+
+    valued_df = pd.DataFrame([_player("p1", "RB", value=50)])
+
+    def _clear_local_sleeper_worker_memory():
+        # The part of the old caching scheme that is genuinely per-process
+        # (modules.sleeper's lru_cache) — clearing it between the two
+        # build_league_summary calls below is what simulates the second
+        # call landing on a cold mobile-api worker.
+        sleeper.get_user_id.cache_clear()
+        sleeper._get_league_cached.cache_clear()
+        sleeper._get_rosters_cached.cache_clear()
+        sleeper._get_users_cached.cache_clear()
+
+    with patch("requests.get", side_effect=_fake_get):
+        with patch("modules.sleeper.default_player_stats_season", return_value=2026):
+            with patch(
+                "modules.league_value_settings.build_valued_players_frame_cached",
+                return_value=valued_df,
+            ):
+                with patch(
+                    "modules.league_rankings.build_league_rankings_frame_cached",
+                    return_value=pd.DataFrame(),
+                ):
+                    with patch(
+                        "modules.trade_hub_engine.generate_trade_idea_records_cached",
+                        return_value=[],
+                    ):
+                        _clear_local_sleeper_worker_memory()
+
+                        first = dashboard_engine.build_league_summary(
+                            league_id=league_id,
+                            lens="Dynasty",
+                            sleeper_username="gm_dynasty",
+                            players_db_path="unused.db",
+                        )
+                        assert first.get("ok") is True
+                        assert len(calls) == 4, (
+                            "first call (cold everywhere) should make exactly "
+                            "one Sleeper round trip each for user lookup, "
+                            f"league, rosters, and users -- got {calls}"
+                        )
+
+                        # Simulate the very next request landing on a
+                        # DIFFERENT mobile-api worker process.
+                        _clear_local_sleeper_worker_memory()
+
+                        second = dashboard_engine.build_league_summary(
+                            league_id=league_id,
+                            lens="Dynasty",
+                            sleeper_username="gm_dynasty",
+                            players_db_path="unused.db",
+                        )
+
+    assert second.get("ok") is True
+    assert len(calls) == 4, (
+        "a back-to-back request landing on a different mobile-api worker "
+        "must reuse the first worker's Redis-cached Sleeper reads instead "
+        f"of re-fetching them all from a cold local cache -- got {calls}"
+    )
