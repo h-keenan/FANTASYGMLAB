@@ -76,6 +76,52 @@ async function authorizedRequest<T>(
   return performRequest<T>(path, init, accessToken);
 }
 
+/** Authenticated binary GET (e.g. a share-card PNG) — mirrors
+ * authorizedRequest/performRequest's auth, timeout, and error-detail
+ * handling, but returns a Blob instead of parsing JSON (a PNG body isn't
+ * JSON, and parsing it as such would always throw). */
+async function authorizedBinaryRequest(path: string): Promise<Blob> {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!accessToken) {
+    throw new ApiError(401, "Not signed in.");
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${env.apiBaseUrl}${path}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError(0, "The request timed out. Check your connection and try again.");
+    }
+    throw new ApiError(0, "Could not reach the server. Check your connection and try again.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const body: unknown = await response.json();
+      detail =
+        body && typeof body === "object" && "detail" in body
+          ? String((body as { detail?: unknown }).detail ?? "")
+          : "";
+    } catch {
+      detail = "";
+    }
+    throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`);
+  }
+
+  return response.blob();
+}
+
 export interface MeResponse {
   ok: boolean;
   user: {
@@ -515,6 +561,12 @@ export interface TradeIdea {
   landed_gm_target_player_ids: string[];
   send_score: number;
   receive_score: number;
+  /** Stable identity for this exact idea (modules.trade_hub_ui.
+   * idea_recommendation_id) — optional only for older test fixtures that
+   * pre-date it; a real GET .../trade-hub response always sends one.
+   * ShareTradeButton uses it to ask GET .../trade-hub/{id}/share-card.png
+   * for a branded PNG of precisely this idea. */
+  recommendation_id?: string;
 }
 
 export interface TradeHubEntitlement {
@@ -2361,6 +2413,23 @@ export const api = {
   getTradeHub: (leagueId: string, strategy: string = "retool", lens: string = "Dynasty") =>
     authorizedRequest<TradeHubResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,
+    ),
+
+  // Branded, QR-coded PNG for one Trade Hub idea (modules.share_card_renderer
+  // — the same pipeline the legacy Streamlit app already uses for its
+  // player-quick-view share card). ShareTradeButton (TradeIdeaCard.tsx)
+  // attaches this to the native Web Share sheet instead of sharing plain
+  // text only. The server re-derives the idea from its own cached search
+  // by recommendation_id rather than trusting a client-posted payload — see
+  // that endpoint's docstring in services/mobile_api_service.py.
+  getTradeHubIdeaShareCardBlob: (
+    leagueId: string,
+    recommendationId: string,
+    strategy: string = "retool",
+    lens: string = "Dynasty",
+  ) =>
+    authorizedBinaryRequest(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub/${encodeURIComponent(recommendationId)}/share-card.png?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}`,
     ),
 
   // "Select these specific players, find who'd want them" — same engine/

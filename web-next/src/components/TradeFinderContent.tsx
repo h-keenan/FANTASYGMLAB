@@ -258,7 +258,13 @@ export function TradeFinderContent({
             ) : (
               <div className="flex flex-col gap-4">
                 {ideas.map((idea, index) => (
-                  <TradeIdeaCardView key={`${idea.partner_team_name}-${index}`} idea={idea} />
+                  <TradeIdeaCardView
+                    key={`${idea.partner_team_name}-${index}`}
+                    idea={idea}
+                    leagueId={leagueId}
+                    strategy="retool"
+                    lens={lens}
+                  />
                 ))}
               </div>
             )

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { TradeIdea } from "@/lib/api";
+import { api, type TradeIdea } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TeamAvatar } from "@/components/TeamAvatar";
@@ -20,19 +20,34 @@ import {
 } from "@/lib/tradeHubPresentation";
 
 /**
- * navigator.share() when available (mobile Safari/Chrome, most modern
- * browsers), falling back to a clipboard copy on a browser without it
- * (most desktop browsers) — `copied` drives a short "Copied!" confirmation
- * since a silent clipboard write gives no feedback otherwise.
+ * Shares a branded PNG (modules.share_card_renderer — QR code to the site,
+ * FantasyDesk branding — the same mature pipeline the legacy Streamlit app
+ * already uses for its player-quick-view share card) via the Files-capable
+ * Web Share API when this idea/league/browser supports it. Falls back to
+ * the original text-only navigator.share, then a clipboard copy, for any
+ * idea/browser/OS that can't produce or share a file — never regresses the
+ * prior text-only behavior.
  */
-function ShareTradeButton({ idea }: { idea: TradeIdea }) {
+export function ShareTradeButton({
+  idea,
+  leagueId,
+  strategy = "retool",
+  lens = "Dynasty",
+}: {
+  idea: TradeIdea;
+  /** Needed to fetch the branded share-card PNG — omitted (e.g. in an
+   * older caller) simply skips straight to the text-only share path. */
+  leagueId?: string;
+  strategy?: string;
+  lens?: string;
+}) {
   const [copied, setCopied] = useState(false);
+  const [preparingImage, setPreparingImage] = useState(false);
 
-  const onShare = async () => {
-    const text = tradeIdeaShareText(idea);
+  const shareTextOnly = async (text: string, title: string) => {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.share({ text, title: `Trade idea vs. ${idea.partner_team_name}` });
+        await navigator.share({ text, title });
         return;
       } catch {
         // User cancelled the share sheet, or the platform rejected it —
@@ -49,10 +64,51 @@ function ShareTradeButton({ idea }: { idea: TradeIdea }) {
     }
   };
 
+  const onShare = async () => {
+    const text = tradeIdeaShareText(idea);
+    const title = `Trade idea vs. ${idea.partner_team_name}`;
+
+    const filesCapable =
+      typeof navigator !== "undefined" &&
+      typeof navigator.share === "function" &&
+      typeof navigator.canShare === "function";
+
+    if (filesCapable && leagueId && idea.recommendation_id) {
+      setPreparingImage(true);
+      try {
+        const blob = await api.getTradeHubIdeaShareCardBlob(leagueId, idea.recommendation_id, strategy, lens);
+        const file = new File([blob], `fantasydesk-trade-${idea.recommendation_id}.png`, {
+          type: "image/png",
+        });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], text, title });
+          setPreparingImage(false);
+          return;
+        }
+        // This browser/OS can share text but rejected this file — fall
+        // through to the text-only path below rather than erroring.
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          // User cancelled the native share sheet — a deliberate no-op,
+          // not a failure to fall back from.
+          setPreparingImage(false);
+          return;
+        }
+        // The PNG fetch failed (network, 404 on a stale recommendation_id,
+        // etc.) or the platform otherwise rejected the file share — fall
+        // through to the existing text-only path, same as always.
+      }
+      setPreparingImage(false);
+    }
+
+    await shareTextOnly(text, title);
+  };
+
   return (
     <button
       type="button"
       onClick={onShare}
+      disabled={preparingImage}
       // coridian_, 2026-10-18: "The share trade button is still just
       // text" — plain colored text with no button chrome at all (no
       // border/background), indistinguishable from a navigation link.
@@ -61,7 +117,7 @@ function ShareTradeButton({ idea }: { idea: TradeIdea }) {
       className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
       style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
     >
-      {copied ? "Copied!" : "Share"}
+      {preparingImage ? "Preparing…" : copied ? "Copied!" : "Share"}
     </button>
   );
 }
@@ -98,7 +154,17 @@ export function ReasoningTags({ tags }: { tags: string[] }) {
   );
 }
 
-export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
+export function TradeIdeaCardView({
+  idea,
+  leagueId,
+  strategy,
+  lens,
+}: {
+  idea: TradeIdea;
+  leagueId?: string;
+  strategy?: string;
+  lens?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const gain = idea.trade_gain;
   const deltaText = formatTradeGain(gain);
@@ -164,7 +230,7 @@ export function TradeIdeaCardView({ idea }: { idea: TradeIdea }) {
               {idea.value_edge_band}
             </span>
           ) : null}
-          <ShareTradeButton idea={idea} />
+          <ShareTradeButton idea={idea} leagueId={leagueId} strategy={strategy} lens={lens} />
         </div>
       </div>
       {idea.partner_team_archetype_label ? (

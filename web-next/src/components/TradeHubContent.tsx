@@ -87,10 +87,17 @@ export function TradeHubContent({
   leagueId,
   leagueName,
   data,
+  lens = "Dynasty",
 }: {
   leagueId: string;
   leagueName: string;
   data: TradeHubResponse;
+  /** The valuation lens these ideas were generated under — threaded down to
+   * ShareTradeButton so its share-card fetch asks for the SAME idea the
+   * board actually rendered (strategy/lens are both part of the server's
+   * idea-identity cache key — see services/mobile_api_service.py's
+   * GET .../trade-hub/{id}/share-card.png docstring). */
+  lens?: string;
 }) {
   const notice = data.reason ? tradeHubReasonMessage(data.reason) : null;
   if (notice) {
@@ -133,7 +140,13 @@ export function TradeHubContent({
       ) : (
         <div className="flex flex-col gap-4">
           {data.ideas.map((idea, index) => (
-            <TradeIdeaCardView key={`${idea.partner_team_name}-${index}`} idea={idea} />
+            <TradeIdeaCardView
+              key={`${idea.partner_team_name}-${index}`}
+              idea={idea}
+              leagueId={leagueId}
+              strategy={data.team_strategy}
+              lens={lens}
+            />
           ))}
         </div>
       )}
