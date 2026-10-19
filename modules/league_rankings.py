@@ -19,7 +19,7 @@ from typing import Any
 
 import pandas as pd
 
-from modules import league_value_settings, player_eligibility, rankings, redis_cache, sleeper, trade_ideas
+from modules import league_value_settings, rankings, redis_cache, sleeper, trade_ideas
 from modules.league_value_settings import _safe_float, _safe_positive_int
 from modules.rank_tie_metadata import add_rank_tie_metadata
 from modules.team_eval import (
@@ -354,16 +354,29 @@ def _build_league_summary_and_draft_capital_cached(
         return pd.DataFrame(), pd.DataFrame()
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(players_db_path)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(players_db_path)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="league_rankings_frame_cache"
+    # coridian_, 2026-10-19, performance audit (Portfolio "18+ seconds,
+    # repeatable" on a real 12-team/32-roster dynasty league): this used to
+    # run its own private load -> filter -> apply_valuation_lens pass here —
+    # an exact duplicate of league_value_settings.build_valued_players_frame_cached's
+    # job over the SAME (league_id, lens, players_db_path) inputs. That's
+    # the identical "redone from scratch" cost modules.trade_hub_engine's
+    # own _generate_trade_idea_records_cached already got fixed for (see
+    # that function's own comment above) by switching to this same shared
+    # cached front door — this call site was simply never updated to match,
+    # so every Dashboard/Portfolio request paid the full-pool valuation
+    # pass a second time for an identical dataframe it had already computed
+    # (and, via _build_league_rankings_frame_cached below, a THIRD time).
+    # Profiled against a realistic 12-team/~32-player-roster fixture (ad-hoc
+    # local profiler, not committed): apply_valuation_lens alone costs
+    # ~90-370ms per invocation over this app's real player pool — a real
+    # cost paid three times instead of once, every single cache window,
+    # for one identical result.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
     )
-    if players_df.empty:
+    if valued.empty:
         return pd.DataFrame(), pd.DataFrame()
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
     return build_league_summary_and_draft_capital(
         valued, league_id, score_field=score_field, league_settings=settings
@@ -418,16 +431,18 @@ def _build_league_rankings_frame_cached(
         return pd.DataFrame()
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(players_db_path)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(players_db_path)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="league_rankings_frame_cache"
+    # Same fix, same reason, as _build_league_summary_and_draft_capital_cached
+    # above: this used to run its own independent load -> filter ->
+    # apply_valuation_lens pass instead of reusing the shared cached frame
+    # every other caller of the same (league_id, lens, players_db_path)
+    # already shares — see that function's comment for the full "why" and
+    # the real measured cost.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
     )
-    if players_df.empty:
+    if valued.empty:
         return pd.DataFrame()
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
     return build_league_rankings_frame(valued, league_id, score_field=score_field, league_settings=settings)
 
@@ -687,16 +702,15 @@ def _build_roster_health_metrics_frame_cached(
         return pd.DataFrame()
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
 
-    players_df = rankings.load_players(players_db_path)
-    if players_df is None or players_df.empty:
-        players_df = rankings.build_players_table(players_db_path)
-    players_df = player_eligibility.filter_current_fantasy_players(
-        players_df, surface="league_rankings_frame_cache"
+    # Same fix, same reason, as _build_league_summary_and_draft_capital_cached
+    # above: reuse the one shared cached full-pool valuation pass instead of
+    # independently redoing load -> filter -> apply_valuation_lens here too.
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
     )
-    if players_df.empty:
+    if valued.empty:
         return pd.DataFrame()
 
-    valued = league_value_settings.apply_valuation_lens(players_df, lens, settings)
     score_field = league_value_settings.valuation_score_field(lens)
     return build_roster_health_metrics_frame(
         valued, league_id, score_field=score_field, lineup_settings=settings
