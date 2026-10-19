@@ -122,7 +122,14 @@ function EvaluationLensButton({ leagueId }: { leagueId: string }) {
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute right-0 top-full mt-1 flex flex-col py-1 w-64" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
+          {/* left-0, not right-0 — same fix as LeagueSwitcherButton's menu
+              above and for the same reason (coridian_: "Dynasty menu in
+              the header clips outside the view on mobile"). This button
+              sits right after the league switcher in the same flex-wrap
+              row, so on a narrow phone it can land near the left edge of
+              its own wrapped row — a right-0 anchored w-64 menu had
+              nowhere to grow but off the left edge of the viewport. */}
+          <div role="menu" className="absolute left-0 top-full mt-1 flex flex-col py-1 w-64" style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)", zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
             {VALUATION_LENS_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -271,6 +278,11 @@ export function Header() {
                   background: "var(--color-surface-secondary)",
                   border: "var(--border-width-default) solid var(--color-border)",
                   zIndex: 50,
+                  // This button is always the last header item, so right-0
+                  // is correct (nothing clips today), but clamping width is
+                  // a cheap safety net consistent with the other two header
+                  // menus' fix, for the "audit all of the menus" ask.
+                  maxWidth: "calc(100vw - 2rem)",
                 }}
               >
                 {LEGAL_LINKS.map((item) => (
