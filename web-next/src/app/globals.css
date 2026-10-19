@@ -1338,6 +1338,31 @@ a {
   }
 }
 
+/* Prestige-ring glow (coridian_, 2026-10-19, queued cosmetic): only the top
+   three player tiers glow at all (see playerTier.ts's tierGlowIntensity) —
+   intensity scales by `--glow-min`/`--glow-max`/`--glow-duration`, set
+   inline per tier by PlayerAvatar.tsx, and the color is the tier's own ring
+   color so a glowing avatar never introduces a second, unrelated hue. */
+@keyframes prestige-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 var(--glow-min, 4px) var(--glow-color, transparent);
+  }
+  50% {
+    box-shadow: 0 0 var(--glow-max, 10px) var(--glow-color, transparent);
+  }
+}
+
+.prestige-glow {
+  animation: prestige-glow-pulse var(--glow-duration, 2.5s) ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prestige-glow {
+    animation: none;
+    box-shadow: 0 0 var(--glow-min, 4px) var(--glow-color, transparent);
+  }
+}
+
 /* Landing page forced-dark scope (src/app/page.tsx) — coridian_, 2026-10-18:
    screenshotted the real site in light mode (a real, common system
    preference, not a hypothetical) and it's completely flat — plain white

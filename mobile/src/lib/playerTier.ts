@@ -152,6 +152,27 @@ function normalize(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/_/g, ' ').split(/\s+/).filter(Boolean).join(' ');
 }
 
+export type TierGlowIntensity = 'strong' | 'medium' | 'subtle' | null;
+
+// coridian_, 2026-10-19 (queued cosmetic, lowest priority): "an effect
+// around the prestige ring ... different for different tiers. Obviously
+// lower tiers don't need one." Only the top three tiers glow at all —
+// everyone from `starter` down keeps the plain ring unchanged, same as
+// today. Same tierId -> intensity mapping as web-next's playerTier.ts.
+const GLOW_INTENSITY_BY_TIER: Record<string, TierGlowIntensity> = {
+  generational: 'strong',
+  elite: 'medium',
+  impact_starter: 'subtle',
+  starter: null,
+  contributor: null,
+  committee_role: null,
+  depth_developmental: null,
+};
+
+export function tierGlowIntensity(tierId: string): TierGlowIntensity {
+  return GLOW_INTENSITY_BY_TIER[tierId] ?? null;
+}
+
 export function resolvePlayerTier(storedTier: string | null | undefined, isDark = true): PlayerTierIdentity {
   const key = normalize(storedTier);
   const base =
