@@ -529,6 +529,41 @@ def test_practice_squad_and_pup_are_not_treated_as_retired():
     assert player_eligibility(practice, now=NOW)["eligible"] is True
 
 
+def test_real_sleeper_pup_and_nfi_status_text_is_not_wrongly_disqualified():
+    """coridian_, 2026-10-19: "fix player identity joins... no mismatched
+    profiles" — real repro. Sleeper's actual raw feed never sends the short
+    "PUP"/"NFI" codes test_practice_squad_and_pup_are_not_treated_as_retired
+    above uses — confirmed against data/sleeper_players.json, it always
+    sends the spelled-out "Physically Unable to Perform"/"Non Football
+    Injury" text (and a real currently-rostered NFI player, Courtney Upshaw,
+    carries exactly this status with active=False). RESERVE_STATUS_TERMS
+    only listed the abbreviations, so player_eligibility's own "don't
+    auto-disqualify a genuinely-current IR/PUP/NFI player" fallthrough
+    (see the comment above RESERVE_STATUS_TERMS) silently never fired for
+    real PUP/NFI players and they were wrongly marked explicitly_inactive."""
+
+    pup_real_text = _player(
+        "pup-real-1",
+        "Real PUP Player",
+        active=False,
+        status="Physically Unable to Perform",
+        years_exp=6,
+        age=28,
+    )
+    nfi_real_text = _player(
+        "nfi-real-1",
+        "Real NFI Player",
+        active=False,
+        status="Non Football Injury",
+        years_exp=4,
+        age=26,
+    )
+    pup_result = player_eligibility(pup_real_text, now=NOW)
+    nfi_result = player_eligibility(nfi_real_text, now=NOW)
+    assert pup_result["reason"] != "explicitly_inactive"
+    assert nfi_result["reason"] != "explicitly_inactive"
+
+
 def test_trade_search_and_recommendation_pools_drop_retired_assets():
     pool = filter_current_fantasy_players(
         _decision_pool(),

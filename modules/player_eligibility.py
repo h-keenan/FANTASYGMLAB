@@ -40,8 +40,24 @@ CURRENT_STATUS_TERMS = {
 # routinely reports `active: false` for exactly these players (their IR
 # placement means they're off the active 53-man roster) even though the
 # status itself is explicitly a CURRENT_STATUS_TERMS entry. See
-# RESERVE_STATUS_TERMS usage in player_eligibility() below.
-RESERVE_STATUS_TERMS = {"injured reserve", "ir", "pup", "nfi"}
+# RESERVE_STATUS_TERMS usage in player_eligibility() below. "pup"/"nfi" are
+# abbreviations that never actually appear in Sleeper's real player feed —
+# confirmed against the real raw feed (data/sleeper_players.json), Sleeper
+# always sends the spelled-out "Physically Unable to Perform"/"Non Football
+# Injury" status text, so both must be listed alongside the abbreviations or
+# this set never matches a real PUP/NFI player and the comment above's
+# "fall through instead of auto-disqualifying" intent silently never fires
+# for them (coridian_, 2026-10-19: "fix player identity joins... no
+# mismatched profiles" — this was one real cause).
+RESERVE_STATUS_TERMS = {
+    "injured reserve",
+    "ir",
+    "pup",
+    "nfi",
+    "physically unable to perform",
+    "non football injury",
+    "non-football injury",
+}
 FREE_AGENT_TEAM_MARKERS = {"", "FA", "FREE AGENT", "FREE_AGENT", "NONE", "N/A", "NA"}
 NEWS_FRESHNESS_DAYS = 730
 UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS = 180
