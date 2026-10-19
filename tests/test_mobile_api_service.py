@@ -5741,6 +5741,33 @@ def test_team_stance_caches_across_requests_for_the_same_user_and_league(monkeyp
     assert second.json()["stance"] == "competing"
 
 
+def test_gm_target_player_ids_cache_across_calls_for_the_same_user_and_league(monkeypatch):
+    """coridian_, 2026-10-19: fourth uncached hot path found in the same
+    site-wide load-time audit — _fetch_gm_target_player_ids had no cache
+    despite being called from 8 Trade Hub/Trade Finder/Dashboard
+    trade-idea-generation call sites. Unlike _fetch_gm_target_rows (which
+    add_gm_target/set_gm_target_untouchable also use as a pre-write
+    existence/cap check that must always see fresh rows), this read-only
+    helper is safe to cache the same way.
+
+    Tested at the function level (not through an endpoint) since every real
+    call site sits inside a large, heavily-mocked composite endpoint
+    (Dashboard/Trade Hub) — mirrors how _reinstated_inactive_roster_rows is
+    tested directly elsewhere in this file."""
+
+    from services import mobile_api_service
+
+    fetch_mock = Mock(return_value=([{"player_id": "1001", "untouchable": True}], ""))
+    monkeypatch.setattr(mobile_api_service.account_store, "fetch_rows", fetch_mock)
+
+    first = mobile_api_service._fetch_gm_target_player_ids({}, "user-targets-1", "token", "league-1")
+    second = mobile_api_service._fetch_gm_target_player_ids({}, "user-targets-1", "token", "league-1")
+
+    assert first == (("1001",), ("1001",))
+    assert second == (("1001",), ("1001",))
+    assert fetch_mock.call_count == 1
+
+
 def test_get_team_stance_defaults_to_retool_strategy_when_nothing_stored(monkeypatch):
     client = _client(monkeypatch)
 
