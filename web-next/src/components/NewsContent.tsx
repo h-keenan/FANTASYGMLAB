@@ -23,22 +23,21 @@ import { groupNewsByDate } from "@/lib/newsPresentation";
  * Navigation note: Streamlit needed modules.interaction_contract.
  * TAP_DELEGATION_JS to resolve "tap the chip vs. tap the article link"
  * because its whole card (including the chip) is one block of injected
- * HTML with no native DOM event model. A real React tree doesn't have that
- * problem — the identity chip below is purely decorative (there is no
- * player-detail destination anywhere in web-next yet, same gap
- * AlertsContent.tsx's own identity display already has), so it carries no
- * click handler at all and simply sits inside the card's outer <a> with no
- * tap ambiguity to resolve. If a player destination is ever added here,
- * giving the chip its own onClick with event.stopPropagation() is the
- * normal React fix — no delegation hack needed.
+ * HTML with no native DOM event model. The identity chip (NewsIdentityRow)
+ * opens the shared PlayerQuickView modal via PlayerIdentityTrigger, which
+ * is a real <button> — that can't nest inside the card's own wrapping <a>
+ * (hasLink case, invalid HTML), so NewsCard below uses the standard
+ * "stretched link" layout instead: the card's own <a>/<div> is an
+ * absolutely-positioned full-cover sibling with no z-index, and the chip
+ * gets `relative z-10` so it paints above that overlay and wins its own
+ * taps (PlayerIdentityTrigger's own stopPropagation keeps the card's click
+ * from also firing).
  */
 
 function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
   const row = (
     <>
       <PositionBadge position={identity.matched_player_position} />
-      {/* coridian_, 2026-10-19 (screenshot, on Alerts — the identical gap
-          exists here): "why is there no player card on these?" */}
       <PlayerAvatar playerId={identity.matched_player_id} size={28} />
       <span className="text-sm font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
         {identity.matched_player}
@@ -62,7 +61,7 @@ function NewsIdentityRow({ identity }: { identity: NewsPlayerIdentity }) {
         team: identity.matched_player_team,
         sourceLabel: "News",
       }}
-      className="flex items-center gap-2"
+      className="flex items-center gap-2 relative z-10"
     >
       {row}
     </PlayerIdentityTrigger>
@@ -144,9 +143,16 @@ function NewsCard({ item }: { item: NewsItem }) {
 
   if (hasLink) {
     return (
-      <a href={item.link ?? "#"} target="_blank" rel="noopener noreferrer" className="block py-3" style={rowStyle}>
+      <div className="relative block py-3" style={rowStyle}>
         {body}
-      </a>
+        <a
+          href={item.link ?? "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={item.title ?? "Open article"}
+          className="absolute inset-0"
+        />
+      </div>
     );
   }
 

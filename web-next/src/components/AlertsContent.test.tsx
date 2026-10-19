@@ -62,11 +62,20 @@ describe("AlertsContent", () => {
   it("marks an alert read and calls the API when the row is opened", () => {
     render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
-    const link = screen.getByText("Test player ruled out for Week 7").closest("a");
-    expect(link).not.toBeNull();
-    fireEvent.click(link as HTMLAnchorElement);
+    fireEvent.click(screen.getByRole("link", { name: "Test player ruled out for Week 7" }));
 
     expect(api.markAlertRead).toHaveBeenCalledWith("league-1", "key-1");
+  });
+
+  // coridian_: "you need to be able to click on the players (needs to be
+  // compact player card)" — tapping the player chip must not also fire the
+  // row's own open/read-marking handler underneath it.
+  it("tapping the player chip does not also mark the alert as read", () => {
+    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Test Player/ }));
+
+    expect(api.markAlertRead).not.toHaveBeenCalled();
   });
 
   it("shows the unconfirmed badge for speculative alerts", () => {
