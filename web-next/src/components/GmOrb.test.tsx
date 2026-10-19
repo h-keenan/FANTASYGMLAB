@@ -25,6 +25,7 @@ function mockAuth(session: MockSession | null) {
     signInWithOAuth: vi.fn(),
     signInAsGuest: vi.fn(),
     signOut: vi.fn(),
+    deleteAccount: vi.fn(),
     isGuest: false,
   });
 }

@@ -1891,6 +1891,28 @@ export interface CommunityPreferencesResponse {
   opted_out: boolean;
 }
 
+/** Mirrors modules.push_triggers.TOGGLEABLE_PUSH_CATEGORIES exactly — the
+ * same four categories mobile's MoreScreen.tsx already lets a user toggle,
+ * surfaced here too since the Account page is the first web-next place a
+ * user can manage them. */
+export type PushCategory = "top_priority" | "watch" | "recap" | "injury";
+
+export interface PushPreferencesResponse {
+  ok: boolean;
+  categories: Record<PushCategory, boolean>;
+}
+
+/** GDPR/CCPA self-service data export — GET /v1/me/export. Every Supabase
+ * table row this account owns, as one JSON document; `tables` is left
+ * loosely typed since its shape mirrors whatever each table actually
+ * stores (see services/mobile_api_service.py's _EXPORTABLE_USER_TABLES). */
+export interface ExportMyDataResponse {
+  ok: boolean;
+  generated_at: string;
+  user: { id: string; email: string };
+  tables: Record<string, unknown>;
+}
+
 // College Scouting (Revision 20) — the shared, crowdsourced college prospect
 // catalog (modules/college_scouting.py / GET /v1/scouting/prospects). Every
 // signed-in user grades the same prospect pool; the pooled aggregate (never
@@ -2490,6 +2512,19 @@ export const api = {
       method: "POST",
       jsonBody: { opted_out: optedOut },
     }),
+
+  // Account page (2026-10-19) — per-category push toggles, same
+  // user_settings-backed endpoints mobile's MoreScreen already calls.
+  getPushPreferences: () => authorizedRequest<PushPreferencesResponse>("/v1/push/preferences"),
+  updatePushPreference: (category: PushCategory, enabled: boolean) =>
+    authorizedRequest<PushPreferencesResponse>("/v1/push/preferences", {
+      method: "POST",
+      jsonBody: { category, enabled },
+    }),
+
+  // Account page (2026-10-19) — GDPR/CCPA data export, the same
+  // GET /v1/me/export mobile's "Export My Data" row already calls.
+  exportMyData: () => authorizedRequest<ExportMyDataResponse>("/v1/me/export"),
 
   // College Scouting (Revision 20) — league-independent like getPortfolio/
   // getNews/getTradeOutcomeHistory above: the shared prospect pool is the

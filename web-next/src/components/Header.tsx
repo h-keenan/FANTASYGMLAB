@@ -305,6 +305,21 @@ export function Header() {
                 >
                   How We Evaluate
                 </Link>
+                {session ? (
+                  // Account/Settings (coridian_, 2026-10-19) — account
+                  // chrome, not a feature page, so it lives in this Menu
+                  // dropdown next to the legal links rather than in
+                  // navDestinations.ts's GM orb/sidebar nav list.
+                  <Link
+                    href="/account"
+                    role="menuitem"
+                    onClick={() => setMenuOpen(false)}
+                    className="px-3 py-2 text-xs font-semibold"
+                    style={{ color: "var(--color-text-secondary)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
+                  >
+                    Account
+                  </Link>
+                ) : null}
                 {LEGAL_LINKS.map((item) => (
                   <Link
                     key={item.pageKey}
