@@ -591,7 +591,7 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 6,
     marginTop: spacing.md,
   },
-  heroButtonText: { fontSize: 12, fontWeight: '700', color: colors.background },
+  heroButtonText: { fontSize: 12, fontWeight: '700', color: colors.onAccent },
   // Shared "grouped surface" wrapper for Injury Concerns / Waiver
   // Suggestions — a SectionHeading over one AnimatedCard, matching Next
   // Move's own Needs Attention/Opportunities grouped-surface pattern
@@ -633,7 +633,7 @@ function createStyles(colors: ThemeColors) {
   stripNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   stripName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
   youBadge: { backgroundColor: colors.accent, borderRadius: radii.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-  youBadgeText: { color: colors.background, fontSize: 10, fontWeight: '700' },
+  youBadgeText: { color: colors.onAccent, fontSize: 10, fontWeight: '700' },
   stripValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   stripValueLabel: { fontSize: 9, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
   stripTextGroup2: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },

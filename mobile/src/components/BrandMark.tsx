@@ -1,35 +1,40 @@
 import React from 'react';
-import { Image } from 'react-native';
+import { Image, type ImageStyle, type StyleProp } from 'react-native';
+import { useThemeMode } from '../context/ThemeModeContext';
+
+/** Width / height of `assets/brand-mark.png` (trimmed FD mark, 1024x480). */
+export const BRAND_MARK_ASPECT = 1024 / 480;
 
 /**
- * The FantasyDesk brand mark — the glossy 3D football-with-ascending-bars
- * illustration that PRs #749/#750 rolled out to every static app icon and
- * logo file, replacing the old abstract three-arc "Analyze / Project /
- * Execute" bezier mark.
+ * The FantasyDesk "FD" brand mark, the same artwork as web-next's
+ * `public/brand-mark.png` (the source of the web favicon and app icon).
  *
- * This component used to be `TrajectoryArcs`: it hand-drew that OLD arc
- * mark's exact bezier geometry live in code (recolored with theme tokens)
- * because, at the time, the arc mark only existed baked into a static icon
- * PNG and nowhere else it could be reused live (splash/loading, the GM orb,
- * the dashboard empty state). PRs #749/#750 replaced the static icon, but
- * missed this component, so those three surfaces kept animating the
- * *retired* brand mark on-screen after every other icon/logo had already
- * moved on.
+ * The asset is a solid-black mark on a transparent background, tinted here
+ * to `colors.textPrimary`, so it reads white on the dark theme and near-black
+ * on the light theme. That mirrors web's `.brand-mark-icon` rule (inverted to
+ * white on the dark-first theme, black under a light scheme).
  *
- * The new mark is a complex glossy 3D illustration, not a simple geometric
- * shape — redrawing it as hand-authored SVG paths would look worse than the
- * genuine artwork, so this just renders the same transparent-background
- * mark asset already used for the splash screen (`assets/splash-icon.png`,
- * swapped in by PR #749) scaled to fit. That keeps this in permanent sync
- * with whatever the current static brand mark is, instead of drifting out
- * of date again.
+ * Callers pass a bounding box; the mark is `contain`-fit inside it, so a box
+ * that is not 2.13:1 just letterboxes. Pass `color` to force a fixed tint
+ * (e.g. share cards that always render on a dark ground).
  */
-export default function BrandMark({ width = 160, height = 108 }: { width?: number; height?: number }) {
+export default function BrandMark({
+  width = 160,
+  height,
+  color,
+  style,
+}: {
+  width?: number;
+  height?: number;
+  color?: string;
+  style?: StyleProp<ImageStyle>;
+}) {
+  const { colors } = useThemeMode();
   return (
     <Image
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      source={require('../../assets/splash-icon.png')}
-      style={{ width, height }}
+      source={require('../../assets/brand-mark.png')}
+      style={[{ width, height: height ?? Math.round(width / BRAND_MARK_ASPECT), tintColor: color ?? colors.textPrimary }, style]}
       resizeMode="contain"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"

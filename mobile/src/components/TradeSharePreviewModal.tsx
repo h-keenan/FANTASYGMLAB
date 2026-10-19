@@ -175,10 +175,10 @@ export default function TradeSharePreviewModal({
           </View>
           <TouchableOpacity style={styles.primaryButton} onPress={onShareImage} disabled={capturing}>
             {capturing ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.onAccent} />
             ) : (
               <>
-                <Ionicons name="image-outline" size={16} color="#fff" />
+                <Ionicons name="image-outline" size={16} color={colors.onAccent} />
                 <AppText style={styles.primaryButtonText}>Share image</AppText>
               </>
             )}
@@ -246,7 +246,7 @@ function createStyles(colors: ThemeColors) {
     width: '100%',
     marginTop: spacing.md,
   },
-  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  primaryButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
   secondaryButton: { paddingVertical: spacing.sm, marginTop: spacing.xs },
   secondaryButtonText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
   closeButton: { paddingVertical: spacing.sm },

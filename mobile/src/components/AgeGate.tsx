@@ -139,7 +139,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
     },
     buttonDisabled: { opacity: disabledOpacity },
-    buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+    buttonText: { color: colors.onAccent, fontSize: 16, fontWeight: '600' },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });
 }

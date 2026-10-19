@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AgeGate from '../components/AgeGate';
 import BrandedSpinner from '../components/BrandedSpinner';
+import BrandMark from '../components/BrandMark';
 import ContentSections, { type ContentSection } from '../components/ContentSections';
 import GridBackground from '../components/GridBackground';
 import legalContent from '../data/legalContent.json';
@@ -31,7 +31,7 @@ import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '.
 const LEGAL_PAGES = (legalContent as { pages: Record<string, { title: string; sections: ContentSection[] }> }).pages;
 
 export default function LoginScreen() {
-  const { signIn, signUp, signInAsGuest, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const { colors } = useThemeMode();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -39,7 +39,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [submitting, setSubmitting] = useState(false);
-  const [guestSubmitting, setGuestSubmitting] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,15 +100,6 @@ export default function LoginScreen() {
     if (result.error) setError(result.error);
   };
 
-  const onGuestPress = async () => {
-    setError(null);
-    setNotice(null);
-    setGuestSubmitting(true);
-    const result = await signInAsGuest();
-    setGuestSubmitting(false);
-    if (result.error) setError(result.error);
-  };
-
   if (ageVerified === null) {
     return (
       <View style={styles.root}>
@@ -131,7 +121,7 @@ export default function LoginScreen() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
+        <BrandMark width={112} style={styles.brandMark} />
         <AppText style={styles.title}>FantasyDesk</AppText>
         <AppText style={styles.subtitle}>
           {resetMode
@@ -269,28 +259,6 @@ export default function LoginScreen() {
           </>
         )}
 
-        {/* Fix 4 (welcome/signup audit, positioning judgment call — see PR
-            description): equal visual weight to the primary account form via
-            this screen's EXISTING secondary-button pattern (the same
-            bordered/surfaceSolid `socialButton` style "Continue with Google"
-            already uses above), not a new one-off style. Account creation
-            stays the default/primary action — this button is not styled as
-            `type="primary"`. */}
-        <TouchableOpacity
-          style={[styles.socialButton, styles.guestButton, guestSubmitting && styles.buttonDisabled]}
-          onPress={onGuestPress}
-          disabled={guestSubmitting}
-        >
-          {guestSubmitting ? (
-            <ActivityIndicator color={colors.textPrimary} />
-          ) : (
-            <AppText style={styles.socialButtonText}>Continue as Guest</AppText>
-          )}
-        </TouchableOpacity>
-        <AppText style={styles.guestCaption}>
-          No account needed to try it now — you can create an account later and keep this league connected.
-        </AppText>
-
         <View style={styles.legalRow}>
           <AppText style={styles.legalLink} onPress={() => setLegalPageKey('terms')}>
             Terms of Use
@@ -330,9 +298,6 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.xl,
   },
   brandMark: {
-    width: 72,
-    height: 72,
-    borderRadius: radii.md,
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
@@ -402,19 +367,6 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.sm,
     color: colors.textSecondary,
     fontSize: 13,
-  },
-  // Layers on top of the shared `socialButton` base (border/surface/height)
-  // — only the extra top margin separating it from the sign-in form is
-  // specific to this placement.
-  guestButton: {
-    marginTop: spacing.lg,
-  },
-  guestCaption: {
-    color: colors.textTertiary,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.lg,
   },
   legalRow: {
     flexDirection: 'row',

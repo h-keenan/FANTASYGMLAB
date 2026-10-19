@@ -32,6 +32,6 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 2,
       marginLeft: spacing.xs,
     },
-    text: { fontSize: 8, fontWeight: '800', color: colors.background, letterSpacing: 0.4 },
+    text: { fontSize: 8, fontWeight: '800', color: colors.onAccent, letterSpacing: 0.4 },
   });
 }

@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Linking,
   Modal,
   RefreshControl,
@@ -21,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
 import BrandedSpinner from '../components/BrandedSpinner';
+import BrandMark from '../components/BrandMark';
 import EmptyState from '../components/EmptyState';
 import GlassPanel from '../components/GlassPanel';
 import GridBackground from '../components/GridBackground';
@@ -361,7 +361,7 @@ export default function HomeScreen({ navigation }: Props) {
             <GlassPanel style={styles.header}>
               <View style={styles.headerRow}>
                 <View style={styles.brandRow}>
-                  <Image source={require('../../assets/icon.png')} style={styles.brandMark} />
+                  <BrandMark width={44} />
                   <View>
                     <AppText style={styles.brandName}>FantasyDesk</AppText>
                     <AppText style={styles.email}>
@@ -735,7 +735,6 @@ function createStyles(colors: ThemeColors) {
   },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  brandMark: { width: 40, height: 40, borderRadius: radii.sm },
   brandName: { ...typography.label, color: colors.textSecondary, letterSpacing: 0.4 },
   email: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginTop: 2 },
   entitlementPill: {

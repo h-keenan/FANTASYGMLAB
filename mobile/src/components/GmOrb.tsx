@@ -743,15 +743,8 @@ export default function GmOrb() {
               // than sitting exactly on the line.
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              {/* BrandMark renders assets/splash-icon.png, not the flat
-                  assets/icon.png: icon.png is a fully opaque square with its
-                  own baked-in dark-navy fill, so it always shows through as
-                  a "grey" disc no matter what this circle's own
-                  backgroundColor is set to. splash-icon.png is the same
-                  mark cropped to a transparent-background PNG, so the
-                  disc's real backgroundColor (colors.background, matching
-                  where the screen's own wash ends) shows through correctly
-                  around it. */}
+              {/* BrandMark is the transparent, theme-tinted FD mark, so the
+                  disc's own backgroundColor shows through around it. */}
               <BrandMark width={34} height={23} />
             </TouchableOpacity>
           </Animated.View>
@@ -944,7 +937,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: ORB_SIZE / 2,
     overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: 'rgba(0,212,255,0.55)',
+    borderColor: 'rgba(103,232,249,0.55)',
     // `background`, not `surface` — the orb sits right where the screen's
     // GridBackground wash ends (bottom of the screen), which is
     // `background`'s own tone (true OLED black in dark mode). `surface` is

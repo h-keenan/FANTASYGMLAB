@@ -22,7 +22,7 @@
     "android": {
       "package": "com.fantasygmlab.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0B0E14",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -44,9 +44,22 @@
       ],
       "./plugins/withIosMinDeploymentTarget.js",
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "dark": {
+            "image": "./assets/splash-icon-dark.png",
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      [
         "expo-notifications",
         {
-          "color": "#22D3EE"
+          "color": "#67E8F9"
         }
       ],
       "expo-web-browser"

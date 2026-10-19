@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
-import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import AppText from './AppText';
+import BrandMark from './BrandMark';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -10,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
 
 /**
  * Compact branded loading state for a single screen's "still loading initial
@@ -46,7 +47,9 @@ export default function BrandedSpinner({
 
   return (
     <View style={[styles.container, style]}>
-      <Animated.Image source={require('../../assets/icon.png')} style={[styles.mark, markStyle]} />
+      <Animated.View style={markStyle}>
+        <BrandMark width={56} />
+      </Animated.View>
       {label ? <AppText style={styles.label}>{label}</AppText> : null}
     </View>
   );
@@ -55,7 +58,6 @@ export default function BrandedSpinner({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-    mark: { width: 40, height: 40, borderRadius: radii.md },
     label: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.xs },
   });
 }

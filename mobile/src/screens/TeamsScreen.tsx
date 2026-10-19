@@ -609,7 +609,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
-  mineBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  mineBadgeText: { color: colors.onAccent, fontSize: 11, fontWeight: '700' },
   countPill: {
     backgroundColor: colors.background,
     borderRadius: radii.pill,
