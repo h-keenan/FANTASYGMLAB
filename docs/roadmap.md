@@ -28,30 +28,25 @@ Website notifications for news alerts and similar real-time events —
 currently nothing surfaces inside the app itself outside of visiting the
 Alerts page.
 
-### Social / community layer
-Expand beyond the existing "follow trade ideas" feature:
-- A community tab showing confirmed trades pulled from users' real leagues
-  (already have the data once a league is connected) — surfaced
-  anonymized as "Team A traded with Team B," not by real identity.
-- Highlight-style framing, e.g. "craziest trades this week."
-- Possibly extend the same idea to draft picks — pull interesting draft
-  behavior/results and surface them similarly.
+### Social / community layer — SHIPPED 2026-10-19 (PR #1261)
+Community Trade Feed: anonymized ("Team A traded with Team B," never real
+identity), opt-on by default with a preferences toggle to turn off, reuses
+the existing trade-outcome grading as the "interesting" signal rather than
+a new heuristic. Reactions are emoji-only, no comments/replies. Surfaced to
+everyone for now per coridian_'s call.
 
-coridian_, 2026-10-19, on what "interesting" means: trades flagged by our
-own system as engagement-prone (not just chronological/raw) — reuses the
-app's existing trade-grading/evaluation signals rather than inventing a
-new "interesting" heuristic from scratch. Reactions are emoji-only, no
-comments/replies — deliberately so the feature needs no moderation layer.
+Not yet done: extending the same "interesting" framing to draft picks.
 
 ### Home screen widget
 Mini dashboard widget, filtered to only very-high-priority items so it
 doesn't get cluttered.
 
-### Guess-the-player mini game (up next, coridian_ 2026-10-19: "add guess the player to the queue")
-Quick, dismissible pop-up: "whose stats are these?" using real last-week
-stats, full player card shown but photo/name blacked out (tier/prestige
-ring still visible). Cheap to build off data the app already computes;
-real instant-engagement potential.
+### Guess-the-player mini game — SHIPPED 2026-10-19 (web PR #1257, mobile PR #1258)
+Dashboard card (web) / popup (mobile): "whose stats are these?" using real
+last-week stats, full player card shown but photo/name blacked out
+(tier/prestige ring still visible), multiple-choice guessing, a surprising
+bench-tier stat line mixed into the options. Real persisted per-user
+streak/best-streak record (`guess_the_player_streaks` table).
 
 ### Become a one-stop-shop platform: host leagues directly
 Let people create/host leagues on FantasyDesk itself, not just import from
