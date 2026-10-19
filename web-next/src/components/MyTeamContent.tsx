@@ -14,7 +14,7 @@ import {
   myTeamReasonMessage,
   sumScore,
 } from "@/lib/myTeamPresentation";
-import { metricToneBand, percentileFromRank, positionColorVar, positionTextClass } from "@/lib/playerPresentation";
+import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
 
 /**
  * Ports modules/my_team_ui.py's render_my_team_workspace for Revision 2 —
@@ -62,19 +62,10 @@ function joinRooms(rooms: string[]): ReactNode {
 
 function LineupRow({ player, muted = false }: { player: LineupPlayer; muted?: boolean }) {
   const tone = injuryTone(player.injury_label);
-  const positionColor = positionColorVar(player.position);
   return (
     <div
-      className="flex items-center gap-3 py-2 pl-2"
-      style={{
-        borderBottom: "var(--border-width-default) solid var(--color-border)",
-        // coridian_, 2026-10-19: "stretch the color of the position ...
-        // to the top and bottom of the pill ... the left side is wrapped
-        // with the color of the position" — the position badge itself
-        // stays (names the position), this is the row's own accent, same
-        // borderLeft-stripe pattern TradeIdeaCard/GmPlanContent already use.
-        borderLeft: positionColor ? `3px solid var(${positionColor})` : "3px solid transparent",
-      }}
+      className="flex items-center gap-3 py-2"
+      style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
       <PlayerIdentityTrigger
         identity={{ ...player, sourceLabel: "My Team" }}
