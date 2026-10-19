@@ -1004,6 +1004,41 @@ def test_my_roster_prefers_the_leagues_own_saved_sleeper_username(monkeypatch):
     assert body["roster"]["roster_id"] == 1
 
 
+def test_me_caches_profile_fields_across_requests_for_the_same_user(monkeypatch):
+    """coridian_, 2026-10-19: real reported site-wide load-time complaint.
+    _fetch_profile_fields had no cache at all despite being called from
+    ~20 endpoints — every authenticated request paid a full uncached
+    Supabase round trip just to read entitlement/sleeper_username. Two
+    back-to-back requests for the SAME user, within the short TTL, must
+    reuse the cached profile fetch (one requests.get for it, not two) —
+    the opposite of test_me_reports_the_saved_league_cap_for_the_plan's own
+    two-DIFFERENT-users setup, which exists specifically to sidestep this
+    same cache."""
+
+    client = _client(monkeypatch)
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-cache-789", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "premium", "sleeper_username": "gm_dynasty"}]
+
+    # Exactly 2 responses queued for 2 requests' worth of auth, but only
+    # ONE profile fetch -- if the cache failed to hit, the second request's
+    # profile call would exhaust this list and the request would 401/error
+    # instead of returning a clean 200.
+    with patch(
+        "requests.get",
+        side_effect=[auth_user_response, profile_response, auth_user_response],
+    ):
+        first = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+        second = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["user"]["entitlement"] == "premium"
+    assert second.json()["user"]["entitlement"] == "premium"
+
+
 def test_my_roster_returns_matching_roster(monkeypatch):
     client = _client(monkeypatch)
 
@@ -10529,16 +10564,23 @@ def test_me_reports_the_saved_league_cap_for_the_plan(monkeypatch):
     client = _client(monkeypatch)
     from modules import saved_leagues
 
-    auth_user_response = Mock(status_code=200)
-    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    # Two DIFFERENT user ids, not the same one twice — _fetch_profile_fields
+    # is now cached per-user_id (short TTL, see its own docstring), so
+    # re-requesting the SAME user_id here would read back the first call's
+    # cached "free" result instead of exercising the premium path this test
+    # exists to check.
+    free_auth_response = Mock(status_code=200)
+    free_auth_response.json.return_value = {"id": "user-free-123", "email": "gm@example.com"}
+    paid_auth_response = Mock(status_code=200)
+    paid_auth_response.json.return_value = {"id": "user-paid-456", "email": "gm2@example.com"}
     free_profile = Mock(status_code=200)
     free_profile.json.return_value = [{"entitlement": "free"}]
     premium_profile = Mock(status_code=200)
     premium_profile.json.return_value = [{"entitlement": "premium"}]
 
-    with patch("requests.get", side_effect=[auth_user_response, free_profile]):
+    with patch("requests.get", side_effect=[free_auth_response, free_profile]):
         free = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
-    with patch("requests.get", side_effect=[auth_user_response, premium_profile]):
+    with patch("requests.get", side_effect=[paid_auth_response, premium_profile]):
         paid = client.get("/v1/me", headers={"Authorization": "Bearer good-token"})
 
     # The client renders the league wall from this number, so it has to be
