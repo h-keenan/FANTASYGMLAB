@@ -74,7 +74,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radii.pill,
       backgroundColor: colors.accent,
     },
-    buttonText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+    buttonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
     secondaryLink: { marginTop: spacing.sm, padding: spacing.xs },
     secondaryLinkText: {
       fontSize: 12,

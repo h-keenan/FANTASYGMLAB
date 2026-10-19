@@ -160,7 +160,7 @@ export default function MoreScreen({ navigation }: Props) {
       // which is also just a better shape for "my data" than a text blob.
       const canShareFile = await Sharing.isAvailableAsync();
       if (canShareFile) {
-        const file = new File(Paths.cache, `fantasygmlab-my-data-${Date.now()}.json`);
+        const file = new File(Paths.cache, `fantasydesk-my-data-${Date.now()}.json`);
         file.create();
         file.write(json);
         await Sharing.shareAsync(file.uri, {
@@ -523,7 +523,7 @@ export default function MoreScreen({ navigation }: Props) {
                 disabled={guestUpgradeSubmitting || !guestUpgradeEmail || !guestUpgradePassword}
               >
                 {guestUpgradeSubmitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.onAccent} />
                 ) : (
                   <AppText style={styles.guestUpgradeSaveText}>Create account</AppText>
                 )}
@@ -759,6 +759,6 @@ function createStyles(colors: ThemeColors) {
       minWidth: 120,
       alignItems: 'center',
     },
-    guestUpgradeSaveText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+    guestUpgradeSaveText: { fontSize: 14, fontWeight: '700', color: colors.onAccent },
   });
 }

@@ -21,8 +21,7 @@ import { spacing, type ThemeColors } from '../theme';
  * of real seconds waiting on the auth check, and a fully static screen in
  * that window reads as frozen/broken rather than working.
  *
- * Uses the shared BrandMark (the transparent-background splash-icon.png
- * mark) rather than a boxed app-icon tile, so this screen and the GM orb /
+ * Uses the shared BrandMark (the theme-tinted FD mark) rather than a boxed app-icon tile, so this screen and the GM orb /
  * dashboard empty state all share the same current brand mark instead of
  * each carrying their own copy that can drift out of date.
  */

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Image, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { CollegeProspect, DraftPickAsset, RankedPlayer } from '../lib/api';
+import BrandMark from '../components/BrandMark';
 import GmOrb from '../components/GmOrb';
 import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
 import { navigationRef } from './navigationRef';
@@ -51,7 +52,11 @@ export type RootStackParamList = {
   Onboarding: undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
   TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string; rosterId: string };
-  Paywall: undefined;
+  /** `fromOnboarding`: shown as the first-run trial offer right after the
+   * intro carousel (web-next's OnboardingPaywall step), so closing it means
+   * "continue free" and finishes onboarding. 'getStarted' = finished the
+   * carousel (arms Team Situation routing), 'skip' = skipped it. */
+  Paywall: { fromOnboarding?: 'getStarted' | 'skip' } | undefined;
   TrialLapsed: undefined;
   News: undefined;
   More: undefined;
@@ -138,7 +143,9 @@ export default function RootNavigator() {
   // user with the flag already true is unaffected even while this is
   // computed on every render.
   const showOnboardingFirst = Boolean(session) && onboardingComplete === false;
-  const hideFloatingChrome = currentRouteName === 'Onboarding';
+  // The whole first-run flow (carousel + its trial-offer Paywall step) hides
+  // the orb, not just the Onboarding route itself.
+  const hideFloatingChrome = currentRouteName === 'Onboarding' || showOnboardingFirst;
 
   return (
     <NavigationContainer
@@ -188,7 +195,7 @@ export default function RootNavigator() {
             component={HomeScreen}
             options={({ navigation }) => ({
               headerTitle: () => (
-                <Image source={require('../../assets/icon.png')} style={{ width: 28, height: 28, borderRadius: 8 }} />
+                <BrandMark width={48} />
               ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', gap: 16 }}>

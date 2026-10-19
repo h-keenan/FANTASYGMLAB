@@ -516,7 +516,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation }
             disabled={analyzing || !hasAnyAssets}
           >
             {analyzing ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.onAccent} />
             ) : (
               <AppText style={styles.analyzeButtonText}>Analyze Trade</AppText>
             )}
@@ -930,7 +930,7 @@ function createStyles(colors: ThemeColors) {
   },
   pillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   pillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  pillTextActive: { color: '#fff' },
+  pillTextActive: { color: colors.onAccent },
   analyzeButton: {
     backgroundColor: colors.accent,
     borderRadius: radii.md,
@@ -939,7 +939,7 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.md,
   },
   analyzeButtonDisabled: { opacity: disabledOpacity },
-  analyzeButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  analyzeButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
   // Quick Compare's instant readout — same label + bar shape as the full
   // verdict's value strip (below), just driven by a client-computed delta.
   quickCompareSection: { marginBottom: spacing.md },

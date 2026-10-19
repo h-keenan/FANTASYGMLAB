@@ -1964,7 +1964,7 @@ function createStyles(colors: ThemeColors) {
     borderWidth: 1,
     borderColor: colors.accent,
   },
-  watchButtonText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  watchButtonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
   watchButtonTextActive: { color: colors.accent },
   untouchableButton: {
     width: 34,
@@ -2214,7 +2214,7 @@ function createStyles(colors: ThemeColors) {
   },
   yearPillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   yearPillText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
-  yearPillTextActive: { color: '#fff' },
+  yearPillTextActive: { color: colors.onAccent },
   notice: {
     marginTop: spacing.md,
     fontSize: 12,

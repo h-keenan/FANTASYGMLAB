@@ -1491,10 +1491,13 @@ export type UiDensityValue = 'guided' | 'compact';
 
 export type ThemeModeValue = 'light' | 'dark' | 'auto';
 
+export type ExperienceLevelValue = 'beginner' | 'advanced';
+
 export interface DevicePreferencesResponse {
   ok: boolean;
   ui_density: UiDensityValue;
   theme_mode: ThemeModeValue;
+  experience_level?: ExperienceLevelValue | null;
   last_league: { league_id: string; league_name: string } | null;
 }
 
@@ -2062,6 +2065,10 @@ export const api = {
   updatePushPreference: (category: PushCategory, enabled: boolean) =>
     authorizedPost<PushPreferencesResponse>('/v1/push/preferences', { category, enabled }),
   getDevicePreferences: () => authorizedFetch<DevicePreferencesResponse>('/v1/preferences'),
+  /** Set by the onboarding carousel's last step, same call as web-next's
+   * OnboardingCarousel (`api.setExperienceLevel`). */
+  setExperienceLevel: (level: ExperienceLevelValue) =>
+    authorizedPost<DevicePreferencesResponse>('/v1/preferences', { experience_level: level }),
   updateDevicePreferences: (body: {
     uiDensity?: UiDensityValue;
     themeMode?: ThemeModeValue;

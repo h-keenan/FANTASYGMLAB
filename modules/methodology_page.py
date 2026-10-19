@@ -17,7 +17,7 @@ from modules.player_tier_identity import player_tier_legend_html
 PAGE_KEY = "methodology"
 NAV_LABEL = "How We Evaluate"
 PAGE_TITLE = "How FantasyDesk Evaluates Players"
-PAGE_KICKER = "HOW FANTASYGM LAB THINKS ABOUT VALUE"
+PAGE_KICKER = "HOW FANTASYDESK THINKS ABOUT VALUE"
 PAGE_PURPOSE = (
     "How FantasyDesk evaluates players in league context, and how rankings "
     "differ from trade recommendations."

@@ -42,7 +42,7 @@ export default function TrialLapsedScreen({ navigation }: Props) {
           <Ionicons name="time-outline" size={48} color={colors.premium} style={styles.icon} />
           <AppText style={styles.title}>Your free trial has ended</AppText>
           <AppText style={styles.subtitle}>
-            Here's the new GM Pro pricing — take a look before you decide.
+            Here's the new Pro pricing — take a look before you decide.
           </AppText>
         </View>
 
@@ -80,6 +80,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       marginBottom: spacing.lg,
     },
-    primaryButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+    primaryButtonText: { fontSize: 16, fontWeight: '600', color: colors.onAccent },
   });
 }

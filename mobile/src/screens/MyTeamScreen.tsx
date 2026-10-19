@@ -694,7 +694,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
   },
-  outlookBadgeText: { fontSize: 11, fontWeight: '800', color: colors.background, letterSpacing: 0.4 },
+  outlookBadgeText: { fontSize: 11, fontWeight: '800', color: colors.onAccent, letterSpacing: 0.4 },
   analyticsRankLine: { fontSize: 13, color: colors.textSecondary },
   analyticsMetricsRow: {
     flexDirection: 'row',

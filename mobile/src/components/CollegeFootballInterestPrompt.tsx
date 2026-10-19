@@ -89,7 +89,7 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
     },
     yesButton: { backgroundColor: colors.accent },
-    yesButtonText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    yesButtonText: { color: colors.onAccent, fontSize: 13, fontWeight: '700' },
     noButton: { backgroundColor: colors.surfaceSolid, borderWidth: 1, borderColor: colors.border },
     noButtonText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   });

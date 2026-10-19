@@ -5,12 +5,10 @@ import { Platform } from 'react-native';
  * constants. Kept deliberately small: this is a client-side presentation
  * layer only, it doesn't encode any product/valuation logic.
  *
- * Palette matches the FGL brand style sheet (blue-black canvas, #151B22
- * cards, #00D4FF/#FFC43D/#FF4D4D trajectory colors) rather than the web
- * app's own flat/dossier CSS tokens — the brand sheet is the newer,
- * explicitly-approved source of truth for how the *mobile app* should look
- * (deliberate divergence from modules/design_tokens.py, which the web app
- * still uses as-is).
+ * Accent family (accent, rim gradients, on-accent ink) matches web-next's
+ * globals.css (--color-accent / --color-accent-strong /
+ * --color-brand-mark-ink) as of the 2026-10-19 liquid-glass pass, so both
+ * platforms share one FantasyDesk accent.
  */
 
 /**
@@ -46,7 +44,7 @@ const darkColors = {
   // generic `border`/`borderStrong` line tokens, which stay neutral for
   // dividers, inputs, and non-card outlines) so this doesn't cascade into
   // unrelated UI that was never meant to look "branded."
-  cardBorder: 'rgba(92,228,255,0.28)',
+  cardBorder: 'rgba(103,232,249,0.28)',
   hairline: 'rgba(255,255,255,0.08)',
   textPrimary: '#F2F4F7',
   textSecondary: '#A6B0BB',
@@ -85,6 +83,10 @@ const darkColors = {
   // get the light-mode-correct answer for free (see lightColors.accentOnTint,
   // which is NOT an alias).
   accentOnTint: '#67e8f9',
+  // Text/icons drawn ON a solid `accent` fill (primary buttons). The light
+  // cyan accent needs dark ink, same as web's --color-brand-mark-ink on
+  // its accent buttons; white text on #67e8f9 is ~1.4:1 and unreadable.
+  onAccent: '#0B1220',
   danger: '#FF4D4D',
   dangerMuted: 'rgba(255,77,77,0.14)',
   success: '#22C55E',
@@ -124,7 +126,7 @@ const lightColors = {
   surfaceSolid: '#FFFFFF',
   border: '#C7D9E3',
   borderStrong: '#AFC7D5',
-  cardBorder: 'rgba(0,120,160,0.25)',
+  cardBorder: 'rgba(5,110,124,0.25)',
   hairline: 'rgba(10,30,45,0.08)',
   textPrimary: '#0B1D26',
   textSecondary: '#3E5867',
@@ -156,6 +158,8 @@ const lightColors = {
   // `accentMuted` fill or the pale `backgroundElevated` sheet surface —
   // web-next's --color-accent-strong, its own stronger/on-tint variant.
   accentOnTint: '#08616e',
+  // Light theme's accent is a dark teal, so white reads cleanly on it.
+  onAccent: '#FFFFFF',
   danger: '#D92D2D',
   dangerMuted: 'rgba(217,45,45,0.12)',
   success: '#178A43',
@@ -290,12 +294,13 @@ export function awardTierColor(
 
 export const gradients = {
   hero: ['#16202C', '#000000'] as const,
-  accent: ['#5CE4FF', '#00D4FF'] as const,
+  // web-next --color-accent -> --color-accent-strong
+  accent: ['#67e8f9', '#22d3ee'] as const,
 };
 
 export const lightGradients = {
   hero: ['#FFFFFF', '#EAF3F8'] as const,
-  accent: ['#00A6CC', '#0077A3'] as const,
+  accent: ['#056e7c', '#08616e'] as const,
   /**
    * GridBackground's full-screen wash, light mode only — deliberately NOT
    * `hero` above (coridian_, verbal, 2026-10-06: "the header becomes

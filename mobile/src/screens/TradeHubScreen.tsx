@@ -1130,7 +1130,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.md,
     backgroundColor: colors.accent,
   },
-  gatePrimaryButtonText: { fontSize: 13, fontWeight: '700', color: colors.background },
+  gatePrimaryButtonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
   root: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
@@ -1403,6 +1403,6 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.md,
     backgroundColor: colors.accent,
   },
-  proposeButtonText: { fontSize: 13, fontWeight: '700', color: colors.background },
+  proposeButtonText: { fontSize: 13, fontWeight: '700', color: colors.onAccent },
   });
 }

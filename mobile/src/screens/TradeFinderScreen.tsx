@@ -225,7 +225,7 @@ function RosterRow({
         accessibilityLabel={`${player.name ?? 'Player'}${selected ? ', selected' : ''}`}
       >
         <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-          {selected ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+          {selected ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : null}
         </View>
       </TouchableOpacity>
       <View style={styles.rosterIdentity}>
@@ -520,7 +520,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation }: 
           accessibilityLabel="Find Trades"
         >
           {searching ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.onAccent} />
           ) : (
             <AppText style={styles.searchButtonText}>Find Trades ({selectedIds.size})</AppText>
           )}
@@ -688,7 +688,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       ...shadows.resting,
     },
-    searchButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    searchButtonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
     error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.sm },
   });
 }

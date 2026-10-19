@@ -205,7 +205,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
             disabled={grade == null || submitting}
           >
             {submitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.onAccent} />
             ) : (
               <AppText style={styles.submitButtonText}>{hadReport ? 'Update Grade' : 'Submit Grade'}</AppText>
             )}
@@ -285,7 +285,7 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.accent,
     },
     submitButtonDisabled: { opacity: 0.5 },
-    submitButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    submitButtonText: { color: colors.onAccent, fontSize: 14, fontWeight: '700' },
     removeButton: { marginTop: spacing.sm, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.sm },
     removeButtonText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
   });

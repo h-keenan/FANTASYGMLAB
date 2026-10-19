@@ -23,7 +23,9 @@ import {
   purchasePackage,
   restorePurchases,
 } from '../lib/revenuecat';
+import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { freeTrialFor } from '../lib/freeTrial';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -117,7 +119,24 @@ function packagePriceSuffix(type: PurchasesPackage['packageType']): string {
   }
 }
 
-export default function PaywallScreen({ navigation }: Props) {
+export default function PaywallScreen({ navigation, route }: Props) {
+  // Set when this is the first-run trial offer right after the intro
+  // carousel (web-next's OnboardingPaywall step). Leaving it, by Skip,
+  // Close, or after a purchase, finishes onboarding; RootNavigator then
+  // remounts its stack onto Home, so no goBack is needed in that mode.
+  const fromOnboarding = route.params?.fromOnboarding;
+  const { completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
+  const exit = useCallback(() => {
+    if (fromOnboarding === 'getStarted') {
+      completeOnboardingViaGetStarted();
+      return;
+    }
+    if (fromOnboarding === 'skip') {
+      completeOnboarding();
+      return;
+    }
+    navigation.goBack();
+  }, [fromOnboarding, completeOnboarding, completeOnboardingViaGetStarted, navigation]);
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -216,6 +235,9 @@ export default function PaywallScreen({ navigation }: Props) {
 
   const packages = offering?.availablePackages ?? [];
   const selected = packages.find((p) => p.identifier === selectedId) ?? null;
+  // Only promise a trial the store will actually grant for the selected
+  // package (RevenueCat introPrice / Play free phase), never a hardcoded one.
+  const trial = freeTrialFor(selected?.product);
 
   const onPurchase = async (pack: PurchasesPackage) => {
     setPurchaseError(null);
@@ -248,11 +270,11 @@ export default function PaywallScreen({ navigation }: Props) {
         <GridBackground />
         <View style={[styles.center, { paddingTop: headerHeight }]}>
           <Ionicons name="checkmark-circle" size={56} color={colors.success} style={styles.successIcon} />
-          <AppText style={styles.successTitle}>You're on GM Pro</AppText>
+          <AppText style={styles.successTitle}>You're on Pro</AppText>
           <AppText style={styles.successSubtitle}>
             It may take a moment to reflect everywhere in the app.
           </AppText>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.primaryButton} onPress={exit}>
             <AppText style={styles.primaryButtonText}>Done</AppText>
           </TouchableOpacity>
         </View>
@@ -276,12 +298,22 @@ export default function PaywallScreen({ navigation }: Props) {
         />
       }
     >
-      <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()} hitSlop={8}>
-        <AppText style={styles.closeButtonText}>Close</AppText>
+      <TouchableOpacity style={styles.closeButton} onPress={exit} hitSlop={8}>
+        <AppText style={styles.closeButtonText}>{fromOnboarding ? 'Skip' : 'Close'}</AppText>
       </TouchableOpacity>
 
-      <AppText style={styles.title}>GM Pro</AppText>
-      <AppText style={styles.subtitle}>Your price is locked in for as long as you stay subscribed.</AppText>
+      {/* Headline/subtitle match web-next: OnboardingPaywall ("Start your
+          7-day free trial" / "Full access to the GM toolkit...") when a real
+          store trial exists, otherwise the Premium page's "Unlock the full
+          GM toolkit". */}
+      <AppText style={styles.title}>
+        {trial ? `Start your ${trial.lengthLabel} free trial` : 'Unlock the full GM toolkit'}
+      </AppText>
+      <AppText style={styles.subtitle}>
+        {trial
+          ? 'Full access to the GM toolkit. Cancel anytime before it ends and you’re never charged.'
+          : 'Your price is locked in for as long as you stay subscribed.'}
+      </AppText>
 
       <SectionHeading title="What's Included" icon="checkmark-done" />
       <AppText style={styles.featuresIntro}>
@@ -417,11 +449,18 @@ export default function PaywallScreen({ navigation }: Props) {
         disabled={!selected || purchasing}
       >
         {purchasing ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.onAccent} />
         ) : (
-          <AppText style={styles.primaryButtonText}>Continue</AppText>
+          <AppText style={styles.primaryButtonText}>{trial ? 'Get Started For Free' : 'Continue'}</AppText>
         )}
       </TouchableOpacity>
+      {trial && selected ? (
+        <AppText style={styles.trialTerms}>
+          Then {selected.product.priceString}
+          {packagePriceSuffix(selected.packageType)} — cancel anytime before your trial ends and you’re never
+          charged.
+        </AppText>
+      ) : null}
 
       {/* Upgraded from a bare text link to a real bordered secondary button
           (same recipe LoginScreen's socialButton already uses: 1px border +
@@ -441,6 +480,12 @@ export default function PaywallScreen({ navigation }: Props) {
           <AppText style={styles.restoreButtonText}>Restore purchases</AppText>
         )}
       </TouchableOpacity>
+
+      {fromOnboarding ? (
+        <TouchableOpacity onPress={exit} style={styles.skipFree} hitSlop={8}>
+          <AppText style={styles.skipFreeText}>Skip for now — continue free</AppText>
+        </TouchableOpacity>
+      ) : null}
 
       <AppText style={styles.disclosure}>
         Payment is charged to your account at confirmation of purchase. Your subscription
@@ -547,7 +592,10 @@ function createStyles(colors: ThemeColors) {
     marginTop: spacing.sm,
   },
   primaryButtonDisabled: { opacity: disabledOpacity },
-  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  primaryButtonText: { color: colors.onAccent, fontSize: 16, fontWeight: '600' },
+  trialTerms: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.sm, lineHeight: 17 },
+  skipFree: { alignSelf: 'center', marginTop: spacing.lg },
+  skipFreeText: { fontSize: 13, color: colors.textSecondary, textDecorationLine: 'underline' },
   restoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
