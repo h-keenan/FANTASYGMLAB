@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { usePathname, useParams, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -58,6 +58,7 @@ export function GmOrb() {
     setDragY(0);
   }
   const { session } = useAuth();
+  const pathname = usePathname();
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
@@ -65,6 +66,14 @@ export function GmOrb() {
   const { coreLeagueDestinations, gmToolsDestinations, generalDestinations } = useNavDestinations(leagueId, leagueName);
 
   if (!session) return null;
+  // Zach, 2026-10-19: "fix the bottom orb on onboard its covering" — "/"
+  // is exclusively the signup/Sleeper-import/paywall flow (an already-
+  // onboarded signed-in user is always router.replace'd away from it to
+  // their league/Portfolio, never shown it) — a floating launcher to jump
+  // elsewhere in the app makes no sense mid-onboarding anyway, and its
+  // fixed bottom-center position was landing directly on top of the
+  // Paywall's own Subscribe button.
+  if (pathname === "/") return null;
 
   return (
     <>

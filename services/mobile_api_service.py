@@ -1005,6 +1005,13 @@ def create_billing_checkout(
     except stripe_billing.BillingConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None
     except Exception:
+        # Zach, 2026-10-19: "502 stripe?" — this previously swallowed the
+        # real exception entirely (`from None`, no logging), so a live
+        # failure had no trail to diagnose from after the fact. Logged
+        # (stdout + Sentry, if configured — see this file's own Sentry
+        # init above) without changing the generic detail returned to the
+        # caller, which still must never leak internal Stripe error text.
+        logger.exception("Stripe checkout session creation failed for user_id=%s tier=%s interval=%s", user_id, body.tier, body.interval)
         raise HTTPException(status_code=502, detail="Could not start checkout.") from None
     checkout_url = str(getattr(session, "url", "") or "")
     if not checkout_url:
