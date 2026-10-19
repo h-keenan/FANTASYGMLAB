@@ -67,17 +67,24 @@ const darkColors = {
   // backgroundElevated, 4.33:1 on surface) — legible enough to read the
   // label, dim enough to unambiguously signal "not interactive right now."
   textDisabled: '#6F7A87',
-  accent: '#00D4FF',
-  accentSoft: '#5CE4FF',
-  accentMuted: 'rgba(0,212,255,0.14)',
+  // Liquid-glass pass, 2026-10-19 (Zach + coridian_, mockup approved):
+  // matches web-next's --color-accent exactly (web-next/src/app/globals.css)
+  // — the two platforms were drifting apart (web moved to this lighter,
+  // less saturated cyan; mobile stayed on the older #00D4FF brand-sheet
+  // value). Soft/muted/badge variants recomputed from the new base the
+  // same way the old ones related to #00D4FF, so the internal contrast
+  // relationships this file's own comments document stay intact.
+  accent: '#67e8f9',
+  accentSoft: '#9FF3FC',
+  accentMuted: 'rgba(103,232,249,0.14)',
   // On-tint text/icon variant — for cyan content painted directly over an
   // `accentMuted` fill (selected segment labels, "CURRENT" nav badge, GM
   // Stance's active pill). Dark mode's plain `accent` already clears AA by
-  // a wide margin there (~9.8:1 against accentMuted-over-black), so this is
-  // an alias today; it exists so components can consistently reach for
-  // "the color for cyan text on a cyan tint" and get the light-mode-correct
-  // answer for free (see lightColors.accentOnTint, which is NOT an alias).
-  accentOnTint: '#00D4FF',
+  // a wide margin there, so this is an alias today; it exists so components
+  // can consistently reach for "the color for cyan text on a cyan tint" and
+  // get the light-mode-correct answer for free (see lightColors.accentOnTint,
+  // which is NOT an alias).
+  accentOnTint: '#67e8f9',
   danger: '#FF4D4D',
   dangerMuted: 'rgba(255,77,77,0.14)',
   success: '#22C55E',
@@ -85,8 +92,8 @@ const darkColors = {
   successMuted: 'rgba(34,197,94,0.14)',
   premium: '#FFC43D',
   premiumMuted: 'rgba(255,196,61,0.14)',
-  badgeBackground: 'rgba(0,212,255,0.14)',
-  badgeText: '#5CE4FF',
+  badgeBackground: 'rgba(103,232,249,0.14)',
+  badgeText: '#9FF3FC',
   violet: '#8B93FF',
   // Color-system audit (2026-10-03): promoted out of GmOrb.tsx's
   // debugOverlayText, which hardcoded '#00FF88' with no light-mode
@@ -135,19 +142,20 @@ const lightColors = {
   // surface): WCAG's text-contrast minimums don't apply to disabled
   // controls, and this needs to read as dimmer than textTertiary.
   textDisabled: '#6B8494',
-  accent: '#0077A3',
-  accentSoft: '#00A6CC',
-  accentMuted: 'rgba(0,119,163,0.12)',
+  // Liquid-glass pass, 2026-10-19: matches web-next's light-mode
+  // --color-accent / --color-accent-strong exactly (same source as the
+  // dark-mode accent change above) — web already had to solve the "this
+  // light cyan needs to be darkened for AA contrast" problem this file's
+  // own comments describe; reusing its exact values keeps both platforms'
+  // light themes in sync instead of maintaining two independently-tuned
+  // answers to the same contrast problem.
+  accent: '#056e7c',
+  accentSoft: '#0891a3',
+  accentMuted: 'rgba(5,110,124,0.12)',
   // On-tint text/icon variant for cyan content painted over an
-  // `accentMuted` fill or the pale `backgroundElevated` sheet surface.
-  // NOT an alias in light mode: plain `accent` (#0077A3) only reaches
-  // ~3.8-4.3:1 against an accentMuted-tinted background and 4.02:1 against
-  // `backgroundElevated` — under AA in both cases, which is exactly why
-  // several shared components' "selected"/"current" label text (segmented
-  // tabs, GM Orb's current nav row, Team Situation's active option) read as
-  // washed-out on the light theme despite dark mode looking fine with the
-  // same code. #00597A clears 5.9-6.6:1 against those same backgrounds.
-  accentOnTint: '#00597A',
+  // `accentMuted` fill or the pale `backgroundElevated` sheet surface —
+  // web-next's --color-accent-strong, its own stronger/on-tint variant.
+  accentOnTint: '#08616e',
   danger: '#D92D2D',
   dangerMuted: 'rgba(217,45,45,0.12)',
   success: '#178A43',
@@ -163,8 +171,8 @@ const lightColors = {
   // as plain text (4.81:1 / 4.42:1) without drifting the hue toward brown.
   premium: '#8A6508',
   premiumMuted: 'rgba(184,134,11,0.12)',
-  badgeBackground: 'rgba(0,119,163,0.12)',
-  badgeText: '#0077A3',
+  badgeBackground: 'rgba(5,110,124,0.12)',
+  badgeText: '#056e7c',
   violet: '#6B5FCC',
   // Color-system audit (2026-10-03): see darkColors.diagnosticText for why
   // this is its own token rather than `success`. Unlike every other pair in
@@ -346,20 +354,19 @@ export const spacing = {
  * fully-round chips/avatars/buttons). `sm`/`lg` cover the smaller and
  * larger ends (tiny inline tags; bottom sheets and modals).
  */
-// Ported verbatim from the web app's canonical geometry scale
-// (modules/design_tokens.py: --radius-sm/md/lg/control/panel are all 0 —
-// "a small intentional scale (square / control / panel / pill / segment)").
-// Hard edges are a deliberate brand choice there, not an oversight — only
-// genuine segmented filter chips get a true pill (--radius-segment: 999px).
-// Apple-style elevation/motion (see `shadows`/`motion` below) comes from
-// shadow depth and spring animation, not rounded corners.
+// Liquid-glass pass, 2026-10-19 (Zach + coridian_, mockup approved):
+// matches web-next's new --radius-sm/md/lg/control/panel scale
+// (web-next/src/app/globals.css) — both platforms moved off the flat/
+// cornerless identity together, toward rounded, layered-glass surfaces.
+// `tile` (card corners) maps to web's --radius-panel; `input` maps to
+// --radius-control; `sm`/`md`/`lg` follow the same 10/14/20 scale directly.
 export const radii = {
-  sm: 0,
-  md: 0,
-  lg: 0,
+  sm: 10,
+  md: 14,
+  lg: 20,
   pill: 999,
-  tile: 0,
-  input: 0,
+  tile: 20,
+  input: 14,
 };
 
 export const typography = {
